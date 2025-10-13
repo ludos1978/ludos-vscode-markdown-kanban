@@ -56,6 +56,7 @@ export interface UnifiedExportOptions {
     autoExportOnSave?: boolean;  // If true, automatically re-export when file is saved
     openAfterExport?: boolean;   // If true, open exported file in browser/viewer after export
     marpTheme?: string;          // Marp theme (for Marp exports)
+    marpEnginePath?: string;     // Custom Marp engine path
     marpBrowser?: string;        // Browser for Marp exports (chrome, edge, firefox, auto)
     marpPreview?: boolean;       // If true, add --preview flag for live preview
 }
@@ -1848,10 +1849,11 @@ export class ExportService {
         options: UnifiedExportOptions & {
             marpTheme?: string;
             marpEnginePath?: string;
+            skipMarpCli?: boolean; // If true, only generate markdown without running Marp CLI
         } & {
             format: string; // Allow marp-prefixed formats
         }
-    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
+    ): Promise<{ success: boolean; message: string; exportedPath?: string; tempFilePath?: string }> {
         try {
             const sourcePath = sourceDocument.uri.fsPath;
 
@@ -1958,6 +1960,22 @@ export class ExportService {
                 fs.mkdirSync(options.targetFolder, { recursive: true });
             }
 
+            // Check if we should skip Marp CLI and just output markdown
+            if (options.skipMarpCli) {
+                // For markdown-only export, just write the markdown file
+                outputPath = path.join(options.targetFolder, `${targetBasename}.md`);
+                
+                fs.writeFileSync(outputPath, marpMarkdown, 'utf-8');
+                
+                console.log(`[kanban.exportService.exportWithMarp] Successfully wrote Marp markdown to: ${outputPath}`);
+
+                return {
+                    success: true,
+                    message: `Successfully exported Marp markdown to ${outputPath}`,
+                    exportedPath: outputPath
+                };
+            }
+
             // Extract Marp output format from options.format (e.g., "marp-pdf" -> "pdf")
             let marpOutputFormat: string;
             if (options.format.startsWith('marp-')) {
@@ -1993,7 +2011,8 @@ export class ExportService {
                 outputPath,
                 enginePath: options.marpEnginePath,
                 theme: options.marpTheme,
-                allowLocalFiles: true
+                allowLocalFiles: true,
+                keepTempFile: options.autoExportOnSave || false // Keep temp file for auto-export
             };
 
             // Add browser option if specified
@@ -2011,12 +2030,13 @@ export class ExportService {
                 exportOptions.additionalArgs = additionalArgs;
             }
 
-            await MarpExportService.export(marpMarkdown, exportOptions);
+            const exportResult = await MarpExportService.export(marpMarkdown, exportOptions);
 
             return {
                 success: true,
                 message: `Successfully exported to ${outputFormat.toUpperCase()}: ${outputPath}`,
-                exportedPath: outputPath
+                exportedPath: outputPath,
+                tempFilePath: exportResult?.tempFilePath // Include temp file path for auto-export
             };
 
         } catch (error) {

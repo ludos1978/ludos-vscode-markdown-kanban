@@ -602,6 +602,8 @@ export class MessageHandler {
                 }
                 break;
 
+            
+
             case 'getMarpThemes':
                 await this.handleGetMarpThemes();
                 break;
@@ -2688,6 +2690,57 @@ export class MessageHandler {
         }
     }
 
+    
+
+    /**
+     * Export only Marp markdown (without running Marp CLI)
+     */
+    private async exportMarpMarkdownOnly(document: vscode.TextDocument, options: any): Promise<{ success: boolean; message: string; exportedPath?: string }> {
+        try {
+            const { ExportService } = await import('./exportService');
+            
+            // Create a modified options object that forces markdown-only export
+            // Only include the essential options, exclude auto-export specific ones
+            const modifiedOptions: any = {
+                scope: options.scope || 'full',
+                format: 'marp-markdown' as any,  // Type assertion to bypass strict typing
+                tagVisibility: options.tagVisibility || 'none',
+                targetFolder: options.targetFolder,
+                selection: options.selection || {},
+                marpTheme: options.marpTheme,
+                skipMarpCli: true,  // Add a flag to skip Marp CLI execution
+                // Explicitly exclude options that might create temp files
+                autoExportOnSave: false,
+                openAfterExport: false,
+                packAssets: false,
+                mergeIncludes: false
+            };
+
+            // Call exportWithMarp with the modified options
+            const result = await ExportService.exportWithMarp(document, modifiedOptions);
+            
+            if (result.success) {
+                return {
+                    success: true,
+                    message: `Successfully exported Marp markdown to ${result.exportedPath}`,
+                    exportedPath: result.exportedPath
+                };
+            } else {
+                return {
+                    success: false,
+                    message: result.message || 'Marp markdown export failed'
+                };
+            }
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.exportMarpMarkdownOnly] Error:', error);
+            return {
+                success: false,
+                message: `Marp markdown export failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
+    }
+
     /**
      * Handle Marp export
      */
@@ -2986,19 +3039,19 @@ export class MessageHandler {
                             const format = this._autoExportSettings.format;
 
                             if (format && format.startsWith('marp')) {
-                                // For Marp HTML exports with preview, don't re-launch Marp since it has its own file change detection
-                                if (format === 'marp-html' && this._autoExportSettings.marpPreview) {
-                                    console.log('[kanban.messageHandler.autoExport] Skipping Marp HTML re-export - Marp handles file changes automatically');
-                                    return;
-                                }
+                                // Only do kanban-to-markdown export, not the Marp command
+                                console.log('[kanban.messageHandler.autoExport] Exporting kanban to markdown for Marp format:', format);
                                 
-                                // For other Marp formats (PDF, PPTX) or HTML without preview, re-export
-                                const result = await ExportService.exportWithMarp(savedDoc, this._autoExportSettings);
-
-                                // Open in browser if requested
-                                if (result.success && this._autoExportSettings.openAfterExport && result.exportedPath) {
-                                    const uri = vscode.Uri.file(result.exportedPath);
-                                    await vscode.env.openExternal(uri);
+                                try {
+                                    const result = await this.exportMarpMarkdownOnly(savedDoc, this._autoExportSettings);
+                                    
+                                    if (result.success) {
+                                        console.log('[kanban.messageHandler.autoExport] Markdown export completed:', result.exportedPath);
+                                    } else {
+                                        console.error('[kanban.messageHandler.autoExport] Markdown export failed:', result.message);
+                                    }
+                                } catch (error) {
+                                    console.error('[kanban.messageHandler.autoExport] Markdown export error:', error);
                                 }
                             } else {
                                 const result = await ExportService.exportUnifiedV2(savedDoc, this._autoExportSettings);

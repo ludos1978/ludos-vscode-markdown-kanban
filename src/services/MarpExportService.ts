@@ -19,6 +19,8 @@ export interface MarpExportOptions {
     allowLocalFiles?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
+    /** Keep the temporary markdown file (for auto-export/live updates) */
+    keepTempFile?: boolean;
 }
 
 /**
@@ -31,9 +33,9 @@ export class MarpExportService {
      * Export markdown content using Marp CLI
      * @param markdownContent - The markdown content to export
      * @param options - Export options
-     * @returns Promise that resolves when export is complete
+     * @returns Promise that resolves when export is complete, optionally returning temp file path
      */
-    static async export(markdownContent: string, options: MarpExportOptions): Promise<void> {
+    static async export(markdownContent: string, options: MarpExportOptions): Promise<{ tempFilePath?: string } | void> {
         // Validate Marp CLI availability
         const isAvailable = await this.isMarpCliAvailable();
         if (!isAvailable) {
@@ -87,11 +89,18 @@ export class MarpExportService {
             }
 
             console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
+            
+            // Return temp file path for auto-export scenarios
+            if (options.keepTempFile) {
+                console.log(`[kanban.MarpExportService] Keeping temp file for auto-export: ${tempMdPath}`);
+                return { tempFilePath: tempMdPath };
+            }
         } finally {
-            // Cleanup temp file
-            if (fs.existsSync(tempMdPath)) {
+            // Cleanup temp file only if not keeping it
+            if (!options.keepTempFile && fs.existsSync(tempMdPath)) {
                 try {
                     fs.unlinkSync(tempMdPath);
+                    console.log(`[kanban.MarpExportService] Deleted temp file: ${tempMdPath}`);
                 } catch (err) {
                     console.warn(`[kanban.MarpExportService] Failed to delete temp file: ${tempMdPath}`, err);
                 }
@@ -270,7 +279,7 @@ export class MarpExportService {
         outputPath: string,
         enginePath?: string
     ): Promise<void> {
-        return this.export(markdownContent, {
+        await this.export(markdownContent, {
             format: 'pdf',
             outputPath,
             enginePath
@@ -289,7 +298,7 @@ export class MarpExportService {
         outputPath: string,
         enginePath?: string
     ): Promise<void> {
-        return this.export(markdownContent, {
+        await this.export(markdownContent, {
             format: 'pptx',
             outputPath,
             enginePath
@@ -308,7 +317,7 @@ export class MarpExportService {
         outputPath: string,
         enginePath?: string
     ): Promise<void> {
-        return this.export(markdownContent, {
+        await this.export(markdownContent, {
             format: 'html',
             outputPath,
             enginePath
