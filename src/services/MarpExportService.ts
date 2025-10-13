@@ -44,6 +44,9 @@ export class MarpExportService {
         const tempDir = path.dirname(options.outputPath);
         const tempMdPath = path.join(tempDir, '.temp-marp-export.md');
 
+        // Ensure required build files exist in dist directory
+        await this.ensureMarpBuildFiles();
+
         try {
             // Write markdown to temp file
             fs.writeFileSync(tempMdPath, markdownContent, 'utf-8');
@@ -57,8 +60,27 @@ export class MarpExportService {
             console.log(`[kanban.MarpExportService] Export options:`, JSON.stringify(options, null, 2));
             console.log(`[kanban.MarpExportService] Marp CLI command: npx @marp-team/marp-cli ${args.join(' ')}`);
 
-            // Execute Marp CLI
-            const exitCode = await marpCli(args);
+            // Execute Marp CLI with proper working directory
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            let exitCode: number;
+            
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                // Change to workspace root directory for Marp CLI execution
+                const originalCwd = process.cwd();
+                const workspaceRoot = workspaceFolders[0].uri.fsPath;
+                
+                try {
+                    process.chdir(workspaceRoot);
+                    console.log(`[kanban.MarpExportService] Changed working directory to: ${workspaceRoot}`);
+                    exitCode = await marpCli(args);
+                } finally {
+                    // Restore original working directory
+                    process.chdir(originalCwd);
+                    console.log(`[kanban.MarpExportService] Restored working directory to: ${originalCwd}`);
+                }
+            } else {
+                exitCode = await marpCli(args);
+            }
 
             if (exitCode !== 0) {
                 throw new Error(`Marp export failed with exit code ${exitCode}`);
@@ -291,6 +313,37 @@ export class MarpExportService {
             outputPath,
             enginePath
         });
+    }
+
+    /**
+     * Ensure required build files exist in dist directory for Marp CLI
+     */
+    private static async ensureMarpBuildFiles(): Promise<void> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            return;
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const distDir = path.join(workspaceRoot, 'dist');
+        
+        // Files that Marp CLI expects
+        const requiredFiles = ['esbuild.js', 'watch.js'];
+        
+        for (const file of requiredFiles) {
+            const distFilePath = path.join(distDir, file);
+            const srcFilePath = path.join(workspaceRoot, file);
+            
+            if (!fs.existsSync(distFilePath) && fs.existsSync(srcFilePath)) {
+                try {
+                    // Copy file from root to dist
+                    fs.copyFileSync(srcFilePath, distFilePath);
+                    console.log(`[kanban.MarpExportService] Copied ${file} to dist directory`);
+                } catch (err) {
+                    console.warn(`[kanban.MarpExportService] Failed to copy ${file} to dist:`, err);
+                }
+            }
+        }
     }
 
     /**

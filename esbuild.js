@@ -30,6 +30,28 @@ const copyStaticFilesPlugin = {
 				fs.mkdirSync('dist', { recursive: true });
 			}
 
+			// Copy build scripts required by Marp CLI
+			const marpRequiredFiles = ['esbuild.js', 'watch.js'];
+			marpRequiredFiles.forEach(file => {
+				const srcFile = path.join(process.cwd(), file);
+				const distFile = path.join('dist', file);
+				if (fs.existsSync(srcFile)) {
+					fs.copyFileSync(srcFile, distFile);
+					console.log(`Copied ${file} to dist/ for Marp CLI`);
+				}
+			});
+
+			// Create watch.js placeholder if it doesn't exist
+			const watchJsPath = path.join('dist', 'watch.js');
+			if (!fs.existsSync(watchJsPath)) {
+				const watchJsContent = `#!/usr/bin/env node
+// Watch script placeholder for Marp CLI
+console.log('Marp watch script placeholder');
+`;
+				fs.writeFileSync(watchJsPath, watchJsContent);
+				console.log('Created watch.js placeholder for Marp CLI');
+			}
+
 			const srcHtmlDir = 'src/html';
 			const distHtmlDir = 'dist/src/html';
 
