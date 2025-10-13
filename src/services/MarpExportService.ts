@@ -123,10 +123,35 @@ export class MarpExportService {
             console.log(`[kanban.MarpExportService] Final engine path: ${finalEnginePath}`);
             console.log(`[kanban.MarpExportService] Updated args:`, updatedArgs);
 
+            let exitCode = 0;
             try {
-                // Execute Marp CLI with updated args
+                // Execute Marp CLI with updated args in a clean environment
                 console.log(`[kanban.MarpExportService] Executing Marp CLI with args:`, updatedArgs);
-                const exitCode = await marpCli(updatedArgs);
+                
+                // Set environment variables to ensure clean execution
+                const originalEnv = { ...process.env };
+                const originalCwd = process.cwd();
+                
+                // Ensure we're in the workspace root, not dist
+                if (process.cwd().includes('/dist')) {
+                    process.chdir(workspaceRoot);
+                    console.log(`[kanban.MarpExportService] Forced working directory change from dist to: ${workspaceRoot}`);
+                }
+                
+                process.env.NODE_ENV = 'production';
+                process.env.PWD = workspaceRoot; // Force PWD environment variable
+                
+                try {
+                    exitCode = await marpCli(updatedArgs);
+                } finally {
+                    // Restore environment and working directory
+                    process.env = originalEnv;
+                    if (process.cwd() !== originalCwd) {
+                        process.chdir(originalCwd);
+                        console.log(`[kanban.MarpExportService] Restored working directory to: ${originalCwd}`);
+                    }
+                }
+                
                 console.log(`[kanban.MarpExportService] Marp CLI exit code: ${exitCode}`);
                 
                 if (exitCode !== 0) {
@@ -158,28 +183,27 @@ export class MarpExportService {
                 console.log(`[kanban.MarpExportService] Restored working directory to: ${originalWorkingDir}`);
             }
 
+            // Clean up workspace temp file
+            if (!keepTempFiles && fs.existsSync(workspaceTempPath)) {
+                try {
+                    fs.unlinkSync(workspaceTempPath);
+                    console.log(`[kanban.MarpExportService] Workspace temp file cleaned up: ${workspaceTempPath}`);
+                } catch (err) {
+                    console.warn(`[kanban.MarpExportService] Failed to delete workspace temp file: ${workspaceTempPath}`, err);
+                }
+            }
             
             if (keepTempFiles) {
                 console.log(`[kanban.MarpExportService] Temp file kept for debugging: ${tempMdPath}`);
             }
         } finally {
-            // Cleanup temp files only if not configured to keep it
-            if (!keepTempFiles) {
-                if (fs.existsSync(tempMdPath)) {
-                    try {
-                        fs.unlinkSync(tempMdPath);
-                        console.log(`[kanban.MarpExportService] Temp file cleaned up: ${tempMdPath}`);
-                    } catch (err) {
-                        console.warn(`[kanban.MarpExportService] Failed to delete temp file: ${tempMdPath}`, err);
-                    }
-                }
-                if (fs.existsSync(workspaceTempPath)) {
-                    try {
-                        fs.unlinkSync(workspaceTempPath);
-                        console.log(`[kanban.MarpExportService] Workspace temp file cleaned up: ${workspaceTempPath}`);
-                    } catch (err) {
-                        console.warn(`[kanban.MarpExportService] Failed to delete workspace temp file: ${workspaceTempPath}`, err);
-                    }
+            // Cleanup original temp file only if not configured to keep it
+            if (!keepTempFiles && fs.existsSync(tempMdPath)) {
+                try {
+                    fs.unlinkSync(tempMdPath);
+                    console.log(`[kanban.MarpExportService] Temp file cleaned up: ${tempMdPath}`);
+                } catch (err) {
+                    console.warn(`[kanban.MarpExportService] Failed to delete temp file: ${tempMdPath}`, err);
                 }
             }
         }
