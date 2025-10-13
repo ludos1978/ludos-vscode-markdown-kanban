@@ -7,6 +7,8 @@ import { ConfigurationService } from '../configurationService';
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
 
 export interface MarpExportOptions {
+    /** Input markdown file path */
+    inputFilePath: string;
     /** Output format */
     format: MarpOutputFormat;
     /** Output file path */
@@ -19,7 +21,7 @@ export interface MarpExportOptions {
     allowLocalFiles?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
-    /** Keep the temporary markdown file (for auto-export/live updates) */
+    /** Keep the markdown file (for auto-export/live updates) */
     keepTempFile?: boolean;
 }
 
@@ -30,31 +32,23 @@ export class MarpExportService {
     private static readonly DEFAULT_ENGINE_PATH = './marp-engine/engine.js';
 
     /**
-     * Export markdown content using Marp CLI
-     * @param markdownContent - The markdown content to export
+     * Export markdown file using Marp CLI
      * @param options - Export options
-     * @returns Promise that resolves when export is complete, optionally returning temp file path
+     * @returns Promise that resolves when export is complete, optionally returning file path
      */
-    static async export(markdownContent: string, options: MarpExportOptions): Promise<{ tempFilePath?: string } | void> {
+    static async export(options: MarpExportOptions): Promise<{ tempFilePath?: string } | void> {
         // Validate Marp CLI availability
         const isAvailable = await this.isMarpCliAvailable();
         if (!isAvailable) {
             throw new Error('Marp CLI is not available. Please ensure @marp-team/marp-cli is installed.');
         }
 
-        // Create temporary markdown file
-        const tempDir = path.dirname(options.outputPath);
-        const tempMdPath = path.join(tempDir, '.temp-marp-export.md');
-
         // Ensure required build files exist in dist directory
         await this.ensureMarpBuildFiles();
 
         try {
-            // Write markdown to temp file
-            fs.writeFileSync(tempMdPath, markdownContent, 'utf-8');
-
-            // Build Marp CLI arguments
-            const args = this.buildMarpCliArgs(tempMdPath, options);
+            // Build Marp CLI arguments using input file path
+            const args = this.buildMarpCliArgs(options.inputFilePath, options);
 
             // Log for debugging
             console.log(`[kanban.MarpExportService] Exporting with Marp CLI: ${args.join(' ')}`);
@@ -90,19 +84,19 @@ export class MarpExportService {
 
             console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
             
-            // Return temp file path for auto-export scenarios
+            // Return input file path for auto-export scenarios
             if (options.keepTempFile) {
-                console.log(`[kanban.MarpExportService] Keeping temp file for auto-export: ${tempMdPath}`);
-                return { tempFilePath: tempMdPath };
+                console.log(`[kanban.MarpExportService] Keeping markdown file for auto-export: ${options.inputFilePath}`);
+                return { tempFilePath: options.inputFilePath };
             }
         } finally {
-            // Cleanup temp file only if not keeping it
-            if (!options.keepTempFile && fs.existsSync(tempMdPath)) {
+            // Cleanup input file only if not keeping it
+            if (!options.keepTempFile && fs.existsSync(options.inputFilePath)) {
                 try {
-                    fs.unlinkSync(tempMdPath);
-                    console.log(`[kanban.MarpExportService] Deleted temp file: ${tempMdPath}`);
+                    fs.unlinkSync(options.inputFilePath);
+                    console.log(`[kanban.MarpExportService] Deleted markdown file: ${options.inputFilePath}`);
                 } catch (err) {
-                    console.warn(`[kanban.MarpExportService] Failed to delete temp file: ${tempMdPath}`, err);
+                    console.warn(`[kanban.MarpExportService] Failed to delete markdown file: ${options.inputFilePath}`, err);
                 }
             }
         }
@@ -274,31 +268,35 @@ export class MarpExportService {
      * @param enginePath - Optional custom engine path
      * @returns Promise that resolves when export is complete
      */
-    static async exportToPdf(
-        markdownContent: string,
-        outputPath: string,
-        enginePath?: string
-    ): Promise<void> {
-        await this.export(markdownContent, {
-            format: 'pdf',
-            outputPath,
-            enginePath
-        });
+    static async testPdfExport(inputFilePath: string, outputPath: string, enginePath?: string): Promise<void> {
+        try {
+            await this.export({
+                inputFilePath,
+                format: 'pdf',
+                outputPath,
+                enginePath
+            });
+            console.log('[kanban.MarpExportService] PDF test export successful');
+        } catch (error) {
+            console.error('[kanban.MarpExportService] PDF test export failed:', error);
+            throw error;
+        }
     }
 
     /**
      * Export to PPTX using Marp
-     * @param markdownContent - Markdown content
+     * @param inputFilePath - Input markdown file path
      * @param outputPath - Output PPTX path
      * @param enginePath - Optional custom engine path
      * @returns Promise that resolves when export is complete
      */
     static async exportToPptx(
-        markdownContent: string,
+        inputFilePath: string,
         outputPath: string,
         enginePath?: string
     ): Promise<void> {
-        await this.export(markdownContent, {
+        await this.export({
+            inputFilePath,
             format: 'pptx',
             outputPath,
             enginePath
@@ -307,17 +305,18 @@ export class MarpExportService {
 
     /**
      * Export to HTML using Marp
-     * @param markdownContent - Markdown content
+     * @param inputFilePath - Input markdown file path
      * @param outputPath - Output HTML path
      * @param enginePath - Optional custom engine path
      * @returns Promise that resolves when export is complete
      */
     static async exportToHtml(
-        markdownContent: string,
+        inputFilePath: string,
         outputPath: string,
         enginePath?: string
     ): Promise<void> {
-        await this.export(markdownContent, {
+        await this.export({
+            inputFilePath,
             format: 'html',
             outputPath,
             enginePath

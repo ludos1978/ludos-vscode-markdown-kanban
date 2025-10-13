@@ -2692,54 +2692,7 @@ export class MessageHandler {
 
     
 
-    /**
-     * Export only Marp markdown (without running Marp CLI)
-     */
-    private async exportMarpMarkdownOnly(document: vscode.TextDocument, options: any): Promise<{ success: boolean; message: string; exportedPath?: string }> {
-        try {
-            const { ExportService } = await import('./exportService');
-            
-            // Create a modified options object that forces markdown-only export
-            // Only include the essential options, exclude auto-export specific ones
-            const modifiedOptions: any = {
-                scope: options.scope || 'full',
-                format: 'marp-markdown' as any,  // Type assertion to bypass strict typing
-                tagVisibility: options.tagVisibility || 'none',
-                targetFolder: options.targetFolder,
-                selection: options.selection || {},
-                marpTheme: options.marpTheme,
-                skipMarpCli: true,  // Add a flag to skip Marp CLI execution
-                // Explicitly exclude options that might create temp files
-                autoExportOnSave: false,
-                openAfterExport: false,
-                packAssets: false,
-                mergeIncludes: false
-            };
-
-            // Call exportWithMarp with the modified options
-            const result = await ExportService.exportWithMarp(document, modifiedOptions);
-            
-            if (result.success) {
-                return {
-                    success: true,
-                    message: `Successfully exported Marp markdown to ${result.exportedPath}`,
-                    exportedPath: result.exportedPath
-                };
-            } else {
-                return {
-                    success: false,
-                    message: result.message || 'Marp markdown export failed'
-                };
-            }
-
-        } catch (error) {
-            console.error('[kanban.messageHandler.exportMarpMarkdownOnly] Error:', error);
-            return {
-                success: false,
-                message: `Marp markdown export failed: ${error instanceof Error ? error.message : String(error)}`
-            };
-        }
-    }
+    
 
     /**
      * Handle Marp export
@@ -3035,32 +2988,14 @@ export class MessageHandler {
                         console.log('[kanban.messageHandler.autoExport] File saved, triggering export...');
 
                         try {
-                            // Execute export with stored settings
-                            const format = this._autoExportSettings.format;
+                            // Execute export with stored settings - always use standard export
+                            console.log('[kanban.messageHandler.autoExport] Using standard export to update markdown');
+                            const result = await ExportService.exportUnifiedV2(savedDoc, this._autoExportSettings);
 
-                            if (format && format.startsWith('marp')) {
-                                // Only do kanban-to-markdown export, not the Marp command
-                                console.log('[kanban.messageHandler.autoExport] Exporting kanban to markdown for Marp format:', format);
-                                
-                                try {
-                                    const result = await this.exportMarpMarkdownOnly(savedDoc, this._autoExportSettings);
-                                    
-                                    if (result.success) {
-                                        console.log('[kanban.messageHandler.autoExport] Markdown export completed:', result.exportedPath);
-                                    } else {
-                                        console.error('[kanban.messageHandler.autoExport] Markdown export failed:', result.message);
-                                    }
-                                } catch (error) {
-                                    console.error('[kanban.messageHandler.autoExport] Markdown export error:', error);
-                                }
-                            } else {
-                                const result = await ExportService.exportUnifiedV2(savedDoc, this._autoExportSettings);
-
-                                // Open in browser if requested
-                                if (result.success && this._autoExportSettings.openAfterExport && result.exportedPath) {
-                                    const uri = vscode.Uri.file(result.exportedPath);
-                                    await vscode.env.openExternal(uri);
-                                }
+                            // Open in browser if requested
+                            if (result.success && this._autoExportSettings.openAfterExport && result.exportedPath) {
+                                const uri = vscode.Uri.file(result.exportedPath);
+                                await vscode.env.openExternal(uri);
                             }
 
                             console.log('[kanban.messageHandler.autoExport] Auto-export completed');

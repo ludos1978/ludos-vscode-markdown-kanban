@@ -1667,11 +1667,8 @@ export class ExportService {
         try {
             const sourcePath = sourceDocument.uri.fsPath;
 
-            // Read source content
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source file not found: ${sourcePath}`);
-            }
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
+            // Use document content (more up-to-date than file system)
+            const fullContent = sourceDocument.getText();
 
             // Step 1: Extract content based on scope (reuse existing extraction methods)
             let content: string | null = null;
@@ -1722,7 +1719,7 @@ export class ExportService {
                 tagVisibility: options.tagVisibility
             });
 
-            // Step 3: For copy operations (no pack), return processed content
+            // Step 3: For copy operations (no pack), write directly to file
             if (!options.packAssets || !options.targetFolder) {
                 // Convert format if needed using ContentPipelineService
                 const formatStrategy: FormatStrategy = options.format === 'presentation' ? 'presentation' : 'keep';
@@ -1744,10 +1741,13 @@ export class ExportService {
                     processedContent = this.ensureYamlFrontmatter(processedContent);
                 }
 
+                // Write directly to the original file path
+                fs.writeFileSync(sourcePath, processedContent, 'utf8');
+
                 return {
                     success: true,
-                    message: 'Content generated successfully',
-                    content: processedContent
+                    message: 'File updated successfully',
+                    exportedPath: sourcePath
                 };
             }
 
@@ -1777,7 +1777,35 @@ export class ExportService {
                 }
             }
 
-            const targetBasename = `${sourceBasename}${scopeSuffix}`;
+            // Use original filename for full scope, otherwise add scope suffix
+            let targetFilename: string;
+            if (options.scope === 'full') {
+                // Use original filename for full scope
+                targetFilename = `${sourceBasename}.md`;
+            } else {
+                // Add scope suffix for partial exports
+                let scopeSuffix = '';
+                const parts: string[] = [];
+
+                if (options.selection.rowNumber !== undefined) {
+                    parts.push(`row${options.selection.rowNumber}`);
+                }
+                if (options.selection.stackIndex !== undefined) {
+                    parts.push(`stack${options.selection.stackIndex}`);
+                }
+                if (options.selection.columnIndex !== undefined) {
+                    parts.push(`col${options.selection.columnIndex}`);
+                }
+
+                if (parts.length === 0) {
+                    scopeSuffix = `-${options.scope}`;
+                } else {
+                    scopeSuffix = `-${parts.join('-')}`;
+                }
+                
+                targetFilename = `${sourceBasename}${scopeSuffix}.md`;
+            }
+            
             const targetFolder = options.targetFolder || this.generateDefaultExportFolder(sourcePath);
 
             // Step 5: Build OperationOptions for ContentPipelineService
@@ -1788,7 +1816,7 @@ export class ExportService {
                 .operation('export')
                 .source(sourcePath)
                 .targetDir(targetFolder)
-                .targetFilename(`${targetBasename}.md`)
+                .targetFilename(targetFilename)
                 .format(formatStrategy)
                 .scope(options.scope as any)
                 .includes({
@@ -1823,10 +1851,32 @@ export class ExportService {
 
             const successMessage = `Export completed! ${includeCount} includes, ${assetCount} assets included. Time: ${result.executionTime}ms`;
 
+            // Step 8: Process Marp export if needed
+            let finalExportedPath = mainFile?.path;
+            if (options.format && options.format.startsWith('marp') && mainFile?.path) {
+                console.log(`[kanban.exportService.exportUnifiedV2] Processing Marp export for format: ${options.format}`);
+                
+                const marpResult = await this.processMarpExport(mainFile.path, {
+                    format: options.format,
+                    marpTheme: (options as any).marpTheme,
+                    marpEnginePath: (options as any).marpEnginePath,
+                    marpBrowser: (options as any).marpBrowser,
+                    marpPreview: (options as any).marpPreview
+                });
+                
+                if (marpResult.success) {
+                    finalExportedPath = marpResult.exportedPath;
+                    console.log(`[kanban.exportService.exportUnifiedV2] Marp processing completed: ${marpResult.message}`);
+                } else {
+                    console.error(`[kanban.exportService.exportUnifiedV2] Marp processing failed: ${marpResult.message}`);
+                    // Continue with the original export, don't fail completely
+                }
+            }
+
             return {
                 success: true,
                 message: successMessage,
-                exportedPath: mainFile?.path
+                exportedPath: finalExportedPath
             };
 
         } catch (error) {
@@ -1834,6 +1884,181 @@ export class ExportService {
             return {
                 success: false,
                 message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
+    }
+
+    /**
+     * Process Marp export as a post-processor
+     * Takes an existing markdown file and processes it with Marp CLI
+     */
+    public static async processMarpExport(
+        markdownFilePath: string,
+        options: {
+            format: string; // marp-pdf, marp-pptx, marp-html, marp-markdown
+            marpTheme?: string;
+            marpEnginePath?: string;
+            marpBrowser?: string;
+            marpPreview?: boolean;
+        }
+    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
+        try {
+            if (!fs.existsSync(markdownFilePath)) {
+                throw new Error(`Markdown file not found: ${markdownFilePath}`);
+            }
+
+            // For marp-markdown format, just add Marp directives
+            if (options.format === 'marp-markdown') {
+                const content = fs.readFileSync(markdownFilePath, 'utf8');
+                
+                // Convert to presentation format first
+                const { FormatConverter } = require('./services/FormatConverter');
+                const processedContent = FormatConverter.convert(content, 'presentation');
+                
+                // Add Marp directives
+                const { MarpConverter } = require('./services/MarpConverter');
+                const marpOptions = {
+                    theme: options.marpTheme,
+                    tagVisibility: 'none',
+                    preserveYaml: true
+                };
+                const marpMarkdown = MarpConverter.addMarpDirectives(processedContent, marpOptions);
+                
+                // Write back to the same file
+                fs.writeFileSync(markdownFilePath, marpMarkdown, 'utf8');
+                
+                return {
+                    success: true,
+                    message: `Successfully added Marp directives to ${markdownFilePath}`,
+                    exportedPath: markdownFilePath
+                };
+            }
+
+            // For other Marp formats, use Marp CLI directly
+            // Determine output format
+            let outputFormat: string;
+            let outputPath: string;
+            
+            if (options.format.startsWith('marp-')) {
+                outputFormat = options.format.substring(5); // Remove "marp-" prefix
+            } else {
+                throw new Error(`Invalid Marp export format: ${options.format}`);
+            }
+
+            // Generate output path
+            const path = require('path');
+            const parsedPath = path.parse(markdownFilePath);
+            
+            switch (outputFormat) {
+                case 'pdf':
+                    outputPath = path.join(parsedPath.dir, `${parsedPath.name}.pdf`);
+                    break;
+                case 'pptx':
+                    outputPath = path.join(parsedPath.dir, `${parsedPath.name}.pptx`);
+                    break;
+                case 'html':
+                    outputPath = path.join(parsedPath.dir, `${parsedPath.name}.html`);
+                    break;
+                default:
+                    throw new Error(`Unsupported Marp export format: ${outputFormat}`);
+            }
+
+            // Read markdown content
+            const content = fs.readFileSync(markdownFilePath, 'utf8');
+            
+            // Convert to presentation format and add Marp directives
+            const { FormatConverter } = require('./services/FormatConverter');
+            const { MarpConverter } = require('./services/MarpConverter');
+            
+            const processedContent = FormatConverter.convert(content, 'presentation');
+            const marpOptions = {
+                theme: options.marpTheme,
+                tagVisibility: 'none',
+                preserveYaml: true
+            };
+            const marpMarkdown = MarpConverter.addMarpDirectives(processedContent, marpOptions);
+
+            // Write the Marp-processed content back to the original file
+            fs.writeFileSync(markdownFilePath, marpMarkdown, 'utf8');
+
+            // Call Marp CLI directly on the file
+            const { spawn } = require('child_process');
+            const vscode = require('vscode');
+            
+            // Build Marp CLI arguments
+            const args = [
+                markdownFilePath,
+                '--' + outputFormat,
+                '-o', outputPath
+            ];
+
+            // Add theme if specified
+            if (options.marpTheme) {
+                args.push('--theme', options.marpTheme);
+            }
+
+            // Add browser option if specified
+            if (options.marpBrowser && options.marpBrowser !== 'auto') {
+                args.push('--browser', options.marpBrowser);
+            }
+
+            // Add preview option if specified
+            if (options.marpPreview) {
+                args.push('--preview');
+            }
+
+            // Add watch option for auto-reload on changes
+            args.push('--watch');
+
+            // Add allow local files
+            args.push('--allow-local-files');
+
+            console.log(`[kanban.exportService.processMarpExport] Running Marp CLI: npx @marp-team/marp-cli ${args.join(' ')}`);
+
+            // Execute Marp CLI
+            await new Promise<void>((resolve, reject) => {
+                const marpCli = spawn('npx', ['@marp-team/marp-cli', ...args], {
+                    cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd(),
+                    stdio: 'pipe'
+                });
+
+                let stdout = '';
+                let stderr = '';
+
+                marpCli.stdout?.on('data', (data: Buffer) => {
+                    stdout += data.toString();
+                });
+
+                marpCli.stderr?.on('data', (data: Buffer) => {
+                    stderr += data.toString();
+                });
+
+                marpCli.on('close', (code: number | null) => {
+                    if (code === 0) {
+                        console.log(`[kanban.exportService.processMarpExport] Marp CLI stdout:`, stdout);
+                        resolve();
+                    } else {
+                        console.error(`[kanban.exportService.processMarpExport] Marp CLI stderr:`, stderr);
+                        reject(new Error(`Marp CLI failed with exit code ${code}: ${stderr}`));
+                    }
+                });
+
+                marpCli.on('error', (error: Error) => {
+                    reject(new Error(`Failed to execute Marp CLI: ${error.message}`));
+                });
+            });
+
+            return {
+                success: true,
+                message: `Successfully exported to ${outputFormat.toUpperCase()}: ${outputPath}`,
+                exportedPath: outputPath
+            };
+
+        } catch (error) {
+            console.error('[kanban.exportService.processMarpExport] Marp processing failed:', error);
+            return {
+                success: false,
+                message: `Marp processing failed: ${error instanceof Error ? error.message : String(error)}`
             };
         }
     }
@@ -1849,11 +2074,10 @@ export class ExportService {
         options: UnifiedExportOptions & {
             marpTheme?: string;
             marpEnginePath?: string;
-            skipMarpCli?: boolean; // If true, only generate markdown without running Marp CLI
         } & {
             format: string; // Allow marp-prefixed formats
         }
-    ): Promise<{ success: boolean; message: string; exportedPath?: string; tempFilePath?: string }> {
+    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
         try {
             const sourcePath = sourceDocument.uri.fsPath;
 
@@ -1960,21 +2184,7 @@ export class ExportService {
                 fs.mkdirSync(options.targetFolder, { recursive: true });
             }
 
-            // Check if we should skip Marp CLI and just output markdown
-            if (options.skipMarpCli) {
-                // For markdown-only export, just write the markdown file
-                outputPath = path.join(options.targetFolder, `${targetBasename}.md`);
-                
-                fs.writeFileSync(outputPath, marpMarkdown, 'utf-8');
-                
-                console.log(`[kanban.exportService.exportWithMarp] Successfully wrote Marp markdown to: ${outputPath}`);
-
-                return {
-                    success: true,
-                    message: `Successfully exported Marp markdown to ${outputPath}`,
-                    exportedPath: outputPath
-                };
-            }
+            
 
             // Extract Marp output format from options.format (e.g., "marp-pdf" -> "pdf")
             let marpOutputFormat: string;
@@ -2011,8 +2221,7 @@ export class ExportService {
                 outputPath,
                 enginePath: options.marpEnginePath,
                 theme: options.marpTheme,
-                allowLocalFiles: true,
-                keepTempFile: options.autoExportOnSave || false // Keep temp file for auto-export
+                allowLocalFiles: true
             };
 
             // Add browser option if specified
@@ -2026,17 +2235,26 @@ export class ExportService {
                 additionalArgs.push(`--preview`);
             }
 
+            // Add watch option for auto-reload on changes
+            additionalArgs.push(`--watch`);
+
             if (additionalArgs.length > 0) {
                 exportOptions.additionalArgs = additionalArgs;
             }
 
-            const exportResult = await MarpExportService.export(marpMarkdown, exportOptions);
+            // Save markdown file first with proper filename
+            const markdownPath = path.join(options.targetFolder, `${targetBasename}.md`);
+            fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
+
+            // Update export options to include input file path
+            exportOptions.inputFilePath = markdownPath;
+
+            const exportResult = await MarpExportService.export(exportOptions);
 
             return {
                 success: true,
                 message: `Successfully exported to ${outputFormat.toUpperCase()}: ${outputPath}`,
-                exportedPath: outputPath,
-                tempFilePath: exportResult?.tempFilePath // Include temp file path for auto-export
+                exportedPath: outputPath
             };
 
         } catch (error) {
