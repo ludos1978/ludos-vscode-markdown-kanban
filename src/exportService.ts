@@ -1850,7 +1850,8 @@ export class ExportService {
                     theme: options.marpTheme,
                     allowLocalFiles: true,
                     inputFilePath: markdownPath,
-                    additionalArgs
+                    additionalArgs,
+                    background: true  // IMPORTANT: Run Marp in background for watch mode
                 };
 
                 console.log('[kanban.exportService.handleMarpExport] About to call MarpExportService.export with options:', JSON.stringify(exportOptions, null, 2));

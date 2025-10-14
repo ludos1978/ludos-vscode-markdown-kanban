@@ -2,6 +2,7 @@ import { marpCli } from '@marp-team/marp-cli';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
+import { spawn } from 'child_process';
 import { ConfigurationService } from '../configurationService';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
@@ -21,6 +22,8 @@ export interface MarpExportOptions {
     allowLocalFiles?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
+    /** Run in background (detached) mode */
+    background?: boolean;
 }
 
 /**
@@ -56,31 +59,62 @@ export class MarpExportService {
 
             // Execute Marp CLI with proper working directory
             const workspaceFolders = vscode.workspace.workspaceFolders;
-            let exitCode: number;
             
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                // Change to workspace root directory for Marp CLI execution
-                const originalCwd = process.cwd();
-                const workspaceRoot = workspaceFolders[0].uri.fsPath;
+            if (options.background) {
+                // Run Marp in background (detached) mode for watch functionality
+                console.log(`[kanban.MarpExportService] Starting Marp in background mode with args: ${args.join(' ')}`);
                 
-                try {
-                    process.chdir(workspaceRoot);
-                    console.log(`[kanban.MarpExportService] Changed working directory to: ${workspaceRoot}`);
-                    exitCode = await marpCli(args);
-                } finally {
-                    // Restore original working directory
-                    process.chdir(originalCwd);
-                    console.log(`[kanban.MarpExportService] Restored working directory to: ${originalCwd}`);
-                }
+                const workspaceRoot = workspaceFolders && workspaceFolders.length > 0 
+                    ? workspaceFolders[0].uri.fsPath 
+                    : process.cwd();
+                
+                // Build the full command for Marp CLI
+                const command = 'npx';
+                const commandArgs = ['@marp-team/marp-cli', ...args];
+                
+                // Spawn Marp as a detached background process
+                const marpProcess = spawn(command, commandArgs, {
+                    cwd: workspaceRoot,
+                    detached: true,
+                    stdio: 'ignore'
+                });
+                
+                // Detach from parent process to allow it to run independently
+                marpProcess.unref();
+                
+                console.log(`[kanban.MarpExportService] Marp background process started with PID: ${marpProcess.pid}`);
+                console.log(`[kanban.MarpExportService] Marp watching file: ${options.inputFilePath}`);
+                
+                // For background mode, we don't wait for completion
+                console.log(`[kanban.MarpExportService] Background Marp process started successfully`);
             } else {
-                exitCode = await marpCli(args);
-            }
+                // Run Marp in foreground mode (blocking)
+                let exitCode: number;
+                
+                if (workspaceFolders && workspaceFolders.length > 0) {
+                    // Change to workspace root directory for Marp CLI execution
+                    const originalCwd = process.cwd();
+                    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+                    
+                    try {
+                        process.chdir(workspaceRoot);
+                        console.log(`[kanban.MarpExportService] Changed working directory to: ${workspaceRoot}`);
+                        exitCode = await marpCli(args);
+                    } finally {
+                        // Restore original working directory
+                        process.chdir(originalCwd);
+                        console.log(`[kanban.MarpExportService] Restored working directory to: ${originalCwd}`);
+                    }
+                } else {
+                    exitCode = await marpCli(args);
+                }
 
-            if (exitCode !== 0) {
-                throw new Error(`Marp export failed with exit code ${exitCode}`);
-            }
+                if (exitCode !== 0) {
+                    throw new Error(`Marp export failed with exit code ${exitCode}`);
+                }
 
-            console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
+                console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
+            }
         } catch (error) {
             console.error('[kanban.MarpExportService] Export failed:', error);
             throw error;
