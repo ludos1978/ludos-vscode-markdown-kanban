@@ -223,7 +223,28 @@ export class BoardOperations {
             tasks: []
         };
 
-        board.columns.push(newColumn);
+        // Extract row number from title to determine correct insertion position
+        const targetRow = this.getColumnRow({ title } as KanbanColumn);
+        
+        // Find the correct position to insert the column
+        let insertIndex = board.columns.length; // Default to end
+        
+        // Find the first column of the target row, or where to insert if row doesn't exist
+        for (let i = 0; i < board.columns.length; i++) {
+            const columnRow = this.getColumnRow(board.columns[i]);
+            
+            if (columnRow > targetRow) {
+                // Insert before this column (higher row number)
+                insertIndex = i;
+                break;
+            } else if (columnRow === targetRow) {
+                // Found the target row, continue to find end of this row
+                continue;
+            }
+        }
+        
+        // Insert at the calculated position
+        board.columns.splice(insertIndex, 0, newColumn);
         this._originalTaskOrder.set(newColumn.id, []);
         return true;
     }

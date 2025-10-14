@@ -2135,11 +2135,16 @@ function addTaskAndUnfold(columnId) {
 
 function addColumn(rowNumber) {
     // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    // Always use empty title so column appears in row 1 as standalone column
-    const title = '';
+    // Include row tag to place column in the correct row
+    let title = '';
+    
+    // Add row tag if rowNumber is provided and greater than 1
+    if (rowNumber && rowNumber > 1) {
+        title = ` #row${rowNumber}`;
+    }
 
     // Use unified operation that communicates with backend
-    addColumn_unified(title);
+    addColumn_unified(title.trim());
 }
 
 // Tag operations - IMPORTANT: Always use unique IDs, never titles!
