@@ -4,13 +4,13 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.
-
-- [ ] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
+- [x] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
 
 - [ ] Add Rewrite Links Rules into the "Pack Assets into Export Folder". It defines how links are changed to be correct for the exported file:
   - for absolute paths it doesnt change them.
   - for relative paths, depending on how the export folder is, fix it accordingly.
+
+- [ ] Drag & Dropping in any row below the first one doesnt work.
 
 - [ ] Create Preset for export:
   - Marp Presentation:
@@ -57,6 +57,14 @@ kanban-plugin: board
       - Documents: On
       - File size limit: 100mb
 
+
+
+
+
+
+
+
+- [x] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.
 
 - [x] exclude tests and tmp from being included in the build, also the .folders and files dont need to go in there. verify what is required and minimize build size
 
