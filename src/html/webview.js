@@ -2399,6 +2399,11 @@ window.addEventListener('message', event => {
             const previousDocumentPath = currentFileInfo?.documentPath;
             currentFileInfo = message.fileInfo;
             
+            // Set current file path for export functions
+            if (currentFileInfo && currentFileInfo.documentPath) {
+                window.currentFilePath = currentFileInfo.documentPath;
+            }
+            
             // Only update document URI if it actually changed
             if (currentFileInfo && currentFileInfo.documentPath && 
                 currentFileInfo.documentPath !== previousDocumentPath) {
@@ -4478,6 +4483,23 @@ function handleExportResult(result) {
 }
 
 /**
+ * Get workspace path from current file
+ */
+function getWorkspacePath() {
+    if (window.currentFilePath) {
+        // Extract directory from current file path
+        const pathParts = window.currentFilePath.split('/');
+        // Remove the filename to get the directory
+        const directoryPath = '/' + pathParts.slice(0, -1).join('/');
+        
+        // Try to find workspace root by looking for common workspace indicators
+        // For now, return the directory path - this should work for most cases
+        return directoryPath;
+    }
+    return '_Export'; // Fallback
+}
+
+/**
  * Handle export format change - enable/disable Marp options
  */
 function handleFormatChange() {
@@ -4691,9 +4713,9 @@ function applyPresetShareContent(currentFilename) {
     // Use Marp: Off
     document.getElementById('use-marp').checked = false;
     
-    // Export folder: Absolute path to _Full_Export_Date/{originalfilename}-{selectedelements}
+    // Export folder: Absolute path to _{filename}_{date}
     const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_Full_Export_${dateStr}/${currentFilename}-all`;
+    const exportFolder = `${workspacePath}/_${currentFilename}_${dateStr}`;
     document.getElementById('export-folder').value = exportFolder;
     
     // Pack Assets into Export folder: On

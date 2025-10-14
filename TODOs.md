@@ -6,7 +6,7 @@ kanban-plugin: board
 
 - [ ] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
 
-- [ ] Create Preset for export:
+- [x] Create Preset for export:
   - Marp Presentation:
     - Export format: Convert to Presentation format
     - Merge Includes into Main File: Off
