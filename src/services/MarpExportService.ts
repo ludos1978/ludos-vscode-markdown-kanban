@@ -21,8 +21,6 @@ export interface MarpExportOptions {
     allowLocalFiles?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
-    /** Keep the markdown file (for auto-export/live updates) */
-    keepTempFile?: boolean;
 }
 
 /**
@@ -34,9 +32,9 @@ export class MarpExportService {
     /**
      * Export markdown file using Marp CLI
      * @param options - Export options
-     * @returns Promise that resolves when export is complete, optionally returning file path
+     * @returns Promise that resolves when export is complete
      */
-    static async export(options: MarpExportOptions): Promise<{ tempFilePath?: string } | void> {
+    static async export(options: MarpExportOptions): Promise<void> {
         // Validate Marp CLI availability
         const isAvailable = await this.isMarpCliAvailable();
         if (!isAvailable) {
@@ -83,22 +81,9 @@ export class MarpExportService {
             }
 
             console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
-            
-            // Return input file path for auto-export scenarios
-            if (options.keepTempFile) {
-                console.log(`[kanban.MarpExportService] Keeping markdown file for auto-export: ${options.inputFilePath}`);
-                return { tempFilePath: options.inputFilePath };
-            }
-        } finally {
-            // Cleanup input file only if not keeping it
-            if (!options.keepTempFile && fs.existsSync(options.inputFilePath)) {
-                try {
-                    fs.unlinkSync(options.inputFilePath);
-                    console.log(`[kanban.MarpExportService] Deleted markdown file: ${options.inputFilePath}`);
-                } catch (err) {
-                    console.warn(`[kanban.MarpExportService] Failed to delete markdown file: ${options.inputFilePath}`, err);
-                }
-            }
+        } catch (error) {
+            console.error('[kanban.MarpExportService] Export failed:', error);
+            throw error;
         }
     }
 

@@ -1797,12 +1797,6 @@ export class ExportService {
                 console.log('[kanban.exportService.handleMarpExport] Markdown file does not exist, will create');
             }
 
-            if (shouldUpdateMarkdown) {
-                console.log('[kanban.exportService.handleMarpExport] Writing markdown file with content length:', marpMarkdown.length);
-                fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
-                console.log('[kanban.exportService.handleMarpExport] Markdown file written successfully');
-            }
-
             // Check if Marp is already watching this file
             const isAlreadyWatching = this.marpWatchProcesses.get(markdownPath) || false;
             console.log('[kanban.exportService.handleMarpExport] isAlreadyWatching:', isAlreadyWatching);
@@ -1810,14 +1804,20 @@ export class ExportService {
             if (isAlreadyWatching) {
                 console.log('[kanban.exportService.handleMarpExport] Marp already watching this file, only updating markdown content');
                 
-                // Only update the markdown file if content changed
+                // ONLY update the markdown file if content changed - Marp watch will handle the rest
                 if (shouldUpdateMarkdown) {
+                    console.log('[kanban.exportService.handleMarpExport] Updating markdown file for existing watch process');
                     fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
                 }
                 
-                // Still need to call Marp to ensure watch process is active
-                // Marp will handle avoiding duplicate watch processes
-                console.log('[kanban.exportService.handleMarpExport] Calling Marp to maintain watch process');
+                // DONE - Marp watch process will detect the file change and update automatically
+                console.log('[kanban.exportService.handleMarpExport] Markdown updated, Marp watch will handle the rest');
+                
+                return {
+                    success: true,
+                    message: `Markdown file updated, Marp watching for changes: ${outputPath}`,
+                    exportedPath: outputPath
+                };
             } else {
                 // First time setup: update markdown file and start Marp watch
                 if (shouldUpdateMarkdown) {
@@ -1828,40 +1828,39 @@ export class ExportService {
                 // Mark this file as being watched
                 this.marpWatchProcesses.set(markdownPath, true);
                 console.log('[kanban.exportService.handleMarpExport] Starting Marp with watch mode for the first time');
+                
+                // Use --watch mode for Marp - it will handle file changes automatically
+                const additionalArgs: string[] = ['--watch'];
+                
+                // Add browser option if specified
+                if (options.marpBrowser && options.marpBrowser !== 'auto') {
+                    additionalArgs.push(`--browser`, options.marpBrowser);
+                }
+
+                // Add preview option if specified
+                if (options.marpPreview) {
+                    additionalArgs.push(`--preview`);
+                }
+
+                // Export using Marp CLI with watch mode (only on first time)
+                const exportOptions: any = {
+                    format: outputFormat,
+                    outputPath,
+                    enginePath: options.marpEnginePath,
+                    theme: options.marpTheme,
+                    allowLocalFiles: true,
+                    inputFilePath: markdownPath,
+                    additionalArgs
+                };
+
+                console.log('[kanban.exportService.handleMarpExport] About to call MarpExportService.export with options:', JSON.stringify(exportOptions, null, 2));
+                console.log('[kanban.exportService.handleMarpExport] MarpExportService available:', typeof MarpExportService);
+                console.log('[kanban.exportService.handleMarpExport] MarpExportService.export available:', typeof MarpExportService?.export);
+
+                // Call Marp ONLY on first time to start the watch process
+                const exportResult = await MarpExportService.export(exportOptions);
+                console.log('[kanban.exportService.handleMarpExport] MarpExportService.export returned:', JSON.stringify(exportResult, null, 2));
             }
-
-            // Always use --watch mode for Marp - it will handle file changes automatically
-            const additionalArgs: string[] = ['--watch'];
-            
-            // Add browser option if specified
-            if (options.marpBrowser && options.marpBrowser !== 'auto') {
-                additionalArgs.push(`--browser`, options.marpBrowser);
-            }
-
-            // Add preview option if specified
-            if (options.marpPreview) {
-                additionalArgs.push(`--preview`);
-            }
-
-            // Export using Marp CLI with watch mode
-            const exportOptions: any = {
-                format: outputFormat,
-                outputPath,
-                enginePath: options.marpEnginePath,
-                theme: options.marpTheme,
-                allowLocalFiles: true,
-                inputFilePath: markdownPath,
-                additionalArgs,
-                keepTempFile: true  // IMPORTANT: Keep the markdown file for watch mode to work
-            };
-
-            console.log('[kanban.exportService.handleMarpExport] About to call MarpExportService.export with options:', JSON.stringify(exportOptions, null, 2));
-            console.log('[kanban.exportService.handleMarpExport] MarpExportService available:', typeof MarpExportService);
-            console.log('[kanban.exportService.handleMarpExport] MarpExportService.export available:', typeof MarpExportService?.export);
-
-            // ALWAYS call Marp to ensure the watch process is running
-            const exportResult = await MarpExportService.export(exportOptions);
-            console.log('[kanban.exportService.handleMarpExport] MarpExportService.export returned:', JSON.stringify(exportResult, null, 2));
 
             return {
                 success: true,
