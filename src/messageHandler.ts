@@ -3038,6 +3038,17 @@ export class MessageHandler {
             this._autoExportSettings = null;
 
             console.log('[kanban.messageHandler.handleStopAutoExport] Auto-export stopped');
+
+            // Notify frontend to hide the auto-export button
+            const panel = this._getWebviewPanel();
+            if (panel && panel.webview) {
+                console.log('[kanban.messageHandler.handleStopAutoExport] Sending autoExportStopped message to frontend');
+                panel.webview.postMessage({
+                    type: 'autoExportStopped'
+                });
+            } else {
+                console.warn('[kanban.messageHandler.handleStopAutoExport] No webview panel available to send message');
+            }
         } catch (error) {
             console.error('[kanban.messageHandler.handleStopAutoExport] Error:', error);
             throw error;

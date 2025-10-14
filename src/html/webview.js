@@ -2733,6 +2733,24 @@ window.addEventListener('message', event => {
                 console.error(`[Debug] Failed to reload ${reloadedFileName}: ${message.error}`);
             }
             break;
+
+        case 'autoExportStopped':
+            // Hide the auto-export button when auto-export is stopped
+            console.log('[kanban.webview] Received autoExportStopped message - hiding button');
+            const autoExportBtn = document.getElementById('auto-export-btn');
+            console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
+            if (autoExportBtn) {
+                autoExportBtn.style.display = 'none';
+                console.log('[kanban.webview] Auto-export button hidden');
+            }
+            // Reset auto-export state
+            window.autoExportActive = false;
+            window.lastExportSettings = null;
+            // Update button appearance to reflect the cleared state
+            if (typeof updateAutoExportButton === 'function') {
+                updateAutoExportButton();
+            }
+            break;
     }
 });
 
@@ -4674,6 +4692,15 @@ function updateAutoExportButton() {
     if (!btn || !icon || !text) {
         return;
     }
+
+    // Hide button if there are no export settings
+    if (!lastExportSettings) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    // Show button if there are export settings
+    btn.style.display = '';
 
     if (autoExportActive) {
         btn.classList.add('active');
