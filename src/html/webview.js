@@ -2741,14 +2741,20 @@ window.addEventListener('message', event => {
             console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
             if (autoExportBtn) {
                 autoExportBtn.style.display = 'none';
-                console.log('[kanban.webview] Auto-export button hidden');
+                autoExportBtn.classList.remove('active');
+                console.log('[kanban.webview] Auto-export button hidden and deactivated');
             }
-            // Reset auto-export state
+            // Reset auto-export state - both local and window variables
+            autoExportActive = false;
+            lastExportSettings = null;
             window.autoExportActive = false;
             window.lastExportSettings = null;
-            // Update button appearance to reflect the cleared state
-            if (typeof updateAutoExportButton === 'function') {
-                updateAutoExportButton();
+            // Reset button text and icon to default state
+            const icon = document.getElementById('auto-export-icon');
+            const text = document.getElementById('auto-export-text');
+            if (icon && text) {
+                icon.textContent = '▶';
+                text.textContent = 'Auto Export';
             }
             break;
     }
@@ -4369,6 +4375,7 @@ function executeUnifiedExport() {
 
             // Save last export settings for quick re-export
             lastExportSettings = options;
+            window.lastExportSettings = options;
 
             vscode.postMessage({
                 type: 'exportWithMarp',
@@ -4397,6 +4404,7 @@ function executeUnifiedExport() {
 
             // Save last export settings for quick re-export
             lastExportSettings = options;
+            window.lastExportSettings = options;
 
             // Send unified export request
             vscode.postMessage({
@@ -4419,6 +4427,7 @@ function executeUnifiedExport() {
     // If auto-export checkbox was enabled in dialog, start auto-export immediately
     if (autoExportOnSave && lastExportSettings) {
         autoExportActive = true;
+        window.autoExportActive = true;
         updateAutoExportButton();
 
         vscode.postMessage({
@@ -4655,6 +4664,9 @@ function toggleAutoExport() {
     }
 
     autoExportActive = !autoExportActive;
+    // Keep window variables in sync
+    window.autoExportActive = autoExportActive;
+    
     updateAutoExportButton();
 
     if (autoExportActive) {
@@ -4690,12 +4702,18 @@ function updateAutoExportButton() {
     const text = document.getElementById('auto-export-text');
 
     if (!btn || !icon || !text) {
+        console.warn('[kanban.webview] updateAutoExportButton: Button elements not found');
         return;
     }
 
     // Hide button if there are no export settings
     if (!lastExportSettings) {
         btn.style.display = 'none';
+        btn.classList.remove('active');
+        icon.textContent = '▶';
+        text.textContent = 'Auto Export';
+        btn.title = 'Start auto-export with last settings';
+        console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
         return;
     }
 
@@ -4707,11 +4725,13 @@ function updateAutoExportButton() {
         icon.textContent = '■'; // Stop icon
         text.textContent = autoExportBrowserMode ? 'Stop Live' : 'Stop Auto';
         btn.title = 'Stop auto-export';
+        console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
         btn.classList.remove('active');
         icon.textContent = '▶'; // Play icon
         text.textContent = autoExportBrowserMode ? 'Start Live' : 'Auto Export';
         btn.title = 'Start auto-export with last settings';
+        console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');
     }
 }
 

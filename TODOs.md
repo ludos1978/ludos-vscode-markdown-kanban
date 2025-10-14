@@ -4,7 +4,63 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] consolidate the functions exportUnified, exportUnifiedV2 and exportWithMarp . 
+- [ ] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.
+
+- [ ] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
+
+- [ ] Add Rewrite Links Rules into the "Pack Assets into Export Folder". It defines how links are changed to be correct for the exported file:
+  - for absolute paths it doesnt change them.
+  - for relative paths, depending on how the export folder is, fix it accordingly.
+
+- [ ] Create Preset for export:
+  - Marp Presentation:
+    - Export format: Convert to Presentation format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: No Tags
+    - Auto-export on save: On
+    - Use Marp: On
+      - Output Fomat: HTML
+      - Style: (last selected style)
+      - Browser: Chrome
+      - Live Preview: On
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Export/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export Folder: Off
+  
+  - Marp PDF:
+    - Export format: Convert to Presentation format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: No Tags
+    - Auto-export on save: On
+    - Use Marp: On
+      - Output Fomat: PDF
+      - Style: (last selected style)
+      - Browser: Chrome
+      - Live Preview: Off
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Export/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export Folder: Off
+  
+  - Share Content:
+    - Export format: Keep original format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: All Tags
+    - Use Marp: Off
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Full_Export_Date/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export folder: On
+      - Rewrite Links: On
+      - Included Files: On
+      - Images: On
+      - Videos: On
+      - Other Media: On
+      - Documents: On
+      - File size limit: 100mb
+
+
+- [x] exclude tests and tmp from being included in the build, also the .folders and files dont need to go in there. verify what is required and minimize build size
+
+- [x] consolidate the functions exportUnified, exportUnifiedV2 and exportWithMarp . 
 
 - [x] currently the export format also includes different marp export solutions. however the export format is only the first stage of data presentation. the second would be the conversion with marp. so i want you to remove the marp export variants from the export format. 
 
@@ -14,11 +70,6 @@ add a checkbox "use marp" below that is available if the export format is "prese
 - the open in browser could be removed, but we should add a checkbox that adds "--preview" for "live preview"
 
 move the "auto-export on save" to the main features (export format), as it should make sure that the export is repeated when the markdown or any included files are changed.
-
-- [ ] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.
-
-- [ ] exclude tests and tmp from being included in the build, also the .folders and files dont need to go in there. verify what is required and minimize build size
-
 
 - [x] when opening as presentation with "open browser after export" it doesnt open a browser.
 
