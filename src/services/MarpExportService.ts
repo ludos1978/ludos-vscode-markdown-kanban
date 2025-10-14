@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { ConfigurationService } from '../configurationService';
+import { ExportService } from '../exportService';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
 
@@ -84,6 +85,14 @@ export class MarpExportService {
                 
                 console.log(`[kanban.MarpExportService] Marp background process started with PID: ${marpProcess.pid}`);
                 console.log(`[kanban.MarpExportService] Marp watching file: ${options.inputFilePath}`);
+                
+                // Store the PID for later termination
+                if (options.inputFilePath && marpProcess.pid) {
+                    console.log(`[kanban.MarpExportService] Storing PID ${marpProcess.pid} for file ${options.inputFilePath}`);
+                    ExportService.addMarpProcessPid(options.inputFilePath, marpProcess.pid);
+                } else {
+                    console.warn(`[kanban.MarpExportService] Could not store PID - inputFilePath: ${options.inputFilePath}, pid: ${marpProcess.pid}`);
+                }
                 
                 // For background mode, we don't wait for completion
                 console.log(`[kanban.MarpExportService] Background Marp process started successfully`);

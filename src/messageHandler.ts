@@ -2964,17 +2964,18 @@ export class MessageHandler {
         try {
             console.log('[kanban.messageHandler.handleStartAutoExport] Starting auto-export with settings:', settings);
 
-            // Stop any existing handler
-            this.handleStopAutoExport();
-
-            // Store settings
-            this._autoExportSettings = settings;
-
-            // Get current document
+            // Get current document path to determine the base kanban file
             const doc = this._fileManager.getDocument();
             if (!doc) {
                 throw new Error('No document available for auto-export');
             }
+
+            // Store settings BEFORE stopping processes so we can use them for logic
+            this._autoExportSettings = settings;
+
+            // Stop any existing handler and Marp processes for OTHER kanban files
+            // Don't stop processes that might be related to the current export session
+            await this.handleStopAutoExportForOtherKanbanFiles(doc.uri.fsPath);
 
             const docUri = doc.uri;
             const coordinator = SaveEventCoordinator.getInstance();
@@ -3030,11 +3031,67 @@ export class MessageHandler {
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
+            // Stop all Marp watch processes
+            console.log('[kanban.messageHandler.handleStopAutoExport] Terminating Marp processes');
+            ExportService.stopAllMarpWatches();
+
             this._autoExportSettings = null;
 
             console.log('[kanban.messageHandler.handleStopAutoExport] Auto-export stopped');
         } catch (error) {
             console.error('[kanban.messageHandler.handleStopAutoExport] Error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stop auto-export for other kanban files (not generated files from current export)
+     */
+    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string): Promise<void> {
+        try {
+            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Stopping auto-export for other kanban files, protecting current:', currentKanbanFilePath);
+
+            // Unregister from SaveEventCoordinator
+            const doc = this._fileManager.getDocument();
+            if (doc) {
+                const coordinator = SaveEventCoordinator.getInstance();
+                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
+            }
+
+            // Stop Marp processes only for other kanban files (not generated files)
+            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes for other kanban files');
+            ExportService.stopAllMarpWatchesExceptKanbanFile(currentKanbanFilePath);
+
+            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Auto-export stopped for other kanban files');
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stop auto-export for a specific file (used during restart)
+     */
+    private async handleStopAutoExportForFile(excludeFilePath?: string): Promise<void> {
+        try {
+            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Stopping auto-export, excluding:', excludeFilePath);
+
+            // Unregister from SaveEventCoordinator
+            const doc = this._fileManager.getDocument();
+            if (doc) {
+                const coordinator = SaveEventCoordinator.getInstance();
+                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
+            }
+
+            // Stop Marp processes only for different files
+            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Terminating Marp processes for other files');
+            ExportService.stopAllMarpWatchesExcept(excludeFilePath);
+
+            this._autoExportSettings = null;
+
+            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Auto-export stopped for other files');
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleStopAutoExportForFile] Error:', error);
             throw error;
         }
     }
