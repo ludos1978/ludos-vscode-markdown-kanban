@@ -2756,6 +2756,15 @@ window.addEventListener('message', event => {
                 icon.textContent = '▶';
                 text.textContent = 'Auto Export';
             }
+            // FORCE HIDE AGAIN after a short delay to ensure it's hidden
+            setTimeout(() => {
+                const btn = document.getElementById('auto-export-btn');
+                if (btn) {
+                    btn.style.display = 'none';
+                    btn.classList.remove('active');
+                    console.log('[kanban.webview] Auto-export button force-hidden after timeout');
+                }
+            }, 100);
             break;
     }
 });
@@ -4681,6 +4690,28 @@ function toggleAutoExport() {
             message: 'Auto-export started. File will export automatically on save.'
         });
     } else {
+        // IMMEDIATELY hide the button when user clicks stop
+        const autoExportBtn = document.getElementById('auto-export-btn');
+        if (autoExportBtn) {
+            autoExportBtn.style.display = 'none';
+            autoExportBtn.classList.remove('active');
+            console.log('[kanban.webview] Auto-export button immediately hidden on user stop');
+        }
+        
+        // Reset state immediately
+        autoExportActive = false;
+        window.autoExportActive = false;
+        lastExportSettings = null;
+        window.lastExportSettings = null;
+        
+        // Reset button text and icon
+        const icon = document.getElementById('auto-export-icon');
+        const text = document.getElementById('auto-export-text');
+        if (icon && text) {
+            icon.textContent = '▶';
+            text.textContent = 'Auto Export';
+        }
+
         // Stop auto-export
         vscode.postMessage({
             type: 'stopAutoExport'
