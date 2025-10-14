@@ -4,13 +4,7 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [x] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
-
-- [ ] Add Rewrite Links Rules into the "Pack Assets into Export Folder". It defines how links are changed to be correct for the exported file:
-  - for absolute paths it doesnt change them.
-  - for relative paths, depending on how the export folder is, fix it accordingly.
-
-- [ ] Drag & Dropping in any row below the first one doesnt work.
+- [ ] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
 
 - [ ] Create Preset for export:
   - Marp Presentation:
@@ -57,11 +51,19 @@ kanban-plugin: board
       - Documents: On
       - File size limit: 100mb
 
+  put the presets at the top. when selecting a preset, set all values accordingly. the user might change the values afterwards. so the configuration must be defined by the individual values. if something is unclear, ask me.
 
 
 
 
 
+- [x] Drag & Dropping in any row below the first one doesnt work.
+
+- [x] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
+
+- [x] Add Rewrite Links Rules into the "Pack Assets into Export Folder". It defines how links are changed to be correct for the exported file:
+  - for absolute paths it doesnt change them.
+  - for relative paths, depending on how the export folder is, fix it accordingly.
 
 
 - [x] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.

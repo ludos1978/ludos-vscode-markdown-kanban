@@ -1878,6 +1878,7 @@ export class MessageHandler {
             }
 
             const defaultFolder = ExportService.generateDefaultExportFolder(document.uri.fsPath);
+            console.log('[kanban.messageHandler.getExportDefaultFolder] Generated default folder:', defaultFolder);
             const panel = this._getWebviewPanel();
             if (panel && panel._panel) {
                 panel._panel.webview.postMessage({
@@ -2699,6 +2700,8 @@ export class MessageHandler {
      */
     private async handleExportWithMarp(options: any, operationId?: string): Promise<void> {
         try {
+            console.log('[kanban.messageHandler.handleExportWithMarp] Received options:', JSON.stringify(options, null, 2));
+            
             const document = this._fileManager.getDocument();
             if (!document) {
                 throw new Error('No document available for Marp export');

@@ -4156,6 +4156,9 @@ function showExportDialogWithSelection(scope, index, id) {
     // Check Marp status when opening dialog
     checkMarpStatus();
 
+    // Add event listeners to detect manual setting changes
+    addExportSettingChangeListeners();
+
     modal.style.display = 'block';
 }
 
@@ -4198,6 +4201,8 @@ function setSelectedExportFolder(folderPath) {
     const folderInput = document.getElementById('export-folder');
     if (folderInput) {
         folderInput.value = folderPath;
+        // Reset preset to custom since user manually changed folder
+        resetPresetToCustom();
     }
 }
 
@@ -4328,6 +4333,7 @@ function executeUnifiedExport() {
 
     // Get pack options if packing is enabled
     const packOptions = packAssets ? {
+        rewriteLinks: document.getElementById('rewrite-links')?.checked || false,
         includeFiles: document.getElementById('include-files')?.checked || false,
         includeImages: document.getElementById('include-images')?.checked || false,
         includeVideos: document.getElementById('include-videos')?.checked || false,
@@ -4537,6 +4543,256 @@ function handleUseMarpChange() {
 }
 
 /**
+ * Store last export settings for quick re-export
+ */
+let lastExportSettings = null;
+
+/**
+ * Apply export preset configuration
+ */
+function applyExportPreset() {
+    const presetSelect = document.getElementById('export-preset');
+    if (!presetSelect) {
+        return;
+    }
+
+    const preset = presetSelect.value;
+    if (!preset) {
+        return; // Custom settings selected
+    }
+
+    console.log('[kanban.webview] Applying export preset:', preset);
+
+    // Get current filename for folder generation
+    const currentFilename = window.currentKanbanFile ? 
+        window.currentKanbanFile.split('/').pop().replace('.md', '') : 'kanban';
+    
+    // Get absolute workspace path for export folder generation
+    const getWorkspacePath = () => {
+        if (window.currentKanbanFile) {
+            // Extract workspace path from current file path
+            const filePathParts = window.currentKanbanFile.split('/');
+            // Find the workspace root (assuming the file is in a workspace folder)
+            // For now, use the directory containing the current file as base
+            return window.currentKanbanFile.replace(/\/[^\/]*\.md$/, '');
+        }
+        return '_Export'; // Fallback
+    };
+
+    switch (preset) {
+        case 'marp-presentation':
+            applyPresetMarpPresentation(currentFilename);
+            break;
+        case 'marp-pdf':
+            applyPresetMarpPdf(currentFilename);
+            break;
+        case 'share-content':
+            applyPresetShareContent(currentFilename);
+            break;
+    }
+
+    // Trigger format change to update Marp options state
+    handleFormatChange();
+}
+
+/**
+ * Apply Marp Presentation preset
+ */
+function applyPresetMarpPresentation(currentFilename) {
+    // Export format: Convert to Presentation format
+    document.getElementById('export-format').value = 'presentation';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: No Tags
+    document.getElementById('export-tag-visibility').value = 'none';
+    
+    // Auto-export on save: On
+    document.getElementById('auto-export-on-save').checked = true;
+    
+    // Use Marp: On
+    document.getElementById('use-marp').checked = true;
+    
+    // Output Format: HTML
+    document.getElementById('marp-output-format').value = 'html';
+    
+    // Browser: Chrome
+    document.getElementById('marp-browser').value = 'chrome';
+    
+    // Live Preview: On
+    document.getElementById('marp-preview').checked = true;
+    
+    // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_Export/${currentFilename}-all`;
+    document.getElementById('export-folder').value = exportFolder;
+    
+    // Pack Assets into Export Folder: Off
+    document.getElementById('pack-assets').checked = false;
+}
+
+/**
+ * Apply Marp PDF preset
+ */
+function applyPresetMarpPdf(currentFilename) {
+    // Export format: Convert to Presentation format
+    document.getElementById('export-format').value = 'presentation';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: No Tags
+    document.getElementById('export-tag-visibility').value = 'none';
+    
+    // Auto-export on save: On
+    document.getElementById('auto-export-on-save').checked = true;
+    
+    // Use Marp: On
+    document.getElementById('use-marp').checked = true;
+    
+    // Output Format: PDF
+    document.getElementById('marp-output-format').value = 'pdf';
+    
+    // Browser: Chrome
+    document.getElementById('marp-browser').value = 'chrome';
+    
+    // Live Preview: Off
+    document.getElementById('marp-preview').checked = false;
+    
+    // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_Export/${currentFilename}-all`;
+    document.getElementById('export-folder').value = exportFolder;
+    
+    // Pack Assets into Export Folder: Off
+    document.getElementById('pack-assets').checked = false;
+}
+
+/**
+ * Apply Share Content preset
+ */
+function applyPresetShareContent(currentFilename) {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Export format: Keep original format
+    document.getElementById('export-format').value = 'keep';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: All Tags
+    document.getElementById('export-tag-visibility').value = 'all';
+    
+    // Auto-export on save: Off (not specified, so default to off)
+    document.getElementById('auto-export-on-save').checked = false;
+    
+    // Use Marp: Off
+    document.getElementById('use-marp').checked = false;
+    
+    // Export folder: Absolute path to _Full_Export_Date/{originalfilename}-{selectedelements}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_Full_Export_${dateStr}/${currentFilename}-all`;
+    document.getElementById('export-folder').value = exportFolder;
+    
+    // Pack Assets into Export folder: On
+    document.getElementById('pack-assets').checked = true;
+    
+    // Pack options - all on
+    document.getElementById('rewrite-links').checked = true;
+    document.getElementById('include-files').checked = true;
+    document.getElementById('include-images').checked = true;
+    document.getElementById('include-videos').checked = true;
+    document.getElementById('include-other-media').checked = true;
+    document.getElementById('include-documents').checked = true;
+    
+    // File size limit: 100mb
+    document.getElementById('file-size-limit').value = 100;
+}
+
+/**
+ * Save current export settings as last used
+ */
+function saveLastExportSettings() {
+    const folderInput = document.getElementById('export-folder');
+    const formatSelect = document.getElementById('export-format');
+    const tagVisibilitySelect = document.getElementById('export-tag-visibility');
+    const mergeIncludesCheckbox = document.getElementById('merge-includes');
+    const autoExportCheckbox = document.getElementById('auto-export-on-save');
+    const useMarpCheckbox = document.getElementById('use-marp');
+    const packAssetsCheckbox = document.getElementById('pack-assets');
+    
+    if (!folderInput || !formatSelect || !tagVisibilitySelect) {
+        return;
+    }
+
+    lastExportSettings = {
+        targetFolder: folderInput.value.trim(),
+        format: formatSelect.value,
+        tagVisibility: tagVisibilitySelect.value,
+        mergeIncludes: mergeIncludesCheckbox?.checked || false,
+        autoExportOnSave: autoExportCheckbox?.checked || false,
+        useMarp: useMarpCheckbox?.checked || false,
+        packAssets: packAssetsCheckbox?.checked || false,
+        // Marp settings
+        marpOutputFormat: document.getElementById('marp-output-format')?.value || 'html',
+        marpTheme: document.getElementById('marp-theme')?.value || 'default',
+        marpBrowser: document.getElementById('marp-browser')?.value || 'chrome',
+        marpPreview: document.getElementById('marp-preview')?.checked || false,
+        // Pack options
+        packOptions: packAssetsCheckbox?.checked ? {
+            rewriteLinks: document.getElementById('rewrite-links')?.checked || false,
+            includeFiles: document.getElementById('include-files')?.checked || false,
+            includeImages: document.getElementById('include-images')?.checked || false,
+            includeVideos: document.getElementById('include-videos')?.checked || false,
+            includeOtherMedia: document.getElementById('include-other-media')?.checked || false,
+            includeDocuments: document.getElementById('include-documents')?.checked || false,
+            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
+        } : undefined
+    };
+
+    window.lastExportSettings = lastExportSettings;
+    console.log('[kanban.webview] Saved last export settings:', lastExportSettings);
+}
+
+/**
+ * Reset preset to Custom Settings when user manually changes options
+ */
+function resetPresetToCustom() {
+    const presetSelect = document.getElementById('export-preset');
+    if (presetSelect && presetSelect.value !== '') {
+        presetSelect.value = '';
+        console.log('[kanban.webview] Reset preset to Custom Settings due to manual change');
+    }
+}
+
+/**
+ * Add event listeners to detect manual changes and reset preset
+ */
+function addExportSettingChangeListeners() {
+    const elements = [
+        'export-format', 'export-tag-visibility', 'merge-includes', 
+        'auto-export-on-save', 'use-marp', 'pack-assets', 
+        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview',
+        'rewrite-links', 'include-files', 'include-images', 'include-videos',
+        'include-other-media', 'include-documents', 'file-size-limit'
+    ];
+
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.addEventListener('change', resetPresetToCustom);
+            } else {
+                element.addEventListener('input', resetPresetToCustom);
+                element.addEventListener('change', resetPresetToCustom);
+            }
+        }
+    });
+}
+
+/**
  * Check Marp CLI and extension status
  */
 function checkMarpStatus() {
@@ -4647,11 +4903,6 @@ function loadMarpThemes() {
         type: 'getMarpThemes'
     });
 }
-
-/**
- * Store last export settings for quick re-export
- */
-let lastExportSettings = null;
 
 /**
  * Auto-export state

@@ -22,6 +22,7 @@ export interface ExportOptions {
     includeOtherMedia: boolean;
     includeDocuments: boolean;
     fileSizeLimitMB: number;
+    rewriteLinks?: boolean;  // If true, rewrite links to be correct for exported file location
     tagVisibility?: TagVisibility;
 }
 
@@ -44,6 +45,7 @@ export interface UnifiedExportOptions {
         includeOtherMedia: boolean;
         includeDocuments: boolean;
         fileSizeLimitMB: number;
+        rewriteLinks: boolean;  // If true, rewrite links to be correct for exported file location
     };
     selection: {
         rowNumber?: number;
@@ -403,9 +405,18 @@ export class ExportService {
             includeFiles: includeStats
         };
 
+        // Rewrite links if requested
+        const rewrittenContent = this.rewriteLinksForExport(
+            modifiedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            options.rewriteLinks || false
+        );
+
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        const filteredContent = this.applyTagFiltering(modifiedContent, options);
+        const filteredContent = this.applyTagFiltering(rewrittenContent, options);
 
         return {
             exportedContent: filteredContent,
@@ -566,6 +577,11 @@ export class ExportService {
                         // Calculate MD5 for duplicate detection
                         const includeBuffer = Buffer.from(exportedContent, 'utf8');
                         const md5Hash = crypto.createHash('md5').update(includeBuffer).digest('hex');
+
+                        // Ensure export folder exists
+                        if (!fs.existsSync(exportFolder)) {
+                            fs.mkdirSync(exportFolder, { recursive: true });
+                        }
 
                         // Check if we already exported this exact content
                         let exportedRelativePath: string;
@@ -910,9 +926,161 @@ export class ExportService {
     }
 
     /**
+     * Rewrite all links in content to be correct for the exported file location
+     * @param content The markdown content
+     * @param sourceDir Original source directory
+     * @param exportFolder Export folder directory
+     * @param fileBasename Base name of the exported file
+     * @param rewriteLinks Whether to rewrite links or keep them as-is
+     * @returns Modified content with rewritten links
+     */
+    private static rewriteLinksForExport(
+        content: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string,
+        rewriteLinks: boolean
+    ): string {
+        if (!rewriteLinks) {
+            return content;
+        }
+
+        let modifiedContent = content;
+
+        // Pattern to match all types of links
+        // 1. Markdown images: ![alt](path)
+        // 2. Markdown links: [text](path)
+        // 3. HTML img/video/audio tags with src attribute
+        // 4. Wiki-style links: [[path]] or [[path|text]]
+        // 5. Angle bracket links: <path>
+        const linkPattern = /(!\[[^\]]*\]\([^)]+\))|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])|(<[^>]+>)/g;
+
+        modifiedContent = modifiedContent.replace(linkPattern, (match) => {
+            return this.processLink(match, sourceDir, exportFolder, fileBasename);
+        });
+
+        return modifiedContent;
+    }
+
+    /**
+     * Process a single link and rewrite it if necessary
+     */
+    private static processLink(
+        link: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string
+    ): string {
+        let filePath: string | null = null;
+        let linkStart = '';
+        let linkEnd = '';
+
+        // Extract path from different link types
+        if (link.startsWith('![')) {
+            // Markdown image: ![alt](path)
+            const match = link.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+            if (match) {
+                filePath = match[1];
+                linkStart = '![';
+                linkEnd = '](';
+            }
+        } else if (link.startsWith('[') && !link.startsWith('[[')) {
+            // Markdown link: [text](path)
+            const match = link.match(/^\[[^\]]*\]\(([^)]+)\)/);
+            if (match) {
+                filePath = match[1];
+                linkStart = '[';
+                linkEnd = '](';
+            }
+        } else if (link.match(/^<(?:img|video|audio)/i)) {
+            // HTML tag: <tag src="path">
+            const match = link.match(/src=["']([^"']+)["']/i);
+            if (match) {
+                filePath = match[1];
+                // For HTML tags, we need to rebuild the tag
+                return this.rewriteHtmlTag(link, filePath, sourceDir, exportFolder, fileBasename);
+            }
+        } else if (link.startsWith('[[')) {
+            // Wiki link: [[path]] or [[path|text]]
+            const match = link.match(/^\[\[([^\]]+)\]\]/);
+            if (match) {
+                filePath = match[1].split('|')[0]; // Get path before | if present
+                linkStart = '[[';
+                linkEnd = ']]';
+            }
+        } else if (link.startsWith('<') && link.endsWith('>')) {
+            // Angle bracket link: <path>
+            filePath = link.slice(1, -1);
+            linkStart = '<';
+            linkEnd = '>';
+        }
+
+        if (!filePath) {
+            return link; // No path found, return original
+        }
+
+        // Clean the path (remove title attributes, etc.)
+        const cleanPath = filePath.replace(/\s+"[^"]*"$/, '').replace(/\s+'[^']*'$/, '');
+
+        // Check if it's an absolute path or URL
+        if (this.isAbsolutePath(cleanPath) || this.isUrl(cleanPath)) {
+            return link; // Don't modify absolute paths or URLs
+        }
+
+        // Resolve the path relative to source directory
+        const absoluteSourcePath = path.resolve(sourceDir, cleanPath);
+
+        // Calculate relative path from export folder to the target
+        const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
+
+        // Rebuild the link with the new path
+        if (link.match(/^<(?:img|video|audio)/i)) {
+            // Already handled above
+            return link;
+        } else {
+            return `${linkStart}${relativePath}${linkEnd}`;
+        }
+    }
+
+    /**
+     * Rewrite HTML tag with new src path
+     */
+    private static rewriteHtmlTag(
+        tag: string,
+        oldPath: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string
+    ): string {
+        const absoluteSourcePath = path.resolve(sourceDir, oldPath);
+        const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
+        
+        return tag.replace(/src=["'][^"']+["']/i, `src="${relativePath}"`);
+    }
+
+    /**
+     * Check if a path is absolute
+     */
+    private static isAbsolutePath(filePath: string): boolean {
+        return path.isAbsolute(filePath) || filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath);
+    }
+
+    /**
+     * Check if a path is a URL
+     */
+    private static isUrl(filePath: string): boolean {
+        return /^https?:\/\//i.test(filePath) || /^ftp:\/\//i.test(filePath) || /^mailto:/i.test(filePath);
+    }
+
+    /**
      * Create _not_included.md file with excluded assets
      */
     private static async createNotIncludedFile(notIncludedAssets: AssetInfo[], targetFolder: string): Promise<void> {
+        // Ensure target folder exists
+        if (!fs.existsSync(targetFolder)) {
+            fs.mkdirSync(targetFolder, { recursive: true });
+        }
+
         const content = [
             '# Assets Not Included in Export',
             '',
@@ -962,8 +1130,10 @@ export class ExportService {
      * Format: {filename}-YYYYMMDD-HHmm (using local time)
      */
     public static generateDefaultExportFolder(sourceDocumentPath: string): string {
-        const sourceDir = path.dirname(sourceDocumentPath);
-        const sourceBasename = path.basename(sourceDocumentPath, '.md');
+        // Ensure we have an absolute path
+        const absoluteSourcePath = path.resolve(sourceDocumentPath);
+        const sourceDir = path.dirname(absoluteSourcePath);
+        const sourceBasename = path.basename(absoluteSourcePath, '.md');
         const now = new Date();
 
         // Use local time instead of UTC (toISOString uses UTC/GMT)
@@ -974,7 +1144,9 @@ export class ExportService {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const timestamp = `${year}${month}${day}-${hours}${minutes}`;  // YYYYMMDD-HHmm
 
-        return path.join(sourceDir, `${sourceBasename}-${timestamp}`);
+        const exportFolder = path.join(sourceDir, `${sourceBasename}-${timestamp}`);
+        console.log('[kanban.exportService.generateDefaultExportFolder] Generated absolute export folder:', exportFolder);
+        return exportFolder;
     }
 
     /**
@@ -1030,9 +1202,18 @@ export class ExportService {
             includeFiles: includeStats
         };
 
+        // Rewrite links if requested
+        const rewrittenContent = this.rewriteLinksForExport(
+            modifiedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            options.rewriteLinks || false
+        );
+
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(modifiedContent, options);
+        let filteredContent = this.applyTagFiltering(rewrittenContent, options);
 
         // Convert to presentation format if requested
         // When merging includes, skip conversion to preserve raw merged content
@@ -1616,6 +1797,7 @@ export class ExportService {
                 includeOtherMedia: options.packOptions?.includeOtherMedia ?? false,
                 includeDocuments: options.packOptions?.includeDocuments ?? false,
                 fileSizeLimitMB: options.packOptions?.fileSizeLimitMB ?? 100,
+                rewriteLinks: options.packOptions?.rewriteLinks ?? false,
                 tagVisibility: options.tagVisibility
             };
             console.log(`[kanban.exportService.exportUnified] Export options:`, exportOptions);
@@ -1740,13 +1922,40 @@ export class ExportService {
 
             const targetBasename = `${sourceBasename}${scopeSuffix}`;
             console.log('[kanban.exportService.handleMarpExport] targetBasename:', targetBasename);
+            console.log('[kanban.exportService.handleMarpExport] Original targetFolder:', options.targetFolder);
 
-            // Ensure target folder exists
-            if (!fs.existsSync(options.targetFolder)) {
-                console.log('[kanban.exportService.handleMarpExport] Creating target folder:', options.targetFolder);
-                fs.mkdirSync(options.targetFolder, { recursive: true });
+            // Fix: Ensure targetFolder is an absolute directory path, not a file
+            let targetFolder = options.targetFolder;
+            
+            // Convert relative paths to absolute relative to source document
+            if (!path.isAbsolute(targetFolder)) {
+                const sourceDir = path.dirname(sourcePath);
+                targetFolder = path.resolve(sourceDir, targetFolder);
+                console.log('[kanban.exportService.handleMarpExport] Resolved relative path to absolute (relative to source):', targetFolder);
             } else {
-                console.log('[kanban.exportService.handleMarpExport] Target folder already exists:', options.targetFolder);
+                targetFolder = path.resolve(targetFolder);
+                console.log('[kanban.exportService.handleMarpExport] Resolved absolute path:', targetFolder);
+            }
+            
+            // Check if it's a file path and extract directory if needed
+            if (targetFolder.endsWith('.md') || targetFolder.endsWith('.pdf') || targetFolder.endsWith('.pptx') || targetFolder.endsWith('.html')) {
+                console.log('[kanban.exportService.handleMarpExport] WARNING: targetFolder appears to be a file path, extracting directory:', targetFolder);
+                targetFolder = path.dirname(targetFolder);
+                console.log('[kanban.exportService.handleMarpExport] Corrected targetFolder to:', targetFolder);
+            }
+
+            // Ensure target folder exists with better error handling
+            try {
+                if (!fs.existsSync(targetFolder)) {
+                    console.log('[kanban.exportService.handleMarpExport] Creating target folder:', targetFolder);
+                    fs.mkdirSync(targetFolder, { recursive: true });
+                    console.log('[kanban.exportService.handleMarpExport] Successfully created target folder');
+                } else {
+                    console.log('[kanban.exportService.handleMarpExport] Target folder already exists:', targetFolder);
+                }
+            } catch (error) {
+                console.error('[kanban.exportService.handleMarpExport] Failed to create target folder:', targetFolder, error);
+                throw new Error(`Failed to create export directory '${targetFolder}': ${error instanceof Error ? error.message : String(error)}`);
             }
 
             // Extract Marp output format from options.format (e.g., "marp-pdf" -> "pdf")
@@ -1763,15 +1972,15 @@ export class ExportService {
             switch (marpOutputFormat) {
                 case 'pdf':
                     outputFormat = 'pdf';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.pdf`);
+                    outputPath = path.join(targetFolder, `${targetBasename}.pdf`);
                     break;
                 case 'pptx':
                     outputFormat = 'pptx';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.pptx`);
+                    outputPath = path.join(targetFolder, `${targetBasename}.pptx`);
                     break;
                 case 'html':
                     outputFormat = 'html';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.html`);
+                    outputPath = path.join(targetFolder, `${targetBasename}.html`);
                     break;
                 default:
                     throw new Error(`Unsupported Marp export format: ${marpOutputFormat}`);
@@ -1780,9 +1989,23 @@ export class ExportService {
             console.log('[kanban.exportService.handleMarpExport] outputFormat:', outputFormat);
             console.log('[kanban.exportService.handleMarpExport] outputPath:', outputPath);
 
+            // Ensure the parent directory of the output file exists
+            const outputDir = path.dirname(outputPath);
+            if (!fs.existsSync(outputDir)) {
+                console.log('[kanban.exportService.handleMarpExport] Creating output directory:', outputDir);
+                fs.mkdirSync(outputDir, { recursive: true });
+            }
+
             // Save markdown file first with proper filename
-            const markdownPath = path.join(options.targetFolder, `${targetBasename}.md`);
+            const markdownPath = path.join(targetFolder, `${targetBasename}.md`);
             console.log('[kanban.exportService.handleMarpExport] markdownPath:', markdownPath);
+            
+            // Ensure the parent directory of the markdown file exists
+            const markdownDir = path.dirname(markdownPath);
+            if (!fs.existsSync(markdownDir)) {
+                console.log('[kanban.exportService.handleMarpExport] Creating markdown directory:', markdownDir);
+                fs.mkdirSync(markdownDir, { recursive: true });
+            }
             
             // Check if markdown file already exists and content has changed
             let shouldUpdateMarkdown = true;

@@ -267,6 +267,18 @@
             </div>
             <div class="modal-body">
 
+                <!-- Export Presets -->
+                <div class="export-field">
+                    <label for="export-preset">Export Preset:</label>
+                    <select id="export-preset" class="form-input" onchange="applyExportPreset()">
+                        <option value="">Custom Settings</option>
+                        <option value="marp-presentation">Marp Presentation</option>
+                        <option value="marp-pdf">Marp PDF</option>
+                        <option value="share-content">Share Content</option>
+                    </select>
+                    <small class="form-help">Select a preset to quickly configure export options. You can customize settings after applying a preset.</small>
+                </div>
+
 								<div class="export-field-row">
 										<div class="export-field-half">
 												<label for="export-format">Export Format:</label>
@@ -378,6 +390,10 @@
                     </label>
                     <div id="export-pack-options" class="export-pack-options">
                         <div class="export-checkboxes">
+                            <label class="export-checkbox" title="Rewrite relative links to be correct for the exported file location. Absolute paths and URLs remain unchanged.">
+                                <input type="checkbox" id="rewrite-links" checked>
+                                <span>Rewrite Links</span>
+                            </label>
                             <label class="export-checkbox">
                                 <input type="checkbox" id="include-files" checked>
                                 <span>Included Files</span>
