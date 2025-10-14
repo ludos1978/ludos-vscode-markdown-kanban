@@ -2217,6 +2217,19 @@ function setupDragAndDrop() {
     setupRowDragAndDrop(); // Setup rows first
     setupColumnDragAndDrop(); // Then columns
     setupTaskDragAndDrop(); // Then tasks
+    
+    // Initialize drop zones for the entire board and all rows
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        // Setup drop zones for the entire board
+        cleanupAndRecreateDropZones(boardElement);
+        
+        // Setup drop zones for each row individually
+        const rows = boardElement.querySelectorAll('.kanban-row');
+        rows.forEach(row => {
+            cleanupAndRecreateDropZones(row);
+        });
+    }
 }
 
 /**
