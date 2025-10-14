@@ -9,22 +9,16 @@ kanban-plugin: board
   some long text a b
   
   Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-## # A
-- [ ] 
+- [ ] photo-1756244866467-f4682840070c.avif
+  ---:
+  
   ![photo-1756244866467-f4682840070c](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/photo-1756244866467-f4682840070c.avif)
-- [ ] ## Task
-  and some content
-
-## # B #stack
-- [ ] ## Task
-  with the content
-
-## # C #stack
-- [ ] ## Include
-  !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-1.md)!!!
-
-## #row2
+  :--:
+  
+  
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/david-kovalenko-dnStBR008JM-unsplash.jpg)
+  
+  :---
 - [ ] andreas-gucklhorn-mawU2PoJWfU-unsplash.jpg
   ---:
   
@@ -37,18 +31,12 @@ kanban-plugin: board
   
   :---
 
-## #row2
-
-## #row3
-- [ ] photo-1756244866467-f4682840070c.avif
-  ---:
-  
+## # A
+- [ ] 
   ![photo-1756244866467-f4682840070c](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/photo-1756244866467-f4682840070c.avif)
-  :--:
-  
-  
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/david-kovalenko-dnStBR008JM-unsplash.jpg)
-  
-  :---
+- [ ] ## Include
+  !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-1.md)!!!
+- [ ] ## Task
+  and some content
 
 
