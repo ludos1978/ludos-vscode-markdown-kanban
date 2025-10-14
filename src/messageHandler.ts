@@ -2708,8 +2708,8 @@ export class MessageHandler {
                 await this.updateOperationProgress(operationId, 25, 'Converting to Marp format...');
             }
 
-            // Call the exportWithMarp method from ExportService
-            const result = await ExportService.exportWithMarp(document, {
+            // Call the exportUnified method from ExportService (now handles Marp formats internally)
+            const result = await ExportService.exportUnified(document, {
                 scope: options.scope || 'full',
                 format: options.format || 'marp-markdown',
                 tagVisibility: options.tagVisibility || 'all',
@@ -2929,7 +2929,7 @@ export class MessageHandler {
             }
 
             // First, export to Marp format - use marp-html for preview since this is for presentation
-            const result = await ExportService.exportWithMarp(document, {
+            const result = await ExportService.exportUnified(document, {
                 scope: options.scope || 'full',
                 format: 'marp-html', // Use marp-html for presentation preview
                 tagVisibility: options.tagVisibility || 'all',
@@ -2990,7 +2990,7 @@ export class MessageHandler {
                         try {
                             // Execute export with stored settings - always use standard export
                             console.log('[kanban.messageHandler.autoExport] Using standard export to update markdown');
-                            const result = await ExportService.exportUnifiedV2(savedDoc, this._autoExportSettings);
+                            const result = await ExportService.exportUnified(savedDoc, this._autoExportSettings);
 
                             // Open in browser if requested
                             if (result.success && this._autoExportSettings.openAfterExport && result.exportedPath) {

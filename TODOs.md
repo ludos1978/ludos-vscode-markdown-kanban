@@ -4,6 +4,8 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] consolidate the functions exportUnified, exportUnifiedV2 and exportWithMarp . 
+
 - [x] currently the export format also includes different marp export solutions. however the export format is only the first stage of data presentation. the second would be the conversion with marp. so i want you to remove the marp export variants from the export format. 
 
 add a checkbox "use marp" below that is available if the export format is "presentation format". within the use marp section:

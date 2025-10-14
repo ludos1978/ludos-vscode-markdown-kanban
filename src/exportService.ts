@@ -95,6 +95,9 @@ export class ExportService {
     // Track MD5 hashes to detect duplicates
     private static fileHashMap = new Map<string, string>();
     private static exportedFiles = new Map<string, string>(); // MD5 -> exported path
+    
+    // Track Marp watch processes to avoid multiple instances
+    private static marpWatchProcesses = new Map<string, boolean>(); // markdownPath -> isWatching
 
     /**
      * Apply tag filtering to content based on export options
@@ -1522,6 +1525,16 @@ export class ExportService {
                 throw new Error(`Could not extract content for scope: ${options.scope}`);
             }
 
+            // Check if this is a Marp export format
+            const isMarpFormat = options.format.startsWith('marp-');
+            console.log(`[kanban.exportService.exportUnified] Checking format: ${options.format}, isMarpFormat: ${isMarpFormat}`);
+            
+            // For Marp exports, use the dedicated Marp handler (regardless of packAssets setting)
+            if (isMarpFormat) {
+                console.log(`[kanban.exportService.exportUnified] Routing to handleMarpExport`);
+                return await this.handleMarpExport(sourceDocument, content, options);
+            }
+
             // For copy operations (no pack), apply tag filtering and format conversion
             if (!options.packAssets || !options.targetFolder) {
                 let processedContent = this.applyTagFiltering(content, {
@@ -1650,341 +1663,23 @@ export class ExportService {
     }
 
     /**
-     * Export using ContentPipelineService (v2 implementation)
-     *
-     * This is the new unified export that uses the ContentPipelineService
-     * for all processing. It coexists with the old exportUnified() method
-     * to allow gradual migration and testing.
-     *
-     * @param sourceDocument Source document to export from
+     * Handle Marp export initiation (kanban → presentation → Marp)
+     * @param sourceDocument Source document
+     * @param content Extracted content
      * @param options Export options
      * @returns Export result
      */
-    public static async exportUnifiedV2(
+    private static async handleMarpExport(
         sourceDocument: vscode.TextDocument,
+        content: string,
         options: UnifiedExportOptions
-    ): Promise<{ success: boolean; message: string; content?: string; exportedPath?: string }> {
-        try {
-            const sourcePath = sourceDocument.uri.fsPath;
-
-            // Use document content (more up-to-date than file system)
-            const fullContent = sourceDocument.getText();
-
-            // Step 1: Extract content based on scope (reuse existing extraction methods)
-            let content: string | null = null;
-            switch (options.scope) {
-                case 'full':
-                    content = fullContent;
-                    break;
-                case 'row':
-                    if (options.selection.rowNumber === undefined) {
-                        throw new Error('Row number required for row scope');
-                    }
-                    content = this.extractRowContent(fullContent, options.selection.rowNumber);
-                    break;
-                case 'stack':
-                    if (options.selection.rowNumber === undefined || options.selection.stackIndex === undefined) {
-                        throw new Error('Row number and stack index required for stack scope');
-                    }
-                    content = this.extractStackContent(fullContent, options.selection.rowNumber, options.selection.stackIndex);
-                    break;
-                case 'column':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for column scope');
-                    }
-                    content = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    break;
-                case 'task':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for task scope');
-                    }
-                    const columnContent = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    content = columnContent ? this.extractTaskContent(columnContent, options.selection.taskId) : null;
-                    break;
-            }
-
-            if (!content) {
-                throw new Error(`Could not extract content for scope: ${options.scope}`);
-            }
-
-            // Step 2: Apply tag filtering (still needed, not part of pipeline)
-            let processedContent = this.applyTagFiltering(content, {
-                targetFolder: '',
-                includeFiles: false,
-                includeImages: false,
-                includeVideos: false,
-                includeOtherMedia: false,
-                includeDocuments: false,
-                fileSizeLimitMB: 100,
-                tagVisibility: options.tagVisibility
-            });
-
-            // Step 3: For copy operations (no pack), write directly to file
-            if (!options.packAssets || !options.targetFolder) {
-                // Convert format if needed using ContentPipelineService
-                const formatStrategy: FormatStrategy = options.format === 'presentation' ? 'presentation' : 'keep';
-
-                if (formatStrategy !== 'keep') {
-                    const tempOptions = new OperationOptionsBuilder()
-                        .operation('export')
-                        .source(sourcePath)
-                        .format(formatStrategy)
-                        .build();
-
-                    // Just use FormatConverter directly for in-memory conversion
-                    const { FormatConverter } = require('./services/FormatConverter');
-                    processedContent = FormatConverter.convert(processedContent, formatStrategy);
-                }
-
-                // Ensure YAML frontmatter for kanban format exports
-                if (options.format === 'kanban' || options.format === 'keep') {
-                    processedContent = this.ensureYamlFrontmatter(processedContent);
-                }
-
-                // Write directly to the original file path
-                fs.writeFileSync(sourcePath, processedContent, 'utf8');
-
-                return {
-                    success: true,
-                    message: 'File updated successfully',
-                    exportedPath: sourcePath
-                };
-            }
-
-            // Step 4: Pack assets using ContentPipelineService
-            const sourceDir = path.dirname(sourcePath);
-            const sourceBasename = path.basename(sourcePath, '.md');
-
-            // Build scope suffix with indices
-            let scopeSuffix = '';
-            if (options.scope !== 'full') {
-                const parts: string[] = [];
-
-                if (options.selection.rowNumber !== undefined) {
-                    parts.push(`row${options.selection.rowNumber}`);
-                }
-                if (options.selection.stackIndex !== undefined) {
-                    parts.push(`stack${options.selection.stackIndex}`);
-                }
-                if (options.selection.columnIndex !== undefined) {
-                    parts.push(`col${options.selection.columnIndex}`);
-                }
-
-                if (parts.length === 0) {
-                    scopeSuffix = `-${options.scope}`;
-                } else {
-                    scopeSuffix = `-${parts.join('-')}`;
-                }
-            }
-
-            // Use original filename for full scope, otherwise add scope suffix
-            let targetFilename: string;
-            if (options.scope === 'full') {
-                // Use original filename for full scope
-                targetFilename = `${sourceBasename}.md`;
-            } else {
-                // Add scope suffix for partial exports
-                let scopeSuffix = '';
-                const parts: string[] = [];
-
-                if (options.selection.rowNumber !== undefined) {
-                    parts.push(`row${options.selection.rowNumber}`);
-                }
-                if (options.selection.stackIndex !== undefined) {
-                    parts.push(`stack${options.selection.stackIndex}`);
-                }
-                if (options.selection.columnIndex !== undefined) {
-                    parts.push(`col${options.selection.columnIndex}`);
-                }
-
-                if (parts.length === 0) {
-                    scopeSuffix = `-${options.scope}`;
-                } else {
-                    scopeSuffix = `-${parts.join('-')}`;
-                }
-                
-                targetFilename = `${sourceBasename}${scopeSuffix}.md`;
-            }
-            
-            const targetFolder = options.targetFolder || this.generateDefaultExportFolder(sourcePath);
-
-            // Step 5: Build OperationOptions for ContentPipelineService
-            const formatStrategy: FormatStrategy = options.format === 'presentation' ? 'presentation' : 'keep';
-            const mergeIncludes = options.mergeIncludes ?? (options.scope !== 'full');
-
-            const pipelineOptions = new OperationOptionsBuilder()
-                .operation('export')
-                .source(sourcePath)
-                .targetDir(targetFolder)
-                .targetFilename(targetFilename)
-                .format(formatStrategy)
-                .scope(options.scope as any)
-                .includes({
-                    strategy: mergeIncludes ? 'merge' : 'separate',
-                    processTypes: ['include', 'columninclude', 'taskinclude'],
-                    resolveNested: true,
-                    maxDepth: 10
-                })
-                .exportOptions({
-                    includeAssets: options.packAssets && (
-                        (options.packOptions?.includeImages ?? false) ||
-                        (options.packOptions?.includeVideos ?? false) ||
-                        (options.packOptions?.includeOtherMedia ?? false) ||
-                        (options.packOptions?.includeDocuments ?? false)
-                    ),
-                    assetStrategy: options.packAssets ? 'copy' : 'ignore',
-                    preserveYaml: true
-                })
-                .build();
-
-            // Step 6: Execute pipeline with extracted content
-            const result = await ContentPipelineService.execute(processedContent, pipelineOptions);
-
-            if (!result.success) {
-                throw new Error(result.errors?.join('; ') || 'Export failed');
-            }
-
-            // Step 7: Build success message
-            const mainFile = result.filesWritten.find(f => f.type === 'main');
-            const includeCount = result.filesWritten.filter(f => f.type === 'include').length;
-            const assetCount = result.filesWritten.filter(f => f.type === 'asset').length;
-
-            const successMessage = `Export completed! ${includeCount} includes, ${assetCount} assets included. Time: ${result.executionTime}ms`;
-
-            // Step 8: Process Marp export if needed
-            let finalExportedPath = mainFile?.path;
-            if (options.format && options.format.startsWith('marp') && mainFile?.path) {
-                console.log(`[kanban.exportService.exportUnifiedV2] Processing Marp export for format: ${options.format}`);
-                
-                // Convert format (marp-pdf -> pdf, etc.)
-                const marpOutputFormat = options.format.substring(5); // Remove "marp-" prefix
-                
-                // Determine output path
-                const parsedPath = path.parse(mainFile.path);
-                let outputPath: string;
-                switch (marpOutputFormat) {
-                    case 'pdf':
-                        outputPath = path.join(parsedPath.dir, `${parsedPath.name}.pdf`);
-                        break;
-                    case 'pptx':
-                        outputPath = path.join(parsedPath.dir, `${parsedPath.name}.pptx`);
-                        break;
-                    case 'html':
-                        outputPath = path.join(parsedPath.dir, `${parsedPath.name}.html`);
-                        break;
-                    case 'markdown':
-                        outputPath = path.join(parsedPath.dir, `${parsedPath.name}.md`);
-                        break;
-                    default:
-                        throw new Error(`Unsupported Marp export format: ${marpOutputFormat}`);
-                }
-                
-                // Build additional args
-                const additionalArgs: string[] = [];
-                if ((options as any).marpBrowser && (options as any).marpBrowser !== 'auto') {
-                    additionalArgs.push('--browser', (options as any).marpBrowser);
-                }
-                if ((options as any).marpPreview) {
-                    additionalArgs.push('--preview');
-                }
-                // Add watch option for auto-reload on changes
-                additionalArgs.push('--watch');
-                
-                // Use MarpExportService
-                const marpResult = await MarpExportService.export({
-                    inputFilePath: mainFile.path,
-                    format: marpOutputFormat as MarpOutputFormat,
-                    outputPath,
-                    enginePath: (options as any).marpEnginePath,
-                    theme: (options as any).marpTheme,
-                    allowLocalFiles: true,
-                    additionalArgs
-                });
-                
-                if (marpResult !== undefined) {
-                    finalExportedPath = outputPath;
-                    console.log(`[kanban.exportService.exportUnifiedV2] Marp processing completed: ${outputPath}`);
-                } else {
-                    console.error(`[kanban.exportService.exportUnifiedV2] Marp processing failed`);
-                    // Continue with the original export, don't fail completely
-                }
-            }
-
-            return {
-                success: true,
-                message: successMessage,
-                exportedPath: finalExportedPath
-            };
-
-        } catch (error) {
-            console.error('[kanban.exportService.exportUnifiedV2] Export failed:', error);
-            return {
-                success: false,
-                message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
-            };
-        }
-    }
-
-    /**
-     * Export using Marp (markdown, PDF, PPTX, or HTML)
-     * @param sourceDocument Source document to export from
-     * @param options Export options
-     * @returns Export result
-     */
-    public static async exportWithMarp(
-        sourceDocument: vscode.TextDocument,
-        options: UnifiedExportOptions & {
-            marpTheme?: string;
-            marpEnginePath?: string;
-        } & {
-            format: string; // Allow marp-prefixed formats
-        }
     ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
+        console.log('[kanban.exportService.handleMarpExport] === START MARP EXPORT ===');
+        console.log('[kanban.exportService.handleMarpExport] options:', JSON.stringify(options, null, 2));
+        
         try {
             const sourcePath = sourceDocument.uri.fsPath;
-
-            // Read source content
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source file not found: ${sourcePath}`);
-            }
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
-
-            // Extract content based on scope
-            let content: string | null = null;
-            switch (options.scope) {
-                case 'full':
-                    content = fullContent;
-                    break;
-                case 'row':
-                    if (options.selection.rowNumber === undefined) {
-                        throw new Error('Row number required for row scope');
-                    }
-                    content = this.extractRowContent(fullContent, options.selection.rowNumber);
-                    break;
-                case 'stack':
-                    if (options.selection.rowNumber === undefined || options.selection.stackIndex === undefined) {
-                        throw new Error('Row number and stack index required for stack scope');
-                    }
-                    content = this.extractStackContent(fullContent, options.selection.rowNumber, options.selection.stackIndex);
-                    break;
-                case 'column':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for column scope');
-                    }
-                    content = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    break;
-                case 'task':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for task scope');
-                    }
-                    const columnContent = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    content = columnContent ? this.extractTaskContent(columnContent, options.selection.taskId) : null;
-                    break;
-            }
-
-            if (!content) {
-                throw new Error(`Could not extract content for scope: ${options.scope}`);
-            }
+            console.log('[kanban.exportService.handleMarpExport] sourcePath:', sourcePath);
 
             // Apply tag filtering
             let processedContent = this.applyTagFiltering(content, {
@@ -1997,11 +1692,12 @@ export class ExportService {
                 fileSizeLimitMB: 100,
                 tagVisibility: options.tagVisibility
             });
+            console.log('[kanban.exportService.handleMarpExport] After tag filtering, content length:', processedContent.length);
 
             // FIRST: Convert kanban to presentation format (slides separated by ---)
-            // This matches the "Convert to Presentation Format" export option
-            console.log('[kanban.exportService.exportWithMarp] Converting to presentation format first');
+            console.log('[kanban.exportService.handleMarpExport] Converting to presentation format first');
             processedContent = this.convertToPresentationFormat(processedContent, false);
+            console.log('[kanban.exportService.handleMarpExport] After presentation conversion, content length:', processedContent.length);
 
             // THEN: Add Marp directives (frontmatter) on top of the presentation content
             const marpOptions: MarpConversionOptions = {
@@ -2012,6 +1708,7 @@ export class ExportService {
 
             // Just add Marp frontmatter to the already-converted presentation content
             const marpMarkdown = MarpConverter.addMarpDirectives(processedContent, marpOptions);
+            console.log('[kanban.exportService.handleMarpExport] After adding Marp directives, content length:', marpMarkdown.length);
 
             // Determine output format and path
             let outputFormat: MarpOutputFormat;
@@ -2022,6 +1719,7 @@ export class ExportService {
             }
 
             const sourceBasename = path.basename(sourcePath, '.md');
+            console.log('[kanban.exportService.handleMarpExport] sourceBasename:', sourceBasename);
 
             // Build scope suffix
             let scopeSuffix = '';
@@ -2040,13 +1738,15 @@ export class ExportService {
             }
 
             const targetBasename = `${sourceBasename}${scopeSuffix}`;
+            console.log('[kanban.exportService.handleMarpExport] targetBasename:', targetBasename);
 
             // Ensure target folder exists
             if (!fs.existsSync(options.targetFolder)) {
+                console.log('[kanban.exportService.handleMarpExport] Creating target folder:', options.targetFolder);
                 fs.mkdirSync(options.targetFolder, { recursive: true });
+            } else {
+                console.log('[kanban.exportService.handleMarpExport] Target folder already exists:', options.targetFolder);
             }
-
-            
 
             // Extract Marp output format from options.format (e.g., "marp-pdf" -> "pdf")
             let marpOutputFormat: string;
@@ -2056,38 +1756,84 @@ export class ExportService {
                 throw new Error(`Invalid Marp export format: ${options.format}`);
             }
 
+            console.log('[kanban.exportService.handleMarpExport] marpOutputFormat:', marpOutputFormat);
+
             // Determine output format
             switch (marpOutputFormat) {
                 case 'pdf':
                     outputFormat = 'pdf';
                     outputPath = path.join(options.targetFolder, `${targetBasename}.pdf`);
                     break;
-
                 case 'pptx':
                     outputFormat = 'pptx';
                     outputPath = path.join(options.targetFolder, `${targetBasename}.pptx`);
                     break;
-
                 case 'html':
                     outputFormat = 'html';
                     outputPath = path.join(options.targetFolder, `${targetBasename}.html`);
                     break;
-
                 default:
                     throw new Error(`Unsupported Marp export format: ${marpOutputFormat}`);
             }
 
-            // Export using Marp CLI
-            const exportOptions: any = {
-                format: outputFormat,
-                outputPath,
-                enginePath: options.marpEnginePath,
-                theme: options.marpTheme,
-                allowLocalFiles: true
-            };
+            console.log('[kanban.exportService.handleMarpExport] outputFormat:', outputFormat);
+            console.log('[kanban.exportService.handleMarpExport] outputPath:', outputPath);
 
+            // Save markdown file first with proper filename
+            const markdownPath = path.join(options.targetFolder, `${targetBasename}.md`);
+            console.log('[kanban.exportService.handleMarpExport] markdownPath:', markdownPath);
+            
+            // Check if markdown file already exists and content has changed
+            let shouldUpdateMarkdown = true;
+            if (fs.existsSync(markdownPath)) {
+                const existingContent = fs.readFileSync(markdownPath, 'utf8');
+                if (existingContent === marpMarkdown) {
+                    console.log('[kanban.exportService.handleMarpExport] Markdown content unchanged, skipping file update');
+                    shouldUpdateMarkdown = false;
+                } else {
+                    console.log('[kanban.exportService.handleMarpExport] Markdown content changed, will update file');
+                }
+            } else {
+                console.log('[kanban.exportService.handleMarpExport] Markdown file does not exist, will create');
+            }
+
+            if (shouldUpdateMarkdown) {
+                console.log('[kanban.exportService.handleMarpExport] Writing markdown file with content length:', marpMarkdown.length);
+                fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
+                console.log('[kanban.exportService.handleMarpExport] Markdown file written successfully');
+            }
+
+            // Check if Marp is already watching this file
+            const isAlreadyWatching = this.marpWatchProcesses.get(markdownPath) || false;
+            console.log('[kanban.exportService.handleMarpExport] isAlreadyWatching:', isAlreadyWatching);
+            
+            if (isAlreadyWatching) {
+                console.log('[kanban.exportService.handleMarpExport] Marp already watching this file, only updating markdown content');
+                
+                // Only update the markdown file if content changed
+                if (shouldUpdateMarkdown) {
+                    fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
+                }
+                
+                // Still need to call Marp to ensure watch process is active
+                // Marp will handle avoiding duplicate watch processes
+                console.log('[kanban.exportService.handleMarpExport] Calling Marp to maintain watch process');
+            } else {
+                // First time setup: update markdown file and start Marp watch
+                if (shouldUpdateMarkdown) {
+                    console.log('[kanban.exportService.handleMarpExport] Creating/updating markdown file for first-time Marp watch');
+                    fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
+                }
+                
+                // Mark this file as being watched
+                this.marpWatchProcesses.set(markdownPath, true);
+                console.log('[kanban.exportService.handleMarpExport] Starting Marp with watch mode for the first time');
+            }
+
+            // Always use --watch mode for Marp - it will handle file changes automatically
+            const additionalArgs: string[] = ['--watch'];
+            
             // Add browser option if specified
-            const additionalArgs: string[] = [];
             if (options.marpBrowser && options.marpBrowser !== 'auto') {
                 additionalArgs.push(`--browser`, options.marpBrowser);
             }
@@ -2097,21 +1843,25 @@ export class ExportService {
                 additionalArgs.push(`--preview`);
             }
 
-            // Add watch option for auto-reload on changes
-            additionalArgs.push(`--watch`);
+            // Export using Marp CLI with watch mode
+            const exportOptions: any = {
+                format: outputFormat,
+                outputPath,
+                enginePath: options.marpEnginePath,
+                theme: options.marpTheme,
+                allowLocalFiles: true,
+                inputFilePath: markdownPath,
+                additionalArgs,
+                keepTempFile: true  // IMPORTANT: Keep the markdown file for watch mode to work
+            };
 
-            if (additionalArgs.length > 0) {
-                exportOptions.additionalArgs = additionalArgs;
-            }
+            console.log('[kanban.exportService.handleMarpExport] About to call MarpExportService.export with options:', JSON.stringify(exportOptions, null, 2));
+            console.log('[kanban.exportService.handleMarpExport] MarpExportService available:', typeof MarpExportService);
+            console.log('[kanban.exportService.handleMarpExport] MarpExportService.export available:', typeof MarpExportService?.export);
 
-            // Save markdown file first with proper filename
-            const markdownPath = path.join(options.targetFolder, `${targetBasename}.md`);
-            fs.writeFileSync(markdownPath, marpMarkdown, 'utf8');
-
-            // Update export options to include input file path
-            exportOptions.inputFilePath = markdownPath;
-
+            // ALWAYS call Marp to ensure the watch process is running
             const exportResult = await MarpExportService.export(exportOptions);
+            console.log('[kanban.exportService.handleMarpExport] MarpExportService.export returned:', JSON.stringify(exportResult, null, 2));
 
             return {
                 success: true,
@@ -2120,11 +1870,33 @@ export class ExportService {
             };
 
         } catch (error) {
-            console.error('[kanban.exportService.exportWithMarp] Export failed:', error);
+            console.error('[kanban.exportService.handleMarpExport] Export failed:', error);
+            console.error('[kanban.exportService.handleMarpExport] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
             return {
                 success: false,
                 message: `Marp export failed: ${error instanceof Error ? error.message : String(error)}`
             };
         }
     }
+
+    /**
+     * Stop Marp watch process for a specific file
+     * @param markdownPath Path to the markdown file being watched
+     */
+    public static stopMarpWatch(markdownPath: string): void {
+        if (this.marpWatchProcesses.has(markdownPath)) {
+            this.marpWatchProcesses.delete(markdownPath);
+            console.log(`[kanban.exportService.stopMarpWatch] Stopped watching ${markdownPath}`);
+        }
+    }
+
+    /**
+     * Stop all Marp watch processes
+     */
+    public static stopAllMarpWatches(): void {
+        const count = this.marpWatchProcesses.size;
+        this.marpWatchProcesses.clear();
+        console.log(`[kanban.exportService.stopAllMarpWatches] Stopped ${count} Marp watch processes`);
+    }
+
 }

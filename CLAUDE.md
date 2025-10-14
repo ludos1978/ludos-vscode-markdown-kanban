@@ -29,6 +29,8 @@
 - NEVER ADD ANYTHING I DONT ASK FOR! Do not invent features or requirements when i dont ask for them. If you think they are needed, ask me.
 - When replacing or removing something, allways analyze what it was used for.
 - Allways create completely functional code, never implement any partial, demo or abstract code. Integrate it into the complete codebase.
+- do not mark as deprecated, remove the code completely!
+
 
 ## Error handling:
 - allways check for compile errors
