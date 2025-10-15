@@ -10,7 +10,6 @@ import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './backupManager';
-import { CacheManager } from './cacheManager';
 import { ExternalFileWatcher } from './externalFileWatcher';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
 import { configService, ConfigurationService } from './configurationService';
@@ -52,7 +51,6 @@ export class KanbanWebviewPanel {
     private _messageHandler: MessageHandler;
 
     private _backupManager: BackupManager;
-    private _cacheManager: CacheManager;
     
     // State
     private _board?: KanbanBoard;
@@ -302,7 +300,6 @@ export class KanbanWebviewPanel {
         this._undoRedoManager = new UndoRedoManager(this._panel.webview);
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
-        this._cacheManager = new CacheManager();
 
         
         // REPLACE this line:
@@ -1481,9 +1478,6 @@ export class KanbanWebviewPanel {
             };
         }
         
-        // Connect UndoRedoManager with CacheManager for undo cache persistence
-        this._undoRedoManager.setCacheManager(this._cacheManager, document);
-        
         await this.sendBoardUpdate(false, forceReload);
         this._fileManager.sendFileInfo();
     }
@@ -1573,9 +1567,6 @@ export class KanbanWebviewPanel {
         // Create cache file for crash recovery (only for valid boards with actual content)
         if (board.valid && board.columns && board.columns.length > 0) {
             const document = this._fileManager.getDocument();
-            if (document) {
-                await this._cacheManager.createCacheFile(document, board);
-            }
         }
     }
 
@@ -1703,9 +1694,6 @@ export class KanbanWebviewPanel {
             // Try to save the document
             try {
                 await document.save();
-                
-                // Clean up cache files after successful save
-                await this._cacheManager.cleanupCacheFiles(document);
             } catch (saveError) {
                 // If save fails, it might be because the document was closed
                 console.warn('Failed to save document:', saveError);
@@ -2090,7 +2078,6 @@ export class KanbanWebviewPanel {
 
         // Stop backup timer
         this._backupManager.dispose();
-        this._cacheManager.dispose();
 
         this._panel.dispose();
 
