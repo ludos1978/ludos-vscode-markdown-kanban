@@ -7,40 +7,16 @@ if (typeof window !== 'undefined') {
     window.handleTaskTagClick = null;
 }
 
-// Smart logger for menuOperations
-const menuLogger = window.createSmartLogger ? window.createSmartLogger('[MenuOps]') : {
-    log: () => {},
-    once: () => {},
-    always: console.log.bind(console, '[MenuOps]')
-};
-
 // Global state
 let activeTagMenu = null;
 
 /**
- * Scrolls an element into view only if it's outside the viewport and highlights it
+ * Scrolls an element into view only if it's outside the viewport
  * @param {HTMLElement} element - Element to check and potentially scroll
  * @param {string} type - 'task' or 'column' for logging purposes
- * @param {boolean} highlight - Whether to highlight the element after scrolling (default: true)
  */
-function scrollToElementIfNeeded(element, type = 'element', highlight = true) {
-    menuLogger.always('scrollToElementIfNeeded Called', {
-        hasElement: !!element,
-        type,
-        highlight,
-        elementId: element?.dataset?.columnId || element?.dataset?.taskId,
-        isConnected: element?.isConnected
-    });
-
-    if (!element) {
-        menuLogger.always('scrollToElementIfNeeded ABORTED - no element');
-        return;
-    }
-
-    if (!element.isConnected) {
-        menuLogger.always('scrollToElementIfNeeded ABORTED - element not in DOM');
-        return;
-    }
+function scrollToElementIfNeeded(element, type = 'element') {
+    if (!element) return;
 
     const rect = element.getBoundingClientRect();
 
@@ -53,63 +29,15 @@ function scrollToElementIfNeeded(element, type = 'element', highlight = true) {
         isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
     }
 
-    menuLogger.log('scrollToElementIfNeeded-visibility', {
+    console.log(`[scrollToElementIfNeeded] ${type} visibility check:`, {
         isVisible,
-        rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
-        viewport: { width: window.innerWidth, height: window.innerHeight }
-    }, 'Visibility check');
+        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        willScroll: !isVisible
+    });
 
     if (!isVisible) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        menuLogger.always('scrollToElementIfNeeded Scrolled into view');
-    }
-
-    // Highlight the element to draw attention
-    if (highlight) {
-        if (type === 'column') {
-            // For columns, highlight all parts: header, title, inner, and footer
-            const parts = [
-                element.querySelector('.column-header'),
-                element.querySelector('.column-title'),
-                element.querySelector('.column-inner'),
-                element.querySelector('.column-footer')
-            ].filter(Boolean);
-
-            menuLogger.always('scrollToElementIfNeeded Applying highlight to column parts', {
-                partsCount: parts.length
-            });
-
-            // Apply animation to all parts
-            parts.forEach(part => {
-                part.style.animation = 'none';
-                void part.offsetWidth; // Force reflow
-                part.style.animation = 'highlightFlash 0.6s ease-in-out 2';
-            });
-
-            menuLogger.always('scrollToElementIfNeeded Highlight applied to all column parts');
-
-            // Clean up after animation completes
-            setTimeout(() => {
-                parts.forEach(part => {
-                    part.style.animation = '';
-                });
-                menuLogger.log('scrollToElementIfNeeded-cleanup', {}, 'Highlight cleaned up');
-            }, 1200);
-        } else {
-            // For tasks, highlight the task element directly
-            menuLogger.always('scrollToElementIfNeeded Applying highlight to task');
-
-            element.style.animation = 'none';
-            void element.offsetWidth;
-            element.style.animation = 'highlightFlash 0.6s ease-in-out 2';
-
-            menuLogger.always('scrollToElementIfNeeded Highlight applied');
-
-            setTimeout(() => {
-                element.style.animation = '';
-                menuLogger.log('scrollToElementIfNeeded-cleanup', {}, 'Highlight cleaned up');
-            }, 1200);
-        }
     }
 }
 
@@ -843,10 +771,11 @@ function insertColumnBefore(columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Extract tags from reference column and send to backend
-    const referenceColumn = window.cachedBoard?.columns.find(col => col.id === columnId);
+    // Get reference column and its row
+    const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
+    const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag and stack tag from reference column
+    // Extract row tag from reference column (e.g., #row2)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -854,37 +783,44 @@ function insertColumnBefore(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // Insert BEFORE rules:
-        // - If reference has #stack: new column gets #stack
-        // - If reference doesn't have #stack: new column gets NO #stack, but reference GETS #stack
+        // If reference column has #stack tag:
+        // 1. New column should also have #stack tag
+        // 2. Reference column must keep its #stack tag (ensure it's there)
         const hasStackTag = /#stack\b/i.test(referenceColumn.title);
         if (hasStackTag) {
             tags += ' #stack';
-        }
 
-        // Ensure reference column gets #stack tag (if it doesn't have it already)
-        if (!hasStackTag) {
-            // Add #stack to reference column
-            const trimmedTitle = referenceColumn.title.trim();
-            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : '#stack';
-
-            // Mark as unsaved since we modified the reference column
-            markUnsavedChanges();
+            // Ensure reference column has #stack tag (it should already, but make sure)
+            if (!/#stack\b/i.test(referenceColumn.title)) {
+                // Add #stack to reference column if somehow missing
+                const trimmedTitle = referenceColumn.title.trim();
+                // Ensure space before #stack if title is not empty
+                referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
+            }
         }
     }
 
-    // Use unified operation that communicates with backend
-    insertColumnBefore_unified(columnId, tags.trim());
+    // Cache-first: Create new column and insert before reference column
+    const newColumn = {
+        id: `temp-column-before-${Date.now()}`,
+        title: tags.trim(), // Include row tag and #stack tag if needed
+        tasks: []
+    };
+
+    updateCacheForNewColumn(newColumn, referenceIndex, columnId);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function insertColumnAfter(columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Extract tags from reference column and send to backend
-    const referenceColumn = window.cachedBoard?.columns.find(col => col.id === columnId);
+    // Get reference column and its row
+    const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
+    const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column
+    // Extract row tag from reference column (e.g., #row2)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -892,13 +828,23 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // Insert AFTER rules:
-        // - ALWAYS add #stack to new column
-        tags += ' #stack';
+        // If reference column has #stack tag, new column should also have #stack tag
+        const hasStackTag = /#stack\b/i.test(referenceColumn.title);
+        if (hasStackTag) {
+            tags += ' #stack';
+        }
     }
 
-    // Use unified operation that communicates with backend
-    insertColumnAfter_unified(columnId, tags.trim());
+    // Cache-first: Create new column and insert after reference column
+    const newColumn = {
+        id: `temp-column-after-${Date.now()}`,
+        title: tags.trim(), // Include row tag and #stack tag if needed
+        tasks: []
+    };
+
+    updateCacheForNewColumn(newColumn, referenceIndex + 1, columnId);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function moveColumnLeft(columnId) {
@@ -1738,16 +1684,50 @@ function insertTaskBefore(taskId, columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    insertTaskBefore_unified(taskId, columnId);
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-before-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function insertTaskAfter(taskId, columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    insertTaskAfter_unified(taskId, columnId);
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-after-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex + 1);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function moveTaskToTop(taskId, columnId) {
@@ -2110,9 +2090,17 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
 function addTask(columnId) {
     // Close all menus properly
     closeAllMenus();
-
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    addTask_unified(columnId, { title: '', description: '' });
+    
+    // Cache-first: Only update cached board, no automatic save
+    const newTask = {
+        id: `temp-menu-${Date.now()}`,
+        title: '',
+        description: ''
+    };
+    
+    updateCacheForNewTask(columnId, newTask);
+    
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 // Helper function to unfold a column if it's collapsed
@@ -2134,17 +2122,17 @@ function addTaskAndUnfold(columnId) {
 }
 
 function addColumn(rowNumber) {
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    // Include row tag to place column in the correct row
-    let title = '';
+    // Cache-first: Create new column and add to end
+    const title = (rowNumber && rowNumber > 1) ? `#row${rowNumber}` : '';
+    const newColumn = {
+        id: `temp-column-${Date.now()}`,
+        title: title,
+        tasks: []
+    };
     
-    // Add row tag if rowNumber is provided and greater than 1
-    if (rowNumber && rowNumber > 1) {
-        title = ` #row${rowNumber}`;
-    }
-
-    // Use unified operation that communicates with backend
-    addColumn_unified(title.trim());
+    updateCacheForNewColumn(newColumn);
+    
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 // Tag operations - IMPORTANT: Always use unique IDs, never titles!
