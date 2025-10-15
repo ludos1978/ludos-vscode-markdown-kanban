@@ -16,3 +16,4 @@ src/test/extension.test.js
 .*.md
 tools/reports
 code-analysis-report.json
+tests/kanban-huge-test
