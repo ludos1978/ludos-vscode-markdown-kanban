@@ -14,23 +14,6 @@ import { MarpExportService, MarpOutputFormat } from './services/MarpExportServic
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
-export interface ExportOptions {
-    targetFolder: string;
-    includeFiles: boolean;
-    includeImages: boolean;
-    includeVideos: boolean;
-    includeOtherMedia: boolean;
-    includeDocuments: boolean;
-    fileSizeLimitMB: number;
-    rewriteLinks?: boolean;  // If true, rewrite links to be correct for exported file location
-    tagVisibility?: TagVisibility;
-}
-
-export interface ColumnExportOptions extends ExportOptions {
-    columnIndex: number;
-    columnTitle?: string;
-}
-
 export interface UnifiedExportOptions {
     targetFolder?: string;
     scope: ExportScope;
@@ -61,6 +44,11 @@ export interface UnifiedExportOptions {
     marpEnginePath?: string;     // Custom Marp engine path
     marpBrowser?: string;        // Browser for Marp exports (chrome, edge, firefox, auto)
     marpPreview?: boolean;       // If true, add --preview flag for live preview
+}
+
+export interface ColumnExportOptions extends UnifiedExportOptions {
+    columnIndex: number;
+    columnTitle?: string;
 }
 
 export interface AssetInfo {
@@ -106,9 +94,9 @@ export class ExportService {
      * Apply tag filtering to content based on export options
      * DRY method to avoid duplication
      */
-    private static applyTagFiltering(content: string, options: ExportOptions): string {
-        if (options.tagVisibility && options.tagVisibility !== 'all') {
-            return TagUtils.processMarkdownContent(content, options.tagVisibility);
+    private static applyTagFiltering(content: string, tagVisibility: TagVisibility): string {
+        if (tagVisibility && tagVisibility !== 'all') {
+            return TagUtils.processMarkdownContent(content, tagVisibility);
         }
         return content;
     }
@@ -136,7 +124,7 @@ export class ExportService {
      */
     public static async exportWithAssets(
         sourceDocument: vscode.TextDocument,
-        options: ExportOptions
+        options: UnifiedExportOptions
     ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
         try {
 
@@ -164,7 +152,10 @@ export class ExportService {
 
             // Ensure target folder exists
             try {
-                if (!fs.existsSync(options.targetFolder)) {
+                if (!options.targetFolder || !fs.existsSync(options.targetFolder)) {
+                    if (!options.targetFolder) {
+                        throw new Error('Target folder path is empty or invalid');
+                    }
                     fs.mkdirSync(options.targetFolder, { recursive: true });
                 }
             } catch (error) {
@@ -274,17 +265,21 @@ export class ExportService {
             const columnFileName = `${sourceBasename}-${sanitizedColumnName}`;
 
             // Ensure target folder exists
+            if (!options.targetFolder) {
+                throw new Error('Target folder is required for column export');
+            }
+            const targetFolder: string = options.targetFolder;
             try {
-                if (!fs.existsSync(options.targetFolder)) {
-                    fs.mkdirSync(options.targetFolder, { recursive: true });
+                if (!fs.existsSync(targetFolder)) {
+                    fs.mkdirSync(targetFolder, { recursive: true });
                 }
             } catch (error) {
-                throw new Error(`Failed to create target folder "${options.targetFolder}": ${error}`);
+                throw new Error(`Failed to create target folder "${targetFolder}": ${error}`);
             }
 
             // Verify write permissions
             try {
-                const testFile = path.join(options.targetFolder, '.write-test');
+                const testFile = path.join(targetFolder, '.write-test');
                 fs.writeFileSync(testFile, 'test');
                 fs.unlinkSync(testFile);
             } catch (error) {
@@ -302,7 +297,7 @@ export class ExportService {
                     columnContent,
                     sourceDir,
                     columnFileName,
-                    options.targetFolder,
+                    targetFolder,
                     options,
                     new Set<string>()
                 );
@@ -319,7 +314,7 @@ export class ExportService {
             exportedContent = this.ensureYamlFrontmatter(exportedContent);
 
             // Write the column markdown file to export folder
-            const targetMarkdownPath = path.join(options.targetFolder, `${columnFileName}.md`);
+            const targetMarkdownPath = path.join(targetFolder, `${columnFileName}.md`);
             try {
                 fs.writeFileSync(targetMarkdownPath, exportedContent, 'utf8');
             } catch (error) {
@@ -329,7 +324,7 @@ export class ExportService {
             // Create _not_included.md if there are excluded assets
             if (notIncludedAssets.length > 0) {
                 try {
-                    await this.createNotIncludedFile(notIncludedAssets, options.targetFolder);
+                    await this.createNotIncludedFile(notIncludedAssets, targetFolder);
                 } catch (error) {
                     console.warn(`Failed to create _not_included.md: ${error}`);
                     // Don't fail the entire export for this
@@ -357,12 +352,13 @@ export class ExportService {
 
     /**
      * Process a markdown file and its assets
+     * uses obsolete data structures: ExportOptions
      */
     private static async processMarkdownFile(
         markdownPath: string,
         exportFolder: string,
         fileBasename: string,
-        options: ExportOptions,
+        options: UnifiedExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false
     ): Promise<{
@@ -411,12 +407,12 @@ export class ExportService {
             sourceDir,
             exportFolder,
             fileBasename,
-            options.rewriteLinks || false
+            options.packOptions?.rewriteLinks || false
         );
 
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        const filteredContent = this.applyTagFiltering(rewrittenContent, options);
+        const filteredContent = this.applyTagFiltering(rewrittenContent, options.tagVisibility);
 
         return {
             exportedContent: filteredContent,
@@ -427,17 +423,18 @@ export class ExportService {
 
     /**
      * Process included markdown files
+     * uses obsolete data structures: ExportOptions
      */
     private static async processIncludedFiles(
         content: string,
         sourceDir: string,
         exportFolder: string,
-        options: ExportOptions,
+        options: UnifiedExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
     ): Promise<{ processedContent: string; includeStats: number }> {
-        if (!options.includeFiles) {
+        if (!options.packOptions?.includeFiles || false) {
             return { processedContent: content, includeStats: 0 };
         }
 
@@ -776,24 +773,29 @@ export class ExportService {
 
     /**
      * Filter assets based on export options
+     * uses obsolete data structures: ExportOptions
      */
-    private static filterAssets(assets: AssetInfo[], options: ExportOptions): AssetInfo[] {
+    private static filterAssets(assets: AssetInfo[], options: UnifiedExportOptions): AssetInfo[] {
+        if (!options.packOptions) {
+            throw new Error('Pack options are missing in export options');
+        }
+        const packOptions = options.packOptions!;
         return assets.filter(asset => {
             // Check if asset exists
             if (!asset.exists) { return false; }
 
             // Check file size limit
             const sizeMB = asset.size / (1024 * 1024);
-            if (sizeMB > options.fileSizeLimitMB) { return false; }
+            if (sizeMB > packOptions.fileSizeLimitMB) { return false; }
 
             // Check type-specific inclusion
             switch (asset.type) {
-                case 'markdown': return options.includeFiles; // Markdown files handled separately
-                case 'image': return options.includeImages;
-                case 'video': return options.includeVideos;
-                case 'audio': return options.includeOtherMedia;
-                case 'document': return options.includeDocuments;
-                case 'file': return options.includeFiles;
+                case 'markdown': return packOptions.includeFiles; // Markdown files handled separately
+                case 'image': return packOptions.includeImages;
+                case 'video': return packOptions.includeVideos;
+                case 'audio': return packOptions.includeOtherMedia;
+                case 'document': return packOptions.includeDocuments;
+                case 'file': return packOptions.includeFiles;
                 default: return false;
             }
         });
@@ -1157,7 +1159,7 @@ export class ExportService {
         sourceDir: string,
         fileBasename: string,
         exportFolder: string,
-        options: ExportOptions,
+        options: UnifiedExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
@@ -1208,12 +1210,12 @@ export class ExportService {
             sourceDir,
             exportFolder,
             fileBasename,
-            options.rewriteLinks || false
+            options.packOptions?.rewriteLinks || false
         );
 
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(rewrittenContent, options);
+        let filteredContent = this.applyTagFiltering(rewrittenContent, options.tagVisibility);
 
         // Convert to presentation format if requested
         // When merging includes, skip conversion to preserve raw merged content
@@ -1719,16 +1721,7 @@ export class ExportService {
 
             // For copy operations (no pack), apply tag filtering and format conversion
             if (!options.packAssets || !options.targetFolder) {
-                let processedContent = this.applyTagFiltering(content, {
-                    targetFolder: '',
-                    includeFiles: false,
-                    includeImages: false,
-                    includeVideos: false,
-                    includeOtherMedia: false,
-                    includeDocuments: false,
-                    fileSizeLimitMB: 100,
-                    tagVisibility: options.tagVisibility
-                });
+                let processedContent = this.applyTagFiltering(content, options.tagVisibility);
 
                 // Convert format if needed
                 if (options.format === 'presentation') {
@@ -1807,7 +1800,7 @@ export class ExportService {
                 sourceDir,
                 targetBasename,
                 options.targetFolder,
-                exportOptions,
+                options,
                 new Set<string>(),
                 convertToPresentation,
                 mergeIncludes
@@ -1865,16 +1858,7 @@ export class ExportService {
             console.log('[kanban.exportService.handleMarpExport] sourcePath:', sourcePath);
 
             // Apply tag filtering
-            let processedContent = this.applyTagFiltering(content, {
-                targetFolder: '',
-                includeFiles: false,
-                includeImages: false,
-                includeVideos: false,
-                includeOtherMedia: false,
-                includeDocuments: false,
-                fileSizeLimitMB: 100,
-                tagVisibility: options.tagVisibility
-            });
+            let processedContent = this.applyTagFiltering(content, options.tagVisibility);
             console.log('[kanban.exportService.handleMarpExport] After tag filtering, content length:', processedContent.length);
 
             // FIRST: Convert kanban to presentation format (slides separated by ---)

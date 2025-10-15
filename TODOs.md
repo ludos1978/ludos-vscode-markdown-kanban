@@ -4,6 +4,10 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] analyze the functions in blocks, try to split it up into blocks consisting of lines of code from 3 to 15 lines of code (rather small then big). where each block has a limited number of input and output data. determine the input values, the way the data is processed, read or put on the interface as well as the output values. determine the order of blocks as well. write your observations into different files in the agent folder. in a later step we will try to find duplicate or obsolete code. start now with the analysis. analyze in depth and generalize using similar descriptions as in parts you already discovered.
+
+- [ ] find functionality, functions, data, data structure and well as html structure duplicates in the code. first create lists of all these aspects in all the code files. structure it well to search for duplicates later on. be careful  to process all ts and js and html files in the src folder. Store the results into the agent folder.
+
 - [ ] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
 
 - [x] Create Preset for export:
