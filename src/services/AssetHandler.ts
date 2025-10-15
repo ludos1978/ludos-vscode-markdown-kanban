@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { PathResolver } from './PathResolver';
 import { FileWriter } from './FileWriter';
 import { AssetStrategy } from './OperationOptions';
+import { MIME_TYPE_MAP } from '../shared/fileTypeDefinitions';
 
 /**
  * Unified asset handling utility
@@ -300,24 +301,7 @@ export class AssetHandler {
      * Get MIME type for file extension
      */
     private static getMimeType(extension: string): string {
-        const mimeTypes: Record<string, string> = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.svg': 'image/svg+xml',
-            '.webp': 'image/webp',
-            '.bmp': 'image/bmp',
-            '.ico': 'image/x-icon',
-            '.mp4': 'video/mp4',
-            '.webm': 'video/webm',
-            '.ogg': 'video/ogg',
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.m4a': 'audio/mp4'
-        };
-
-        return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
+        return MIME_TYPE_MAP[extension.toLowerCase()] || 'application/octet-stream';
     }
 
     /**
