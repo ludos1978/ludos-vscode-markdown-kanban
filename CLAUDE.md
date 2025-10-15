@@ -21,16 +21,17 @@
 - Implmement the requested features according to the request. 
 - Keep changes small. 
 - Suggest DRY cleanups if you find functions get similar functionality. 
-- Before creating a new functionality or creating larger code parts allways consult the FUNCTIONS.md. 
 - Keep a FUNCTIONS.md actual and update after each modification, the file keeps track of all functions in the code in front and backend. Each functions is described as: 
 	- path_to_filename-classname_functionname or -functionname when it's not in a class.
 	- a description of the functionality in 1 or 2 lines of keywords or sentences.
+- Before creating a new functionality or creating larger code parts allways consult the FUNCTIONS.md. 
 - Be very careful and think carefully when i type in capital letters! Be extremely careful and check at least three times with different aspects when i use swear-words.$
 - NEVER ADD ANYTHING I DONT ASK FOR! Do not invent features or requirements when i dont ask for them. If you think they are needed, ask me.
 - When replacing or removing something, allways analyze what it was used for.
 - Allways create completely functional code, never implement any partial, demo or abstract code. Integrate it into the complete codebase.
 - do not mark as deprecated, remove the code completely!
-
+- do not modify the general application structure if you have not given an explicit task for it.
+- do not randomly trim values. spaces might be there for a reason. especially in front of strings!
 
 ## Error handling:
 - allways check for compile errors

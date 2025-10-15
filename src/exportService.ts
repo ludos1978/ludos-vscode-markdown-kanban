@@ -1587,74 +1587,16 @@ export class ExportService {
             return '';
         }
 
-        if (mergeIncludes) {
-            // When merging includes, preserve column structure
-            // Don't split tasks into individual slides
-            let presentationContent = '';
-
-            for (const column of board.columns) {
-                const columnTitle = column.title.trim();
-                console.log(`[kanban.exportService.convertToPresentationFormat] Column: "${columnTitle}"`);
-
-                // Add column as a section with ## header
-                if (columnTitle) {
-                    presentationContent += `## ${columnTitle}\n\n`;
-                }
-
-                // Add tasks under the column (not as separate slides)
-                if (column.tasks && column.tasks.length > 0) {
-                    for (const task of column.tasks) {
-                        // Add task with its title and description
-                        const taskTitle = task.title.replace(/^- \[ \]\s*/, '').trim();
-                        presentationContent += `${taskTitle}\n`;
-
-                        if (task.description && task.description.trim()) {
-                            presentationContent += `\n${task.description.trim()}\n`;
-                        }
-                        presentationContent += '\n';
-                    }
-                }
-
-                // Separate columns with slide separator
-                presentationContent += '---\n\n';
-            }
-
-            console.log(`[kanban.exportService.convertToPresentationFormat] Preserved column structure for ${board.columns.length} columns (mergeIncludes mode)`);
-            return presentationContent;
-
-        } else {
-            // Build slides with column titles as section headers
-            const slides: string[] = [];
-
-            for (const column of board.columns) {
-                // Add column title as a slide
-                // The parser already removed "## " from column.title, just use it directly
-                const columnTitle = column.title.trim();
-
-                console.log(`[kanban.exportService.convertToPresentationFormat] Column title: "${columnTitle}"`);
-
-                // Add the column title as-is (parser already stripped the kanban ## structure)
-                if (columnTitle) {
-                    slides.push(columnTitle);
-                    console.log(`[kanban.exportService.convertToPresentationFormat]   Added column title as slide`);
-                }
-
-                // Convert column tasks to slides
-                if (column.tasks && column.tasks.length > 0) {
-                    const columnSlides = PresentationParser.tasksToPresentation(column.tasks);
-                    // Remove the trailing newline from tasksToPresentation and split by slide separator
-                    const taskSlideArray = columnSlides.trim().split(/\n\n---\n\n/);
-                    slides.push(...taskSlideArray);
+        const slides: string[] = [];
+        for (const column of board.columns) {
+            slides.push(column.title);
+            if (column.tasks && column.tasks.length > 0) {
+                for (const task of column.tasks) {
+                    slides.push(`${task.title}\n\n${task.description}`);
                 }
             }
-
-            console.log(`[kanban.exportService.convertToPresentationFormat] Converted ${board.columns.length} columns with column titles as slides`);
-
-            // Join all slides with separator
-            const presentationContent = slides.join('\n\n---\n\n') + '\n';
-
-            return presentationContent;
         }
+        return slides.join('\n\n---\n\n') + '\n';
     }
 
     /**
@@ -1854,9 +1796,6 @@ export class ExportService {
         console.log('[kanban.exportService.handleMarpExport] options:', JSON.stringify(options, null, 2));
         
         try {
-            const sourcePath = sourceDocument.uri.fsPath;
-            console.log('[kanban.exportService.handleMarpExport] sourcePath:', sourcePath);
-
             // Apply tag filtering
             let processedContent = this.applyTagFiltering(content, options.tagVisibility);
             console.log('[kanban.exportService.handleMarpExport] After tag filtering, content length:', processedContent.length);
@@ -1885,7 +1824,9 @@ export class ExportService {
                 throw new Error('Target folder is required for Marp export');
             }
 
+            const sourcePath = sourceDocument.uri.fsPath;
             const sourceBasename = path.basename(sourcePath, '.md');
+            console.log('[kanban.exportService.handleMarpExport] sourcePath:', sourcePath);
             console.log('[kanban.exportService.handleMarpExport] sourceBasename:', sourceBasename);
 
             // Build scope suffix
