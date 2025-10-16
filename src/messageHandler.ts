@@ -565,6 +565,7 @@ export class MessageHandler {
                 await this.handleSelectExportFolder(message.defaultPath);
                 break;
 
+            // Marp export operations
             case 'getMarpThemes':
                 await this.handleGetMarpThemes();
                 break;
@@ -1865,6 +1866,696 @@ export class MessageHandler {
         }
     }
 
+    private async handleAskOpenExportFolder(exportPath: string): Promise<void> {
+        try {
+            const folderPath = path.dirname(exportPath);
+            const result = await vscode.window.showInformationMessage(
+                'Export completed successfully!',
+                'Open Export Folder',
+                'Dismiss'
+            );
+
+            if (result === 'Open Export Folder') {
+                await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), true);
+            }
+        } catch (error) {
+            console.error('Error handling export folder open request:', error);
+        }
+    }
+
+    /**
+     * Handle request for tracked files debug information
+     */
+    private async handleGetTrackedFilesDebugInfo(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            // Collect debug information from various sources
+            const debugData = await this.collectTrackedFilesDebugInfo();
+
+            // Send debug data to frontend
+            panel._panel.webview.postMessage({
+                type: 'trackedFilesDebugInfo',
+                data: debugData
+            });
+
+        } catch (error) {
+            console.error('[MessageHandler] Error getting tracked files debug info:', error);
+        }
+    }
+
+    /**
+     * Handle request to clear tracked files cache
+     */
+    private async handleClearTrackedFilesCache(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            // Clear various caches
+            await this.clearAllTrackedFileCaches();
+
+            // Confirm cache clear
+            panel._panel.webview.postMessage({
+                type: 'debugCacheCleared'
+            });
+
+
+        } catch (error) {
+            console.error('[MessageHandler] Error clearing tracked files cache:', error);
+        }
+    }
+
+    /**
+     * Handle request to reload all included files (images, videos, includes)
+     */
+    private async handleReloadAllIncludedFiles(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            let reloadCount = 0;
+
+            // Reload all include files by refreshing their content from disk
+            const includeFileMap = (panel as any)._includeFiles;
+            if (includeFileMap) {
+                for (const [relativePath, fileData] of includeFileMap) {
+                    try {
+                        // Read fresh content from disk
+                        const freshContent = await (panel as any)._readFileContent(relativePath);
+                        if (freshContent !== null) {
+                            // Update content and reset baseline to fresh content
+                            (panel as any).updateIncludeFileContent(relativePath, freshContent, true);
+                            reloadCount++;
+                        }
+                    } catch (error) {
+                        console.warn(`[MessageHandler] Failed to reload include file ${relativePath}:`, error);
+                    }
+                }
+            }
+
+            // Trigger a full webview refresh to reload all media and includes
+            const document = this._fileManager.getDocument();
+            if (document) {
+                await panel.loadMarkdownFile(document);
+            }
+
+            // Send confirmation message
+            panel._panel.webview.postMessage({
+                type: 'allIncludedFilesReloaded',
+                reloadCount: reloadCount
+            });
+
+
+        } catch (error) {
+            console.error('[MessageHandler] Error reloading all included files:', error);
+        }
+    }
+
+    /**
+     * Handle request to save an individual file
+     */
+    private async handleSaveIndividualFile(filePath: string, isMainFile: boolean): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            if (isMainFile) {
+                // Save the main kanban file by triggering the existing save mechanism
+                await panel.saveToMarkdown();
+
+                panel._panel.webview.postMessage({
+                    type: 'individualFileSaved',
+                    filePath: filePath,
+                    isMainFile: true,
+                    success: true
+                });
+            } else {
+                // For include files, save the current content to disk
+                const includeFileMap = (panel as any)._includeFiles;
+                const includeFile = includeFileMap?.get(filePath);
+
+                if (includeFile && includeFile.content) {
+                    // Write the current content to disk
+                    await (panel as any)._writeFileContent(filePath, includeFile.content);
+
+                    // Update baseline to match saved content
+                    includeFile.baseline = includeFile.content;
+                    includeFile.hasUnsavedChanges = false;
+                    includeFile.lastModified = Date.now();
+
+
+                    panel._panel.webview.postMessage({
+                        type: 'individualFileSaved',
+                        filePath: filePath,
+                        isMainFile: false,
+                        success: true
+                    });
+                } else {
+                    console.warn(`[MessageHandler] Include file not found or has no content: ${filePath}`);
+
+                    panel._panel.webview.postMessage({
+                        type: 'individualFileSaved',
+                        filePath: filePath,
+                        isMainFile: false,
+                        success: false,
+                        error: 'File not found or has no content'
+                    });
+                }
+            }
+
+        } catch (error) {
+            console.error(`[MessageHandler] Error saving individual file ${filePath}:`, error);
+
+            const panel = this._getWebviewPanel();
+            if (panel) {
+                panel._panel.webview.postMessage({
+                    type: 'individualFileSaved',
+                    filePath: filePath,
+                    isMainFile: isMainFile,
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+    }
+
+    /**
+     * Handle request to reload an individual file from saved state
+     */
+    private async handleReloadIndividualFile(filePath: string, isMainFile: boolean): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            if (isMainFile) {
+                // Reload the main file by refreshing from the document
+                const document = this._fileManager.getDocument();
+                if (document) {
+                    await panel.loadMarkdownFile(document);
+                }
+
+                panel._panel.webview.postMessage({
+                    type: 'individualFileReloaded',
+                    filePath: filePath,
+                    isMainFile: true,
+                    success: true
+                });
+            } else {
+                // For include files, reload content from disk
+                const includeFileMap = (panel as any)._includeFiles;
+                const includeFile = includeFileMap?.get(filePath);
+
+
+                if (includeFile) {
+                    try {
+                        // Read fresh content from disk
+                        const freshContent = await (panel as any)._readFileContent(filePath);
+
+                        if (freshContent !== null) {
+                            // Update content and reset baseline
+                            includeFile.content = freshContent;
+                            includeFile.baseline = freshContent;
+                            includeFile.hasUnsavedChanges = false;
+                            includeFile.hasExternalChanges = false; // Clear external changes flag
+                            includeFile.isUnsavedInEditor = false; // Clear editor unsaved flag
+                            includeFile.externalContent = undefined; // Clear external content
+                            includeFile.lastModified = Date.now();
+
+
+                            // Trigger webview refresh to show updated content
+                            const document = this._fileManager.getDocument();
+                            if (document) {
+                                await panel.loadMarkdownFile(document);
+                            }
+
+                            panel._panel.webview.postMessage({
+                                type: 'individualFileReloaded',
+                                filePath: filePath,
+                                isMainFile: false,
+                                success: true
+                            });
+                        } else {
+                            console.warn(`[MessageHandler] Could not read include file: ${filePath}`);
+
+                            panel._panel.webview.postMessage({
+                                type: 'individualFileReloaded',
+                                filePath: filePath,
+                                isMainFile: false,
+                                success: false,
+                                error: 'Could not read file from disk'
+                            });
+                        }
+                    } catch (readError) {
+                        console.error(`[MessageHandler] Error reading include file ${filePath}:`, readError);
+
+                        panel._panel.webview.postMessage({
+                            type: 'individualFileReloaded',
+                            filePath: filePath,
+                            isMainFile: false,
+                            success: false,
+                            error: readError instanceof Error ? readError.message : String(readError)
+                        });
+                    }
+                } else {
+                    console.warn(`[MessageHandler] Include file not tracked: ${filePath}`);
+
+                    panel._panel.webview.postMessage({
+                        type: 'individualFileReloaded',
+                        filePath: filePath,
+                        isMainFile: false,
+                        success: false,
+                        error: 'File not tracked'
+                    });
+                }
+            }
+
+        } catch (error) {
+            console.error(`[MessageHandler] Error reloading individual file ${filePath}:`, error);
+
+            const panel = this._getWebviewPanel();
+            if (panel) {
+                panel._panel.webview.postMessage({
+                    type: 'individualFileReloaded',
+                    filePath: filePath,
+                    isMainFile: isMainFile,
+                    success: false,
+                    error: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+    }
+
+    /**
+     * Collect comprehensive debug information about tracked files
+     */
+    /**
+     * Get unified file state data that all systems should use for consistency
+     * THIS METHOD MUST BE USED BY ALL SYSTEMS - FILE STATE WINDOW, POPUPS, CONFLICT RESOLUTION
+     */
+    public getUnifiedFileState(): {
+        hasInternalChanges: boolean;
+        hasExternalChanges: boolean;
+        isUnsavedInEditor: boolean;
+        documentVersion: number;
+        lastDocumentVersion: number;
+    } {
+        const document = this._fileManager.getDocument();
+        if (!document) {
+            return {
+                hasInternalChanges: false,
+                hasExternalChanges: false,
+                isUnsavedInEditor: false,
+                documentVersion: 0,
+                lastDocumentVersion: -1
+            };
+        }
+
+        const fileStateManager = getFileStateManager();
+        const mainFileState = fileStateManager.getFileState(document.uri.fsPath);
+
+        if (!mainFileState) {
+            // Fallback to legacy method if state not yet initialized
+            const panel = this._getWebviewPanel();
+            const documentVersion = document.version;
+            const lastDocumentVersion = panel ? (panel as any)._lastDocumentVersion || -1 : -1;
+
+            return {
+                hasInternalChanges: panel ? (panel as any)._hasUnsavedChanges || false : false,
+                hasExternalChanges: panel ? (panel as any)._hasExternalUnsavedChanges || false : false,
+                isUnsavedInEditor: document.isDirty,
+                documentVersion,
+                lastDocumentVersion
+            };
+        }
+
+        return {
+            hasInternalChanges: mainFileState.needsSave,
+            hasExternalChanges: mainFileState.needsReload,
+            isUnsavedInEditor: mainFileState.backend.isDirtyInEditor,
+            documentVersion: mainFileState.backend.documentVersion,
+            lastDocumentVersion: mainFileState.backend.documentVersion - 1 // Approximation
+        };
+    }
+
+    private async collectTrackedFilesDebugInfo(): Promise<any> {
+        const document = this._fileManager.getDocument();
+        const fileStateManager = getFileStateManager();
+
+        // Get unified file state that all systems should use
+        const fileState = this.getUnifiedFileState();
+
+
+        // Use preserved file path from FileManager, which persists even when document is closed
+        const mainFilePath = this._fileManager.getFilePath() || document?.uri.fsPath || 'Unknown';
+        const mainFileState = mainFilePath !== 'Unknown' ? fileStateManager.getFileState(mainFilePath) : undefined;
+
+        const mainFileInfo = {
+            path: mainFilePath,
+            lastModified: mainFileState?.backend.lastModified?.toISOString() || 'Unknown',
+            exists: mainFileState?.backend.exists ?? (document ? true : false),
+            watcherActive: true, // Assume active for now
+            hasInternalChanges: fileState.hasInternalChanges,
+            hasExternalChanges: fileState.hasExternalChanges,
+            documentVersion: fileState.documentVersion,
+            lastDocumentVersion: fileState.lastDocumentVersion,
+            isUnsavedInEditor: fileState.isUnsavedInEditor,
+            baseline: mainFileState?.frontend.baseline || ''
+        };
+
+
+        // External file watchers
+        const externalWatchers: any[] = [];
+        let watcherDebugInfo: any = {};
+        try {
+            // Get external file watcher instance
+            const { ExternalFileWatcher } = require('./externalFileWatcher');
+            const watcher = ExternalFileWatcher.getInstance();
+
+            // Get debug information from watcher
+            watcherDebugInfo = watcher.getDebugInfo();
+
+            // Transform watcher info for display
+            watcherDebugInfo.watchers.forEach((watcherInfo: any) => {
+                externalWatchers.push({
+                    path: watcherInfo.path,
+                    active: watcherInfo.active,
+                    type: watcherInfo.type
+                });
+            });
+        } catch (error) {
+            console.warn('[Debug] Could not access ExternalFileWatcher:', error);
+        }
+
+        // Include files from FileStateManager
+        const includeFiles: any[] = [];
+        const allStates = fileStateManager.getAllStates();
+
+
+        for (const [filePath, fileStateData] of allStates) {
+            // Skip main file - we handle it separately
+            if (filePath === mainFilePath) {
+                continue;
+            }
+
+
+            includeFiles.push({
+                path: fileStateData.relativePath,
+                type: fileStateData.fileType,
+                exists: fileStateData.backend.exists,
+                lastModified: fileStateData.backend.lastModified?.toISOString() || 'Unknown',
+                size: 'Unknown', // Size not tracked in FileStateManager yet
+                hasInternalChanges: fileStateData.needsSave,
+                hasExternalChanges: fileStateData.needsReload,
+                isUnsavedInEditor: fileStateData.backend.isDirtyInEditor,
+                baseline: fileStateData.frontend.baseline,
+                content: fileStateData.frontend.content,
+                externalContent: '', // Not tracked separately anymore
+                contentLength: fileStateData.frontend.content.length,
+                baselineLength: fileStateData.frontend.baseline.length,
+                externalContentLength: 0
+            });
+        }
+
+        // Conflict management status
+        const conflictManager = {
+            healthy: watcherDebugInfo.listenerEnabled || false,
+            trackedFiles: watcherDebugInfo.totalWatchedFiles || (1 + includeFiles.length),
+            activeWatchers: watcherDebugInfo.totalWatchers || 0,
+            pendingConflicts: 0,
+            watcherFailures: 0,
+            listenerEnabled: watcherDebugInfo.listenerEnabled || false,
+            documentSaveListenerActive: watcherDebugInfo.documentSaveListenerActive || false
+        };
+
+        // System health
+        const systemHealth = {
+            overall: (watcherDebugInfo.totalWatchers > 0 && includeFiles.length > 0) ? 'good' : 'warn',
+            extensionState: 'active',
+            memoryUsage: 'normal',
+            lastError: null
+        };
+
+        return {
+            mainFile: mainFileInfo.path,
+            mainFileLastModified: mainFileInfo.lastModified,
+            fileWatcherActive: mainFileInfo.watcherActive,
+            externalWatchers: externalWatchers,
+            includeFiles: includeFiles,
+            conflictManager: conflictManager,
+            systemHealth: systemHealth,
+            hasUnsavedChanges: this._getWebviewPanel() ? (this._getWebviewPanel() as any)._hasUnsavedChanges || false : false,
+            timestamp: new Date().toISOString(),
+            watcherDetails: mainFileInfo, // FIX: Send main file info instead of external watcher info
+            externalWatcherDebugInfo: watcherDebugInfo // Keep external watcher info separate
+        };
+    }
+
+    /**
+     * Clear all tracked file caches
+     */
+    private async clearAllTrackedFileCaches(): Promise<void> {
+        const panel = this._getWebviewPanel();
+
+        if (panel) {
+            // Clear include file caches
+            try {
+                const includeFileMap = (panel as any)._includeFiles;
+                if (includeFileMap) {
+                    includeFileMap.clear();
+                }
+
+                // Clear cached board state if needed
+                (panel as any)._cachedBoardFromWebview = null;
+
+                // Trigger a fresh load
+                const document = this._fileManager.getDocument();
+                if (document) {
+                    await panel.loadMarkdownFile(document, false);
+                }
+            } catch (error) {
+                console.warn('[Debug] Error clearing panel caches:', error);
+            }
+        }
+    }
+
+    /**
+     * Handle updating task content after strikethrough deletion
+     */
+    private async handleUpdateTaskFromStrikethroughDeletion(message: any): Promise<void> {
+        const { taskId, columnId, newContent, contentType } = message;
+
+        try {
+            const board = this._getCurrentBoard();
+            if (!board) {
+                console.error('🗑️ Backend: No current board available for strikethrough deletion');
+                return;
+            }
+
+
+            // Content is already in markdown format from frontend
+            const markdownContent = newContent;
+
+            // Update the appropriate field based on content type
+            const updateData: any = {};
+            if (contentType === 'title') {
+                updateData.title = markdownContent;
+            } else if (contentType === 'description') {
+                updateData.description = markdownContent;
+            } else {
+                console.warn('🗑️ Backend: Unknown content type, defaulting to title');
+                updateData.title = markdownContent;
+            }
+
+            await this.performBoardAction(() =>
+                this._boardOperations.editTask(board, taskId, columnId, updateData)
+            );
+
+
+        } catch (error) {
+            console.error('🗑️ Backend: Error updating task from strikethrough deletion:', error);
+            vscode.window.showErrorMessage('Failed to update task content');
+        }
+    }
+
+    /**
+     * Handle updating column title after strikethrough deletion
+     */
+    private async handleUpdateColumnTitleFromStrikethroughDeletion(message: any): Promise<void> {
+        const { columnId, newTitle } = message;
+
+        try {
+            const board = this._getCurrentBoard();
+            if (!board) {
+                console.error('🗑️ Backend: No current board available for strikethrough deletion');
+                return;
+            }
+
+
+            // Content is already in markdown format from frontend
+            const markdownTitle = newTitle;
+
+            // Update the column title
+            await this.performBoardAction(() =>
+                this._boardOperations.editColumnTitle(board, columnId, markdownTitle)
+            );
+
+
+        } catch (error) {
+            console.error('🗑️ Backend: Error updating column title from strikethrough deletion:', error);
+            vscode.window.showErrorMessage('Failed to update column title');
+        }
+    }
+
+    
+
+    
+
+    /**
+     * Handle Marp export
+     */
+    /**
+     * Handle get Marp themes request
+     */
+    private async handleGetMarpThemes(): Promise<void> {
+        console.log('[kanban.messageHandler.handleGetMarpThemes] Starting to get Marp themes...');
+        try {
+            const themes = await MarpExportService.getAvailableThemes();
+            console.log('[kanban.messageHandler.handleGetMarpThemes] Got themes:', themes);
+            
+            const panel = this._getWebviewPanel();
+            console.log('[kanban.messageHandler.handleGetMarpThemes] Panel result:', panel);
+            
+            if (panel && panel._panel && panel._panel.webview) {
+                const message = {
+                    type: 'marpThemesAvailable',
+                    themes: themes
+                };
+                console.log('[kanban.messageHandler.handleGetMarpThemes] Sending message:', message);
+                
+                panel._panel.webview.postMessage(message);
+            } else {
+                console.error('[kanban.messageHandler.handleGetMarpThemes] No webview panel available');
+                console.error('[kanban.messageHandler.handleGetMarpThemes] Panel exists:', !!panel);
+                console.error('[kanban.messageHandler.handleGetMarpThemes] Panel._panel exists:', !!(panel?._panel));
+                console.error('[kanban.messageHandler.handleGetMarpThemes] Webview exists:', !!(panel?._panel?.webview));
+            }
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleGetMarpThemes] Error:', error);
+            
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel && panel._panel.webview) {
+                const message = {
+                    type: 'marpThemesAvailable',
+                    themes: ['default'], // Fallback
+                    error: error instanceof Error ? error.message : String(error)
+                };
+                console.log('[kanban.messageHandler.handleGetMarpThemes] Sending error message:', message);
+                panel._panel.webview.postMessage(message);
+            }
+        }
+    }
+
+    /**
+     * Handle poll for Marp themes (fallback mechanism)
+     */
+    private async handlePollMarpThemes(): Promise<void> {
+        console.log('[kanban.messageHandler.handlePollMarpThemes] Polling for Marp themes...');
+        try {
+            // Check if we have cached themes from the previous attempt
+            const cachedThemes = (globalThis as any).pendingMarpThemes;
+            if (cachedThemes) {
+                console.log('[kanban.messageHandler.handlePollMarpThemes] Found cached themes:', cachedThemes);
+                
+                const panel = this._getWebviewPanel();
+                if (panel && panel._panel && panel._panel.webview) {
+                    panel._panel.webview.postMessage({
+                        type: 'marpThemesAvailable',
+                        themes: cachedThemes
+                    });
+                    // Clear the cache
+                    delete (globalThis as any).pendingMarpThemes;
+                    return;
+                }
+            }
+            
+            // If no cached themes, try to get them again
+            const themes = await MarpExportService.getAvailableThemes();
+            console.log('[kanban.messageHandler.handlePollMarpThemes] Got fresh themes:', themes);
+            
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpThemesAvailable',
+                    themes: themes
+                });
+            } else {
+                console.error('[kanban.messageHandler.handlePollMarpThemes] Still no webview panel available');
+            }
+        } catch (error) {
+            console.error('[kanban.messageHandler.handlePollMarpThemes] Error:', error);
+        }
+    }
+
+    /**
+     * Open a markdown file in Marp preview
+     */
+    private async handleOpenInMarpPreview(filePath: string): Promise<void> {
+        try {
+            await MarpExtensionService.openInMarpPreview(filePath);
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Check Marp status and send to frontend
+     */
+    private async handleCheckMarpStatus(): Promise<void> {
+        try {
+            const marpExtensionStatus = MarpExtensionService.getMarpStatus();
+            const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
+            const engineFileExists = MarpExportService.engineFileExists();
+
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpStatus',
+                    extensionInstalled: marpExtensionStatus.installed,
+                    extensionVersion: marpExtensionStatus.version,
+                    cliAvailable: marpCliAvailable,
+                    engineFileExists: engineFileExists
+                });
+            } else {
+                console.error('[kanban.messageHandler.handleCheckMarpStatus] No webview panel available');
+            }
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleCheckMarpStatus] Error:', error);
+        }
+    }
+
+    /**
+     * Present kanban content with Marp
+     */
+    /**
+     * Start auto-export on file save
+     */
+    /**
+     * Stop auto-export
+     */
     private async handleStopAutoExport(): Promise<void> {
         try {
             console.log('[kanban.messageHandler.handleStopAutoExport] Stopping auto-export');
