@@ -15,46 +15,8 @@ import { MarpExportService, MarpOutputFormat } from './services/MarpExportServic
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
-export interface UnifiedExportOptions {
-    targetFolder?: string;
-    scope: ExportScope;
-    format: ExportFormat;
-    tagVisibility: TagVisibility;
-    packAssets: boolean;
-    mergeIncludes?: boolean;  // If true, merge all includes into one file; if false, keep as separate files
-    packOptions?: {
-        includeFiles: boolean;
-        includeImages: boolean;
-        includeVideos: boolean;
-        includeOtherMedia: boolean;
-        includeDocuments: boolean;
-        fileSizeLimitMB: number;
-        rewriteLinks: boolean;  // If true, rewrite links to be correct for exported file location
-    };
-    selection: {
-        rowNumber?: number;
-        stackIndex?: number;
-        columnIndex?: number;
-        taskId?: string;
-        columnId?: string;
-    };
-    // New export behavior options
-    autoExportOnSave?: boolean;  // If true, automatically re-export when file is saved
-    openAfterExport?: boolean;   // If true, open exported file in browser/viewer after export
-    marpTheme?: string;          // Marp theme (for Marp exports)
-    marpEnginePath?: string;     // Custom Marp engine path
-    marpBrowser?: string;        // Browser for Marp exports (chrome, edge, firefox, auto)
-    marpPreview?: boolean;       // If true, add --preview flag for live preview
-}
-
-export interface ColumnExportOptions extends UnifiedExportOptions {
-    columnIndex: number;
-    columnTitle?: string;
-}
-
 /**
- * New unified export options - consolidates ALL export types
- * Replaces: UnifiedExportOptions (partially), exportWithAssets options, exportColumn options
+ * Export options - SINGLE unified system for ALL exports
  */
 export interface NewExportOptions {
     // SCOPE: What to export
@@ -189,7 +151,7 @@ export class ExportService {
         markdownPath: string,
         exportFolder: string,
         fileBasename: string,
-        options: UnifiedExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false
     ): Promise<{
@@ -260,7 +222,7 @@ export class ExportService {
         content: string,
         sourceDir: string,
         exportFolder: string,
-        options: UnifiedExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
@@ -606,7 +568,7 @@ export class ExportService {
      * Filter assets based on export options
      * uses obsolete data structures: ExportOptions
      */
-    private static filterAssets(assets: AssetInfo[], options: UnifiedExportOptions): AssetInfo[] {
+    private static filterAssets(assets: AssetInfo[], options: NewExportOptions): AssetInfo[] {
         // If packing is disabled or no pack options, return empty array
         if (!options.packAssets || !options.packOptions) {
             return [];
@@ -618,16 +580,17 @@ export class ExportService {
 
             // Check file size limit
             const sizeMB = asset.size / (1024 * 1024);
-            if (sizeMB > packOptions.fileSizeLimitMB) { return false; }
+            const fileSizeLimitMB = packOptions.fileSizeLimitMB ?? 100;
+            if (sizeMB > fileSizeLimitMB) { return false; }
 
             // Check type-specific inclusion
             switch (asset.type) {
-                case 'markdown': return packOptions.includeFiles; // Markdown files handled separately
-                case 'image': return packOptions.includeImages;
-                case 'video': return packOptions.includeVideos;
-                case 'audio': return packOptions.includeOtherMedia;
-                case 'document': return packOptions.includeDocuments;
-                case 'file': return packOptions.includeFiles;
+                case 'markdown': return packOptions.includeFiles ?? false;
+                case 'image': return packOptions.includeImages ?? false;
+                case 'video': return packOptions.includeVideos ?? false;
+                case 'audio': return packOptions.includeOtherMedia ?? false;
+                case 'document': return packOptions.includeDocuments ?? false;
+                case 'file': return packOptions.includeFiles ?? false;
                 default: return false;
             }
         });
@@ -991,7 +954,7 @@ export class ExportService {
         sourceDir: string,
         fileBasename: string,
         exportFolder: string,
-        options: UnifiedExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
@@ -1665,37 +1628,13 @@ export class ExportService {
 
             console.log(`[kanban.exportService.transformContentNew] packAssets: ${options.packAssets}, format: ${options.format}, convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
 
-            // Build UnifiedExportOptions for processMarkdownContent
-            const legacyOptions: UnifiedExportOptions = {
-                scope: options.scope,
-                format: options.format === 'marp' ? 'presentation' : options.format,
-                tagVisibility: options.tagVisibility,
-                packAssets: options.packAssets,
-                mergeIncludes: mergeIncludes,
-                packOptions: options.packOptions ? {
-                    includeFiles: options.packOptions.includeFiles ?? false,
-                    includeImages: options.packOptions.includeImages ?? false,
-                    includeVideos: options.packOptions.includeVideos ?? false,
-                    includeOtherMedia: options.packOptions.includeOtherMedia ?? false,
-                    includeDocuments: options.packOptions.includeDocuments ?? false,
-                    fileSizeLimitMB: options.packOptions.fileSizeLimitMB ?? 100,
-                    rewriteLinks: options.packOptions.rewriteLinks ?? false
-                } : undefined,
-                selection: options.selection || {},
-                targetFolder: options.targetFolder,
-                openAfterExport: options.openAfterExport,
-                marpTheme: options.marpTheme,
-                marpEnginePath: options.marpEnginePath,
-                marpBrowser: options.marpBrowser
-            };
-
             // Use existing processMarkdownContent (it does everything)
             const processed = await this.processMarkdownContent(
                 result,
                 sourceDir,
                 sourceBasename,
                 options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
-                legacyOptions,
+                options,
                 new Set<string>(),
                 convertToPresentation,
                 mergeIncludes

@@ -4611,16 +4611,16 @@ function applyExportPreset() {
         window.currentKanbanFile.split('/').pop().replace('.md', '') : 'kanban';
     
     // Get absolute workspace path for export folder generation
-    const getWorkspacePath = () => {
-        if (window.currentKanbanFile) {
-            // Extract workspace path from current file path
-            const filePathParts = window.currentKanbanFile.split('/');
-            // Find the workspace root (assuming the file is in a workspace folder)
-            // For now, use the directory containing the current file as base
-            return window.currentKanbanFile.replace(/\/[^\/]*\.md$/, '');
-        }
-        return '_Export'; // Fallback
-    };
+    // const getWorkspacePath = () => {
+    //     if (window.currentKanbanFile) {
+    //         // Extract workspace path from current file path
+    //         const filePathParts = window.currentKanbanFile.split('/');
+    //         // Find the workspace root (assuming the file is in a workspace folder)
+    //         // For now, use the directory containing the current file as base
+    //         return window.currentKanbanFile.replace(/\/[^\/]*\.md$/, '');
+    //     }
+    //     return '_Export'; // Fallback
+    // };
 
     switch (preset) {
         case 'marp-presentation':
@@ -4668,7 +4668,7 @@ function applyPresetMarpPresentation(currentFilename) {
     
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_Export/${currentFilename}-all`;
+    const exportFolder = `${workspacePath}/_Export`;
     document.getElementById('export-folder').value = exportFolder;
     
     // Pack Assets into Export Folder: Off
@@ -4705,7 +4705,7 @@ function applyPresetMarpPdf(currentFilename) {
     
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_Export/${currentFilename}-all`;
+    const exportFolder = `${workspacePath}/_Export`;
     document.getElementById('export-folder').value = exportFolder;
     
     // Pack Assets into Export Folder: Off
