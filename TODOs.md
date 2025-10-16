@@ -4,6 +4,16 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [x] when the user selects "auto export on save" or ("use marp" and "live preview") then the stop running button should be shown. when the stop button is pressed both activities should be stopped. The marp process must only be started once and be kept running in the background, DO NOT RESTART THE MARP PROCESS ON SAVE! . The auto export on save should be repeated using the same export settings until the stop button is pressed. 
+
+when the board is exported again it should first stop the running processes as if the stop button is pressed. 
+
+Maybe show a animated image that shows an active export or marp in the kanban header.
+
+Integrate the changes into the existing functions. DO NOT CREATE ALTERNATIVE CODE PATHS FOR THESE CHANGES!
+
+Ultrathink think ultrathink think plan
+
 - [x] There are currently multiple export system functions. It must be unified to one new export system. The current structure is extremely broken as it's not unifying the processes properly.
 
   - What i need:

@@ -2828,17 +2828,22 @@ window.addEventListener('message', event => {
             break;
 
         case 'autoExportStopped':
-            // Hide the auto-export button when auto-export is stopped
-            console.log('[kanban.webview] Received autoExportStopped message - hiding button');
+            // Hide the auto-export button and indicator when auto-export is stopped
+            console.log('[kanban.webview] Received autoExportStopped message - hiding button and indicator');
             const autoExportBtn = document.getElementById('auto-export-btn');
+            const activityIndicator = document.getElementById('export-activity-indicator');
             console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
             if (autoExportBtn) {
                 autoExportBtn.style.display = 'none';
                 autoExportBtn.classList.remove('active');
                 console.log('[kanban.webview] Auto-export button hidden and deactivated');
             }
+            if (activityIndicator) {
+                activityIndicator.style.display = 'none';
+            }
             // Reset auto-export state - both local and window variables
             autoExportActive = false;
+            autoExportBrowserMode = false;
             lastExportSettings = null;
             window.autoExportActive = false;
             window.lastExportSettings = null;
@@ -2852,10 +2857,14 @@ window.addEventListener('message', event => {
             // FORCE HIDE AGAIN after a short delay to ensure it's hidden
             setTimeout(() => {
                 const btn = document.getElementById('auto-export-btn');
+                const indicator = document.getElementById('export-activity-indicator');
                 if (btn) {
                     btn.style.display = 'none';
                     btn.classList.remove('active');
                     console.log('[kanban.webview] Auto-export button force-hidden after timeout');
+                }
+                if (indicator) {
+                    indicator.style.display = 'none';
                 }
             }, 100);
             break;
@@ -4396,6 +4405,31 @@ function initializeExportTree(preSelectNodeId = null) {
  * Execute unified export
  */
 function executeUnifiedExport() {
+    // Stop existing auto-export and Marp processes before starting new export
+    if (autoExportActive || lastExportSettings) {
+        console.log('[kanban.webview.executeUnifiedExport] Stopping existing processes before new export');
+
+        // Stop auto-export
+        if (autoExportActive) {
+            vscode.postMessage({
+                type: 'stopAutoExport'
+            });
+        }
+
+        // Hide indicator
+        const indicator = document.getElementById('export-activity-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+
+        // Reset state
+        autoExportActive = false;
+        window.autoExportActive = false;
+        autoExportBrowserMode = false;
+        lastExportSettings = null;
+        window.lastExportSettings = null;
+    }
+
     const folderInput = document.getElementById('export-folder');
     if (!folderInput || !folderInput.value.trim()) {
         vscode.postMessage({
@@ -4528,19 +4562,18 @@ function executeUnifiedExport() {
     // Update auto-export mode tracking (for Marp preview)
     autoExportBrowserMode = useMarp && marpPreview;
 
-    // Show the auto-export button after first export
+    // Show the auto-export button if auto-export-on-save OR (marp + live preview) is enabled
+    const shouldShowButton = autoExportOnSave || (useMarp && marpPreview);
     const autoExportBtn = document.getElementById('auto-export-btn');
-    if (autoExportBtn && lastExportSettings) {
+    if (autoExportBtn && lastExportSettings && shouldShowButton) {
         autoExportBtn.style.display = '';
+        autoExportActive = true;
+        window.autoExportActive = true;
         updateAutoExportButton();
     }
 
     // If auto-export checkbox was enabled in dialog, start auto-export immediately
     if (autoExportOnSave && lastExportSettings) {
-        autoExportActive = true;
-        window.autoExportActive = true;
-        updateAutoExportButton();
-
         // Convert to new unified export format with auto mode
         const autoOptions = mapToNewExportOptions('startAutoExport', lastExportSettings);
         vscode.postMessage({
@@ -5057,20 +5090,25 @@ function toggleAutoExport() {
             message: 'Auto-export started. File will export automatically on save.'
         });
     } else {
-        // IMMEDIATELY hide the button when user clicks stop
+        // IMMEDIATELY hide the button and indicator when user clicks stop
         const autoExportBtn = document.getElementById('auto-export-btn');
+        const indicator = document.getElementById('export-activity-indicator');
         if (autoExportBtn) {
             autoExportBtn.style.display = 'none';
             autoExportBtn.classList.remove('active');
             console.log('[kanban.webview] Auto-export button immediately hidden on user stop');
         }
-        
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+
         // Reset state immediately
         autoExportActive = false;
         window.autoExportActive = false;
+        autoExportBrowserMode = false;
         lastExportSettings = null;
         window.lastExportSettings = null;
-        
+
         // Reset button text and icon
         const icon = document.getElementById('auto-export-icon');
         const text = document.getElementById('auto-export-text');
@@ -5079,14 +5117,14 @@ function toggleAutoExport() {
             text.textContent = 'Auto Export';
         }
 
-        // Stop auto-export
+        // Stop both auto-export and Marp processes
         vscode.postMessage({
             type: 'stopAutoExport'
         });
 
         vscode.postMessage({
             type: 'showInfo',
-            message: 'Auto-export stopped.'
+            message: 'Auto-export and Marp processes stopped.'
         });
     }
 }
@@ -5098,19 +5136,21 @@ function updateAutoExportButton() {
     const btn = document.getElementById('auto-export-btn');
     const icon = document.getElementById('auto-export-icon');
     const text = document.getElementById('auto-export-text');
+    const indicator = document.getElementById('export-activity-indicator');
 
     if (!btn || !icon || !text) {
         console.warn('[kanban.webview] updateAutoExportButton: Button elements not found');
         return;
     }
 
-    // Hide button if there are no export settings
+    // Hide button and indicator if there are no export settings
     if (!lastExportSettings) {
         btn.style.display = 'none';
         btn.classList.remove('active');
         icon.textContent = '▶';
         text.textContent = 'Auto Export';
         btn.title = 'Start auto-export with last settings';
+        if (indicator) indicator.style.display = 'none';
         console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
         return;
     }
@@ -5122,6 +5162,7 @@ function updateAutoExportButton() {
         btn.classList.add('active');
         icon.textContent = '■'; // Stop icon
         text.textContent = autoExportBrowserMode ? 'Stop Live' : 'Stop Auto';
+        if (indicator) indicator.style.display = 'inline-flex';
         btn.title = 'Stop auto-export';
         console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
@@ -5129,6 +5170,7 @@ function updateAutoExportButton() {
         icon.textContent = '▶'; // Play icon
         text.textContent = autoExportBrowserMode ? 'Start Live' : 'Auto Export';
         btn.title = 'Start auto-export with last settings';
+        if (indicator) indicator.style.display = 'none';
         console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');
     }
 }

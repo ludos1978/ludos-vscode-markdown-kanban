@@ -1575,8 +1575,8 @@ export class ExportService {
      */
     private static async extractContentNew(
         sourceDocument: vscode.TextDocument,
-        scope: 'full' | 'column' | 'task',
-        selection?: { columnIndex?: number; columnId?: string; taskId?: string }
+        scope: ExportScope,
+        selection?: { rowNumber?: number; stackIndex?: number; columnIndex?: number; columnId?: string; taskId?: string }
     ): Promise<string> {
         const sourcePath = sourceDocument.uri.fsPath;
         if (!fs.existsSync(sourcePath)) {
@@ -1588,6 +1588,26 @@ export class ExportService {
         switch (scope) {
             case 'full':
                 return fullContent;
+
+            case 'row':
+                if (selection?.rowNumber === undefined) {
+                    throw new Error('Row number required for row scope');
+                }
+                const rowContent = this.extractRowContent(fullContent, selection.rowNumber);
+                if (!rowContent) {
+                    throw new Error(`Row ${selection.rowNumber} not found or empty`);
+                }
+                return rowContent;
+
+            case 'stack':
+                if (selection?.rowNumber === undefined || selection?.stackIndex === undefined) {
+                    throw new Error('Row number and stack index required for stack scope');
+                }
+                const stackContent = this.extractStackContent(fullContent, selection.rowNumber, selection.stackIndex);
+                if (!stackContent) {
+                    throw new Error(`Stack ${selection.stackIndex} in row ${selection.rowNumber} not found or empty`);
+                }
+                return stackContent;
 
             case 'column':
                 if (selection?.columnIndex === undefined) {

@@ -39,6 +39,15 @@ export class MarpExportService {
      * @returns Promise that resolves when export is complete
      */
     static async export(options: MarpExportOptions): Promise<void> {
+        // Check if a Marp process is already running for this file (background mode only)
+        if (options.background) {
+            const existingPid = ExportService['marpProcessPids'].get(options.inputFilePath);
+            if (existingPid) {
+                console.log(`[kanban.MarpExportService] Marp process already running for ${options.inputFilePath} (PID: ${existingPid}), skipping new process`);
+                return;
+            }
+        }
+
         // Validate Marp CLI availability
         const isAvailable = await this.isMarpCliAvailable();
         if (!isAvailable) {
