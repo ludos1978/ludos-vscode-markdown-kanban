@@ -2569,7 +2569,7 @@ export class MessageHandler {
 
             // Stop all Marp watch processes
             console.log('[kanban.messageHandler.handleStopAutoExport] Terminating Marp processes');
-            ExportService.stopAllMarpWatches();
+            MarpExportService.stopAllMarpWatches();
 
             this._autoExportSettings = null;
 
@@ -2605,9 +2605,9 @@ export class MessageHandler {
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
-            // Stop Marp processes only for other kanban files (not generated files)
-            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes for other kanban files');
-            ExportService.stopAllMarpWatchesExceptKanbanFile(currentKanbanFilePath);
+            // Stop all Marp watch processes
+            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes');
+            MarpExportService.stopAllMarpWatches();
 
             console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Auto-export stopped for other kanban files');
         } catch (error) {
@@ -2630,9 +2630,9 @@ export class MessageHandler {
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
-            // Stop Marp processes only for different files
-            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Terminating Marp processes for other files');
-            ExportService.stopAllMarpWatchesExcept(excludeFilePath);
+            // Stop all Marp watch processes
+            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Terminating Marp processes');
+            MarpExportService.stopAllMarpWatches();
 
             this._autoExportSettings = null;
 
@@ -2766,7 +2766,23 @@ export class MessageHandler {
             id: `auto-export-${docUri.fsPath}`,
             handleSave: async (savedDoc: vscode.TextDocument) => {
                 if (savedDoc.uri.toString() === docUri.toString()) {
-                    console.log('[kanban.messageHandler.autoExport] File saved, triggering export...');
+                    console.log('[kanban.messageHandler.autoExport] File saved');
+
+                    // For Marp watch mode, update markdown only - Marp's watch will handle the rest
+                    if (options.marpWatch) {
+                        console.log('[kanban.messageHandler.autoExport] Marp watch active - updating markdown only, NOT restarting Marp');
+
+                        try {
+                            // Export with marpWatch flag set - skips Marp conversion
+                            await ExportService.export(savedDoc, options);
+                            console.log('[kanban.messageHandler.autoExport] Markdown updated, Marp watch will auto-detect changes');
+                        } catch (error) {
+                            console.error('[kanban.messageHandler.autoExport] Markdown update failed:', error);
+                        }
+                        return;
+                    }
+
+                    console.log('[kanban.messageHandler.autoExport] Triggering full export...');
 
                     try {
                         // Use new unified export

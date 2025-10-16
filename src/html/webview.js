@@ -94,13 +94,17 @@ function mapToNewExportOptions(oldType, oldOptions) {
             newOptions.mode = 'save';
             newOptions.format = 'marp';
             newOptions.marpFormat = oldOptions.format?.replace('marp-', '') || 'html';
+            // If Marp preview (live preview) is enabled, set marpWatch flag
+            if (oldOptions.marpPreview) {
+                newOptions.marpWatch = true;
+            }
             break;
 
         case 'presentWithMarp':
             newOptions.mode = 'preview';
             newOptions.format = 'marp';
             newOptions.marpFormat = 'html';
-            newOptions.marpRealtime = true;
+            newOptions.marpWatch = true;
             break;
 
         case 'startAutoExport':
@@ -109,6 +113,10 @@ function mapToNewExportOptions(oldType, oldOptions) {
             if (oldOptions.format && oldOptions.format.startsWith('marp-')) {
                 newOptions.format = 'marp';
                 newOptions.marpFormat = oldOptions.format.replace('marp-', '');
+                // If Marp preview was enabled, set marpWatch flag
+                if (oldOptions.marpPreview) {
+                    newOptions.marpWatch = true;
+                }
             } else {
                 newOptions.format = oldOptions.format || 'kanban';
             }

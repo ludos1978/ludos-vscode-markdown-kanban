@@ -100,7 +100,7 @@ export interface NewExportOptions {
     marpTheme?: string;
     marpBrowser?: string;
     marpEnginePath?: string;
-    marpRealtime?: boolean;            // Run Marp in watch mode
+    marpWatch?: boolean;            // Run Marp in watch mode
 }
 
 /**
@@ -1762,10 +1762,15 @@ export class ExportService {
         console.log(`[kanban.exportService.outputContentNew] Writing markdown to: ${markdownPath}`);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
 
-        // Handle Marp conversion
-        if (options.format === 'marp') {
+        // Handle Marp conversion (skip if marpWatch flag is set - Marp already watching)
+        if (options.format === 'marp' && !options.marpWatch) {
             console.log(`[kanban.exportService.outputContentNew] Running Marp conversion`);
             return await this.runMarpConversionNew(markdownPath, options);
+        }
+
+        // If marpWatch is set, just return success (markdown updated, Marp watching)
+        if (options.marpWatch) {
+            console.log(`[kanban.exportService.outputContentNew] Markdown updated (marpWatch=true), Marp watch will handle conversion`);
         }
 
         // Regular save succeeded
@@ -1788,7 +1793,7 @@ export class ExportService {
 
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
-        console.log(`[kanban.exportService.runMarpConversionNew] Format: ${marpFormat}, mode: ${options.mode}, realtime: ${options.marpRealtime}`);
+        console.log(`[kanban.exportService.runMarpConversionNew] Format: ${marpFormat}, mode: ${options.mode}, watch: ${options.marpWatch}`);
 
         // Build output path
         const dir = path.dirname(markdownPath);
@@ -1802,18 +1807,17 @@ export class ExportService {
         }
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
-        // MODE: PREVIEW (realtime watch) - use background mode
-        if (options.mode === 'preview' || options.marpRealtime) {
+        // MODE: PREVIEW (watch mode) - run Marp in watch mode
+        if (options.marpWatch) {
             try {
-                console.log(`[kanban.exportService.runMarpConversionNew] Starting realtime export (background mode)`);
+                console.log(`[kanban.exportService.runMarpConversionNew] Starting Marp in watch mode`);
                 await MarpExportService.export({
                     inputFilePath: markdownPath,
                     format: marpFormat,
                     outputPath: outputPath,
+                    watchMode: true,
                     enginePath: options.marpEnginePath,
-                    theme: options.marpTheme,
-                    allowLocalFiles: true,
-                    background: true  // Run in background for realtime
+                    theme: options.marpTheme
                 });
                 return {
                     success: true,
@@ -1837,9 +1841,7 @@ export class ExportService {
                 format: marpFormat,
                 outputPath: outputPath,
                 enginePath: options.marpEnginePath,
-                theme: options.marpTheme,
-                allowLocalFiles: true,
-                background: false  // Wait for completion
+                theme: options.marpTheme
             });
             console.log(`[kanban.exportService.runMarpConversionNew] Conversion completed: ${outputPath}`);
             return {

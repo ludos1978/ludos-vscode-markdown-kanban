@@ -4,7 +4,6 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { ConfigurationService } from '../configurationService';
-import { ExportService } from '../exportService';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
 
@@ -19,12 +18,10 @@ export interface MarpExportOptions {
     enginePath?: string;
     /** Marp theme */
     theme?: string;
-    /** Allow local file access */
-    allowLocalFiles?: boolean;
+    /** Watch mode: runs Marp with --watch and --preview, stores PID */
+    watchMode?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
-    /** Run in background (detached) mode */
-    background?: boolean;
 }
 
 /**
@@ -33,15 +30,64 @@ export interface MarpExportOptions {
 export class MarpExportService {
     private static readonly DEFAULT_ENGINE_PATH = './marp-engine/engine.js';
 
+    // PID storage for Marp watch processes
+    private static marpProcessPids = new Map<string, number>();
+
+    /**
+     * Store Marp process PID
+     */
+    private static storeMarpPid(filePath: string, pid: number): void {
+        this.marpProcessPids.set(filePath, pid);
+    }
+
+    /**
+     * Get Marp process PID for a file
+     */
+    private static getMarpPid(filePath: string): number | undefined {
+        return this.marpProcessPids.get(filePath);
+    }
+
+    /**
+     * Stop Marp watch process for a file
+     */
+    public static stopMarpWatch(filePath: string): void {
+        const pid = this.marpProcessPids.get(filePath);
+        if (pid) {
+            try {
+                process.kill(pid);
+                console.log(`[kanban.MarpExportService] Killed Marp process ${pid} for ${filePath}`);
+            } catch (error) {
+                console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
+            }
+            this.marpProcessPids.delete(filePath);
+        }
+    }
+
+    /**
+     * Stop all Marp watch processes
+     */
+    public static stopAllMarpWatches(): void {
+        console.log(`[kanban.MarpExportService] Stopping all Marp watch processes (${this.marpProcessPids.size} processes)`);
+        for (const [filePath, pid] of this.marpProcessPids.entries()) {
+            try {
+                process.kill(pid);
+                console.log(`[kanban.MarpExportService] Killed Marp process ${pid} for ${filePath}`);
+            } catch (error) {
+                console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
+            }
+        }
+        this.marpProcessPids.clear();
+    }
+
     /**
      * Export markdown file using Marp CLI
      * @param options - Export options
      * @returns Promise that resolves when export is complete
      */
     static async export(options: MarpExportOptions): Promise<void> {
-        // Check if a Marp process is already running for this file (background mode only)
-        if (options.background) {
-            const existingPid = ExportService['marpProcessPids'].get(options.inputFilePath);
+        // Check if a Marp process is already running for this file (watch mode only)
+        if (options.watchMode) {
+            const existingPid = this.getMarpPid(options.inputFilePath);
             if (existingPid) {
                 console.log(`[kanban.MarpExportService] Marp process already running for ${options.inputFilePath} (PID: ${existingPid}), skipping new process`);
                 return;
@@ -69,70 +115,65 @@ export class MarpExportService {
 
             // Execute Marp CLI with proper working directory
             const workspaceFolders = vscode.workspace.workspaceFolders;
-            
-            if (options.background) {
-                // Run Marp in background (detached) mode for watch functionality
-                console.log(`[kanban.MarpExportService] Starting Marp in background mode with args: ${args.join(' ')}`);
-                
-                const workspaceRoot = workspaceFolders && workspaceFolders.length > 0 
-                    ? workspaceFolders[0].uri.fsPath 
-                    : process.cwd();
-                
-                // Build the full command for Marp CLI
-                const command = 'npx';
-                const commandArgs = ['@marp-team/marp-cli', ...args];
-                
-                // Spawn Marp as a detached background process
-                const marpProcess = spawn(command, commandArgs, {
-                    cwd: workspaceRoot,
-                    detached: true,
-                    stdio: 'ignore'
-                });
-                
-                // Detach from parent process to allow it to run independently
-                marpProcess.unref();
-                
-                console.log(`[kanban.MarpExportService] Marp background process started with PID: ${marpProcess.pid}`);
-                console.log(`[kanban.MarpExportService] Marp watching file: ${options.inputFilePath}`);
-                
-                // Store the PID for later termination
-                if (options.inputFilePath && marpProcess.pid) {
-                    console.log(`[kanban.MarpExportService] Storing PID ${marpProcess.pid} for file ${options.inputFilePath}`);
-                    ExportService.addMarpProcessPid(options.inputFilePath, marpProcess.pid);
-                } else {
-                    console.warn(`[kanban.MarpExportService] Could not store PID - inputFilePath: ${options.inputFilePath}, pid: ${marpProcess.pid}`);
-                }
-                
-                // For background mode, we don't wait for completion
-                console.log(`[kanban.MarpExportService] Background Marp process started successfully`);
+
+            // if (options.watchMode) {
+            // WATCH MODE: Run Marp as detached background process
+            console.log(`[kanban.MarpExportService] Starting Marp in watch mode (detached process)`);
+
+            const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
+                ? workspaceFolders[0].uri.fsPath
+                : process.cwd();
+
+            const command = 'npx';
+            const commandArgs = ['@marp-team/marp-cli', ...args];
+
+            // Spawn Marp as a detached background process
+            const marpProcess = spawn(command, commandArgs, {
+                cwd: workspaceRoot,
+                detached: true,
+                stdio: 'ignore'
+            });
+
+            // Detach from parent process to allow it to run independently
+            marpProcess.unref();
+
+            console.log(`[kanban.MarpExportService] Marp watch process started with PID: ${marpProcess.pid}`);
+
+            // Store the PID in MarpExportService for later termination
+            if (options.inputFilePath && marpProcess.pid) {
+                console.log(`[kanban.MarpExportService] Storing PID ${marpProcess.pid} for file ${options.inputFilePath}`);
+                this.storeMarpPid(options.inputFilePath, marpProcess.pid);
             } else {
-                // Run Marp in foreground mode (blocking)
-                let exitCode: number;
-                
-                if (workspaceFolders && workspaceFolders.length > 0) {
-                    // Change to workspace root directory for Marp CLI execution
-                    const originalCwd = process.cwd();
-                    const workspaceRoot = workspaceFolders[0].uri.fsPath;
-                    
-                    try {
-                        process.chdir(workspaceRoot);
-                        console.log(`[kanban.MarpExportService] Changed working directory to: ${workspaceRoot}`);
-                        exitCode = await marpCli(args);
-                    } finally {
-                        // Restore original working directory
-                        process.chdir(originalCwd);
-                        console.log(`[kanban.MarpExportService] Restored working directory to: ${originalCwd}`);
-                    }
-                } else {
-                    exitCode = await marpCli(args);
-                }
-
-                if (exitCode !== 0) {
-                    throw new Error(`Marp export failed with exit code ${exitCode}`);
-                }
-
-                console.log(`[kanban.MarpExportService] Export completed successfully: ${options.outputPath}`);
+                console.warn(`[kanban.MarpExportService] Could not store PID - inputFilePath: ${options.inputFilePath}, pid: ${marpProcess.pid}`);
             }
+            // } 
+            // else {
+            //     // NORMAL MODE: Run Marp synchronously and wait for completion
+            //     console.log(`[kanban.MarpExportService] Starting Marp in normal mode (synchronous)`);
+
+            //     let exitCode: number;
+
+            //     if (workspaceFolders && workspaceFolders.length > 0) {
+            //         const originalCwd = process.cwd();
+            //         const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+            //         try {
+            //             process.chdir(workspaceRoot);
+            //             exitCode = await marpCli(args);
+            //         } finally {
+            //             process.chdir(originalCwd);
+            //         }
+            //     } else {
+            //         exitCode = await marpCli(args);
+            //     }
+
+            //     if (exitCode !== 0) {
+            //         throw new Error(`Marp export failed with exit code ${exitCode}`);
+            //     }
+
+            //     console.log(`[kanban.MarpExportService] Marp conversion completed successfully`);
+            // }
+
         } catch (error) {
             console.error('[kanban.MarpExportService] Export failed:', error);
             throw error;
@@ -155,8 +196,12 @@ export class MarpExportService {
             args.push('--pptx');
         } else if (options.format === 'html') {
             args.push('--html');
+        }
+
+        if (options.watchMode) {
             // For HTML export, add preview to open in browser
             args.push('--preview');
+            args.push('--watch');
         }
 
         // Output path (only for non-markdown formats, but not for HTML with preview)
@@ -226,10 +271,14 @@ export class MarpExportService {
             }
         }
 
-        // Allow local files (required for images)
-        if (options.allowLocalFiles !== false) {
-            args.push('--allow-local-files');
-        }
+        // Always allow local files (required for images)
+        args.push('--allow-local-files');
+
+        // Watch mode: add --watch flag
+        // if (options.watchMode) {
+        //     args.push('--watch');
+        //     console.log(`[kanban.MarpExportService] Adding --watch flag for watch mode`);
+        // }
 
         // Browser setting - prioritize options.additionalArgs, then config
         let browser: string | undefined;
