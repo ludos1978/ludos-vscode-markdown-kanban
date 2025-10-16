@@ -32,6 +32,7 @@
 - do not mark as deprecated, remove the code completely!
 - do not modify the general application structure if you have not given an explicit task for it.
 - do not randomly trim values. spaces might be there for a reason. especially in front of strings!
+- Do not create summary documents, but documents to prevent future code duplications.
 
 ## Error handling:
 - allways check for compile errors

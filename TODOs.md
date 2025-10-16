@@ -4,65 +4,61 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] There are currently multiple export system functions. It must be unified to one new export system. The current structure is extremely broken as it's not unifying the processes properly.
+- [x] There are currently multiple export system functions. It must be unified to one new export system. The current structure is extremely broken as it's not unifying the processes properly.
 
-- What i need:
-  - Presentation/Export Mode.
-    - Export parts of the kanban as kanbanMarkdown.
-    - All kanban can be combined into one main file (merge includes)
+  - What i need:
+    - Presentation/Export Mode.
+      - Export parts of the kanban as kanbanMarkdown.
+      - All kanban can be combined into one main file (merge includes)
+      - filter the tags according to the export settings
+      - Export as Marp (html, pdf, pptx)
+      - (optional) Export with everything included (pack files).
+      - (optional) Rewrite the paths to the included files.
+    
+    - Export the kanban
+      - Export with everything included (pack files)
+      - Export keeping the structure.
+      - Does not need partial export.
+
+  - process flow:
+    - unified export system
+    - select the parts of the kanbanMarkdown we need to export
+    - combine the contents into one datastream when merge includes is active.
     - filter the tags according to the export settings
-    - Export as Marp (html, pdf, pptx)
-    - (optional) Export with everything included (pack files).
-    - (optional) Rewrite the paths to the included files.
-  
-  - Export the kanban
-    - Export with everything included (pack files)
-    - Export keeping the structure.
-    - Does not need partial export.
+    - create a list of media that has is included (if pack or rewrite is active) from the files in the kanbanMarkdown data.
+      - if new files are detected in the data, copy and add them to the list
+      - or add the rewritten path to the files.
+    - rewrite the media paths according to the list of media files.
+    - run marp until realtime is stopped.
 
-- process flow:
-  - unified export system
-  - select the parts of the kanbanMarkdown we need to export
-  - combine the contents into one datastream when merge includes is active.
-  - filter the tags according to the export settings
-  - create a list of media that has is included (if pack or rewrite is active) from the files in the kanbanMarkdown data.
-    - if new files are detected in the data, copy and add them to the list
-    - or add the rewritten path to the files.
-  - rewrite the media paths according to the list of media files.
-  - run marp until realtime is stopped.
+  - functions we need:
+    - column_to_presentationMarkdown
+      - copy a column as markdown ( title, task-title & task-content, next task-title & task-content, repeated, combined using "---" )
+      - can be used when copying column as markdown-presentation-format.
+      - can also be used when exporting
+      - can be used when exporting and converting using marp
+      - updates the exported file when "auto_update on save" is active
+    - run_marp
+      - run marp to convert from presentationMarkdown to html, pdf, pptx
+      - run marp in background and abort when realtime aborted.
 
-- functions we need:
-  - column_to_presentationMarkdown
-    - copy a column as markdown ( title, task-title & task-content, next task-title & task-content, repeated, combined using "---" )
-    - can be used when copying column as markdown-presentation-format.
-    - can also be used when exporting
-    - can be used when exporting and converting using marp
-    - updates the exported file when "auto_update on save" is active
-  - run_marp
-    - run marp to convert from presentationMarkdown to html, pdf, pptx
-    - run marp in background and abort when realtime aborted.
+  - reuse the existing functionalities such as the interface from the export.
 
-- reuse the existing functionalities such as the interface from the export.
-
-- completely remove the functions
-  - handleGenerateCopyContent
-  - handleUnifiedExport
-  - handleExportWithMarp
-  - handlePresentWithMarp
-  - handleStartAutoExport
-
-
+  - completely remove the functions
+    - handleGenerateCopyContent
+    - handleUnifiedExport
+    - handleExportWithMarp
+    - handlePresentWithMarp
+    - handleStartAutoExport
 
 - [x] What are all the different ExportService.exportUnified usage for?
   - analyze where they are called from and determine what is unused, obsolete or still in use.
-
-
 
 - [ ] analyze the functions in blocks, try to split it up into blocks consisting of lines of code from 3 to 15 lines of code (rather small then big). where each block has a limited number of input and output data. determine the input values, the way the data is processed, read or put on the interface as well as the output values. determine the order of blocks as well. write your observations into different files in the agent folder. in a later step we will try to find duplicate or obsolete code. start now with the analysis. analyze in depth and generalize using similar descriptions as in parts you already discovered.
 
 - [ ] find functionality, functions, data, data structure and well as html structure duplicates in the code. first create lists of all these aspects in all the code files. structure it well to search for duplicates later on. be careful  to process all ts and js and html files in the src folder. Store the results into the agent folder.
 
-- [ ] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
+- [x] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
 
 - [x] Create Preset for export:
   - Marp Presentation:
