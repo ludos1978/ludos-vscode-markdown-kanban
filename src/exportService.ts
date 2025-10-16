@@ -1665,15 +1665,10 @@ export class ExportService {
         console.log(`[kanban.exportService.outputContentNew] Writing markdown to: ${markdownPath}`);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
 
-        // Handle Marp conversion (skip if marpWatch flag is set - Marp already watching)
-        if (options.format === 'marp' && !options.marpWatch) {
+        // Handle Marp conversion
+        if (options.format === 'marp') {
             console.log(`[kanban.exportService.outputContentNew] Running Marp conversion`);
             return await this.runMarpConversionNew(markdownPath, options);
-        }
-
-        // If marpWatch is set, just return success (markdown updated, Marp watching)
-        if (options.marpWatch) {
-            console.log(`[kanban.exportService.outputContentNew] Markdown updated (marpWatch=true), Marp watch will handle conversion`);
         }
 
         // Regular save succeeded
@@ -1712,8 +1707,18 @@ export class ExportService {
 
         // MODE: PREVIEW (watch mode) - run Marp in watch mode
         if (options.marpWatch) {
+            // Check if Marp is already watching this file
+            if (MarpExportService.isWatching(markdownPath)) {
+                console.log(`[kanban.exportService.runMarpConversionNew] Marp already watching ${markdownPath}, skipping restart`);
+                return {
+                    success: true,
+                    message: 'Markdown updated, Marp watch active',
+                    exportedPath: outputPath
+                };
+            }
+
             try {
-                console.log(`[kanban.exportService.runMarpConversionNew] Starting Marp in watch mode`);
+                console.log(`[kanban.exportService.runMarpConversionNew] Starting Marp in watch mode for ${markdownPath}`);
                 await MarpExportService.export({
                     inputFilePath: markdownPath,
                     format: marpFormat,

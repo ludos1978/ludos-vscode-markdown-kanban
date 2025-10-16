@@ -2594,9 +2594,12 @@ export class MessageHandler {
     /**
      * Stop auto-export for other kanban files (not generated files from current export)
      */
-    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string): Promise<void> {
+    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, protectExportedPath?: string): Promise<void> {
         try {
             console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Stopping auto-export for other kanban files, protecting current:', currentKanbanFilePath);
+            if (protectExportedPath) {
+                console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Also protecting exported file:', protectExportedPath);
+            }
 
             // Unregister from SaveEventCoordinator
             const doc = this._fileManager.getDocument();
@@ -2605,9 +2608,13 @@ export class MessageHandler {
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
-            // Stop all Marp watch processes
-            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes');
-            MarpExportService.stopAllMarpWatches();
+            // Stop Marp watch processes for OTHER files (not the current export)
+            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes (except current export)');
+            if (protectExportedPath) {
+                ExportService.stopAllMarpWatchesExcept(protectExportedPath);
+            } else {
+                MarpExportService.stopAllMarpWatches();
+            }
 
             console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Auto-export stopped for other kanban files');
         } catch (error) {
@@ -2755,8 +2762,14 @@ export class MessageHandler {
         // Store settings
         this._autoExportSettings = options;
 
-        // Stop existing handlers for other files
-        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath);
+        // Do initial export FIRST (to start Marp if needed)
+        console.log('[kanban.messageHandler.handleAutoExportMode] Running initial export...');
+        const initialResult = await ExportService.export(document, options);
+        console.log('[kanban.messageHandler.handleAutoExportMode] Initial export completed, path:', initialResult.exportedPath);
+
+        // NOW stop existing handlers/processes for other files
+        // If Marp was started, protect the exported markdown file
+        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, initialResult.exportedPath);
 
         const docUri = document.uri;
         const coordinator = SaveEventCoordinator.getInstance();

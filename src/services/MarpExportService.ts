@@ -64,6 +64,13 @@ export class MarpExportService {
     }
 
     /**
+     * Check if a file is being watched by Marp
+     */
+    public static isWatching(filePath: string): boolean {
+        return this.marpProcessPids.has(filePath);
+    }
+
+    /**
      * Stop all Marp watch processes
      */
     public static stopAllMarpWatches(): void {
