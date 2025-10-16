@@ -36,6 +36,94 @@ let currentWhitespace = '8px';
 let currentTaskMinHeight = 'auto';
 let currentLayoutRows = 1;
 
+// ============================================================================
+// NEW UNIFIED EXPORT SYSTEM - Options Mapping
+// ============================================================================
+
+/**
+ * Convert old export options to new unified format
+ * This enables gradual migration from old system to new system
+ */
+function mapToNewExportOptions(oldType, oldOptions) {
+    console.log('[webview.mapToNewExportOptions] Converting old type:', oldType, 'with options:', oldOptions);
+
+    const newOptions = {
+        scope: oldOptions.scope || 'full',
+        selection: oldOptions.selection || {},
+        tagVisibility: oldOptions.tagVisibility || 'all',
+        packAssets: oldOptions.packAssets || false,
+        packOptions: oldOptions.packOptions || {},
+        targetFolder: oldOptions.targetFolder,
+        openAfterExport: oldOptions.openAfterExport || false,
+        marpTheme: oldOptions.marpTheme,
+        marpBrowser: oldOptions.marpBrowser,
+        marpEnginePath: oldOptions.marpEnginePath,
+        mergeIncludes: oldOptions.mergeIncludes
+    };
+
+    // Map old message type to new mode and format
+    switch (oldType) {
+        case 'exportWithAssets':
+            newOptions.mode = 'save';
+            newOptions.format = 'kanban';
+            break;
+
+        case 'exportColumn':
+            newOptions.mode = 'save';
+            newOptions.format = 'kanban';
+            newOptions.scope = 'column';
+            break;
+
+        case 'generateCopyContent':
+            newOptions.mode = 'copy';
+            newOptions.format = oldOptions.format || 'presentation';
+            break;
+
+        case 'unifiedExport':
+            newOptions.mode = 'save';
+            // Map old format to new format
+            if (oldOptions.format && oldOptions.format.startsWith('marp-')) {
+                newOptions.format = 'marp';
+                newOptions.marpFormat = oldOptions.format.replace('marp-', '');
+            } else {
+                newOptions.format = oldOptions.format || 'kanban';
+            }
+            break;
+
+        case 'exportWithMarp':
+            newOptions.mode = 'save';
+            newOptions.format = 'marp';
+            newOptions.marpFormat = oldOptions.format?.replace('marp-', '') || 'html';
+            break;
+
+        case 'presentWithMarp':
+            newOptions.mode = 'preview';
+            newOptions.format = 'marp';
+            newOptions.marpFormat = 'html';
+            newOptions.marpRealtime = true;
+            break;
+
+        case 'startAutoExport':
+            newOptions.mode = 'auto';
+            // Map format
+            if (oldOptions.format && oldOptions.format.startsWith('marp-')) {
+                newOptions.format = 'marp';
+                newOptions.marpFormat = oldOptions.format.replace('marp-', '');
+            } else {
+                newOptions.format = oldOptions.format || 'kanban';
+            }
+            break;
+
+        default:
+            console.warn('[webview.mapToNewExportOptions] Unknown old type:', oldType);
+            newOptions.mode = 'save';
+            newOptions.format = 'kanban';
+    }
+
+    console.log('[webview.mapToNewExportOptions] Converted to new options:', newOptions);
+    return newOptions;
+}
+
 // Centralized configuration for all menu options
 // Font size configuration
 const fontSizeMultipliers = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
@@ -4397,9 +4485,11 @@ function executeUnifiedExport() {
             lastExportSettings = options;
             window.lastExportSettings = options;
 
+            // Convert to new unified export format
+            const newMarpOptions = mapToNewExportOptions('exportWithMarp', options);
             vscode.postMessage({
-                type: 'exportWithMarp',
-                options: options
+                type: 'export',
+                options: newMarpOptions
             });
         });
     } else {
@@ -4426,10 +4516,11 @@ function executeUnifiedExport() {
             lastExportSettings = options;
             window.lastExportSettings = options;
 
-            // Send unified export request
+            // Convert to new unified export format and send
+            const newOptions = mapToNewExportOptions('unifiedExport', options);
             vscode.postMessage({
-                type: 'unifiedExport',
-                options: options
+                type: 'export',
+                options: newOptions
             });
         });
     }
@@ -4450,9 +4541,11 @@ function executeUnifiedExport() {
         window.autoExportActive = true;
         updateAutoExportButton();
 
+        // Convert to new unified export format with auto mode
+        const autoOptions = mapToNewExportOptions('startAutoExport', lastExportSettings);
         vscode.postMessage({
-            type: 'startAutoExport',
-            settings: lastExportSettings
+            type: 'export',
+            options: autoOptions
         });
     }
 }
@@ -4952,10 +5045,11 @@ function toggleAutoExport() {
     updateAutoExportButton();
 
     if (autoExportActive) {
-        // Start auto-export
+        // Start auto-export with new unified system
+        const autoOptions = mapToNewExportOptions('startAutoExport', lastExportSettings);
         vscode.postMessage({
-            type: 'startAutoExport',
-            settings: lastExportSettings
+            type: 'export',
+            options: autoOptions
         });
 
         vscode.postMessage({
@@ -5061,25 +5155,29 @@ function executeQuickExport() {
         if (autoExportActive) {
             // For auto-export, only do kanban-to-markdown export
             console.log('[kanban.webview.executeQuickExport] Auto-exporting kanban to markdown for Marp format:', format);
-            
+
+            const autoMarpOptions = mapToNewExportOptions('unifiedExport', {
+                ...lastExportSettings,
+                format: 'marp-markdown'
+            });
             vscode.postMessage({
-                type: 'unifiedExport',
-                options: {
-                    ...lastExportSettings,
-                    format: 'marp-markdown'
-                }
+                type: 'export',
+                options: autoMarpOptions
             });
         } else {
-            // For manual export, use full Marp export
+            // For manual export, use full Marp export with new system
+            const marpOptions = mapToNewExportOptions('exportWithMarp', lastExportSettings);
             vscode.postMessage({
-                type: 'exportWithMarp',
-                options: lastExportSettings
+                type: 'export',
+                options: marpOptions
             });
         }
     } else {
+        // Standard export with new system
+        const standardOptions = mapToNewExportOptions('unifiedExport', lastExportSettings);
         vscode.postMessage({
-            type: 'unifiedExport',
-            options: lastExportSettings
+            type: 'export',
+            options: standardOptions
         });
     }
 

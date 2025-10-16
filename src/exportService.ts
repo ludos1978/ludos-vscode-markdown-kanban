@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as crypto from 'crypto';
 import { TagUtils, TagVisibility } from './utils/tagUtils';
 import { MarkdownKanbanParser } from './markdownParser';
@@ -49,6 +50,67 @@ export interface UnifiedExportOptions {
 export interface ColumnExportOptions extends UnifiedExportOptions {
     columnIndex: number;
     columnTitle?: string;
+}
+
+/**
+ * New unified export options - consolidates ALL export types
+ * Replaces: UnifiedExportOptions (partially), exportWithAssets options, exportColumn options
+ */
+export interface NewExportOptions {
+    // SCOPE: What to export
+    scope: 'full' | 'column' | 'task';
+    selection?: {
+        columnIndex?: number;
+        columnId?: string;
+        taskId?: string;
+    };
+
+    // MODE: Operation mode
+    mode: 'copy' | 'save' | 'auto' | 'preview';
+    // - copy: Return content only (for clipboard operations)
+    // - save: Write to disk
+    // - auto: Auto-export on save (registers save handler)
+    // - preview: Open in Marp preview (realtime watch)
+
+    // FORMAT: Output format
+    format: 'kanban' | 'presentation' | 'marp';
+    marpFormat?: 'markdown' | 'html' | 'pdf' | 'pptx';
+
+    // TRANSFORMATIONS
+    mergeIncludes?: boolean;           // Default: false for full, true for scoped
+    tagVisibility: TagVisibility;
+
+    // PACKING
+    packAssets: boolean;
+    packOptions?: {
+        includeFiles?: boolean;
+        includeImages?: boolean;
+        includeVideos?: boolean;
+        includeOtherMedia?: boolean;
+        includeDocuments?: boolean;
+        fileSizeLimitMB?: number;
+        rewriteLinks?: boolean;
+    };
+
+    // OUTPUT
+    targetFolder?: string;              // Required for save/auto/preview modes
+    openAfterExport?: boolean;
+
+    // MARP SPECIFIC
+    marpTheme?: string;
+    marpBrowser?: string;
+    marpEnginePath?: string;
+    marpRealtime?: boolean;            // Run Marp in watch mode
+}
+
+/**
+ * Result of export operation
+ */
+export interface ExportResult {
+    success: boolean;
+    message: string;
+    content?: string;                   // For mode: 'copy'
+    exportedPath?: string;              // For mode: 'save'
 }
 
 export interface AssetInfo {
@@ -2159,6 +2221,333 @@ export class ExportService {
         this.marpProcessPids.clear();
         this.marpWatchProcesses.clear();
         console.log(`[kanban.exportService.stopAllMarpWatches] Stopped ${count} Marp watch processes`);
+    }
+
+    // ============================================================================
+    // NEW UNIFIED EXPORT SYSTEM
+    // Replaces: exportWithAssets(), exportColumn(), exportUnified()
+    // ============================================================================
+
+    /**
+     * Extract content based on scope
+     * Phase 1 of export pipeline: EXTRACTION
+     */
+    private static async extractContentNew(
+        sourceDocument: vscode.TextDocument,
+        scope: 'full' | 'column' | 'task',
+        selection?: { columnIndex?: number; columnId?: string; taskId?: string }
+    ): Promise<string> {
+        const sourcePath = sourceDocument.uri.fsPath;
+        if (!fs.existsSync(sourcePath)) {
+            throw new Error(`Source file not found: ${sourcePath}`);
+        }
+
+        const fullContent = fs.readFileSync(sourcePath, 'utf8');
+
+        switch (scope) {
+            case 'full':
+                return fullContent;
+
+            case 'column':
+                if (selection?.columnIndex === undefined) {
+                    throw new Error('Column index required for column scope');
+                }
+                const columnContent = this.extractColumnContent(fullContent, selection.columnIndex);
+                if (!columnContent) {
+                    throw new Error(`Column ${selection.columnIndex} not found or empty`);
+                }
+                return columnContent;
+
+            case 'task':
+                if (selection?.columnIndex === undefined) {
+                    throw new Error('Column index required for task scope');
+                }
+                const colContent = this.extractColumnContent(fullContent, selection.columnIndex);
+                if (!colContent) {
+                    throw new Error(`Column ${selection.columnIndex} not found`);
+                }
+                const taskContent = this.extractTaskContent(colContent, selection.taskId);
+                if (!taskContent) {
+                    throw new Error(`Task not found in column ${selection.columnIndex}`);
+                }
+                return taskContent;
+
+            default:
+                throw new Error(`Unknown scope: ${scope}`);
+        }
+    }
+
+    /**
+     * Transform content through the processing pipeline
+     * Phase 2 of export pipeline: TRANSFORMATION
+     */
+    private static async transformContentNew(
+        content: string,
+        sourceDocument: vscode.TextDocument,
+        options: NewExportOptions
+    ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
+
+        const sourcePath = sourceDocument.uri.fsPath;
+        const sourceDir = path.dirname(sourcePath);
+        const sourceBasename = path.basename(sourcePath, '.md');
+
+        let result = content;
+        let notIncludedAssets: AssetInfo[] = [];
+
+        // If packing assets or converting format, use full processing pipeline
+        if (options.packAssets || options.format !== 'kanban') {
+
+            // Determine settings
+            const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
+            const mergeIncludes = options.mergeIncludes ?? (options.scope !== 'full');
+
+            console.log(`[kanban.exportService.transformContentNew] packAssets: ${options.packAssets}, format: ${options.format}, convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
+
+            // Build UnifiedExportOptions for processMarkdownContent
+            const legacyOptions: UnifiedExportOptions = {
+                scope: options.scope,
+                format: options.format === 'marp' ? 'presentation' : options.format,
+                tagVisibility: options.tagVisibility,
+                packAssets: options.packAssets,
+                mergeIncludes: mergeIncludes,
+                packOptions: options.packOptions ? {
+                    includeFiles: options.packOptions.includeFiles ?? false,
+                    includeImages: options.packOptions.includeImages ?? false,
+                    includeVideos: options.packOptions.includeVideos ?? false,
+                    includeOtherMedia: options.packOptions.includeOtherMedia ?? false,
+                    includeDocuments: options.packOptions.includeDocuments ?? false,
+                    fileSizeLimitMB: options.packOptions.fileSizeLimitMB ?? 100,
+                    rewriteLinks: options.packOptions.rewriteLinks ?? false
+                } : undefined,
+                selection: options.selection || {},
+                targetFolder: options.targetFolder,
+                openAfterExport: options.openAfterExport,
+                marpTheme: options.marpTheme,
+                marpEnginePath: options.marpEnginePath,
+                marpBrowser: options.marpBrowser
+            };
+
+            // Use existing processMarkdownContent (it does everything)
+            const processed = await this.processMarkdownContent(
+                result,
+                sourceDir,
+                sourceBasename,
+                options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                legacyOptions,
+                new Set<string>(),
+                convertToPresentation,
+                mergeIncludes
+            );
+
+            result = processed.exportedContent;
+            notIncludedAssets = processed.notIncludedAssets;
+
+        } else {
+            // Simple path: just tag filtering
+            result = this.applyTagFiltering(result, options.tagVisibility);
+        }
+
+        return { content: result, notIncludedAssets };
+    }
+
+    /**
+     * Output content based on mode
+     * Phase 3 of export pipeline: OUTPUT
+     */
+    private static async outputContentNew(
+        transformed: { content: string; notIncludedAssets: AssetInfo[] },
+        sourceDocument: vscode.TextDocument,
+        options: NewExportOptions
+    ): Promise<ExportResult> {
+
+        // MODE: COPY (return content for clipboard)
+        if (options.mode === 'copy') {
+            console.log(`[kanban.exportService.outputContentNew] Mode: copy, returning content`);
+            return {
+                success: true,
+                message: 'Content generated successfully',
+                content: transformed.content
+            };
+        }
+
+        // MODE: SAVE / AUTO / PREVIEW (write to disk)
+        if (!options.targetFolder) {
+            throw new Error('Target folder required for save/auto/preview modes');
+        }
+
+        // Ensure target folder exists
+        if (!fs.existsSync(options.targetFolder)) {
+            fs.mkdirSync(options.targetFolder, { recursive: true });
+        }
+
+        // Build output filename
+        const sourcePath = sourceDocument.uri.fsPath;
+        const sourceBasename = path.basename(sourcePath, '.md');
+        let outputBasename = sourceBasename;
+
+        // Add scope suffix for scoped exports
+        if (options.scope !== 'full' && options.selection) {
+            const parts: string[] = [];
+            if (options.selection.columnIndex !== undefined) {
+                parts.push(`col${options.selection.columnIndex}`);
+            }
+            if (parts.length > 0) {
+                outputBasename = `${sourceBasename}-${parts.join('-')}`;
+            }
+        }
+
+        // Write markdown file
+        const markdownPath = path.join(options.targetFolder, `${outputBasename}.md`);
+        console.log(`[kanban.exportService.outputContentNew] Writing markdown to: ${markdownPath}`);
+        fs.writeFileSync(markdownPath, transformed.content, 'utf8');
+
+        // Handle Marp conversion
+        if (options.format === 'marp') {
+            console.log(`[kanban.exportService.outputContentNew] Running Marp conversion`);
+            return await this.runMarpConversionNew(markdownPath, options);
+        }
+
+        // Regular save succeeded
+        console.log(`[kanban.exportService.outputContentNew] Export completed: ${markdownPath}`);
+        return {
+            success: true,
+            message: `Exported to ${markdownPath}`,
+            exportedPath: markdownPath
+        };
+    }
+
+    /**
+     * Run Marp conversion
+     * Helper for outputContentNew
+     */
+    private static async runMarpConversionNew(
+        markdownPath: string,
+        options: NewExportOptions
+    ): Promise<ExportResult> {
+
+        const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
+
+        console.log(`[kanban.exportService.runMarpConversionNew] Format: ${marpFormat}, mode: ${options.mode}, realtime: ${options.marpRealtime}`);
+
+        // Build output path
+        const dir = path.dirname(markdownPath);
+        const baseName = path.basename(markdownPath, '.md');
+        let ext = '.html';
+        switch (marpFormat) {
+            case 'pdf': ext = '.pdf'; break;
+            case 'pptx': ext = '.pptx'; break;
+            case 'markdown': ext = '.md'; break;
+            default: ext = '.html'; break;
+        }
+        const outputPath = path.join(dir, `${baseName}${ext}`);
+
+        // MODE: PREVIEW (realtime watch) - use background mode
+        if (options.mode === 'preview' || options.marpRealtime) {
+            try {
+                console.log(`[kanban.exportService.runMarpConversionNew] Starting realtime export (background mode)`);
+                await MarpExportService.export({
+                    inputFilePath: markdownPath,
+                    format: marpFormat,
+                    outputPath: outputPath,
+                    enginePath: options.marpEnginePath,
+                    theme: options.marpTheme,
+                    allowLocalFiles: true,
+                    background: true  // Run in background for realtime
+                });
+                return {
+                    success: true,
+                    message: 'Marp preview started',
+                    exportedPath: outputPath
+                };
+            } catch (error) {
+                console.error(`[kanban.exportService.runMarpConversionNew] Realtime export failed:`, error);
+                return {
+                    success: false,
+                    message: `Marp preview failed: ${error instanceof Error ? error.message : String(error)}`
+                };
+            }
+        }
+
+        // MODE: SAVE (single conversion)
+        try {
+            console.log(`[kanban.exportService.runMarpConversionNew] Starting single conversion`);
+            await MarpExportService.export({
+                inputFilePath: markdownPath,
+                format: marpFormat,
+                outputPath: outputPath,
+                enginePath: options.marpEnginePath,
+                theme: options.marpTheme,
+                allowLocalFiles: true,
+                background: false  // Wait for completion
+            });
+            console.log(`[kanban.exportService.runMarpConversionNew] Conversion completed: ${outputPath}`);
+            return {
+                success: true,
+                message: `Exported to ${outputPath}`,
+                exportedPath: outputPath
+            };
+        } catch (error) {
+            console.error(`[kanban.exportService.runMarpConversionNew] Conversion failed:`, error);
+            return {
+                success: false,
+                message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
+    }
+
+    /**
+     * NEW UNIFIED EXPORT ENTRY POINT
+     * Replaces: exportWithAssets(), exportColumn(), exportUnified()
+     *
+     * This is the single entry point for ALL export operations.
+     * Handles all scopes (full, column, task), all formats (kanban, presentation, marp),
+     * and all modes (copy, save, auto, preview).
+     */
+    public static async export(
+        sourceDocument: vscode.TextDocument,
+        options: NewExportOptions
+    ): Promise<ExportResult> {
+        try {
+            console.log(`[kanban.exportService.export] Starting export - scope: ${options.scope}, mode: ${options.mode}, format: ${options.format}`);
+
+            // Clear tracking maps for new export
+            this.fileHashMap.clear();
+            this.exportedFiles.clear();
+
+            // PHASE 1: EXTRACTION
+            console.log(`[kanban.exportService.export] Phase 1: Extraction`);
+            const extracted = await this.extractContentNew(
+                sourceDocument,
+                options.scope,
+                options.selection
+            );
+
+            // PHASE 2: TRANSFORMATION
+            console.log(`[kanban.exportService.export] Phase 2: Transformation`);
+            const transformed = await this.transformContentNew(
+                extracted,
+                sourceDocument,
+                options
+            );
+
+            // PHASE 3: OUTPUT
+            console.log(`[kanban.exportService.export] Phase 3: Output`);
+            const result = await this.outputContentNew(
+                transformed,
+                sourceDocument,
+                options
+            );
+
+            console.log(`[kanban.exportService.export] Export completed - success: ${result.success}`);
+            return result;
+
+        } catch (error) {
+            console.error('[kanban.exportService.export] Export failed:', error);
+            return {
+                success: false,
+                message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
     }
 
 }

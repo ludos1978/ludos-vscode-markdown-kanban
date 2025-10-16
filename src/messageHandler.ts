@@ -5,7 +5,7 @@ import { LinkHandler } from './linkHandler';
 import { KanbanBoard } from './markdownParser';
 import { ExternalFileWatcher } from './externalFileWatcher';
 import { configService } from './configurationService';
-import { ExportService } from './exportService';
+import { ExportService, NewExportOptions } from './exportService';
 import { getFileStateManager } from './fileStateManager';
 import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/MarpExtensionService';
@@ -678,6 +678,19 @@ export class MessageHandler {
 
             case 'stopAutoExport':
                 await this.handleStopAutoExport();
+                break;
+
+            // NEW UNIFIED EXPORT HANDLER
+            case 'export':
+                const newExportId = `export_${Date.now()}`;
+                await this.startOperation(newExportId, 'export', 'Exporting...');
+                try {
+                    await this.handleExport(message.options, newExportId);
+                    await this.endOperation(newExportId);
+                } catch (error) {
+                    await this.endOperation(newExportId);
+                    throw error;
+                }
                 break;
 
             default:
@@ -3108,5 +3121,152 @@ export class MessageHandler {
             console.error('[kanban.messageHandler.handleStopAutoExportForFile] Error:', error);
             throw error;
         }
+    }
+
+    // ============================================================================
+    // NEW UNIFIED EXPORT HANDLER
+    // Replaces: handleExportWithAssets, handleExportColumn, handleGenerateCopyContent,
+    //           handleUnifiedExport, handleExportWithMarp, handlePresentWithMarp, handleStartAutoExport
+    // ============================================================================
+
+    /**
+     * Unified export handler - handles ALL export operations
+     * This single handler replaces 7 old handlers with a clean, consistent interface
+     */
+    private async handleExport(options: any, operationId?: string): Promise<void> {
+        try {
+            console.log('[kanban.messageHandler.handleExport] Starting export with options:', JSON.stringify(options, null, 2));
+
+            // Get document
+            const document = this._fileManager.getDocument();
+            if (!document) {
+                throw new Error('No document available for export');
+            }
+
+            // Handle AUTO mode specially (register save handler)
+            if (options.mode === 'auto') {
+                return await this.handleAutoExportMode(document, options);
+            }
+
+            // Handle COPY mode (no progress bar)
+            if (options.mode === 'copy') {
+                console.log('[kanban.messageHandler.handleExport] Copy mode - no progress bar');
+                const result = await ExportService.export(document, options);
+
+                const panel = this._getWebviewPanel();
+                if (panel && panel._panel) {
+                    panel._panel.webview.postMessage({
+                        type: 'copyContentResult',
+                        result: result
+                    });
+                }
+
+                if (!result.success) {
+                    vscode.window.showErrorMessage(result.message);
+                }
+                return;
+            }
+
+            // Handle SAVE / PREVIEW modes (with progress bar)
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Exporting ${options.scope}...`,
+                cancellable: false
+            }, async (progress) => {
+
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 20, 'Processing content...');
+                }
+                progress.report({ increment: 20, message: 'Processing content...' });
+
+                const result = await ExportService.export(document!, options);
+
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 90, 'Finalizing...');
+                }
+                progress.report({ increment: 80, message: 'Finalizing...' });
+
+                // Send result to webview
+                const panel = this._getWebviewPanel();
+                if (panel && panel._panel) {
+                    panel._panel.webview.postMessage({
+                        type: 'exportResult',
+                        result: result
+                    });
+                }
+
+                // Open in browser if requested
+                if (result.success && options.openAfterExport && result.exportedPath) {
+                    console.log('[kanban.messageHandler.handleExport] Opening exported file:', result.exportedPath);
+                    const uri = vscode.Uri.file(result.exportedPath);
+
+                    if (result.exportedPath.endsWith('.html')) {
+                        await vscode.env.openExternal(vscode.Uri.parse(uri.toString()));
+                    } else {
+                        await vscode.env.openExternal(uri);
+                    }
+                }
+
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 100);
+                }
+
+                // Show result message
+                if (result.success) {
+                    vscode.window.showInformationMessage(result.message);
+                } else {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleExport] Error:', error);
+            vscode.window.showErrorMessage(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Handle auto-export mode (register save handler)
+     * Part of unified export handler
+     */
+    private async handleAutoExportMode(document: vscode.TextDocument, options: any): Promise<void> {
+        console.log('[kanban.messageHandler.handleAutoExportMode] Starting auto-export');
+
+        // Store settings
+        this._autoExportSettings = options;
+
+        // Stop existing handlers for other files
+        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath);
+
+        const docUri = document.uri;
+        const coordinator = SaveEventCoordinator.getInstance();
+
+        // Register handler
+        const handler: SaveEventHandler = {
+            id: `auto-export-${docUri.fsPath}`,
+            handleSave: async (savedDoc: vscode.TextDocument) => {
+                if (savedDoc.uri.toString() === docUri.toString()) {
+                    console.log('[kanban.messageHandler.autoExport] File saved, triggering export...');
+
+                    try {
+                        // Use new unified export
+                        const result = await ExportService.export(savedDoc, options);
+
+                        if (result.success && options.openAfterExport && result.exportedPath) {
+                            const uri = vscode.Uri.file(result.exportedPath);
+                            await vscode.env.openExternal(uri);
+                        }
+
+                        console.log('[kanban.messageHandler.autoExport] Auto-export completed');
+                    } catch (error) {
+                        console.error('[kanban.messageHandler.autoExport] Auto-export failed:', error);
+                        vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                }
+            }
+        };
+
+        coordinator.registerHandler(handler);
+        console.log('[kanban.messageHandler.handleAutoExportMode] Handler registered');
     }
 }

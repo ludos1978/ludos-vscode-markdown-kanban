@@ -1118,10 +1118,11 @@ async function copyColumnAsMarkdown(columnId) {
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
-    // Use unified export system with presentation format
+    // Use NEW unified export system with presentation format
     vscode.postMessage({
-        type: 'generateCopyContent',
+        type: 'export',
         options: {
+            mode: 'copy',
             scope: 'column',
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
@@ -1140,10 +1141,11 @@ async function copyTaskAsMarkdown(taskId, columnId) {
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
-    // Use unified export system with presentation format
+    // Use NEW unified export system with presentation format
     vscode.postMessage({
-        type: 'generateCopyContent',
+        type: 'export',
         options: {
+            mode: 'copy',
             scope: 'task',
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
