@@ -2027,6 +2027,12 @@ function setupTaskDragAndDrop() {
                 if (afterElement !== dragState.lastAfterElement) {
                     dragState.lastAfterElement = afterElement;
 
+                    // Safety check: ensure draggedTask is still a valid DOM element
+                    if (!dragState.draggedTask || !dragState.draggedTask.parentNode) {
+                        console.warn('[kanban.dragDrop] draggedTask is invalid or detached, skipping DOM update');
+                        return;
+                    }
+
                     if (afterElement === null) {
                         // Insert at the end, but before the add button if it exists
                         const addButton = isOriginalColumn && dragState.cachedAddButton

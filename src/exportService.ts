@@ -1009,13 +1009,18 @@ export class ExportService {
 
         // Convert to presentation format if requested
         // When merging includes, skip conversion to preserve raw merged content
-        console.log(`[kanban.exportService.processMarkdownContent] convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
-        if (convertToPresentation && !mergeIncludes) {
+        // console.log(`[kanban.exportService.processMarkdownContent] convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
+
+        if (convertToPresentation) {
             filteredContent = this.convertToPresentationFormat(filteredContent, false);
             console.log(`[kanban.exportService.processMarkdownContent] After conversion, content contains ${filteredContent.match(/!!!include/g)?.length || 0} include markers`);
-        } else if (convertToPresentation && mergeIncludes) {
-            console.log(`[kanban.exportService.processMarkdownContent] Skipping conversion - using raw merged content to preserve structure`);
         }
+        
+        // this is wrong. if it's convertToPresentation, do it.
+        // && !mergeIncludes) {
+        // } else if (convertToPresentation && mergeIncludes) {
+        //     console.log(`[kanban.exportService.processMarkdownContent] Skipping conversion - using raw merged content to preserve structure`);
+        // }
 
         return {
             exportedContent: filteredContent,
@@ -1523,16 +1528,11 @@ export class ExportService {
         console.log(`[kanban.exportService.stopAllMarpWatches] Stopped ${count} Marp watch processes`);
     }
 
-    // ============================================================================
-    // NEW UNIFIED EXPORT SYSTEM
-    // Replaces: exportWithAssets(), exportColumn(), exportUnified()
-    // ============================================================================
-
     /**
      * Extract content based on scope
      * Phase 1 of export pipeline: EXTRACTION
      */
-    private static async extractContentNew(
+    private static async extractContent(
         sourceDocument: vscode.TextDocument,
         columnIndexes?: number[]
     ): Promise<string> {
@@ -1575,7 +1575,7 @@ export class ExportService {
      * Transform content through the processing pipeline
      * Phase 2 of export pipeline: TRANSFORMATION
      */
-    private static async transformContentNew(
+    private static async transformContent(
         content: string,
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions
@@ -1624,7 +1624,7 @@ export class ExportService {
      * Output content based on mode
      * Phase 3 of export pipeline: OUTPUT
      */
-    private static async outputContentNew(
+    private static async outputContent(
         transformed: { content: string; notIncludedAssets: AssetInfo[] },
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions
@@ -1668,7 +1668,7 @@ export class ExportService {
         // Handle Marp conversion
         if (options.format === 'marp') {
             console.log(`[kanban.exportService.outputContentNew] Running Marp conversion`);
-            return await this.runMarpConversionNew(markdownPath, options);
+            return await this.runMarpConversion(markdownPath, options);
         }
 
         // Regular save succeeded
@@ -1684,7 +1684,7 @@ export class ExportService {
      * Run Marp conversion
      * Helper for outputContentNew
      */
-    private static async runMarpConversionNew(
+    private static async runMarpConversion(
         markdownPath: string,
         options: NewExportOptions
     ): Promise<ExportResult> {
@@ -1787,14 +1787,14 @@ export class ExportService {
 
             // PHASE 1: EXTRACTION
             console.log(`[kanban.exportService.export] Phase 1: Extraction`);
-            const extracted = await this.extractContentNew(
+            const extracted = await this.extractContent(
                 sourceDocument,
                 options.columnIndexes
             );
 
             // PHASE 2: TRANSFORMATION
             console.log(`[kanban.exportService.export] Phase 2: Transformation`);
-            const transformed = await this.transformContentNew(
+            const transformed = await this.transformContent(
                 extracted,
                 sourceDocument,
                 options
@@ -1802,7 +1802,7 @@ export class ExportService {
 
             // PHASE 3: OUTPUT
             console.log(`[kanban.exportService.export] Phase 3: Output`);
-            const result = await this.outputContentNew(
+            const result = await this.outputContent(
                 transformed,
                 sourceDocument,
                 options
