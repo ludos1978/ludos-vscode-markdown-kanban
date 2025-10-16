@@ -607,10 +607,11 @@ export class ExportService {
      * uses obsolete data structures: ExportOptions
      */
     private static filterAssets(assets: AssetInfo[], options: UnifiedExportOptions): AssetInfo[] {
-        if (!options.packOptions) {
-            throw new Error('Pack options are missing in export options');
+        // If packing is disabled or no pack options, return empty array
+        if (!options.packAssets || !options.packOptions) {
+            return [];
         }
-        const packOptions = options.packOptions!;
+        const packOptions = options.packOptions;
         return assets.filter(asset => {
             // Check if asset exists
             if (!asset.exists) { return false; }

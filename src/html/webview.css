@@ -4258,6 +4258,11 @@ mark {
     word-break: break-word;
 }
 
+.vscode-dark mark {
+    background-color: var(--vscode-editor-findMatchHighlightBackground, #885533);
+    color: var(--vscode-editor-foreground);
+}
+
 /* Additional markdown-it plugin styles */
 sub, sup {
     font-size: 0.75em;

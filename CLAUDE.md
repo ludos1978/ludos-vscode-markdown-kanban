@@ -33,6 +33,7 @@
 - do not modify the general application structure if you have not given an explicit task for it.
 - do not randomly trim values. spaces might be there for a reason. especially in front of strings!
 - Do not create summary documents, but documents to prevent future code duplications.
+- Never keep any obsolete code! Rewrite code to make it use new data styles completely or remove it completely. Do not create any compatiblity layers or conversions from old data styles!
 
 ## Error handling:
 - allways check for compile errors
