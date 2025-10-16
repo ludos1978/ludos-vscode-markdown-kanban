@@ -19,13 +19,8 @@ export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' 
  * Export options - SINGLE unified system for ALL exports
  */
 export interface NewExportOptions {
-    // SCOPE: What to export
-    scope: 'full' | 'column' | 'task';
-    selection?: {
-        columnIndex?: number;
-        columnId?: string;
-        taskId?: string;
-    };
+    // SELECTION: Column indexes to export (empty or undefined = full board)
+    columnIndexes?: number[];
 
     // MODE: Operation mode
     mode: 'copy' | 'save' | 'auto' | 'preview';
@@ -39,7 +34,7 @@ export interface NewExportOptions {
     marpFormat?: 'markdown' | 'html' | 'pdf' | 'pptx';
 
     // TRANSFORMATIONS
-    mergeIncludes?: boolean;           // Default: false for full, true for scoped
+    mergeIncludes?: boolean;
     tagVisibility: TagVisibility;
 
     // PACKING
@@ -1539,8 +1534,7 @@ export class ExportService {
      */
     private static async extractContentNew(
         sourceDocument: vscode.TextDocument,
-        scope: ExportScope,
-        selection?: { rowNumber?: number; stackIndex?: number; columnIndex?: number; columnId?: string; taskId?: string }
+        columnIndexes?: number[]
     ): Promise<string> {
         const sourcePath = sourceDocument.uri.fsPath;
         if (!fs.existsSync(sourcePath)) {
@@ -1549,57 +1543,32 @@ export class ExportService {
 
         const fullContent = fs.readFileSync(sourcePath, 'utf8');
 
-        switch (scope) {
-            case 'full':
-                return fullContent;
-
-            case 'row':
-                if (selection?.rowNumber === undefined) {
-                    throw new Error('Row number required for row scope');
-                }
-                const rowContent = this.extractRowContent(fullContent, selection.rowNumber);
-                if (!rowContent) {
-                    throw new Error(`Row ${selection.rowNumber} not found or empty`);
-                }
-                return rowContent;
-
-            case 'stack':
-                if (selection?.rowNumber === undefined || selection?.stackIndex === undefined) {
-                    throw new Error('Row number and stack index required for stack scope');
-                }
-                const stackContent = this.extractStackContent(fullContent, selection.rowNumber, selection.stackIndex);
-                if (!stackContent) {
-                    throw new Error(`Stack ${selection.stackIndex} in row ${selection.rowNumber} not found or empty`);
-                }
-                return stackContent;
-
-            case 'column':
-                if (selection?.columnIndex === undefined) {
-                    throw new Error('Column index required for column scope');
-                }
-                const columnContent = this.extractColumnContent(fullContent, selection.columnIndex);
-                if (!columnContent) {
-                    throw new Error(`Column ${selection.columnIndex} not found or empty`);
-                }
-                return columnContent;
-
-            case 'task':
-                if (selection?.columnIndex === undefined) {
-                    throw new Error('Column index required for task scope');
-                }
-                const colContent = this.extractColumnContent(fullContent, selection.columnIndex);
-                if (!colContent) {
-                    throw new Error(`Column ${selection.columnIndex} not found`);
-                }
-                const taskContent = this.extractTaskContent(colContent, selection.taskId);
-                if (!taskContent) {
-                    throw new Error(`Task not found in column ${selection.columnIndex}`);
-                }
-                return taskContent;
-
-            default:
-                throw new Error(`Unknown scope: ${scope}`);
+        // If no column indexes specified, export full board
+        if (!columnIndexes || columnIndexes.length === 0) {
+            return fullContent;
         }
+
+        console.log(`[kanban.exportService.extractContentNew] Extracting columns at indexes:`, columnIndexes);
+
+        // Extract selected columns and combine them
+        const extractedColumns: string[] = [];
+
+        for (const columnIndex of columnIndexes) {
+            const columnContent = this.extractColumnContent(fullContent, columnIndex);
+            if (columnContent) {
+                extractedColumns.push(columnContent);
+            }
+        }
+
+        if (extractedColumns.length === 0) {
+            throw new Error('Failed to extract any column content');
+        }
+
+        // Combine columns with the kanban header
+        const headerMatch = fullContent.match(/^---\n[\s\S]*?\n---\n/);
+        const header = headerMatch ? headerMatch[0] : '';
+
+        return header + '\n' + extractedColumns.join('\n\n');
     }
 
     /**
@@ -1624,7 +1593,7 @@ export class ExportService {
 
             // Determine settings
             const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
-            const mergeIncludes = options.mergeIncludes ?? (options.scope !== 'full');
+            const mergeIncludes = options.mergeIncludes ?? (options.columnIndexes && options.columnIndexes.length > 0);
 
             console.log(`[kanban.exportService.transformContentNew] packAssets: ${options.packAssets}, format: ${options.format}, convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
 
@@ -1686,15 +1655,9 @@ export class ExportService {
         const sourceBasename = path.basename(sourcePath, '.md');
         let outputBasename = sourceBasename;
 
-        // Add scope suffix for scoped exports
-        if (options.scope !== 'full' && options.selection) {
-            const parts: string[] = [];
-            if (options.selection.columnIndex !== undefined) {
-                parts.push(`col${options.selection.columnIndex}`);
-            }
-            if (parts.length > 0) {
-                outputBasename = `${sourceBasename}-${parts.join('-')}`;
-            }
+        // Add suffix for partial exports (when specific columns selected)
+        if (options.columnIndexes && options.columnIndexes.length > 0) {
+            outputBasename = `${sourceBasename}-partial`;
         }
 
         // Write markdown file
@@ -1811,7 +1774,7 @@ export class ExportService {
         options: NewExportOptions
     ): Promise<ExportResult> {
         try {
-            console.log(`[kanban.exportService.export] Starting export - scope: ${options.scope}, mode: ${options.mode}, format: ${options.format}`);
+            console.log(`[kanban.exportService.export] Starting export - columnIndexes: ${options.columnIndexes?.length || 'all'}, mode: ${options.mode}, format: ${options.format}`);
 
             // Clear tracking maps for new export
             this.fileHashMap.clear();
@@ -1821,8 +1784,7 @@ export class ExportService {
             console.log(`[kanban.exportService.export] Phase 1: Extraction`);
             const extracted = await this.extractContentNew(
                 sourceDocument,
-                options.scope,
-                options.selection
+                options.columnIndexes
             );
 
             // PHASE 2: TRANSFORMATION

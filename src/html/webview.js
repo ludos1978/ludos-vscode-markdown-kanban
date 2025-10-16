@@ -4405,51 +4405,43 @@ function executeUnifiedExport() {
     // Close modal
     closeExportModal();
 
-    // Export each selected item
-    selectedItems.forEach(item => {
-        const options = {
-            // SCOPE
-            scope: item.scope,
-            selection: {
-                rowNumber: item.rowNumber,
-                stackIndex: item.stackIndex,
-                columnIndex: item.columnIndex,
-                columnId: item.columnId
-            },
+    // selectedItems is now an array of column indexes
+    const options = {
+        // SELECTION: Column indexes to export
+        columnIndexes: selectedItems,
 
-            // MODE
-            mode: 'save',
+        // MODE
+        mode: 'save',
 
-            // FORMAT
-            format: useMarp && format === 'presentation' ? 'marp' : format,
-            marpFormat: useMarp && format === 'presentation' ? marpOutputFormat : undefined,
+        // FORMAT
+        format: useMarp && format === 'presentation' ? 'marp' : format,
+        marpFormat: useMarp && format === 'presentation' ? marpOutputFormat : undefined,
 
-            // TRANSFORMATIONS
-            tagVisibility: tagVisibility,
-            mergeIncludes: mergeIncludes,
+        // TRANSFORMATIONS
+        tagVisibility: tagVisibility,
+        mergeIncludes: mergeIncludes,
 
-            // PACKING
-            packAssets: packAssets,
-            packOptions: packOptions,
+        // PACKING
+        packAssets: packAssets,
+        packOptions: packOptions,
 
-            // OUTPUT
-            targetFolder: folderInput.value.trim(),
-            openAfterExport: false,
+        // OUTPUT
+        targetFolder: folderInput.value.trim(),
+        openAfterExport: false,
 
-            // MARP SPECIFIC
-            marpTheme: useMarp ? marpTheme : undefined,
-            marpBrowser: useMarp ? marpBrowser : undefined,
-            marpWatch: useMarp && marpPreview ? true : undefined
-        };
+        // MARP SPECIFIC
+        marpTheme: useMarp ? marpTheme : undefined,
+        marpBrowser: useMarp ? marpBrowser : undefined,
+        marpWatch: useMarp && marpPreview ? true : undefined
+    };
 
-        // Save last export settings for quick re-export
-        lastExportSettings = options;
-        window.lastExportSettings = options;
+    // Save last export settings for quick re-export
+    lastExportSettings = options;
+    window.lastExportSettings = options;
 
-        vscode.postMessage({
-            type: 'export',
-            options: options
-        });
+    vscode.postMessage({
+        type: 'export',
+        options: options
     });
 
     // Update auto-export mode tracking (for Marp preview)
