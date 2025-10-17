@@ -1064,8 +1064,14 @@ class TaskEditor {
                             }
                             this.currentEditor.displayElement.innerHTML = renderedHtml;
                         } else {
-                            // Handle empty values - must be truly empty for CSS :empty selector
-                            this.currentEditor.displayElement.innerHTML = '';
+                            // Handle empty values
+                            // For task descriptions, always wrap in sections for keyboard navigation
+                            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
+                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections('');
+                            } else {
+                                // For other types, must be truly empty for CSS :empty selector
+                                this.currentEditor.displayElement.innerHTML = '';
+                            }
                         }
                         // Ensure display element is visible
                         this.currentEditor.displayElement.style.display = 'block';

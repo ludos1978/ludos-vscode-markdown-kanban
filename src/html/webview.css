@@ -1230,7 +1230,8 @@ body.section-height-limited .task-section figure img {
   opacity: 0.7;
 }
 
-.task-description-display:empty::before {
+.task-description-display:empty::before,
+.task-description-display:has(> .task-section:only-child:empty)::before {
   content: "Add description...";
   color: var(--vscode-descriptionForeground);
   font-size: 13px;

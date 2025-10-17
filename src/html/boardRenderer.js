@@ -78,8 +78,10 @@ function interpolateColor(color1, color2, factor) {
  * @returns {string} HTML with sections wrapped
  */
 function wrapTaskSections(html) {
+    // Always create at least one section, even for empty content
+    // This ensures tasks are focusable with keyboard navigation
     if (!html || !html.trim()) {
-        return html;
+        return `<div class="task-section" tabindex="0"></div>`;
     }
 
     // Create a temporary container to parse the HTML
@@ -1844,10 +1846,9 @@ function createTaskElement(task, columnId, taskIndex) {
 
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description) : '';
 
-    // Wrap description in task sections for keyboard navigation
-    if (renderedDescription) {
-        renderedDescription = wrapTaskSections(renderedDescription);
-    }
+    // Always wrap description in task sections for keyboard navigation
+    // Even empty tasks need at least one section to be focusable
+    renderedDescription = wrapTaskSections(renderedDescription);
 
     // Use same pattern as column includes:
     // - displayTitle for display (content from file or filtered title)
