@@ -1349,6 +1349,54 @@ export class ExportService {
     }
 
     /**
+     * Convert board object directly to presentation format
+     * No parsing needed - works directly with in-memory data
+     */
+    private static boardToPresentation(board: any): string {
+        console.log(`[kanban.exportService.boardToPresentation] ✅✅✅ USING NEW BOARD-BASED CONVERSION - NO STRING PARSING`);
+        console.log(`[kanban.exportService.boardToPresentation] Board has ${board.columns?.length || 0} columns`);
+
+        const slides: string[] = [];
+
+        for (const column of board.columns) {
+            // Add column title as slide
+            if (column.title && column.title.trim()) {
+                slides.push(column.title.trim());
+            }
+
+            // Add each task as slide
+            if (column.tasks && column.tasks.length > 0) {
+                for (const task of column.tasks) {
+                    let slideContent = '';
+
+                    // Add task title
+                    if (task.title && task.title.trim()) {
+                        slideContent = task.title.trim();
+                    }
+
+                    // Add task description
+                    if (task.description && task.description.trim()) {
+                        if (slideContent) {
+                            slideContent += '\n\n' + task.description.trim();
+                        } else {
+                            slideContent = task.description.trim();
+                        }
+                    }
+
+                    if (slideContent) {
+                        console.log(`[kanban.exportService.boardToPresentation] Slide content preview: ${slideContent.substring(0, 50)}...`);
+                        slides.push(slideContent);
+                    }
+                }
+            }
+        }
+
+        const result = slides.join('\n\n---\n\n') + '\n';
+        console.log(`[kanban.exportService.boardToPresentation] Generated ${slides.length} slides`);
+        return result;
+    }
+
+    /**
      * Convert kanban format to presentation format
      * Each task becomes a slide separated by ---
      * Column titles are included as slides before their tasks
@@ -1358,39 +1406,76 @@ export class ExportService {
      * @param mergeIncludes - If true, preserve column structure without separating tasks into slides
      */
     private static convertToPresentationFormat(content: string, mergeIncludes: boolean = false): string {
-        console.log(`[kanban.exportService.convertToPresentationFormat] Converting to presentation format, mergeIncludes: ${mergeIncludes}`);
+        console.log(`[kanban.exportService.convertToPresentationFormat] ❌❌❌ OLD STRING-BASED FUNCTION CALLED - THIS SHOULD NOT HAPPEN FOR PRESENTATION EXPORTS!`);
 
-        // Add temporary YAML header if missing (needed for parser)
-        let contentToParse = content;
-        const hasYaml = content.trim().startsWith('---');
-
-        if (!hasYaml) {
-            contentToParse = '---\nkanban-plugin: board\n---\n\n' + content;
-            console.log('[kanban.exportService.convertToPresentationFormat] Added temporary YAML header for parsing');
-        }
-
-        // Parse the kanban content to extract tasks
-        const { board } = MarkdownKanbanParser.parseMarkdown(contentToParse);
-
-        if (!board.valid) {
-            console.log('[kanban.exportService.convertToPresentationFormat] No valid kanban board found after adding YAML, returning original content');
-            return content;
-        }
-
-        if (board.columns.length === 0) {
-            console.log('[kanban.exportService.convertToPresentationFormat] No columns found');
-            return '';
+        // Remove YAML frontmatter if present
+        let workingContent = content;
+        const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n\n?/);
+        if (yamlMatch) {
+            workingContent = content.substring(yamlMatch[0].length);
         }
 
         const slides: string[] = [];
-        for (const column of board.columns) {
-            slides.push(column.title);
-            if (column.tasks && column.tasks.length > 0) {
-                for (const task of column.tasks) {
-                    slides.push(`${task.title}\n\n${task.description}`);
+        const lines = workingContent.split('\n');
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+
+            // Column header: ## Title (ONLY if not indented - starts at beginning of line)
+            if (line.startsWith('## ') && !line.startsWith(' ')) {
+                const columnTitle = line.substring(3).trim();
+                if (columnTitle) {
+                    slides.push(columnTitle);
                 }
+                i++;
+                continue;
             }
+
+            // Task: - [ ] Title or - [x] Title (ONLY if not indented - starts at beginning of line)
+            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
+                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
+
+                // Collect description (indented lines)
+                const descriptionLines: string[] = [];
+                i++;
+
+                while (i < lines.length) {
+                    const nextLine = lines[i];
+
+                    // Stop at next NON-INDENTED column or task
+                    if (!nextLine.startsWith(' ') && (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
+                        break;
+                    }
+
+                    // Collect indented or empty lines
+                    if (nextLine.startsWith('  ')) {
+                        descriptionLines.push(nextLine.substring(2));
+                        i++;
+                    } else if (nextLine.trim() === '') {
+                        descriptionLines.push('');
+                        i++;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Build slide: title + description
+                let slide = taskTitle;
+                if (descriptionLines.length > 0) {
+                    const description = descriptionLines.join('\n').trim();
+                    if (description) {
+                        slide += '\n\n' + description;
+                    }
+                }
+
+                slides.push(slide);
+                continue;
+            }
+
+            i++;
         }
+
         return slides.join('\n\n---\n\n') + '\n';
     }
 
@@ -1536,6 +1621,9 @@ export class ExportService {
         sourceDocument: vscode.TextDocument,
         columnIndexes?: number[]
     ): Promise<string> {
+        // This function ONLY reads from files (kanban-markdown)
+        // For board-based exports, skip this phase entirely
+
         const sourcePath = sourceDocument.uri.fsPath;
         if (!fs.existsSync(sourcePath)) {
             throw new Error(`Source file not found: ${sourcePath}`);
@@ -1578,7 +1666,8 @@ export class ExportService {
     private static async transformContent(
         content: string,
         sourceDocument: vscode.TextDocument,
-        options: NewExportOptions
+        options: NewExportOptions,
+        board?: any
     ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
 
         const sourcePath = sourceDocument.uri.fsPath;
@@ -1588,11 +1677,23 @@ export class ExportService {
         let result = content;
         let notIncludedAssets: AssetInfo[] = [];
 
-        // If packing assets or converting format, use full processing pipeline
+        // ROUTING LOGIC:
+        // - Converting format (presentation/marp) → Use in-memory board (kanban-data)
+        // - Keeping original format (kanban) → Use file (kanban-markdown) to preserve formatting
+        // - Asset packing → Use file to process includes correctly
+        const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
+
+        // Use board-based conversion for ANY format conversion (not just presentation)
+        if (board && options.format !== 'kanban' && !options.packAssets) {
+            console.log(`[kanban.exportService.transformContent] Using in-memory board (kanban-data) for ${options.format} conversion`);
+            result = this.boardToPresentation(board);
+            return { content: result, notIncludedAssets: [] };
+        }
+
+        // Use file-based pipeline only for keeping original format or packing assets
         if (options.packAssets || options.format !== 'kanban') {
 
             // Determine settings
-            const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
             const mergeIncludes = options.mergeIncludes ?? (options.columnIndexes && options.columnIndexes.length > 0);
 
             console.log(`[kanban.exportService.transformContentNew] packAssets: ${options.packAssets}, format: ${options.format}, convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
@@ -1773,31 +1874,45 @@ export class ExportService {
      * This is the single entry point for ALL export operations.
      * Handles all scopes (full, column, task), all formats (kanban, presentation, marp),
      * and all modes (copy, save, auto, preview).
+     *
+     * @param board - Optional in-memory board object for presentation exports (avoids file parsing)
      */
     public static async export(
         sourceDocument: vscode.TextDocument,
-        options: NewExportOptions
+        options: NewExportOptions,
+        board?: any
     ): Promise<ExportResult> {
         try {
-            console.log(`[kanban.exportService.export] Starting export - columnIndexes: ${options.columnIndexes?.length || 'all'}, mode: ${options.mode}, format: ${options.format}`);
+            console.log(`[kanban.exportService.export] Starting export - columnIndexes: ${options.columnIndexes?.length || 'all'}, mode: ${options.mode}, format: ${options.format}, hasBoard: ${!!board}`);
 
             // Clear tracking maps for new export
             this.fileHashMap.clear();
             this.exportedFiles.clear();
 
             // PHASE 1: EXTRACTION
-            console.log(`[kanban.exportService.export] Phase 1: Extraction`);
-            const extracted = await this.extractContent(
-                sourceDocument,
-                options.columnIndexes
-            );
+            // Use in-memory board for ANY conversion (kanban or presentation)
+            // Only use file-based extraction when keeping original format or packing assets
+            const useBoardDirectly = board && options.format !== 'kanban' && !options.packAssets;
+            let extracted: string;
+
+            if (useBoardDirectly) {
+                console.log(`[kanban.exportService.export] Phase 1: Skipping extraction - using in-memory board for conversion`);
+                extracted = ''; // Dummy value, won't be used
+            } else {
+                console.log(`[kanban.exportService.export] Phase 1: Extracting from file (original format or asset packing)`);
+                extracted = await this.extractContent(
+                    sourceDocument,
+                    options.columnIndexes
+                );
+            }
 
             // PHASE 2: TRANSFORMATION
             console.log(`[kanban.exportService.export] Phase 2: Transformation`);
             const transformed = await this.transformContent(
                 extracted,
                 sourceDocument,
-                options
+                options,
+                board
             );
 
             // PHASE 3: OUTPUT

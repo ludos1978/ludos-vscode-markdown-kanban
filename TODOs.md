@@ -4,6 +4,57 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] it still convert this:
+"""
+## # Day 3 - World Scale 2
+- [ ] ## World Scale in Games
+  Video game scale is weird
+  
+  ## h2
+  
+  The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
+  
+  <https://book.leveldesignbook.com/process/blockout/metrics#scale>
+"""
+
+to this:
+"""
+# Day 3 - World Scale 2
+
+---
+
+## World Scale in Games
+
+Video game scale is weird
+
+---
+
+h2
+"""
+
+the text is missing the link is gone and addiitonal --- are added where they should not be placed
+
+this would be correct:
+"""
+# Day 3 - World Scale 2
+
+---
+
+## World Scale in Games
+
+Video game scale is weird
+
+## h2
+
+The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
+
+<https://book.leveldesignbook.com/process/blockout/metrics#scale>
+"""
+
+ultrathink plan think
+
+- [ ] when copying as markdown it should only copy the object, that the function called. that might be the column or the task!
+
 - [x] when the user selects "auto export on save" or ("use marp" and "live preview") then the stop running button should be shown. when the stop button is pressed both activities should be stopped. The marp process must only be started once and be kept running in the background, DO NOT RESTART THE MARP PROCESS ON SAVE! . The auto export on save should be repeated using the same export settings until the stop button is pressed. 
 
 when the board is exported again it should first stop the running processes as if the stop button is pressed. 

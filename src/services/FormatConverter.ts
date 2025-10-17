@@ -1,5 +1,5 @@
 import { PresentationParser } from '../presentationParser';
-import { MarkdownKanbanParser, KanbanColumn, KanbanTask } from '../markdownParser';
+import { KanbanColumn, KanbanTask } from '../markdownParser';
 
 /**
  * Unified format conversion utility
@@ -24,44 +24,77 @@ export class FormatConverter {
         preserveYaml: boolean = true
     ): string {
         // Extract YAML frontmatter if it exists
-        const yamlMatch = kanbanContent.match(/^---\n([\s\S]*?)\n---\n/);
+        const yamlMatch = kanbanContent.match(/^---\n([\s\S]*?)\n---\n\n?/);
         let yaml = '';
-        let contentWithoutYaml = kanbanContent;
+        let workingContent = kanbanContent;
 
         if (yamlMatch) {
             yaml = yamlMatch[0];
-            contentWithoutYaml = kanbanContent.substring(yamlMatch[0].length);
-        } else if (!yamlMatch && preserveYaml) {
-            // Add temporary YAML for parsing
-            yaml = '---\nkanban-plugin: board\n---\n\n';
+            workingContent = kanbanContent.substring(yamlMatch[0].length);
         }
 
-        // Parse the kanban format
-        const parseResult = MarkdownKanbanParser.parseMarkdown(yaml + contentWithoutYaml);
-        const columns = parseResult.board.columns;
-
-        if (!columns || columns.length === 0) {
-            return kanbanContent; // Return original if parsing failed
-        }
-
-        // Convert each column to presentation format
         const slides: string[] = [];
+        const lines = workingContent.split('\n');
+        let i = 0;
 
-        columns.forEach(column => {
-            // Add column title as a slide (if not empty)
-            if (column.title && column.title.trim()) {
-                slides.push(`## ${column.title}`);
+        while (i < lines.length) {
+            const line = lines[i];
+
+            // Column header: ## Title (ONLY if not indented - starts at beginning of line)
+            if (line.startsWith('## ') && !line.startsWith(' ')) {
+                const columnTitle = line.substring(3).trim();
+                if (columnTitle) {
+                    slides.push(columnTitle);
+                }
+                i++;
+                continue;
             }
 
-            // Add each task as a slide
-            column.tasks.forEach(task => {
-                const taskSlides = this.taskToPresentation(task);
-                slides.push(taskSlides);
-            });
-        });
+            // Task: - [ ] Title or - [x] Title (ONLY if not indented - starts at beginning of line)
+            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
+                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
 
-        // Combine slides
-        const presentationContent = slides.filter(s => s.trim()).join('\n\n---\n\n');
+                // Collect description (indented lines)
+                const descriptionLines: string[] = [];
+                i++;
+
+                while (i < lines.length) {
+                    const nextLine = lines[i];
+
+                    // Stop at next NON-INDENTED column or task
+                    if (!nextLine.startsWith(' ') && (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
+                        break;
+                    }
+
+                    // Collect indented or empty lines
+                    if (nextLine.startsWith('  ')) {
+                        descriptionLines.push(nextLine.substring(2));
+                        i++;
+                    } else if (nextLine.trim() === '') {
+                        descriptionLines.push('');
+                        i++;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Build slide: title + description
+                let slide = taskTitle;
+                if (descriptionLines.length > 0) {
+                    const description = descriptionLines.join('\n').trim();
+                    if (description) {
+                        slide += '\n\n' + description;
+                    }
+                }
+
+                slides.push(slide);
+                continue;
+            }
+
+            i++;
+        }
+
+        const presentationContent = slides.join('\n\n---\n\n');
 
         // Add YAML back if requested
         if (preserveYaml && yaml) {

@@ -272,10 +272,10 @@ export class IncludeProcessor {
         }
 
         // For columninclude in presentation, special handling
-        if (includeType === 'columninclude' && targetFormat === 'presentation') {
-            // Convert kanban column to presentation slides
-            return FormatConverter.kanbanToPresentation(content, true);
-        }
+        // if (includeType === 'columninclude' && targetFormat === 'presentation') {
+        //     // Convert kanban column to presentation slides
+        //     return FormatConverter.kanbanToPresentation(content, true);
+        // }
 
         // For taskinclude, convert appropriately
         if (includeType === 'taskinclude') {

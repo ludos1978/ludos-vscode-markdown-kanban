@@ -2675,10 +2675,14 @@ export class MessageHandler {
                 return await this.handleAutoExportMode(document, options);
             }
 
+            // Get board for ANY conversion exports (use in-memory board data)
+            // Only use file data when keeping original format (kanban) or packing assets
+            const board = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
+
             // Handle COPY mode (no progress bar)
             if (options.mode === 'copy') {
                 console.log('[kanban.messageHandler.handleExport] Copy mode - no progress bar');
-                const result = await ExportService.export(document, options);
+                const result = await ExportService.export(document, options, board);
 
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
@@ -2706,7 +2710,7 @@ export class MessageHandler {
                 }
                 progress.report({ increment: 20, message: 'Processing content...' });
 
-                const result = await ExportService.export(document!, options);
+                const result = await ExportService.export(document!, options, board);
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 90, 'Finalizing...');
