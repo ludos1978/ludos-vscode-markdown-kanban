@@ -99,6 +99,7 @@ const baseOptions = {
         { label: "2/3 Screen", value: "66percent", css: "63vw"},
         { label: "Full Width", value: "100percent", css: "95vw" }
     ],
+
     // Card height options
     cardHeight: [
         { label: "Auto", value: "auto", css: "auto" },
@@ -108,7 +109,7 @@ const baseOptions = {
         { label: "1/3 Screen", value: "33percent", css: "26.5vh", separator: true },
         { label: "1/2 Screen", value: "50percent", css: "43.5vh" },
         { label: "2/3 Screen", value: "66percent", css: "59vh" },
-        { label: "Full Screen", value: "100percent", css: "89vh" }
+        { label: "Full Screen", value: "100percent", css: "92vh" }
     ],
     // Section max height options
     sectionMaxHeight: [
@@ -119,8 +120,9 @@ const baseOptions = {
         { label: "1/3 Screen", value: "33percent", css: "17vh", separator: true },
         { label: "1/2 Screen", value: "50percent", css: "33vh" },
         { label: "2/3 Screen", value: "66percent", css: "48vh" },
-        { label: "Full Screen", value: "100percent", css: "78vh" }
+        { label: "Full Screen", value: "100percent", css: "80vh" }
     ],
+
     // Row height options
     rowHeight: [
         { label: "Auto", value: "auto", css: "auto" },
@@ -1298,22 +1300,6 @@ function applyRowHeightSetting(height) {
 
 function setRowHeight(height) {
     applyAndSaveSetting('rowHeight', height, applyRowHeightSetting);
-
-    // Show user-friendly message
-    // let message = 'Row height set to ';
-    // switch(height) {
-    //     case '100vh': message += '100% of screen'; break;
-    //     case '63vh': message += '2/3 of screen'; break;
-    //     case '44vh': message += '1/2 of screen'; break;
-    //     case '30vh': message += '1/3 of screen'; break;
-    //     case '44em': message += '700px (~44em)'; break;
-    //     case '31em': message += '500px (~31em)'; break;
-    //     case '19em': message += '300px (~19em)'; break;
-    //     case 'auto': message += 'auto height'; break;
-    //     default: message += height; break;
-    // }
-    
-    // vscode.postMessage({ type: 'showMessage', text: message });
 }
 
 // Sticky stack elements functionality

@@ -1150,7 +1150,7 @@ export class KanbanWebviewPanel {
                 settings: {
                     columnWidth: "100percent",
                     cardHeight: "100percent",
-										sectionMaxHeight: "100percent",
+                    sectionMaxHeight: "100percent",
                     fontSize: "3x",
                     tagVisibility: "none",
                     whitespace: "16px",
