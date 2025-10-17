@@ -2766,9 +2766,12 @@ export class MessageHandler {
         // Store settings
         this._autoExportSettings = options;
 
+        // Get board for conversion exports
+        const board = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
+
         // Do initial export FIRST (to start Marp if needed)
         console.log('[kanban.messageHandler.handleAutoExportMode] Running initial export...');
-        const initialResult = await ExportService.export(document, options);
+        const initialResult = await ExportService.export(document, options, board);
         console.log('[kanban.messageHandler.handleAutoExportMode] Initial export completed, path:', initialResult.exportedPath);
 
         // NOW stop existing handlers/processes for other files
@@ -2790,8 +2793,10 @@ export class MessageHandler {
                         console.log('[kanban.messageHandler.autoExport] Marp watch active - updating markdown only, NOT restarting Marp');
 
                         try {
+                            // Get fresh board for conversion
+                            const boardForUpdate = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
                             // Export with marpWatch flag set - skips Marp conversion
-                            await ExportService.export(savedDoc, options);
+                            await ExportService.export(savedDoc, options, boardForUpdate);
                             console.log('[kanban.messageHandler.autoExport] Markdown updated, Marp watch will auto-detect changes');
                         } catch (error) {
                             console.error('[kanban.messageHandler.autoExport] Markdown update failed:', error);
@@ -2802,8 +2807,10 @@ export class MessageHandler {
                     console.log('[kanban.messageHandler.autoExport] Triggering full export...');
 
                     try {
+                        // Get fresh board for conversion
+                        const boardForExport = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
                         // Use new unified export
-                        const result = await ExportService.export(savedDoc, options);
+                        const result = await ExportService.export(savedDoc, options, boardForExport);
 
                         if (result.success && options.openAfterExport && result.exportedPath) {
                             const uri = vscode.Uri.file(result.exportedPath);

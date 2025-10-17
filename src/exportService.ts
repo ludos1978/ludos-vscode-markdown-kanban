@@ -1353,8 +1353,7 @@ export class ExportService {
      * No parsing needed - works directly with in-memory data
      */
     private static boardToPresentation(board: any): string {
-        console.log(`[kanban.exportService.boardToPresentation] ✅✅✅ USING NEW BOARD-BASED CONVERSION - NO STRING PARSING`);
-        console.log(`[kanban.exportService.boardToPresentation] Board has ${board.columns?.length || 0} columns`);
+        console.log(`[kanban.exportService.boardToPresentation] ✅✅✅ BOARD-BASED CONVERSION`);
 
         const slides: string[] = [];
 
@@ -1384,16 +1383,13 @@ export class ExportService {
                     }
 
                     if (slideContent) {
-                        console.log(`[kanban.exportService.boardToPresentation] Slide content preview: ${slideContent.substring(0, 50)}...`);
                         slides.push(slideContent);
                     }
                 }
             }
         }
 
-        const result = slides.join('\n\n---\n\n') + '\n';
-        console.log(`[kanban.exportService.boardToPresentation] Generated ${slides.length} slides`);
-        return result;
+        return slides.join('\n\n---\n\n') + '\n';
     }
 
     /**
@@ -1685,10 +1681,12 @@ export class ExportService {
 
         // Use board-based conversion for ANY format conversion (not just presentation)
         if (board && options.format !== 'kanban' && !options.packAssets) {
-            console.log(`[kanban.exportService.transformContent] Using in-memory board (kanban-data) for ${options.format} conversion`);
+            console.log(`[kanban.exportService.transformContent] ✅ boardToPresentation()`);
             result = this.boardToPresentation(board);
             return { content: result, notIncludedAssets: [] };
         }
+
+        console.log(`[kanban.exportService.transformContent] ⚠️ Using file-based pipeline`);
 
         // Use file-based pipeline only for keeping original format or packing assets
         if (options.packAssets || options.format !== 'kanban') {
@@ -1883,7 +1881,7 @@ export class ExportService {
         board?: any
     ): Promise<ExportResult> {
         try {
-            console.log(`[kanban.exportService.export] Starting export - columnIndexes: ${options.columnIndexes?.length || 'all'}, mode: ${options.mode}, format: ${options.format}, hasBoard: ${!!board}`);
+            console.log(`[kanban.exportService.export] format=${options.format}, hasBoard=${!!board}, packAssets=${options.packAssets}`);
 
             // Clear tracking maps for new export
             this.fileHashMap.clear();
@@ -1896,10 +1894,10 @@ export class ExportService {
             let extracted: string;
 
             if (useBoardDirectly) {
-                console.log(`[kanban.exportService.export] Phase 1: Skipping extraction - using in-memory board for conversion`);
+                console.log(`[kanban.exportService.export] ✅ Using in-memory board`);
                 extracted = ''; // Dummy value, won't be used
             } else {
-                console.log(`[kanban.exportService.export] Phase 1: Extracting from file (original format or asset packing)`);
+                console.log(`[kanban.exportService.export] ⚠️ Reading from file`);
                 extracted = await this.extractContent(
                     sourceDocument,
                     options.columnIndexes
@@ -1907,7 +1905,6 @@ export class ExportService {
             }
 
             // PHASE 2: TRANSFORMATION
-            console.log(`[kanban.exportService.export] Phase 2: Transformation`);
             const transformed = await this.transformContent(
                 extracted,
                 sourceDocument,
