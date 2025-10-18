@@ -192,11 +192,6 @@ body {
   }
 }
 
-.auto-export-icon,
-.auto-export-text {
-  font-size: 12px;
-}
-
 /* Export activity indicator */
 .export-activity-indicator {
   display: inline-flex;
@@ -2693,31 +2688,27 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   font-weight: normal !important;
 }
 
-/* Pack Assets Toggle */
-.export-pack-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  cursor: pointer;
-}
-
-.export-pack-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.export-pack-options {
+/* Link Handling Options */
+.link-handling-options {
   margin-left: 24px;
-  margin-top: 8px;
+  margin-top: 12px;
   padding-left: 12px;
   border-left: 2px solid var(--vscode-panel-border);
 }
 
-.export-pack-options.disabled {
-  display: none;
+.export-field-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+#file-type-options {
+  margin-bottom: 12px;
+}
+
+#file-size-option {
+  margin-top: 8px;
 }
 
 /* Search Panel */

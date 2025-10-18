@@ -2749,10 +2749,8 @@ window.addEventListener('message', event => {
             window.lastExportSettings = null;
             // Reset button text and icon to default state
             const icon = document.getElementById('auto-export-icon');
-            const text = document.getElementById('auto-export-text');
-            if (icon && text) {
+            if (icon) {
                 icon.textContent = '▶';
-                text.textContent = 'Auto Export';
             }
             // FORCE HIDE AGAIN after a short delay to ensure it's hidden
             setTimeout(() => {
@@ -4279,25 +4277,63 @@ function initializeExportTree(preSelectNodeId = null) {
         exportTreeUI.selectAll();
     }
 
-    // Set up pack assets toggle
-    const packCheckbox = document.getElementById('pack-assets');
-    const packOptions = document.getElementById('export-pack-options');
+    // Set up link handling mode dropdown
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+    const linkHandlingOptions = document.getElementById('link-handling-options');
+    const fileTypeOptions = document.getElementById('file-type-options');
+    const fileSizeOption = document.getElementById('file-size-option');
 
-    if (packCheckbox && packOptions) {
-        packCheckbox.addEventListener('change', () => {
-            if (packCheckbox.checked) {
-                packOptions.classList.remove('disabled');
-            } else {
-                packOptions.classList.add('disabled');
-            }
+    if (linkModeDropdown && linkHandlingOptions && fileTypeOptions && fileSizeOption) {
+        linkModeDropdown.addEventListener('change', () => {
+            updateLinkHandlingOptionsVisibility();
         });
 
         // Initialize state
-        if (packCheckbox.checked) {
-            packOptions.classList.remove('disabled');
-        } else {
-            packOptions.classList.add('disabled');
-        }
+        updateLinkHandlingOptionsVisibility();
+    }
+}
+
+/**
+ * Update visibility of link handling options based on selected mode
+ */
+function updateLinkHandlingOptionsVisibility() {
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+    const linkHandlingOptions = document.getElementById('link-handling-options');
+    const fileTypeOptions = document.getElementById('file-type-options');
+    const fileSizeOption = document.getElementById('file-size-option');
+
+    if (!linkModeDropdown || !linkHandlingOptions || !fileTypeOptions || !fileSizeOption) {
+        return;
+    }
+
+    const mode = linkModeDropdown.value;
+
+    switch (mode) {
+        case 'rewrite-only':
+        case 'no-modify':
+            // No options needed for these modes
+            linkHandlingOptions.style.display = 'none';
+            fileTypeOptions.style.display = 'none';
+            fileSizeOption.style.display = 'none';
+            break;
+
+        case 'pack-linked':
+            // Show only file size limit
+            linkHandlingOptions.style.display = 'block';
+            fileTypeOptions.style.display = 'none';
+            fileSizeOption.style.display = 'block';
+            break;
+
+        case 'pack-all':
+            // Show both file type options and file size limit
+            linkHandlingOptions.style.display = 'block';
+            fileTypeOptions.style.display = 'block';
+            fileSizeOption.style.display = 'block';
+            break;
+
+        default:
+            linkHandlingOptions.style.display = 'none';
+            break;
     }
 }
 
@@ -4355,19 +4391,28 @@ function executeUnifiedExport() {
     // Get tag visibility
     const tagVisibility = document.getElementById('export-tag-visibility')?.value || 'allexcludinglayout';
 
-    // Get pack assets option
-    const packAssets = document.getElementById('pack-assets')?.checked || false;
+    // Get link handling mode
+    const linkHandlingMode = document.getElementById('link-handling-mode')?.value || 'rewrite-only';
 
-    // Get pack options if packing is enabled
-    const packOptions = packAssets ? {
-        rewriteLinks: document.getElementById('rewrite-links')?.checked || false,
-        includeFiles: document.getElementById('include-files')?.checked || false,
-        includeImages: document.getElementById('include-images')?.checked || false,
-        includeVideos: document.getElementById('include-videos')?.checked || false,
-        includeOtherMedia: document.getElementById('include-other-media')?.checked || false,
-        includeDocuments: document.getElementById('include-documents')?.checked || false,
-        fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
-    } : undefined;
+    // Determine pack settings based on link handling mode
+    let packAssets = false;
+    let packOptions = undefined;
+
+    if (linkHandlingMode === 'pack-linked' || linkHandlingMode === 'pack-all') {
+        packAssets = true;
+        packOptions = {
+            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
+        };
+
+        // For pack-all mode, include type filters
+        if (linkHandlingMode === 'pack-all') {
+            packOptions.includeFiles = document.getElementById('include-files')?.checked || false;
+            packOptions.includeImages = document.getElementById('include-images')?.checked || false;
+            packOptions.includeVideos = document.getElementById('include-videos')?.checked || false;
+            packOptions.includeOtherMedia = document.getElementById('include-other-media')?.checked || false;
+            packOptions.includeDocuments = document.getElementById('include-documents')?.checked || false;
+        }
+    }
 
     // Get merge includes option
     const mergeIncludes = document.getElementById('merge-includes')?.checked || false;
@@ -4407,7 +4452,8 @@ function executeUnifiedExport() {
         tagVisibility: tagVisibility,
         mergeIncludes: mergeIncludes,
 
-        // PACKING
+        // PACKING & LINK HANDLING
+        linkHandlingMode: linkHandlingMode,
         packAssets: packAssets,
         packOptions: packOptions,
 
@@ -4648,9 +4694,10 @@ function applyPresetMarpPresentation(currentFilename) {
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
     document.getElementById('export-folder').value = exportFolder;
-    
-    // Pack Assets into Export Folder: Off
-    document.getElementById('pack-assets').checked = false;
+
+    // Link & Asset Handling: Rewrite relative links (no packing)
+    document.getElementById('link-handling-mode').value = 'rewrite-only';
+    updateLinkHandlingOptionsVisibility();
 }
 
 /**
@@ -4685,9 +4732,10 @@ function applyPresetMarpPdf(currentFilename) {
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
     document.getElementById('export-folder').value = exportFolder;
-    
-    // Pack Assets into Export Folder: Off
-    document.getElementById('pack-assets').checked = false;
+
+    // Link & Asset Handling: Rewrite relative links (no packing)
+    document.getElementById('link-handling-mode').value = 'rewrite-only';
+    updateLinkHandlingOptionsVisibility();
 }
 
 /**
@@ -4716,18 +4764,18 @@ function applyPresetShareContent(currentFilename) {
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_${currentFilename}_${dateStr}`;
     document.getElementById('export-folder').value = exportFolder;
-    
-    // Pack Assets into Export folder: On
-    document.getElementById('pack-assets').checked = true;
-    
-    // Pack options - all on
-    document.getElementById('rewrite-links').checked = true;
+
+    // Link & Asset Handling: Pack all files (by type)
+    document.getElementById('link-handling-mode').value = 'pack-all';
+    updateLinkHandlingOptionsVisibility();
+
+    // Pack options - all file types enabled
     document.getElementById('include-files').checked = true;
     document.getElementById('include-images').checked = true;
     document.getElementById('include-videos').checked = true;
     document.getElementById('include-other-media').checked = true;
     document.getElementById('include-documents').checked = true;
-    
+
     // File size limit: 100mb
     document.getElementById('file-size-limit').value = 100;
 }
@@ -4742,10 +4790,33 @@ function saveLastExportSettings() {
     const mergeIncludesCheckbox = document.getElementById('merge-includes');
     const autoExportCheckbox = document.getElementById('auto-export-on-save');
     const useMarpCheckbox = document.getElementById('use-marp');
-    const packAssetsCheckbox = document.getElementById('pack-assets');
-    
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+
     if (!folderInput || !formatSelect || !tagVisibilitySelect) {
         return;
+    }
+
+    // Get link handling mode
+    const linkHandlingMode = linkModeDropdown?.value || 'rewrite-only';
+
+    // Determine pack settings based on link handling mode
+    let packAssets = false;
+    let packOptions = undefined;
+
+    if (linkHandlingMode === 'pack-linked' || linkHandlingMode === 'pack-all') {
+        packAssets = true;
+        packOptions = {
+            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
+        };
+
+        // For pack-all mode, include type filters
+        if (linkHandlingMode === 'pack-all') {
+            packOptions.includeFiles = document.getElementById('include-files')?.checked || false;
+            packOptions.includeImages = document.getElementById('include-images')?.checked || false;
+            packOptions.includeVideos = document.getElementById('include-videos')?.checked || false;
+            packOptions.includeOtherMedia = document.getElementById('include-other-media')?.checked || false;
+            packOptions.includeDocuments = document.getElementById('include-documents')?.checked || false;
+        }
     }
 
     lastExportSettings = {
@@ -4755,22 +4826,14 @@ function saveLastExportSettings() {
         mergeIncludes: mergeIncludesCheckbox?.checked || false,
         autoExportOnSave: autoExportCheckbox?.checked || false,
         useMarp: useMarpCheckbox?.checked || false,
-        packAssets: packAssetsCheckbox?.checked || false,
+        linkHandlingMode: linkHandlingMode,
+        packAssets: packAssets,
+        packOptions: packOptions,
         // Marp settings
         marpOutputFormat: document.getElementById('marp-output-format')?.value || 'html',
         marpTheme: document.getElementById('marp-theme')?.value || 'default',
         marpBrowser: document.getElementById('marp-browser')?.value || 'chrome',
-        marpPreview: document.getElementById('marp-preview')?.checked || false,
-        // Pack options
-        packOptions: packAssetsCheckbox?.checked ? {
-            rewriteLinks: document.getElementById('rewrite-links')?.checked || false,
-            includeFiles: document.getElementById('include-files')?.checked || false,
-            includeImages: document.getElementById('include-images')?.checked || false,
-            includeVideos: document.getElementById('include-videos')?.checked || false,
-            includeOtherMedia: document.getElementById('include-other-media')?.checked || false,
-            includeDocuments: document.getElementById('include-documents')?.checked || false,
-            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
-        } : undefined
+        marpPreview: document.getElementById('marp-preview')?.checked || false
     };
 
     window.lastExportSettings = lastExportSettings;
@@ -4793,10 +4856,10 @@ function resetPresetToCustom() {
  */
 function addExportSettingChangeListeners() {
     const elements = [
-        'export-format', 'export-tag-visibility', 'merge-includes', 
-        'auto-export-on-save', 'use-marp', 'pack-assets', 
+        'export-format', 'export-tag-visibility', 'merge-includes',
+        'auto-export-on-save', 'use-marp', 'link-handling-mode',
         'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview',
-        'rewrite-links', 'include-files', 'include-images', 'include-videos',
+        'include-files', 'include-images', 'include-videos',
         'include-other-media', 'include-documents', 'file-size-limit'
     ];
 
@@ -4987,10 +5050,8 @@ function toggleAutoExport() {
 
         // Reset button text and icon
         const icon = document.getElementById('auto-export-icon');
-        const text = document.getElementById('auto-export-text');
-        if (icon && text) {
+        if (icon) {
             icon.textContent = '▶';
-            text.textContent = 'Auto Export';
         }
 
         // Stop both auto-export and Marp processes
@@ -5011,10 +5072,9 @@ function toggleAutoExport() {
 function updateAutoExportButton() {
     const btn = document.getElementById('auto-export-btn');
     const icon = document.getElementById('auto-export-icon');
-    const text = document.getElementById('auto-export-text');
     const indicator = document.getElementById('export-activity-indicator');
 
-    if (!btn || !icon || !text) {
+    if (!btn || !icon || !indicator) {
         console.warn('[kanban.webview] updateAutoExportButton: Button elements not found');
         return;
     }
@@ -5024,7 +5084,6 @@ function updateAutoExportButton() {
         btn.style.display = 'none';
         btn.classList.remove('active');
         icon.textContent = '▶';
-        text.textContent = 'Auto Export';
         btn.title = 'Start auto-export with last settings';
         if (indicator) indicator.style.display = 'none';
         console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
@@ -5037,14 +5096,12 @@ function updateAutoExportButton() {
     if (autoExportActive) {
         btn.classList.add('active');
         icon.textContent = '■'; // Stop icon
-        text.textContent = autoExportBrowserMode ? 'Stop Live' : 'Stop Auto';
         if (indicator) indicator.style.display = 'inline-flex';
         btn.title = 'Stop auto-export';
         console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
         btn.classList.remove('active');
         icon.textContent = '▶'; // Play icon
-        text.textContent = autoExportBrowserMode ? 'Start Live' : 'Auto Export';
         btn.title = 'Start auto-export with last settings';
         if (indicator) indicator.style.display = 'none';
         console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');

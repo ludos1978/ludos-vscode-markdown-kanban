@@ -37,7 +37,8 @@ export interface NewExportOptions {
     mergeIncludes?: boolean;
     tagVisibility: TagVisibility;
 
-    // PACKING
+    // PACKING & LINK HANDLING
+    linkHandlingMode?: 'rewrite-only' | 'pack-linked' | 'pack-all' | 'no-modify';
     packAssets: boolean;
     packOptions?: {
         includeFiles?: boolean;
@@ -46,7 +47,6 @@ export interface NewExportOptions {
         includeOtherMedia?: boolean;
         includeDocuments?: boolean;
         fileSizeLimitMB?: number;
-        rewriteLinks?: boolean;
     };
 
     // OUTPUT
@@ -171,12 +171,23 @@ export class ExportService {
             convertToPresentation
         );
 
+        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
+        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
+        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
+            processedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            true
+        ) : processedContent;
+
         // Filter assets based on options
         const assetsToInclude = this.filterAssets(assets, options);
 
-        // Process assets and update content
+        // Process assets and update content (this also rewrites paths for packed assets)
         const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            processedContent,
+            rewrittenContent,
             assetsToInclude,
             assets,
             mediaFolder,
@@ -189,18 +200,9 @@ export class ExportService {
             includeFiles: includeStats
         };
 
-        // Rewrite links if requested
-        const rewrittenContent = this.rewriteLinksForExport(
-            modifiedContent,
-            sourceDir,
-            exportFolder,
-            fileBasename,
-            options.packOptions?.rewriteLinks || false
-        );
-
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        const filteredContent = this.applyTagFiltering(rewrittenContent, options.tagVisibility);
+        const filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
         return {
             exportedContent: filteredContent,
@@ -569,6 +571,8 @@ export class ExportService {
             return [];
         }
         const packOptions = options.packOptions;
+        const linkHandlingMode = options.linkHandlingMode || 'rewrite-only';
+
         return assets.filter(asset => {
             // Check if asset exists
             if (!asset.exists) { return false; }
@@ -578,7 +582,12 @@ export class ExportService {
             const fileSizeLimitMB = packOptions.fileSizeLimitMB ?? 100;
             if (sizeMB > fileSizeLimitMB) { return false; }
 
-            // Check type-specific inclusion
+            // For pack-linked mode: include ALL assets (regardless of type)
+            if (linkHandlingMode === 'pack-linked') {
+                return true;
+            }
+
+            // For pack-all mode: check type-specific inclusion
             switch (asset.type) {
                 case 'markdown': return packOptions.includeFiles ?? false;
                 case 'image': return packOptions.includeImages ?? false;
@@ -660,8 +669,11 @@ export class ExportService {
                     this.exportedFiles.set(md5, targetPath);
                 }
 
-                // Update path in content - use relative path from markdown to media folder
-                const relativePath = path.join(`${fileBasename}-Media`, exportedFileName);
+                // Update path in content - calculate relative path from exported markdown file to packed asset
+                // mediaFolder is at exportFolder/fileBasename-Media
+                // Exported markdown is at exportFolder/fileBasename.md
+                // So relative path from markdown to media is just the folder name
+                const relativePath = path.join(`${fileBasename}-Media`, exportedFileName).replace(/\\/g, '/');
                 modifiedContent = this.replaceAssetPath(modifiedContent, asset.originalPath, relativePath);
 
             } catch (error) {
@@ -733,7 +745,16 @@ export class ExportService {
         fileBasename: string,
         rewriteLinks: boolean
     ): string {
+        console.log('[kanban.exportService.rewriteLinksForExport] Called with:', {
+            rewriteLinks,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            contentLength: content.length
+        });
+
         if (!rewriteLinks) {
+            console.log('[kanban.exportService.rewriteLinksForExport] Skipping - rewriteLinks is false');
             return content;
         }
 
@@ -770,19 +791,21 @@ export class ExportService {
         // Extract path from different link types
         if (link.startsWith('![')) {
             // Markdown image: ![alt](path)
-            const match = link.match(/^!\[[^\]]*\]\(([^)]+)\)/);
+            const match = link.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
             if (match) {
-                filePath = match[1];
-                linkStart = '![';
-                linkEnd = '](';
+                const altText = match[1];
+                filePath = match[2];
+                linkStart = `![${altText}](`;
+                linkEnd = ')';
             }
         } else if (link.startsWith('[') && !link.startsWith('[[')) {
             // Markdown link: [text](path)
-            const match = link.match(/^\[[^\]]*\]\(([^)]+)\)/);
+            const match = link.match(/^\[([^\]]*)\]\(([^)]+)\)/);
             if (match) {
-                filePath = match[1];
-                linkStart = '[';
-                linkEnd = '](';
+                const linkText = match[1];
+                filePath = match[2];
+                linkStart = `[${linkText}](`;
+                linkEnd = ')';
             }
         } else if (link.match(/^<(?:img|video|audio)/i)) {
             // HTML tag: <tag src="path">
@@ -819,11 +842,26 @@ export class ExportService {
             return link; // Don't modify absolute paths or URLs
         }
 
-        // Resolve the path relative to source directory
-        const absoluteSourcePath = path.resolve(sourceDir, cleanPath);
+        // Step 1: Convert the original relative path to absolute (relative to source directory)
+        const absoluteTargetPath = path.resolve(sourceDir, cleanPath);
 
-        // Calculate relative path from export folder to the target
-        const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
+        // Step 2: Define the absolute path of the exported markdown file
+        const exportedFilePath = path.join(exportFolder, fileBasename + '.md');
+
+        // Step 3: Calculate relative path from exported file to target
+        const exportedFileDir = path.dirname(exportedFilePath);
+        const relativePath = path.relative(exportedFileDir, absoluteTargetPath).replace(/\\/g, '/');
+
+        console.log('[kanban.exportService.processLink]', {
+            originalPath: cleanPath,
+            sourceDir,
+            absoluteTargetPath,
+            exportFolder,
+            fileBasename,
+            exportedFilePath,
+            exportedFileDir,
+            calculatedRelativePath: relativePath
+        });
 
         // Rebuild the link with the new path
         if (link.match(/^<(?:img|video|audio)/i)) {
@@ -976,12 +1014,23 @@ export class ExportService {
         );
         console.log(`[kanban.exportService.processMarkdownContent] After processIncludedFiles, content contains ${processedContent.match(/!!!include/g)?.length || 0} include markers`);
 
+        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
+        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
+        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
+            processedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            true
+        ) : processedContent;
+
         // Filter assets based on options
         const assetsToInclude = this.filterAssets(assets, options);
 
-        // Process assets and update content
+        // Process assets and update content (this also rewrites paths for packed assets)
         const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            processedContent,
+            rewrittenContent,
             assetsToInclude,
             assets,
             mediaFolder,
@@ -994,18 +1043,9 @@ export class ExportService {
             includeFiles: includeStats
         };
 
-        // Rewrite links if requested
-        const rewrittenContent = this.rewriteLinksForExport(
-            modifiedContent,
-            sourceDir,
-            exportFolder,
-            fileBasename,
-            options.packOptions?.rewriteLinks || false
-        );
-
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(rewrittenContent, options.tagVisibility);
+        let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
         // Convert to presentation format if requested
         // When merging includes, skip conversion to preserve raw merged content
@@ -1666,9 +1706,20 @@ export class ExportService {
         board?: any
     ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
 
+        console.log(`[kanban.exportService.transformContent] 🔵🔵🔵 ENTERED transformContent 🔵🔵🔵`);
+        console.log(`  format: ${options.format}`);
+        console.log(`  packAssets: ${options.packAssets}`);
+        console.log(`  linkHandlingMode: ${options.linkHandlingMode}`);
+        console.log(`  hasBoard: ${!!board}`);
+
         const sourcePath = sourceDocument.uri.fsPath;
         const sourceDir = path.dirname(sourcePath);
         const sourceBasename = path.basename(sourcePath, '.md');
+
+        console.log(`  sourcePath: ${sourcePath}`);
+        console.log(`  sourceDir: ${sourceDir}`);
+        console.log(`  sourceBasename: ${sourceBasename}`);
+        console.log(`  targetFolder: ${options.targetFolder}`);
 
         let result = content;
         let notIncludedAssets: AssetInfo[] = [];
@@ -1683,6 +1734,24 @@ export class ExportService {
         if (board && options.format !== 'kanban' && !options.packAssets) {
             console.log(`[kanban.exportService.transformContent] ✅ boardToPresentation()`);
             result = this.boardToPresentation(board);
+
+            // Rewrite links if requested (same as simple path)
+            const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+            console.log(`[kanban.exportService.transformContent] Board-based path - linkHandlingMode: ${options.linkHandlingMode}, shouldRewriteLinks: ${shouldRewriteLinks}`);
+            if (shouldRewriteLinks) {
+                console.log(`[kanban.exportService.transformContent] Board-based path - calling rewriteLinksForExport with:`);
+                console.log(`  sourceDir: ${sourceDir}`);
+                console.log(`  targetFolder: ${options.targetFolder}`);
+                console.log(`  sourceBasename: ${sourceBasename}`);
+                result = this.rewriteLinksForExport(
+                    result,
+                    sourceDir,
+                    options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                    sourceBasename,
+                    true
+                );
+            }
+
             return { content: result, notIncludedAssets: [] };
         }
 
@@ -1712,8 +1781,26 @@ export class ExportService {
             notIncludedAssets = processed.notIncludedAssets;
 
         } else {
-            // Simple path: just tag filtering
+            // Simple path: tag filtering and link rewriting (no asset packing)
+            console.log(`[kanban.exportService.transformContent] 🟢 SIMPLE PATH - tag filtering + link rewriting only`);
             result = this.applyTagFiltering(result, options.tagVisibility);
+
+            // Rewrite links if requested
+            const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+            console.log(`[kanban.exportService.transformContent] linkHandlingMode: ${options.linkHandlingMode}, shouldRewriteLinks: ${shouldRewriteLinks}`);
+            if (shouldRewriteLinks) {
+                console.log(`[kanban.exportService.transformContent] About to call rewriteLinksForExport with:`);
+                console.log(`  sourceDir: ${sourceDir}`);
+                console.log(`  targetFolder: ${options.targetFolder}`);
+                console.log(`  sourceBasename: ${sourceBasename}`);
+                result = this.rewriteLinksForExport(
+                    result,
+                    sourceDir,
+                    options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                    sourceBasename,
+                    true
+                );
+            }
         }
 
         return { content: result, notIncludedAssets };

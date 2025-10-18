@@ -2664,8 +2664,19 @@ export class MessageHandler {
         try {
             console.log('[kanban.messageHandler.handleExport] Starting export with options:', JSON.stringify(options, null, 2));
 
-            // Get document
-            const document = this._fileManager.getDocument();
+            // Get document (with fallback to file path if document is closed)
+            let document = this._fileManager.getDocument();
+            if (!document) {
+                const filePath = this._fileManager.getFilePath();
+                if (filePath) {
+                    try {
+                        document = await vscode.workspace.openTextDocument(filePath);
+                        console.log('[kanban.messageHandler.handleExport] Opened document from file path:', filePath);
+                    } catch (error) {
+                        console.error('[kanban.messageHandler.handleExport] Failed to open document from file path:', error);
+                    }
+                }
+            }
             if (!document) {
                 throw new Error('No document available for export');
             }
