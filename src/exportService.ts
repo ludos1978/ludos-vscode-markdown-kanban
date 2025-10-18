@@ -852,17 +852,6 @@ export class ExportService {
         const exportedFileDir = path.dirname(exportedFilePath);
         const relativePath = path.relative(exportedFileDir, absoluteTargetPath).replace(/\\/g, '/');
 
-        console.log('[kanban.exportService.processLink]', {
-            originalPath: cleanPath,
-            sourceDir,
-            absoluteTargetPath,
-            exportFolder,
-            fileBasename,
-            exportedFilePath,
-            exportedFileDir,
-            calculatedRelativePath: relativePath
-        });
-
         // Rebuild the link with the new path
         if (link.match(/^<(?:img|video|audio)/i)) {
             // Already handled above
@@ -1706,20 +1695,9 @@ export class ExportService {
         board?: any
     ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
 
-        console.log(`[kanban.exportService.transformContent] 🔵🔵🔵 ENTERED transformContent 🔵🔵🔵`);
-        console.log(`  format: ${options.format}`);
-        console.log(`  packAssets: ${options.packAssets}`);
-        console.log(`  linkHandlingMode: ${options.linkHandlingMode}`);
-        console.log(`  hasBoard: ${!!board}`);
-
         const sourcePath = sourceDocument.uri.fsPath;
         const sourceDir = path.dirname(sourcePath);
         const sourceBasename = path.basename(sourcePath, '.md');
-
-        console.log(`  sourcePath: ${sourcePath}`);
-        console.log(`  sourceDir: ${sourceDir}`);
-        console.log(`  sourceBasename: ${sourceBasename}`);
-        console.log(`  targetFolder: ${options.targetFolder}`);
 
         let result = content;
         let notIncludedAssets: AssetInfo[] = [];
@@ -1732,17 +1710,10 @@ export class ExportService {
 
         // Use board-based conversion for ANY format conversion (not just presentation)
         if (board && options.format !== 'kanban' && !options.packAssets) {
-            console.log(`[kanban.exportService.transformContent] ✅ boardToPresentation()`);
             result = this.boardToPresentation(board);
 
             // Rewrite links if requested (same as simple path)
-            const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
-            console.log(`[kanban.exportService.transformContent] Board-based path - linkHandlingMode: ${options.linkHandlingMode}, shouldRewriteLinks: ${shouldRewriteLinks}`);
-            if (shouldRewriteLinks) {
-                console.log(`[kanban.exportService.transformContent] Board-based path - calling rewriteLinksForExport with:`);
-                console.log(`  sourceDir: ${sourceDir}`);
-                console.log(`  targetFolder: ${options.targetFolder}`);
-                console.log(`  sourceBasename: ${sourceBasename}`);
+            if (options.linkHandlingMode !== 'no-modify') {
                 result = this.rewriteLinksForExport(
                     result,
                     sourceDir,
@@ -1755,15 +1726,11 @@ export class ExportService {
             return { content: result, notIncludedAssets: [] };
         }
 
-        console.log(`[kanban.exportService.transformContent] ⚠️ Using file-based pipeline`);
-
         // Use file-based pipeline only for keeping original format or packing assets
         if (options.packAssets || options.format !== 'kanban') {
 
             // Determine settings
             const mergeIncludes = options.mergeIncludes ?? (options.columnIndexes && options.columnIndexes.length > 0);
-
-            console.log(`[kanban.exportService.transformContentNew] packAssets: ${options.packAssets}, format: ${options.format}, convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
 
             // Use existing processMarkdownContent (it does everything)
             const processed = await this.processMarkdownContent(
@@ -1782,17 +1749,10 @@ export class ExportService {
 
         } else {
             // Simple path: tag filtering and link rewriting (no asset packing)
-            console.log(`[kanban.exportService.transformContent] 🟢 SIMPLE PATH - tag filtering + link rewriting only`);
             result = this.applyTagFiltering(result, options.tagVisibility);
 
             // Rewrite links if requested
-            const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
-            console.log(`[kanban.exportService.transformContent] linkHandlingMode: ${options.linkHandlingMode}, shouldRewriteLinks: ${shouldRewriteLinks}`);
-            if (shouldRewriteLinks) {
-                console.log(`[kanban.exportService.transformContent] About to call rewriteLinksForExport with:`);
-                console.log(`  sourceDir: ${sourceDir}`);
-                console.log(`  targetFolder: ${options.targetFolder}`);
-                console.log(`  sourceBasename: ${sourceBasename}`);
+            if (options.linkHandlingMode !== 'no-modify') {
                 result = this.rewriteLinksForExport(
                     result,
                     sourceDir,
