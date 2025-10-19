@@ -1327,6 +1327,20 @@ export class ExportService {
      * Returns a filtered board object containing only the requested content
      */
     private static filterBoard(board: any, options: NewExportOptions): any {
+        // Check for columnIndexes (new export dialog system)
+        if (options.columnIndexes && options.columnIndexes.length > 0) {
+            console.log(`[kanban.exportService.filterBoard] Filtering board: ${board.columns.length} total columns, selecting indexes ${options.columnIndexes.join(', ')}`);
+            const selectedColumns = options.columnIndexes
+                .filter(index => index >= 0 && index < board.columns.length)
+                .map(index => board.columns[index]);
+
+            console.log(`[kanban.exportService.filterBoard] Filtered to ${selectedColumns.length} columns`);
+            return {
+                columns: selectedColumns
+            };
+        }
+
+        // Fallback to old scope-based system
         if (!options.scope || options.scope === 'board') {
             return board;
         }
