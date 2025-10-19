@@ -1744,14 +1744,14 @@ function createColumnElement(column, columnIndex) {
 								<div class="donut-menu">
 										<button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">⋯</button>
 										<div class="donut-menu-dropdown">
-												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert list before</button>
-												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert list after</button>
+												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert column before</button>
+												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert column after</button>
 												<div class="donut-menu-divider"></div>
 												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
 												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
 												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move list left</button>
-												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move list right</button>
+												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move column left</button>
+												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move column right</button>
 												<div class="donut-menu-divider"></div>
 												<div class="donut-menu-item span-width-control">
 													<span class="span-width-label">Width:</span>
@@ -1790,7 +1790,7 @@ function createColumnElement(column, columnIndex) {
 												<div class="donut-menu-divider"></div>
 												${generateTagMenuItems(column.id, 'column', null)}
 												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete list</button>
+												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 										</div>
 								</div>
 						</div>
@@ -3998,7 +3998,7 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
  * @param {number} insertIndex - Position to insert at (-1 for end)
  * @returns {HTMLElement} - The created column element
  */
-function addSingleColumnToDOM(column, insertIndex = -1) {
+function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null) {
     const boardElement = getBoardElement();
     if (!boardElement) {
         return null;
@@ -4050,20 +4050,98 @@ function addSingleColumnToDOM(column, insertIndex = -1) {
             rowContainer.appendChild(dropZoneSpacer);
         }
 
-        // Wrap the column in a stack container
-        const stackContainer = document.createElement('div');
-        stackContainer.className = 'kanban-column-stack';
-        stackContainer.appendChild(columnElement);
+        // Find the correct position to insert within this row based on data model order
+        // Get all columns in the data model that should be in this row, in order
+        const columnsInThisRow = window.cachedBoard.columns.filter(col => {
+            return getColumnRow(col.title) === columnRow;
+        });
 
-        // Find the "Add Column" button in this row (it should be at the end)
-        const addColumnBtn = rowContainer.querySelector('.add-column-btn');
+        // Find where the new column should be positioned within this row
+        const positionInRow = columnsInThisRow.findIndex(col => col.id === column.id);
 
-        if (addColumnBtn) {
-            // Insert the stack before the "Add Column" button
-            rowContainer.insertBefore(stackContainer, addColumnBtn);
+        console.log(`[kanban.addSingleColumnToDOM] Adding column ${column.id} at position ${positionInRow} in row ${columnRow}, referenceColumnId: ${referenceColumnId}`);
+        console.log(`[kanban.addSingleColumnToDOM] Columns in this row:`, columnsInThisRow.map(c => ({id: c.id, title: c.title})));
+
+        // Find the stack by looking ONLY at the reference column
+        let targetStack = null;
+        let insertBeforeColumn = null;
+        let insertAfterColumn = null;
+
+        const allStacks = rowContainer.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+
+        // If we have a reference column ID, find it in the DOM
+        if (referenceColumnId) {
+            console.log(`[kanban.addSingleColumnToDOM] Looking for reference column ${referenceColumnId}`);
+            for (const stack of allStacks) {
+                const refColumnElement = stack.querySelector(`[data-column-id="${referenceColumnId}"]`);
+                if (refColumnElement) {
+                    targetStack = stack;
+
+                    // Determine if we're inserting before or after based on position
+                    const refColumnIndex = columnsInThisRow.findIndex(c => c.id === referenceColumnId);
+                    if (positionInRow < refColumnIndex) {
+                        // Inserting before the reference column
+                        insertBeforeColumn = refColumnElement;
+                        console.log(`[kanban.addSingleColumnToDOM] Will insert BEFORE reference column`);
+                    } else {
+                        // Inserting after the reference column
+                        insertAfterColumn = refColumnElement;
+                        console.log(`[kanban.addSingleColumnToDOM] Will insert AFTER reference column`);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (targetStack) {
+            // Add to existing stack
+            if (insertBeforeColumn) {
+                targetStack.insertBefore(columnElement, insertBeforeColumn);
+            } else if (insertAfterColumn) {
+                // Insert after the reference column
+                if (insertAfterColumn.nextSibling) {
+                    targetStack.insertBefore(columnElement, insertAfterColumn.nextSibling);
+                } else {
+                    targetStack.appendChild(columnElement);
+                }
+            } else {
+                targetStack.appendChild(columnElement);
+            }
         } else {
-            // Fallback: append to the end of row
-            rowContainer.appendChild(stackContainer);
+            // No adjacent columns found - create a new stack
+            const stackContainer = document.createElement('div');
+            stackContainer.className = 'kanban-column-stack';
+            stackContainer.appendChild(columnElement);
+
+            // Find the correct position to insert the new stack
+            let insertBeforeStack = null;
+            if (positionInRow >= 0 && positionInRow < columnsInThisRow.length - 1) {
+                // Get the column that should come after the new column in the data model
+                const nextColumnId = columnsInThisRow[positionInRow + 1].id;
+
+                // Find the DOM stack containing that column
+                for (const stack of allStacks) {
+                    const stackColumn = stack.querySelector(`[data-column-id="${nextColumnId}"]`);
+                    if (stackColumn) {
+                        insertBeforeStack = stack;
+                        break;
+                    }
+                }
+            }
+
+            if (insertBeforeStack) {
+                // Insert before the found stack
+                rowContainer.insertBefore(stackContainer, insertBeforeStack);
+            } else {
+                // Insert before the "Add Column" button (at the end of row)
+                const addColumnBtn = rowContainer.querySelector('.add-column-btn');
+                if (addColumnBtn) {
+                    rowContainer.insertBefore(stackContainer, addColumnBtn);
+                } else {
+                    // Fallback: append to the end of row
+                    rowContainer.appendChild(stackContainer);
+                }
+            }
         }
     } else {
         // Legacy single-row mode: insert directly into boardElement
@@ -4103,6 +4181,15 @@ function addSingleColumnToDOM(column, insertIndex = -1) {
     // Setup drag & drop for the new column
     if (typeof setupColumnDragAndDrop === 'function') {
         setupColumnDragAndDrop();
+    }
+
+    // Recreate drop zones for the row that was modified
+    if (isMultiRow) {
+        const columnRow = getColumnRow(column.title);
+        const rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
+        if (rowContainer && typeof window.cleanupAndRecreateDropZones === 'function') {
+            window.cleanupAndRecreateDropZones(rowContainer);
+        }
     }
 
     return columnElement;

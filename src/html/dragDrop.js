@@ -2310,14 +2310,17 @@ function setupDragAndDrop() {
     // Initialize drop zones for the entire board and all rows
     const boardElement = document.getElementById('kanban-board');
     if (boardElement) {
-        // Setup drop zones for the entire board
-        cleanupAndRecreateDropZones(boardElement);
-        
-        // Setup drop zones for each row individually
         const rows = boardElement.querySelectorAll('.kanban-row');
-        rows.forEach(row => {
-            cleanupAndRecreateDropZones(row);
-        });
+
+        if (rows.length > 0) {
+            // Multi-row mode: setup drop zones for each row individually
+            rows.forEach(row => {
+                cleanupAndRecreateDropZones(row);
+            });
+        } else {
+            // Single row mode: setup drop zones for the entire board
+            cleanupAndRecreateDropZones(boardElement);
+        }
     }
 }
 
@@ -2354,10 +2357,15 @@ function cleanupEmptyStack(stack) {
  * Removes consecutive empty stacks and ensures drop zones before/between/after content stacks
  */
 function cleanupAndRecreateDropZones(container) {
+    const isRow = container.classList.contains('kanban-row');
+    const rowNumber = isRow ? container.getAttribute('data-row-number') : 'board';
+
     // Get all stacks
     const allStacks = Array.from(container.children).filter(child =>
         child.classList.contains('kanban-column-stack')
     );
+
+    console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: Found ${allStacks.length} total stacks`);
 
     // Separate content stacks from drop-zone stacks
     const contentStacks = [];
@@ -2371,6 +2379,8 @@ function cleanupAndRecreateDropZones(container) {
             dropZoneStacks.push(stack);
         }
     });
+
+    console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: ${contentStacks.length} content stacks, ${dropZoneStacks.length} drop zone stacks`);
 
     // Remove all existing drop-zone stacks
     dropZoneStacks.forEach(stack => {
@@ -2397,6 +2407,10 @@ function cleanupAndRecreateDropZones(container) {
         } else {
             container.appendChild(dropZoneAfter);
         }
+
+        console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: Created ${contentStacks.length * 2 + 1} drop zones`);
+    } else {
+        console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: No content stacks, no drop zones created`);
     }
 }
 
@@ -2493,6 +2507,7 @@ function updateStackBottomDropZones() {
 
 // Make it globally accessible for layout updates
 window.updateStackBottomDropZones = updateStackBottomDropZones;
+window.cleanupAndRecreateDropZones = cleanupAndRecreateDropZones;
 
 /**
  * Updates the visual column title display in the DOM after modifying the data model
@@ -2704,7 +2719,9 @@ function setupColumnDragAndDrop() {
             });
 
             // Clean up visual feedback
-            columnElement.classList.remove('dragging', 'drag-preview');
+            if (dragState.draggedColumn) {
+                dragState.draggedColumn.classList.remove('dragging', 'drag-preview');
+            }
 
             document.querySelectorAll('.kanban-full-height-column').forEach(col => {
                 col.classList.remove('drag-over', 'drag-transitioning');
@@ -2714,16 +2731,20 @@ function setupColumnDragAndDrop() {
             });
 
             // Calculate target position based on where the column is in the DOM now
+            const draggedColumn = dragState.draggedColumn;
+            if (!draggedColumn) {return;}
+
             const allColumns = Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
-            const targetDOMIndex = allColumns.indexOf(columnElement);
-            
+            const targetDOMIndex = allColumns.indexOf(draggedColumn);
+
             // Map DOM position to data model position
             // Build the new order based on current DOM state
             const newOrder = allColumns.map(col => col.getAttribute('data-column-id'));
+            const columnId = draggedColumn.getAttribute('data-column-id');
             const targetDataIndex = newOrder.indexOf(columnId);
-            
+
             // Get row number
-            const parentRow = columnElement.closest('.kanban-row');
+            const parentRow = draggedColumn.closest('.kanban-row');
             const newRow = parentRow ? parseInt(parentRow.getAttribute('data-row-number') || '1') : 1;
 
             // Update the column's row tag FIRST in the data before reordering

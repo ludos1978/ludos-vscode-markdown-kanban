@@ -783,27 +783,21 @@ function insertColumnBefore(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // If reference column has #stack tag:
-        // 1. New column should also have #stack tag
-        // 2. Reference column must keep its #stack tag (ensure it's there)
-        const hasStackTag = /#stack\b/i.test(referenceColumn.title);
-        if (hasStackTag) {
-            tags += ' #stack';
-
-            // Ensure reference column has #stack tag (it should already, but make sure)
-            if (!/#stack\b/i.test(referenceColumn.title)) {
-                // Add #stack to reference column if somehow missing
-                const trimmedTitle = referenceColumn.title.trim();
-                // Ensure space before #stack if title is not empty
-                referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
-            }
+        // NEW column gets #stack tag (to be part of the stack)
+        // Reference column also gets #stack tag if it doesn't have it
+        if (!/#stack\b/i.test(referenceColumn.title)) {
+            const trimmedTitle = referenceColumn.title.trim();
+            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
         }
+
+        // New column gets #stack tag
+        tags += ' #stack';
     }
 
     // Cache-first: Create new column and insert before reference column
     const newColumn = {
         id: `temp-column-before-${Date.now()}`,
-        title: tags.trim(), // Include row tag and #stack tag if needed
+        title: tags.trim(), // Row tag AND #stack tag
         tasks: []
     };
 
@@ -828,17 +822,21 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // If reference column has #stack tag, new column should also have #stack tag
-        const hasStackTag = /#stack\b/i.test(referenceColumn.title);
-        if (hasStackTag) {
-            tags += ' #stack';
+        // New column should get #stack tag (since it comes after reference column)
+        // Reference column should also get #stack tag if it doesn't have it
+        if (!/#stack\b/i.test(referenceColumn.title)) {
+            const trimmedTitle = referenceColumn.title.trim();
+            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
         }
+
+        // New column gets #stack tag to be part of the stack
+        tags += ' #stack';
     }
 
     // Cache-first: Create new column and insert after reference column
     const newColumn = {
         id: `temp-column-after-${Date.now()}`,
-        title: tags.trim(), // Include row tag and #stack tag if needed
+        title: tags.trim(), // Row tag and #stack tag
         tasks: []
     };
 
@@ -2067,7 +2065,7 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
 
         // Use incremental DOM update instead of full redraw
         if (typeof window.addSingleColumnToDOM === 'function') {
-            const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex);
+            const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex, referenceColumnId);
 
             // Focus the newly created column and start editing its title
             if (columnElement) {
@@ -2124,16 +2122,44 @@ function addTaskAndUnfold(columnId) {
 }
 
 function addColumn(rowNumber) {
-    // Cache-first: Create new column and add to end
+    // Cache-first: Create new column and add to end of the specified row
     const title = (rowNumber && rowNumber > 1) ? `#row${rowNumber}` : '';
     const newColumn = {
         id: `temp-column-${Date.now()}`,
         title: title,
         tasks: []
     };
-    
-    updateCacheForNewColumn(newColumn);
-    
+
+    // Find the last column in this row to determine insert position
+    let insertIndex = -1;
+    if (window.cachedBoard?.columns) {
+        // Find the index after the last column in this row
+        for (let i = window.cachedBoard.columns.length - 1; i >= 0; i--) {
+            const col = window.cachedBoard.columns[i];
+            const colRow = getColumnRow(col.title);
+            if (colRow === rowNumber) {
+                // Found the last column in this row, insert after it
+                insertIndex = i + 1;
+                break;
+            }
+        }
+
+        // If no columns found in this row, find where this row should start
+        if (insertIndex === -1) {
+            // Find the first column that belongs to a higher row number
+            for (let i = 0; i < window.cachedBoard.columns.length; i++) {
+                const col = window.cachedBoard.columns[i];
+                const colRow = getColumnRow(col.title);
+                if (colRow > rowNumber) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    updateCacheForNewColumn(newColumn, insertIndex);
+
     // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
