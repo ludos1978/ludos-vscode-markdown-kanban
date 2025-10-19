@@ -1979,7 +1979,8 @@ export class KanbanWebviewPanel {
         const documentDir = path.dirname(document.uri.fsPath);
 
         // Pattern to match markdown images: ![alt](path)
-        const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+        // Use lazy matching to handle brackets in alt text
+        const imageRegex = /!\[.*?\]\(([^)]+)\)/g;
         // Pattern to match HTML img/video/audio tags
         const htmlMediaRegex = /<(?:img|video|audio)[^>]+src=["']([^"']+)["'][^>]*>/gi;
 
@@ -2055,7 +2056,6 @@ export class KanbanWebviewPanel {
                     if (fs.existsSync(absolutePath)) {
                         const dir = path.dirname(absolutePath);
                         assetDirs.add(dir);
-                        console.log(`[AssetDirs] Found asset: ${absolutePath}`);
                     } else {
                         console.log(`[AssetDirs] Asset not found: ${absolutePath}`);
                     }
