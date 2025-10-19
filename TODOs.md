@@ -4,13 +4,13 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] do we have an rewrite links, so when a file is referenced using a relative link, that we can rewrite the path relative to the new folder the file is exported into? this should be an alternative selection when exporting, to eighter pack the file or to rewrite file links.
+- [x] do we have an rewrite links, so when a file is referenced using a relative link, that we can rewrite the path relative to the new folder the file is exported into? this should be an alternative selection when exporting, to eighter pack the file or to rewrite file links.
 
-- [ ] why is there rewriteLinksForExport if processAssets changes it anyway?!?
+- [x] why is there rewriteLinksForExport if processAssets changes it anyway?!?
 
 - [x] it doesnt add the column stacks (the ones used to create new stacks when dropping columns on) in the second row or later. it only creates them on the first row. this gives us no gap inbetween the rows, and dropping into new rows is also impossible.
 
-- [ ] when copying as markdown it should only copy the object, that the function called. if can be the column or the task, but not the full kanban as it currently does!
+- [x] when copying as markdown it should only copy the object, that the function called. if can be the column or the task, but not the full kanban as it currently does!
 
 - [x] it still convert this:
   """
@@ -64,13 +64,13 @@ kanban-plugin: board
 
 - [x] when the user selects "auto export on save" or ("use marp" and "live preview") then the stop running button should be shown. when the stop button is pressed both activities should be stopped. The marp process must only be started once and be kept running in the background, DO NOT RESTART THE MARP PROCESS ON SAVE! . The auto export on save should be repeated using the same export settings until the stop button is pressed. 
 
-when the board is exported again it should first stop the running processes as if the stop button is pressed. 
+  when the board is exported again it should first stop the running processes as if the stop button is pressed. 
 
-Maybe show a animated image that shows an active export or marp in the kanban header.
+  Maybe show a animated image that shows an active export or marp in the kanban header.
 
-Integrate the changes into the existing functions. DO NOT CREATE ALTERNATIVE CODE PATHS FOR THESE CHANGES!
+  Integrate the changes into the existing functions. DO NOT CREATE ALTERNATIVE CODE PATHS FOR THESE CHANGES!
 
-Ultrathink think ultrathink think plan
+  Ultrathink think ultrathink think plan
 
 - [x] There are currently multiple export system functions. It must be unified to one new export system. The current structure is extremely broken as it's not unifying the processes properly.
 

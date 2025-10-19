@@ -22,6 +22,15 @@ export interface NewExportOptions {
     // SELECTION: Column indexes to export (empty or undefined = full board)
     columnIndexes?: number[];
 
+    // SCOPE: What to export
+    scope?: 'board' | 'column' | 'task';
+
+    // SELECTION: Specific item to export (for column/task scope)
+    selection?: {
+        columnIndex?: number;
+        taskId?: string;
+    };
+
     // MODE: Operation mode
     mode: 'copy' | 'save' | 'auto' | 'preview';
     // - copy: Return content only (for clipboard operations)
@@ -1314,6 +1323,47 @@ export class ExportService {
     }
 
     /**
+     * Filter board based on scope and selection
+     * Returns a filtered board object containing only the requested content
+     */
+    private static filterBoard(board: any, options: NewExportOptions): any {
+        if (!options.scope || options.scope === 'board') {
+            return board;
+        }
+
+        if (options.scope === 'column' && options.selection?.columnIndex !== undefined) {
+            const columnIndex = options.selection.columnIndex;
+            if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                return {
+                    columns: [board.columns[columnIndex]]
+                };
+            }
+        }
+
+        if (options.scope === 'task' && options.selection?.columnIndex !== undefined && options.selection?.taskId) {
+            const columnIndex = options.selection.columnIndex;
+            const taskId = options.selection.taskId;
+
+            if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                const column = board.columns[columnIndex];
+                const task = column.tasks?.find((t: any) => t.id === taskId);
+
+                if (task) {
+                    return {
+                        columns: [{
+                            id: column.id,
+                            title: '',
+                            tasks: [task]
+                        }]
+                    };
+                }
+            }
+        }
+
+        return board;
+    }
+
+    /**
      * Convert board object directly to presentation format
      * No parsing needed - works directly with in-memory data
      */
@@ -1606,7 +1656,9 @@ export class ExportService {
 
         // Use board-based conversion for ANY format conversion (not just presentation)
         if (board && options.format !== 'kanban' && !options.packAssets) {
-            result = this.boardToPresentation(board);
+            // Filter board based on scope and selection
+            const filteredBoard = this.filterBoard(board, options);
+            result = this.boardToPresentation(filteredBoard);
 
             // Rewrite links if requested (same as simple path)
             if (options.linkHandlingMode !== 'no-modify') {

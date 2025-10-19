@@ -1112,6 +1112,8 @@ function sortColumn(columnId, sortType) {
 
 // Copy operations - using unified export system
 async function copyColumnAsMarkdown(columnId) {
+    closeAllMenus();
+
     if (!currentBoard?.columns) {return;}
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
@@ -1130,11 +1132,11 @@ async function copyColumnAsMarkdown(columnId) {
             }
         }
     });
-
-    document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 }
 
 async function copyTaskAsMarkdown(taskId, columnId) {
+    closeAllMenus();
+
     if (!currentBoard?.columns) {return;}
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
@@ -1154,8 +1156,6 @@ async function copyTaskAsMarkdown(taskId, columnId) {
             }
         }
     });
-
-    document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 }
 
 function copyToClipboard(text) {
