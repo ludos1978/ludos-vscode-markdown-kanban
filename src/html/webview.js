@@ -111,12 +111,24 @@ const baseOptions = {
         { label: "2/3 Screen", value: "66percent", css: "59vh" },
         { label: "Full Screen", value: "100percent", css: "92vh" }
     ],
-    // Section max height options
-    sectionMaxHeight: [
+    // Section height options
+    sectionHeight: [
         { label: "Auto", value: "auto", css: "auto" },
         { label: "Small", value: "200px", css: "200px", separator: true },
         { label: "Medium", value: "400px", css: "400px" },
         { label: "Large", value: "600px", css: "600px" },
+        { label: "1/3 Screen", value: "33percent", css: "17vh", separator: true },
+        { label: "1/2 Screen", value: "50percent", css: "33vh" },
+        { label: "2/3 Screen", value: "66percent", css: "48vh" },
+        { label: "Full Screen", value: "100percent", css: "80vh" }
+    ],
+
+    // Task section height options
+    taskSectionHeight: [
+        { label: "Auto", value: "auto", css: "auto" },
+        { label: "Small", value: "150px", css: "150px", separator: true },
+        { label: "Medium", value: "300px", css: "300px" },
+        { label: "Large", value: "500px", css: "500px" },
         { label: "1/3 Screen", value: "33percent", css: "17vh", separator: true },
         { label: "1/2 Screen", value: "50percent", css: "33vh" },
         { label: "2/3 Screen", value: "66percent", css: "48vh" },
@@ -210,7 +222,8 @@ function getValue(optionType, css) {
 const menuConfig = {
     columnWidth: null, // Generated
     cardHeight: null, // Generated
-    sectionMaxHeight: null, // Generated
+    sectionHeight: null, // Generated
+    taskSectionHeight: null, // Generated
     rowHeight: null, // Generated
     whitespace: null, // Generated
     fontSize: null, // Generated
@@ -238,7 +251,7 @@ const menuConfig = {
 
 // Generate menu configurations from base options
 // Simple generator for most menu types
-['columnWidth', 'cardHeight', 'sectionMaxHeight', 'rowHeight', 'whitespace', 'fontSize', 'layoutRows', 'stickyStackMode', 'tagVisibility', 'showHtmlComments', 'arrowKeyFocusScroll'].forEach(key => {
+['columnWidth', 'cardHeight', 'sectionHeight', 'taskSectionHeight', 'rowHeight', 'whitespace', 'fontSize', 'layoutRows', 'stickyStackMode', 'tagVisibility', 'showHtmlComments', 'arrowKeyFocusScroll'].forEach(key => {
     if (baseOptions[key]) {
         menuConfig[key] = baseOptions[key].map(option => {
             const result = {
@@ -4087,6 +4100,12 @@ function applyLayoutPreset(presetKey) {
                 break;
             case 'cardHeight':
                 setTaskMinHeight(value);
+                break;
+            case 'sectionHeight':
+                setSectionHeight(value);
+                break;
+            case 'taskSectionHeight':
+                setTaskSectionHeight(value);
                 break;
             case 'fontSize':
                 setFontSize(value);

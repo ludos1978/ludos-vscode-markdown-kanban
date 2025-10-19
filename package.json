@@ -89,10 +89,10 @@
             "Minimum height of 89% of viewport height"
           ]
         },
-        "markdown-kanban.sectionMaxHeight": {
+        "markdown-kanban.sectionHeight": {
           "type": "string",
           "default": "auto",
-          "description": "Maximum height for content sections between horizontal rules (HRs) in task descriptions",
+          "description": "Height for content sections between horizontal rules (HRs) in task descriptions (sets both min and max to same value)",
           "enum": [
             "auto",
             "200px",
@@ -108,6 +108,31 @@
             "Fixed 200 pixels",
             "Fixed 400 pixels",
             "Fixed 600 pixels",
+            "1/3 of viewport height",
+            "1/2 of viewport height",
+            "2/3 of viewport height",
+            "Full viewport height"
+          ]
+        },
+        "markdown-kanban.taskSectionHeight": {
+          "type": "string",
+          "default": "auto",
+          "description": "Height for task section content areas (sets both min and max to same value)",
+          "enum": [
+            "auto",
+            "150px",
+            "300px",
+            "500px",
+            "33percent",
+            "50percent",
+            "66percent",
+            "100percent"
+          ],
+          "enumDescriptions": [
+            "No height limit (automatic based on content)",
+            "Fixed 150 pixels",
+            "Fixed 300 pixels",
+            "Fixed 500 pixels",
             "1/3 of viewport height",
             "1/2 of viewport height",
             "2/3 of viewport height",
@@ -313,9 +338,13 @@
                     "type": "string",
                     "description": "Card height setting"
                   },
-                  "sectionMaxHeight": {
+                  "sectionHeight": {
                     "type": "string",
-                    "description": "Section max height setting"
+                    "description": "Section height setting"
+                  },
+                  "taskSectionHeight": {
+                    "type": "string",
+                    "description": "Task section height setting"
                   },
                   "fontSize": {
                     "type": "string",

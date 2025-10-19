@@ -1145,6 +1145,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "250px",
                     cardHeight: "auto",
 										sectionHeight: "auto",
+										taskSectionHeight: "auto",
                     fontSize: "0_5x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1158,6 +1159,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "350px",
                     cardHeight: "auto",
 										sectionHeight: "auto",
+										taskSectionHeight: "auto",
                     fontSize: "1x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1171,6 +1173,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "33percent",
                     cardHeight: "auto",
 										sectionHeight: "auto",
+										taskSectionHeight: "auto",
                     fontSize: "1x",
                     whitespace: "12px",
                     arrowKeyFocusScroll: "nearest"
@@ -1185,6 +1188,7 @@ export class KanbanWebviewPanel {
 									fontSize: "1_5x",
 									whitespace: "12px",
 									sectionHeight: "66percent",
+									taskSectionHeight: "auto",
                   arrowKeyFocusScroll: "nearest"
 							}
 						},
@@ -1195,6 +1199,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "100percent",
                     cardHeight: "100percent",
                     sectionHeight: "100percent",
+                    taskSectionHeight: "auto",
                     fontSize: "3x",
                     tagVisibility: "none",
                     whitespace: "16px",
