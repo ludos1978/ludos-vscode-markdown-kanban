@@ -1052,8 +1052,44 @@ export class KanbanWebviewPanel {
      * Update webview permissions to include all current workspace folders
      */
     private _updateWebviewPermissions() {
+        const localResourceRoots = this._buildLocalResourceRoots(false);
+
+        // Update webview options
+        this._panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: localResourceRoots,
+            enableCommandUris: true
+        };
+
+
+        // Refresh the webview HTML to apply new permissions
+        if (this._isInitialized) {
+            this._panel.webview.html = this._getHtmlForWebview();
+        }
+    }
+
+    /**
+     * Update webview permissions to include asset directories from the board
+     * This is called before sending board updates to ensure all assets can be loaded
+     */
+    private _updateWebviewPermissionsForAssets() {
+        const localResourceRoots = this._buildLocalResourceRoots(true);
+
+        // Update webview options
+        this._panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: localResourceRoots,
+            enableCommandUris: true
+        };
+    }
+
+    /**
+     * Build the list of local resource roots for the webview
+     * @param includeAssets - Whether to scan board for asset directories
+     */
+    private _buildLocalResourceRoots(includeAssets: boolean): vscode.Uri[] {
         const localResourceRoots = [this._extensionUri];
-        
+
         // Add all current workspace folders
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders) {
@@ -1061,32 +1097,39 @@ export class KanbanWebviewPanel {
                 localResourceRoots.push(folder.uri);
             });
         }
-        
+
         // Add document directory if it's outside workspace folders
         if (this._fileManager.getDocument()) {
             const document = this._fileManager.getDocument()!;
             const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-            const isInWorkspace = workspaceFolders?.some(folder => 
+            const isInWorkspace = workspaceFolders?.some(folder =>
                 documentDir.fsPath.startsWith(folder.uri.fsPath)
             );
-            
+
             if (!isInWorkspace) {
                 localResourceRoots.push(documentDir);
             }
+
+            // Scan board for asset directories if requested
+            if (includeAssets) {
+                const assetDirs = this._collectAssetDirectories();
+                let addedCount = 0;
+                for (const dir of assetDirs) {
+                    const dirUri = vscode.Uri.file(dir);
+                    // Check if not already included
+                    const alreadyIncluded = localResourceRoots.some(root =>
+                        dir.startsWith(root.fsPath)
+                    );
+                    if (!alreadyIncluded) {
+                        localResourceRoots.push(dirUri);
+                        addedCount++;
+                    }
+                }
+                console.log(`[LocalResourceRoots] Added ${addedCount} asset directories to localResourceRoots (total: ${localResourceRoots.length})`);
+            }
         }
-        
-        // Update webview options
-        this._panel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: localResourceRoots,
-            enableCommandUris: true
-        };
-        
-        
-        // Refresh the webview HTML to apply new permissions
-        if (this._isInitialized) {
-            this._panel.webview.html = this._getHtmlForWebview();
-        }
+
+        return localResourceRoots;
     }
 
     private async _getLayoutPresetsConfiguration(): Promise<any> {
@@ -1485,14 +1528,18 @@ export class KanbanWebviewPanel {
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
         if (!this._panel.webview) { return; }
 
-        let board = this._board || { 
-            valid: false, 
-            title: 'Please open a Markdown Kanban file', 
-            columns: [], 
-            yamlHeader: null, 
-            kanbanFooter: null 
+        let board = this._board || {
+            valid: false,
+            title: 'Please open a Markdown Kanban file',
+            columns: [],
+            yamlHeader: null,
+            kanbanFooter: null
         };
-        
+
+        // Update webview permissions to include asset directories
+        // This must happen before generating image mappings to ensure access
+        this._updateWebviewPermissionsForAssets();
+
         // Generate image path mappings without modifying the board content
         const imageMappings = await this._generateImageMappings(board);
         
@@ -1819,43 +1866,13 @@ export class KanbanWebviewPanel {
             html = html.replace('<head>', `<head>\n    ${cspMeta}`);
         }
 
-        // ENHANCED: Build comprehensive localResourceRoots for cross-workspace access
-        const localResourceRoots = [this._extensionUri];
-
-        // Add ALL workspace folders (not just the one containing current document)
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            workspaceFolders.forEach(folder => {
-                localResourceRoots.push(folder.uri);
-            });
-        }
+        // Build comprehensive localResourceRoots including asset directories
+        const localResourceRoots = this._buildLocalResourceRoots(true);
 
         // Add document-specific paths if available
         if (this._fileManager.getDocument()) {
             const document = this._fileManager.getDocument()!;
             const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-
-            // Only add document dir if it's not already covered by workspace folders
-            const isInWorkspace = workspaceFolders?.some(folder =>
-                documentDir.fsPath.startsWith(folder.uri.fsPath)
-            );
-
-            if (!isInWorkspace) {
-                localResourceRoots.push(documentDir);
-            }
-
-            // Scan board for asset paths and add their parent directories to localResourceRoots
-            const assetDirs = this._collectAssetDirectories();
-            for (const dir of assetDirs) {
-                const dirUri = vscode.Uri.file(dir);
-                // Check if not already included
-                const alreadyIncluded = localResourceRoots.some(root =>
-                    dir.startsWith(root.fsPath)
-                );
-                if (!alreadyIncluded) {
-                    localResourceRoots.push(dirUri);
-                }
-            }
 
             const baseHref = this._panel.webview.asWebviewUri(documentDir).toString() + '/';
             html = html.replace(/<head>/, `<head><base href="${baseHref}">`);
@@ -1873,7 +1890,7 @@ export class KanbanWebviewPanel {
                 console.warn('Failed to load local markdown-it, using CDN version:', error);
             }
         }
-        
+
         // Apply the enhanced localResourceRoots
         this._panel.webview.options = {
             enableScripts: true,
@@ -1949,11 +1966,13 @@ export class KanbanWebviewPanel {
         const assetDirs = new Set<string>();
 
         if (!this._board) {
+            console.log('[AssetDirs] No board available');
             return [];
         }
 
         const document = this._fileManager.getDocument();
         if (!document) {
+            console.log('[AssetDirs] No document available');
             return [];
         }
 
@@ -1978,7 +1997,9 @@ export class KanbanWebviewPanel {
             }
         }
 
-        return Array.from(assetDirs);
+        const assetDirsArray = Array.from(assetDirs);
+        console.log(`[AssetDirs] Found ${assetDirsArray.length} unique asset directories:`, assetDirsArray);
+        return assetDirsArray;
     }
 
     /**
@@ -2019,6 +2040,9 @@ export class KanbanWebviewPanel {
                         }
                     }
 
+                    // Unescape backslash-escaped characters (e.g., \' -> ')
+                    decodedPath = decodedPath.replace(/\\(.)/g, '$1');
+
                     // Resolve to absolute path
                     let absolutePath: string;
                     if (path.isAbsolute(decodedPath)) {
@@ -2031,9 +2055,12 @@ export class KanbanWebviewPanel {
                     if (fs.existsSync(absolutePath)) {
                         const dir = path.dirname(absolutePath);
                         assetDirs.add(dir);
+                        console.log(`[AssetDirs] Found asset: ${absolutePath}`);
+                    } else {
+                        console.log(`[AssetDirs] Asset not found: ${absolutePath}`);
                     }
                 } catch (error) {
-                    // Skip invalid paths
+                    console.log(`[AssetDirs] Error processing path: ${assetPath}`, error);
                 }
             }
         }
