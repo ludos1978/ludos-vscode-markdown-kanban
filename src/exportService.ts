@@ -258,7 +258,6 @@ export class ExportService {
         // Process each include pattern
         for (const { pattern, replacement, shouldWriteSeparateFile, includeType } of includePatterns) {
             const regex = new RegExp(pattern.source, pattern.flags);
-            console.log(`[kanban.exportService.processIncludedFiles] Searching with pattern: ${pattern.source}`);
 
             // Collect all matches first before modifying content
             const matches: RegExpExecArray[] = [];
@@ -270,7 +269,6 @@ export class ExportService {
             // Process matches in reverse order to maintain correct string positions
             for (let i = matches.length - 1; i >= 0; i--) {
                 match = matches[i];
-                console.log(`[kanban.exportService.processIncludedFiles] Found match: ${match[0]}`);
 
                 // Extract data based on include type
                 // taskinclude: match[1]=indentation, match[2]=path
@@ -291,15 +289,11 @@ export class ExportService {
                     includePath = match[1].trim();
                 }
 
-                console.log(`[kanban.exportService.processIncludedFiles]   includePath: "${includePath}"`);
                 // PathResolver.resolve() handles URL decoding
                 const resolvedPath = PathResolver.resolve(sourceDir, includePath);
-                console.log(`[kanban.exportService.processIncludedFiles]   resolvedPath: "${resolvedPath}"`);
-                console.log(`[kanban.exportService.processIncludedFiles]   exists: ${fs.existsSync(resolvedPath)}`);
 
                 // Avoid circular references
                 if (processedIncludes.has(resolvedPath)) {
-                    console.log(`[kanban.exportService.processIncludedFiles]   Skipping (circular reference)`);
                     continue;
                 }
 
@@ -308,9 +302,6 @@ export class ExportService {
                     includeCount++;
 
                     const includeBasename = path.basename(resolvedPath, '.md');
-
-                    console.log(`[kanban.exportService.processIncludedFiles] Processing include: ${resolvedPath}`);
-                    console.log(`[kanban.exportService.processIncludedFiles]   mergeIncludes: ${mergeIncludes}, shouldWriteSeparateFile: ${shouldWriteSeparateFile}`);
 
                     // Detect if the included file is already in presentation format
                     const includeContent = fs.readFileSync(resolvedPath, 'utf8');
@@ -321,14 +312,7 @@ export class ExportService {
                     if (convertToPresentation) {
                         // Exporting to presentation: convert if include is kanban format
                         shouldConvertInclude = isKanbanFormat;
-                    } else if (mergeIncludes && !isKanbanFormat) {
-                        // Exporting to kanban AND merging: convert if include is NOT kanban format
-                        // When merging into a kanban file, presentation includes must be converted to kanban
-                        // This will be handled differently - we need to convert presentation to kanban
-                        console.log(`[kanban.exportService.processIncludedFiles]   Include is presentation format, needs conversion to kanban for merge`);
                     }
-
-                    console.log(`[kanban.exportService.processIncludedFiles]   isKanbanFormat: ${isKanbanFormat}, shouldConvertInclude: ${shouldConvertInclude}`);
 
                     // Process the included file recursively
                     // IMPORTANT: When merging into presentation, don't convert - keep raw format
@@ -348,14 +332,12 @@ export class ExportService {
                     } else {
                         // When merging, use raw content without processing
                         // This preserves ## headers and slide structure
-                        console.log(`[kanban.exportService.processIncludedFiles]   Using raw content for merge (no conversion)`);
                         exportedContent = includeContent;
                     }
 
                     // If merging into kanban format and include is presentation format,
                     // convert presentation slides to kanban tasks
                     if (mergeIncludes && !convertToPresentation && !isKanbanFormat) {
-                        console.log(`[kanban.exportService.processIncludedFiles]   Converting presentation to kanban format for merge`);
                         exportedContent = this.convertPresentationToKanban(exportedContent, match[0]);
                     }
 
@@ -376,7 +358,6 @@ export class ExportService {
                             // Use existing exported file
                             const existingPath = this.exportedFiles.get(md5Hash)!;
                             exportedRelativePath = path.relative(exportFolder, existingPath).replace(/\\/g, '/');
-                            console.log(`[kanban.exportService.processIncludedFiles]   Reusing existing file (MD5 match): ${exportedRelativePath}`);
                         } else {
                             // Generate unique filename if needed
                             const fileName = path.basename(resolvedPath);
@@ -405,9 +386,6 @@ export class ExportService {
                             if (!fs.existsSync(targetIncludePath)) {
                                 fs.writeFileSync(targetIncludePath, exportedContent, 'utf8');
                                 this.exportedFiles.set(md5Hash, targetIncludePath);
-                                console.log(`[kanban.exportService.processIncludedFiles]   Wrote separate file: ${targetIncludePath}`);
-                            } else {
-                                console.log(`[kanban.exportService.processIncludedFiles]   File already exists with same content: ${targetIncludePath}`);
                             }
 
                             exportedRelativePath = exportedFileName;
@@ -421,9 +399,6 @@ export class ExportService {
                     } else {
                         // Mode: Merge includes into main file
                         // Replace the marker with the actual content
-                        console.log(`[kanban.exportService.processIncludedFiles]   Merging content inline (${exportedContent.length} chars)`);
-                        console.log(`[kanban.exportService.processIncludedFiles]   First 200 chars: ${exportedContent.substring(0, 200)}`);
-
                         let contentToInsert = exportedContent;
 
                         // Handle different include types
@@ -745,16 +720,7 @@ export class ExportService {
         fileBasename: string,
         rewriteLinks: boolean
     ): string {
-        console.log('[kanban.exportService.rewriteLinksForExport] Called with:', {
-            rewriteLinks,
-            sourceDir,
-            exportFolder,
-            fileBasename,
-            contentLength: content.length
-        });
-
         if (!rewriteLinks) {
-            console.log('[kanban.exportService.rewriteLinksForExport] Skipping - rewriteLinks is false');
             return content;
         }
 
@@ -964,7 +930,6 @@ export class ExportService {
         const timestamp = `${year}${month}${day}-${hours}${minutes}`;  // YYYYMMDD-HHmm
 
         const exportFolder = path.join(sourceDir, `${sourceBasename}-${timestamp}`);
-        console.log('[kanban.exportService.generateDefaultExportFolder] Generated absolute export folder:', exportFolder);
         return exportFolder;
     }
 
@@ -991,7 +956,6 @@ export class ExportService {
         const assets = this.findAssets(content, sourceDir);
 
         // Find and process included markdown files
-        console.log(`[kanban.exportService.processMarkdownContent] Before processIncludedFiles, content contains ${content.match(/!!!include/g)?.length || 0} include markers`);
         const { processedContent, includeStats } = await this.processIncludedFiles(
             content,
             sourceDir,
@@ -1001,7 +965,6 @@ export class ExportService {
             convertToPresentation,
             mergeIncludes
         );
-        console.log(`[kanban.exportService.processMarkdownContent] After processIncludedFiles, content contains ${processedContent.match(/!!!include/g)?.length || 0} include markers`);
 
         // Rewrite links based on linkHandlingMode (BEFORE processing assets)
         // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
@@ -1037,19 +1000,9 @@ export class ExportService {
         let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
         // Convert to presentation format if requested
-        // When merging includes, skip conversion to preserve raw merged content
-        // console.log(`[kanban.exportService.processMarkdownContent] convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
-
         if (convertToPresentation) {
             filteredContent = this.convertToPresentationFormat(filteredContent, false);
-            console.log(`[kanban.exportService.processMarkdownContent] After conversion, content contains ${filteredContent.match(/!!!include/g)?.length || 0} include markers`);
         }
-        
-        // this is wrong. if it's convertToPresentation, do it.
-        // && !mergeIncludes) {
-        // } else if (convertToPresentation && mergeIncludes) {
-        //     console.log(`[kanban.exportService.processMarkdownContent] Skipping conversion - using raw merged content to preserve structure`);
-        // }
 
         return {
             exportedContent: filteredContent,
@@ -1189,7 +1142,6 @@ export class ExportService {
      * A stack includes: base column (without #stack) + all consecutive #stack columns after it
      */
     private static extractStackContent(markdownContent: string, rowNumber: number, stackIndex: number): string | null {
-        console.log(`[kanban.exportService.extractStackContent] Extracting row ${rowNumber}, stack ${stackIndex}`);
 
         const isKanban = markdownContent.includes('kanban-plugin: board');
         if (!isKanban) { return null; }
@@ -1229,11 +1181,6 @@ export class ExportService {
             });
         }
 
-        console.log(`[kanban.exportService.extractStackContent] Found ${rowColumns.length} columns in row ${rowNumber}:`);
-        rowColumns.forEach((col, i) => {
-            console.log(`  [${i}] stacked:${col.stacked} title:"${col.title}"`);
-        });
-
         // Now group columns into stacks (matching frontend logic)
         // A stack is: base column + all consecutive #stack columns
         const stacks: string[][] = [];
@@ -1241,29 +1188,22 @@ export class ExportService {
 
         while (i < rowColumns.length) {
             const currentStack = [rowColumns[i].content]; // Start with base column
-            console.log(`[kanban.exportService.extractStackContent] Starting stack ${stacks.length} with base: "${rowColumns[i].title}"`);
             i++;
 
             // Add all consecutive #stack columns to this stack
             while (i < rowColumns.length && rowColumns[i].stacked) {
-                console.log(`[kanban.exportService.extractStackContent]   Adding stacked: "${rowColumns[i].title}"`);
                 currentStack.push(rowColumns[i].content);
                 i++;
             }
 
-            console.log(`[kanban.exportService.extractStackContent] Stack ${stacks.length} has ${currentStack.length} columns`);
             stacks.push(currentStack);
         }
 
-        console.log(`[kanban.exportService.extractStackContent] Total stacks: ${stacks.length}, requesting index: ${stackIndex}`);
-
         if (stackIndex >= stacks.length) {
-            console.log(`[kanban.exportService.extractStackContent] Stack index ${stackIndex} out of bounds (only ${stacks.length} stacks)`);
             return null;
         }
 
         const result = stacks[stackIndex].join('\n\n');
-        console.log(`[kanban.exportService.extractStackContent] Returning stack ${stackIndex} with ${stacks[stackIndex].length} columns, ${result.split('## ').length - 1} column headers`);
         return result;
     }
 
@@ -1303,7 +1243,6 @@ export class ExportService {
      * For column includes and task includes that are in presentation format
      */
     private static convertPresentationToKanban(presentationContent: string, includeMarker: string): string {
-        console.log('[kanban.exportService.convertPresentationToKanban] Converting presentation to kanban format');
 
         // Determine the include type from the marker
         const isColumnInclude = includeMarker.includes('!!!columninclude');
@@ -1333,7 +1272,6 @@ export class ExportService {
                 }
             }
 
-            console.log(`[kanban.exportService.convertPresentationToKanban] Converted ${slides.length} slides to ${tasks.length} tasks (columninclude - no header)`);
             return kanbanContent;
 
         } else if (isTaskInclude) {
@@ -1367,12 +1305,10 @@ export class ExportService {
                 }
             }
 
-            console.log(`[kanban.exportService.convertPresentationToKanban] Converted taskinclude to single task with title: "${title}"`);
             return kanbanContent;
 
         } else {
             // Regular include - just return as-is or wrapped in a column
-            console.log(`[kanban.exportService.convertPresentationToKanban] Regular include, returning as-is`);
             return presentationContent;
         }
     }
@@ -1382,8 +1318,6 @@ export class ExportService {
      * No parsing needed - works directly with in-memory data
      */
     private static boardToPresentation(board: any): string {
-        console.log(`[kanban.exportService.boardToPresentation] ✅✅✅ BOARD-BASED CONVERSION`);
-
         const slides: string[] = [];
 
         for (const column of board.columns) {
@@ -1431,7 +1365,6 @@ export class ExportService {
      * @param mergeIncludes - If true, preserve column structure without separating tasks into slides
      */
     private static convertToPresentationFormat(content: string, mergeIncludes: boolean = false): string {
-        console.log(`[kanban.exportService.convertToPresentationFormat] ❌❌❌ OLD STRING-BASED FUNCTION CALLED - THIS SHOULD NOT HAPPEN FOR PRESENTATION EXPORTS!`);
 
         // Remove YAML frontmatter if present
         let workingContent = content;
@@ -1511,10 +1444,7 @@ export class ExportService {
      * @param pid Process ID of the Marp process
      */
     public static addMarpProcessPid(markdownPath: string, pid: number): void {
-        console.log(`[kanban.exportService.addMarpProcessPid] Adding PID ${pid} for ${markdownPath}`);
-        console.log(`[kanban.exportService.addMarpProcessPid] Current tracked PIDs:`, Array.from(this.marpProcessPids.entries()));
         this.marpProcessPids.set(markdownPath, pid);
-        console.log(`[kanban.exportService.addMarpProcessPid] After adding, tracked PIDs:`, Array.from(this.marpProcessPids.entries()));
     }
 
     /**
@@ -1527,16 +1457,14 @@ export class ExportService {
             try {
                 // Kill the Marp process
                 process.kill(pid, 'SIGTERM');
-                console.log(`[kanban.exportService.stopMarpWatch] Killed Marp process ${pid} for ${markdownPath}`);
             } catch (error) {
                 console.error(`[kanban.exportService.stopMarpWatch] Failed to kill process ${pid}:`, error);
             }
             this.marpProcessPids.delete(markdownPath);
         }
-        
+
         if (this.marpWatchProcesses.has(markdownPath)) {
             this.marpWatchProcesses.delete(markdownPath);
-            console.log(`[kanban.exportService.stopMarpWatch] Stopped watching ${markdownPath}`);
         }
     }
 
@@ -1545,42 +1473,31 @@ export class ExportService {
      * @param kanbanFilePath Path to the kanban file whose generated files should NOT be stopped
      */
     public static stopAllMarpWatchesExceptKanbanFile(kanbanFilePath: string): void {
-        const count = this.marpWatchProcesses.size;
-        const pidCount = this.marpProcessPids.size;
-        
-        console.log(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Stopping processes for ${count} watched files and ${pidCount} tracked processes, protecting generated files from: ${kanbanFilePath}`);
-        
         // Get the base name of the kanban file without extension
         const kanbanBaseName = path.basename(kanbanFilePath, '.md');
         const kanbanDir = path.dirname(kanbanFilePath);
-        
+
         // Kill all tracked Marp processes except those generated from the current kanban file
         for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
             const markdownBaseName = path.basename(markdownPath, '.md');
             const markdownDir = path.dirname(markdownPath);
-            
+
             // Check if this markdown file is a generated file from the current kanban
-            const isGeneratedFromCurrentKanban = 
-                markdownDir.startsWith(kanbanDir) && 
-                (markdownBaseName.startsWith(kanbanBaseName) || 
+            const isGeneratedFromCurrentKanban =
+                markdownDir.startsWith(kanbanDir) &&
+                (markdownBaseName.startsWith(kanbanBaseName) ||
                  markdownBaseName.includes(kanbanBaseName));
-            
+
             if (!isGeneratedFromCurrentKanban) {
                 try {
-                    console.log(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Attempting to kill process ${pid} for ${markdownPath} (not from current kanban)`);
                     process.kill(pid, 'SIGTERM');
-                    console.log(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Successfully killed Marp process ${pid}`);
                 } catch (error) {
                     console.error(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Failed to kill process ${pid}:`, error);
                 }
                 this.marpProcessPids.delete(markdownPath);
                 this.marpWatchProcesses.delete(markdownPath);
-            } else {
-                console.log(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Protecting process ${pid} for ${markdownPath} (generated from current kanban)`);
             }
         }
-        
-        console.log(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Remaining tracked processes: ${this.marpProcessPids.size}`);
     }
 
     /**
@@ -1588,54 +1505,35 @@ export class ExportService {
      * @param excludeFilePath Path to the file whose Marp process should NOT be stopped
      */
     public static stopAllMarpWatchesExcept(excludeFilePath?: string): void {
-        const count = this.marpWatchProcesses.size;
-        const pidCount = this.marpProcessPids.size;
-        
-        console.log(`[kanban.exportService.stopAllMarpWatchesExcept] Stopping processes for ${count} watched files and ${pidCount} tracked processes, excluding: ${excludeFilePath}`);
-        
         // Kill all tracked Marp processes except the excluded one
         for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
             if (markdownPath !== excludeFilePath) {
                 try {
-                    console.log(`[kanban.exportService.stopAllMarpWatchesExcept] Attempting to kill process ${pid} for ${markdownPath}`);
                     process.kill(pid, 'SIGTERM');
-                    console.log(`[kanban.exportService.stopAllMarpWatchesExcept] Successfully killed Marp process ${pid}`);
                 } catch (error) {
                     console.error(`[kanban.exportService.stopAllMarpWatchesExcept] Failed to kill process ${pid}:`, error);
                 }
                 this.marpProcessPids.delete(markdownPath);
                 this.marpWatchProcesses.delete(markdownPath);
-            } else {
-                console.log(`[kanban.exportService.stopAllMarpWatchesExcept] Excluding process ${pid} for ${markdownPath} from termination`);
             }
         }
-        
-        console.log(`[kanban.exportService.stopAllMarpWatchesExcept] Remaining tracked processes: ${this.marpProcessPids.size}`);
     }
 
     /**
      * Stop all Marp watch processes
      */
     public static stopAllMarpWatches(): void {
-        const count = this.marpWatchProcesses.size;
-        const pidCount = this.marpProcessPids.size;
-        
-        console.log(`[kanban.exportService.stopAllMarpWatches] Stopping ${count} watched files and ${pidCount} tracked processes`);
-        
         // Kill all tracked Marp processes
-        for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
+        for (const [, pid] of this.marpProcessPids.entries()) {
             try {
-                console.log(`[kanban.exportService.stopAllMarpWatches] Attempting to kill process ${pid} for ${markdownPath}`);
                 process.kill(pid, 'SIGTERM');
-                console.log(`[kanban.exportService.stopAllMarpWatches] Successfully killed Marp process ${pid}`);
             } catch (error) {
                 console.error(`[kanban.exportService.stopAllMarpWatches] Failed to kill process ${pid}:`, error);
             }
         }
-        
+
         this.marpProcessPids.clear();
         this.marpWatchProcesses.clear();
-        console.log(`[kanban.exportService.stopAllMarpWatches] Stopped ${count} Marp watch processes`);
     }
 
     /**
@@ -1660,8 +1558,6 @@ export class ExportService {
         if (!columnIndexes || columnIndexes.length === 0) {
             return fullContent;
         }
-
-        console.log(`[kanban.exportService.extractContentNew] Extracting columns at indexes:`, columnIndexes);
 
         // Extract selected columns and combine them
         const extractedColumns: string[] = [];
@@ -1778,7 +1674,6 @@ export class ExportService {
 
         // MODE: COPY (return content for clipboard)
         if (options.mode === 'copy') {
-            console.log(`[kanban.exportService.outputContentNew] Mode: copy, returning content`);
             return {
                 success: true,
                 message: 'Content generated successfully',
@@ -1808,17 +1703,14 @@ export class ExportService {
 
         // Write markdown file
         const markdownPath = path.join(options.targetFolder, `${outputBasename}.md`);
-        console.log(`[kanban.exportService.outputContentNew] Writing markdown to: ${markdownPath}`);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
 
         // Handle Marp conversion
         if (options.format === 'marp') {
-            console.log(`[kanban.exportService.outputContentNew] Running Marp conversion`);
             return await this.runMarpConversion(markdownPath, options);
         }
 
         // Regular save succeeded
-        console.log(`[kanban.exportService.outputContentNew] Export completed: ${markdownPath}`);
         return {
             success: true,
             message: `Exported to ${markdownPath}`,
@@ -1837,8 +1729,6 @@ export class ExportService {
 
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
-        console.log(`[kanban.exportService.runMarpConversionNew] Format: ${marpFormat}, mode: ${options.mode}, watch: ${options.marpWatch}`);
-
         // Build output path
         const dir = path.dirname(markdownPath);
         const baseName = path.basename(markdownPath, '.md');
@@ -1855,7 +1745,6 @@ export class ExportService {
         if (options.marpWatch) {
             // Check if Marp is already watching this file
             if (MarpExportService.isWatching(markdownPath)) {
-                console.log(`[kanban.exportService.runMarpConversionNew] Marp already watching ${markdownPath}, skipping restart`);
                 return {
                     success: true,
                     message: 'Markdown updated, Marp watch active',
@@ -1864,7 +1753,6 @@ export class ExportService {
             }
 
             try {
-                console.log(`[kanban.exportService.runMarpConversionNew] Starting Marp in watch mode for ${markdownPath}`);
                 await MarpExportService.export({
                     inputFilePath: markdownPath,
                     format: marpFormat,
@@ -1889,7 +1777,6 @@ export class ExportService {
 
         // MODE: SAVE (single conversion)
         try {
-            console.log(`[kanban.exportService.runMarpConversionNew] Starting single conversion`);
             await MarpExportService.export({
                 inputFilePath: markdownPath,
                 format: marpFormat,
@@ -1897,14 +1784,13 @@ export class ExportService {
                 enginePath: options.marpEnginePath,
                 theme: options.marpTheme
             });
-            console.log(`[kanban.exportService.runMarpConversionNew] Conversion completed: ${outputPath}`);
             return {
                 success: true,
                 message: `Exported to ${outputPath}`,
                 exportedPath: outputPath
             };
         } catch (error) {
-            console.error(`[kanban.exportService.runMarpConversionNew] Conversion failed:`, error);
+            console.error(`[kanban.exportService.runMarpConversion] Conversion failed:`, error);
             return {
                 success: false,
                 message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
@@ -1928,8 +1814,6 @@ export class ExportService {
         board?: any
     ): Promise<ExportResult> {
         try {
-            console.log(`[kanban.exportService.export] format=${options.format}, hasBoard=${!!board}, packAssets=${options.packAssets}`);
-
             // Clear tracking maps for new export
             this.fileHashMap.clear();
             this.exportedFiles.clear();
@@ -1941,10 +1825,8 @@ export class ExportService {
             let extracted: string;
 
             if (useBoardDirectly) {
-                console.log(`[kanban.exportService.export] ✅ Using in-memory board`);
                 extracted = ''; // Dummy value, won't be used
             } else {
-                console.log(`[kanban.exportService.export] ⚠️ Reading from file`);
                 extracted = await this.extractContent(
                     sourceDocument,
                     options.columnIndexes
@@ -1960,14 +1842,12 @@ export class ExportService {
             );
 
             // PHASE 3: OUTPUT
-            console.log(`[kanban.exportService.export] Phase 3: Output`);
             const result = await this.outputContent(
                 transformed,
                 sourceDocument,
                 options
             );
 
-            console.log(`[kanban.exportService.export] Export completed - success: ${result.success}`);
             return result;
 
         } catch (error) {
