@@ -1961,6 +1961,8 @@ function createTaskElement(task, columnId, taskIndex) {
 
 // Update tag styles when theme changes
 function updateTagStylesForTheme() {
+    // Clear cached editor background to re-read from new theme
+    cachedEditorBg = null;
     applyTagStyles();
 }
 
@@ -3087,11 +3089,9 @@ function generateTagStyles() {
 
                 const columnBg = interpolateColor(editorBg, bgDark, 0.15);
 
-                // Calculate automatic text color from the opaque background (not interpolated)
-                // Strip alpha channel like we do for tags
-                const opaqueDefaultBg = columnColors.background.length === 9 ? columnColors.background.substring(0, 7) : columnColors.background;
-                const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueDefaultBg) : '#000000';
-                const defaultColumnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultColumnTextColor, opaqueDefaultBg) : '';
+                // Calculate text color from the ACTUAL interpolated background
+                const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
+                const defaultColumnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultColumnTextColor, columnBg) : '';
 
                 // Default column header background
                 styles += `.kanban-full-height-column:not([data-column-tag]) .column-header {
@@ -3125,9 +3125,9 @@ function generateTagStyles() {
 
                 const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
 
-                // Use the same text color as default columns for collapsed state
-                const defaultCollapsedTextColor = defaultColumnTextColor;
-                const defaultCollapsedTextShadow = defaultColumnTextShadow;
+                // Calculate text color from the ACTUAL collapsed background
+                const defaultCollapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                const defaultCollapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultCollapsedTextColor, columnCollapsedBg) : '';
 
                 // Default collapsed column header background
                 styles += `.kanban-full-height-column.collapsed:not([data-column-tag]) .column-header {
@@ -3237,10 +3237,9 @@ function generateTagStyles() {
                     // Interpolate 15% towards the darker color
                     const columnBg = interpolateColor(editorBg, bgDark, 0.15);
 
-                    // Use the same text color as tags for all headers/footers
-                    // This ensures consistency across tags, headers, and footers
-                    const columnTextColor = tagTextColor;
-                    const columnTextShadow = tagTextShadow;
+                    // Calculate text color from the ACTUAL interpolated background, not the original color
+                    const columnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
+                    const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
                     styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-header {
@@ -3275,10 +3274,9 @@ function generateTagStyles() {
                     // Column collapsed state - interpolate 20% towards the darker color
                     const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
 
-                    // Use the same text color as tags for collapsed state
-                    // This ensures consistency across all states
-                    const collapsedTextColor = tagTextColor;
-                    const collapsedTextShadow = tagTextShadow;
+                    // Calculate text color from the ACTUAL collapsed background
+                    const collapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                    const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
                     styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-header {

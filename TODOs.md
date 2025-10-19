@@ -4,6 +4,9 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] - the font color calculation (it detects wether it should be white or black) doesnt work properly in the dark mode. it seems not to take the right background color to calculate the font color. 
+- also the styles for dark and light should allways be dynamically generated. it should only require to add a css value to change between light and dark mode. 
+
 - [x] do we have an rewrite links, so when a file is referenced using a relative link, that we can rewrite the path relative to the new folder the file is exported into? this should be an alternative selection when exporting, to eighter pack the file or to rewrite file links.
 
 - [x] why is there rewriteLinksForExport if processAssets changes it anyway?!?
