@@ -280,6 +280,8 @@ function getCurrentSettingValue(configKey) {
             return window.currentTaskMinHeight || 'auto';
         case 'sectionMaxHeight':
             return window.currentSectionMaxHeight || 'auto';
+        case 'sectionMinHeight':
+            return window.currentSectionMinHeight || 'auto';
         case 'whitespace':
             return window.currentWhitespace || '8px';
         case 'fontSize':
@@ -309,6 +311,7 @@ function updateAllMenuIndicators() {
         { selector: '[data-menu="columnWidth"]', config: 'columnWidth', function: 'setColumnWidth' },
         { selector: '[data-menu="cardHeight"]', config: 'cardHeight', function: 'setTaskMinHeight' },
         { selector: '[data-menu="sectionMaxHeight"]', config: 'sectionMaxHeight', function: 'setSectionMaxHeight' },
+        { selector: '[data-menu="sectionMinHeight"]', config: 'sectionMinHeight', function: 'setSectionMinHeight' },
         { selector: '[data-menu="whitespace"]', config: 'whitespace', function: 'setWhitespace' },
         { selector: '[data-menu="fontSize"]', config: 'fontSize', function: 'setFontSize' },
         { selector: '[data-menu="fontFamily"]', config: 'fontFamily', function: 'setFontFamily' },
@@ -1495,6 +1498,18 @@ function setSectionMaxHeight(height) {
     applyAndSaveSetting('sectionMaxHeight', height, applySectionMaxHeight);
 }
 
+// Section min height functions
+function applySectionMinHeight(height) {
+    window.currentSectionMinHeight = height;
+
+    // Use styleManager to apply section min height
+    styleManager.applySectionMinHeight(height);
+}
+
+function setSectionMinHeight(height) {
+    applyAndSaveSetting('sectionMinHeight', height, applySectionMinHeight);
+}
+
 // Function to detect row tags from board
 /**
  * Auto-detects number of rows from column tags
@@ -2194,6 +2209,13 @@ window.addEventListener('message', event => {
                     applySectionMaxHeight(message.sectionMaxHeight);
                 } else {
                     applySectionMaxHeight('auto'); // Default fallback
+                }
+
+                // Update section min height with the value from configuration
+                if (message.sectionMinHeight) {
+                    applySectionMinHeight(message.sectionMinHeight);
+                } else {
+                    applySectionMinHeight('auto'); // Default fallback
                 }
 
                 // Update font size with the value from configuration

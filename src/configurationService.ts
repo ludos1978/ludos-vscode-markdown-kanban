@@ -16,6 +16,7 @@ export interface KanbanConfiguration {
     tagColors: { [key: string]: string };
     taskMinHeight: string;
     sectionMaxHeight: string;
+    sectionMinHeight: string;
     fontSize: string;
     fontFamily: string;
     columnWidth: string;
@@ -49,6 +50,7 @@ export interface ConfigurationDefaults {
     maxRowHeight: number;
     taskMinHeight: string;
     sectionMaxHeight: string;
+    sectionMinHeight: string;
     fontSize: string;
     fontFamily: string;
     columnWidth: string;
@@ -87,6 +89,7 @@ export class ConfigurationService {
         maxRowHeight: 0,
         taskMinHeight: 'auto',
         sectionMaxHeight: 'auto',
+        sectionMinHeight: 'auto',
         fontSize: 'medium',
         fontFamily: 'default',
         columnWidth: 'auto',
@@ -268,6 +271,7 @@ export class ConfigurationService {
             whitespace: this.getConfig('whitespace'),
             taskMinHeight: this.getConfig('taskMinHeight'),
             sectionMaxHeight: this.getConfig('sectionMaxHeight'),
+            sectionMinHeight: this.getConfig('sectionMinHeight'),
             fontSize: this.getConfig('fontSize'),
             fontFamily: this.getConfig('fontFamily'),
             columnWidth: this.getConfig('columnWidth'),

@@ -98,6 +98,7 @@ export class KanbanWebviewPanel {
                     columnWidth: configService.getConfig('columnWidth', '350px'),
                     taskMinHeight: configService.getConfig('taskMinHeight'),
                     sectionMaxHeight: configService.getConfig('sectionMaxHeight'),
+                    sectionMinHeight: configService.getConfig('sectionMinHeight'),
                     fontSize: configService.getConfig('fontSize'),
                     fontFamily: configService.getConfig('fontFamily'),
                     whitespace: configService.getConfig('whitespace', '8px'),
@@ -1144,6 +1145,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "250px",
                     cardHeight: "auto",
 										sectionMaxHeight: "auto",
+										sectionMinHeight: "auto",
                     fontSize: "0_5x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1157,6 +1159,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "350px",
                     cardHeight: "auto",
 										sectionMaxHeight: "auto",
+										sectionMinHeight: "auto",
                     fontSize: "1x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1170,6 +1173,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "33percent",
                     cardHeight: "auto",
 										sectionMaxHeight: "auto",
+										sectionMinHeight: "auto",
                     fontSize: "1x",
                     whitespace: "12px",
                     arrowKeyFocusScroll: "nearest"
@@ -1184,6 +1188,7 @@ export class KanbanWebviewPanel {
 									fontSize: "1_5x",
 									whitespace: "12px",
 									sectionMaxHeight: "66percent",
+									sectionMinHeight: "auto",
                   arrowKeyFocusScroll: "nearest"
 							}
 						},
@@ -1194,6 +1199,7 @@ export class KanbanWebviewPanel {
                     columnWidth: "100percent",
                     cardHeight: "100percent",
                     sectionMaxHeight: "100percent",
+                    sectionMinHeight: "auto",
                     fontSize: "3x",
                     tagVisibility: "none",
                     whitespace: "16px",

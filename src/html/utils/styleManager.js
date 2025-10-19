@@ -159,11 +159,28 @@ styleManager.applySectionMaxHeight = function(height) {
     // Convert value to CSS using getCSS helper
     const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionMaxHeight', height) : height;
 
-    // Set both min and max height to the same value for fixed height
+    // Set max height
     this.setCSSVariable('section-max-height', actualHeight);
+
+    // Check if either min or max is set to enable the height-limited class
+    const minHeight = this.getCSSVariable('section-min-height');
+    if (height !== 'auto' || (minHeight && minHeight !== 'auto')) {
+        document.body.classList.add('section-height-limited');
+    } else {
+        document.body.classList.remove('section-height-limited');
+    }
+};
+
+styleManager.applySectionMinHeight = function(height) {
+    // Convert value to CSS using getCSS helper
+    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionMinHeight', height) : height;
+
+    // Set min height
     this.setCSSVariable('section-min-height', actualHeight);
 
-    if (height !== 'auto') {
+    // Check if either min or max is set to enable the height-limited class
+    const maxHeight = this.getCSSVariable('section-max-height');
+    if (height !== 'auto' || (maxHeight && maxHeight !== 'auto')) {
         document.body.classList.add('section-height-limited');
     } else {
         document.body.classList.remove('section-height-limited');
