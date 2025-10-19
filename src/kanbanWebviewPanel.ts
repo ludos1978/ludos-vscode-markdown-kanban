@@ -1812,16 +1812,16 @@ export class KanbanWebviewPanel {
 
         const nonce = this._getNonce();
         const cspSource = this._panel.webview.cspSource;
-        
+
         const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none';">`;
-        
+
         if (!html.includes('Content-Security-Policy')) {
             html = html.replace('<head>', `<head>\n    ${cspMeta}`);
         }
-        
+
         // ENHANCED: Build comprehensive localResourceRoots for cross-workspace access
         const localResourceRoots = [this._extensionUri];
-        
+
         // Add ALL workspace folders (not just the one containing current document)
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders) {
@@ -1829,19 +1829,32 @@ export class KanbanWebviewPanel {
                 localResourceRoots.push(folder.uri);
             });
         }
-        
+
         // Add document-specific paths if available
         if (this._fileManager.getDocument()) {
             const document = this._fileManager.getDocument()!;
             const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-            
+
             // Only add document dir if it's not already covered by workspace folders
-            const isInWorkspace = workspaceFolders?.some(folder => 
+            const isInWorkspace = workspaceFolders?.some(folder =>
                 documentDir.fsPath.startsWith(folder.uri.fsPath)
             );
-            
+
             if (!isInWorkspace) {
                 localResourceRoots.push(documentDir);
+            }
+
+            // Scan board for asset paths and add their parent directories to localResourceRoots
+            const assetDirs = this._collectAssetDirectories();
+            for (const dir of assetDirs) {
+                const dirUri = vscode.Uri.file(dir);
+                // Check if not already included
+                const alreadyIncluded = localResourceRoots.some(root =>
+                    dir.startsWith(root.fsPath)
+                );
+                if (!alreadyIncluded) {
+                    localResourceRoots.push(dirUri);
+                }
             }
 
             const baseHref = this._panel.webview.asWebviewUri(documentDir).toString() + '/';
@@ -1926,6 +1939,104 @@ export class KanbanWebviewPanel {
         });
 
         return html;
+    }
+
+    /**
+     * Collect all asset directories from the current board to add to localResourceRoots
+     * This allows images/media from outside the workspace to be displayed
+     */
+    private _collectAssetDirectories(): string[] {
+        const assetDirs = new Set<string>();
+
+        if (!this._board) {
+            return [];
+        }
+
+        const document = this._fileManager.getDocument();
+        if (!document) {
+            return [];
+        }
+
+        const documentDir = path.dirname(document.uri.fsPath);
+
+        // Pattern to match markdown images: ![alt](path)
+        const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+        // Pattern to match HTML img/video/audio tags
+        const htmlMediaRegex = /<(?:img|video|audio)[^>]+src=["']([^"']+)["'][^>]*>/gi;
+
+        // Scan all columns and tasks
+        for (const column of this._board.columns) {
+            // Check column title
+            this._extractAssetDirs(column.title, documentDir, assetDirs, imageRegex, htmlMediaRegex);
+
+            // Check all tasks in column
+            for (const task of column.tasks) {
+                this._extractAssetDirs(task.title, documentDir, assetDirs, imageRegex, htmlMediaRegex);
+                if (task.description) {
+                    this._extractAssetDirs(task.description, documentDir, assetDirs, imageRegex, htmlMediaRegex);
+                }
+            }
+        }
+
+        return Array.from(assetDirs);
+    }
+
+    /**
+     * Extract asset directories from content
+     */
+    private _extractAssetDirs(content: string, basePath: string, assetDirs: Set<string>, ...regexes: RegExp[]): void {
+        if (!content) {
+            return;
+        }
+
+        for (const regex of regexes) {
+            let match;
+            regex.lastIndex = 0; // Reset regex state
+            while ((match = regex.exec(content)) !== null) {
+                const assetPath = match[1].trim();
+
+                // Skip URLs (http://, https://, data:, etc.)
+                if (/^(https?|data|blob):/.test(assetPath)) {
+                    continue;
+                }
+
+                // Skip anchor links
+                if (assetPath.startsWith('#')) {
+                    continue;
+                }
+
+                // Remove query params and anchors
+                const cleanPath = assetPath.split(/[?#]/)[0];
+
+                try {
+                    // Decode URL-encoded paths
+                    let decodedPath = cleanPath;
+                    if (cleanPath.includes('%')) {
+                        try {
+                            decodedPath = decodeURIComponent(cleanPath);
+                        } catch (e) {
+                            // Use original if decode fails
+                        }
+                    }
+
+                    // Resolve to absolute path
+                    let absolutePath: string;
+                    if (path.isAbsolute(decodedPath)) {
+                        absolutePath = decodedPath;
+                    } else {
+                        absolutePath = path.resolve(basePath, decodedPath);
+                    }
+
+                    // Check if file exists
+                    if (fs.existsSync(absolutePath)) {
+                        const dir = path.dirname(absolutePath);
+                        assetDirs.add(dir);
+                    }
+                } catch (error) {
+                    // Skip invalid paths
+                }
+            }
+        }
     }
 
     private _getNonce() {
