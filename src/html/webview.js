@@ -2830,10 +2830,11 @@ if (typeof MutationObserver !== 'undefined') {
 function updateCardList() {
     // Use more flexible selector to handle class name variations
     const allTaskItems = document.querySelectorAll('[class*="task-item"]');
-    
+
     allCards = Array.from(allTaskItems).filter(card => {
         const column = card.closest('.kanban-full-height-column');
-        return column && !column.classList.contains('collapsed');
+        // Filter out cards in collapsed columns and collapsed tasks
+        return column && !window.isColumnCollapsed(column) && !card.classList.contains('collapsed');
     });
 }
 
@@ -2910,16 +2911,22 @@ function focusSection(section) {
     section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+// Helper function to get visible (non-collapsed) task cards from a column
+function getVisibleTaskCards(column) {
+    const allTaskItems = Array.from(column.querySelectorAll('[class*="task-item"]'));
+    return allTaskItems.filter(task => !task.classList.contains('collapsed'));
+}
+
 function getCurrentCardPosition() {
     if (!currentFocusedCard) {return null;}
-    
+
     const column = currentFocusedCard.closest('.kanban-full-height-column');
     if (!column) {return null;}
-    
-    const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+
+    const columnCards = getVisibleTaskCards(column);
     const cardIndex = columnCards.indexOf(currentFocusedCard);
     const columnIndex = Array.from(document.querySelectorAll('.kanban-full-height-column')).indexOf(column);
-    
+
     return { columnIndex, cardIndex, columnCards };
 }
 
@@ -3013,23 +3020,29 @@ function navigateToCard(direction) {
             break;
             
         case 'left':
-            if (columnIndex > 0) {
-                const prevColumn = columns[columnIndex - 1];
-                const prevColumnCards = Array.from(prevColumn.querySelectorAll('[class*="task-item"]'));
-                if (prevColumnCards.length > 0) {
-                    // Always go to first task in the column
-                    focusCard(prevColumnCards[0]);
+            // Find the first non-collapsed column to the left with visible tasks
+            for (let i = columnIndex - 1; i >= 0; i--) {
+                const prevColumn = columns[i];
+                if (!window.isColumnCollapsed(prevColumn)) {
+                    const prevColumnCards = getVisibleTaskCards(prevColumn);
+                    if (prevColumnCards.length > 0) {
+                        focusCard(prevColumnCards[0]);
+                        break;
+                    }
                 }
             }
             break;
 
         case 'right':
-            if (columnIndex < columns.length - 1) {
-                const nextColumn = columns[columnIndex + 1];
-                const nextColumnCards = Array.from(nextColumn.querySelectorAll('[class*="task-item"]'));
-                if (nextColumnCards.length > 0) {
-                    // Always go to first task in the column
-                    focusCard(nextColumnCards[0]);
+            // Find the first non-collapsed column to the right with visible tasks
+            for (let i = columnIndex + 1; i < columns.length; i++) {
+                const nextColumn = columns[i];
+                if (!window.isColumnCollapsed(nextColumn)) {
+                    const nextColumnCards = getVisibleTaskCards(nextColumn);
+                    if (nextColumnCards.length > 0) {
+                        focusCard(nextColumnCards[0]);
+                        break;
+                    }
                 }
             }
             break;
@@ -3070,7 +3083,7 @@ function handleSectionNavigation(key, currentSection) {
         } else {
             // At last section, go to first section of next task
             const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+            const columnCards = getVisibleTaskCards(column);
             const taskIndex = columnCards.indexOf(taskItem);
 
             if (taskIndex < columnCards.length - 1) {
@@ -3085,16 +3098,20 @@ function handleSectionNavigation(key, currentSection) {
                 const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                 const columnIndex = columns.indexOf(column);
 
-                if (columnIndex < columns.length - 1) {
-                    const nextColumn = columns[columnIndex + 1];
-                    const nextColumnCards = Array.from(nextColumn.querySelectorAll('[class*="task-item"]'));
+                // Find the first non-collapsed column to the right with visible tasks
+                for (let i = columnIndex + 1; i < columns.length; i++) {
+                    const nextColumn = columns[i];
+                    if (!window.isColumnCollapsed(nextColumn)) {
+                        const nextColumnCards = getVisibleTaskCards(nextColumn);
 
-                    if (nextColumnCards.length > 0) {
-                        const firstTask = nextColumnCards[0];
-                        const firstTaskSections = firstTask.querySelectorAll('.task-section');
+                        if (nextColumnCards.length > 0) {
+                            const firstTask = nextColumnCards[0];
+                            const firstTaskSections = firstTask.querySelectorAll('.task-section');
 
-                        if (firstTaskSections.length > 0) {
-                            focusSection(firstTaskSections[0]);
+                            if (firstTaskSections.length > 0) {
+                                focusSection(firstTaskSections[0]);
+                                break;
+                            }
                         }
                     }
                 }
@@ -3107,7 +3124,7 @@ function handleSectionNavigation(key, currentSection) {
         } else {
             // At first section, go to last section of previous task
             const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+            const columnCards = getVisibleTaskCards(column);
             const taskIndex = columnCards.indexOf(taskItem);
 
             if (taskIndex > 0) {
@@ -3122,16 +3139,20 @@ function handleSectionNavigation(key, currentSection) {
                 const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                 const columnIndex = columns.indexOf(column);
 
-                if (columnIndex > 0) {
-                    const prevColumn = columns[columnIndex - 1];
-                    const prevColumnCards = Array.from(prevColumn.querySelectorAll('[class*="task-item"]'));
+                // Find the first non-collapsed column to the left with visible tasks
+                for (let i = columnIndex - 1; i >= 0; i--) {
+                    const prevColumn = columns[i];
+                    if (!window.isColumnCollapsed(prevColumn)) {
+                        const prevColumnCards = getVisibleTaskCards(prevColumn);
 
-                    if (prevColumnCards.length > 0) {
-                        const lastTask = prevColumnCards[prevColumnCards.length - 1];
-                        const lastTaskSections = lastTask.querySelectorAll('.task-section');
+                        if (prevColumnCards.length > 0) {
+                            const lastTask = prevColumnCards[prevColumnCards.length - 1];
+                            const lastTaskSections = lastTask.querySelectorAll('.task-section');
 
-                        if (lastTaskSections.length > 0) {
-                            focusSection(lastTaskSections[lastTaskSections.length - 1]);
+                            if (lastTaskSections.length > 0) {
+                                focusSection(lastTaskSections[lastTaskSections.length - 1]);
+                                break;
+                            }
                         }
                     }
                 }
@@ -3143,19 +3164,25 @@ function handleSectionNavigation(key, currentSection) {
         const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
         const columnIndex = columns.indexOf(column);
 
-        const targetColumnIndex = key === 'ArrowLeft' ? columnIndex - 1 : columnIndex + 1;
+        // Find the first non-collapsed column in the target direction
+        const start = key === 'ArrowLeft' ? columnIndex - 1 : columnIndex + 1;
+        const end = key === 'ArrowLeft' ? -1 : columns.length;
+        const step = key === 'ArrowLeft' ? -1 : 1;
 
-        if (targetColumnIndex >= 0 && targetColumnIndex < columns.length) {
-            const targetColumn = columns[targetColumnIndex];
-            const targetColumnCards = Array.from(targetColumn.querySelectorAll('[class*="task-item"]'));
+        for (let i = start; key === 'ArrowLeft' ? i > end : i < end; i += step) {
+            const targetColumn = columns[i];
+            if (!window.isColumnCollapsed(targetColumn)) {
+                const targetColumnCards = getVisibleTaskCards(targetColumn);
 
-            if (targetColumnCards.length > 0) {
-                // Always go to first task's first section in the column
-                const targetTask = targetColumnCards[0];
-                const targetSections = targetTask.querySelectorAll('.task-section');
+                if (targetColumnCards.length > 0) {
+                    // Always go to first task's first section in the column
+                    const targetTask = targetColumnCards[0];
+                    const targetSections = targetTask.querySelectorAll('.task-section');
 
-                if (targetSections.length > 0) {
-                    focusSection(targetSections[0]);
+                    if (targetSections.length > 0) {
+                        focusSection(targetSections[0]);
+                        break;
+                    }
                 }
             }
         }
@@ -3573,18 +3600,16 @@ function updateWhitespace(value) {
 function updateBorderStyles() {
     // Borders should be set via window.borderConfig from extension
     if (!window.borderConfig) {
-        console.error('[Border] Border configuration not received from extension');
+        // Configuration will be received shortly after webview loads
         return;
     }
 
     const { columnBorder, taskBorder } = window.borderConfig;
-    console.log('[Border-Debug] updateBorderStyles - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
+    console.log('[Border-Debug] Received from extension - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
     // Apply CSS variables
     document.documentElement.style.setProperty('--column-border', columnBorder);
     document.documentElement.style.setProperty('--task-border', taskBorder);
-
-    console.log('[Border-Debug] Applied to CSS - --column-border:', document.documentElement.style.getPropertyValue('--column-border'), '--task-border:', document.documentElement.style.getPropertyValue('--task-border'));
 }
 
 function calculateTaskDescriptionHeight() {
