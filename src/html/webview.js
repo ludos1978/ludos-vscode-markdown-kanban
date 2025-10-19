@@ -278,10 +278,10 @@ function getCurrentSettingValue(configKey) {
             return window.currentColumnWidth || '350px';
         case 'cardHeight':
             return window.currentTaskMinHeight || 'auto';
-        case 'sectionMaxHeight':
-            return window.currentSectionMaxHeight || 'auto';
-        case 'sectionMinHeight':
-            return window.currentSectionMinHeight || 'auto';
+        case 'sectionHeight':
+            return window.currentSectionHeight || 'auto';
+        case 'taskSectionHeight':
+            return window.currentTaskSectionHeight || 'auto';
         case 'whitespace':
             return window.currentWhitespace || '8px';
         case 'fontSize':
@@ -310,8 +310,8 @@ function updateAllMenuIndicators() {
     const menuMappings = [
         { selector: '[data-menu="columnWidth"]', config: 'columnWidth', function: 'setColumnWidth' },
         { selector: '[data-menu="cardHeight"]', config: 'cardHeight', function: 'setTaskMinHeight' },
-        { selector: '[data-menu="sectionMaxHeight"]', config: 'sectionMaxHeight', function: 'setSectionMaxHeight' },
-        { selector: '[data-menu="sectionMinHeight"]', config: 'sectionMinHeight', function: 'setSectionMinHeight' },
+        { selector: '[data-menu="sectionHeight"]', config: 'sectionHeight', function: 'setSectionHeight' },
+        { selector: '[data-menu="taskSectionHeight"]', config: 'taskSectionHeight', function: 'setTaskSectionHeight' },
         { selector: '[data-menu="whitespace"]', config: 'whitespace', function: 'setWhitespace' },
         { selector: '[data-menu="fontSize"]', config: 'fontSize', function: 'setFontSize' },
         { selector: '[data-menu="fontFamily"]', config: 'fontFamily', function: 'setFontFamily' },
@@ -1486,28 +1486,28 @@ function setTaskMinHeight(height) {
     applyAndSaveSetting('taskMinHeight', height, applyTaskMinHeight);
 }
 
-// Section max height functions
-function applySectionMaxHeight(height) {
-    window.currentSectionMaxHeight = height;
+// Section height functions
+function applySectionHeight(height) {
+    window.currentSectionHeight = height;
 
-    // Use styleManager to apply section max height
-    styleManager.applySectionMaxHeight(height);
+    // Use styleManager to apply section height
+    styleManager.applySectionHeight(height);
 }
 
-function setSectionMaxHeight(height) {
-    applyAndSaveSetting('sectionMaxHeight', height, applySectionMaxHeight);
+function setSectionHeight(height) {
+    applyAndSaveSetting('sectionHeight', height, applySectionHeight);
 }
 
-// Section min height functions
-function applySectionMinHeight(height) {
-    window.currentSectionMinHeight = height;
+// Task section height functions
+function applyTaskSectionHeight(height) {
+    window.currentTaskSectionHeight = height;
 
-    // Use styleManager to apply section min height
-    styleManager.applySectionMinHeight(height);
+    // Use styleManager to apply task section height
+    styleManager.applyTaskSectionHeight(height);
 }
 
-function setSectionMinHeight(height) {
-    applyAndSaveSetting('sectionMinHeight', height, applySectionMinHeight);
+function setTaskSectionHeight(height) {
+    applyAndSaveSetting('taskSectionHeight', height, applyTaskSectionHeight);
 }
 
 // Function to detect row tags from board
@@ -2204,18 +2204,18 @@ window.addEventListener('message', event => {
                     applyTaskMinHeight('auto'); // Default fallback
                 }
 
-                // Update section max height with the value from configuration
-                if (message.sectionMaxHeight) {
-                    applySectionMaxHeight(message.sectionMaxHeight);
+                // Update section height with the value from configuration
+                if (message.sectionHeight) {
+                    applySectionHeight(message.sectionHeight);
                 } else {
-                    applySectionMaxHeight('auto'); // Default fallback
+                    applySectionHeight('auto'); // Default fallback
                 }
 
-                // Update section min height with the value from configuration
-                if (message.sectionMinHeight) {
-                    applySectionMinHeight(message.sectionMinHeight);
+                // Update task section height with the value from configuration
+                if (message.taskSectionHeight) {
+                    applyTaskSectionHeight(message.taskSectionHeight);
                 } else {
-                    applySectionMinHeight('auto'); // Default fallback
+                    applyTaskSectionHeight('auto'); // Default fallback
                 }
 
                 // Update font size with the value from configuration

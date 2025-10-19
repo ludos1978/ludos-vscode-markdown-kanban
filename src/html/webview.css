@@ -6,6 +6,8 @@
   --whitespace-div2: calc(var(--whitespace) / 2);
   --whitespace-div4: calc(var(--whitespace) / 4);
   --task-height: auto;
+  --task-section-min-height: auto;
+  --task-section-max-height: auto;
   --column-width: 350px;
   --collapsed-column-width: 40px;
 
@@ -1185,6 +1187,17 @@ body.small-card-fonts .task-title-container .markdown-content img {
 body.section-height-limited .task-section {
   max-height: var(--section-max-height, auto);
   min-height: var(--section-min-height, auto);
+  max-width: -webkit-fill-available;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Apply task-section specific min/max height when task-section-height-limited class is active */
+body.task-section-height-limited .task-section {
+  min-height: var(--task-section-min-height, auto);
+  max-height: var(--task-section-max-height, auto);
   max-width: -webkit-fill-available;
   overflow-y: auto;
   overflow-x: hidden;

@@ -97,8 +97,8 @@ export class KanbanWebviewPanel {
                     board: this._board,
                     columnWidth: configService.getConfig('columnWidth', '350px'),
                     taskMinHeight: configService.getConfig('taskMinHeight'),
-                    sectionMaxHeight: configService.getConfig('sectionMaxHeight'),
-                    sectionMinHeight: configService.getConfig('sectionMinHeight'),
+                    sectionHeight: configService.getConfig('sectionHeight'),
+                    taskSectionHeight: configService.getConfig('taskSectionHeight'),
                     fontSize: configService.getConfig('fontSize'),
                     fontFamily: configService.getConfig('fontFamily'),
                     whitespace: configService.getConfig('whitespace', '8px'),
@@ -1144,8 +1144,7 @@ export class KanbanWebviewPanel {
                 settings: {
                     columnWidth: "250px",
                     cardHeight: "auto",
-										sectionMaxHeight: "auto",
-										sectionMinHeight: "auto",
+										sectionHeight: "auto",
                     fontSize: "0_5x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1158,8 +1157,7 @@ export class KanbanWebviewPanel {
                 settings: {
                     columnWidth: "350px",
                     cardHeight: "auto",
-										sectionMaxHeight: "auto",
-										sectionMinHeight: "auto",
+										sectionHeight: "auto",
                     fontSize: "1x",
                     whitespace: "8px",
                     tagVisibility: "allexcludinglayout",
@@ -1172,8 +1170,7 @@ export class KanbanWebviewPanel {
                 settings: {
                     columnWidth: "33percent",
                     cardHeight: "auto",
-										sectionMaxHeight: "auto",
-										sectionMinHeight: "auto",
+										sectionHeight: "auto",
                     fontSize: "1x",
                     whitespace: "12px",
                     arrowKeyFocusScroll: "nearest"
@@ -1187,8 +1184,7 @@ export class KanbanWebviewPanel {
 									cardHeight: "auto",
 									fontSize: "1_5x",
 									whitespace: "12px",
-									sectionMaxHeight: "66percent",
-									sectionMinHeight: "auto",
+									sectionHeight: "66percent",
                   arrowKeyFocusScroll: "nearest"
 							}
 						},
@@ -1198,8 +1194,7 @@ export class KanbanWebviewPanel {
                 settings: {
                     columnWidth: "100percent",
                     cardHeight: "100percent",
-                    sectionMaxHeight: "100percent",
-                    sectionMinHeight: "auto",
+                    sectionHeight: "100percent",
                     fontSize: "3x",
                     tagVisibility: "none",
                     whitespace: "16px",
@@ -1556,7 +1551,8 @@ export class KanbanWebviewPanel {
         const customTagCategories = configService.getCustomTagCategories();
         const whitespace = configService.getConfig('whitespace', '8px');
         const taskMinHeight = configService.getConfig('taskMinHeight');
-        const sectionMaxHeight = configService.getConfig('sectionMaxHeight');
+        const sectionHeight = configService.getConfig('sectionHeight');
+        const taskSectionHeight = configService.getConfig('taskSectionHeight');
         const fontSize = configService.getConfig('fontSize');
         const fontFamily = configService.getConfig('fontFamily');
         const columnWidth = configService.getConfig('columnWidth', '350px');
@@ -1586,7 +1582,8 @@ export class KanbanWebviewPanel {
                 customTagCategories: customTagCategories,
                 whitespace: whitespace,
                 taskMinHeight: taskMinHeight,
-                sectionMaxHeight: sectionMaxHeight,
+                sectionHeight: sectionHeight,
+                taskSectionHeight: taskSectionHeight,
                 fontSize: fontSize,
                 fontFamily: fontFamily,
                 columnWidth: columnWidth,

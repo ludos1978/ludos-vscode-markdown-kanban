@@ -155,35 +155,33 @@ styleManager.applyRowHeight = function(height) {
     this.setCSSVariable('row-height', actualHeight);
 };
 
-styleManager.applySectionMaxHeight = function(height) {
+styleManager.applySectionHeight = function(height) {
     // Convert value to CSS using getCSS helper
-    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionMaxHeight', height) : height;
+    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionHeight', height) : height;
 
-    // Set max height
+    // Set both min and max height to the same value for fixed height
     this.setCSSVariable('section-max-height', actualHeight);
+    this.setCSSVariable('section-min-height', actualHeight);
 
-    // Check if either min or max is set to enable the height-limited class
-    const minHeight = this.getCSSVariable('section-min-height');
-    if (height !== 'auto' || (minHeight && minHeight !== 'auto')) {
+    if (height !== 'auto') {
         document.body.classList.add('section-height-limited');
     } else {
         document.body.classList.remove('section-height-limited');
     }
 };
 
-styleManager.applySectionMinHeight = function(height) {
+styleManager.applyTaskSectionHeight = function(height) {
     // Convert value to CSS using getCSS helper
-    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionMinHeight', height) : height;
+    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('taskSectionHeight', height) : height;
 
-    // Set min height
-    this.setCSSVariable('section-min-height', actualHeight);
+    // Set both min and max height to the same value for fixed height
+    this.setCSSVariable('task-section-min-height', actualHeight);
+    this.setCSSVariable('task-section-max-height', actualHeight);
 
-    // Check if either min or max is set to enable the height-limited class
-    const maxHeight = this.getCSSVariable('section-max-height');
-    if (height !== 'auto' || (maxHeight && maxHeight !== 'auto')) {
-        document.body.classList.add('section-height-limited');
+    if (height !== 'auto') {
+        document.body.classList.add('task-section-height-limited');
     } else {
-        document.body.classList.remove('section-height-limited');
+        document.body.classList.remove('task-section-height-limited');
     }
 };
 
