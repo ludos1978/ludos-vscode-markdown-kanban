@@ -8,7 +8,7 @@ kanban-plugin: board
 
 - [ ] why is there rewriteLinksForExport if processAssets changes it anyway?!?
 
-- [ ] it doesnt add the column stacks (the ones used to create new stacks when dropping columns on) in the second row or later. it only creates them on the first row. this gives us no gap inbetween the rows, and dropping into new rows is also impossible.
+- [x] it doesnt add the column stacks (the ones used to create new stacks when dropping columns on) in the second row or later. it only creates them on the first row. this gives us no gap inbetween the rows, and dropping into new rows is also impossible.
 
 - [ ] when copying as markdown it should only copy the object, that the function called. if can be the column or the task, but not the full kanban as it currently does!
 

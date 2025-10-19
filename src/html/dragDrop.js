@@ -2357,15 +2357,10 @@ function cleanupEmptyStack(stack) {
  * Removes consecutive empty stacks and ensures drop zones before/between/after content stacks
  */
 function cleanupAndRecreateDropZones(container) {
-    const isRow = container.classList.contains('kanban-row');
-    const rowNumber = isRow ? container.getAttribute('data-row-number') : 'board';
-
     // Get all stacks
     const allStacks = Array.from(container.children).filter(child =>
         child.classList.contains('kanban-column-stack')
     );
-
-    console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: Found ${allStacks.length} total stacks`);
 
     // Separate content stacks from drop-zone stacks
     const contentStacks = [];
@@ -2379,8 +2374,6 @@ function cleanupAndRecreateDropZones(container) {
             dropZoneStacks.push(stack);
         }
     });
-
-    console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: ${contentStacks.length} content stacks, ${dropZoneStacks.length} drop zone stacks`);
 
     // Remove all existing drop-zone stacks
     dropZoneStacks.forEach(stack => {
@@ -2407,10 +2400,6 @@ function cleanupAndRecreateDropZones(container) {
         } else {
             container.appendChild(dropZoneAfter);
         }
-
-        console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: Created ${contentStacks.length * 2 + 1} drop zones`);
-    } else {
-        console.log(`[kanban.dragDrop.cleanupAndRecreateDropZones] Row ${rowNumber}: No content stacks, no drop zones created`);
     }
 }
 

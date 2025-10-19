@@ -4059,9 +4059,6 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
         // Find where the new column should be positioned within this row
         const positionInRow = columnsInThisRow.findIndex(col => col.id === column.id);
 
-        console.log(`[kanban.addSingleColumnToDOM] Adding column ${column.id} at position ${positionInRow} in row ${columnRow}, referenceColumnId: ${referenceColumnId}`);
-        console.log(`[kanban.addSingleColumnToDOM] Columns in this row:`, columnsInThisRow.map(c => ({id: c.id, title: c.title})));
-
         // Find the stack by looking ONLY at the reference column
         let targetStack = null;
         let insertBeforeColumn = null;
@@ -4071,7 +4068,6 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
 
         // If we have a reference column ID, find it in the DOM
         if (referenceColumnId) {
-            console.log(`[kanban.addSingleColumnToDOM] Looking for reference column ${referenceColumnId}`);
             for (const stack of allStacks) {
                 const refColumnElement = stack.querySelector(`[data-column-id="${referenceColumnId}"]`);
                 if (refColumnElement) {
@@ -4082,11 +4078,9 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
                     if (positionInRow < refColumnIndex) {
                         // Inserting before the reference column
                         insertBeforeColumn = refColumnElement;
-                        console.log(`[kanban.addSingleColumnToDOM] Will insert BEFORE reference column`);
                     } else {
                         // Inserting after the reference column
                         insertAfterColumn = refColumnElement;
-                        console.log(`[kanban.addSingleColumnToDOM] Will insert AFTER reference column`);
                     }
                     break;
                 }
