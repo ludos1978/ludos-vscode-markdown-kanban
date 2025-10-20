@@ -1462,18 +1462,18 @@ function editTaskIncludeFile(taskId, columnId) {
     // Get current include file path
     const currentFile = task.includeFiles[0]; // For now, handle single file includes
 
-    // Request new filename from backend
+    // Request new file path via VS Code dialog (with unsaved changes check in backend)
     vscode.postMessage({
-        type: 'requestInput',
-        prompt: 'Enter the new include file name:',
-        value: currentFile,
-        callback: 'updateTaskIncludeFile',
-        params: { taskId: taskId, columnId: columnId }
+        type: 'requestEditTaskIncludeFileName',
+        taskId: taskId,
+        columnId: columnId,
+        currentFile: currentFile
     });
+    return; // Exit here, the backend will handle the input and response
 }
 
 // Function called from backend after user provides new include file name
-function updateTaskIncludeFile(taskId, columnId, newFileName) {
+function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
     if (!window.cachedBoard) {
         console.error('No cached board available');
         return;
@@ -1491,39 +1491,48 @@ function updateTaskIncludeFile(taskId, columnId, newFileName) {
         return;
     }
 
-    // Update task title with new include file
-    let cleanTitle = task.title || '';
+    if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
+        // Update task title with new include file
+        let cleanTitle = task.title || '';
 
-    // Remove all existing taskinclude patterns
-    cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
+        // Remove all existing taskinclude patterns
+        cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
 
-    // Add new include pattern
-    const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
+        // Add new include pattern
+        const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
 
-    // Update cached board
-    task.title = newTitle;
-    task.originalTitle = cleanTitle;
+        // Update cached board
+        task.title = newTitle;
+        task.includeFiles = [newFileName.trim()];
+        task.originalTitle = cleanTitle;
 
-    // Also update currentBoard for compatibility
-    if (window.cachedBoard !== window.cachedBoard) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-            if (currentTask) {
-                currentTask.title = newTitle;
-                currentTask.originalTitle = cleanTitle;
+        // Also update currentBoard for compatibility
+        if (window.cachedBoard !== window.cachedBoard) {
+            const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
+            if (currentColumn) {
+                const currentTask = currentColumn.tasks.find(t => t.id === taskId);
+                if (currentTask) {
+                    currentTask.title = newTitle;
+                    currentTask.includeFiles = [newFileName.trim()];
+                    currentTask.originalTitle = cleanTitle;
+                }
             }
         }
+
+        // Send update to backend
+        vscode.postMessage({
+            type: 'updateBoard',
+            board: window.cachedBoard
+        });
+
+        // Update button state to show unsaved changes
+        updateRefreshButtonState('unsaved', 1);
+
+        vscode.postMessage({
+            type: 'showMessage',
+            text: `Task include file updated to: ${newFileName.trim()}`
+        });
     }
-
-    // Send update to backend
-    vscode.postMessage({
-        type: 'updateBoard',
-        board: window.cachedBoard
-    });
-
-    // Update button state to show unsaved changes
-    updateRefreshButtonState('unsaved', 1);
 }
 
 // Disable task include mode

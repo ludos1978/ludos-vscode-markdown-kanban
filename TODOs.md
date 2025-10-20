@@ -4,7 +4,9 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
+- [ ] test the different situatuons when files are included into the kanban using taskinclude or columninclude. they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
+
+- [x] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
 
 html comments should be:
 - hidden (as it's handled by normal markdown renderer)

@@ -2596,6 +2596,12 @@ window.addEventListener('message', event => {
                 updateColumnIncludeFile(message.columnId, message.newFileName, message.currentFile);
             }
             break;
+        case 'proceedUpdateTaskIncludeFile':
+            // User provided new file name in VS Code dialog - proceed with updating task include file
+            if (typeof updateTaskIncludeFile === 'function') {
+                updateTaskIncludeFile(message.taskId, message.columnId, message.newFileName, message.currentFile);
+            }
+            break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
 

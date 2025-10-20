@@ -169,6 +169,11 @@ export class MessageHandler {
                 await this.handleRequestEditIncludeFileName(message);
                 break;
 
+            // Request edit task include file name for changing task include files
+            case 'requestEditTaskIncludeFileName':
+                await this.handleRequestEditTaskIncludeFileName(message);
+                break;
+
             // Enhanced file and link handling
             case 'openFileLink':
                 await this._linkHandler.handleFileLink(message.href, message.taskId, message.columnId, message.linkIndex);
@@ -1719,10 +1724,124 @@ export class MessageHandler {
     private async handleRequestEditIncludeFileName(message: any): Promise<void> {
         try {
             const currentFile = message.currentFile || '';
+            console.log('[requestEditIncludeFileName] currentFile:', currentFile, 'columnId:', message.columnId);
+
+            // CRITICAL: Check if current include file has unsaved changes before switching
+            const fileStateManager = getFileStateManager();
+            const fileState = fileStateManager.getIncludeFileByRelativePath(currentFile);
+            console.log('[requestEditIncludeFileName] fileState found:', !!fileState, 'hasUnsaved:', fileState?.frontend.hasUnsavedChanges);
+
+            if (fileState && fileState.frontend.hasUnsavedChanges) {
+                // Current include file has unsaved changes - ask user what to do
+                const choice = await vscode.window.showWarningMessage(
+                    `The current include file "${currentFile}" has unsaved changes. What would you like to do?`,
+                    { modal: true },
+                    'Save and Switch',
+                    'Discard and Switch',
+                    'Cancel'
+                );
+
+                if (choice === 'Save and Switch') {
+                    // Save the current include file first
+                    const panel = this._getWebviewPanel();
+                    if (panel) {
+                        await panel.saveIncludeFileChanges(fileState.path);
+                    }
+                } else if (choice === 'Discard and Switch') {
+                    // Clear unsaved changes flag
+                    fileStateManager.markFrontendChange(fileState.path, false);
+                } else {
+                    // User cancelled - don't proceed with switching
+                    return;
+                }
+            }
+
+            // Now show the file name input dialog
+            console.log('[requestEditIncludeFileName] Showing input box with current value:', currentFile);
             const fileName = await vscode.window.showInputBox({
                 prompt: 'Edit the path to the presentation file',
                 value: currentFile,
                 placeHolder: 'e.g., presentation.md or slides/intro.md',
+                validateInput: (value) => {
+                    if (!value || !value.trim()) {
+                        return 'Please enter a file path';
+                    }
+                    if (!value.endsWith('.md')) {
+                        return 'File should be a markdown file (.md)';
+                    }
+                    return undefined;
+                }
+            });
+
+            console.log('[requestEditIncludeFileName] User entered fileName:', fileName);
+            if (fileName && fileName.trim()) {
+                // User provided a file name - send message back to webview to proceed
+                const panel = this._getWebviewPanel();
+                console.log('[requestEditIncludeFileName] Sending proceedUpdateIncludeFile message');
+                if (panel && panel._panel) {
+                    panel._panel.webview.postMessage({
+                        type: 'proceedUpdateIncludeFile',
+                        columnId: message.columnId,
+                        newFileName: fileName.trim(),
+                        currentFile: currentFile
+                    });
+                    console.log('[requestEditIncludeFileName] Message sent successfully');
+                } else {
+                    console.error('[requestEditIncludeFileName] No panel or panel._panel available!');
+                }
+            } else {
+                console.log('[requestEditIncludeFileName] User cancelled or entered empty filename');
+            }
+            // If cancelled, do nothing
+
+        } catch (error) {
+            console.error('[requestEditIncludeFileName] Error handling input request:', error);
+        }
+    }
+
+    /**
+     * Handle request to edit/change task include filename
+     */
+    private async handleRequestEditTaskIncludeFileName(message: any): Promise<void> {
+        try {
+            const currentFile = message.currentFile || '';
+            const taskId = message.taskId;
+            const columnId = message.columnId;
+
+            // CRITICAL: Check if current include file has unsaved changes before switching
+            const fileStateManager = getFileStateManager();
+            const fileState = fileStateManager.getIncludeFileByRelativePath(currentFile);
+
+            if (fileState && fileState.frontend.hasUnsavedChanges) {
+                // Current include file has unsaved changes - ask user what to do
+                const choice = await vscode.window.showWarningMessage(
+                    `The current task include file "${currentFile}" has unsaved changes. What would you like to do?`,
+                    { modal: true },
+                    'Save and Switch',
+                    'Discard and Switch',
+                    'Cancel'
+                );
+
+                if (choice === 'Save and Switch') {
+                    // Save the current include file first
+                    const panel = this._getWebviewPanel();
+                    if (panel) {
+                        await panel.saveIncludeFileChanges(fileState.path);
+                    }
+                } else if (choice === 'Discard and Switch') {
+                    // Clear unsaved changes flag
+                    fileStateManager.markFrontendChange(fileState.path, false);
+                } else {
+                    // User cancelled - don't proceed with switching
+                    return;
+                }
+            }
+
+            // Now show the file name input dialog
+            const fileName = await vscode.window.showInputBox({
+                prompt: 'Edit the path to the task include file',
+                value: currentFile,
+                placeHolder: 'e.g., task-notes.md or includes/task-details.md',
                 validateInput: (value) => {
                     if (!value || !value.trim()) {
                         return 'Please enter a file path';
@@ -1739,8 +1858,9 @@ export class MessageHandler {
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
-                        type: 'proceedUpdateIncludeFile',
-                        columnId: message.columnId,
+                        type: 'proceedUpdateTaskIncludeFile',
+                        taskId: taskId,
+                        columnId: columnId,
                         newFileName: fileName.trim(),
                         currentFile: currentFile
                     });
@@ -1749,12 +1869,12 @@ export class MessageHandler {
             // If cancelled, do nothing
 
         } catch (error) {
-            console.error('[requestEditIncludeFileName] Error handling input request:', error);
+            console.error('[requestEditTaskIncludeFileName] Error handling input request:', error);
         }
     }
 
     /**
-     * Handle request for task include filename
+     * Handle request for task include filename (enabling include mode)
      */
     private async handleRequestTaskIncludeFileName(taskId: string, columnId: string): Promise<void> {
         try {

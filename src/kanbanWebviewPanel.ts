@@ -2737,79 +2737,13 @@ export class KanbanWebviewPanel {
             const unifiedIncludeFile = this._findIncludeFile(fileState);
 
             if (!unifiedIncludeFile) {
+                console.warn('[saveColumnIncludeChanges] No unified include file found for:', fileState);
                 return false;
             }
 
-            // CRITICAL FIX: Check if the column's tasks actually came from this file's baseline
-            // This prevents saving old file's tasks to a new file after changing the include path
-            const baselineTasks = PresentationParser.parseMarkdownToTasks(unifiedIncludeFile.frontend.baseline);
-
-            // Check overlap between baseline and current column tasks
-            let baselineOverlapCount = 0;
-            if (baselineTasks.length > 0 && column.tasks.length > 0) {
-                for (const baselineTask of baselineTasks) {
-                    for (const columnTask of column.tasks) {
-                        if (baselineTask.title === columnTask.title ||
-                            baselineTask.title.includes(columnTask.title) ||
-                            columnTask.title.includes(baselineTask.title)) {
-                            baselineOverlapCount++;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            const baselineOverlapRatio = baselineTasks.length > 0
-                ? baselineOverlapCount / Math.min(baselineTasks.length, column.tasks.length)
-                : 0;
-
-            // If there's NO overlap with the baseline, the tasks came from a different file
-            // This happens when include file path is changed but new content hasn't loaded yet
-            if (baselineTasks.length > 0 && column.tasks.length > 0 && baselineOverlapRatio < 0.3) {
-                return false;
-            }
-
-            // CRITICAL FIX: Check if the current tasks actually came from this file
-            // Read the current file content and compare with what we would generate
-            const currentFileContent = fs.readFileSync(absolutePath, 'utf8');
-            const currentFileTasks = PresentationParser.parseMarkdownToTasks(currentFileContent);
-
-            // Smart validation: Detect file path changes vs legitimate edits/additions
-            const taskCountDifference = Math.abs(currentFileTasks.length - column.tasks.length);
-
-            // Check for content overlap to distinguish file path changes from legitimate edits
-            let hasContentOverlap = false;
-            let overlapCount = 0;
-
-            if (currentFileTasks.length > 0 && column.tasks.length > 0) {
-                // Count how many tasks have similar titles (indicating they're the same content)
-                for (const fileTask of currentFileTasks) {
-                    for (const columnTask of column.tasks) {
-                        if (fileTask.title === columnTask.title ||
-                            fileTask.title.includes(columnTask.title) ||
-                            columnTask.title.includes(fileTask.title)) {
-                            overlapCount++;
-                            break; // Count each file task only once
-                        }
-                    }
-                }
-
-                // If most tasks overlap, it's likely legitimate editing
-                const overlapRatio = overlapCount / Math.min(currentFileTasks.length, column.tasks.length);
-                hasContentOverlap = overlapRatio >= 0.5; // At least 50% overlap
-            }
-
-            // Only block save if there's a big count difference AND no content overlap
-            // This indicates a file path change where completely different content was loaded
-            const isLikelyFilePathChange = taskCountDifference > 2 && !hasContentOverlap;
-
-            if (isLikelyFilePathChange) {
-                return false;
-            }
-
-            // Check if we have any actual task changes to save
-            // If the tasks came from a file include and haven't been modified, don't overwrite
+            // Check if we have any tasks to save
             if (column.tasks.length === 0) {
+                console.log('[saveColumnIncludeChanges] No tasks to save, skipping');
                 return false;
             }
 
@@ -2818,13 +2752,20 @@ export class KanbanWebviewPanel {
 
             // Don't write if the content would be empty or just separators
             if (!presentationContent || presentationContent.trim() === '' || presentationContent.trim() === '---') {
+                console.log('[saveColumnIncludeChanges] Empty content, skipping');
                 return false;
             }
 
-            // Additional safety check: don't write if the generated content is identical to current file
+            // Read current file content to check if it's actually different
+            const currentFileContent = fs.readFileSync(absolutePath, 'utf8');
+
+            // Don't write if the generated content is identical to current file
             if (currentFileContent.trim() === presentationContent.trim()) {
+                console.log('[saveColumnIncludeChanges] Content unchanged, skipping');
                 return false;
             }
+
+            console.log(`[saveColumnIncludeChanges] Saving ${column.tasks.length} tasks to ${fileState}`);
 
             // Create backup before writing (same protection as main file)
             await this._backupManager.createFileBackup(absolutePath, presentationContent, {
@@ -3139,23 +3080,11 @@ export class KanbanWebviewPanel {
 
             if (fileContent !== null) {
 
-                // Smart detection: check if content is presentation format or regular markdown tasks
-                const hasSlideMarkers = fileContent.includes('---');
-                const hasTaskMarkers = fileContent.includes('- [ ]') || fileContent.includes('- [x]');
-
+                // columninclude files are ALWAYS parsed as presentation slides (separated by ---)
+                // Each slide becomes one task
+                // No special parsing of markdown task lists (- [ ]) or any other syntax
                 let newTasks: KanbanTask[];
-                if (hasSlideMarkers && !hasTaskMarkers) {
-                    // Use presentation parser for slide-based content
-                    newTasks = PresentationParser.parseMarkdownToTasks(fileContent);
-                } else if (hasTaskMarkers) {
-                    // Use existing markdown parser for task-based content
-                    const tempParseResult = MarkdownKanbanParser.parseMarkdown(fileContent);
-                    // Extract all tasks from all columns in the parsed board
-                    newTasks = tempParseResult.board.columns.flatMap(col => col.tasks);
-                } else {
-                    // Default to presentation parser
-                    newTasks = PresentationParser.parseMarkdownToTasks(fileContent);
-                }
+                newTasks = PresentationParser.parseMarkdownToTasks(fileContent);
 
                 // Update the column's tasks directly
                 column.tasks = newTasks;
@@ -3420,6 +3349,9 @@ export class KanbanWebviewPanel {
             return;
         }
 
+        // Get file state manager instance for API calls
+        const fileStateManager = getFileStateManager();
+
         // Don't process include file changes if we're currently updating from the panel
         // But only for column/task includes which can be edited internally
         // Regular includes should always update since they're read-only
@@ -3473,7 +3405,7 @@ export class KanbanWebviewPanel {
 
             if (resolution.shouldReload && !resolution.shouldCreateBackup) {
                 // Discard local changes and reload from external file
-                // FIXME: Use FileStateManager.markFrontendChange - fileState.frontend.hasUnsavedChanges = false;
+                fileStateManager.markFrontendChange(fileState.path, false);
                 await this.updateIncludeFile(filePath, FileStateManager.getLegacyType(fileState.fileType) === 'column', FileStateManager.getLegacyType(fileState.fileType) === 'task', true);
 
                 // Mark this file as recently reloaded to prevent immediate re-saving
@@ -3493,7 +3425,7 @@ export class KanbanWebviewPanel {
                     await this.saveIncludeFileAsBackup(filePath);
                 }
 
-                // FIXME: Use FileStateManager.markFrontendChange - fileState.frontend.hasUnsavedChanges = false;
+                fileStateManager.markFrontendChange(fileState.path, false);
                 await this.updateIncludeFile(filePath, FileStateManager.getLegacyType(fileState.fileType) === 'column', FileStateManager.getLegacyType(fileState.fileType) === 'task', true);
 
                 // Mark this file as recently reloaded to prevent immediate re-saving
@@ -3512,7 +3444,7 @@ export class KanbanWebviewPanel {
                 if (FileStateManager.getLegacyType(fileState.fileType) === 'column' || FileStateManager.getLegacyType(fileState.fileType) === 'task') {
                     await this.saveIncludeFileChanges(filePath);
                 }
-                // FIXME: Use FileStateManager.markFrontendChange - fileState.frontend.hasUnsavedChanges = false;
+                fileStateManager.markFrontendChange(fileState.path, false);
                 // For regular includes, this would mean saving main kanban changes (already handled elsewhere)
 
             } else if (resolution.shouldIgnore) {
