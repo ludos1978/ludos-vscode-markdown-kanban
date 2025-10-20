@@ -4179,7 +4179,9 @@ export class KanbanWebviewPanel {
                         ? PresentationParser.tasksToPresentation(column.tasks)
                         : '';
 
-                    if (effectiveBaseline.trim() !== currentPresentationContent.trim()) {
+                    // CRITICAL: Only compare if we have a valid baseline
+                    // During initial load, baseline might not be set yet, so we skip comparison to avoid false positives
+                    if (effectiveBaseline && effectiveBaseline.trim() !== currentPresentationContent.trim()) {
                         // Mark frontend changes in FileStateManager
                         fileStateManager.markFrontendChange(absolutePath, true, currentPresentationContent);
                         hasIncludeChanges = true;
@@ -4247,7 +4249,9 @@ export class KanbanWebviewPanel {
                             expectedContent += task.description;
                         }
 
-                        if (effectiveBaseline.trim() !== expectedContent.trim()) {
+                        // CRITICAL: Only compare if we have a valid baseline
+                        // During initial load, baseline might not be set yet, so we skip comparison to avoid false positives
+                        if (effectiveBaseline && effectiveBaseline.trim() !== expectedContent.trim()) {
                             // Mark frontend changes in FileStateManager
                             fileStateManager.markFrontendChange(absolutePath, true, expectedContent);
                             hasIncludeChanges = true;

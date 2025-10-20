@@ -3,7 +3,7 @@
   "displayName": "Markdown Kanban Obsidian",
   "description": "Kanban board for Markdown files, compatible with obsidian kanban boards",
   "publisher": "ludos",
-  "version": "0.20.1",
+  "version": "0.21.1",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -288,10 +288,31 @@
             "Hide all tags"
           ]
         },
-        "markdown-kanban.showHtmlComments": {
-          "type": "boolean",
-          "default": false,
-          "description": "Show HTML comments (<!-- -->) as visible markers in the kanban view"
+        "markdown-kanban.htmlCommentRenderMode": {
+          "type": "string",
+          "default": "hidden",
+          "enum": [
+            "hidden",
+            "text"
+          ],
+          "enumDescriptions": [
+            "Hide HTML comments (default markdown behavior)",
+            "Render HTML comments as visible text"
+          ],
+          "description": "How to render HTML comments (<!-- -->) in the kanban view"
+        },
+        "markdown-kanban.htmlContentRenderMode": {
+          "type": "string",
+          "default": "html",
+          "enum": [
+            "html",
+            "text"
+          ],
+          "enumDescriptions": [
+            "Render HTML tags as HTML (default)",
+            "Render HTML tags as visible text"
+          ],
+          "description": "How to render HTML content (e.g., <div>, <span>) in the kanban view"
         },
         "markdown-kanban.layoutPreset": {
           "type": "string",

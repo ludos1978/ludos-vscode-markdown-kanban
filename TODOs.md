@@ -4,7 +4,17 @@ kanban-plugin: board
 
 ## Open Todos
 
-- [ ] - the font color calculation (it detects wether it should be white or black) doesnt work properly in the dark mode. it seems not to take the right background color to calculate the font color. 
+- [ ] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
+
+html comments should be:
+- hidden (as it's handled by normal markdown renderer)
+- rendered as normal text (as it currently is)
+
+html content: anything that starts with <div or similar, but make sure not to accidentially handle <https://links.to/websites> should be:
+- rendered as normal text (similar to html comments)
+- rendered as html (whats usually happening in markdown rendering)
+
+- [x] - the font color calculation (it detects wether it should be white or black) doesnt work properly in the dark mode. it seems not to take the right background color to calculate the font color. 
 - also the styles for dark and light should allways be dynamically generated. it should only require to add a css value to change between light and dark mode. 
 
 - [x] do we have an rewrite links, so when a file is referenced using a relative link, that we can rewrite the path relative to the new folder the file is exported into? this should be an alternative selection when exporting, to eighter pack the file or to rewrite file links.
