@@ -45,7 +45,10 @@
       "Bash(npm test:*)",
       "Bash(md5:*)",
       "Bash(xargs ls:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(bash /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tmp/migration-script.sh)",
+      "Bash(python3 tmp/complete-migration.py)",
+      "Bash(while read line)"
     ],
     "deny": [],
     "ask": []

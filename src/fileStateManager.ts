@@ -62,7 +62,8 @@ export class FileStateManager {
         path: string,
         relativePath: string,
         isMainFile: boolean,
-        fileType: 'main' | 'include-regular' | 'include-column' | 'include-task'
+        fileType: 'main' | 'include-regular' | 'include-column' | 'include-task',
+        initialContent?: string
     ): FileState {
         let state = this.fileStates.get(path);
 
@@ -81,8 +82,8 @@ export class FileStateManager {
                 },
                 frontend: {
                     hasUnsavedChanges: false,
-                    content: '',
-                    baseline: ''
+                    content: initialContent || '',
+                    baseline: initialContent || ''
                 },
                 needsReload: false,
                 needsSave: false,
@@ -191,6 +192,62 @@ export class FileStateManager {
      */
     public getAllStates(): Map<string, FileState> {
         return new Map(this.fileStates);
+    }
+
+    /**
+     * Get all include file states (non-main files)
+     */
+    public getAllIncludeFiles(): FileState[] {
+        return Array.from(this.fileStates.values()).filter(s => !s.isMainFile);
+    }
+
+    /**
+     * Get include file by relative path
+     */
+    public getIncludeFileByRelativePath(relativePath: string): FileState | undefined {
+        return Array.from(this.fileStates.values()).find(s => s.relativePath === relativePath && !s.isMainFile);
+    }
+
+    /**
+     * Check if any include files have unsaved changes
+     */
+    public hasUnsavedIncludeFiles(): boolean {
+        return this.getAllIncludeFiles().some(file => file.frontend.hasUnsavedChanges);
+    }
+
+    /**
+     * Get legacy type from FileState fileType
+     */
+    public static getLegacyType(fileType: string): 'regular' | 'column' | 'task' {
+        switch (fileType) {
+            case 'include-column': return 'column';
+            case 'include-task': return 'task';
+            case 'include-regular': return 'regular';
+            default: return 'regular';
+        }
+    }
+
+    /**
+     * Get FileState fileType from legacy type
+     */
+    public static getFileType(type: 'regular' | 'column' | 'task'): 'include-regular' | 'include-column' | 'include-task' {
+        switch (type) {
+            case 'column': return 'include-column';
+            case 'task': return 'include-task';
+            case 'regular': return 'include-regular';
+        }
+    }
+
+    /**
+     * Update file content (updates frontend content but not baseline)
+     */
+    public updateContent(path: string, content: string): void {
+        const state = this.fileStates.get(path);
+        if (state) {
+            state.frontend.content = content;
+            state.backend.lastModified = new Date();
+            this.updateComputedState(state);
+        }
     }
 
     /**

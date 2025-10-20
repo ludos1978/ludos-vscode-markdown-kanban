@@ -3450,7 +3450,7 @@ blockquote {
 
 .html-comment-marker:hover {
   opacity: 1;
-  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.4));
+  /* background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.4)); */
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
