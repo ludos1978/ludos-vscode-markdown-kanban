@@ -105,12 +105,17 @@ export class ConflictResolver {
     private async showPanelCloseDialog(context: ConflictContext): Promise<ConflictResolution> {
         let message = '';
 
+        // Build include files list if present
+        const includeFilesList = context.changedIncludeFiles && context.changedIncludeFiles.length > 0
+            ? '\n\nChanged include files:\n' + context.changedIncludeFiles.map(f => `  • ${f}`).join('\n')
+            : '';
+
         if (context.hasMainUnsavedChanges && context.hasIncludeUnsavedChanges) {
-            message = `You have unsaved changes in "${context.fileName}" and in column include files. Do you want to save before closing?`;
+            message = `You have unsaved changes in "${context.fileName}" and in column include files.${includeFilesList}\n\nDo you want to save before closing?`;
         } else if (context.hasMainUnsavedChanges) {
             message = `You have unsaved changes in "${context.fileName}". Do you want to save before closing?`;
         } else if (context.hasIncludeUnsavedChanges) {
-            message = `You have unsaved changes in column include files. Do you want to save before closing?`;
+            message = `You have unsaved changes in column include files.${includeFilesList}\n\nDo you want to save before closing?`;
         } else {
             // No unsaved changes - allow close
             return {
@@ -216,13 +221,18 @@ export class ConflictResolver {
         }
 
         // Has unsaved changes - full option set
+        // Build include files list if present
+        const includeFilesList = context.changedIncludeFiles && context.changedIncludeFiles.length > 0
+            ? '\n\nChanged include files:\n' + context.changedIncludeFiles.map(f => `  • ${f}`).join('\n')
+            : '';
+
         let message = `The file "${context.fileName}" has been modified externally.`;
         if (context.hasMainUnsavedChanges && context.hasIncludeUnsavedChanges) {
-            message += ` Your current kanban changes and column include file changes may be lost if you reload.`;
+            message += ` Your current kanban changes and column include file changes may be lost if you reload.${includeFilesList}`;
         } else if (context.hasMainUnsavedChanges) {
             message += ` Your current kanban changes may be lost if you reload.`;
         } else {
-            message += ` Your current column include file changes may be lost if you reload.`;
+            message += ` Your current column include file changes may be lost if you reload.${includeFilesList}`;
         }
 
         const discardMyChanges = 'Discard my changes and reload';

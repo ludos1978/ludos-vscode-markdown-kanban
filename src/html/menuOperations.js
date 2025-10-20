@@ -1262,12 +1262,15 @@ function editColumnIncludeFile(columnId) {
     // Get current include file path
     const currentFile = column.includeFiles[0]; // For now, handle single file includes
 
+    console.log('[editColumnIncludeFile] Sending requestEditIncludeFileName message:', { columnId, currentFile });
+
     // Request new file path via VS Code dialog
     vscode.postMessage({
         type: 'requestEditIncludeFileName',
         columnId: columnId,
         currentFile: currentFile
     });
+    console.log('[editColumnIncludeFile] Message sent');
     return; // Exit here, the backend will handle the input and response
 }
 
@@ -1298,16 +1301,6 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         column.title = newTitle;
         column.includeFiles = [newFileName.trim()];
         column.originalTitle = newTitle;
-
-        // Also update currentBoard for compatibility
-        if (window.cachedBoard !== window.cachedBoard) {
-            const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-            if (currentColumn) {
-                currentColumn.title = newTitle;
-                currentColumn.includeFiles = [newFileName.trim()];
-                currentColumn.originalTitle = newTitle;
-            }
-        }
 
         // Send update to backend
         vscode.postMessage({
@@ -1505,19 +1498,6 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         task.title = newTitle;
         task.includeFiles = [newFileName.trim()];
         task.originalTitle = cleanTitle;
-
-        // Also update currentBoard for compatibility
-        if (window.cachedBoard !== window.cachedBoard) {
-            const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-            if (currentColumn) {
-                const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-                if (currentTask) {
-                    currentTask.title = newTitle;
-                    currentTask.includeFiles = [newFileName.trim()];
-                    currentTask.originalTitle = cleanTitle;
-                }
-            }
-        }
 
         // Send update to backend
         vscode.postMessage({

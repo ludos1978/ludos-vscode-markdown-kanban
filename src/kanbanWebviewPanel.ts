@@ -4111,31 +4111,39 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // For now, we'll only return true if we detected include changes
-        // and the board only contains included content
-        // This is a conservative approach - we might incorrectly mark the main file
-        // as changed when it hasn't, but that's safer than missing main file changes
+        // Return true if ONLY include files have changes
+        // This means: include files changed, but main kanban structure did NOT change
 
-        // Check if ALL columns and tasks are from includes
-        let allContentIsFromIncludes = true;
-        for (const column of board.columns) {
-            if (!column.includeMode || !column.includeFiles || column.includeFiles.length === 0) {
-                // Found a column that's not from an include
-                if (column.tasks && column.tasks.length > 0) {
-                    // Check if all tasks in this column are from includes
-                    const hasNonIncludeTasks = column.tasks.some(task =>
-                        !task.includeMode || !task.includeFiles || task.includeFiles.length === 0
-                    );
-                    if (hasNonIncludeTasks) {
-                        allContentIsFromIncludes = false;
-                        break;
-                    }
-                }
-            }
+        // If no include changes, then main file changed
+        if (!hasIncludeChanges) {
+            return false;
         }
 
-        // Return true only if we have include changes AND all content is from includes
-        return hasIncludeChanges && allContentIsFromIncludes;
+        // We have include changes. Now check if main file ALSO changed.
+        // The main file stores: column structure, titles, tags, metadata, include file paths
+        // But NOT the actual content from includes (that's in the include files)
+
+        // To check if main file changed, we'll generate the markdown and compare with current file
+        // (currentDocument already declared at line 3971, reusing it here)
+        try {
+            // Generate markdown from current board
+            const generatedMarkdown = MarkdownKanbanParser.generateMarkdown(board);
+            const currentFileContent = currentDocument.getText();
+
+            // If markdown is identical, then ONLY includes changed (main file unchanged)
+            const mainFileUnchanged = generatedMarkdown.trim() === currentFileContent.trim();
+
+            if (mainFileUnchanged) {
+                console.log('[trackIncludeFileUnsavedChanges] Only include files changed, main file unchanged');
+                return true; // Only includes changed
+            } else {
+                console.log('[trackIncludeFileUnsavedChanges] Both main file and include files changed');
+                return false; // Both main and includes changed
+            }
+        } catch (error) {
+            console.error('[trackIncludeFileUnsavedChanges] Error comparing main file:', error);
+            return false; // Default to "main file changed" to be safe
+        }
     }
 
     /**
