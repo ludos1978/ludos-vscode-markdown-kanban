@@ -3233,16 +3233,16 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .markdown-content code {
-  background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-editor-foreground)	;
+  /* background-color: var(--vscode-textCodeBlock-background);
+  color: var(--vscode-editor-foreground)	; */
   padding: 0.1em 0.3em;
   border-radius: 3px;
   font-size: 0.9em;
 }
 
 .markdown-content pre {
-  background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-textPreformat-foreground);
+  /* background-color: var(--vscode-textCodeBlock-background);
+  color: var(--vscode-textPreformat-foreground); */
   padding: 0.5em;
   border-radius: 3px;
   overflow-x: auto;
@@ -3428,8 +3428,10 @@ blockquote {
 
 /* HTML Comment Markers */
 .html-comment-marker {
-  color: var(--vscode-editor-foreground, #cccccc);
-  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.25));
+  /* color: var(--vscode-editor-foreground, #cccccc);
+  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.25)); */
+  color: var(--vscode-textPreformat-foreground, #666);
+  background-color: var(--vscode-textPreformat-background, transparent);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 0.85em;
@@ -3452,9 +3454,30 @@ blockquote {
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
-/* Hide HTML comments when showHtmlComments config is false */
-body:not(.show-html-comments) .html-comment-marker {
-  display: none;
+/* HTML Content rendered as text */
+.html-content-text {
+  color: var(--vscode-textPreformat-foreground);
+  background-color: var(--vscode-textPreformat-background);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Courier New', monospace;
+  font-style: normal;
+  font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  border: 1px dashed var(--vscode-editorWarning-foreground, #cc6600);
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.html-content-text:hover {
+  opacity: 1;
+  border-color: var(--vscode-focusBorder, #007acc);
+  border-style: solid;
 }
 
 /* Tags */

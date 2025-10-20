@@ -1568,7 +1568,8 @@ export class KanbanWebviewPanel {
         const maxRowHeight = configService.getConfig('maxRowHeight', 0);
         const columnBorder = configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)');
         const taskBorder = configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)');
-        const showHtmlComments = configService.getConfig('showHtmlComments', false);
+        const htmlCommentRenderMode = configService.getConfig('htmlCommentRenderMode', 'hidden');
+        const htmlContentRenderMode = configService.getConfig('htmlContentRenderMode', 'html');
 
         console.log('[Border-Debug] About to send via postMessage - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
@@ -1599,7 +1600,8 @@ export class KanbanWebviewPanel {
                 maxRowHeight: maxRowHeight,
                 columnBorder: columnBorder,
                 taskBorder: taskBorder,
-                showHtmlComments: showHtmlComments,
+                htmlCommentRenderMode: htmlCommentRenderMode,
+                htmlContentRenderMode: htmlContentRenderMode,
                 applyDefaultFolding: applyDefaultFolding,
                 isFullRefresh: isFullRefresh,
                 version: version

@@ -28,7 +28,8 @@ export interface KanbanConfiguration {
     layoutPresets: { [key: string]: any };
     tagVisibility: string;
     exportTagVisibility: boolean;
-    showHtmlComments: boolean;
+    htmlCommentRenderMode: string;
+    htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
     // Marp configuration
     marp: {
@@ -61,7 +62,8 @@ export interface ConfigurationDefaults {
     layoutPreset: string;
     tagVisibility: string;
     exportTagVisibility: boolean;
-    showHtmlComments: boolean;
+    htmlCommentRenderMode: string;
+    htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
     // Marp configuration defaults
     marp: {
@@ -100,7 +102,8 @@ export class ConfigurationService {
         layoutPreset: 'default',
         tagVisibility: 'visible',
         exportTagVisibility: true,
-        showHtmlComments: false,
+        htmlCommentRenderMode: 'hidden',
+        htmlContentRenderMode: 'html',
         arrowKeyFocusScroll: 'center',
         // Marp defaults
         marp: {

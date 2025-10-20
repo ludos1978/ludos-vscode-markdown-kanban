@@ -822,14 +822,8 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // New column should get #stack tag (since it comes after reference column)
-        // Reference column should also get #stack tag if it doesn't have it
-        if (!/#stack\b/i.test(referenceColumn.title)) {
-            const trimmedTitle = referenceColumn.title.trim();
-            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
-        }
-
-        // New column gets #stack tag to be part of the stack
+        // For insertColumnAfter: Only the NEW column gets #stack tag
+        // The reference column is NOT modified
         tags += ' #stack';
     }
 

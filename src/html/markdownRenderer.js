@@ -265,10 +265,11 @@ function enhancedStrikethroughPlugin(md) {
     };
 }
 
-// HTML Comment Visibility Plugin
-// Makes HTML comments visible similar to style markers
+// HTML Comment and Content Rendering Plugin
+// Handles HTML comments and HTML content based on user settings
 function htmlCommentPlugin(md, options = {}) {
-    const showComments = options.showComments !== false; // Default to true if not specified
+    const commentMode = options.commentMode || 'hidden'; // 'hidden' or 'text'
+    const contentMode = options.contentMode || 'html'; // 'html' or 'text'
 
     // Parse HTML comments as inline tokens
     function parseHtmlComment(state, silent) {
@@ -318,21 +319,21 @@ function htmlCommentPlugin(md, options = {}) {
     // Also register as block rule to catch block-level comments
     md.block.ruler.before('html_block', 'html_comment_block', parseHtmlComment);
 
-    // Render rule
+    // Render rule for HTML comments
     md.renderer.rules.html_comment = function(tokens, idx) {
         const token = tokens[idx];
         const content = token.content;
 
-        if (!showComments) {
-            // Hide comment completely (don't return HTML comment as it's invisible anyway)
+        if (commentMode === 'hidden') {
+            // Hide comment completely
             return '';
         }
 
-        // Return visible comment marker (escaped so it shows as text, not as HTML comment)
+        // Return visible comment marker (escaped so it shows as text)
         return `<span class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(content)}--&gt;</span>`;
     };
 
-    // Override default html_block renderer to handle comments
+    // Override default html_block renderer to handle comments and content
     const originalHtmlBlock = md.renderer.rules.html_block;
     md.renderer.rules.html_block = function(tokens, idx, options, env, self) {
         const token = tokens[idx];
@@ -342,15 +343,46 @@ function htmlCommentPlugin(md, options = {}) {
         if (content.trim().startsWith('<!--') && content.trim().endsWith('-->')) {
             const commentContent = content.trim().slice(4, -3).trim();
 
-            if (!showComments) {
+            if (commentMode === 'hidden') {
                 return '';
             }
 
             return `<div class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(commentContent)}--&gt;</div>`;
         }
 
-        // Not a comment, use original renderer
+        // Check if this is HTML content (not a comment, not a URL)
+        // HTML content starts with < but not <http or <https
+        const trimmedContent = content.trim();
+        const isHtmlContent = trimmedContent.startsWith('<') &&
+                              !trimmedContent.match(/^<https?:\/\//i);
+
+        if (isHtmlContent && contentMode === 'text') {
+            // Render HTML tags as visible text
+            return `<pre class="html-content-text">${escapeHtml(content)}</pre>`;
+        }
+
+        // Not a comment or should render as HTML, use original renderer
         return originalHtmlBlock ? originalHtmlBlock(tokens, idx, options, env, self) : content;
+    };
+
+    // Override default html_inline renderer for inline HTML content
+    const originalHtmlInline = md.renderer.rules.html_inline;
+    md.renderer.rules.html_inline = function(tokens, idx, options, env, self) {
+        const token = tokens[idx];
+        const content = token.content;
+
+        // Check if this is inline HTML content (not a URL)
+        const trimmedContent = content.trim();
+        const isHtmlContent = trimmedContent.startsWith('<') &&
+                              !trimmedContent.match(/^<https?:\/\//i);
+
+        if (isHtmlContent && contentMode === 'text') {
+            // Render HTML tags as visible text
+            return `<code class="html-content-text">${escapeHtml(content)}</code>`;
+        }
+
+        // Should render as HTML, use original renderer
+        return originalHtmlInline ? originalHtmlInline(tokens, idx, options, env, self) : content;
     };
 }
 
@@ -358,8 +390,9 @@ function renderMarkdown(text) {
     if (!text) {return '';}
 
     try {
-        // Get HTML comment visibility setting
-        const showHtmlComments = window.configManager?.getConfig('showHtmlComments', false) ?? false;
+        // Get HTML rendering settings
+        const htmlCommentRenderMode = window.configManager?.getConfig('htmlCommentRenderMode', 'hidden') ?? 'hidden';
+        const htmlContentRenderMode = window.configManager?.getConfig('htmlContentRenderMode', 'html') ?? 'html';
 
         // Initialize markdown-it with enhanced wiki links and tags plugins
         const md = window.markdownit({
@@ -377,8 +410,9 @@ function renderMarkdown(text) {
         .use(datePersonTagPlugin) // Add this line
         .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
         .use(htmlCommentPlugin, {
-            showComments: showHtmlComments
-        }); // HTML comment visibility
+            commentMode: htmlCommentRenderMode,
+            contentMode: htmlContentRenderMode
+        }); // HTML comment and content rendering
 
         // Add plugins that are available from CDN (CSP-compliant)
         if (typeof window.markdownitEmoji !== 'undefined') {
