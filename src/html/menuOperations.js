@@ -2671,11 +2671,36 @@ function updateTagChipStyle(button, tagName, isActive) {
 function markUnsavedChanges() {
     window.hasUnsavedChanges = true;
     updateRefreshButtonState('unsaved', 1);
-    
+
     // Always notify backend about unsaved changes state AND send the current cached board data
     if (typeof vscode !== 'undefined') {
         const boardToSend = window.cachedBoard || window.cachedBoard;
-        
+
+        console.log('[FRONTEND markUnsavedChanges] ===== SENDING TO BACKEND =====');
+        console.log('[FRONTEND markUnsavedChanges] boardToSend exists:', !!boardToSend);
+        if (boardToSend && boardToSend.columns) {
+            console.log('[FRONTEND markUnsavedChanges] columns:', boardToSend.columns.length);
+            // Log all include tasks
+            let includeTaskCount = 0;
+            boardToSend.columns.forEach((col, colIdx) => {
+                if (col.tasks) {
+                    col.tasks.forEach((task, taskIdx) => {
+                        if (task.includeMode) {
+                            includeTaskCount++;
+                            console.log(`[FRONTEND markUnsavedChanges] Column ${colIdx} Task ${taskIdx} (include):`, {
+                                title: task.title,
+                                displayTitle: task.displayTitle,
+                                descriptionLength: task.description ? task.description.length : 0,
+                                descriptionFirst50: task.description ? task.description.substring(0, 50) : '',
+                                includeFiles: task.includeFiles
+                            });
+                        }
+                    });
+                }
+            });
+            console.log('[FRONTEND markUnsavedChanges] Total include tasks:', includeTaskCount);
+        }
+
         vscode.postMessage({
             type: 'markUnsavedChanges',
             hasUnsavedChanges: true,

@@ -2604,11 +2604,21 @@ window.addEventListener('message', event => {
             break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
+            console.log('[FRONTEND updateColumnContent] ========================================');
+            console.log('[FRONTEND updateColumnContent] RECEIVED MESSAGE FROM BACKEND');
+            console.log('[FRONTEND updateColumnContent] columnId:', message.columnId);
+            console.log('[FRONTEND updateColumnContent] tasks count:', message.tasks ? message.tasks.length : 0);
+            if (message.tasks && message.tasks.length > 0) {
+                console.log('[FRONTEND updateColumnContent] First task title:', message.tasks[0].title ? message.tasks[0].title.substring(0, 100) : '');
+            }
+            console.log('[FRONTEND updateColumnContent] ========================================');
 
             // Update the column in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
+                    console.log('[FRONTEND updateColumnContent] Found column in cached board');
+                    console.log('[FRONTEND updateColumnContent] Column current tasks:', column.tasks ? column.tasks.length : 0);
 
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
@@ -2616,6 +2626,8 @@ window.addEventListener('message', event => {
                     column.displayTitle = message.displayTitle || column.displayTitle;
                     column.includeMode = message.includeMode;
                     column.includeFiles = message.includeFiles;
+
+                    console.log('[FRONTEND updateColumnContent] Column updated - new tasks count:', column.tasks.length);
 
 
                     // Re-render just this column
@@ -2647,6 +2659,11 @@ window.addEventListener('message', event => {
             break;
         case 'updateTaskContent':
             // Handle targeted task content update for include file changes
+            console.log('[FRONTEND updateTaskContent] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND updateTaskContent] taskId:', message.taskId);
+            console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
+            console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
+            console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2664,6 +2681,9 @@ window.addEventListener('message', event => {
                 }
 
                 if (foundTask && foundColumn) {
+                    console.log('[FRONTEND updateTaskContent] Found task in cachedBoard, updating...');
+                    console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+
                     // Update task metadata
                     foundTask.description = message.description || '';
                     foundTask.title = message.taskTitle || foundTask.title;
@@ -2671,6 +2691,9 @@ window.addEventListener('message', event => {
                     foundTask.includeMode = message.includeMode;
                     foundTask.includeFiles = message.includeFiles;
                     foundTask.originalTitle = message.originalTitle || foundTask.originalTitle;
+
+                    console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+                    console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
 
                     // Re-render just this column to reflect the task update

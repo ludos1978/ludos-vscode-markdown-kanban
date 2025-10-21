@@ -1027,22 +1027,42 @@ class TaskEditor {
                         if (task.includeMode) {
                             // For include tasks, check if displayTitle changed
                             wasChanged = (task.displayTitle || '') !== originalDisplayTitle;
+                            console.log('[TaskEditor] Include task title edit:', {
+                                wasChanged,
+                                newDisplayTitle: task.displayTitle,
+                                originalDisplayTitle,
+                                includeMode: task.includeMode
+                            });
                         } else {
                             // For regular tasks, check if title changed
                             wasChanged = (task.title || '') !== originalTitle;
                         }
                     } else if (type === 'task-description') {
                         wasChanged = (task.description || '') !== originalDescription;
+                        console.log('[TaskEditor] Task description edit:', {
+                            wasChanged,
+                            type,
+                            includeMode: task.includeMode,
+                            newDescription: task.description ? task.description.substring(0, 50) : '',
+                            originalDescription: originalDescription ? originalDescription.substring(0, 50) : ''
+                        });
                     }
 
+                    console.log('[TaskEditor] After edit check - wasChanged:', wasChanged, 'type:', type);
+
                     if (wasChanged) {
+                        console.log('[TaskEditor] Change detected! Calling markUnsavedChanges()');
                         if (typeof markUnsavedChanges === 'function') {
                             markUnsavedChanges();
+                        } else {
+                            console.error('[TaskEditor] markUnsavedChanges function not available!');
                         }
 
                         // Note: No need to send updateTaskInBackend message here
                         // The markUnsavedChanges() call above already sends the complete
                         // updated board data via the cachedBoard parameter
+                    } else {
+                        console.log('[TaskEditor] No change detected - NOT calling markUnsavedChanges()');
                     }
                     
                     if (this.currentEditor.displayElement) {

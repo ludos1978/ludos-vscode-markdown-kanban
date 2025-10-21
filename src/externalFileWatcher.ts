@@ -75,33 +75,49 @@ export class ExternalFileWatcher implements vscode.Disposable {
             id: 'external-file-watcher',
             handleSave: (document: vscode.TextDocument) => {
                 const documentPath = document.uri.fsPath;
+                console.log(`[ExternalFileWatcher.handleSave] ===== SAVE DETECTED =====`);
+                console.log(`[ExternalFileWatcher.handleSave] File saved: ${documentPath}`);
+                console.log(`[ExternalFileWatcher.handleSave] File listener enabled: ${this.fileListenerEnabled}`);
 
                 // Check if this document is in our watched files
                 const watchedFile = this.watchedFiles.get(documentPath);
+                console.log(`[ExternalFileWatcher.handleSave] Is in watched files: ${!!watchedFile}`);
+
                 if (watchedFile) {
+                    console.log(`[ExternalFileWatcher.handleSave] Watched file type: ${watchedFile.type}, panels: ${watchedFile.panels.size}`);
                     // Fire the change event immediately on save
+                    console.log(`[ExternalFileWatcher.handleSave] Calling handleFileChange('modified')`);
                     this.handleFileChange(documentPath, 'modified');
+                } else {
+                    console.log(`[ExternalFileWatcher.handleSave] File NOT in watched files - skipping`);
+                    console.log(`[ExternalFileWatcher.handleSave] Currently watched files:`, Array.from(this.watchedFiles.keys()));
                 }
             },
             isEnabled: () => this.fileListenerEnabled
         };
 
         coordinator.registerHandler(handler);
+        console.log(`[ExternalFileWatcher] Registered with SaveEventCoordinator with ID: 'external-file-watcher'`);
     }
 
     /**
      * Register a file for watching
      */
     public registerFile(path: string, type: FileType, panel: KanbanWebviewPanel): void {
+        console.log(`[ExternalFileWatcher.registerFile] ===== REGISTERING FILE FOR WATCHING =====`);
+        console.log(`[ExternalFileWatcher.registerFile] Path: ${path}`);
+        console.log(`[ExternalFileWatcher.registerFile] Type: ${type}`);
 
         // Check if this file is already being watched
         let watchedFile = this.watchedFiles.get(path);
 
         if (watchedFile) {
             // File already watched, just add this panel to the set
+            console.log(`[ExternalFileWatcher.registerFile] File already watched, adding panel (total panels: ${watchedFile.panels.size + 1})`);
             watchedFile.panels.add(panel);
         } else {
             // New file to watch
+            console.log(`[ExternalFileWatcher.registerFile] NEW file to watch, creating watcher`);
             watchedFile = {
                 path,
                 type,
@@ -112,6 +128,9 @@ export class ExternalFileWatcher implements vscode.Disposable {
             // Create the actual file system watcher
             this.createWatcher(path, type);
         }
+
+        console.log(`[ExternalFileWatcher.registerFile] Total watched files: ${this.watchedFiles.size}`);
+        console.log(`[ExternalFileWatcher.registerFile] All watched paths:`, Array.from(this.watchedFiles.keys()));
     }
 
     /**
@@ -241,8 +260,14 @@ export class ExternalFileWatcher implements vscode.Disposable {
      * Handle a file change event
      */
     private async handleFileChange(path: string, changeType: FileChangeType): Promise<void> {
+        console.log(`[ExternalFileWatcher.handleFileChange] Path: ${path}, Type: ${changeType}`);
         const watchedFile = this.watchedFiles.get(path);
-        if (!watchedFile) {return;}
+        if (!watchedFile) {
+            console.log(`[ExternalFileWatcher.handleFileChange] File not in watched list: ${path}`);
+            return;
+        }
+
+        console.log(`[ExternalFileWatcher.handleFileChange] File type: ${watchedFile.type}, Panels: ${watchedFile.panels.size}`);
 
         // Update FileStateManager with backend changes
         const fileStateManager = getFileStateManager();
@@ -250,6 +275,7 @@ export class ExternalFileWatcher implements vscode.Disposable {
         if (changeType === 'modified') {
             // Mark file system change in the unified state manager
             fileStateManager.markFileSystemChange(path);
+            console.log(`[ExternalFileWatcher.handleFileChange] Marked as file system change in FileStateManager`);
         }
 
         // Convert Set to Array for the event
@@ -263,7 +289,10 @@ export class ExternalFileWatcher implements vscode.Disposable {
             return !isUpdating;
         });
 
-        if (panelsToNotify.length === 0) {return;}
+        if (panelsToNotify.length === 0) {
+            console.log(`[ExternalFileWatcher.handleFileChange] No panels to notify (all updating)`);
+            return;
+        }
 
         // Emit the change event
         const event: FileChangeEvent = {
@@ -273,7 +302,7 @@ export class ExternalFileWatcher implements vscode.Disposable {
             panels: panelsToNotify
         };
 
-
+        console.log(`[ExternalFileWatcher.handleFileChange] Firing event to ${panelsToNotify.length} panels`);
         this._onFileChanged.fire(event);
     }
 

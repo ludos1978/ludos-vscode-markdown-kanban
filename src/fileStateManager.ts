@@ -3,6 +3,27 @@
  *
  * This module provides a single source of truth for all file state tracking,
  * clearly separating backend (file system) changes from frontend (Kanban UI) changes.
+ *
+ * ===== SPECIFICATION (ONLY CORRECT BEHAVIOR) =====
+ *
+ * When to show conflict dialog vs auto-reload:
+ *
+ * SHOW DIALOG when:
+ *   - External file modified AND (has unsaved changes OR is in edit mode)
+ *
+ * AUTO-RELOAD when:
+ *   - External file modified AND NOT has unsaved changes AND NOT in edit mode
+ *
+ * File Types:
+ *   - 'main': Main kanban markdown file
+ *   - 'include-column': Column include (!!!columninclude) - can be edited
+ *   - 'include-task': Task include (!!!taskinclude) - can be edited
+ *   - 'include-regular': Regular include (!!!include) - ALWAYS auto-reload (cannot be edited)
+ *
+ * NOTE: Edit mode tracking not yet implemented
+ * TODO: Add isInEditMode field to FileState.frontend
+ *
+ * =================================================
  */
 
 import * as vscode from 'vscode';
@@ -31,12 +52,13 @@ export interface FileState {
         hasUnsavedChanges: boolean;    // Kanban UI has modifications
         content: string;                // Current content in Kanban
         baseline: string;               // Last known saved content
+        isInEditMode: boolean;          // User is actively editing (cursor in task/column editor)
     };
 
     // Computed state
-    needsReload: boolean;              // Backend changes need to be loaded into frontend
+    needsReload: boolean;              // Backend changes need to be loaded into frontend (if not editing and no unsaved changes)
     needsSave: boolean;                // Frontend changes need to be saved to backend
-    hasConflict: boolean;              // Both backend and frontend have changes
+    hasConflict: boolean;              // Both backend and frontend have changes (or user is editing while backend changed)
 }
 
 /**
@@ -83,7 +105,8 @@ export class FileStateManager {
                 frontend: {
                     hasUnsavedChanges: false,
                     content: initialContent || '',
-                    baseline: initialContent || ''
+                    baseline: initialContent || '',
+                    isInEditMode: false
                 },
                 needsReload: false,
                 needsSave: false,
@@ -160,23 +183,62 @@ export class FileStateManager {
             state.frontend.baseline = newContent;
             state.frontend.hasUnsavedChanges = false;
             this.updateComputedState(state);
-            console.log(`[FileStateManager] File reloaded: ${path}`);
+            console.log(`[FileStateManager.markReloaded] ========================================`);
+            console.log(`[FileStateManager.markReloaded] Path: ${path}`);
+            console.log(`[FileStateManager.markReloaded] New baseline (first 100 chars): "${newContent.substring(0, 100)}"`);
+            console.log(`[FileStateManager.markReloaded] Baseline length: ${newContent.length}`);
+            console.log(`[FileStateManager.markReloaded] hasUnsavedChanges cleared to: false`);
         }
     }
 
     /**
+     * Mark file as being in edit mode (user has cursor in task/column editor)
+     */
+    public markEditModeStart(path: string): void {
+        const state = this.fileStates.get(path);
+        if (state) {
+            state.frontend.isInEditMode = true;
+            this.updateComputedState(state);
+            console.log(`[FileStateManager.markEditModeStart] Edit mode started for: ${path}`);
+        }
+    }
+
+    /**
+     * Mark file as no longer being in edit mode
+     */
+    public markEditModeEnd(path: string): void {
+        const state = this.fileStates.get(path);
+        if (state) {
+            state.frontend.isInEditMode = false;
+            this.updateComputedState(state);
+            console.log(`[FileStateManager.markEditModeEnd] Edit mode ended for: ${path}`);
+        }
+    }
+
+    /**
+     * Check if file is in edit mode
+     */
+    public isInEditMode(path: string): boolean {
+        const state = this.fileStates.get(path);
+        return state?.frontend.isInEditMode ?? false;
+    }
+
+    /**
      * Update computed state based on backend and frontend states
+     *
+     * SPEC REQUIREMENT: Auto-reload ONLY if no unsaved changes AND not in edit mode
      */
     private updateComputedState(state: FileState): void {
-        // Need to reload if backend has changes but frontend doesn't
+        // Need to reload if backend has changes but frontend doesn't AND not in edit mode
         state.needsReload = (state.backend.hasFileSystemChanges || state.backend.isDirtyInEditor)
-                          && !state.frontend.hasUnsavedChanges;
+                          && !state.frontend.hasUnsavedChanges
+                          && !state.frontend.isInEditMode;
 
         // Need to save if frontend has changes
         state.needsSave = state.frontend.hasUnsavedChanges;
 
-        // Has conflict if both have changes
-        state.hasConflict = state.frontend.hasUnsavedChanges
+        // Has conflict if both have changes OR user is editing while backend changed
+        state.hasConflict = (state.frontend.hasUnsavedChanges || state.frontend.isInEditMode)
                          && (state.backend.hasFileSystemChanges || state.backend.isDirtyInEditor);
     }
 

@@ -14,6 +14,7 @@ export interface ConflictContext {
     hasExternalChanges?: boolean;
     changedIncludeFiles: string[];
     isClosing?: boolean;
+    isInEditMode?: boolean;  // User is actively editing (cursor in editor)
 }
 
 export interface ConflictResolution {
@@ -29,6 +30,30 @@ export interface ConflictResolution {
 /**
  * Centralized conflict resolution system that handles all file change protection scenarios
  * with consistent dialogs and unified logic to prevent multiple dialog appearances.
+ *
+ * ===== SPECIFICATION (ONLY CORRECT BEHAVIOR) =====
+ *
+ * For Main Kanban File AND Each columninclude/taskinclude File INDIVIDUALLY:
+ *
+ * 1. External file modified + Kanban has unsaved changes OR is in edit mode:
+ *    → SHOW CONFLICT DIALOG with 4 options:
+ *      a) Ignore external changes (DEFAULT/ESC) - nothing happens, kanban keeps changes
+ *      b) Overwrite external file - save kanban contents to file (becomes unedited state)
+ *      c) Save as backup + reload - kanban saved to backup, external changes loaded
+ *      d) Discard + reload - discard kanban changes, reload from external
+ *
+ * 2. External file modified + Kanban has NO unsaved changes AND is NOT in edit mode:
+ *    → AUTO-RELOAD IMMEDIATELY (no dialog)
+ *
+ * 3. Kanban modified and saved + External file has unsaved changes (later saved):
+ *    → Rely on VSCode's default change detection
+ *
+ * For Regular Include Files (!!!include - NOT columninclude/taskinclude):
+ *    → ALWAYS auto-reload on external modification (cannot be edited internally)
+ *
+ * NOTE: Edit mode tracking not yet implemented - currently only checks unsaved changes
+ *
+ * =================================================
  */
 export class ConflictResolver {
     private static instance: ConflictResolver | undefined;
@@ -184,12 +209,30 @@ export class ConflictResolver {
 
     /**
      * External main file change dialog
+     *
+     * SPEC REQUIREMENT: Should auto-reload if no unsaved changes AND not in edit mode (without showing dialog)
+     * NOTE: Edit mode tracking not yet implemented, so we still show dialog for now
      */
     private async showExternalMainFileDialog(context: ConflictContext): Promise<ConflictResolution> {
         const hasAnyUnsavedChanges = context.hasMainUnsavedChanges || context.hasIncludeUnsavedChanges;
+        const isInEditMode = context.isInEditMode || false;
 
-        if (!hasAnyUnsavedChanges) {
-            // No unsaved changes - simple reload option
+        // SPEC: Auto-reload if no unsaved changes AND not in edit mode (no dialog)
+        if (!hasAnyUnsavedChanges && !isInEditMode) {
+            // Auto-reload immediately without showing dialog
+            return {
+                action: 'discard_local',
+                shouldProceed: true,
+                shouldCreateBackup: false,
+                shouldSave: false,
+                shouldReload: true,
+                shouldIgnore: false
+            };
+        }
+
+        // Has unsaved changes OR in edit mode - show dialog
+        if (!hasAnyUnsavedChanges && isInEditMode) {
+            // In edit mode but no unsaved changes - simplified options
             const reloadFromFile = 'Reload from file';
             const ignoreExternalChanges = 'Ignore external changes';
 
@@ -302,12 +345,28 @@ export class ConflictResolver {
 
     /**
      * External include file change dialog
+     *
+     * SPEC REQUIREMENT:
+     * - Regular includes (!!!include): ALWAYS auto-reload (no dialog) - cannot be edited internally
+     * - Column/Task includes (!!!columninclude/!!!taskinclude):
+     *   - Auto-reload if: no unsaved changes AND not in edit mode
+     *   - Show dialog if: has unsaved changes OR is in edit mode
+     *
+     * NOTE: Edit mode tracking not yet implemented, so currently only checks unsaved changes
      */
     private async showExternalIncludeFileDialog(context: ConflictContext): Promise<ConflictResolution> {
         const hasIncludeChanges = context.hasIncludeUnsavedChanges;
         const hasExternalChanges = context.hasExternalChanges ?? true; // Default to true for safety
+        const isInEditMode = context.isInEditMode || false;
+
+        console.log('[ConflictResolver.showExternalIncludeFileDialog] ENTRY:', JSON.stringify({
+            hasIncludeChanges,
+            hasExternalChanges,
+            isInEditMode
+        }));
 
         if (!hasIncludeChanges && !hasExternalChanges) {
+            console.log('[ConflictResolver] Case: No changes - returning ignore');
             // No unsaved changes and no external changes - nothing to do
             return {
                 action: 'ignore',
@@ -319,8 +378,10 @@ export class ConflictResolver {
             };
         }
 
-        if (!hasIncludeChanges && hasExternalChanges) {
-            // External changes but no internal changes - simple reload
+        // SPEC: Auto-reload if no unsaved changes AND not in edit mode AND has external changes
+        if (!hasIncludeChanges && !isInEditMode && hasExternalChanges) {
+            console.log('[ConflictResolver] Case: Auto-reload (no unsaved, not in edit mode) - returning discard_local');
+            // External changes but no internal changes and not in edit mode - auto-reload immediately
             return {
                 action: 'discard_local',
                 shouldProceed: true,
@@ -331,7 +392,9 @@ export class ConflictResolver {
             };
         }
 
-        // Has unsaved include file changes - show conflict dialog per specification
+        console.log('[ConflictResolver] Case: Should show dialog - hasIncludeChanges OR isInEditMode');
+
+        // Has unsaved include file changes OR is in edit mode - show conflict dialog per specification
         // Option order matches specification with "ignore external changes" as default
         const ignoreExternal = 'Ignore external changes (default)';
         const overwriteExternal = 'Overwrite external file with kanban contents';

@@ -208,8 +208,36 @@ export class MessageHandler {
             case 'selectFile':
                 await this.handleSelectFile();
                 break;
+            case 'editModeStart':
+                // User started editing (cursor entered task/column editor)
+                await this.handleEditModeStart(message);
+                break;
+            case 'editModeEnd':
+                // User stopped editing (cursor left task/column editor)
+                await this.handleEditModeEnd(message);
+                break;
             case 'markUnsavedChanges':
                 // Track unsaved changes at panel level and update cached board if provided
+                console.log('[MessageHandler.markUnsavedChanges] ENTRY - hasChanges:', message.hasUnsavedChanges, 'hasCachedBoard:', !!message.cachedBoard);
+                if (message.cachedBoard) {
+                    console.log('[MessageHandler.markUnsavedChanges] cachedBoard columns:', message.cachedBoard.columns?.length);
+                    // Check if any tasks have includeMode
+                    let includeTaskCount = 0;
+                    message.cachedBoard.columns?.forEach((col: any) => {
+                        col.tasks?.forEach((task: any) => {
+                            if (task.includeMode) {
+                                includeTaskCount++;
+                                console.log('[MessageHandler.markUnsavedChanges] Include task found:', {
+                                    title: task.title,
+                                    displayTitle: task.displayTitle,
+                                    descriptionLength: task.description?.length || 0,
+                                    includeFiles: task.includeFiles
+                                });
+                            }
+                        });
+                    });
+                    console.log('[MessageHandler.markUnsavedChanges] Total include tasks:', includeTaskCount);
+                }
                 this._markUnsavedChanges(message.hasUnsavedChanges, message.cachedBoard);
                 break;
             case 'saveUndoState':
@@ -826,6 +854,64 @@ export class MessageHandler {
         if (document) {
             // This would need to be handled by the main panel
         }
+    }
+
+    /**
+     * Handle edit mode start message from frontend
+     */
+    private async handleEditModeStart(message: any) {
+        const filePath = message.filePath;
+        const fileType = message.fileType;
+
+        console.log(`[MessageHandler.handleEditModeStart] filePath: ${filePath}, fileType: ${fileType}`);
+
+        // Resolve to absolute path
+        const currentDocument = this._fileManager.getDocument();
+        if (!currentDocument) {
+            console.warn('[MessageHandler.handleEditModeStart] No current document');
+            return;
+        }
+
+        let absolutePath: string;
+        if (fileType === 'main') {
+            absolutePath = currentDocument.uri.fsPath;
+        } else {
+            // For includes, filePath is relative - resolve it
+            const basePath = path.dirname(currentDocument.uri.fsPath);
+            absolutePath = path.resolve(basePath, filePath);
+        }
+
+        // Mark edit mode start in FileStateManager
+        getFileStateManager().markEditModeStart(absolutePath);
+    }
+
+    /**
+     * Handle edit mode end message from frontend
+     */
+    private async handleEditModeEnd(message: any) {
+        const filePath = message.filePath;
+        const fileType = message.fileType;
+
+        console.log(`[MessageHandler.handleEditModeEnd] filePath: ${filePath}, fileType: ${fileType}`);
+
+        // Resolve to absolute path
+        const currentDocument = this._fileManager.getDocument();
+        if (!currentDocument) {
+            console.warn('[MessageHandler.handleEditModeEnd] No current document');
+            return;
+        }
+
+        let absolutePath: string;
+        if (fileType === 'main') {
+            absolutePath = currentDocument.uri.fsPath;
+        } else {
+            // For includes, filePath is relative - resolve it
+            const basePath = path.dirname(currentDocument.uri.fsPath);
+            absolutePath = path.resolve(basePath, filePath);
+        }
+
+        // Mark edit mode end in FileStateManager
+        getFileStateManager().markEditModeEnd(absolutePath);
     }
 
     /**
