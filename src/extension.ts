@@ -1,14 +1,10 @@
 import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
-import { ExternalFileWatcher } from './externalFileWatcher';
 import { configService } from './configurationService';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('[Kanban Extension] Activating markdown-kanban-obsidian extension...');
 	let fileListenerEnabled = true;
-
-	// Initialize the centralized file watcher
-	const fileWatcher = ExternalFileWatcher.getInstance();
 
 	// Function to get file listener status
 	const getFileListenerStatus = () => {
@@ -18,7 +14,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// Function to toggle file listener
 	const setFileListenerStatus = (enabled: boolean) => {
 		fileListenerEnabled = enabled;
-		fileWatcher.setFileListenerEnabled(enabled);
 		const status = fileListenerEnabled ? 'enabled' : 'disabled';
 		vscode.window.showInformationMessage(`Kanban auto-switching ${status}`);
 	};
@@ -28,51 +23,6 @@ export function activate(context: vscode.ExtensionContext) {
 		getStatus: getFileListenerStatus,
 		setStatus: setFileListenerStatus
 	};
-
-	// Listen for file change events from the centralized watcher
-	const fileChangeListener = fileWatcher.onFileChanged(async (event) => {
-		for (const panel of event.panels) {
-			if (event.fileType === 'main') {
-				// Notify the MainKanbanFile instance about the external change
-				const mainFile = panel.fileRegistry.getMainFile();
-				if (mainFile) {
-					await mainFile.handleExternalChange(event.changeType);
-
-					// If file was reloaded (no longer has file system changes), update the UI
-					if (!mainFile.hasExternalChanges() && event.changeType !== 'deleted') {
-						const document = vscode.workspace.textDocuments.find(doc =>
-							doc.uri.toString() === vscode.Uri.file(event.path).toString()
-						);
-						if (document) {
-							await panel.loadMarkdownFile(document, false);
-						}
-					}
-				}
-			} else if (event.fileType === 'include') {
-				// Notify the include file instance about the external change
-				const includeFile = panel.fileRegistry.get(event.path);
-				if (includeFile) {
-					await includeFile.handleExternalChange(event.changeType);
-
-					// If file was reloaded, refresh the board to show new content
-					if (!includeFile.hasExternalChanges() && event.changeType !== 'deleted') {
-						// Find the main file's document to trigger a reload
-						const mainFile = panel.fileRegistry.getMainFile();
-						if (mainFile) {
-							const document = vscode.workspace.textDocuments.find(doc =>
-								doc.uri.fsPath === mainFile.getPath()
-							);
-							if (document) {
-								await panel.loadMarkdownFile(document, false);
-							}
-						}
-					}
-				}
-			}
-		}
-	});
-
-	context.subscriptions.push(fileChangeListener);
 
 	// Register onWillSaveTextDocument to sync board changes before save
 	const willSaveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
@@ -296,8 +246,7 @@ export function activate(context: vscode.ExtensionContext) {
 		activePanel.triggerSnippetInsertion();
 	});
 
-	// Note: External file change detection is now handled by ExternalFileWatcher
-	// Document save events are also handled through the file watcher system
+	// Note: External file change detection is handled by MarkdownFile instances via their built-in watchers
 
 	// Listen for active editor changes
 	const activeEditorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -358,9 +307,6 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(configChangeListener);
-
-	// Clean up file watcher on disposal
-	context.subscriptions.push(fileWatcher);
 
 	// If current active editor is markdown, auto-activate kanban
 	if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId === 'markdown') {

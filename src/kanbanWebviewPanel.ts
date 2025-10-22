@@ -10,7 +10,6 @@ import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './backupManager';
-import { ExternalFileWatcher } from './externalFileWatcher';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
 import { configService, ConfigurationService } from './configurationService';
 import { PathResolver } from './services/PathResolver';
@@ -78,7 +77,6 @@ export class KanbanWebviewPanel {
 
     // Unified include file tracking system - single source of truth
     private _recentlyReloadedFiles: Set<string> = new Set(); // Track files that were just reloaded from external
-    private _fileWatcher: ExternalFileWatcher;
     private _conflictResolver: ConflictResolver;
 
     // Method to force refresh webview content (useful during development)
@@ -330,9 +328,6 @@ export class KanbanWebviewPanel {
             () => this._cachedBoardFromWebview
         );
 
-        // Get the file watcher instance (needed before KanbanFileService)
-        this._fileWatcher = ExternalFileWatcher.getInstance();
-
         // Initialize ConflictService
         this._conflictService = new ConflictService(
             this._fileRegistry,
@@ -353,7 +348,6 @@ export class KanbanWebviewPanel {
             this._includeFileManager,
             this._backupManager,
             this._boardOperations,
-            this._fileWatcher,
             () => this._board,
             (board) => { this._board = board; },
             (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
@@ -378,20 +372,6 @@ export class KanbanWebviewPanel {
             this._fileManager,
             this._panel.webview,
             this.handleLinkReplacement.bind(this)
-        );
-
-        // Subscribe to file change events
-        this._disposables.push(
-            this._fileWatcher.onFileChanged((event) =>
-                this._includeFileManager.handleExternalFileChange(
-                    event,
-                    (filePath, changeType) => this._conflictService.handleInlineIncludeFileChange(
-                        filePath,
-                        changeType,
-                        () => this.sendBoardUpdate(false, true)
-                    )
-                )
-            )
         );
 
         // Set up document change listener to track external unsaved modifications
@@ -1627,9 +1607,6 @@ export class KanbanWebviewPanel {
             this._unsavedChangesCheckInterval = undefined;
         }
 
-        // Unregister from external file watcher
-        this._fileWatcher.unregisterPanel(this);
-
         // Remove from panels map using the tracked URI (which persists even after document is closed)
         if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
             KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
@@ -1790,9 +1767,6 @@ export class KanbanWebviewPanel {
 
         // Update the column with the loaded tasks
         column.tasks = allTasks;
-
-        // Update the file watcher
-        this._fileWatcher.updateIncludeFiles(this, this._includeFileManager.getAllIncludeFilePaths());
     }
 
     public async loadNewTaskIncludeContent(task: KanbanTask, newIncludeFiles: string[]): Promise<void> {

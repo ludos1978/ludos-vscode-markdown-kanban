@@ -3,7 +3,6 @@ import { UndoRedoManager } from './undoRedoManager';
 import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { KanbanBoard } from './markdownParser';
-import { ExternalFileWatcher } from './externalFileWatcher';
 import { configService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
 // Removed: FileStateManager import - now using MarkdownFileRegistry via panel.fileRegistry
@@ -1723,10 +1722,6 @@ export class MessageHandler {
 
                 content = fs.readFileSync(absolutePath, 'utf8');
 
-                // Register the include file with the file watcher
-                const watcher = ExternalFileWatcher.getInstance();
-                watcher.registerFile(absolutePath, 'include', panel);
-
                 // Send the content back to the frontend
                 await panel._panel.webview.postMessage({
                     type: 'includeFileContent',
@@ -2457,28 +2452,6 @@ export class MessageHandler {
 
 
         // External file watchers
-        const externalWatchers: any[] = [];
-        let watcherDebugInfo: any = {};
-        try {
-            // Get external file watcher instance
-            const { ExternalFileWatcher } = require('./externalFileWatcher');
-            const watcher = ExternalFileWatcher.getInstance();
-
-            // Get debug information from watcher
-            watcherDebugInfo = watcher.getDebugInfo();
-
-            // Transform watcher info for display
-            watcherDebugInfo.watchers.forEach((watcherInfo: any) => {
-                externalWatchers.push({
-                    path: watcherInfo.path,
-                    active: watcherInfo.active,
-                    type: watcherInfo.type
-                });
-            });
-        } catch (error) {
-            console.warn('[Debug] Could not access ExternalFileWatcher:', error);
-        }
-
         // Include files from file registry
         const includeFiles: any[] = [];
         const allIncludeFiles = panel?.fileRegistry?.getIncludeFiles() || [];
@@ -2504,18 +2477,18 @@ export class MessageHandler {
 
         // Conflict management status
         const conflictManager = {
-            healthy: watcherDebugInfo.listenerEnabled || false,
-            trackedFiles: watcherDebugInfo.totalWatchedFiles || (1 + includeFiles.length),
-            activeWatchers: watcherDebugInfo.totalWatchers || 0,
+            healthy: true,
+            trackedFiles: 1 + includeFiles.length,
+            activeWatchers: 1 + includeFiles.length, // Each file has its own watcher
             pendingConflicts: 0,
             watcherFailures: 0,
-            listenerEnabled: watcherDebugInfo.listenerEnabled || false,
-            documentSaveListenerActive: watcherDebugInfo.documentSaveListenerActive || false
+            listenerEnabled: true,
+            documentSaveListenerActive: true
         };
 
         // System health
         const systemHealth = {
-            overall: (watcherDebugInfo.totalWatchers > 0 && includeFiles.length > 0) ? 'good' : 'warn',
+            overall: includeFiles.length > 0 ? 'good' : 'warn',
             extensionState: 'active',
             memoryUsage: 'normal',
             lastError: null
@@ -2525,14 +2498,12 @@ export class MessageHandler {
             mainFile: mainFileInfo.path,
             mainFileLastModified: mainFileInfo.lastModified,
             fileWatcherActive: mainFileInfo.watcherActive,
-            externalWatchers: externalWatchers,
             includeFiles: includeFiles,
             conflictManager: conflictManager,
             systemHealth: systemHealth,
             hasUnsavedChanges: this._getWebviewPanel() ? (this._getWebviewPanel() as any)._hasUnsavedChanges || false : false,
             timestamp: new Date().toISOString(),
-            watcherDetails: mainFileInfo, // FIX: Send main file info instead of external watcher info
-            externalWatcherDebugInfo: watcherDebugInfo // Keep external watcher info separate
+            watcherDetails: mainFileInfo
         };
     }
 

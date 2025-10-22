@@ -8,7 +8,6 @@ import { BackupManager } from './backupManager';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
 import { BoardOperations } from './boardOperations';
-import { ExternalFileWatcher } from './externalFileWatcher';
 
 /**
  * KanbanFileService
@@ -36,7 +35,6 @@ export class KanbanFileService {
         private includeFileManager: IncludeFileManager,
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
-        private fileWatcher: ExternalFileWatcher,
         private board: () => KanbanBoard | undefined,
         private setBoard: (board: KanbanBoard) => void,
         private sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>,
@@ -159,10 +157,6 @@ export class KanbanFileService {
                 // Initialize content for new files only (preserve existing baselines)
                 await this.includeFileManager._initializeUnifiedIncludeContents(() => this.fileManager.getDocument());
 
-                // Register all include files with the file watcher
-                const allIncludePaths = this.includeFileManager.getAllIncludeFilePaths();
-                this.fileWatcher.updateIncludeFiles(this.getPanelInstance(), allIncludePaths);
-
                 // ALWAYS re-check for changes after reload
                 // This will detect any changes between the preserved baseline and current state
                 await this.includeFileManager._recheckIncludeFileChanges();
@@ -272,10 +266,6 @@ export class KanbanFileService {
             const panelInstance = this.getPanelInstance();
             if (oldDocUri && this.panels.get(oldDocUri) === panelInstance) {
                 this.panels.delete(oldDocUri);
-                // Unregister the old main file from the watcher if we have a previous document
-                if (previousDocument) {
-                    this.fileWatcher.unregisterFile(previousDocument.uri.fsPath, panelInstance);
-                }
             }
 
             // Add to new document tracking
@@ -289,9 +279,6 @@ export class KanbanFileService {
             if (currentPanel) {
                 currentPanel.title = `Kanban: ${fileName}`;
             }
-
-            // Register the new main file with the external file watcher
-            this.fileWatcher.registerFile(document.uri.fsPath, 'main', panelInstance);
         }
 
         this.fileManager.setDocument(document);
@@ -340,10 +327,6 @@ export class KanbanFileService {
 
             // Initialize content for new files only (preserve existing baselines)
             await this.includeFileManager._initializeUnifiedIncludeContents(() => this.fileManager.getDocument());
-
-            // Register all include files with the file watcher
-            const allIncludePaths = this.includeFileManager.getAllIncludeFilePaths();
-            this.fileWatcher.updateIncludeFiles(this.getPanelInstance(), allIncludePaths);
 
             // Always send notification to update tracked files list
 
