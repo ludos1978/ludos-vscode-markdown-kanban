@@ -1660,11 +1660,84 @@ export class MessageHandler {
                 return;
             }
 
-            // Set the updated board
+            // CRITICAL: Check for unsaved changes in include files BEFORE updating the board
+            const panel = this._getWebviewPanel();
+            const oldBoard = this._getCurrentBoard();
+
+            if (oldBoard && panel) {
+                // Check column includes
+                for (let i = 0; i < board.columns.length && i < oldBoard.columns.length; i++) {
+                    const newCol = board.columns[i];
+                    const oldCol = oldBoard.columns[i];
+
+                    const oldIncludeFiles = oldCol.includeFiles || [];
+                    const newIncludeFiles = newCol.includeFiles || [];
+                    const removedFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
+
+                    for (const removedPath of removedFiles) {
+                        const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
+                        if (oldFile && oldFile.hasUnsavedChanges()) {
+                            console.log(`[handleUpdateBoard] Column include file being removed has unsaved changes: ${removedPath}`);
+
+                            const choice = await vscode.window.showWarningMessage(
+                                `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
+                                { modal: true },
+                                'Save and Continue',
+                                'Discard and Continue',
+                                'Cancel'
+                            );
+
+                            if (choice === 'Save and Continue') {
+                                await oldFile.save();
+                            } else if (choice === 'Discard and Continue') {
+                                oldFile.discardChanges();
+                            } else {
+                                console.log('[handleUpdateBoard] User cancelled - aborting board update');
+                                return; // Cancel the entire update
+                            }
+                        }
+                    }
+
+                    // Check task includes within this column
+                    for (const newTask of newCol.tasks) {
+                        const oldTask = oldCol.tasks.find((t: any) => t.id === newTask.id);
+                        if (oldTask) {
+                            const oldTaskIncludes = oldTask.includeFiles || [];
+                            const newTaskIncludes = newTask.includeFiles || [];
+                            const removedTaskFiles = oldTaskIncludes.filter((oldPath: string) => !newTaskIncludes.includes(oldPath));
+
+                            for (const removedPath of removedTaskFiles) {
+                                const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
+                                if (oldFile && oldFile.hasUnsavedChanges()) {
+                                    console.log(`[handleUpdateBoard] Task include file being removed has unsaved changes: ${removedPath}`);
+
+                                    const choice = await vscode.window.showWarningMessage(
+                                        `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
+                                        { modal: true },
+                                        'Save and Continue',
+                                        'Discard and Continue',
+                                        'Cancel'
+                                    );
+
+                                    if (choice === 'Save and Continue') {
+                                        await oldFile.save();
+                                    } else if (choice === 'Discard and Continue') {
+                                        oldFile.discardChanges();
+                                    } else {
+                                        console.log('[handleUpdateBoard] User cancelled - aborting board update');
+                                        return; // Cancel the entire update
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Set the updated board (now that we've handled unsaved changes)
             this._setBoard(board);
 
             // Sync include files with registry to create any new include file instances
-            const panel = this._getWebviewPanel();
             if (panel && panel.syncIncludeFilesWithBoard) {
                 panel.syncIncludeFilesWithBoard(board);
             }
@@ -2015,11 +2088,30 @@ export class MessageHandler {
             const { columnId, newFilePath, oldFilePath, newTitle } = message;
             console.log(`[switchColumnIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for column ${columnId}`);
 
-            // 1. Save old include file if it has unsaved changes
+            // 1. Check if old include file has unsaved changes and prompt user
             const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
             if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log('[switchColumnIncludeFile] Saving old file with unsaved changes');
-                await oldFile.save();
+                console.log('[switchColumnIncludeFile] Old file has unsaved changes, prompting user');
+
+                const choice = await vscode.window.showWarningMessage(
+                    `The include file "${oldFilePath}" has unsaved changes. What would you like to do?`,
+                    { modal: true },
+                    'Save and Switch',
+                    'Discard and Switch',
+                    'Cancel'
+                );
+
+                if (choice === 'Save and Switch') {
+                    console.log('[switchColumnIncludeFile] User chose to save and switch');
+                    await oldFile.save();
+                } else if (choice === 'Discard and Switch') {
+                    console.log('[switchColumnIncludeFile] User chose to discard changes and switch');
+                    oldFile.discardChanges();
+                } else {
+                    // Cancel or closed dialog
+                    console.log('[switchColumnIncludeFile] User cancelled switch');
+                    return;
+                }
             }
 
             // 2. Update board with new include path
@@ -2094,11 +2186,30 @@ export class MessageHandler {
             const { taskId, columnId, newFilePath, oldFilePath, newTitle } = message;
             console.log(`[switchTaskIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for task ${taskId}`);
 
-            // 1. Save old include file if it has unsaved changes
+            // 1. Check if old include file has unsaved changes and prompt user
             const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
             if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log('[switchTaskIncludeFile] Saving old file with unsaved changes');
-                await oldFile.save();
+                console.log('[switchTaskIncludeFile] Old file has unsaved changes, prompting user');
+
+                const choice = await vscode.window.showWarningMessage(
+                    `The include file "${oldFilePath}" has unsaved changes. What would you like to do?`,
+                    { modal: true },
+                    'Save and Switch',
+                    'Discard and Switch',
+                    'Cancel'
+                );
+
+                if (choice === 'Save and Switch') {
+                    console.log('[switchTaskIncludeFile] User chose to save and switch');
+                    await oldFile.save();
+                } else if (choice === 'Discard and Switch') {
+                    console.log('[switchTaskIncludeFile] User chose to discard changes and switch');
+                    oldFile.discardChanges();
+                } else {
+                    // Cancel or closed dialog
+                    console.log('[switchTaskIncludeFile] User cancelled switch');
+                    return;
+                }
             }
 
             // 2. Update board with new include path
