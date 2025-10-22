@@ -36,3 +36,6 @@ export { RegularIncludeFile } from './RegularIncludeFile';
 // Registry and factory
 export { MarkdownFileRegistry } from './MarkdownFileRegistry';
 export { FileFactory } from './FileFactory';
+
+// FileState interface for compatibility
+export { FileState } from '../fileStateManager';

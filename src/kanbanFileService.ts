@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
-import { FileStateManager, getFileStateManager } from './fileStateManager';
+import { MarkdownFileRegistry } from './files';
 import { IncludeFileManager } from './includeFileManager';
 import { BackupManager } from './backupManager';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
@@ -32,7 +32,7 @@ export class KanbanFileService {
 
     constructor(
         private fileManager: FileManager,
-        private fileStateManager: FileStateManager,
+        private fileRegistry: MarkdownFileRegistry,
         private includeFileManager: IncludeFileManager,
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
@@ -143,12 +143,12 @@ export class KanbanFileService {
                     const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath);
                     this.setBoard(parseResult.board);
                     // Update the unified include system
-                    this.includeFileManager._updateUnifiedIncludeSystem(parseResult.includedFiles, parseResult.columnIncludeFiles, parseResult.taskIncludeFiles || [], () => this.fileManager.getDocument());
+                    this.includeFileManager._updateUnifiedIncludeSystem(parseResult.board, () => this.fileManager.getDocument());
                 }
 
                 // Register included files with the external file watcher
                 // Preserve existing change state
-                const preservedChangeState = getFileStateManager().hasUnsavedIncludeFiles();
+                const preservedChangeState = this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main");
 
 
                 // Initialize content for new files only (preserve existing baselines)
@@ -160,17 +160,17 @@ export class KanbanFileService {
 
                 // ALWAYS re-check for changes after reload
                 // This will detect any changes between the preserved baseline and current state
-                await this.includeFileManager._recheckIncludeFileChanges(getFileStateManager().getAllIncludeFiles().length > 0, () => this.fileManager.getDocument());
+                await this.includeFileManager._recheckIncludeFileChanges();
 
                 // Only restore the change state if recheck didn't find changes
                 // (If recheck found changes, it already set the state)
-                if (!getFileStateManager().hasUnsavedIncludeFiles() && preservedChangeState) {
+                if (!this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main") && preservedChangeState) {
 
 
                 }
 
                 // Send notification again in case it was lost
-                if (getFileStateManager().hasUnsavedIncludeFiles()) {
+                if (this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main")) {
                         }
 
                 const currentBoard = this.board();
@@ -320,17 +320,17 @@ export class KanbanFileService {
             // Update the board
             this.setBoard(parseResult.board);
             // Update the unified include system
-            this.includeFileManager._updateUnifiedIncludeSystem(parseResult.includedFiles, parseResult.columnIncludeFiles, parseResult.taskIncludeFiles || [], () => this.fileManager.getDocument());
+            this.includeFileManager._updateUnifiedIncludeSystem(parseResult.board, () => this.fileManager.getDocument());
 
             // Handle any unsaved changes in files that need to be removed
-            await this.includeFileManager._handleUnsavedIncludeFileChanges(() => this.fileManager.getDocument());
+            await this.includeFileManager._handleUnsavedIncludeFileChanges();
 
             // Update our baseline of known file content
             this.updateKnownFileContent(document.getText());
 
             // Update included files with the external file watcher
             // Preserve existing change state
-            const preservedChangeState = getFileStateManager().hasUnsavedIncludeFiles();
+            const preservedChangeState = this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main");
 
 
             // Initialize content for new files only (preserve existing baselines)
@@ -344,11 +344,11 @@ export class KanbanFileService {
 
             // ALWAYS re-check for changes after reload
             // This will detect any changes between the preserved baseline and current state
-            await this.includeFileManager._recheckIncludeFileChanges(getFileStateManager().getAllIncludeFiles().length > 0, () => this.fileManager.getDocument());
+            await this.includeFileManager._recheckIncludeFileChanges();
 
             // Only restore the change state if recheck didn't find changes
             // (If recheck found changes, it already set the state)
-            if (!getFileStateManager().hasUnsavedIncludeFiles() && preservedChangeState) {
+            if (!this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main") && preservedChangeState) {
 
 
             }
@@ -426,8 +426,8 @@ export class KanbanFileService {
             }
 
             // First, save any changes to column and task include files (bidirectional editing)
-            await this.includeFileManager.saveAllColumnIncludeChanges(() => this.fileManager.getDocument());
-            await this.includeFileManager.saveAllTaskIncludeChanges(() => this.fileManager.getDocument());
+            await this.includeFileManager.saveAllColumnIncludeChanges();
+            await this.includeFileManager.saveAllTaskIncludeChanges();
 
             const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
             // Check for external unsaved changes before proceeding
@@ -622,18 +622,11 @@ export class KanbanFileService {
      * Setup document change listener for tracking modifications
      */
     public setupDocumentChangeListener(disposables: vscode.Disposable[]): void {
-        const fileStateManager = getFileStateManager();
-
         // Listen for document changes
         const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
             const currentDocument = this.fileManager.getDocument();
             if (currentDocument && event.document === currentDocument) {
-                // Update FileStateManager with editor changes for main file
-                fileStateManager.markEditorChange(
-                    event.document.uri.fsPath,
-                    event.document.isDirty,
-                    event.document.version
-                );
+                // Registry tracks editor changes automatically via file watchers
 
                 // Document was modified externally (not by our kanban save operation)
                 if (!this._isUpdatingFromPanel) {
@@ -661,21 +654,12 @@ export class KanbanFileService {
 
             /* COMMENTED OUT - User doesn't want unsaved editor change tracking
             // Check if this is an included file
-            for (const fileState of getFileStateManager().getAllIncludeFiles()) {
+            for (const fileState of this.fileRegistry.getIncludeFiles().map(f => f.toFileState())) {
                 if (event.document.uri.fsPath === fileState.path) {
                     console.log(`[DocumentChangeListener] Include file edited in VS Code editor: ${fileState.relativePath}`);
                     console.log(`[DocumentChangeListener] isDirty: ${event.document.isDirty}`);
 
-                    // Update FileStateManager with editor changes for include file
-                    fileStateManager.markEditorChange(
-                        event.document.uri.fsPath,
-                        event.document.isDirty,
-                        event.document.version
-                    );
-
-                    // Mark the included file as having unsaved changes in the editor (legacy compatibility)
-                    fileState.backend.isDirtyInEditor = event.document.isDirty;
-                    console.log(`[DocumentChangeListener] Set backend.isDirtyInEditor = ${event.document.isDirty}`);
+                    // Registry tracks editor changes automatically
 
                     // Notify debug overlay to update
                     this._panel.webview.postMessage({
@@ -708,11 +692,9 @@ export class KanbanFileService {
             id: handlerId,
             handleSave: (savedDocument: vscode.TextDocument) => {
                 const currentDocument = this.fileManager.getDocument();
-                const fileStateManager = getFileStateManager();
 
                 if (currentDocument && savedDocument === currentDocument) {
-                    // Update FileStateManager that main file was saved
-                    fileStateManager.markSaved(savedDocument.uri.fsPath, ''); // Content will be updated by save operation
+                    // Registry tracks saves automatically
 
                     // Document was saved, update our version tracking to match (legacy compatibility)
                     this._lastDocumentVersion = savedDocument.version;
@@ -720,26 +702,10 @@ export class KanbanFileService {
                 }
 
                 // Check if this is an included file
-                for (const fileState of getFileStateManager().getAllIncludeFiles()) {
-                    if (savedDocument.uri.fsPath === fileState.path) {
-                        // CRITICAL: Don't call markSaved() for external saves!
-                        // markSaved() clears hasUnsavedChanges, but when a file is saved EXTERNALLY,
-                        // we might still have unsaved changes in the kanban UI that need to be preserved.
-                        // Just update the backend flags to reflect the file is no longer dirty in the editor.
-
-                        console.log(`[SaveHandler] Include file saved externally: ${fileState.relativePath}`);
-                        console.log(`[SaveHandler] BEFORE - frontend.hasUnsavedChanges: ${fileState.frontend.hasUnsavedChanges}`);
-                        console.log(`[SaveHandler] BEFORE - backend.isDirtyInEditor: ${fileState.backend.isDirtyInEditor}`);
-
-                        // Clear editor dirty state (the file was saved in the editor)
-                        fileState.backend.isDirtyInEditor = false;
-
-                        // Mark that this include file has external changes that need reloading
-                        fileState.backend.hasFileSystemChanges = true;
-
-                        console.log(`[SaveHandler] AFTER - frontend.hasUnsavedChanges: ${fileState.frontend.hasUnsavedChanges} (PRESERVED)`);
-                        console.log(`[SaveHandler] AFTER - backend.isDirtyInEditor: ${fileState.backend.isDirtyInEditor}`);
-                        console.log(`[SaveHandler] AFTER - backend.hasFileSystemChanges: ${fileState.backend.hasFileSystemChanges}`);
+                for (const file of this.fileRegistry.getIncludeFiles()) {
+                    if (savedDocument.uri.fsPath === file.getPath()) {
+                        // Registry tracks save state automatically
+                        console.log(`[SaveHandler] Include file saved externally: ${file.getRelativePath()}`);
 
 
 
@@ -748,7 +714,7 @@ export class KanbanFileService {
                         if (currentPanel) {
                             currentPanel.webview.postMessage({
                                 type: 'includeFileStateChanged',
-                                filePath: fileState.relativePath,
+                                filePath: file.getRelativePath(),
                                 isUnsavedInEditor: false
                             });
                         }
@@ -758,7 +724,7 @@ export class KanbanFileService {
                         // REMOVED duplicate handling here to prevent race conditions and double-reload bugs.
                         // ExternalFileWatcher will fire the event and handleExternalFileChange will be called.
 
-                        console.log(`[SaveHandler] Include file saved: ${fileState.relativePath} - ExternalFileWatcher will handle conflict detection`);
+                        console.log(`[SaveHandler] Include file saved: ${file.getRelativePath()} - ExternalFileWatcher will handle conflict detection`);
                         break;
                     }
                 }
@@ -885,7 +851,7 @@ export class KanbanFileService {
         }
 
         // Now check include files for external changes
-        const hasExternalIncludeChanges = await this.includeFileManager.checkForExternalIncludeFileChanges((context) => this.showConflictDialog(context));
+        const hasExternalIncludeChanges = this.includeFileManager.checkForExternalIncludeFileChanges();
         if (!hasExternalIncludeChanges) {
             return false; // User chose not to proceed with include file conflicts
         }

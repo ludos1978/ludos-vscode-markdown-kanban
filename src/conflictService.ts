@@ -6,7 +6,7 @@ import { KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
 import { BackupManager } from './backupManager';
-import { getFileStateManager, FileStateManager } from './fileStateManager';
+import { MarkdownFileRegistry } from './files';
 import { IncludeFileManager } from './includeFileManager';
 import { MarkdownKanbanParser } from './markdownParser';
 
@@ -27,7 +27,7 @@ export class ConflictService {
     private readonly _MIN_DIALOG_INTERVAL = 2000; // 2 seconds minimum between dialogs
 
     constructor(
-        private fileStateManager: FileStateManager,
+        private fileRegistry: MarkdownFileRegistry,
         private conflictResolver: ConflictResolver,
         private backupManager: BackupManager,
         private board: () => KanbanBoard | undefined,
@@ -78,13 +78,15 @@ export class ConflictService {
         // Get unified file state from message handler - ALL SYSTEMS MUST USE THIS!
         const fileState = getUnifiedFileState();
 
-        const hasIncludeUnsavedChanges = getFileStateManager().getAllIncludeFiles().some(file => file.frontend.hasUnsavedChanges);
-        const changedIncludeFiles = getFileStateManager().getAllIncludeFiles().filter(f => f.frontend.hasUnsavedChanges).map(f => f.relativePath);
+        const filesWithUnsaved = this.fileRegistry.getFilesWithUnsavedChanges();
+        const hasIncludeUnsavedChanges = filesWithUnsaved.some(f => f.getFileType() !== 'main');
+        const changedIncludeFiles = filesWithUnsaved
+            .filter(f => f.getFileType() !== 'main')
+            .map(f => f.getRelativePath());
 
         // Check if main file is in edit mode
-        const fileStateManager = getFileStateManager();
-        const mainFileState = fileStateManager.getFileState(document.uri.fsPath);
-        const isInEditMode = mainFileState?.frontend.isInEditMode || false;
+        const mainFile = this.fileRegistry.getMainFile();
+        const isInEditMode = mainFile?.isInEditMode() || false;
 
         // Use the unified conflict resolver with consistent data
         const context: ConflictContext = {
@@ -169,23 +171,19 @@ export class ConflictService {
             this.includeFileManager.ensureIncludeFileRegistered(relativePath, 'regular', () => this.fileManager.getDocument());
 
             // Read the new external content
-            const newExternalContent = await this.includeFileManager.readFileContent(filePath);
+            const newExternalContent = await this.includeFileManager.readFileContent(relativePath, () => this.fileManager.getDocument());
 
             if (newExternalContent !== null) {
-                // Update the include file in the unified system
-                const fileState = getFileStateManager().getIncludeFileByRelativePath(relativePath);
-                if (fileState) {
+                // Update the include file
+                const file = this.fileRegistry.getByRelativePath(relativePath);
+                if (file) {
                     // Check if content actually changed
-                    if (newExternalContent !== fileState.frontend.content) {
-                        // Update the content and baseline
-                        // FIXME: Use FileStateManager.updateContent - fileState.frontend.content = newExternalContent;
-                        // FIXME: Use FileStateManager.markSaved - fileState.frontend.baseline = newExternalContent;
-                        // FIXME: Use FileStateManager.markFrontendChange - fileState.frontend.hasUnsavedChanges = false;
-                        fileState.backend.hasFileSystemChanges = false;
-                        // FIXME: Use FileStateManager methods - fileState.backend.lastModified = new Date();
+                    if (newExternalContent !== file.getContent()) {
+                        // Update the file - registry handles this automatically
+                        await file.reload();
 
                         // Automatically update the content in the frontend
-                        await this.includeFileManager.updateInlineIncludeFile(filePath, fileState.relativePath);
+                        await this.includeFileManager.updateInlineIncludeFile(filePath, relativePath);
 
                         // Trigger a board refresh to re-render with the new content
                         await sendBoardUpdate();
@@ -279,7 +277,8 @@ export class ConflictService {
         // Check if there are unsaved changes before closing - use unified file state
         const fileState = getUnifiedFileState();
         const hasMainUnsavedChanges = fileState?.hasInternalChanges || false;
-        const hasIncludeUnsavedChanges = getFileStateManager().getAllIncludeFiles().some(file => file.frontend.hasUnsavedChanges);
+        const filesWithUnsaved = this.fileRegistry.getFilesWithUnsavedChanges();
+        const hasIncludeUnsavedChanges = filesWithUnsaved.some(f => f.getFileType() !== 'main');
 
         if ((hasMainUnsavedChanges || hasIncludeUnsavedChanges) && !isClosingPrevented) {
             const newIsClosingPrevented = true;
@@ -291,7 +290,9 @@ export class ConflictService {
 
             const document = this.fileManager.getDocument();
             const fileName = document ? path.basename(document.fileName) : 'the kanban board';
-            const changedIncludeFiles = getFileStateManager().getAllIncludeFiles().filter(f => f.frontend.hasUnsavedChanges).map(f => f.relativePath);
+            const changedIncludeFiles = filesWithUnsaved
+                .filter(f => f.getFileType() !== 'main')
+                .map(f => f.getRelativePath());
 
             // Use the unified conflict resolver with consistent data
             const context: ConflictContext = {
@@ -322,10 +323,8 @@ export class ConflictService {
                     try {
                         // Save the changes before closing (this will save both main and include files)
                         await this.saveToMarkdown();
-                        // Clear all include file unsaved changes
-                        for (const fileState of getFileStateManager().getAllIncludeFiles()) {
-                            getFileStateManager().markFrontendChange(fileState.path, false);
-                        }
+                        // Registry handles clearing unsaved changes automatically
+
                         // Allow disposal to continue
                         disposeCallback();
                         return {
@@ -346,10 +345,8 @@ export class ConflictService {
                     }
                 } else {
                     // User explicitly chose to close without saving
-                    // Clear all include file unsaved changes
-                    for (const fileState of getFileStateManager().getAllIncludeFiles()) {
-                        getFileStateManager().markFrontendChange(fileState.path, false);
-                    }
+                    // Registry handles clearing unsaved changes automatically
+
                     disposeCallback();
                     return {
                         shouldPreventClose: false,

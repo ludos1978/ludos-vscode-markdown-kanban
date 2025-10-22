@@ -13,7 +13,6 @@ import { BackupManager } from './backupManager';
 import { ExternalFileWatcher } from './externalFileWatcher';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
 import { configService, ConfigurationService } from './configurationService';
-import { getFileStateManager, FileState, FileStateManager } from './fileStateManager';
 import { PathResolver } from './services/PathResolver';
 import { FileWriter } from './services/FileWriter';
 import { FormatConverter } from './services/FormatConverter';
@@ -57,7 +56,7 @@ export class KanbanWebviewPanel {
     private _fileService: KanbanFileService;
     private _conflictService: ConflictService;
 
-    // File abstraction system (Phase 1: parallel with FileStateManager)
+    // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
 
@@ -298,7 +297,7 @@ export class KanbanWebviewPanel {
         // Get the conflict resolver instance (needed before IncludeFileManager)
         this._conflictResolver = ConflictResolver.getInstance();
 
-        // Initialize file abstraction system (Phase 1: parallel with FileStateManager)
+        // Initialize file abstraction system
         this._fileRegistry = new MarkdownFileRegistry();
         this._fileFactory = new FileFactory(
             this._fileManager,
@@ -315,7 +314,7 @@ export class KanbanWebviewPanel {
 
         // Initialize IncludeFileManager
         this._includeFileManager = new IncludeFileManager(
-            getFileStateManager(),
+            this._fileRegistry,
             this._conflictResolver,
             this._backupManager,
             () => this._fileManager.getFilePath(),
@@ -330,7 +329,7 @@ export class KanbanWebviewPanel {
 
         // Initialize ConflictService
         this._conflictService = new ConflictService(
-            getFileStateManager(),
+            this._fileRegistry,
             this._conflictResolver,
             this._backupManager,
             () => this._board,
@@ -344,7 +343,7 @@ export class KanbanWebviewPanel {
         // Initialize KanbanFileService
         this._fileService = new KanbanFileService(
             this._fileManager,
-            getFileStateManager(),
+            this._fileRegistry,
             this._includeFileManager,
             this._backupManager,
             this._boardOperations,
@@ -416,43 +415,22 @@ export class KanbanWebviewPanel {
                     console.log('[markUnsavedChanges callback] hasChanges:', hasChanges);
                     console.log('[markUnsavedChanges callback] cachedBoard exists:', !!cachedBoard);
 
-                    // Use getFilePath() instead of getDocument() - it persists even when document is cleared
-                    const mainFilePath = this._fileManager.getFilePath();
-                    console.log('[markUnsavedChanges callback] mainFilePath:', mainFilePath);
-                    console.log('[markUnsavedChanges callback] mainFilePath exists:', !!mainFilePath);
-
-                    if (!mainFilePath) {
-                        console.log('[markUnsavedChanges callback] ===== EARLY RETURN - NO FILE PATH =====');
+                    if (!this._isRegistryReady()) {
+                        console.log('[markUnsavedChanges callback] Registry not ready');
                         return;
                     }
 
-                    const fileStateManager = getFileStateManager();
-
-                    // Initialize main file state if needed
-                    const mainFileState = fileStateManager.initializeFile(
-                        mainFilePath,
-                        '.',
-                        true,
-                        'main'
-                    );
-
-                    console.log('[markUnsavedChanges callback] ===== ENTRY =====');
-                    console.log('[markUnsavedChanges callback] hasChanges:', hasChanges);
-                    console.log('[markUnsavedChanges callback] cachedBoard exists:', !!cachedBoard);
-                    console.log('[markUnsavedChanges callback] Condition (hasChanges && cachedBoard):', hasChanges && cachedBoard);
-
                     if (hasChanges && cachedBoard) {
-                        // First, track changes in include files
-                        console.log('[markUnsavedChanges callback] Calling trackIncludeFileUnsavedChanges with board having', cachedBoard.columns?.length, 'columns');
+                        // Track changes in include files
+                        console.log('[markUnsavedChanges callback] Tracking unsaved changes with board having', cachedBoard.columns?.length, 'columns');
                         const onlyIncludeChanges = await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
                         console.log('[markUnsavedChanges callback] trackIncludeFileUnsavedChanges returned:', onlyIncludeChanges);
 
-                        // Mark frontend changes based on whether main file or only includes changed
-                        if (!onlyIncludeChanges) {
-                            fileStateManager.markFrontendChange(mainFilePath, true, JSON.stringify(cachedBoard));
-                            this._hasUnsavedChanges = true; // Keep legacy flag for compatibility
+                        // Update main file unsaved changes flag
+                        const mainFile = this._getMainFile();
+                        if (mainFile && !onlyIncludeChanges) {
+                            this._hasUnsavedChanges = true;
                         } else {
-                            fileStateManager.markFrontendChange(mainFilePath, false);
                             this._hasUnsavedChanges = false;
                         }
 
@@ -466,15 +444,8 @@ export class KanbanWebviewPanel {
                                 .catch(error => console.error('Cache update backup failed:', error));
                         }
                     } else {
-                        console.log('[markUnsavedChanges callback] ===== ELSE BRANCH =====');
-                        console.log('[markUnsavedChanges callback] Condition failed - NOT calling trackIncludeFileUnsavedChanges');
-                        console.log('[markUnsavedChanges callback] hasChanges:', hasChanges);
-                        console.log('[markUnsavedChanges callback] cachedBoard:', cachedBoard);
-
-                        // Check if any include files have unsaved changes before potentially resetting the flag
-                        const hasIncludeFileChanges = getFileStateManager().getAllIncludeFiles().some(file => file.frontend.hasUnsavedChanges);
-
-                        fileStateManager.markFrontendChange(mainFilePath, hasChanges);
+                        // Check if any include files have unsaved changes
+                        const hasIncludeFileChanges = this._getFilesWithUnsavedChanges().length > 0;
 
                         // Only update _hasUnsavedChanges if we're not losing include file changes
                         if (hasChanges || !hasIncludeFileChanges) {
@@ -613,14 +584,7 @@ export class KanbanWebviewPanel {
         if (modified) {
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
-
-            // Mark board as having unsaved changes in the file state manager
-            const document = this._fileManager.getDocument();
-            if (document) {
-                const fileStateManager = getFileStateManager();
-                fileStateManager.markFrontendChange(document.uri.fsPath, true, JSON.stringify(this._board));
-                this._hasUnsavedChanges = true;
-            }
+            this._hasUnsavedChanges = true;
 
             await this.sendBoardUpdate();
         }
@@ -997,14 +961,15 @@ export class KanbanWebviewPanel {
             });
         }, 10);
 
-        // Send include file contents after board update using unified system
-        if (getFileStateManager().getAllIncludeFiles().length > 0) {
+        // Send include file contents after board update
+        const includeFiles = this._fileRegistry.getIncludeFiles();
+        if (includeFiles.length > 0) {
             setTimeout(() => {
-                for (const fileState of getFileStateManager().getAllIncludeFiles()) {
+                for (const file of includeFiles) {
                     this._panel.webview.postMessage({
                         type: 'updateIncludeContent',
-                        filePath: fileState.relativePath,
-                        content: fileState.frontend.content
+                        filePath: file.getRelativePath(),
+                        content: file.getContent()
                     });
                 }
             }, 20);
@@ -1055,9 +1020,6 @@ export class KanbanWebviewPanel {
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
-
-        // Phase 2: Sync FileStateManager state to file instances after save
-        await this._syncFileStateToRegistry();
     }
 
     private async initializeFile() {
@@ -1295,12 +1257,12 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Phase 1: Sync main file to registry (create or update MainKanbanFile instance)
+     * Load main file to registry (create or update MainKanbanFile instance)
      */
     private async _syncMainFileToRegistry(document: vscode.TextDocument): Promise<void> {
         const filePath = document.uri.fsPath;
 
-        console.log(`[KanbanWebviewPanel] Syncing main file to registry: ${filePath}`);
+        console.log(`[KanbanWebviewPanel] Loading main file to registry: ${filePath}`);
 
         // Check if MainKanbanFile already exists
         let mainFile = this._fileRegistry.getMainFile();
@@ -1319,14 +1281,7 @@ export class KanbanWebviewPanel {
             mainFile.startWatching();
         }
 
-        // Sync state from FileStateManager to file instance
-        const fileState = getFileStateManager().getFileState(filePath);
-        if (fileState) {
-            console.log(`[KanbanWebviewPanel] Syncing state from FileStateManager`);
-            mainFile.fromFileState(fileState);
-        }
-
-        // Load content into file instance
+        // Load content into file instance directly from document/disk
         try {
             await mainFile.reload();
             console.log(`[KanbanWebviewPanel] MainKanbanFile content loaded`);
@@ -1334,7 +1289,7 @@ export class KanbanWebviewPanel {
             console.error(`[KanbanWebviewPanel] Failed to load MainKanbanFile content:`, error);
         }
 
-        // Sync include files if board is available
+        // Load include files if board is available
         if (this._board && this._board.valid) {
             this._syncIncludeFilesWithRegistry(this._board);
         }
@@ -1377,12 +1332,6 @@ export class KanbanWebviewPanel {
                         this._fileRegistry.register(columnInclude);
                         columnInclude.startWatching();
 
-                        // Sync state from FileStateManager
-                        const fileState = getFileStateManager().getIncludeFileByRelativePath(relativePath);
-                        if (fileState) {
-                            columnInclude.fromFileState(fileState);
-                        }
-
                         createdCount++;
                     }
                 }
@@ -1412,12 +1361,6 @@ export class KanbanWebviewPanel {
                             this._fileRegistry.register(taskInclude);
                             taskInclude.startWatching();
 
-                            // Sync state from FileStateManager
-                            const fileState = getFileStateManager().getIncludeFileByRelativePath(relativePath);
-                            if (fileState) {
-                                taskInclude.fromFileState(fileState);
-                            }
-
                             createdCount++;
                         }
                     }
@@ -1429,19 +1372,15 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Handle file registry change events (Phase 1: monitor only)
+     * Handle file registry change events
      */
     private _handleFileRegistryChange(event: FileChangeEvent): void {
         console.log(`[KanbanWebviewPanel] File registry change: ${event.file.getRelativePath()} (${event.changeType})`);
 
-        // Phase 1: Just monitor changes - sync happens when creating file instances
-        // The file instances will be updated FROM FileStateManager via fromFileState()
-
-        // Phase 2 TODO: Use registry changes to trigger UI updates, handle conflicts, etc.
-        // Phase 2 TODO: Migrate from FileStateManager methods to direct file instance operations
+        // TODO: Use registry changes to trigger UI updates, handle conflicts, etc.
     }
 
-    // ============= PHASE 2: FILE REGISTRY HELPER METHODS =============
+    // ============= FILE REGISTRY HELPER METHODS =============
 
     /**
      * Get the main kanban file instance from registry
@@ -1504,219 +1443,94 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Phase 2: Get file content (tries file instance first, falls back to FileStateManager)
+     * Get file content from registry
      */
     private _getFileContent(relativePath: string): string | undefined {
-        if (this._isRegistryReady()) {
-            const file = relativePath === '.'
-                ? this._getMainFile()
-                : this._getIncludeFileByPath(relativePath);
+        const file = relativePath === '.'
+            ? this._getMainFile()
+            : this._getIncludeFileByPath(relativePath);
 
-            if (file) {
-                return file.getContent();
-            }
-        }
-
-        // Fallback to FileStateManager
-        const fileState = relativePath === '.'
-            ? getFileStateManager().getFileState(this._fileManager.getFilePath() || '')
-            : getFileStateManager().getIncludeFileByRelativePath(relativePath);
-
-        return fileState?.frontend.content;
+        return file?.getContent();
     }
 
     /**
-     * Phase 2: Check if file has unsaved changes (tries file instance first)
+     * Check if file has unsaved changes
      */
     private _fileHasUnsavedChanges(relativePath: string): boolean {
-        if (this._isRegistryReady()) {
-            const file = relativePath === '.'
-                ? this._getMainFile()
-                : this._getIncludeFileByPath(relativePath);
+        const file = relativePath === '.'
+            ? this._getMainFile()
+            : this._getIncludeFileByPath(relativePath);
 
-            if (file) {
-                return file.hasUnsavedChanges();
-            }
-        }
-
-        // Fallback to FileStateManager
-        const fileState = relativePath === '.'
-            ? getFileStateManager().getFileState(this._fileManager.getFilePath() || '')
-            : getFileStateManager().getIncludeFileByRelativePath(relativePath);
-
-        return fileState?.frontend.hasUnsavedChanges || false;
+        return file?.hasUnsavedChanges() || false;
     }
 
     /**
-     * Phase 2: Check if file has conflicts (tries file instance first)
+     * Check if file has conflicts
      */
     private _fileHasConflict(relativePath: string): boolean {
-        if (this._isRegistryReady()) {
-            const file = relativePath === '.'
-                ? this._getMainFile()
-                : this._getIncludeFileByPath(relativePath);
+        const file = relativePath === '.'
+            ? this._getMainFile()
+            : this._getIncludeFileByPath(relativePath);
 
-            if (file) {
-                return file.hasConflict();
-            }
-        }
-
-        // Fallback to FileStateManager
-        const fileState = relativePath === '.'
-            ? getFileStateManager().getFileState(this._fileManager.getFilePath() || '')
-            : getFileStateManager().getIncludeFileByRelativePath(relativePath);
-
-        return fileState?.hasConflict || false;
+        return file?.hasConflict() || false;
     }
 
     /**
-     * Phase 2: Check if file needs reload (tries file instance first)
+     * Check if file needs reload
      */
     private _fileNeedsReload(relativePath: string): boolean {
-        if (this._isRegistryReady()) {
-            const file = relativePath === '.'
-                ? this._getMainFile()
-                : this._getIncludeFileByPath(relativePath);
+        const file = relativePath === '.'
+            ? this._getMainFile()
+            : this._getIncludeFileByPath(relativePath);
 
-            if (file) {
-                return file.needsReload();
-            }
-        }
-
-        // Fallback to FileStateManager
-        const fileState = relativePath === '.'
-            ? getFileStateManager().getFileState(this._fileManager.getFilePath() || '')
-            : getFileStateManager().getIncludeFileByRelativePath(relativePath);
-
-        return fileState?.needsReload || false;
+        return file?.needsReload() || false;
     }
 
     /**
-     * Phase 2: Check if file needs save (tries file instance first)
+     * Check if file needs save
      */
     private _fileNeedsSave(relativePath: string): boolean {
-        if (this._isRegistryReady()) {
-            const file = relativePath === '.'
-                ? this._getMainFile()
-                : this._getIncludeFileByPath(relativePath);
+        const file = relativePath === '.'
+            ? this._getMainFile()
+            : this._getIncludeFileByPath(relativePath);
 
-            if (file) {
-                return file.needsSave();
-            }
-        }
-
-        // Fallback to FileStateManager
-        const fileState = relativePath === '.'
-            ? getFileStateManager().getFileState(this._fileManager.getFilePath() || '')
-            : getFileStateManager().getIncludeFileByRelativePath(relativePath);
-
-        return fileState?.needsSave || false;
+        return file?.needsSave() || false;
     }
 
     /**
-     * Phase 2: Get unified unsaved changes state (uses registry when available)
+     * Get unified unsaved changes state from registry
      */
     private _getUnifiedUnsavedChangesState(): { hasUnsavedChanges: boolean; details: string } {
-        if (this._isRegistryReady()) {
-            const filesWithChanges = this._getFilesWithUnsavedChanges();
+        const filesWithChanges = this._getFilesWithUnsavedChanges();
 
-            if (filesWithChanges.length === 0) {
-                return { hasUnsavedChanges: false, details: 'No unsaved changes' };
-            }
-
-            const details = filesWithChanges.map(f => f.getRelativePath()).join(', ');
-            return {
-                hasUnsavedChanges: true,
-                details: `Unsaved changes in: ${details}`
-            };
+        if (filesWithChanges.length === 0) {
+            return { hasUnsavedChanges: false, details: 'No unsaved changes' };
         }
 
-        // Fallback to FileStateManager
-        const mainFilePath = this._fileManager.getFilePath();
-        const mainFileState = mainFilePath ? getFileStateManager().getFileState(mainFilePath) : undefined;
-        const hasMainChanges = mainFileState?.frontend.hasUnsavedChanges || false;
-        const hasIncludeChanges = getFileStateManager().hasUnsavedIncludeFiles();
-
-        if (!hasMainChanges && !hasIncludeChanges) {
-            return { hasUnsavedChanges: false, details: 'No unsaved changes (legacy)' };
-        }
-
-        const changedFiles: string[] = [];
-        if (hasMainChanges) {
-            changedFiles.push('main file');
-        }
-        if (hasIncludeChanges) {
-            const includeFiles = getFileStateManager().getAllIncludeFiles()
-                .filter(f => f.frontend.hasUnsavedChanges)
-                .map(f => f.relativePath);
-            changedFiles.push(...includeFiles);
-        }
-
+        const details = filesWithChanges.map(f => f.getRelativePath()).join(', ');
         return {
             hasUnsavedChanges: true,
-            details: `Unsaved changes in: ${changedFiles.join(', ')} (legacy)`
+            details: `Unsaved changes in: ${details}`
         };
     }
 
     /**
-     * Phase 2: Get files that need attention (conflicts, unsaved changes, external changes)
+     * Get files that need attention (conflicts, unsaved changes, external changes)
      */
     private _getFilesThatNeedAttention(): {
         conflicts: MarkdownFile[];
         unsaved: MarkdownFile[];
         needReload: MarkdownFile[];
     } {
-        if (this._isRegistryReady()) {
-            return {
-                conflicts: this._getFilesWithConflicts(),
-                unsaved: this._getFilesWithUnsavedChanges(),
-                needReload: this._getFilesThatNeedReload()
-            };
-        }
-
-        // Fallback returns empty arrays - could implement FileStateManager fallback if needed
         return {
-            conflicts: [],
-            unsaved: [],
-            needReload: []
+            conflicts: this._getFilesWithConflicts(),
+            unsaved: this._getFilesWithUnsavedChanges(),
+            needReload: this._getFilesThatNeedReload()
         };
     }
 
-    /**
-     * Phase 2: Sync FileStateManager state to registry file instances
-     */
-    private async _syncFileStateToRegistry(): Promise<void> {
-        if (!this._isRegistryReady()) {
-            return;
-        }
 
-        console.log('[KanbanWebviewPanel] Syncing FileStateManager state to registry');
-
-        // Sync main file
-        const mainFile = this._getMainFile();
-        if (mainFile) {
-            const mainFilePath = this._fileManager.getFilePath();
-            if (mainFilePath) {
-                const fileState = getFileStateManager().getFileState(mainFilePath);
-                if (fileState) {
-                    mainFile.fromFileState(fileState);
-                }
-            }
-        }
-
-        // Sync include files
-        const includeFiles = this._fileRegistry.getIncludeFiles();
-        for (const file of includeFiles) {
-            const fileState = getFileStateManager().getIncludeFileByRelativePath(file.getRelativePath());
-            if (fileState) {
-                file.fromFileState(fileState);
-            }
-        }
-
-        console.log('[KanbanWebviewPanel] Synced state for', 1 + includeFiles.length, 'files');
-    }
-
-    // ============= END PHASE 2 HELPER METHODS =============
+    // ============= END FILE REGISTRY HELPER METHODS =============
 
     private async _handlePanelClose() {
         // Use the cached board that was already sent when changes were made
@@ -1821,6 +1635,10 @@ export class KanbanWebviewPanel {
         return this._backupManager;
     }
 
+    public get fileRegistry(): MarkdownFileRegistry {
+        return this._fileRegistry;
+    }
+
     /**
      * Debug method to check webview permissions and image resolution
      * ---
@@ -1869,9 +1687,6 @@ export class KanbanWebviewPanel {
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
-
-        // Phase 2: Sync FileStateManager state to file instances after reload
-        await this._syncFileStateToRegistry();
     }
 
     /**
@@ -1885,9 +1700,11 @@ export class KanbanWebviewPanel {
     /**
      * Save modifications from task includes back to their original files
      * This enables bidirectional editing for task includes
+     * NOTE: This method is not currently used - task includes are processed automatically by the registry
      */
     public async reprocessTaskIncludes(): Promise<void> {
-        return this._includeFileManager.reprocessTaskIncludes(() => this._fileManager.getDocument());
+        // No-op: Registry handles task include processing automatically
+        return Promise.resolve();
     }
 
     public async checkTaskIncludeUnsavedChanges(task: KanbanTask): Promise<boolean> {
@@ -1905,7 +1722,8 @@ export class KanbanWebviewPanel {
      * Check if a specific include file has unsaved changes
      */
     public hasUnsavedIncludeFileChanges(relativePath: string): boolean {
-        return this._includeFileManager.hasUnsavedIncludeFileChanges(relativePath);
+        const file = this._fileRegistry.getByRelativePath(relativePath);
+        return file?.hasUnsavedChanges() || false;
     }
 
     public async saveTaskIncludeChanges(task: KanbanTask): Promise<boolean> {
@@ -1921,13 +1739,25 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
-        return this._includeFileManager.updateIncludeContentUnified(
-            column,
-            newIncludeFiles,
-            source,
-            () => this._fileManager.getDocument(),
-            (paths) => this._fileWatcher.updateIncludeFiles(this, paths)
-        );
+        // Update the column's include files
+        column.includeFiles = newIncludeFiles;
+
+        // Load content from the include files
+        const allTasks: KanbanTask[] = [];
+        for (const relativePath of newIncludeFiles) {
+            const file = this._fileRegistry.getByRelativePath(relativePath);
+            if (file && file.getFileType() === 'include-column') {
+                const columnFile = file as any; // ColumnIncludeFile
+                const tasks = columnFile.parseToTasks();
+                allTasks.push(...tasks);
+            }
+        }
+
+        // Update the column with the loaded tasks
+        column.tasks = allTasks;
+
+        // Update the file watcher
+        this._fileWatcher.updateIncludeFiles(this, this._includeFileManager.getAllIncludeFilePaths());
     }
 
     public async loadNewTaskIncludeContent(task: KanbanTask, newIncludeFiles: string[]): Promise<void> {
@@ -1947,8 +1777,9 @@ export class KanbanWebviewPanel {
             // Normalize the path to match keys in _includeFiles map
             const normalizedIncludeFile = this._includeFileManager._normalizeIncludePath(fileState);
 
-            // Use shared method to read and update content
-            const fileContent = await this._includeFileManager.readAndUpdateIncludeContent(absolutePath, normalizedIncludeFile);
+            // Reload the file content and then read it
+            await this._includeFileManager.readAndUpdateIncludeContent(normalizedIncludeFile, () => this._fileManager.getDocument());
+            const fileContent = await this._includeFileManager.readFileContent(normalizedIncludeFile, () => this._fileManager.getDocument());
 
             if (fileContent !== null) {
                 const lines = fileContent.split('\n');
@@ -1999,12 +1830,7 @@ export class KanbanWebviewPanel {
                     console.warn('[loadNewTaskIncludeContent] Cannot send message - panel is null');
                 }
 
-                // Clear the hasUnsavedChanges flag since we just loaded from external file
-                const includeFileEntry = getFileStateManager().getIncludeFileByRelativePath(normalizedIncludeFile);
-                if (includeFileEntry) {
-                    console.log(`[loadNewTaskIncludeContent] Clearing hasUnsavedChanges for: ${includeFileEntry.relativePath}`);
-                    getFileStateManager().markFrontendChange(includeFileEntry.path, false);
-                }
+                // File instance tracks its own state, no manual marking needed
 
             } else {
                 console.warn(`[LoadNewTaskInclude] Include file not found: ${absolutePath}`);

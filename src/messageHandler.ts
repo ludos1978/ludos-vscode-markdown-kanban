@@ -6,7 +6,7 @@ import { KanbanBoard } from './markdownParser';
 import { ExternalFileWatcher } from './externalFileWatcher';
 import { configService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
-import { getFileStateManager } from './fileStateManager';
+// Removed: FileStateManager import - now using MarkdownFileRegistry via panel.fileRegistry
 import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/MarpExtensionService';
 import { MarpExportService } from './services/MarpExportService';
