@@ -6,14 +6,19 @@ kanban-plugin: board
 
 ## Normal column
 - [ ] normal task
+  some content
+  
+  whatever
 
-## task includes
-- [ ] !!!taskinclude(./root/root-include-1.md)!!!
-
-## !!!columninclude(./root/root-include-2.md)!!!
-
-## standard includes
+## standard includes #stack
 - [ ] different includes
   ==./root/root-include-1.md==
   
-  !!!include(./root/root-include-3.md)!!!
+  !!!include(./root/root-include-1.md)!!!
+
+## task includes
+- [ ] !!!taskinclude(./root/root-include-2.md)!!!
+
+## !!!columninclude(./root/root-include-3.md)!!! #stack
+
+

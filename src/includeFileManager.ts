@@ -67,9 +67,25 @@ export class IncludeFileManager {
 
         for (const relativePath of task.includeFiles) {
             const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
-            if (file && task.description) {
-                file.setTaskDescription(task.description);
-                await file.save();
+            if (file) {
+                // Reconstruct full content: displayTitle (header) + description
+                // When parsing, the first line is stored as displayTitle and the rest as description
+                // We need to combine them back when saving
+                let fullContent = '';
+
+                if (task.displayTitle) {
+                    fullContent = task.displayTitle + '\n';
+                }
+
+                if (task.description) {
+                    fullContent += task.description;
+                }
+
+                // Only save if there's content (either header or description)
+                if (fullContent.trim()) {
+                    file.setTaskDescription(fullContent);
+                    await file.save();
+                }
             }
         }
         return true;
