@@ -271,6 +271,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/messageHandler-MessageHandler_handleStopAutoExportForFile - Stop auto-export for specific file
 - src/messageHandler-MessageHandler_handleExport - Handle export operation
 - src/messageHandler-MessageHandler_handleAutoExportMode - Handle auto-export mode
+- src/messageHandler-MessageHandler_handleSwitchColumnIncludeFile - Switch column include file without saving main file, save old file if needed, create/load new file, update column content
+- src/messageHandler-MessageHandler_handleSwitchTaskIncludeFile - Switch task include file without saving main file, save old file if needed, create/load new file, update task content
 
 ## src/extension.ts
 
