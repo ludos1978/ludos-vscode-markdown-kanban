@@ -1302,14 +1302,16 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         column.includeFiles = [newFileName.trim()];
         column.originalTitle = newTitle;
 
-        // Send update to backend
+        // Send update to backend with immediate flag to trigger save and reload
+        // This ensures the new include file is properly registered and loaded
         vscode.postMessage({
             type: 'updateBoard',
-            board: window.cachedBoard
+            board: window.cachedBoard,
+            immediate: true  // Trigger save and reload to switch files
         });
 
-        // Update button state to show unsaved changes
-        updateRefreshButtonState('unsaved', 1);
+        // Update button state to show saving
+        updateRefreshButtonState('saving', 1);
 
         vscode.postMessage({
             type: 'showMessage',
@@ -1499,14 +1501,16 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         task.includeFiles = [newFileName.trim()];
         task.originalTitle = cleanTitle;
 
-        // Send update to backend
+        // Send update to backend with immediate flag to trigger save and reload
+        // This ensures the new include file is properly registered and loaded
         vscode.postMessage({
             type: 'updateBoard',
-            board: window.cachedBoard
+            board: window.cachedBoard,
+            immediate: true  // Trigger save and reload to switch files
         });
 
-        // Update button state to show unsaved changes
-        updateRefreshButtonState('unsaved', 1);
+        // Update button state to show saving
+        updateRefreshButtonState('saving', 1);
 
         vscode.postMessage({
             type: 'showMessage',
