@@ -1910,6 +1910,20 @@ export class KanbanWebviewPanel {
             // Normalize the path to match keys in _includeFiles map
             const normalizedIncludeFile = this._includeFileManager._normalizeIncludePath(fileState);
 
+            // Create new include file in registry if it doesn't exist
+            if (!this.fileRegistry?.hasByRelativePath(normalizedIncludeFile)) {
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
+                    console.log('[loadNewTaskIncludeContent] Creating new TaskIncludeFile in registry:', normalizedIncludeFile);
+                    const taskInclude = this._fileFactory.createTaskInclude(
+                        normalizedIncludeFile,
+                        mainFile,
+                        false
+                    );
+                    this.fileRegistry.register(taskInclude);
+                }
+            }
+
             // Reload the file content and then read it
             await this._includeFileManager.readAndUpdateIncludeContent(normalizedIncludeFile, () => this._fileManager.getDocument());
             const fileContent = await this._includeFileManager.readFileContent(normalizedIncludeFile, () => this._fileManager.getDocument());

@@ -2027,7 +2027,6 @@ export class MessageHandler {
                         false
                     );
                     panel.fileRegistry.register(columnInclude);
-                    await columnInclude.ensureLoaded();
                 }
             }
 
@@ -2109,7 +2108,6 @@ export class MessageHandler {
                         false
                     );
                     panel.fileRegistry.register(taskInclude);
-                    await taskInclude.ensureLoaded();
                 }
             }
 
