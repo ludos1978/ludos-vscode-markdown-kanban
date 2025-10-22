@@ -2599,14 +2599,29 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating include file
+            console.log('[FRONTEND proceedUpdateIncludeFile] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND proceedUpdateIncludeFile] columnId:', message.columnId);
+            console.log('[FRONTEND proceedUpdateIncludeFile] newFileName:', message.newFileName);
+            console.log('[FRONTEND proceedUpdateIncludeFile] currentFile:', message.currentFile);
             if (typeof updateColumnIncludeFile === 'function') {
+                console.log('[FRONTEND proceedUpdateIncludeFile] Calling updateColumnIncludeFile...');
                 updateColumnIncludeFile(message.columnId, message.newFileName, message.currentFile);
+            } else {
+                console.error('[FRONTEND proceedUpdateIncludeFile] updateColumnIncludeFile function not found!');
             }
             break;
         case 'proceedUpdateTaskIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating task include file
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] taskId:', message.taskId);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] columnId:', message.columnId);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] newFileName:', message.newFileName);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] currentFile:', message.currentFile);
             if (typeof updateTaskIncludeFile === 'function') {
+                console.log('[FRONTEND proceedUpdateTaskIncludeFile] Calling updateTaskIncludeFile...');
                 updateTaskIncludeFile(message.taskId, message.columnId, message.newFileName, message.currentFile);
+            } else {
+                console.error('[FRONTEND proceedUpdateTaskIncludeFile] updateTaskIncludeFile function not found!');
             }
             break;
         case 'updateColumnContent':

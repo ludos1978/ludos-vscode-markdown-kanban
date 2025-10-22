@@ -1276,18 +1276,28 @@ function editColumnIncludeFile(columnId) {
 
 // Function called from backend after user provides edited include file name
 function updateColumnIncludeFile(columnId, newFileName, currentFile) {
+    console.log('[updateColumnIncludeFile] ===== CALLED =====');
+    console.log('[updateColumnIncludeFile] columnId:', columnId);
+    console.log('[updateColumnIncludeFile] newFileName:', newFileName);
+    console.log('[updateColumnIncludeFile] currentFile:', currentFile);
+
     if (!window.cachedBoard) {
-        console.error('No cached board available');
+        console.error('[updateColumnIncludeFile] No cached board available');
         return;
     }
 
     const column = window.cachedBoard.columns.find(col => col.id === columnId);
     if (!column) {
-        console.error('Column not found:', columnId);
+        console.error('[updateColumnIncludeFile] Column not found:', columnId);
         return;
     }
 
+    console.log('[updateColumnIncludeFile] Column found, title:', column.title);
+    console.log('[updateColumnIncludeFile] Column includeFiles:', column.includeFiles);
+
     if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
+        console.log('[updateColumnIncludeFile] newFileName is different from currentFile, proceeding...');
+
         // Extract the clean title (without include syntax)
         let cleanTitle = column.title || '';
 
@@ -1296,6 +1306,10 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
 
         // Create new title with updated include syntax
         const newTitle = `${cleanTitle} !!!columninclude(${newFileName.trim()})!!!`.trim();
+
+        console.log('[updateColumnIncludeFile] cleanTitle:', cleanTitle);
+        console.log('[updateColumnIncludeFile] newTitle:', newTitle);
+        console.log('[updateColumnIncludeFile] Sending switchColumnIncludeFile message...');
 
         // Send request to backend to switch the include file
         // Backend will: save old file if needed, load new file, update column content
@@ -1308,8 +1322,12 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
             newTitle: newTitle
         });
 
+        console.log('[updateColumnIncludeFile] Message sent!');
+
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
         updateRefreshButtonState('unsaved', 1);
+    } else {
+        console.log('[updateColumnIncludeFile] Skipping - newFileName same as currentFile or empty');
     }
 }
 
@@ -1462,24 +1480,35 @@ function editTaskIncludeFile(taskId, columnId) {
 
 // Function called from backend after user provides new include file name
 function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
+    console.log('[updateTaskIncludeFile] ===== CALLED =====');
+    console.log('[updateTaskIncludeFile] taskId:', taskId);
+    console.log('[updateTaskIncludeFile] columnId:', columnId);
+    console.log('[updateTaskIncludeFile] newFileName:', newFileName);
+    console.log('[updateTaskIncludeFile] currentFile:', currentFile);
+
     if (!window.cachedBoard) {
-        console.error('No cached board available');
+        console.error('[updateTaskIncludeFile] No cached board available');
         return;
     }
 
     const column = window.cachedBoard.columns.find(col => col.id === columnId);
     if (!column) {
-        console.error('Column not found:', columnId);
+        console.error('[updateTaskIncludeFile] Column not found:', columnId);
         return;
     }
 
     const task = column.tasks.find(t => t.id === taskId);
     if (!task) {
-        console.error('Task not found:', taskId);
+        console.error('[updateTaskIncludeFile] Task not found:', taskId);
         return;
     }
 
+    console.log('[updateTaskIncludeFile] Task found, title:', task.title);
+    console.log('[updateTaskIncludeFile] Task includeFiles:', task.includeFiles);
+
     if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
+        console.log('[updateTaskIncludeFile] newFileName is different from currentFile, proceeding...');
+
         // Update task title with new include file
         let cleanTitle = task.title || '';
 
@@ -1488,6 +1517,10 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
 
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
+
+        console.log('[updateTaskIncludeFile] cleanTitle:', cleanTitle);
+        console.log('[updateTaskIncludeFile] newTitle:', newTitle);
+        console.log('[updateTaskIncludeFile] Sending switchTaskIncludeFile message...');
 
         // Send request to backend to switch the include file
         // Backend will: save old file if needed, load new file, update task content
@@ -1501,8 +1534,12 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
             newTitle: newTitle
         });
 
+        console.log('[updateTaskIncludeFile] Message sent!');
+
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
         updateRefreshButtonState('unsaved', 1);
+    } else {
+        console.log('[updateTaskIncludeFile] Skipping - newFileName same as currentFile or empty');
     }
 }
 

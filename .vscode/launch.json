@@ -12,7 +12,8 @@
 				"${workspaceFolder}/dist/**/*.js"
 			],
 			"sourceMaps": true,
-			"preLaunchTask": "compile"
+			"preLaunchTask": "watch",
+			"postDebugTask": "terminate-watch"
 		}
 	]
 }

@@ -63,6 +63,17 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	}
 
+	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
+	const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
+	if (isDevelopment) {
+		console.log('[Kanban Extension] Development mode - refreshing all panels to load latest code');
+		const allPanels = KanbanWebviewPanel.getAllPanels();
+		Promise.all(allPanels.map(async (panel) => {
+			console.log('[Kanban Extension] Refreshing panel:', panel.getPanelId());
+			await panel.refreshWebviewContent();
+		})).catch(err => console.error('[Kanban Extension] Error refreshing panels:', err));
+	}
+
 	// Register command to open kanban panel
 	const openKanbanCommand = vscode.commands.registerCommand('markdown-kanban.openKanban', async (uri?: vscode.Uri) => {
 		console.log('[Kanban Extension] openKanban command executed!');
