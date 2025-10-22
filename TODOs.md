@@ -4,6 +4,21 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] Conflict tracking behaviour:
+  - if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode. then the conflict manager must ask the user:
+      - wether he wants to ignore the external changes (nothing happens, remember we still have unsaved changes in the kanban)
+      - overwrite the external file with the kanban c$ontents (the kanban is then in an unedited state)
+      - save the kanban as a backup file and reload the kanban from the external changes (original kanban is stored in a backup file, the external changes of the markdown are loaded into the kanban)
+      - discard the changes in the kanban and reload from the external edit.
+  - if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
+  - if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
+
+  do this for the main kanban file and each columninclude and taskincluded files individually. the include files (not the columninclude & taskinclude) should automatically update on a modification externally, they cannot be modified internally. 
+
+  ONLY THIS BEHAVIOUR. ALL OTHER BEHAVIOURS OR COMMENTS HOW IT WORKS ARE WRONG AND MUST BE MODIFIED OR REMOVED FROM THE CODE!!!
+
+  ULTRATHINK THINK PLAN
+
 - [ ] test the different situatuons when files are included into the kanban using taskinclude or columninclude. they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
 
 - [x] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
@@ -515,7 +530,7 @@ ultrathink
 do this for the kanban and each column and task included files individually. the include files should automatically update on a modification externally, they cannot be modified internally.
 
 
-- [ ] add an option to the export as in which style to export. it can be eigher kanbanstyle (does not modify the style) or it can be presentation style (which uses the same method as when copying the columns and cards as markdown.
+- [x] add an option to the export as in which style to export. it can be eigher kanbanstyle (does not modify the style) or it can be presentation style (which uses the same method as when copying the columns and cards as markdown.
 - [x] OBSOLETE, WRONG ASSUMPTION. 1. Clicking on the task description to edit it: 2. Changing the text from !!!include(./markdown-include-2.md)!!! to something like   !!!include(. markdown-include-1.md)!!! 3. stop editing the field. - should result in an modfied included content. but does not. Instead it shows Loading: newfilename.md forever. i think the backend is missing an editTaskDescription that handles the contents similar to the editTaskTitle which checks for includes and handles it there. or where does that happen?
 - ok, i did an error. the !!!include()!!! must be run in the frontend only, as it's genearted with the markdown-ti. i undid all changes. try to get it running again with in this style.
 - [x] EditTask message is send when the view looses focus afaik. but it should be sent when the edit of a task ends. can you verify and fix that?

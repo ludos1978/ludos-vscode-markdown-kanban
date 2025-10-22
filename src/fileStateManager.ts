@@ -183,11 +183,11 @@ export class FileStateManager {
             state.frontend.baseline = newContent;
             state.frontend.hasUnsavedChanges = false;
             this.updateComputedState(state);
-            console.log(`[FileStateManager.markReloaded] ========================================`);
-            console.log(`[FileStateManager.markReloaded] Path: ${path}`);
-            console.log(`[FileStateManager.markReloaded] New baseline (first 100 chars): "${newContent.substring(0, 100)}"`);
-            console.log(`[FileStateManager.markReloaded] Baseline length: ${newContent.length}`);
-            console.log(`[FileStateManager.markReloaded] hasUnsavedChanges cleared to: false`);
+            // console.log(`[FileStateManager.markReloaded] ========================================`);
+            // console.log(`[FileStateManager.markReloaded] Path: ${path}`);
+            // console.log(`[FileStateManager.markReloaded] New baseline (first 100 chars): "${newContent.substring(0, 100)}"`);
+            // console.log(`[FileStateManager.markReloaded] Baseline length: ${newContent.length}`);
+            // console.log(`[FileStateManager.markReloaded] hasUnsavedChanges cleared to: false`);
         }
     }
 

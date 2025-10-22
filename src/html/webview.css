@@ -1586,7 +1586,7 @@ body.vscode-high-contrast-light .task-count {
 
 .donut-menu-item,
 .file-bar-menu-item {
-  padding: 8px 12px;
+  padding: 4px 8px;
   cursor: pointer;
   font-size: 13px;
   color: var(--vscode-dropdown-foreground);

@@ -1,0 +1,579 @@
+# Kanban Extension Function Reference
+
+This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
+
+## Format
+Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## src/kanbanWebviewPanel.ts - KanbanWebviewPanel
+
+- src/kanbanWebviewPanel-KanbanWebviewPanel_createOrShow - Static factory method to create or show webview panel for a document
+- src/kanbanWebviewPanel-KanbanWebviewPanel_revive - Static method to revive panel from serialized state
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getPanelForDocument - Get panel instance for specific document URI
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getAllPanels - Get array of all active panel instances
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getPanelId - Get unique identifier for this panel instance
+- src/kanbanWebviewPanel-KanbanWebviewPanel_refreshWebviewContent - Force refresh webview HTML and board state
+- src/kanbanWebviewPanel-KanbanWebviewPanel_handleLinkReplacement - Handle link/image path replacement in tasks/columns
+- src/kanbanWebviewPanel-KanbanWebviewPanel_setupDocumentCloseListener - Listen for document close events
+- src/kanbanWebviewPanel-KanbanWebviewPanel_setupWorkspaceChangeListener - Listen for workspace configuration changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_updateWebviewPermissions - Update webview permission settings
+- src/kanbanWebviewPanel-KanbanWebviewPanel_updateWebviewPermissionsForAssets - Update asset directory permissions
+- src/kanbanWebviewPanel-KanbanWebviewPanel_buildLocalResourceRoots - Build list of allowed local resource directories
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getLayoutPresetsConfiguration - Get layout preset configuration
+- src/kanbanWebviewPanel-KanbanWebviewPanel_isFileLocked - Check if file is locked for editing
+- src/kanbanWebviewPanel-KanbanWebviewPanel_toggleFileLock - Toggle file lock state
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getCurrentDocumentUri - Get current document URI
+- src/kanbanWebviewPanel-KanbanWebviewPanel_initialize - Initialize panel state and listeners
+- src/kanbanWebviewPanel-KanbanWebviewPanel_setupEventListeners - Setup message and event listeners
+- src/kanbanWebviewPanel-KanbanWebviewPanel_ensureBoardAndSendUpdate - Ensure board exists and send update to webview
+- src/kanbanWebviewPanel-KanbanWebviewPanel_loadMarkdownFile - Load markdown file into panel
+- src/kanbanWebviewPanel-KanbanWebviewPanel_sendBoardUpdate - Send board data to webview
+- src/kanbanWebviewPanel-KanbanWebviewPanel_generateImageMappings - Generate image path mappings for webview
+- src/kanbanWebviewPanel-KanbanWebviewPanel_saveToMarkdown - Save board state to markdown file
+- src/kanbanWebviewPanel-KanbanWebviewPanel_initializeFile - Initialize new kanban file
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getHtmlForWebview - Generate HTML content for webview
+- src/kanbanWebviewPanel-KanbanWebviewPanel_collectAssetDirectories - Collect asset directories for permissions
+- src/kanbanWebviewPanel-KanbanWebviewPanel_extractAssetDirs - Extract asset directories from content
+- src/kanbanWebviewPanel-KanbanWebviewPanel_getNonce - Generate nonce for CSP
+- src/kanbanWebviewPanel-KanbanWebviewPanel_handlePanelClose - Handle panel close event
+- src/kanbanWebviewPanel-KanbanWebviewPanel_tryAutoLoadActiveMarkdown - Try to auto-load active markdown file
+- src/kanbanWebviewPanel-KanbanWebviewPanel_dispose - Dispose panel and cleanup resources
+- src/kanbanWebviewPanel-KanbanWebviewPanel_debugWebviewPermissions - Debug webview permission configuration
+- src/kanbanWebviewPanel-KanbanWebviewPanel_setupDocumentChangeListener - Setup listener for document changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_forceReloadFromFile - Force reload file from disk
+- src/kanbanWebviewPanel-KanbanWebviewPanel_reprocessTaskIncludes - Reprocess all task includes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_checkTaskIncludeUnsavedChanges - Check if task has unsaved include changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_checkColumnIncludeUnsavedChanges - Check if column has unsaved include changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_hasUnsavedIncludeFileChanges - Check if specific include has unsaved changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_saveTaskIncludeChanges - Save changes to task include file
+- src/kanbanWebviewPanel-KanbanWebviewPanel_updateIncludeContentUnified - Update include content in unified system
+- src/kanbanWebviewPanel-KanbanWebviewPanel_loadNewTaskIncludeContent - Load content from new task include files
+- src/kanbanWebviewPanel-KanbanWebviewPanel_saveAllColumnIncludeChanges - Save all column include changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_saveAllTaskIncludeChanges - Save all task include changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_ensureIncludeFileRegistered - Ensure include file is registered
+- src/kanbanWebviewPanel-KanbanWebviewPanel_saveMainKanbanChanges - Save main kanban file changes
+- src/kanbanWebviewPanel-KanbanWebviewPanel_openFileWithReuseCheck - Open file with editor reuse check
+- src/kanbanWebviewPanel-KanbanWebviewPanel_setFileHidden - Set file as hidden in explorer
+- src/kanbanWebviewPanel-KanbanWebviewPanel_triggerSnippetInsertion - Trigger snippet insertion
+
+## src/includeFileManager.ts - IncludeFileManager
+
+- src/includeFileManager-IncludeFileManager_getOrCreateIncludeFile - Get or create FileState for include file
+- src/includeFileManager-IncludeFileManager_getIncludeFilesByType - Get list of include files by type (regular, column, task)
+- src/includeFileManager-IncludeFileManager_updateIncludeFileContent - Update include file content and track changes
+- src/includeFileManager-IncludeFileManager_normalizeIncludePath - Normalize include path for consistent lookup
+- src/includeFileManager-IncludeFileManager_findIncludeFile - Find include file by normalized path
+- src/includeFileManager-IncludeFileManager_isSameIncludePath - Check if two include paths are equivalent
+- src/includeFileManager-IncludeFileManager_handleUnsavedIncludeFileChanges - Handle unsaved changes in include files
+- src/includeFileManager-IncludeFileManager_removeTrackedFiles - Remove tracked files from FileStateManager
+- src/includeFileManager-IncludeFileManager_initializeUnifiedIncludeContents - Initialize include file contents from disk
+- src/includeFileManager-IncludeFileManager_getAllIncludeFilePaths - Get all tracked include file paths
+- src/includeFileManager-IncludeFileManager_updateUnifiedIncludeSystem - Update unified include tracking system
+- src/includeFileManager-IncludeFileManager_ensureIncludeFileRegistered - Ensure include file is registered
+- src/includeFileManager-IncludeFileManager_loadNewIncludeContent - Load content from new column include files
+- src/includeFileManager-IncludeFileManager_loadNewTaskIncludeContent - Load content from new task include files
+- src/includeFileManager-IncludeFileManager_readAndUpdateIncludeContent - Read and update include file content
+- src/includeFileManager-IncludeFileManager__readFileContent - Read file content from disk (internal helper with documentGetter)
+- src/includeFileManager-IncludeFileManager_readFileContent - Read content from a file on disk
+- src/includeFileManager-IncludeFileManager_refreshIncludeFileContents - Refresh include file contents without affecting board
+- src/includeFileManager-IncludeFileManager_recheckIncludeFileChanges - Re-check if include files have changed after reload
+- src/includeFileManager-IncludeFileManager_saveColumnIncludeChanges - Save changes to column include file
+- src/includeFileManager-IncludeFileManager_saveTaskIncludeChanges - Save changes to task include file
+- src/includeFileManager-IncludeFileManager_saveAllColumnIncludeChanges - Save all column include changes
+- src/includeFileManager-IncludeFileManager_saveAllTaskIncludeChanges - Save all task include changes
+- src/includeFileManager-IncludeFileManager_saveIncludeFileChanges - Save include file changes to disk
+- src/includeFileManager-IncludeFileManager_saveIncludeFileAsBackup - Save include file as backup
+- src/includeFileManager-IncludeFileManager_checkColumnIncludeUnsavedChanges - Check if column has unsaved include changes
+- src/includeFileManager-IncludeFileManager_checkTaskIncludeUnsavedChanges - Check if task has unsaved include changes
+- src/includeFileManager-IncludeFileManager_hasUnsavedIncludeFileChanges - Check if specific include has unsaved changes
+- src/includeFileManager-IncludeFileManager_trackIncludeFileUnsavedChanges - Track unsaved changes in include files
+- src/includeFileManager-IncludeFileManager_checkForExternalIncludeFileChanges - Check for external changes in include files
+- src/includeFileManager-IncludeFileManager_hasExternalChanges - Check if include file has external changes
+- src/includeFileManager-IncludeFileManager_hasExternalChangesForContent - Check external changes against specific content
+- src/includeFileManager-IncludeFileManager_updateIncludeContentUnified - Update include content in unified system
+- src/includeFileManager-IncludeFileManager_updateIncludeFile - Update include file from external change
+- src/includeFileManager-IncludeFileManager_updateInlineIncludeFile - Update inline include file
+- src/includeFileManager-IncludeFileManager_updateTaskIncludeWithConflictDetection - Update task include with conflict detection
+- src/includeFileManager-IncludeFileManager_reprocessTaskIncludes - Reprocess all task includes
+- src/includeFileManager-IncludeFileManager_handleIncludeFileConflict - Handle include file conflict
+- src/includeFileManager-IncludeFileManager_isColumnIncludeFile - Check if file is column include
+- src/includeFileManager-IncludeFileManager_isTaskIncludeFile - Check if file is task include
+- src/includeFileManager-IncludeFileManager_handleExternalFileChange - Handle external file change event
+- src/includeFileManager-IncludeFileManager_writeFileContent - Write file content to disk
+- src/includeFileManager-IncludeFileManager_getRecentlyReloadedFiles - Get recently reloaded files set
+- src/includeFileManager-IncludeFileManager_addRecentlyReloadedFile - Add file to recently reloaded set
+- src/includeFileManager-IncludeFileManager_clearRecentlyReloadedFiles - Clear recently reloaded files set
+
+## src/kanbanFileService.ts - KanbanFileService
+
+- src/kanbanFileService-KanbanFileService_initializeState - Initialize state tracking values
+- src/kanbanFileService-KanbanFileService_getState - Get current state values for syncing back to panel
+- src/kanbanFileService-KanbanFileService_isFileLocked - Check if file is locked
+- src/kanbanFileService-KanbanFileService_toggleFileLock - Toggle file lock state
+- src/kanbanFileService-KanbanFileService_getCurrentDocumentUri - Get current document URI
+- src/kanbanFileService-KanbanFileService_ensureBoardAndSendUpdate - Ensure board is loaded and send update to webview
+- src/kanbanFileService-KanbanFileService_loadMarkdownFile - Load markdown file and parse into board structure
+- src/kanbanFileService-KanbanFileService_forceReloadFromFile - Force reload the board from file (user-initiated)
+- src/kanbanFileService-KanbanFileService_saveToMarkdown - Save board to markdown file
+- src/kanbanFileService-KanbanFileService_saveMainKanbanChanges - Save main kanban changes
+- src/kanbanFileService-KanbanFileService_initializeFile - Initialize a new kanban file with header
+- src/kanbanFileService-KanbanFileService_setupDocumentChangeListener - Setup document change listener for tracking modifications
+- src/kanbanFileService-KanbanFileService_registerSaveHandler - Register handler with SaveEventCoordinator for version tracking
+- src/kanbanFileService-KanbanFileService_updateKnownFileContent - Update the known file content baseline
+- src/kanbanFileService-KanbanFileService_openFileWithReuseCheck - Open a file with reuse check (focus existing editor if already open)
+- src/kanbanFileService-KanbanFileService_setFileHidden - Set file as hidden on Windows using attrib command
+- src/kanbanFileService-KanbanFileService_checkForExternalUnsavedChanges - Check for external unsaved changes when about to save
+
+## src/conflictService.ts - ConflictService
+
+- src/conflictService-ConflictService_showConflictDialog - Centralized dialog manager to prevent duplicate conflict dialogs
+- src/conflictService-ConflictService_notifyExternalChanges - Notify user about external changes without forcing reload
+- src/conflictService-ConflictService_handleInlineIncludeFileChange - Handle changes to inline include files
+- src/conflictService-ConflictService_createUnifiedBackup - Create unified backup (conflict or other types)
+- src/conflictService-ConflictService_createBoardStateBackup - Create board state backup file
+- src/conflictService-ConflictService_handlePanelClose - Handle panel close with unsaved changes check
+- src/conflictService-ConflictService_openFileWithReuseCheck - Open a file with reuse check (internal)
+- src/conflictService-ConflictService_setFileHidden - Set file as hidden on Windows using attrib command (internal)
+
+## src/utils/linkOperations.ts - LinkOperations
+
+- src/utils/linkOperations-LinkOperations_replaceSingleLink - Replace only the specific occurrence (by index) of a specific link in text
+- src/utils/linkOperations-LinkOperations_replaceMatchAtPosition - Replace a specific match at its exact position with the new path
+
+## src/fileStateManager.ts - FileStateManager
+
+- src/fileStateManager-FileStateManager_getInstance - Get singleton instance
+- src/fileStateManager-FileStateManager_registerFile - Register file for tracking
+- src/fileStateManager-FileStateManager_updateFileContent - Update file content and track changes
+- src/fileStateManager-FileStateManager_getFileState - Get file state by path
+- src/fileStateManager-FileStateManager_hasUnsavedChanges - Check if file has unsaved changes
+- src/fileStateManager-FileStateManager_getUnsavedChanges - Get unsaved changes content
+- src/fileStateManager-FileStateManager_clearUnsavedChanges - Clear unsaved changes flag
+- src/fileStateManager-FileStateManager_markAsSaved - Mark file as saved with baseline update
+- src/fileStateManager-FileStateManager_hasExternalChanges - Check for external changes
+- src/fileStateManager-FileStateManager_getExternalChanges - Get external changes content
+- src/fileStateManager-FileStateManager_updateBaseline - Update baseline content
+- src/fileStateManager-FileStateManager_unregisterFile - Unregister file from tracking
+- src/fileStateManager-FileStateManager_getAllFiles - Get all tracked file paths
+- src/fileStateManager-FileStateManager_getFilesWithUnsavedChanges - Get files with unsaved changes
+- src/fileStateManager-FileStateManager_clearAllUnsavedFlags - Clear all unsaved flags
+- src/fileStateManager-FileStateManager_clearCache - Clear internal cache
+- src/fileStateManager-FileStateManager_getDebugInfo - Get debug information
+- src/fileStateManager-FileStateManager_readFromDisk - Read current file content from disk
+- src/fileStateManager-FileStateManager_refreshBaseline - Refresh baseline from disk
+
+## src/conflictResolver.ts - ConflictResolver
+
+- src/conflictResolver-ConflictResolver_detectConflict - Detect conflict between versions
+- src/conflictResolver-ConflictResolver_resolveConflict - Resolve conflict with chosen strategy
+- src/conflictResolver-ConflictResolver_mergeChanges - Merge changes with auto-resolution
+- src/conflictResolver-ConflictResolver_createDiffView - Create diff view for comparison
+- src/conflictResolver-ConflictResolver_hasConflict - Check if content has conflicts
+- src/conflictResolver-ConflictResolver_extractConflictMarkers - Extract conflict markers from content
+
+## src/externalFileWatcher.ts - ExternalFileWatcher
+
+- src/externalFileWatcher-ExternalFileWatcher_constructor - Initialize file watcher
+- src/externalFileWatcher-ExternalFileWatcher_watchFile - Add file to watch list
+- src/externalFileWatcher-ExternalFileWatcher_unwatchFile - Remove file from watch list
+- src/externalFileWatcher-ExternalFileWatcher_dispose - Dispose watcher and cleanup
+- src/externalFileWatcher-ExternalFileWatcher_onDidChange - Get change event emitter
+
+## src/saveEventCoordinator.ts - SaveEventCoordinator
+
+- src/saveEventCoordinator-SaveEventCoordinator_constructor - Initialize coordinator
+- src/saveEventCoordinator-SaveEventCoordinator_beginSave - Begin save operation
+- src/saveEventCoordinator-SaveEventCoordinator_completeSave - Complete save operation
+- src/saveEventCoordinator-SaveEventCoordinator_cancelSave - Cancel save operation
+- src/saveEventCoordinator-SaveEventCoordinator_isSaving - Check if save in progress
+- src/saveEventCoordinator-SaveEventCoordinator_isSavingFile - Check if specific file is being saved
+- src/saveEventCoordinator-SaveEventCoordinator_shouldIgnoreChange - Check if change should be ignored
+- src/saveEventCoordinator-SaveEventCoordinator_getActiveSaves - Get list of active saves
+
+## src/fileManager.ts - FileManager
+
+- src/fileManager-FileManager_constructor - Initialize file manager
+- src/fileManager-FileManager_readFile - Read file from disk
+- src/fileManager-FileManager_writeFile - Write file to disk
+- src/fileManager-FileManager_fileExists - Check if file exists
+- src/fileManager-FileManager_deleteFile - Delete file from disk
+- src/fileManager-FileManager_copyFile - Copy file to new location
+- src/fileManager-FileManager_ensureDirectory - Ensure directory exists
+
+## src/messageHandler.ts - MessageHandler
+
+- src/messageHandler-MessageHandler_handleMessage - Main message routing handler
+- src/messageHandler-MessageHandler_startOperation - Start operation with progress tracking
+- src/messageHandler-MessageHandler_updateOperationProgress - Update operation progress
+- src/messageHandler-MessageHandler_endOperation - End operation and clear progress
+- src/messageHandler-MessageHandler_handleUndo - Handle undo operation
+- src/messageHandler-MessageHandler_detectBoardChanges - Detect changes between board states
+- src/messageHandler-MessageHandler_unfoldColumnsForFocusTargets - Unfold columns for focus targets
+- src/messageHandler-MessageHandler_sendFocusTargets - Send focus targets to webview
+- src/messageHandler-MessageHandler_handleRedo - Handle redo operation
+- src/messageHandler-MessageHandler_handleSelectFile - Handle file selection dialog
+- src/messageHandler-MessageHandler_handleEditModeStart - Handle edit mode start
+- src/messageHandler-MessageHandler_handleEditModeEnd - Handle edit mode end
+- src/messageHandler-MessageHandler_handleOpenFile - Handle file open request
+- src/messageHandler-MessageHandler_handleSaveBoardState - Handle board state save
+- src/messageHandler-MessageHandler_performBoardAction - Perform board action with undo
+- src/messageHandler-MessageHandler_performBoardActionSilent - Perform board action silently
+- src/messageHandler-MessageHandler_handlePageHiddenWithUnsavedChanges - Handle page hidden with unsaved changes
+- src/messageHandler-MessageHandler_handleSetPreference - Handle preference update
+- src/messageHandler-MessageHandler_handleSetContext - Handle context variable update
+- src/messageHandler-MessageHandler_handleVSCodeSnippet - Handle snippet insertion
+- src/messageHandler-MessageHandler_getSnippetNameForShortcut - Get snippet name for keyboard shortcut
+- src/messageHandler-MessageHandler_loadVSCodeKeybindings - Load VSCode keybindings
+- src/messageHandler-MessageHandler_getUserKeybindingsPath - Get user keybindings file path
+- src/messageHandler-MessageHandler_getWorkspaceKeybindingsPath - Get workspace keybindings path
+- src/messageHandler-MessageHandler_matchesShortcut - Check if keybinding matches shortcut
+- src/messageHandler-MessageHandler_resolveSnippetContent - Resolve snippet content
+- src/messageHandler-MessageHandler_loadMarkdownSnippets - Load markdown snippets
+- src/messageHandler-MessageHandler_getUserSnippetsPath - Get user snippets path
+- src/messageHandler-MessageHandler_getWorkspaceSnippetsPath - Get workspace snippets path
+- src/messageHandler-MessageHandler_getVSCodeUserDataDir - Get VSCode user data directory
+- src/messageHandler-MessageHandler_loadSnippetsFromFile - Load snippets from file
+- src/messageHandler-MessageHandler_loadExtensionSnippets - Load extension snippets
+- src/messageHandler-MessageHandler_processSnippetBody - Process snippet body with variables
+- src/messageHandler-MessageHandler_handleRuntimeTrackingReport - Handle runtime tracking report
+- src/messageHandler-MessageHandler_handleSaveClipboardImage - Handle clipboard image save
+- src/messageHandler-MessageHandler_handleSaveClipboardImageWithPath - Handle clipboard image save with path
+- src/messageHandler-MessageHandler_handlePasteImageIntoField - Handle image paste into field
+- src/messageHandler-MessageHandler_handleUpdateBoard - Handle board update from webview
+- src/messageHandler-MessageHandler_handleConfirmDisableIncludeMode - Handle include mode disable confirmation
+- src/messageHandler-MessageHandler_handleRequestIncludeFile - Handle include file request
+- src/messageHandler-MessageHandler_handleRegisterInlineInclude - Handle inline include registration
+- src/messageHandler-MessageHandler_handleRequestIncludeFileName - Handle include filename request
+- src/messageHandler-MessageHandler_handleRequestEditIncludeFileName - Handle edit include filename request
+- src/messageHandler-MessageHandler_handleRequestEditTaskIncludeFileName - Handle edit task include filename
+- src/messageHandler-MessageHandler_handleRequestTaskIncludeFileName - Handle task include filename request
+- src/messageHandler-MessageHandler_handleGetExportDefaultFolder - Get default export folder
+- src/messageHandler-MessageHandler_handleSelectExportFolder - Handle export folder selection
+- src/messageHandler-MessageHandler_handleAskOpenExportFolder - Ask to open export folder
+- src/messageHandler-MessageHandler_handleGetTrackedFilesDebugInfo - Get tracked files debug info
+- src/messageHandler-MessageHandler_handleClearTrackedFilesCache - Clear tracked files cache
+- src/messageHandler-MessageHandler_handleReloadAllIncludedFiles - Reload all included files
+- src/messageHandler-MessageHandler_handleSaveIndividualFile - Save individual file
+- src/messageHandler-MessageHandler_handleReloadIndividualFile - Reload individual file
+- src/messageHandler-MessageHandler_getUnifiedFileState - Get unified file state info
+- src/messageHandler-MessageHandler_collectTrackedFilesDebugInfo - Collect debug info for tracked files
+- src/messageHandler-MessageHandler_clearAllTrackedFileCaches - Clear all tracked file caches
+- src/messageHandler-MessageHandler_handleUpdateTaskFromStrikethroughDeletion - Handle task strikethrough deletion
+- src/messageHandler-MessageHandler_handleUpdateColumnTitleFromStrikethroughDeletion - Handle column title strikethrough
+- src/messageHandler-MessageHandler_handleGetMarpThemes - Get available Marp themes
+- src/messageHandler-MessageHandler_handlePollMarpThemes - Poll for Marp themes
+- src/messageHandler-MessageHandler_handleOpenInMarpPreview - Open file in Marp preview
+- src/messageHandler-MessageHandler_handleCheckMarpStatus - Check Marp extension status
+- src/messageHandler-MessageHandler_handleStopAutoExport - Stop auto-export mode
+- src/messageHandler-MessageHandler_handleStopAutoExportForOtherKanbanFiles - Stop auto-export for other files
+- src/messageHandler-MessageHandler_handleStopAutoExportForFile - Stop auto-export for specific file
+- src/messageHandler-MessageHandler_handleExport - Handle export operation
+- src/messageHandler-MessageHandler_handleAutoExportMode - Handle auto-export mode
+
+## src/extension.ts
+
+- src/extension-activate - Extension activation entry point
+- src/extension-deactivate - Extension deactivation entry point
+
+## src/boardOperations.ts - BoardOperations
+
+- src/boardOperations-BoardOperations_constructor - Initialize board operations
+- src/boardOperations-BoardOperations_addColumn - Add new column to board
+- src/boardOperations-BoardOperations_removeColumn - Remove column from board
+- src/boardOperations-BoardOperations_moveColumn - Move column to new position
+- src/boardOperations-BoardOperations_updateColumnTitle - Update column title
+- src/boardOperations-BoardOperations_addTask - Add new task to column
+- src/boardOperations-BoardOperations_removeTask - Remove task from column
+- src/boardOperations-BoardOperations_moveTask - Move task between columns
+- src/boardOperations-BoardOperations_updateTaskTitle - Update task title
+- src/boardOperations-BoardOperations_updateTaskDescription - Update task description
+- src/boardOperations-BoardOperations_toggleTaskComplete - Toggle task completion state
+
+## src/markdownParser.ts
+
+- src/markdownParser-parseKanbanBoard - Parse markdown into kanban board structure
+- src/markdownParser-kanbanBoardToMarkdown - Convert kanban board to markdown
+- src/markdownParser-extractYamlFrontmatter - Extract YAML frontmatter from markdown
+- src/markdownParser-parseColumn - Parse column from markdown
+- src/markdownParser-parseTask - Parse task from markdown
+- src/markdownParser-columnToMarkdown - Convert column to markdown
+- src/markdownParser-taskToMarkdown - Convert task to markdown
+
+## src/undoRedoManager.ts - UndoRedoManager
+
+- src/undoRedoManager-UndoRedoManager_constructor - Initialize undo/redo manager
+- src/undoRedoManager-UndoRedoManager_saveState - Save board state to history
+- src/undoRedoManager-UndoRedoManager_undo - Undo to previous state
+- src/undoRedoManager-UndoRedoManager_redo - Redo to next state
+- src/undoRedoManager-UndoRedoManager_canUndo - Check if undo is available
+- src/undoRedoManager-UndoRedoManager_canRedo - Check if redo is available
+- src/undoRedoManager-UndoRedoManager_clear - Clear undo/redo history
+
+## src/backupManager.ts - BackupManager
+
+- src/backupManager-BackupManager_constructor - Initialize backup manager
+- src/backupManager-BackupManager_createBackup - Create backup of current state
+- src/backupManager-BackupManager_autoBackup - Create automatic backup
+- src/backupManager-BackupManager_restoreBackup - Restore from backup
+- src/backupManager-BackupManager_listBackups - List available backups
+- src/backupManager-BackupManager_deleteBackup - Delete backup file
+- src/backupManager-BackupManager_cleanOldBackups - Clean old backups based on retention
+
+## src/linkHandler.ts - LinkHandler
+
+- src/linkHandler-LinkHandler_constructor - Initialize link handler
+- src/linkHandler-LinkHandler_handleLink - Handle link click
+- src/linkHandler-LinkHandler_resolveLink - Resolve link path
+- src/linkHandler-LinkHandler_openLink - Open link in editor or browser
+- src/linkHandler-LinkHandler_isExternalLink - Check if link is external URL
+- src/linkHandler-LinkHandler_updateLinkPath - Update link path in content
+
+## src/fileSearchService.ts - FileSearchService
+
+- src/fileSearchService-FileSearchService_searchFiles - Search for files by pattern
+- src/fileSearchService-FileSearchService_findMarkdownFiles - Find markdown files in workspace
+- src/fileSearchService-FileSearchService_quickPick - Show file quick pick dialog
+- src/fileSearchService-FileSearchService_getRelativePath - Get relative path for file
+
+## src/configurationService.ts - ConfigurationService
+
+- src/configurationService-ConfigurationService_getInstance - Get singleton instance
+- src/configurationService-ConfigurationService_getConfig - Get configuration value with caching
+- src/configurationService-ConfigurationService_getNestedConfig - Get nested config using dot notation
+- src/configurationService-ConfigurationService_updateConfig - Update configuration value
+- src/configurationService-ConfigurationService_getAllConfig - Get all configuration as typed object
+- src/configurationService-ConfigurationService_clearCache - Clear configuration cache
+- src/configurationService-ConfigurationService_getTagConfiguration - Get tag configuration
+- src/configurationService-ConfigurationService_getEnabledTagCategoriesColumn - Get enabled tag categories for columns
+- src/configurationService-ConfigurationService_getEnabledTagCategoriesTask - Get enabled tag categories for tasks
+- src/configurationService-ConfigurationService_getCustomTagCategories - Get custom tag categories
+- src/configurationService-ConfigurationService_getLayoutConfiguration - Get layout configuration
+- src/configurationService-ConfigurationService_getBackupConfiguration - Get backup configuration
+- src/configurationService-ConfigurationService_getLinkConfiguration - Get link configuration
+- src/configurationService-ConfigurationService_getPathGenerationMode - Get path generation mode
+- src/configurationService-ConfigurationService_validateConfig - Validate configuration value
+- src/configurationService-ConfigurationService_getNestedProperty - Get nested property from object
+
+## src/presentationParser.ts - PresentationParser
+
+- src/presentationParser-PresentationParser_parsePresentation - Parse presentation markdown into slides
+- src/presentationParser-PresentationParser_slidesToTasks - Convert slides to kanban tasks
+- src/presentationParser-PresentationParser_tasksToPresentation - Convert tasks to presentation format
+- src/presentationParser-PresentationParser_parseMarkdownToTasks - Parse markdown file to tasks
+
+## src/utils/idGenerator.ts - IdGenerator
+
+- src/utils/idGenerator-IdGenerator_generateUUID - Generate RFC4122 UUID v4
+- src/utils/idGenerator-IdGenerator_generateColumnId - Generate column ID with prefix
+- src/utils/idGenerator-IdGenerator_generateTaskId - Generate task ID with prefix
+- src/utils/idGenerator-IdGenerator_isValidUUID - Validate UUID format
+- src/utils/idGenerator-IdGenerator_isValidColumnId - Validate column ID format
+- src/utils/idGenerator-IdGenerator_isValidTaskId - Validate task ID format
+- src/utils/idGenerator-IdGenerator_extractUUID - Extract UUID from prefixed ID
+- src/utils/idGenerator-IdGenerator_getShortId - Generate short display ID
+
+## src/utils/tagUtils.ts - TagUtils
+
+- src/utils/tagUtils-TagUtils_filterTagsFromText - Remove tags based on visibility setting
+- src/utils/tagUtils-TagUtils_removeConfiguredTags - Remove configured tags from text
+- src/utils/tagUtils-TagUtils_processMarkdownContent - Process markdown content to filter tags
+
+## src/utils/fileTypeUtils.ts - FileTypeUtils
+
+- src/utils/fileTypeUtils-FileTypeUtils_getFileExtension - Get file extension using path module
+
+## src/utils/columnUtils.ts
+
+- src/utils/columnUtils-getColumnRow - Extract row number from column title
+- src/utils/columnUtils-sortColumnsByRow - Sort columns by row number
+
+## src/services/PathResolver.ts - PathResolver
+
+- src/services/PathResolver-PathResolver_resolve - Resolve relative path to absolute
+- src/services/PathResolver-PathResolver_normalize - Normalize path with ./ prefix
+- src/services/PathResolver-PathResolver_removePrefix - Remove ./ prefix from path
+- src/services/PathResolver-PathResolver_areEqual - Check if two paths are equivalent
+- src/services/PathResolver-PathResolver_findMatch - Find matching path in array
+- src/services/PathResolver-PathResolver_getVariations - Get all equivalent path variations
+- src/services/PathResolver-PathResolver_getRelativePath - Get relative path between files
+- src/services/PathResolver-PathResolver_isAbsolute - Check if path is absolute
+- src/services/PathResolver-PathResolver_getBaseName - Get base name from path
+- src/services/PathResolver-PathResolver_getDirName - Get directory name from path
+- src/services/PathResolver-PathResolver_join - Join path segments
+- src/services/PathResolver-PathResolver_normalizeSeparators - Normalize path separators
+
+## src/services/FileWriter.ts - FileWriter
+
+- src/services/FileWriter-FileWriter_writeFile - Write content to file with error handling
+- src/services/FileWriter-FileWriter_writeBatch - Write multiple files in batch
+- src/services/FileWriter-FileWriter_createBackup - Create backup of file
+- src/services/FileWriter-FileWriter_fileExists - Check if file exists
+- src/services/FileWriter-FileWriter_directoryExists - Check if directory exists
+- src/services/FileWriter-FileWriter_getUniqueFilePath - Generate unique filename
+- src/services/FileWriter-FileWriter_deleteFile - Safely delete file
+- src/services/FileWriter-FileWriter_readFile - Read file content
+- src/services/FileWriter-FileWriter_ensureDirectory - Create directory if needed
+
+## src/services/ContentPipelineService.ts - ContentPipelineService
+
+- src/services/ContentPipelineService-ContentPipelineService_execute - Execute save/backup/export operation
+- src/services/ContentPipelineService-ContentPipelineService_executeSave - Execute save operation
+- src/services/ContentPipelineService-ContentPipelineService_executeBackup - Execute backup operation
+- src/services/ContentPipelineService-ContentPipelineService_executeExport - Execute export operation
+- src/services/ContentPipelineService-ContentPipelineService_createBackupFile - Create backup file
+- src/services/ContentPipelineService-ContentPipelineService_batchExport - Batch export multiple items
+- src/services/ContentPipelineService-ContentPipelineService_validateContent - Validate content before operation
+
+## src/services/OperationOptions.ts - OperationOptionsBuilder
+
+- src/services/OperationOptions-OperationOptionsBuilder_operation - Set operation type
+- src/services/OperationOptions-OperationOptionsBuilder_source - Set source file path
+- src/services/OperationOptions-OperationOptionsBuilder_targetDir - Set target directory
+- src/services/OperationOptions-OperationOptionsBuilder_targetFilename - Set target filename
+- src/services/OperationOptions-OperationOptionsBuilder_format - Set format strategy
+- src/services/OperationOptions-OperationOptionsBuilder_scope - Set export scope
+- src/services/OperationOptions-OperationOptionsBuilder_includes - Set include processing mode
+- src/services/OperationOptions-OperationOptionsBuilder_createDirs - Enable/disable directory creation
+- src/services/OperationOptions-OperationOptionsBuilder_notify - Enable/disable notifications
+- src/services/OperationOptions-OperationOptionsBuilder_overwrite - Enable/disable overwrite
+- src/services/OperationOptions-OperationOptionsBuilder_backup - Enable/disable backup
+- src/services/OperationOptions-OperationOptionsBuilder_exportOptions - Set export-specific options
+- src/services/OperationOptions-OperationOptionsBuilder_backupOptions - Set backup-specific options
+- src/services/OperationOptions-OperationOptionsBuilder_build - Build and validate options
+- src/services/OperationOptions-OperationOptionsBuilder_quickExport - Create quick export options
+- src/services/OperationOptions-OperationOptionsBuilder_quickSave - Create quick save options
+- src/services/OperationOptions-OperationOptionsBuilder_quickBackup - Create quick backup options
+
+## src/services/MarpConverter.ts - MarpConverter
+
+- src/services/MarpConverter-MarpConverter_kanbanToMarp - Convert kanban board to Marp presentation
+- src/services/MarpConverter-MarpConverter_createMarpFrontmatter - Create Marp YAML frontmatter
+- src/services/MarpConverter-MarpConverter_columnToSlides - Convert column to Marp slides
+- src/services/MarpConverter-MarpConverter_taskToSlide - Convert task to Marp slide
+- src/services/MarpConverter-MarpConverter_convertMarkdownToMarp - Convert kanban markdown to Marp
+- src/services/MarpConverter-MarpConverter_addMarpDirectives - Add Marp directives to markdown
+
+## src/services/MarpExtensionService.ts - MarpExtensionService
+
+- src/services/MarpExtensionService-MarpExtensionService_isMarpExtensionInstalled - Check if Marp extension is installed
+- src/services/MarpExtensionService-MarpExtensionService_isMarpExtensionActive - Check if Marp extension is active
+- src/services/MarpExtensionService-MarpExtensionService_openInMarpPreview - Open file in Marp preview
+- src/services/MarpExtensionService-MarpExtensionService_saveAndOpenInMarpPreview - Save and open in Marp preview
+- src/services/MarpExtensionService-MarpExtensionService_promptInstallMarpExtension - Prompt to install Marp extension
+- src/services/MarpExtensionService-MarpExtensionService_exportUsingMarpExtension - Export using Marp extension
+- src/services/MarpExtensionService-MarpExtensionService_getMarpStatus - Get Marp extension status
+- src/services/MarpExtensionService-MarpExtensionService_createMarpStatusBarItem - Create Marp status bar item
+
+## src/services/AssetHandler.ts - AssetHandler
+
+- src/services/AssetHandler-AssetHandler_findAssets - Find all assets in markdown content
+- src/services/AssetHandler-AssetHandler_processAssets - Process assets according to strategy
+- src/services/AssetHandler-AssetHandler_copyAsset - Copy asset to target directory
+- src/services/AssetHandler-AssetHandler_embedAsset - Embed asset as base64 data URL
+- src/services/AssetHandler-AssetHandler_calculateMD5 - Calculate MD5 hash for file
+- src/services/AssetHandler-AssetHandler_detectAssetType - Detect asset type from extension
+- src/services/AssetHandler-AssetHandler_isRemoteUrl - Check if path is remote URL
+- src/services/AssetHandler-AssetHandler_getMimeType - Get MIME type for extension
+- src/services/AssetHandler-AssetHandler_getAssetsByType - Get assets of specific type
+- src/services/AssetHandler-AssetHandler_getTotalSize - Calculate total size of assets
+- src/services/AssetHandler-AssetHandler_validateAssets - Validate asset paths in content
+
+## src/services/MarpExportService.ts - MarpExportService
+
+- src/services/MarpExportService-MarpExportService_storeMarpPid - Store Marp process PID
+- src/services/MarpExportService-MarpExportService_getMarpPid - Get Marp process PID
+- src/services/MarpExportService-MarpExportService_stopMarpWatch - Stop Marp watch process
+- src/services/MarpExportService-MarpExportService_isWatching - Check if file is being watched
+- src/services/MarpExportService-MarpExportService_stopAllMarpWatches - Stop all Marp watch processes
+- src/services/MarpExportService-MarpExportService_export - Export markdown using Marp CLI
+- src/services/MarpExportService-MarpExportService_buildMarpCliArgs - Build Marp CLI arguments
+- src/services/MarpExportService-MarpExportService_getDefaultEnginePath - Get default engine path
+- src/services/MarpExportService-MarpExportService_testPdfExport - Export to PDF for testing
+- src/services/MarpExportService-MarpExportService_exportToPptx - Export to PPTX
+- src/services/MarpExportService-MarpExportService_exportToHtml - Export to HTML
+- src/services/MarpExportService-MarpExportService_ensureMarpBuildFiles - Ensure required build files exist
+- src/services/MarpExportService-MarpExportService_isMarpCliAvailable - Check if Marp CLI is available
+- src/services/MarpExportService-MarpExportService_engineFileExists - Check if engine file exists
+- src/services/MarpExportService-MarpExportService_getMarpVersion - Get Marp CLI version
+- src/services/MarpExportService-MarpExportService_getAvailableThemes - Get available Marp themes
+
+## src/services/IncludeProcessor.ts - IncludeProcessor
+
+- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content
+- src/services/IncludeProcessor-IncludeProcessor_processIncludeType - Process specific type of include
+- src/services/IncludeProcessor-IncludeProcessor_processIncludeContent - Process include content recursively
+- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing
+- src/services/IncludeProcessor-IncludeProcessor_detectIncludeType - Detect includes of specific type
+- src/services/IncludeProcessor-IncludeProcessor_convertIncludeContent - Convert include content based on format
+- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type
+- src/services/IncludeProcessor-IncludeProcessor_detectIncludeFormat - Detect format of include file
+- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file
+- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers
+- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers
+
+## src/services/FormatConverter.ts - FormatConverter
+
+- src/services/FormatConverter-FormatConverter_kanbanToPresentation - Convert kanban to presentation format
+- src/services/FormatConverter-FormatConverter_taskToPresentation - Convert task to presentation slide
+- src/services/FormatConverter-FormatConverter_presentationToKanban - Convert presentation to kanban format
+- src/services/FormatConverter-FormatConverter_columnToMarkdown - Convert column to markdown
+- src/services/FormatConverter-FormatConverter_taskToMarkdown - Convert task to markdown
+- src/services/FormatConverter-FormatConverter_detectFormat - Detect format of markdown content
+- src/services/FormatConverter-FormatConverter_convert - Convert content to specific format
+- src/services/FormatConverter-FormatConverter_stripYaml - Remove YAML frontmatter
+- src/services/FormatConverter-FormatConverter_extractYaml - Extract YAML frontmatter
+- src/services/FormatConverter-FormatConverter_addYaml - Add or replace YAML frontmatter
+
+---
+
+## Summary
+
+Total functions documented: **318**
+
+### Files analyzed:
+1. kanbanWebviewPanel.ts - 39 methods (reduced from 93)
+2. includeFileManager.ts - 42 methods (NEW)
+3. kanbanFileService.ts - 17 methods (NEW)
+4. conflictService.ts - 6 methods (NEW, renamed from partial conflictResolver)
+5. utils/linkOperations.ts - 2 methods (NEW)
+6. fileStateManager.ts - 17 methods
+7. conflictResolver.ts - 6 methods
+8. externalFileWatcher.ts - 5 methods
+9. saveEventCoordinator.ts - 7 methods
+10. fileManager.ts - 6 methods
+11. messageHandler.ts - 50+ methods
+12. extension.ts - 2 functions
+13. boardOperations.ts - 10 methods
+14. markdownParser.ts - 7 functions
+15. undoRedoManager.ts - 7 methods
+16. backupManager.ts - 6 methods
+17. linkHandler.ts - 6 methods
+18. fileSearchService.ts - 4 methods
+19. configurationService.ts - 14 methods
+20. presentationParser.ts - 4 methods
+21. utils/idGenerator.ts - 7 methods
+22. utils/tagUtils.ts - 3 methods
+23. utils/fileTypeUtils.ts - 1 method
+24. utils/columnUtils.ts - 2 functions
+25. services/PathResolver.ts - 14 methods
+26. services/FileWriter.ts - 9 methods
+27. services/ContentPipelineService.ts - 7 methods
+28. services/OperationOptions.ts - 16 methods
+29. services/MarpConverter.ts - 6 methods
+30. services/MarpExtensionService.ts - 8 methods
+31. services/AssetHandler.ts - 11 methods
+32. services/MarpExportService.ts - 16 methods
+33. services/IncludeProcessor.ts - 11 methods
+34. services/FormatConverter.ts - 10 methods
+
+### Refactoring Summary:
+- **kanbanWebviewPanel.ts**: Reduced from 93 to 39 methods (54 methods extracted)
+- **New classes created**:
+  - IncludeFileManager (42 methods) - All include file operations
+  - KanbanFileService (17 methods) - File loading, saving, and state management
+  - ConflictService (8 methods) - Conflict resolution and backup operations
+  - LinkOperations (2 static methods) - Link replacement utilities
+  - ExportService (50+ methods) - Export operations
+

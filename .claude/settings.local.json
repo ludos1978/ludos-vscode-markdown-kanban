@@ -48,7 +48,11 @@
       "Bash(npm ls:*)",
       "Bash(bash /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tmp/migration-script.sh)",
       "Bash(python3 tmp/complete-migration.py)",
-      "Bash(while read line)"
+      "Bash(while read line)",
+      "Bash(for file in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/*.js)",
+      "Bash(done)",
+      "Bash(while read file)",
+      "Bash(do basename \"$file\")"
     ],
     "deny": [],
     "ask": []
