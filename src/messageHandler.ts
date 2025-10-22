@@ -173,6 +173,16 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
+            // Switch column include file (load new file without saving main file)
+            case 'switchColumnIncludeFile':
+                await this.handleSwitchColumnIncludeFile(message);
+                break;
+
+            // Switch task include file (load new file without saving main file)
+            case 'switchTaskIncludeFile':
+                await this.handleSwitchTaskIncludeFile(message);
+                break;
+
             // Enhanced file and link handling
             case 'openFileLink':
                 await this._linkHandler.handleFileLink(message.href, message.taskId, message.columnId, message.linkIndex);
@@ -1967,6 +1977,176 @@ export class MessageHandler {
 
         } catch (error) {
             console.error('[requestEditTaskIncludeFileName] Error handling input request:', error);
+        }
+    }
+
+    /**
+     * Switch column include file without saving the main file
+     * - Saves old include file if it has unsaved changes
+     * - Creates and loads new include file
+     * - Updates column with new content
+     * - Does NOT save the main kanban file
+     */
+    private async handleSwitchColumnIncludeFile(message: any): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                console.error('[switchColumnIncludeFile] No panel found');
+                return;
+            }
+
+            const { columnId, newFilePath, oldFilePath, newTitle } = message;
+            console.log(`[switchColumnIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for column ${columnId}`);
+
+            // 1. Save old include file if it has unsaved changes
+            const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
+            if (oldFile && oldFile.hasUnsavedChanges()) {
+                console.log('[switchColumnIncludeFile] Saving old file with unsaved changes');
+                await oldFile.save();
+            }
+
+            // 2. Update board with new include path
+            const board = this._getCurrentBoard();
+            if (board) {
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (column) {
+                    column.title = newTitle;
+                    column.includeFiles = [newFilePath];
+                    column.originalTitle = newTitle;
+                }
+            }
+
+            // 3. Create new include file in registry if it doesn't exist
+            if (!panel.fileRegistry?.hasByRelativePath(newFilePath)) {
+                const mainFile = panel.fileRegistry.getMainFile();
+                if (mainFile) {
+                    console.log('[switchColumnIncludeFile] Creating new ColumnIncludeFile');
+                    const columnInclude = panel._fileFactory.createColumnInclude(
+                        newFilePath,
+                        mainFile,
+                        false
+                    );
+                    panel.fileRegistry.register(columnInclude);
+                    await columnInclude.ensureLoaded();
+                }
+            }
+
+            // 4. Load content from new file and parse tasks
+            const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
+            if (newFile && newFile.parseToTasks) {
+                const tasks = newFile.parseToTasks();
+                console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
+
+                // 5. Send updated content to frontend
+                panel._panel?.webview.postMessage({
+                    type: 'updateColumnContent',
+                    columnId: columnId,
+                    tasks: tasks
+                });
+
+                vscode.window.showInformationMessage(`Switched to include file: ${newFilePath}`);
+            }
+
+        } catch (error) {
+            console.error('[switchColumnIncludeFile] Error:', error);
+            vscode.window.showErrorMessage(`Failed to switch include file: ${error}`);
+        }
+    }
+
+    /**
+     * Switch task include file without saving the main file
+     * - Saves old include file if it has unsaved changes
+     * - Creates and loads new include file
+     * - Updates task with new content
+     * - Does NOT save the main kanban file
+     */
+    private async handleSwitchTaskIncludeFile(message: any): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                console.error('[switchTaskIncludeFile] No panel found');
+                return;
+            }
+
+            const { taskId, columnId, newFilePath, oldFilePath, newTitle } = message;
+            console.log(`[switchTaskIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for task ${taskId}`);
+
+            // 1. Save old include file if it has unsaved changes
+            const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
+            if (oldFile && oldFile.hasUnsavedChanges()) {
+                console.log('[switchTaskIncludeFile] Saving old file with unsaved changes');
+                await oldFile.save();
+            }
+
+            // 2. Update board with new include path
+            const board = this._getCurrentBoard();
+            if (board) {
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (column) {
+                    const task = column.tasks.find((t: any) => t.id === taskId);
+                    if (task) {
+                        task.title = newTitle;
+                        task.includeFiles = [newFilePath];
+                    }
+                }
+            }
+
+            // 3. Create new include file in registry if it doesn't exist
+            if (!panel.fileRegistry?.hasByRelativePath(newFilePath)) {
+                const mainFile = panel.fileRegistry.getMainFile();
+                if (mainFile) {
+                    console.log('[switchTaskIncludeFile] Creating new TaskIncludeFile');
+                    const taskInclude = panel._fileFactory.createTaskInclude(
+                        newFilePath,
+                        mainFile,
+                        false
+                    );
+                    panel.fileRegistry.register(taskInclude);
+                    await taskInclude.ensureLoaded();
+                }
+            }
+
+            // 4. Load content from new file
+            const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
+            if (newFile && newFile.getTaskDescription) {
+                const description = newFile.getTaskDescription();
+                console.log(`[switchTaskIncludeFile] Loaded content from new file (${description.length} chars)`);
+
+                // 5. Parse displayTitle and description (same logic as parsing)
+                const lines = description.split('\n');
+                let displayTitle = '';
+                let taskDescription = '';
+
+                let titleFound = false;
+                let descriptionLines: string[] = [];
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!titleFound && line) {
+                        displayTitle = lines[i];
+                        titleFound = true;
+                    } else if (titleFound) {
+                        descriptionLines.push(lines[i]);
+                    }
+                }
+
+                taskDescription = descriptionLines.join('\n').trim();
+
+                // 6. Send updated content to frontend
+                panel._panel?.webview.postMessage({
+                    type: 'updateTaskContent',
+                    taskId: taskId,
+                    columnId: columnId,
+                    displayTitle: displayTitle,
+                    description: taskDescription
+                });
+
+                vscode.window.showInformationMessage(`Switched to task include file: ${newFilePath}`);
+            }
+
+        } catch (error) {
+            console.error('[switchTaskIncludeFile] Error:', error);
+            vscode.window.showErrorMessage(`Failed to switch task include file: ${error}`);
         }
     }
 

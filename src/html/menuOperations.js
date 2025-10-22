@@ -1297,26 +1297,19 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         // Create new title with updated include syntax
         const newTitle = `${cleanTitle} !!!columninclude(${newFileName.trim()})!!!`.trim();
 
-        // Update the cached board
-        column.title = newTitle;
-        column.includeFiles = [newFileName.trim()];
-        column.originalTitle = newTitle;
-
-        // Send update to backend with immediate flag to trigger save and reload
-        // This ensures the new include file is properly registered and loaded
+        // Send request to backend to switch the include file
+        // Backend will: save old file if needed, load new file, update column content
+        // WITHOUT saving the main kanban file
         vscode.postMessage({
-            type: 'updateBoard',
-            board: window.cachedBoard,
-            immediate: true  // Trigger save and reload to switch files
+            type: 'switchColumnIncludeFile',
+            columnId: columnId,
+            newFilePath: newFileName.trim(),
+            oldFilePath: currentFile,
+            newTitle: newTitle
         });
 
-        // Update button state to show saving
-        updateRefreshButtonState('saving', 1);
-
-        vscode.postMessage({
-            type: 'showMessage',
-            text: `Column include file updated to: ${newFileName.trim()}`
-        });
+        // Update button state to show unsaved changes (path changed but not saved to main file yet)
+        updateRefreshButtonState('unsaved', 1);
     }
 }
 
@@ -1496,26 +1489,20 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
 
-        // Update cached board
-        task.title = newTitle;
-        task.includeFiles = [newFileName.trim()];
-        task.originalTitle = cleanTitle;
-
-        // Send update to backend with immediate flag to trigger save and reload
-        // This ensures the new include file is properly registered and loaded
+        // Send request to backend to switch the include file
+        // Backend will: save old file if needed, load new file, update task content
+        // WITHOUT saving the main kanban file
         vscode.postMessage({
-            type: 'updateBoard',
-            board: window.cachedBoard,
-            immediate: true  // Trigger save and reload to switch files
+            type: 'switchTaskIncludeFile',
+            taskId: taskId,
+            columnId: columnId,
+            newFilePath: newFileName.trim(),
+            oldFilePath: currentFile,
+            newTitle: newTitle
         });
 
-        // Update button state to show saving
-        updateRefreshButtonState('saving', 1);
-
-        vscode.postMessage({
-            type: 'showMessage',
-            text: `Task include file updated to: ${newFileName.trim()}`
-        });
+        // Update button state to show unsaved changes (path changed but not saved to main file yet)
+        updateRefreshButtonState('unsaved', 1);
     }
 }
 
