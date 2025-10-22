@@ -1290,8 +1290,11 @@ export class KanbanWebviewPanel {
         }
 
         // Load include files if board is available
+        console.log(`[_syncMainFileToRegistry] Board exists: ${!!this._board}, Board valid: ${this._board?.valid}`);
         if (this._board && this._board.valid) {
             this._syncIncludeFilesWithRegistry(this._board);
+        } else {
+            console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
         }
 
         // Log registry statistics
@@ -1395,8 +1398,21 @@ export class KanbanWebviewPanel {
         } else if (fileType === 'include-regular') {
             await this._handleRegularIncludeChange(file as RegularIncludeFile, event.changeType);
         } else if (fileType === 'main') {
-            // Main file changes are handled elsewhere (loadMarkdownFile)
-            console.log('[KanbanWebviewPanel] Main file change detected - handled by loadMarkdownFile');
+            // Main file content changed - sync include files with the new board
+            console.log('[KanbanWebviewPanel] Main file change detected');
+
+            if (event.changeType === 'content' || event.changeType === 'reloaded') {
+                // Get the updated board from the main file
+                const mainFile = file as MainKanbanFile;
+                const board = mainFile.getBoard();
+
+                if (board && board.valid) {
+                    console.log('[KanbanWebviewPanel] Syncing include files after main file content change');
+                    this._syncIncludeFilesWithRegistry(board);
+                } else {
+                    console.warn('[KanbanWebviewPanel] Main file changed but board is invalid');
+                }
+            }
         }
     }
 
