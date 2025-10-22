@@ -282,6 +282,10 @@ export class KanbanWebviewPanel {
         return this._panelId;
     }
 
+    public hasUnsavedChanges(): boolean {
+        return this._hasUnsavedChanges;
+    }
+
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         this._panel = panel;
         this._extensionUri = extensionUri;
@@ -444,15 +448,25 @@ export class KanbanWebviewPanel {
                                 .catch(error => console.error('Cache update backup failed:', error));
                         }
                     } else {
-                        // Check if any include files have unsaved changes
+                        // ARCHITECTURE: Frontend can only mark changes (true), never clear them (false)
+                        // Only backend can clear unsaved changes after save completes
+                        if (!hasChanges && !cachedBoard) {
+                            console.warn('[markUnsavedChanges callback] IGNORING invalid markUnsavedChanges(false) from frontend - only backend can clear unsaved state');
+                            return;
+                        }
+
+                        // If we get here, it's a valid state change from frontend (marking something as changed)
+                        // Update the flag based on whether it's just include files or also main file changes
                         const hasIncludeFileChanges = this._getFilesWithUnsavedChanges().length > 0;
 
-                        // Only update _hasUnsavedChanges if we're not losing include file changes
-                        if (hasChanges || !hasIncludeFileChanges) {
-                            this._hasUnsavedChanges = hasChanges;
-                        } else {
+                        if (cachedBoard) {
+                            // Frontend sent board changes
+                            this._hasUnsavedChanges = true;
+                        } else if (hasChanges) {
+                            // Frontend marking as changed without board (edge case)
                             this._hasUnsavedChanges = true;
                         }
+                        console.log(`[markUnsavedChanges callback] _hasUnsavedChanges set to: ${this._hasUnsavedChanges}`);
                     }
 
                     if (cachedBoard) {
@@ -1010,8 +1024,8 @@ export class KanbanWebviewPanel {
         return mappings;
     }
 
-    private async saveToMarkdown(updateVersionTracking: boolean = true) {
-        await this._fileService.saveToMarkdown(updateVersionTracking);
+    public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
+        await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;

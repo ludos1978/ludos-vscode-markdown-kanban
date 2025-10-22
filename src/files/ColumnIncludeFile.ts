@@ -88,7 +88,7 @@ export class ColumnIncludeFile extends IncludeFile {
 
             return {
                 id: `task-${this._columnId}-${index}`,
-                title: title.replace(/^#+ /, ''), // Remove heading markers
+                title: title.replace(/^#+\s*/, ''), // Remove ALL leading # and spaces
                 description: description || undefined,
                 includeMode: true,
                 includeFiles: [this._relativePath]

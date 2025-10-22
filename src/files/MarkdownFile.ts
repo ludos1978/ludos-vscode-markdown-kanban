@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileState } from '../fileStateManager';
+import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 
@@ -454,6 +454,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 lastModified: this._lastModified,
                 isDirtyInEditor: this._isDirtyInEditor,
                 documentVersion: this._documentVersion,
+                lastDocumentVersion: this._documentVersion - 1, // Approximation for compatibility
                 hasFileSystemChanges: this._hasFileSystemChanges
             },
             frontend: {

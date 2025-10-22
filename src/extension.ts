@@ -33,21 +33,76 @@ export function activate(context: vscode.ExtensionContext) {
 	const fileChangeListener = fileWatcher.onFileChanged(async (event) => {
 		for (const panel of event.panels) {
 			if (event.fileType === 'main') {
-				// Handle main file changes
-				const document = vscode.workspace.textDocuments.find(doc =>
-					doc.uri.toString() === vscode.Uri.file(event.path).toString()
-				);
-				if (document) {
-					panel.loadMarkdownFile(document, false);
+				// Notify the MainKanbanFile instance about the external change
+				const mainFile = panel.fileRegistry.getMainFile();
+				if (mainFile) {
+					await mainFile.handleExternalChange(event.changeType);
+
+					// If file was reloaded (no longer has file system changes), update the UI
+					if (!mainFile.hasExternalChanges() && event.changeType !== 'deleted') {
+						const document = vscode.workspace.textDocuments.find(doc =>
+							doc.uri.toString() === vscode.Uri.file(event.path).toString()
+						);
+						if (document) {
+							await panel.loadMarkdownFile(document, false);
+						}
+					}
 				}
 			} else if (event.fileType === 'include') {
-				// Include file changes are now handled directly by each panel's file watcher subscription
-				// No need to call panel.handleIncludeFileChange() - this would cause duplicate dialogs
+				// Notify the include file instance about the external change
+				const includeFile = panel.fileRegistry.get(event.path);
+				if (includeFile) {
+					await includeFile.handleExternalChange(event.changeType);
+
+					// If file was reloaded, refresh the board to show new content
+					if (!includeFile.hasExternalChanges() && event.changeType !== 'deleted') {
+						// Find the main file's document to trigger a reload
+						const mainFile = panel.fileRegistry.getMainFile();
+						if (mainFile) {
+							const document = vscode.workspace.textDocuments.find(doc =>
+								doc.uri.fsPath === mainFile.getPath()
+							);
+							if (document) {
+								await panel.loadMarkdownFile(document, false);
+							}
+						}
+					}
+				}
 			}
 		}
 	});
 
 	context.subscriptions.push(fileChangeListener);
+
+	// Register onWillSaveTextDocument to sync board changes before save
+	const willSaveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
+		const document = event.document;
+		console.log(`[Extension.onWillSave] Document about to save: ${document.uri.fsPath}`);
+
+		// Find panel for this document
+		const panel = KanbanWebviewPanel.getPanelForDocument(document.uri.toString());
+		if (!panel) {
+			console.log('[Extension.onWillSave] No panel found for document');
+			return; // No panel for this document
+		}
+
+		const hasUnsaved = panel.hasUnsavedChanges();
+		console.log(`[Extension.onWillSave] Panel found, hasUnsavedChanges: ${hasUnsaved}`);
+
+		// If there are unsaved changes in the UI, update the document before save
+		if (hasUnsaved) {
+			console.log('[Extension.onWillSave] Updating document with board changes before save');
+
+			// Use waitUntil to ensure the document is updated before the save proceeds
+			event.waitUntil(
+				panel.saveToMarkdown(false, false) // updateVersionTracking=false, triggerSave=false (save will happen automatically)
+			);
+		} else {
+			console.log('[Extension.onWillSave] No unsaved changes, allowing save to proceed normally');
+		}
+	});
+
+	context.subscriptions.push(willSaveListener);
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {

@@ -1843,11 +1843,13 @@ export class MessageHandler {
                     // Save the current include file first
                     const panel = this._getWebviewPanel();
                     if (panel) {
-                        await panel.saveIncludeFileChanges(fileState.path);
+                        await panel.saveIncludeFileChanges(file.getRelativePath());
                     }
                 } else if (choice === 'Discard and Switch') {
-                    // Clear unsaved changes flag
-                    fileStateManager.markFrontendChange(fileState.path, false);
+                    // Clear unsaved changes flag - reload from disk to discard changes
+                    if (file) {
+                        await file.reload();
+                    }
                 } else {
                     // User cancelled - don't proceed with switching
                     return;
@@ -1924,11 +1926,13 @@ export class MessageHandler {
                     // Save the current include file first
                     const panel = this._getWebviewPanel();
                     if (panel) {
-                        await panel.saveIncludeFileChanges(fileState.path);
+                        await panel.saveIncludeFileChanges(file.getRelativePath());
                     }
                 } else if (choice === 'Discard and Switch') {
-                    // Clear unsaved changes flag
-                    fileStateManager.markFrontendChange(fileState.path, false);
+                    // Clear unsaved changes flag - reload from disk to discard changes
+                    if (file) {
+                        await file.reload();
+                    }
                 } else {
                     // User cancelled - don't proceed with switching
                     return;
@@ -2400,12 +2404,11 @@ export class MessageHandler {
             };
         }
 
-        const fileStateManager = getFileStateManager();
-        const mainFileState = fileStateManager.getFileState(document.uri.fsPath);
+        const panel = this._getWebviewPanel();
+        const mainFile = panel?.fileRegistry?.getMainFile();
 
-        if (!mainFileState) {
-            // Fallback to legacy method if state not yet initialized
-            const panel = this._getWebviewPanel();
+        if (!mainFile) {
+            // Fallback if file not yet initialized
             const documentVersion = document.version;
             const lastDocumentVersion = panel ? (panel as any)._lastDocumentVersion || -1 : -1;
 
@@ -2419,17 +2422,18 @@ export class MessageHandler {
         }
 
         return {
-            hasInternalChanges: mainFileState.needsSave,
-            hasExternalChanges: mainFileState.needsReload,
-            isUnsavedInEditor: mainFileState.backend.isDirtyInEditor,
-            documentVersion: mainFileState.backend.documentVersion,
-            lastDocumentVersion: mainFileState.backend.documentVersion - 1 // Approximation
+            hasInternalChanges: mainFile.hasUnsavedChanges(),
+            hasExternalChanges: mainFile.hasExternalChanges(),
+            isUnsavedInEditor: document.isDirty,
+            documentVersion: document.version,
+            lastDocumentVersion: document.version - 1 // Approximation
         };
     }
 
     private async collectTrackedFilesDebugInfo(): Promise<any> {
         const document = this._fileManager.getDocument();
-        const fileStateManager = getFileStateManager();
+        const panel = this._getWebviewPanel();
+        const mainFile = panel?.fileRegistry?.getMainFile();
 
         // Get unified file state that all systems should use
         const fileState = this.getUnifiedFileState();
@@ -2437,19 +2441,18 @@ export class MessageHandler {
 
         // Use preserved file path from FileManager, which persists even when document is closed
         const mainFilePath = this._fileManager.getFilePath() || document?.uri.fsPath || 'Unknown';
-        const mainFileState = mainFilePath !== 'Unknown' ? fileStateManager.getFileState(mainFilePath) : undefined;
 
         const mainFileInfo = {
             path: mainFilePath,
-            lastModified: mainFileState?.backend.lastModified?.toISOString() || 'Unknown',
-            exists: mainFileState?.backend.exists ?? (document ? true : false),
+            lastModified: mainFile?.getLastModified()?.toISOString() || 'Unknown',
+            exists: mainFile?.exists() ?? (document ? true : false),
             watcherActive: true, // Assume active for now
             hasInternalChanges: fileState.hasInternalChanges,
             hasExternalChanges: fileState.hasExternalChanges,
             documentVersion: fileState.documentVersion,
             lastDocumentVersion: fileState.lastDocumentVersion,
             isUnsavedInEditor: fileState.isUnsavedInEditor,
-            baseline: mainFileState?.frontend.baseline || ''
+            baseline: mainFile?.getBaseline() || ''
         };
 
 
@@ -2476,32 +2479,25 @@ export class MessageHandler {
             console.warn('[Debug] Could not access ExternalFileWatcher:', error);
         }
 
-        // Include files from FileStateManager
+        // Include files from file registry
         const includeFiles: any[] = [];
-        const allStates = fileStateManager.getAllStates();
+        const allIncludeFiles = panel?.fileRegistry?.getIncludeFiles() || [];
 
-
-        for (const [filePath, fileStateData] of allStates) {
-            // Skip main file - we handle it separately
-            if (filePath === mainFilePath) {
-                continue;
-            }
-
-
+        for (const file of allIncludeFiles) {
             includeFiles.push({
-                path: fileStateData.relativePath,
-                type: fileStateData.fileType,
-                exists: fileStateData.backend.exists,
-                lastModified: fileStateData.backend.lastModified?.toISOString() || 'Unknown',
-                size: 'Unknown', // Size not tracked in FileStateManager yet
-                hasInternalChanges: fileStateData.needsSave,
-                hasExternalChanges: fileStateData.needsReload,
-                isUnsavedInEditor: fileStateData.backend.isDirtyInEditor,
-                baseline: fileStateData.frontend.baseline,
-                content: fileStateData.frontend.content,
-                externalContent: '', // Not tracked separately anymore
-                contentLength: fileStateData.frontend.content.length,
-                baselineLength: fileStateData.frontend.baseline.length,
+                path: file.getRelativePath(),
+                type: file.getFileType(),
+                exists: file.exists(),
+                lastModified: file.getLastModified()?.toISOString() || 'Unknown',
+                size: 'Unknown', // Size not tracked yet
+                hasInternalChanges: file.hasUnsavedChanges(),
+                hasExternalChanges: file.hasExternalChanges(),
+                isUnsavedInEditor: file.isDirtyInEditor(),
+                baseline: file.getBaseline(),
+                content: file.getContent(),
+                externalContent: '', // Not tracked separately
+                contentLength: file.getContent().length,
+                baselineLength: file.getBaseline().length,
                 externalContentLength: 0
             });
         }

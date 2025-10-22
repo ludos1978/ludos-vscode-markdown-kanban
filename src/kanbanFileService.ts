@@ -394,16 +394,24 @@ export class KanbanFileService {
     /**
      * Save board to markdown file
      */
-    public async saveToMarkdown(updateVersionTracking: boolean = true): Promise<void> {
+    /**
+     * Update document content with board state, optionally save to disk
+     * @param updateVersionTracking - Track document version changes
+     * @param triggerSave - Whether to call document.save() (false when called from onWillSave)
+     */
+    public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
+        console.log(`[KanbanFileService.saveToMarkdown] ENTRY - updateVersionTracking: ${updateVersionTracking}, triggerSave: ${triggerSave}`);
+
         let document = this.fileManager.getDocument();
         if (!document || !this.board() || !this.board()!.valid) {
-            console.warn('Cannot save: no document or invalid board');
+            console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - document: ${!!document}, board: ${!!this.board()}, valid: ${this.board()?.valid}`);
             return;
         }
 
+        console.log(`[KanbanFileService.saveToMarkdown] Proceeding with save`);
         this._isUpdatingFromPanel = true;
 
-        try {
+        try{
             // Check if document is still valid/open
             const isDocumentOpen = vscode.workspace.textDocuments.some(doc =>
                 doc.uri.toString() === document!.uri.toString()
@@ -430,19 +438,25 @@ export class KanbanFileService {
             await this.includeFileManager.saveAllTaskIncludeChanges();
 
             const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
+            console.log(`[KanbanFileService.saveToMarkdown] Generated markdown (${markdown.length} chars)`);
+
             // Check for external unsaved changes before proceeding
             const canProceed = await this.checkForExternalUnsavedChanges();
             if (!canProceed) {
+                console.warn('[KanbanFileService.saveToMarkdown] EARLY RETURN: checkForExternalUnsavedChanges returned false');
                 return;
             }
 
             // Check if content has actually changed before applying edit
             const currentContent = document.getText();
+            console.log(`[KanbanFileService.saveToMarkdown] Current content (${currentContent.length} chars), Generated (${markdown.length} chars)`);
             if (currentContent === markdown) {
                 // No changes needed, skip the edit to avoid unnecessary re-renders
+                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged, skipping save');
                 this._hasUnsavedChanges = false;
                 return;
             }
+            console.log('[KanbanFileService.saveToMarkdown] Content has changed, proceeding with save');
 
             const edit = new vscode.WorkspaceEdit();
             edit.replace(
@@ -451,7 +465,9 @@ export class KanbanFileService {
                 markdown
             );
 
+            console.log(`[KanbanFileService.saveToMarkdown] Applying edit to document...`);
             const success = await vscode.workspace.applyEdit(edit);
+            console.log(`[KanbanFileService.saveToMarkdown] applyEdit result: ${success}`);
 
             if (!success) {
                 // VS Code's applyEdit can return false even when successful
@@ -485,25 +501,31 @@ export class KanbanFileService {
                 this._lastDocumentVersion = document.version + 1;
             }
 
-            // Try to save the document
-            try {
-                await document.save();
-            } catch (saveError) {
-                // If save fails, it might be because the document was closed
-                console.warn('Failed to save document:', saveError);
+            // Save the document to disk (if requested)
+            if (triggerSave) {
+                console.log(`[KanbanFileService.saveToMarkdown] Calling document.save()...`);
+                try {
+                    await document.save();
+                    console.log(`[KanbanFileService.saveToMarkdown] document.save() completed successfully`);
+                } catch (saveError) {
+                    // If save fails, it might be because the document was closed
+                    console.warn('[KanbanFileService.saveToMarkdown] Failed to save document:', saveError);
 
-                // Check if the document is still open
-                const stillOpen = vscode.workspace.textDocuments.some(doc =>
-                    doc.uri.toString() === document!.uri.toString()
-                );
-
-                if (!stillOpen) {
-                    vscode.window.showWarningMessage(
-                        `Changes applied but could not save: "${path.basename(document.fileName)}" was closed during the save operation.`
+                    // Check if the document is still open
+                    const stillOpen = vscode.workspace.textDocuments.some(doc =>
+                        doc.uri.toString() === document!.uri.toString()
                     );
-                } else {
-                    throw saveError; // Re-throw if it's a different error
+
+                    if (!stillOpen) {
+                        vscode.window.showWarningMessage(
+                            `Changes applied but could not save: "${path.basename(document.fileName)}" was closed during the save operation.`
+                        );
+                    } else {
+                        throw saveError; // Re-throw if it's a different error
+                    }
                 }
+            } else {
+                console.log(`[KanbanFileService.saveToMarkdown] triggerSave=false, skipping document.save() (will be saved by VS Code)`);
             }
 
             // After successful save, create a backup (respects minimum interval)
@@ -511,6 +533,23 @@ export class KanbanFileService {
 
             // Clear unsaved changes flag after successful save
             this._hasUnsavedChanges = false;
+            console.log('[KanbanFileService.saveToMarkdown] Save completed successfully, clearing unsaved changes');
+
+            // Notify frontend that save is complete so it can update UI
+            const panelInstance = this.panel();
+            if (panelInstance) {
+                panelInstance.webview.postMessage({
+                    type: 'saveCompleted',
+                    success: true
+                });
+                console.log('[KanbanFileService.saveToMarkdown] Sent saveCompleted message to frontend');
+            }
+
+            // Update the main file in the registry with the new content
+            const mainFile = this.fileRegistry.getMainFile();
+            if (mainFile) {
+                mainFile.setContent(markdown, true); // true = already saved, don't mark as unsaved
+            }
 
             // Update our baseline after successful save
             this.updateKnownFileContent(markdown);
@@ -852,10 +891,13 @@ export class KanbanFileService {
 
         // Now check include files for external changes
         const hasExternalIncludeChanges = this.includeFileManager.checkForExternalIncludeFileChanges();
-        if (!hasExternalIncludeChanges) {
-            return false; // User chose not to proceed with include file conflicts
+        if (hasExternalIncludeChanges) {
+            console.log('[checkForExternalUnsavedChanges] External include file changes detected, showing conflict dialog');
+            // TODO: Show conflict dialog for include files and respect user choice
+            // For now, allow save to proceed
+            console.warn('[checkForExternalUnsavedChanges] Include file conflict dialog not implemented, proceeding with save');
         }
 
-        return true; // All checks passed
+        return true; // All checks passed - save can proceed
     }
 }

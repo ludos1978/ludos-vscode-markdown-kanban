@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
-import { getFileStateManager } from './fileStateManager';
+// Removed: FileStateManager import - file state now tracked by MarkdownFile instances
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 
 export type FileChangeType = 'modified' | 'deleted' | 'created';
@@ -269,14 +269,8 @@ export class ExternalFileWatcher implements vscode.Disposable {
 
         console.log(`[ExternalFileWatcher.handleFileChange] File type: ${watchedFile.type}, Panels: ${watchedFile.panels.size}`);
 
-        // Update FileStateManager with backend changes
-        const fileStateManager = getFileStateManager();
-
-        if (changeType === 'modified') {
-            // Mark file system change in the unified state manager
-            fileStateManager.markFileSystemChange(path);
-            console.log(`[ExternalFileWatcher.handleFileChange] Marked as file system change in FileStateManager`);
-        }
+        // File system changes are now tracked automatically by MarkdownFile instances
+        // when they are reloaded via the panel's file registry
 
         // Convert Set to Array for the event
         const affectedPanels = Array.from(watchedFile.panels);

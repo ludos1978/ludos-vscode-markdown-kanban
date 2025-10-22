@@ -2470,6 +2470,13 @@ window.addEventListener('message', event => {
         case 'resetClosePromptFlag':
             closePromptActive = false;
             break;
+        case 'saveCompleted':
+            // Backend has confirmed save is complete, update frontend UI
+            console.log('[FRONTEND] Received saveCompleted from backend');
+            if (typeof markSavedChanges === 'function') {
+                markSavedChanges();
+            }
+            break;
         case 'undoRedoStatus':
             canUndo = message.canUndo;
             canRedo = message.canRedo;

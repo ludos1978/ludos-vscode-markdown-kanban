@@ -2710,22 +2710,19 @@ function markUnsavedChanges() {
 }
 
 /**
- * Marks changes as saved and notifies backend
- * Purpose: Track when changes have been saved successfully
- * Used by: Save operations and discard operations
+ * Marks changes as saved in frontend only
+ * Purpose: Update UI state when backend confirms save completed
+ * Used by: Backend messages after save completion
  * Side effects: Clears unsaved flag and updates UI state
+ * NOTE: Frontend cannot clear backend unsaved state - only backend can do that after save completes
  */
 function markSavedChanges() {
     window.hasUnsavedChanges = false;
     updateRefreshButtonState('default');
-    
-    // Always notify backend about saved state immediately
-    if (typeof vscode !== 'undefined') {
-        vscode.postMessage({
-            type: 'markUnsavedChanges',
-            hasUnsavedChanges: false
-        });
-    }
+
+    // REMOVED: Frontend should NOT tell backend save is complete
+    // Backend controls saving, so only backend should clear its unsaved changes flag
+    // Frontend will receive a message from backend when save actually completes
 }
 
 /**
