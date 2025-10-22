@@ -881,8 +881,14 @@ export class MessageHandler {
             absolutePath = path.resolve(basePath, filePath);
         }
 
-        // Mark edit mode start in FileStateManager
-        getFileStateManager().markEditModeStart(absolutePath);
+        // Mark edit mode start in file registry
+        const panel = this._getWebviewPanel();
+        if (panel && panel.fileRegistry) {
+            const file = panel.fileRegistry.getByPath(absolutePath);
+            if (file) {
+                file.setEditMode(true);
+            }
+        }
     }
 
     /**
@@ -910,8 +916,14 @@ export class MessageHandler {
             absolutePath = path.resolve(basePath, filePath);
         }
 
-        // Mark edit mode end in FileStateManager
-        getFileStateManager().markEditModeEnd(absolutePath);
+        // Mark edit mode end in file registry
+        const panel2 = this._getWebviewPanel();
+        if (panel2 && panel2.fileRegistry) {
+            const file = panel2.fileRegistry.getByPath(absolutePath);
+            if (file) {
+                file.setEditMode(false);
+            }
+        }
     }
 
     /**
@@ -1813,11 +1825,11 @@ export class MessageHandler {
             console.log('[requestEditIncludeFileName] currentFile:', currentFile, 'columnId:', message.columnId);
 
             // CRITICAL: Check if current include file has unsaved changes before switching
-            const fileStateManager = getFileStateManager();
-            const fileState = fileStateManager.getIncludeFileByRelativePath(currentFile);
-            console.log('[requestEditIncludeFileName] fileState found:', !!fileState, 'hasUnsaved:', fileState?.frontend.hasUnsavedChanges);
+            const panel = this._getWebviewPanel();
+            const file = panel?.fileRegistry?.getByRelativePath(currentFile);
+            console.log('[requestEditIncludeFileName] file found:', !!file, 'hasUnsaved:', file?.hasUnsavedChanges());
 
-            if (fileState && fileState.frontend.hasUnsavedChanges) {
+            if (file && file.hasUnsavedChanges()) {
                 // Current include file has unsaved changes - ask user what to do
                 const choice = await vscode.window.showWarningMessage(
                     `The current include file "${currentFile}" has unsaved changes. What would you like to do?`,
@@ -1895,10 +1907,10 @@ export class MessageHandler {
             const columnId = message.columnId;
 
             // CRITICAL: Check if current include file has unsaved changes before switching
-            const fileStateManager = getFileStateManager();
-            const fileState = fileStateManager.getIncludeFileByRelativePath(currentFile);
+            const panel = this._getWebviewPanel();
+            const file = panel?.fileRegistry?.getByRelativePath(currentFile);
 
-            if (fileState && fileState.frontend.hasUnsavedChanges) {
+            if (file && file.hasUnsavedChanges()) {
                 // Current include file has unsaved changes - ask user what to do
                 const choice = await vscode.window.showWarningMessage(
                     `The current task include file "${currentFile}" has unsaved changes. What would you like to do?`,
