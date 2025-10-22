@@ -1931,6 +1931,23 @@ export class KanbanWebviewPanel {
         // Load content from the include files
         const allTasks: KanbanTask[] = [];
         for (const relativePath of newIncludeFiles) {
+            // Create new include file in registry if it doesn't exist
+            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
+                const mainFile = this._fileRegistry.getMainFile();
+                if (mainFile) {
+                    console.log('[updateIncludeContentUnified] Creating new ColumnIncludeFile in registry:', relativePath);
+                    const columnInclude = this._fileFactory.createColumnInclude(
+                        relativePath,
+                        mainFile,
+                        false
+                    );
+                    columnInclude.setColumnId(column.id);
+                    columnInclude.setColumnTitle(column.title);
+                    this._fileRegistry.register(columnInclude);
+                    columnInclude.startWatching();
+                }
+            }
+
             const file = this._fileRegistry.getByRelativePath(relativePath);
             if (file && file.getFileType() === 'include-column') {
                 const columnFile = file as any; // ColumnIncludeFile
