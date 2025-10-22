@@ -560,12 +560,6 @@ export class KanbanFileService {
                 console.log('[KanbanFileService.saveToMarkdown] Sent saveCompleted message to frontend');
             }
 
-            // Update the main file in the registry with the new content
-            const mainFile = this.fileRegistry.getMainFile();
-            if (mainFile) {
-                mainFile.setContent(markdown, true); // true = already saved, don't mark as unsaved
-            }
-
             // Update our baseline after successful save
             this.updateKnownFileContent(markdown);
         } catch (error) {

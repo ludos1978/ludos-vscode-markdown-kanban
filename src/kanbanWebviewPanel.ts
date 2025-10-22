@@ -283,7 +283,9 @@ export class KanbanWebviewPanel {
     }
 
     public hasUnsavedChanges(): boolean {
-        return this._hasUnsavedChanges;
+        // Query main file for unsaved changes (single source of truth)
+        const mainFile = this._fileRegistry.getMainFile();
+        return mainFile?.hasUnsavedChanges() || false;
     }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
@@ -430,12 +432,12 @@ export class KanbanWebviewPanel {
                         const onlyIncludeChanges = await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
                         console.log('[markUnsavedChanges callback] trackIncludeFileUnsavedChanges returned:', onlyIncludeChanges);
 
-                        // Update main file unsaved changes flag
+                        // Update main file unsaved changes - generate markdown and set on MarkdownFile
                         const mainFile = this._getMainFile();
                         if (mainFile && !onlyIncludeChanges) {
-                            this._hasUnsavedChanges = true;
-                        } else {
-                            this._hasUnsavedChanges = false;
+                            // Main file has changes - generate markdown and mark as unsaved
+                            const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
+                            mainFile.setContent(markdown, false); // false = not saved yet
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -456,17 +458,17 @@ export class KanbanWebviewPanel {
                         }
 
                         // If we get here, it's a valid state change from frontend (marking something as changed)
-                        // Update the flag based on whether it's just include files or also main file changes
-                        const hasIncludeFileChanges = this._getFilesWithUnsavedChanges().length > 0;
-
                         if (cachedBoard) {
-                            // Frontend sent board changes
-                            this._hasUnsavedChanges = true;
+                            // Frontend sent board changes - mark main file as having unsaved changes
+                            const mainFile = this._getMainFile();
+                            if (mainFile) {
+                                const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
+                                mainFile.setContent(markdown, false); // false = not saved yet
+                            }
                         } else if (hasChanges) {
-                            // Frontend marking as changed without board (edge case)
-                            this._hasUnsavedChanges = true;
+                            // Frontend marking as changed without board (edge case) - should not happen
+                            console.warn('[markUnsavedChanges callback] hasChanges=true but no cachedBoard provided');
                         }
-                        console.log(`[markUnsavedChanges callback] _hasUnsavedChanges set to: ${this._hasUnsavedChanges}`);
                     }
 
                     if (cachedBoard) {
@@ -482,7 +484,7 @@ export class KanbanWebviewPanel {
         // Initialize state in KanbanFileService
         this._fileService.initializeState(
             this._isUpdatingFromPanel,
-            this._hasUnsavedChanges,
+            // REMOVED: _hasUnsavedChanges parameter - now managed by MarkdownFile
             this._cachedBoardFromWebview,
             this._lastDocumentVersion,
             this._lastDocumentUri,
@@ -598,7 +600,11 @@ export class KanbanWebviewPanel {
         if (modified) {
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
-            this._hasUnsavedChanges = true;
+            const mainFile = this._getMainFile();
+            if (mainFile && this._board) {
+                const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
+                mainFile.setContent(markdown, false); // false = not saved yet
+            }
 
             await this.sendBoardUpdate();
         }
@@ -876,7 +882,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
@@ -888,7 +894,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
@@ -1029,7 +1035,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
@@ -1041,7 +1047,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
@@ -1552,16 +1558,28 @@ export class KanbanWebviewPanel {
             this._board = this._cachedBoardFromWebview;
         }
 
+        // Query current unsaved changes state from MarkdownFile
+        const mainFile = this._getMainFile();
+        const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
+
         const result = await this._conflictService._handlePanelClose(
             () => this._messageHandler?.getUnifiedFileState(),
-            this._hasUnsavedChanges,
+            hasUnsavedChanges,
             this._isClosingPrevented,
             this._cachedBoardFromWebview,
             () => this.dispose()
         );
 
         // Update state from result
-        this._hasUnsavedChanges = result.newHasUnsavedChanges;
+        // NOTE: newHasUnsavedChanges should be applied to MarkdownFile, not stored locally
+        if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && this._board) {
+            if (result.newHasUnsavedChanges) {
+                const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
+                mainFile.setContent(markdown, false);
+            } else {
+                mainFile.discardChanges();
+            }
+        }
         this._isClosingPrevented = result.newIsClosingPrevented;
         this._cachedBoardFromWebview = result.newCachedBoard;
 
@@ -1597,7 +1615,10 @@ export class KanbanWebviewPanel {
 
     public async dispose() {
         // Clear unsaved changes flag and prevent closing flags
-        this._hasUnsavedChanges = false;
+        const mainFile = this._getMainFile();
+        if (mainFile) {
+            mainFile.discardChanges();
+        }
         this._isClosingPrevented = false;
 
         // Stop unsaved changes monitoring
@@ -1696,7 +1717,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
@@ -1963,7 +1984,7 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        this._hasUnsavedChanges = state.hasUnsavedChanges;
+        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
         this._cachedBoardFromWebview = state.cachedBoardFromWebview;
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
