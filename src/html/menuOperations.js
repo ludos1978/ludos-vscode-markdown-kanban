@@ -2877,6 +2877,17 @@ function saveCachedBoard() {
         return;
     }
 
+    console.log('[FRONTEND saveCurrentBoard] ========================================');
+    console.log('[FRONTEND saveCurrentBoard] Preparing to save board');
+    console.log(`[FRONTEND saveCurrentBoard] cachedBoard has ${window.cachedBoard.columns?.length || 0} columns`);
+
+    // Log each column's includeMode status
+    if (window.cachedBoard.columns) {
+        for (const col of window.cachedBoard.columns) {
+            console.log(`[FRONTEND saveCurrentBoard] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
+        }
+    }
+
     // Capture any in-progress edits and include them in the save
     let boardToSave = window.cachedBoard;
     let hadInProgressEdits = false;
@@ -2887,6 +2898,9 @@ function saveCachedBoard() {
             hadInProgressEdits = true;
         }
     }
+
+    console.log('[FRONTEND saveCurrentBoard] Sending board to backend');
+    console.log('[FRONTEND saveCurrentBoard] ========================================');
 
     // Send the complete board state to VS Code using a simple message
     // This avoids complex sequential processing that might cause issues

@@ -54,9 +54,18 @@ export class IncludeFileManager {
         for (const relativePath of column.includeFiles) {
             const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
             if (file) {
+                console.log(`[saveColumnIncludeChanges] Processing ${relativePath} with ${column.tasks.length} tasks`);
+                console.log(`[saveColumnIncludeChanges] Current file content length: ${file.getContent().length}`);
+
                 const content = file.generateFromTasks(column.tasks);
+                console.log(`[saveColumnIncludeChanges] Generated content length: ${content.length}`);
+                console.log(`[saveColumnIncludeChanges] Generated content:\n${content}`);
+
                 file.setContent(content);
+                console.log(`[saveColumnIncludeChanges] After setContent, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
+
                 await file.save();
+                console.log(`[saveColumnIncludeChanges] Save completed for ${relativePath}`);
             }
         }
         return true;

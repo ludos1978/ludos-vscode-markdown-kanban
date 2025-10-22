@@ -1008,6 +1008,17 @@ export class MessageHandler {
             return;
         }
 
+        console.log('[handleSaveBoardState] ========================================');
+        console.log('[handleSaveBoardState] Received board from frontend for saving');
+        console.log(`[handleSaveBoardState] Board has ${board.columns?.length || 0} columns`);
+
+        // Log each column's includeMode status
+        if (board.columns) {
+            for (const col of board.columns) {
+                console.log(`[handleSaveBoardState] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
+            }
+        }
+        console.log('[handleSaveBoardState] ========================================');
 
         // NOTE: Do not save undo state here - individual operations already saved their undo states
         // before making changes. Saving here would create duplicate/grouped undo states.

@@ -2646,8 +2646,14 @@ window.addEventListener('message', event => {
                     column.tasks = message.tasks || [];
                     column.title = message.columnTitle || column.title;
                     column.displayTitle = message.displayTitle || column.displayTitle;
-                    column.includeMode = message.includeMode;
-                    column.includeFiles = message.includeFiles;
+
+                    // Only update includeMode if explicitly provided (preserve existing value otherwise)
+                    if (message.includeMode !== undefined) {
+                        column.includeMode = message.includeMode;
+                    }
+                    if (message.includeFiles !== undefined) {
+                        column.includeFiles = message.includeFiles;
+                    }
 
                     console.log('[FRONTEND updateColumnContent] Column updated - new tasks count:', column.tasks.length);
 
@@ -2710,9 +2716,15 @@ window.addEventListener('message', event => {
                     foundTask.description = message.description || '';
                     foundTask.title = message.taskTitle || foundTask.title;
                     foundTask.displayTitle = message.displayTitle || foundTask.displayTitle;
-                    foundTask.includeMode = message.includeMode;
-                    foundTask.includeFiles = message.includeFiles;
                     foundTask.originalTitle = message.originalTitle || foundTask.originalTitle;
+
+                    // Only update includeMode if explicitly provided (preserve existing value otherwise)
+                    if (message.includeMode !== undefined) {
+                        foundTask.includeMode = message.includeMode;
+                    }
+                    if (message.includeFiles !== undefined) {
+                        foundTask.includeFiles = message.includeFiles;
+                    }
 
                     console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
                     console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');

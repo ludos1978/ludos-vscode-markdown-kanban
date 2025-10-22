@@ -428,8 +428,15 @@ export class KanbanFileService {
             await this.includeFileManager.saveAllColumnIncludeChanges();
             await this.includeFileManager.saveAllTaskIncludeChanges();
 
+            console.log('[KanbanFileService.saveToMarkdown] About to generate markdown for main file');
+            console.log(`[KanbanFileService.saveToMarkdown] Board has ${this.board()!.columns.length} columns`);
+            for (const col of this.board()!.columns) {
+                console.log(`[KanbanFileService.saveToMarkdown] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
+            }
+
             const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
             console.log(`[KanbanFileService.saveToMarkdown] Generated markdown (${markdown.length} chars)`);
+            console.log(`[KanbanFileService.saveToMarkdown] Generated markdown:\n${markdown}`);
 
             // Check for external unsaved changes before proceeding
             const canProceed = await this.checkForExternalUnsavedChanges();

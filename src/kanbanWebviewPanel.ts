@@ -1469,11 +1469,15 @@ export class KanbanWebviewPanel {
                 // Update column in cached board
                 column.tasks = tasks;
 
-                // Send update to frontend
+                // Send update to frontend with all required metadata
                 this._panel.webview.postMessage({
                     type: 'updateColumnContent',
                     columnId: column.id,
-                    tasks: tasks
+                    tasks: tasks,
+                    columnTitle: column.title,
+                    displayTitle: column.displayTitle,
+                    includeMode: true,  // CRITICAL: Must send this to preserve includeMode in frontend
+                    includeFiles: column.includeFiles
                 });
 
                 break;
@@ -1526,13 +1530,17 @@ export class KanbanWebviewPanel {
                     task.displayTitle = displayTitle;
                     task.description = taskDescription;
 
-                    // Send update to frontend
+                    // Send update to frontend with all required metadata
                     this._panel.webview.postMessage({
                         type: 'updateTaskContent',
                         taskId: task.id,
                         columnId: column.id,
                         displayTitle: displayTitle,
-                        description: taskDescription
+                        description: taskDescription,
+                        taskTitle: task.title,
+                        includeMode: true,  // CRITICAL: Must send this to preserve includeMode in frontend
+                        includeFiles: task.includeFiles,
+                        originalTitle: task.originalTitle
                     });
 
                     return; // Found the task, done
@@ -1955,7 +1963,13 @@ export class KanbanWebviewPanel {
             const file = this._fileRegistry.getByRelativePath(relativePath);
             if (file && file.getFileType() === 'include-column') {
                 const columnFile = file as any; // ColumnIncludeFile
+
+                // Reload the file content from disk before parsing
+                console.log('[updateIncludeContentUnified] Reloading file content:', relativePath);
+                await columnFile.reload();
+
                 const tasks = columnFile.parseToTasks();
+                console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
                 allTasks.push(...tasks);
             }
         }

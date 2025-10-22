@@ -75,25 +75,17 @@ export class ColumnIncludeFile extends IncludeFile {
     public parseToTasks(): KanbanTask[] {
         console.log(`[ColumnIncludeFile] Parsing presentation to tasks: ${this._relativePath}`);
 
+        // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
+        const tasks = PresentationParser.slidesToTasks(slides);
 
-        // Each slide becomes a task
-        return slides.map((slide, index) => {
-            // Extract title from first line of slide content
-            const lines = slide.content.trim().split('\n');
-            const title = lines[0] || `Task ${index + 1}`;
-
-            // Rest is description
-            const description = lines.slice(1).join('\n').trim();
-
-            return {
-                id: `task-${this._columnId}-${index}`,
-                title: title.replace(/^#+\s*/, ''), // Remove ALL leading # and spaces
-                description: description || undefined,
-                includeMode: true,
-                includeFiles: [this._relativePath]
-            };
-        });
+        // Update task IDs to include column information and reset includeMode
+        return tasks.map((task, index) => ({
+            ...task,
+            id: `task-${this._columnId}-${index}`,
+            includeMode: false, // Tasks from columninclude are NOT individual includes
+            includeFiles: undefined // Column has the includeFiles, not individual tasks
+        }));
     }
 
     /**
@@ -102,20 +94,8 @@ export class ColumnIncludeFile extends IncludeFile {
     public generateFromTasks(tasks: KanbanTask[]): string {
         console.log(`[ColumnIncludeFile] Generating presentation from ${tasks.length} tasks: ${this._relativePath}`);
 
-        const slides: string[] = [];
-
-        for (const task of tasks) {
-            let slideContent = `# ${task.title}\n\n`;
-
-            if (task.description) {
-                slideContent += task.description;
-            }
-
-            slides.push(slideContent);
-        }
-
-        // Join slides with slide separator
-        return slides.join('\n\n---\n\n');
+        // Use PresentationParser to convert tasks back to presentation format
+        return PresentationParser.tasksToPresentation(tasks);
     }
 
     /**

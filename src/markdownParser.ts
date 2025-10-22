@@ -376,11 +376,14 @@ export class MarkdownKanbanParser {
 
     // Add columns (no ID persistence - runtime only)
     for (const column of sortedColumns) {
+      console.log(`[generateMarkdown] Column "${column.title}" includeMode=${column.includeMode}, includeFiles=${column.includeFiles?.join(',')}, tasks=${column.tasks.length}`);
+
       if (column.includeMode) {
         // For include columns, use the current title (which may have been updated with tags)
         // column.title should contain the include syntax plus any added tags
         const titleToUse = column.title;
         markdown += `## ${titleToUse}\n`;
+        console.log(`[generateMarkdown] Skipping ${column.tasks.length} tasks for includeMode column`);
         // Skip generating tasks for include columns - they remain as includes
       } else {
         // Regular column processing
