@@ -1937,37 +1937,7 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
-        // Check if any old include files are being removed and have unsaved changes
-        const oldIncludeFiles = column.includeFiles || [];
-        const removedFiles = oldIncludeFiles.filter(oldPath => !newIncludeFiles.includes(oldPath));
-
-        for (const removedPath of removedFiles) {
-            const oldFile = this._fileRegistry.getByRelativePath(removedPath);
-            if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log(`[updateIncludeContentUnified] File being removed has unsaved changes: ${removedPath}`);
-
-                const choice = await vscode.window.showWarningMessage(
-                    `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
-                    { modal: true },
-                    'Save and Continue',
-                    'Discard and Continue',
-                    'Cancel'
-                );
-
-                if (choice === 'Save and Continue') {
-                    console.log('[updateIncludeContentUnified] User chose to save and continue');
-                    await oldFile.save();
-                } else if (choice === 'Discard and Continue') {
-                    console.log('[updateIncludeContentUnified] User chose to discard changes and continue');
-                    oldFile.discardChanges();
-                } else {
-                    // Cancel or closed dialog
-                    console.log('[updateIncludeContentUnified] User cancelled switch');
-                    return;
-                }
-            }
-        }
-
+        // Note: Unsaved changes check happens in handleUpdateBoard BEFORE this is called
         // Update the column's include files
         column.includeFiles = newIncludeFiles;
 
@@ -2031,37 +2001,7 @@ export class KanbanWebviewPanel {
                 return;
             }
 
-            // Check if any old include files are being removed and have unsaved changes
-            const oldIncludeFiles = task.includeFiles || [];
-            const removedFiles = oldIncludeFiles.filter(oldPath => !newIncludeFiles.includes(oldPath));
-
-            for (const removedPath of removedFiles) {
-                const oldFile = this._fileRegistry.getByRelativePath(removedPath);
-                if (oldFile && oldFile.hasUnsavedChanges()) {
-                    console.log(`[loadNewTaskIncludeContent] File being removed has unsaved changes: ${removedPath}`);
-
-                    const choice = await vscode.window.showWarningMessage(
-                        `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
-                        { modal: true },
-                        'Save and Continue',
-                        'Discard and Continue',
-                        'Cancel'
-                    );
-
-                    if (choice === 'Save and Continue') {
-                        console.log('[loadNewTaskIncludeContent] User chose to save and continue');
-                        await oldFile.save();
-                    } else if (choice === 'Discard and Continue') {
-                        console.log('[loadNewTaskIncludeContent] User chose to discard changes and continue');
-                        oldFile.discardChanges();
-                    } else {
-                        // Cancel or closed dialog
-                        console.log('[loadNewTaskIncludeContent] User cancelled switch');
-                        return;
-                    }
-                }
-            }
-
+            // Note: Unsaved changes check happens in handleUpdateBoard BEFORE this is called
             const basePath = path.dirname(currentDocument.uri.fsPath);
 
             // For now, handle single file includes

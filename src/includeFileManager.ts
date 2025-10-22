@@ -44,8 +44,63 @@ export class IncludeFileManager {
     }
 
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard, documentGetter: any, filePathGetter: any): Promise<boolean> {
-        // Registry tracks changes automatically
-        return false; // No unsaved changes (handled by registry)
+        console.log('[trackIncludeFileUnsavedChanges] ENTRY - Tracking unsaved changes in include files');
+
+        // Update ColumnIncludeFile instances with current task content (without saving to disk)
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    if (file) {
+                        console.log(`[trackIncludeFileUnsavedChanges] ========== ColumnInclude: ${relativePath} ==========`);
+                        console.log(`[trackIncludeFileUnsavedChanges] Column has ${column.tasks.length} tasks`);
+                        console.log(`[trackIncludeFileUnsavedChanges] Current file content (first 200 chars):\n${file.getContent().substring(0, 200)}`);
+
+                        // Generate content from current tasks
+                        const content = file.generateFromTasks(column.tasks);
+                        console.log(`[trackIncludeFileUnsavedChanges] Generated content (first 200 chars):\n${content.substring(0, 200)}`);
+                        console.log(`[trackIncludeFileUnsavedChanges] Content is same as current: ${content === file.getContent()}`);
+
+                        // Update file content (marks as unsaved if changed)
+                        file.setContent(content, false); // false = NOT saved yet
+
+                        console.log(`[trackIncludeFileUnsavedChanges] After setContent, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
+                    } else {
+                        console.log(`[trackIncludeFileUnsavedChanges] ⚠️  File NOT found in registry: ${relativePath}`);
+                    }
+                }
+            }
+        }
+
+        // Update TaskIncludeFile instances with current task content (without saving to disk)
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
+                        if (file) {
+                            console.log(`[trackIncludeFileUnsavedChanges] Updating TaskIncludeFile: ${relativePath}`);
+
+                            // Reconstruct full content: displayTitle + description
+                            let fullContent = '';
+                            if (task.displayTitle) {
+                                fullContent = task.displayTitle + '\n\n';
+                            }
+                            if (task.description) {
+                                fullContent += task.description;
+                            }
+
+                            // Update file content (marks as unsaved if changed)
+                            file.setTaskDescription(fullContent);
+
+                            console.log(`[trackIncludeFileUnsavedChanges] After setTaskDescription, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        return false; // Return false = main file also needs saving
     }
 
     public async saveColumnIncludeChanges(column: KanbanColumn, documentGetter: any): Promise<boolean> {

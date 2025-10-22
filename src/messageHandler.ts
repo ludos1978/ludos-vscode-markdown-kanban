@@ -1664,7 +1664,13 @@ export class MessageHandler {
             const panel = this._getWebviewPanel();
             const oldBoard = this._getCurrentBoard();
 
+            console.log('[handleUpdateBoard] ========== UNSAVED CHANGES CHECK ==========');
+            console.log('[handleUpdateBoard] oldBoard exists:', !!oldBoard);
+            console.log('[handleUpdateBoard] panel exists:', !!panel);
+
             if (oldBoard && panel) {
+                console.log('[handleUpdateBoard] Checking columns for include file changes...');
+
                 // Check column includes
                 for (let i = 0; i < board.columns.length && i < oldBoard.columns.length; i++) {
                     const newCol = board.columns[i];
@@ -1672,12 +1678,24 @@ export class MessageHandler {
 
                     const oldIncludeFiles = oldCol.includeFiles || [];
                     const newIncludeFiles = newCol.includeFiles || [];
+                    console.log(`[handleUpdateBoard] Column ${i} "${newCol.title}":`);
+                    console.log(`[handleUpdateBoard]   Old includeFiles:`, oldIncludeFiles);
+                    console.log(`[handleUpdateBoard]   New includeFiles:`, newIncludeFiles);
+
                     const removedFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
+                    console.log(`[handleUpdateBoard]   Removed files:`, removedFiles);
 
                     for (const removedPath of removedFiles) {
                         const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
+                        console.log(`[handleUpdateBoard]   Checking file "${removedPath}"`);
+                        console.log(`[handleUpdateBoard]     File exists in registry:`, !!oldFile);
+                        if (oldFile) {
+                            console.log(`[handleUpdateBoard]     File type:`, oldFile.getFileType());
+                            console.log(`[handleUpdateBoard]     Has unsaved changes:`, oldFile.hasUnsavedChanges());
+                        }
+
                         if (oldFile && oldFile.hasUnsavedChanges()) {
-                            console.log(`[handleUpdateBoard] Column include file being removed has unsaved changes: ${removedPath}`);
+                            console.log(`[handleUpdateBoard] ⚠️  Column include file being removed has unsaved changes: ${removedPath}`);
 
                             const choice = await vscode.window.showWarningMessage(
                                 `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
