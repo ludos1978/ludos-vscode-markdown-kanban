@@ -530,7 +530,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ## Summary
 
-Total functions documented: **318**
+Total functions documented: **523**
 
 ### Files analyzed:
 1. kanbanWebviewPanel.ts - 39 methods (reduced from 93)
@@ -577,3 +577,133 @@ Total functions documented: **318**
   - LinkOperations (2 static methods) - Link replacement utilities
   - ExportService (50+ methods) - Export operations
 
+
+## src/files/MarkdownFile.ts - MarkdownFile (Abstract Base)
+
+- src/files/MarkdownFile-MarkdownFile_getPath - Get absolute file path
+- src/files/MarkdownFile-MarkdownFile_getRelativePath - Get relative file path
+- src/files/MarkdownFile-MarkdownFile_getFileName - Get file name only
+- src/files/MarkdownFile-MarkdownFile_exists - Check if file exists
+- src/files/MarkdownFile-MarkdownFile_getLastModified - Get last modified timestamp
+- src/files/MarkdownFile-MarkdownFile_getContent - Get current file content
+- src/files/MarkdownFile-MarkdownFile_getBaseline - Get baseline (last saved) content
+- src/files/MarkdownFile-MarkdownFile_setContent - Set content (optionally update baseline)
+- src/files/MarkdownFile-MarkdownFile_hasUnsavedChanges - Check if file has unsaved changes
+- src/files/MarkdownFile-MarkdownFile_hasExternalChanges - Check if file changed on disk
+- src/files/MarkdownFile-MarkdownFile_isInEditMode - Check if user is actively editing
+- src/files/MarkdownFile-MarkdownFile_setEditMode - Set edit mode state
+- src/files/MarkdownFile-MarkdownFile_isDirtyInEditor - Check if VS Code editor is dirty
+- src/files/MarkdownFile-MarkdownFile_hasConflict - Check for conflict (local + external changes)
+- src/files/MarkdownFile-MarkdownFile_needsReload - Check if file needs reload from disk
+- src/files/MarkdownFile-MarkdownFile_needsSave - Check if file needs save to disk
+- src/files/MarkdownFile-MarkdownFile_reload - Reload content from disk
+- src/files/MarkdownFile-MarkdownFile_save - Save current content to disk
+- src/files/MarkdownFile-MarkdownFile_discardChanges - Discard unsaved changes
+- src/files/MarkdownFile-MarkdownFile_resolveConflict - Resolve conflict with action (save/discard/backup)
+- src/files/MarkdownFile-MarkdownFile_showConflictDialog - Show conflict dialog and resolve
+- src/files/MarkdownFile-MarkdownFile_createBackup - Create backup of current content
+- src/files/MarkdownFile-MarkdownFile_startWatching - Start watching file for external changes
+- src/files/MarkdownFile-MarkdownFile_stopWatching - Stop watching file
+- src/files/MarkdownFile-MarkdownFile_checkForExternalChanges - Check if content changed on disk
+- src/files/MarkdownFile-MarkdownFile_toFileState - Convert to FileState interface (compatibility)
+- src/files/MarkdownFile-MarkdownFile_fromFileState - Update from FileState interface (compatibility)
+- src/files/MarkdownFile-MarkdownFile_dispose - Dispose all resources
+
+## src/files/MainKanbanFile.ts - MainKanbanFile
+
+- src/files/MainKanbanFile-MainKanbanFile_getBoard - Get parsed board structure (cached)
+- src/files/MainKanbanFile-MainKanbanFile_parseToBoard - Parse content to KanbanBoard structure
+- src/files/MainKanbanFile-MainKanbanFile_updateFromBoard - Update content from board structure
+- src/files/MainKanbanFile-MainKanbanFile_getYamlHeader - Get YAML frontmatter
+- src/files/MainKanbanFile-MainKanbanFile_setYamlHeader - Set YAML frontmatter
+- src/files/MainKanbanFile-MainKanbanFile_getKanbanFooter - Get kanban footer
+- src/files/MainKanbanFile-MainKanbanFile_setKanbanFooter - Set kanban footer
+- src/files/MainKanbanFile-MainKanbanFile_readFromDisk - Read from VS Code document or file system
+- src/files/MainKanbanFile-MainKanbanFile_writeToDisk - Write to disk using VS Code API
+- src/files/MainKanbanFile-MainKanbanFile_handleExternalChange - Handle external file change (modified/deleted/created)
+- src/files/MainKanbanFile-MainKanbanFile_validate - Validate kanban markdown content
+- src/files/MainKanbanFile-MainKanbanFile_getConflictContext - Get conflict context for dialog
+
+## src/files/IncludeFile.ts - IncludeFile (Abstract Base for Includes)
+
+- src/files/IncludeFile-IncludeFile_getParentFile - Get parent MainKanbanFile
+- src/files/IncludeFile-IncludeFile_getParentPath - Get parent file path
+- src/files/IncludeFile-IncludeFile_getAbsolutePath - Get absolute path (resolved from relative)
+- src/files/IncludeFile-IncludeFile_isInline - Check if this is inline include
+- src/files/IncludeFile-IncludeFile_readFromDisk - Read include file from disk
+- src/files/IncludeFile-IncludeFile_writeToDisk - Write include file to disk
+- src/files/IncludeFile-IncludeFile_handleExternalChange - Handle external change (include-specific)
+- src/files/IncludeFile-IncludeFile_notifyParentOfChange - Notify parent of changes
+- src/files/IncludeFile-IncludeFile_getConflictContext - Get include conflict context
+
+## src/files/ColumnIncludeFile.ts - ColumnIncludeFile
+
+- src/files/ColumnIncludeFile-ColumnIncludeFile_setColumnId - Set column ID this include belongs to
+- src/files/ColumnIncludeFile-ColumnIncludeFile_getColumnId - Get column ID
+- src/files/ColumnIncludeFile-ColumnIncludeFile_setColumnTitle - Set column title
+- src/files/ColumnIncludeFile-ColumnIncludeFile_getColumnTitle - Get column title
+- src/files/ColumnIncludeFile-ColumnIncludeFile_parseToTasks - Parse presentation format to tasks array
+- src/files/ColumnIncludeFile-ColumnIncludeFile_generateFromTasks - Generate presentation format from tasks
+- src/files/ColumnIncludeFile-ColumnIncludeFile_updateTasks - Update tasks (regenerate content)
+- src/files/ColumnIncludeFile-ColumnIncludeFile_validate - Validate presentation format content
+
+## src/files/TaskIncludeFile.ts - TaskIncludeFile
+
+- src/files/TaskIncludeFile-TaskIncludeFile_setTaskId - Set task ID this include belongs to
+- src/files/TaskIncludeFile-TaskIncludeFile_getTaskId - Get task ID
+- src/files/TaskIncludeFile-TaskIncludeFile_setTaskTitle - Set task title
+- src/files/TaskIncludeFile-TaskIncludeFile_getTaskTitle - Get task title
+- src/files/TaskIncludeFile-TaskIncludeFile_setColumnId - Set column ID containing task
+- src/files/TaskIncludeFile-TaskIncludeFile_getColumnId - Get column ID
+- src/files/TaskIncludeFile-TaskIncludeFile_getTaskDescription - Get task description content
+- src/files/TaskIncludeFile-TaskIncludeFile_setTaskDescription - Set task description content
+- src/files/TaskIncludeFile-TaskIncludeFile_validate - Validate task include content
+
+## src/files/RegularIncludeFile.ts - RegularIncludeFile
+
+- src/files/RegularIncludeFile-RegularIncludeFile_getBoard - Get parsed board (cached)
+- src/files/RegularIncludeFile-RegularIncludeFile_parseToBoard - Parse kanban format to board
+- src/files/RegularIncludeFile-RegularIncludeFile_generateFromBoard - Generate markdown from board
+- src/files/RegularIncludeFile-RegularIncludeFile_updateBoard - Update board (regenerate content)
+- src/files/RegularIncludeFile-RegularIncludeFile_validate - Validate kanban format content
+
+## src/files/MarkdownFileRegistry.ts - MarkdownFileRegistry
+
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_register - Register file in registry
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_unregister - Unregister file from registry
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_clear - Clear all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_get - Get file by absolute path
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getByRelativePath - Get file by relative path
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getAll - Get all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_has - Check if file registered by path
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_hasByRelativePath - Check if file registered by relative path
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_size - Get number of registered files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getByType - Get files by type (generic)
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getMainFile - Get main kanban file
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getIncludeFiles - Get all include files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getColumnIncludeFiles - Get column include files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getTaskIncludeFiles - Get task include files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getRegularIncludeFiles - Get regular include files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesWithConflicts - Get files with conflicts
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesWithUnsavedChanges - Get files with unsaved changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesWithExternalChanges - Get files with external changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesThatNeedReload - Get files needing reload
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesThatNeedSave - Get files needing save
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesInEditMode - Get files in edit mode
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_saveAll - Save all files with unsaved changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_reloadAll - Reload all files with external changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_checkAllForExternalChanges - Check all files for external changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_startWatchingAll - Start watching all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_stopWatchingAll - Stop watching all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_backupAll - Create backups for all files
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_getStatistics - Get registry statistics
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_logStatistics - Log current statistics
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_dispose - Dispose all resources
+
+## src/files/FileFactory.ts - FileFactory
+
+- src/files/FileFactory-FileFactory_createMainFile - Create MainKanbanFile instance
+- src/files/FileFactory-FileFactory_createColumnInclude - Create ColumnIncludeFile instance
+- src/files/FileFactory-FileFactory_createTaskInclude - Create TaskIncludeFile instance
+- src/files/FileFactory-FileFactory_createRegularInclude - Create RegularIncludeFile instance
+- src/files/FileFactory-FileFactory_createInclude - Create include file with type auto-detection

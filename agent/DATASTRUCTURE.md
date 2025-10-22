@@ -684,3 +684,139 @@ This documentation covers **42 distinct data structures** across the codebase:
 - **Classes**: All define data structures through their properties
 
 Total documented data structures: **42**
+
+---
+
+## File Abstraction Classes
+
+### `/src/files/MarkdownFile.ts`
+
+#### `FileChangeEvent`
+Event emitted when file state changes.
+
+```typescript
+interface FileChangeEvent {
+    file: MarkdownFile;
+    changeType: 'content' | 'external' | 'saved' | 'reloaded' | 'conflict';
+    timestamp: Date;
+}
+```
+
+**Purpose**: Notification event for file state changes.
+
+#### `MarkdownFile` (Abstract Class)
+Abstract base class for all markdown files with integrated change detection.
+
+**Purpose**: Encapsulates file state, operations, and change detection in a single class.
+
+**Key Features**:
+- Content state (current, baseline, unsaved changes)
+- Backend state (file system, VS Code editor)
+- Frontend state (Kanban UI modifications)
+- Integrated file watching and change detection
+- Event emitter for state changes
+- Polymorphic file operations
+
+### `/src/files/MainKanbanFile.ts`
+
+#### `MainKanbanFile` (Class)
+Represents the main kanban markdown file.
+
+**Purpose**: Main kanban file with board parsing and conflict handling.
+
+**Extends**: `MarkdownFile`
+
+**Key Features**:
+- Parse markdown ↔ KanbanBoard structure
+- YAML frontmatter and footer management
+- VS Code document integration
+- Main file conflict resolution
+
+### `/src/files/IncludeFile.ts`
+
+#### `IncludeFile` (Abstract Class)
+Abstract base for all include files.
+
+**Purpose**: Common functionality for column, task, and regular includes.
+
+**Extends**: `MarkdownFile`
+
+**Key Features**:
+- Parent-child relationship with MainKanbanFile
+- Relative path resolution
+- Include-specific conflict handling
+- Parent notification system
+
+### `/src/files/ColumnIncludeFile.ts`
+
+#### `ColumnIncludeFile` (Class)
+Column include file (presentation format → tasks).
+
+**Purpose**: Manage column includes with presentation format.
+
+**Extends**: `IncludeFile`
+
+**Key Features**:
+- Parse presentation format to tasks
+- Generate presentation from tasks
+- Column association tracking
+
+### `/src/files/TaskIncludeFile.ts`
+
+#### `TaskIncludeFile` (Class)
+Task include file (markdown description).
+
+**Purpose**: Manage task includes with markdown content.
+
+**Extends**: `IncludeFile`
+
+**Key Features**:
+- Task description content
+- Task and column association tracking
+
+### `/src/files/RegularIncludeFile.ts`
+
+#### `RegularIncludeFile` (Class)
+Regular include file (kanban format → board).
+
+**Purpose**: Manage regular includes with full kanban format.
+
+**Extends**: `IncludeFile`
+
+**Key Features**:
+- Parse kanban format to board
+- Generate kanban from board
+- Board merge capability
+
+### `/src/files/MarkdownFileRegistry.ts`
+
+#### `MarkdownFileRegistry` (Class)
+Central registry for all markdown files.
+
+**Purpose**: Type-safe file management and query operations.
+
+**Key Features**:
+- File registration and lifecycle management
+- Type-specific queries (getColumnIncludeFiles(), etc.)
+- State queries (getFilesWithConflicts(), etc.)
+- Bulk operations (saveAll(), reloadAll(), etc.)
+- Statistics and monitoring
+- Event aggregation
+
+### `/src/files/FileFactory.ts`
+
+#### `FileFactory` (Class)
+Factory for creating file instances with dependency injection.
+
+**Purpose**: Centralized file creation with proper dependencies.
+
+**Key Features**:
+- Create MainKanbanFile
+- Create include files (column, task, regular)
+- Auto-detection based on file type
+- Dependency injection
+
+---
+
+**New Data Structures Added**: 8 classes + 1 interface
+**Total Data Structures**: 50+
