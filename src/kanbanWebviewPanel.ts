@@ -1374,10 +1374,134 @@ export class KanbanWebviewPanel {
     /**
      * Handle file registry change events
      */
-    private _handleFileRegistryChange(event: FileChangeEvent): void {
+    private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
         console.log(`[KanbanWebviewPanel] File registry change: ${event.file.getRelativePath()} (${event.changeType})`);
 
-        // TODO: Use registry changes to trigger UI updates, handle conflicts, etc.
+        const file = event.file;
+        const fileType = file.getFileType();
+
+        // Handle different file types
+        if (fileType === 'include-column') {
+            await this._handleColumnIncludeChange(file as ColumnIncludeFile, event.changeType);
+        } else if (fileType === 'include-task') {
+            await this._handleTaskIncludeChange(file as TaskIncludeFile, event.changeType);
+        } else if (fileType === 'include-regular') {
+            await this._handleRegularIncludeChange(file as RegularIncludeFile, event.changeType);
+        } else if (fileType === 'main') {
+            // Main file changes are handled elsewhere (loadMarkdownFile)
+            console.log('[KanbanWebviewPanel] Main file change detected - handled by loadMarkdownFile');
+        }
+    }
+
+    /**
+     * Handle columninclude file change - update column content
+     */
+    private async _handleColumnIncludeChange(file: ColumnIncludeFile, changeType: string): Promise<void> {
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
+            return; // Only update UI for saved, external, or loaded changes
+        }
+
+        console.log(`[KanbanWebviewPanel] Updating column for include file: ${file.getRelativePath()}`);
+
+        // Find the column that uses this include file
+        if (!this._board) return;
+
+        for (const column of this._board.columns) {
+            if (column.includeFiles && column.includeFiles.includes(file.getRelativePath())) {
+                // Parse tasks from the updated file
+                const tasks = file.parseToTasks();
+                console.log(`[KanbanWebviewPanel] Parsed ${tasks.length} tasks from updated column include`);
+
+                // Update column in cached board
+                column.tasks = tasks;
+
+                // Send update to frontend
+                this._panel.webview.postMessage({
+                    type: 'updateColumnContent',
+                    columnId: column.id,
+                    tasks: tasks
+                });
+
+                break;
+            }
+        }
+    }
+
+    /**
+     * Handle taskinclude file change - update task content
+     */
+    private async _handleTaskIncludeChange(file: TaskIncludeFile, changeType: string): Promise<void> {
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
+            return; // Only update UI for saved, external, or loaded changes
+        }
+
+        console.log(`[KanbanWebviewPanel] Updating task for include file: ${file.getRelativePath()}`);
+
+        // Find the task that uses this include file
+        if (!this._board) return;
+
+        for (const column of this._board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.includes(file.getRelativePath())) {
+                    // Get description from file
+                    const description = file.getTaskDescription();
+
+                    // Parse displayTitle and description (same logic as parsing)
+                    const lines = description.split('\n');
+                    let displayTitle = '';
+                    let taskDescription = '';
+
+                    let titleFound = false;
+                    let descriptionLines: string[] = [];
+
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!titleFound && line) {
+                            displayTitle = lines[i];
+                            titleFound = true;
+                        } else if (titleFound) {
+                            descriptionLines.push(lines[i]);
+                        }
+                    }
+
+                    taskDescription = descriptionLines.join('\n').trim();
+
+                    console.log(`[KanbanWebviewPanel] Updating task content - displayTitle: ${displayTitle}`);
+
+                    // Update task in cached board
+                    task.displayTitle = displayTitle;
+                    task.description = taskDescription;
+
+                    // Send update to frontend
+                    this._panel.webview.postMessage({
+                        type: 'updateTaskContent',
+                        taskId: task.id,
+                        columnId: column.id,
+                        displayTitle: displayTitle,
+                        description: taskDescription
+                    });
+
+                    return; // Found the task, done
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle regular include file change - reload the whole board
+     */
+    private async _handleRegularIncludeChange(file: RegularIncludeFile, changeType: string): Promise<void> {
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
+            return; // Only update UI for saved, external, or loaded changes
+        }
+
+        console.log(`[KanbanWebviewPanel] Regular include changed, reloading board: ${file.getRelativePath()}`);
+
+        // Regular includes affect the whole board structure, so reload everything
+        const document = this._fileManager.getDocument();
+        if (document) {
+            await this.loadMarkdownFile(document, false);
+        }
     }
 
     // ============= FILE REGISTRY HELPER METHODS =============
