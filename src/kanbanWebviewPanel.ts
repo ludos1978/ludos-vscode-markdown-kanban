@@ -1409,6 +1409,33 @@ export class KanbanWebviewPanel {
                 if (board && board.valid) {
                     console.log('[KanbanWebviewPanel] Syncing include files after main file content change');
                     this._syncIncludeFilesWithRegistry(board);
+
+                    // Load content for all column includes and update the columns
+                    for (const column of board.columns) {
+                        if (column.includeFiles && column.includeFiles.length > 0) {
+                            for (const relativePath of column.includeFiles) {
+                                const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                                if (file) {
+                                    console.log(`[KanbanWebviewPanel] Loading and updating column for: ${relativePath}`);
+                                    const tasks = file.parseToTasks();
+                                    column.tasks = tasks;
+
+                                    // Send update to frontend
+                                    if (this._panel) {
+                                        this._panel.webview.postMessage({
+                                            type: 'updateColumnContent',
+                                            columnId: column.id,
+                                            tasks: tasks,
+                                            columnTitle: column.title,
+                                            displayTitle: column.displayTitle,
+                                            includeMode: true,
+                                            includeFiles: column.includeFiles
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
                     console.warn('[KanbanWebviewPanel] Main file changed but board is invalid');
                 }
