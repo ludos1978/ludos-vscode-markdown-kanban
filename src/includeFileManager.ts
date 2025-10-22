@@ -70,11 +70,11 @@ export class IncludeFileManager {
             if (file) {
                 // Reconstruct full content: displayTitle (header) + description
                 // When parsing, the first line is stored as displayTitle and the rest as description
-                // We need to combine them back when saving
+                // We need to combine them back when saving with a blank line separator
                 let fullContent = '';
 
                 if (task.displayTitle) {
-                    fullContent = task.displayTitle + '\n';
+                    fullContent = task.displayTitle + '\n\n'; // Add blank line after header
                 }
 
                 if (task.description) {
