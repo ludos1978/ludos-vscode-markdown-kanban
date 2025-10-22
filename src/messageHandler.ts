@@ -2037,11 +2037,18 @@ export class MessageHandler {
                 const tasks = newFile.parseToTasks();
                 console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
 
-                // 5. Send updated content to frontend
+                // 5. Get updated column metadata from board
+                const column = board?.columns.find((c: any) => c.id === columnId);
+
+                // 6. Send updated content to frontend with all required fields
                 panel._panel?.webview.postMessage({
                     type: 'updateColumnContent',
                     columnId: columnId,
-                    tasks: tasks
+                    tasks: tasks,
+                    columnTitle: column?.title || newTitle,
+                    displayTitle: column?.displayTitle,
+                    includeMode: true,
+                    includeFiles: [newFilePath]
                 });
 
                 vscode.window.showInformationMessage(`Switched to include file: ${newFilePath}`);
@@ -2132,13 +2139,20 @@ export class MessageHandler {
 
                 taskDescription = descriptionLines.join('\n').trim();
 
-                // 6. Send updated content to frontend
+                // 6. Get updated task metadata from board
+                const task = board?.columns.find((c: any) => c.id === columnId)?.tasks.find((t: any) => t.id === taskId);
+
+                // 7. Send updated content to frontend with all required fields
                 panel._panel?.webview.postMessage({
                     type: 'updateTaskContent',
                     taskId: taskId,
                     columnId: columnId,
                     displayTitle: displayTitle,
-                    description: taskDescription
+                    description: taskDescription,
+                    taskTitle: task?.title || newTitle,
+                    includeMode: true,
+                    includeFiles: [newFilePath],
+                    originalTitle: task?.originalTitle
                 });
 
                 vscode.window.showInformationMessage(`Switched to task include file: ${newFilePath}`);
