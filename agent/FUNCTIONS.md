@@ -124,7 +124,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/kanbanFileService-KanbanFileService_updateKnownFileContent - Update the known file content baseline
 - src/kanbanFileService-KanbanFileService_openFileWithReuseCheck - Open a file with reuse check (focus existing editor if already open)
 - src/kanbanFileService-KanbanFileService_setFileHidden - Set file as hidden on Windows using attrib command
-- src/kanbanFileService-KanbanFileService_checkForExternalUnsavedChanges - Check for external unsaved changes when about to save
+- src/kanbanFileService-KanbanFileService_checkForExternalUnsavedChanges - Check for external unsaved changes when about to save; shows conflict dialog if both webview and external have changes; respects user choice to proceed or abort
 
 ## src/conflictService.ts - ConflictService
 

@@ -24,7 +24,7 @@ export class KanbanFileService {
     private _lastKnownFileContent: string = '';
     private _hasExternalUnsavedChanges: boolean = false;
     private _isUpdatingFromPanel: boolean = false;
-    private _hasUnsavedChanges: boolean = false;
+    // REMOVED: _hasUnsavedChanges - now queried from MarkdownFile (single source of truth)
     private _cachedBoardFromWebview: any = null;
     private _lastDocumentUri?: string;
     private _panelId: string;
@@ -58,7 +58,7 @@ export class KanbanFileService {
      */
     public initializeState(
         isUpdatingFromPanel: boolean,
-        hasUnsavedChanges: boolean,
+        // REMOVED: hasUnsavedChanges parameter - set directly on MarkdownFile
         cachedBoardFromWebview: any,
         lastDocumentVersion: number,
         lastDocumentUri?: string,
@@ -66,7 +66,7 @@ export class KanbanFileService {
         panelId?: string
     ): void {
         this._isUpdatingFromPanel = isUpdatingFromPanel;
-        this._hasUnsavedChanges = hasUnsavedChanges;
+        // REMOVED: this._hasUnsavedChanges = hasUnsavedChanges;
         this._cachedBoardFromWebview = cachedBoardFromWebview;
         this._lastDocumentVersion = lastDocumentVersion;
         this._lastDocumentUri = lastDocumentUri;
@@ -90,9 +90,13 @@ export class KanbanFileService {
         lastKnownFileContent: string;
         hasExternalUnsavedChanges: boolean;
     } {
+        // Query main file for unsaved changes (single source of truth)
+        const mainFile = this.fileRegistry.getMainFile();
+        const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
+
         return {
             isUpdatingFromPanel: this._isUpdatingFromPanel,
-            hasUnsavedChanges: this._hasUnsavedChanges,
+            hasUnsavedChanges: hasUnsavedChanges,
             cachedBoardFromWebview: this._cachedBoardFromWebview,
             lastDocumentVersion: this._lastDocumentVersion,
             lastDocumentUri: this._lastDocumentUri,
@@ -134,7 +138,8 @@ export class KanbanFileService {
 
                 // If we have unsaved changes with a cached board, use that instead of re-parsing
                 // This preserves user's work when switching views
-                if (this._hasUnsavedChanges && this._cachedBoardFromWebview) {
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile?.hasUnsavedChanges() && this._cachedBoardFromWebview) {
                     this.setBoard(this._cachedBoardFromWebview);
                     // Keep using the cached board and existing include file states
                 } else {
@@ -364,7 +369,10 @@ export class KanbanFileService {
 
             // Clear unsaved changes flag after successful reload
             if (forceReload) {
-                this._hasUnsavedChanges = false;
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
+                    mainFile.discardChanges();
+                }
             }
         } catch (error) {
             vscode.window.showErrorMessage(`Kanban parsing error: ${error instanceof Error ? error.message : String(error)}`);
@@ -453,7 +461,10 @@ export class KanbanFileService {
             if (currentContent === markdown) {
                 // No changes needed, skip the edit to avoid unnecessary re-renders
                 console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged, skipping save');
-                this._hasUnsavedChanges = false;
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
+                    mainFile.discardChanges();
+                }
                 return;
             }
             console.log('[KanbanFileService.saveToMarkdown] Content has changed, proceeding with save');
@@ -532,7 +543,11 @@ export class KanbanFileService {
             await this.backupManager.createBackup(document);
 
             // Clear unsaved changes flag after successful save
-            this._hasUnsavedChanges = false;
+            const mainFile = this.fileRegistry.getMainFile();
+            if (mainFile) {
+                // Mark as saved and update baseline to current content
+                mainFile.setContent(markdown, true); // true = already saved
+            }
             console.log('[KanbanFileService.saveToMarkdown] Save completed successfully, clearing unsaved changes');
 
             // Notify frontend that save is complete so it can update UI
@@ -890,12 +905,44 @@ export class KanbanFileService {
         }
 
         // Now check include files for external changes
-        const hasExternalIncludeChanges = this.includeFileManager.checkForExternalIncludeFileChanges();
-        if (hasExternalIncludeChanges) {
-            console.log('[checkForExternalUnsavedChanges] External include file changes detected, showing conflict dialog');
-            // TODO: Show conflict dialog for include files and respect user choice
-            // For now, allow save to proceed
-            console.warn('[checkForExternalUnsavedChanges] Include file conflict dialog not implemented, proceeding with save');
+        const filesThatNeedReload = this.fileRegistry.getFilesThatNeedReload();
+        if (filesThatNeedReload.length > 0) {
+            console.log(`[checkForExternalUnsavedChanges] ${filesThatNeedReload.length} include file(s) have external changes, showing conflict dialog`);
+
+            // Check if any of these files also have unsaved changes (conflict situation)
+            const filesWithConflicts = filesThatNeedReload.filter(f => f.hasUnsavedChanges());
+
+            if (filesWithConflicts.length > 0) {
+                // We have include files with both external changes AND unsaved changes - show conflict dialog
+                const changedIncludeFiles = filesWithConflicts.map(f => f.getRelativePath());
+                const fileName = document ? path.basename(document.fileName) : 'Unknown';
+
+                const mainFile = this.fileRegistry.getMainFile();
+                const context: ConflictContext = {
+                    type: 'presave_check',
+                    fileType: 'include',
+                    filePath: document?.uri.fsPath || '',
+                    fileName: fileName,
+                    hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false, // We're about to save main file
+                    hasIncludeUnsavedChanges: true,
+                    changedIncludeFiles: changedIncludeFiles
+                };
+
+                try {
+                    const resolution = await this.showConflictDialog(context);
+                    if (!resolution || !resolution.shouldProceed) {
+                        console.log('[checkForExternalUnsavedChanges] User chose not to proceed with include file conflicts');
+                        return false; // User chose not to proceed
+                    }
+                    console.log('[checkForExternalUnsavedChanges] User chose to proceed despite include file conflicts');
+                } catch (error) {
+                    console.error('[checkForExternalUnsavedChanges] Error in include file conflict resolution:', error);
+                    return false;
+                }
+            } else {
+                // Files need reload but no unsaved changes - safe to auto-reload
+                console.log('[checkForExternalUnsavedChanges] Include files have external changes but no unsaved changes, will auto-reload');
+            }
         }
 
         return true; // All checks passed - save can proceed

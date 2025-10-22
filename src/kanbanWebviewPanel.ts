@@ -67,7 +67,7 @@ export class KanbanWebviewPanel {
     private _lastDocumentVersion: number = -1;  // Track document version
     private _isUndoRedoOperation: boolean = false;  // Track undo/redo operations
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
-    private _hasUnsavedChanges: boolean = false;  // Track unsaved changes at panel level
+    // REMOVED: _hasUnsavedChanges - now queried from MarkdownFile (single source of truth)
     private _cachedBoardFromWebview: any = null;  // Store the latest cached board from webview
     private _isClosingPrevented: boolean = false;  // Flag to prevent recursive closing attempts
     private _lastDocumentUri?: string;  // Track current document for serialization
