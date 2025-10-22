@@ -22,6 +22,7 @@ export class MainKanbanFile extends MarkdownFile {
     private _board?: KanbanBoard;
     private _yamlHeader: string | null = null;
     private _kanbanFooter: string | null = null;
+    private _includedFiles: string[] = []; // Regular includes (!!!include(file)!!!)
 
     // ============= DEPENDENCIES =============
     private _fileManager: FileManager;
@@ -60,10 +61,20 @@ export class MainKanbanFile extends MarkdownFile {
         console.log(`[MainKanbanFile] Parsing content to board: ${this._relativePath}`);
         const parseResult = this._parser.parseMarkdown(this._content);
         this._board = parseResult.board;
+        this._includedFiles = parseResult.includedFiles || [];
+
+        console.log(`[MainKanbanFile] Parsed board with ${this._includedFiles.length} regular includes`);
 
         // Extract YAML and footer if present
         // (This would use the existing parsing logic)
         return parseResult.board;
+    }
+
+    /**
+     * Get regular include files (!!!include(file)!!!)
+     */
+    public getIncludedFiles(): string[] {
+        return this._includedFiles;
     }
 
     /**
