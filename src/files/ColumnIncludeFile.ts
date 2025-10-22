@@ -142,11 +142,15 @@ export class ColumnIncludeFile extends IncludeFile {
                 errors.push('Column include must have at least one slide (task)');
             }
 
-            // Check if slides have content
+            // Check if slides have at least a title or content
+            // A slide with just a title is valid (represents a task with no description)
             for (let i = 0; i < slides.length; i++) {
                 const slide = slides[i];
-                if (!slide.content || slide.content.trim().length === 0) {
-                    errors.push(`Slide ${i + 1} is empty`);
+                const hasTitle = slide.title && slide.title.trim().length > 0;
+                const hasContent = slide.content && slide.content.trim().length > 0;
+
+                if (!hasTitle && !hasContent) {
+                    errors.push(`Slide ${i + 1} is empty (no title or content)`);
                 }
             }
         } catch (error) {
