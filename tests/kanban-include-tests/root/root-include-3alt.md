@@ -1,8 +1,11 @@
-# # # # include in ./root/root-include-3alt.md
+# include in ./root/root-include-3alt.md
 
-Modify this line B
+./root/root-include-3alt.md
+
+Modify this line 3alt - B
 
 ---
 
-# # # # second slide
+# second slide
+
 

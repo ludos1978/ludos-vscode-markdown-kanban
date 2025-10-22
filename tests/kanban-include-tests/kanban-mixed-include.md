@@ -19,6 +19,6 @@ kanban-plugin: board
 ## task includes
 - [ ] !!!taskinclude(./root/root-include-2.md)!!!
 
-## !!!columninclude(./root/root-include-3.md)!!! #stack
+## !!!columninclude(./root/root-include-3alt.md)!!! #stack
 
 
