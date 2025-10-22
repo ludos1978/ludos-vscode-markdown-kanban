@@ -1411,10 +1411,14 @@ export class KanbanWebviewPanel {
                     this._syncIncludeFilesWithRegistry(board);
 
                     // Load content for all column includes and update the columns
+                    console.log(`[KanbanWebviewPanel] Board has ${board.columns.length} columns`);
                     for (const column of board.columns) {
+                        console.log(`[KanbanWebviewPanel] Checking column ${column.id}, includeFiles:`, column.includeFiles);
                         if (column.includeFiles && column.includeFiles.length > 0) {
                             for (const relativePath of column.includeFiles) {
+                                console.log(`[KanbanWebviewPanel] Looking for file in registry: ${relativePath}`);
                                 const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                                console.log(`[KanbanWebviewPanel] File found:`, !!file, `Type:`, file?.getFileType());
                                 if (file) {
                                     console.log(`[KanbanWebviewPanel] Loading and updating column for: ${relativePath}`);
                                     const tasks = file.parseToTasks();
@@ -1958,6 +1962,20 @@ export class KanbanWebviewPanel {
 
         // Update the column with the loaded tasks
         column.tasks = allTasks;
+
+        // Send update to frontend
+        if (this._panel) {
+            this._panel.webview.postMessage({
+                type: 'updateColumnContent',
+                columnId: column.id,
+                tasks: allTasks,
+                columnTitle: column.title,
+                displayTitle: column.displayTitle,
+                includeMode: true,
+                includeFiles: newIncludeFiles
+            });
+            console.log(`[updateIncludeContentUnified] Sent updateColumnContent with ${allTasks.length} tasks to frontend`);
+        }
     }
 
     public async loadNewTaskIncludeContent(task: KanbanTask, newIncludeFiles: string[]): Promise<void> {
