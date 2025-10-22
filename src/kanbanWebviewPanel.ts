@@ -1299,6 +1299,13 @@ export class KanbanWebviewPanel {
     }
 
     /**
+     * Public method to sync include files with registry (called from message handler after board updates)
+     */
+    public syncIncludeFilesWithBoard(board: KanbanBoard): void {
+        this._syncIncludeFilesWithRegistry(board);
+    }
+
+    /**
      * Phase 1: Sync include files with registry (create instances for all includes in the board)
      */
     private _syncIncludeFilesWithRegistry(board: KanbanBoard): void {

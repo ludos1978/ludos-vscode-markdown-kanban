@@ -1652,6 +1652,12 @@ export class MessageHandler {
             // Set the updated board
             this._setBoard(board);
 
+            // Sync include files with registry to create any new include file instances
+            const panel = this._getWebviewPanel();
+            if (panel && panel.syncIncludeFilesWithBoard) {
+                panel.syncIncludeFilesWithBoard(board);
+            }
+
             // If this is an immediate update (like column include changes), trigger a save and reload
             if (message.immediate) {
 
