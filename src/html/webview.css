@@ -858,7 +858,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   background-color: var(--vscode-list-hoverBackground);
 }
 
-/* Columninclude link styling */
+/* Column and Task include link styling */
 .columninclude-link {
   color: var(--vscode-textLink-foreground);
   text-decoration: underline;

@@ -5347,6 +5347,21 @@ function handleColumnIncludeClick(event, filePath) {
     // Normal clicks do nothing (don't interfere with column title editing)
 }
 
+function handleTaskIncludeClick(event, filePath) {
+    // Only open file on Alt+click
+    if (event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Send message to backend to open the file
+        vscode.postMessage({
+            type: 'openIncludeFile',
+            filePath: filePath
+        });
+    }
+    // Normal clicks do nothing (don't interfere with task title editing)
+}
+
 function handleColumnExportResult(result) {
     if (result.success) {
         vscode.postMessage({

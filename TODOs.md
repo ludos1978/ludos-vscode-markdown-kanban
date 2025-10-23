@@ -4,6 +4,8 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
+
 - [ ] Conflict tracking behaviour:
   - if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode. then the conflict manager must ask the user:
       - wether he wants to ignore the external changes (nothing happens, remember we still have unsaved changes in the kanban)

@@ -1853,8 +1853,12 @@ function createTaskElement(task, columnId, taskIndex) {
     // Use same pattern as column includes:
     // - displayTitle for display (content from file or filtered title)
     // - task.title for editing (includes the !!!taskinclude(...)!!! syntax)
-    const displayTitle = task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '');
-    const renderedTitle = (displayTitle && typeof displayTitle === 'string' && displayTitle.trim()) ? renderMarkdown(displayTitle) : '';
+    // Use getTaskDisplayTitle to handle taskinclude filepaths as clickable links
+    const renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
+        ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
+         typeof (task.displayTitle || task.title) === 'string' &&
+         (task.displayTitle || task.title).trim()) ?
+        renderMarkdown(task.displayTitle || task.title) : '';
 
     // For editing, always use the full title including include syntax
     const editTitle = task.title || '';

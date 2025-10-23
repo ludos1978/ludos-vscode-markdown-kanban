@@ -589,6 +589,64 @@ class TagUtils {
             return renderFn ? renderFn(displayTitle) : displayTitle;
         }
     }
+
+    /**
+     * Get display title for a task, handling taskinclude specially to make filepaths clickable
+     * Uses same format as column includes: "include(path/filename.md)"
+     * @param {Object} task - Task object with displayTitle, includeMode, includeFiles
+     * @returns {string} HTML string for display
+     */
+    getTaskDisplayTitle(task) {
+        if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
+            // For taskinclude, show as "include(...path/filename.md)" format - same as column includes
+            const fileName = task.includeFiles[0];
+            const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
+            const baseFileName = parts[parts.length - 1];
+
+            // Get path (everything except filename), limit to 10 characters
+            let pathPart = '';
+            if (parts.length > 1) {
+                const fullPath = parts.slice(0, -1).join('/');
+                if (fullPath.length > 10) {
+                    // Show last 10 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-10);
+                } else {
+                    pathPart = fullPath;
+                }
+            }
+
+            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
+            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+
+            const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+            const linkHtml = `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
+
+            // Check if there's additional title text beyond just the filename
+            const fileNameWithoutExt = baseFileName.replace(/\.[^/.]+$/, '');
+            const displayTitle = task.displayTitle || '';
+
+            // Strip common patterns like "include in ./path/file.md" or "# include in ./path/file.md" to check for additional content
+            const cleanedDisplayTitle = displayTitle
+                .replace(/^#+\s*/, '') // Remove markdown headers
+                .replace(/include\s+in\s+[\w\-\/\\. ]+\.md/i, '') // Remove "include in path/file.md"
+                .replace(/[\w\-\/\\. ]*\.md/, '') // Remove any remaining filepath patterns
+                .trim();
+
+            const additionalTitle = (cleanedDisplayTitle && cleanedDisplayTitle !== fileNameWithoutExt) ? cleanedDisplayTitle : '';
+
+            if (additionalTitle) {
+                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+                return `${linkHtml} ${renderFn ? renderFn(additionalTitle) : additionalTitle}`;
+            } else {
+                return linkHtml;
+            }
+        } else {
+            // Normal task - render displayTitle as-is
+            const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
+            const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+            return renderFn ? renderFn(displayTitle) : displayTitle;
+        }
+    }
 }
 
 // Create singleton instance
