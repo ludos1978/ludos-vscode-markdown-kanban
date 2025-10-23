@@ -1550,20 +1550,26 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Handle regular include file change - reload the whole board
+     * Handle regular include file change - update frontend cache
      */
     private async _handleRegularIncludeChange(file: RegularIncludeFile, changeType: string): Promise<void> {
         if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
             return; // Only update UI for saved, external, or loaded changes
         }
 
-        console.log(`[KanbanWebviewPanel] Regular include changed, reloading board: ${file.getRelativePath()}`);
+        console.log(`[KanbanWebviewPanel] Updating include cache for: ${file.getRelativePath()}`);
 
-        // Regular includes affect the whole board structure, so reload everything
-        const document = this._fileManager.getDocument();
-        if (document) {
-            await this.loadMarkdownFile(document, false);
-        }
+        // Get the updated content from the file
+        const content = file.getContent();
+
+        // Send content to frontend to update markdown-it-include cache
+        this._panel.webview.postMessage({
+            type: 'includeFileContent',
+            filePath: file.getRelativePath(),
+            content: content
+        });
+
+        console.log(`[KanbanWebviewPanel] Sent ${content.length} characters to frontend cache`);
     }
 
     // ============= FILE REGISTRY HELPER METHODS =============
