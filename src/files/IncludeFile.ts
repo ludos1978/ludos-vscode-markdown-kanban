@@ -147,16 +147,15 @@ export abstract class IncludeFile extends MarkdownFile {
             this._exists = true;
         }
 
-        // Check for conflict
+        // Check for conflict FIRST - only clear content if auto-reloading
         if (this.hasConflict()) {
-            console.log(`[${this.getFileType()}] Conflict detected - showing dialog`);
+            console.log(`[${this.getFileType()}] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
             await this.showConflictDialog();
         } else if (this.needsReload()) {
-            console.log(`[${this.getFileType()}] Auto-reloading from disk`);
-            await this.reload();
-            await this.notifyParentOfChange();
+            console.log(`[${this.getFileType()}] ⚠ Auto-reload: Reloading from disk`);
+            await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
         } else {
-            console.log(`[${this.getFileType()}] External change detected but not processing (editing or has unsaved changes)`);
+            console.log(`[${this.getFileType()}] ⏸ External change detected but neither conflict nor reload needed`);
         }
     }
 
@@ -177,6 +176,35 @@ export abstract class IncludeFile extends MarkdownFile {
             if (hasParentChanges) {
                 console.log(`[${this.getFileType()}] Parent also has changes - reloading parent`);
             }
+        }
+    }
+
+    // ============= BACKUP =============
+
+    /**
+     * Create backup of current content for include files
+     * Since include files don't have TextDocuments, we write directly to a backup file
+     */
+    public async createBackup(label: string = 'manual'): Promise<void> {
+        console.log(`[${this.getFileType()}] Creating backup with label '${label}': ${this._relativePath}`);
+
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const backupDir = path.join(path.dirname(this._absolutePath), '.backups');
+            const filename = path.basename(this._absolutePath);
+            const backupPath = path.join(backupDir, `${timestamp}_${label}_${filename}`);
+
+            // Ensure backup directory exists
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
+            }
+
+            // Write current content to backup file
+            await fs.promises.writeFile(backupPath, this._content, 'utf8');
+            console.log(`[${this.getFileType()}] ✓ Backup created: ${backupPath}`);
+        } catch (error) {
+            console.error(`[${this.getFileType()}] ✗ Failed to create backup:`, error);
+            throw error;
         }
     }
 

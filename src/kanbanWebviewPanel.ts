@@ -319,6 +319,7 @@ export class KanbanWebviewPanel {
         // Initialize IncludeFileManager
         this._includeFileManager = new IncludeFileManager(
             this._fileRegistry,
+            this._fileFactory,
             this._conflictResolver,
             this._backupManager,
             () => this._fileManager.getFilePath(),
@@ -1451,8 +1452,8 @@ export class KanbanWebviewPanel {
      * Handle columninclude file change - update column content
      */
     private async _handleColumnIncludeChange(file: ColumnIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
-            return; // Only update UI for saved, external, or loaded changes
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
+            return; // Only update UI for saved, external, loaded, or reloaded changes
         }
 
         console.log(`[KanbanWebviewPanel] Updating column for include file: ${file.getRelativePath()}`);
@@ -1489,8 +1490,8 @@ export class KanbanWebviewPanel {
      * Handle taskinclude file change - update task content
      */
     private async _handleTaskIncludeChange(file: TaskIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
-            return; // Only update UI for saved, external, or loaded changes
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
+            return; // Only update UI for saved, external, loaded, or reloaded changes
         }
 
         console.log(`[KanbanWebviewPanel] Updating task for include file: ${file.getRelativePath()}`);
@@ -1558,8 +1559,8 @@ export class KanbanWebviewPanel {
      * Handle regular include file change - update frontend cache
      */
     private async _handleRegularIncludeChange(file: RegularIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded') {
-            return; // Only update UI for saved, external, or loaded changes
+        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
+            return; // Only update UI for saved, external, loaded, or reloaded changes
         }
 
         console.log(`[KanbanWebviewPanel] Updating include cache for: ${file.getRelativePath()}`);

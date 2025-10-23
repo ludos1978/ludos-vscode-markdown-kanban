@@ -206,11 +206,12 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
     /**
      * Reload content from disk and update baseline
+     * Verifies content has actually changed before accepting
      */
     public async reload(): Promise<void> {
         console.log(`[${this.getFileType()}] Reloading from disk: ${this._relativePath}`);
 
-        const content = await this.readFromDisk();
+        const content = await this._readFromDiskWithVerification();
         if (content !== null) {
             this._content = content;
             this._baseline = content;
@@ -221,8 +222,68 @@ export abstract class MarkdownFile implements vscode.Disposable {
             this._emitChange('reloaded');
             console.log(`[${this.getFileType()}] Reloaded successfully: ${this._relativePath}`);
         } else {
-            console.error(`[${this.getFileType()}] Failed to reload: ${this._relativePath}`);
+            console.warn(`[${this.getFileType()}] ⚠ Verification failed - content unchanged. Keeping content cleared.`);
+            console.warn(`[${this.getFileType()}] This may be a false alarm from file watcher. Content will remain empty until actual change detected.`);
+            // Keep content cleared (_content is already empty from handleExternalChange)
+            // Don't update baseline - next watcher event will try again
         }
+    }
+
+    /**
+     * Read from disk with verification that content has actually changed
+     * Retries if file appears unchanged (incomplete write)
+     */
+    private async _readFromDiskWithVerification(): Promise<string | null> {
+        const maxRetries = 10;
+        const retryDelay = 100;
+
+        console.log(`[${this.getFileType()}] Starting verification - baseline length: ${this._baseline.length}`);
+        console.log(`[${this.getFileType()}] Last modified: ${this._lastModified?.toISOString()}`);
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            // Check file modification time first
+            const currentMtime = await this._getFileModifiedTime();
+            if (currentMtime && this._lastModified) {
+                const mtimeChanged = currentMtime.getTime() !== this._lastModified.getTime();
+                console.log(`[${this.getFileType()}] Attempt ${attempt + 1}: mtime changed = ${mtimeChanged}`);
+                console.log(`[${this.getFileType()}]   Current: ${currentMtime.toISOString()}`);
+                console.log(`[${this.getFileType()}]   Cached:  ${this._lastModified.toISOString()}`);
+
+                if (!mtimeChanged && attempt === 0) {
+                    console.warn(`[${this.getFileType()}] ⚠ File mtime unchanged - false alarm from watcher!`);
+                    return null;
+                }
+            }
+
+            // Read content
+            const content = await this.readFromDisk();
+
+            if (content === null) {
+                console.error(`[${this.getFileType()}] Read failed on attempt ${attempt + 1}`);
+                return null;
+            }
+
+            console.log(`[${this.getFileType()}] Attempt ${attempt + 1}: read ${content.length} chars`);
+
+            // Verify content has actually changed
+            if (content !== this._baseline) {
+                console.log(`[${this.getFileType()}] ✓ Content verified changed (${content.length} chars, attempt ${attempt + 1})`);
+                return content;
+            }
+
+            // Content unchanged - file write may be incomplete, wait and retry
+            if (attempt < maxRetries - 1) {
+                console.log(`[${this.getFileType()}] Content unchanged, waiting for complete write (attempt ${attempt + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            } else {
+                console.error(`[${this.getFileType()}] ✗✗✗ Content STILL unchanged after ${maxRetries} attempts!`);
+                console.error(`[${this.getFileType()}] Baseline: ${this._baseline.substring(0, 100)}...`);
+                console.error(`[${this.getFileType()}] Disk:     ${content.substring(0, 100)}...`);
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**

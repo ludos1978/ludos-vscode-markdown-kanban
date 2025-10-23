@@ -33,25 +33,23 @@ export interface ConflictResolution {
  *
  * ===== SPECIFICATION (ONLY CORRECT BEHAVIOR) =====
  *
- * For Main Kanban File AND Each columninclude/taskinclude File INDIVIDUALLY:
+ * For ALL File Types (Main Kanban, ColumnInclude, TaskInclude, RegularInclude):
  *
- * 1. External file modified + Kanban has unsaved changes OR is in edit mode:
+ * 1. External file modified + File has unsaved changes OR is in edit mode:
  *    → SHOW CONFLICT DIALOG with 4 options:
- *      a) Ignore external changes (DEFAULT/ESC) - nothing happens, kanban keeps changes
- *      b) Overwrite external file - save kanban contents to file (becomes unedited state)
- *      c) Save as backup + reload - kanban saved to backup, external changes loaded
- *      d) Discard + reload - discard kanban changes, reload from external
+ *      a) Ignore external changes (DEFAULT/ESC) - nothing happens, keeps current changes
+ *      b) Overwrite external file - save current contents to file (becomes unedited state)
+ *      c) Save as backup + reload - current content saved to backup, external changes loaded
+ *      d) Discard + reload - discard current changes, reload from external
  *
- * 2. External file modified + Kanban has NO unsaved changes AND is NOT in edit mode:
+ * 2. External file modified + File has NO unsaved changes AND is NOT in edit mode:
  *    → AUTO-RELOAD IMMEDIATELY (no dialog)
  *
- * 3. Kanban modified and saved + External file has unsaved changes (later saved):
+ * 3. File modified and saved + External file has unsaved changes (later saved):
  *    → Rely on VSCode's default change detection
  *
- * For Regular Include Files (!!!include - NOT columninclude/taskinclude):
- *    → ALWAYS auto-reload on external modification (cannot be edited internally)
- *
- * NOTE: Edit mode tracking not yet implemented - currently only checks unsaved changes
+ * NOTE: All four file types (Main, ColumnInclude, TaskInclude, RegularInclude) follow
+ * the SAME conflict tracking behavior as specified above.
  *
  * =================================================
  */
@@ -347,12 +345,11 @@ export class ConflictResolver {
      * External include file change dialog
      *
      * SPEC REQUIREMENT:
-     * - Regular includes (!!!include): ALWAYS auto-reload (no dialog) - cannot be edited internally
-     * - Column/Task includes (!!!columninclude/!!!taskinclude):
+     * - ALL include types (Regular, Column, Task) follow the SAME conflict tracking:
      *   - Auto-reload if: no unsaved changes AND not in edit mode
-     *   - Show dialog if: has unsaved changes OR is in edit mode
+     *   - Show 4-option dialog if: has unsaved changes OR is in edit mode
      *
-     * NOTE: Edit mode tracking not yet implemented, so currently only checks unsaved changes
+     * NOTE: Edit mode tracking is implemented via isInEditMode flag
      */
     private async showExternalIncludeFileDialog(context: ConflictContext): Promise<ConflictResolution> {
         const hasIncludeChanges = context.hasIncludeUnsavedChanges;

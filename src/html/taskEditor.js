@@ -1101,8 +1101,10 @@ class TaskEditor {
                             const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
                             if (taskElement) {
                                 const titleDisplayElement = taskElement.querySelector('.task-title-display');
-                                if (titleDisplayElement && task.displayTitle) {
-                                    titleDisplayElement.innerHTML = renderMarkdown(task.displayTitle);
+                                if (titleDisplayElement) {
+                                    // Use getTaskDisplayTitle to maintain link format
+                                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '');
+                                    titleDisplayElement.innerHTML = displayHtml;
                                 }
                             }
                         }

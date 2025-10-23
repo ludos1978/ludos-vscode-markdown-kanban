@@ -4478,6 +4478,42 @@ s {
     transform: scale(1.1);
 }
 
+/* Regular include bordered container with title bar */
+.include-container {
+    display: block;
+    border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.2));
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.include-title-bar {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background-color: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+    font-size: 0.9em;
+    font-family: var(--vscode-font-family);
+}
+
+.include-filename-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.include-filename-link:hover {
+    text-decoration: underline;
+    color: var(--vscode-textLink-activeForeground);
+}
+
+.include-content-area {
+    padding: 8px 12px;
+    background-color: var(--vscode-editor-background);
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.6; }

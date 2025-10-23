@@ -192,15 +192,15 @@ export class MainKanbanFile extends MarkdownFile {
             this._exists = true;
         }
 
-        // Check for conflict
+        // Check for conflict FIRST - only clear content if auto-reloading
         if (this.hasConflict()) {
-            console.log(`[MainKanbanFile] Conflict detected - showing dialog`);
+            console.log(`[MainKanbanFile] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
             await this.showConflictDialog();
         } else if (this.needsReload()) {
-            console.log(`[MainKanbanFile] Auto-reloading from disk`);
-            await this.reload();
+            console.log(`[MainKanbanFile] ⚠ Auto-reload: Reloading from disk`);
+            await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
         } else {
-            console.log(`[MainKanbanFile] External change detected but not processing (editing or has unsaved changes)`);
+            console.log(`[MainKanbanFile] ⏸ External change detected but neither conflict nor reload needed`);
         }
     }
 

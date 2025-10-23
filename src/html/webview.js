@@ -5362,6 +5362,26 @@ function handleTaskIncludeClick(event, filePath) {
     // Normal clicks do nothing (don't interfere with task title editing)
 }
 
+/**
+ * Handle clicks on regular include filename links
+ * @param {Event} event - The click event
+ * @param {string} filePath - The path to the include file
+ */
+function handleRegularIncludeClick(event, filePath) {
+    // Only open file on Alt+click
+    if (event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Send message to backend to open the file
+        vscode.postMessage({
+            type: 'openIncludeFile',
+            filePath: filePath
+        });
+    }
+    // Normal clicks do nothing
+}
+
 function handleColumnExportResult(result) {
     if (result.success) {
         vscode.postMessage({

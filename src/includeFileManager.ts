@@ -3,7 +3,7 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { BackupManager } from './backupManager';
 import { ConflictResolver } from './conflictResolver';
-import { MarkdownFileRegistry, IncludeFile, ColumnIncludeFile, TaskIncludeFile, FileState } from './files';
+import { MarkdownFileRegistry, IncludeFile, ColumnIncludeFile, TaskIncludeFile, FileState, FileFactory } from './files';
 
 /**
  * IncludeFileManager - Thin wrapper around MarkdownFileRegistry
@@ -16,6 +16,7 @@ export class IncludeFileManager {
 
     constructor(
         private fileRegistry: MarkdownFileRegistry,
+        private fileFactory: FileFactory,
         private conflictResolver: ConflictResolver,
         private backupManager: BackupManager,
         private mainFilePath: () => string | undefined,
@@ -216,7 +217,59 @@ export class IncludeFileManager {
     }
 
     public ensureIncludeFileRegistered(relativePath: string, type: string, documentGetter: any): void {
-        // Files are registered when board is loaded - this is a no-op
+        console.log(`\n========== ensureIncludeFileRegistered ==========`);
+        console.log(`[IncludeFileManager] CALLED with: ${relativePath}, type: ${type}`);
+
+        // Check if file is already registered
+        if (this.fileRegistry.hasByRelativePath(relativePath)) {
+            console.log(`[IncludeFileManager] ✓ Already registered: ${relativePath}`);
+            const file = this.fileRegistry.getByRelativePath(relativePath);
+            console.log(`[IncludeFileManager]   - File type: ${file?.getFileType()}`);
+            console.log(`[IncludeFileManager]   - Has watcher: ${file ? 'yes' : 'no'}`);
+            console.log(`================================================\n`);
+            return;
+        }
+
+        // Get main file
+        const mainFile = this.fileRegistry.getMainFile();
+        if (!mainFile) {
+            console.error(`[IncludeFileManager] ✗ NO MAIN FILE - Cannot register!`);
+            console.error(`[IncludeFileManager]   Registry has ${this.fileRegistry.getAll().length} files`);
+            console.log(`================================================\n`);
+            return;
+        }
+
+        console.log(`[IncludeFileManager] → Creating ${type} include file...`);
+
+        // Create appropriate file type
+        let includeFile;
+        try {
+            if (type === 'regular') {
+                includeFile = this.fileFactory.createRegularInclude(relativePath, mainFile, true);
+            } else if (type === 'column') {
+                includeFile = this.fileFactory.createColumnInclude(relativePath, mainFile, true);
+            } else if (type === 'task') {
+                includeFile = this.fileFactory.createTaskInclude(relativePath, mainFile, true);
+            } else {
+                console.error(`[IncludeFileManager] ✗ Unknown type: ${type}`);
+                console.log(`================================================\n`);
+                return;
+            }
+
+            // Register and start watching
+            this.fileRegistry.register(includeFile);
+            console.log(`[IncludeFileManager] ✓ Registered in file registry`);
+
+            includeFile.startWatching();
+            console.log(`[IncludeFileManager] ✓ Started file watcher`);
+
+            console.log(`[IncludeFileManager] ✓✓✓ SUCCESS! Now tracking: ${relativePath}`);
+            console.log(`[IncludeFileManager]   Total files in registry: ${this.fileRegistry.getAll().length}`);
+            console.log(`================================================\n`);
+        } catch (error) {
+            console.error(`[IncludeFileManager] ✗✗✗ ERROR:`, error);
+            console.log(`================================================\n`);
+        }
     }
 
     public async readFileContent(relativePath: string, documentGetter: any): Promise<string | null> {
