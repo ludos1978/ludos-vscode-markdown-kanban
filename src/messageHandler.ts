@@ -2276,12 +2276,17 @@ export class MessageHandler {
                     if (!titleFound && line) {
                         displayTitle = lines[i];
                         titleFound = true;
-                    } else if (titleFound) {
+                    } else if (titleFound && line) {
+                        // Skip blank lines immediately after title (writer adds \n\n separator)
+                        descriptionLines.push(lines[i]);
+                    } else if (titleFound && descriptionLines.length > 0) {
+                        // Once we have content, preserve blank lines (including trailing)
                         descriptionLines.push(lines[i]);
                     }
                 }
 
-                taskDescription = descriptionLines.join('\n').trim();
+                // Preserve trailing whitespace for symmetric read/write
+                taskDescription = descriptionLines.join('\n');
 
                 // 6. Get updated task metadata from board
                 const task = board?.columns.find((c: any) => c.id === columnId)?.tasks.find((t: any) => t.id === taskId);

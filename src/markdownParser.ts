@@ -312,13 +312,17 @@ export class MarkdownKanbanParser {
                   if (!titleFound && line) {
                     includeTitle = lines[i]; // Use original line with indentation
                     titleFound = true;
-                  } else if (titleFound) {
+                  } else if (titleFound && line) {
+                    // Skip blank lines immediately after title (writer adds \n\n separator)
+                    descriptionLines.push(lines[i]);
+                  } else if (titleFound && descriptionLines.length > 0) {
+                    // Once we have content, preserve blank lines (including trailing)
                     descriptionLines.push(lines[i]);
                   }
                 }
 
-                // Join remaining lines as description
-                includeDescription = descriptionLines.join('\n').trim();
+                // Join remaining lines as description - preserve trailing whitespace for symmetric read/write
+                includeDescription = descriptionLines.join('\n');
 
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);

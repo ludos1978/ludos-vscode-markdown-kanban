@@ -619,27 +619,9 @@ class TagUtils {
             const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
 
             const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-            const linkHtml = `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
 
-            // Check if there's additional title text beyond just the filename
-            const fileNameWithoutExt = baseFileName.replace(/\.[^/.]+$/, '');
-            const displayTitle = task.displayTitle || '';
-
-            // Strip common patterns like "include in ./path/file.md" or "# include in ./path/file.md" to check for additional content
-            const cleanedDisplayTitle = displayTitle
-                .replace(/^#+\s*/, '') // Remove markdown headers
-                .replace(/include\s+in\s+[\w\-\/\\. ]+\.md/i, '') // Remove "include in path/file.md"
-                .replace(/[\w\-\/\\. ]*\.md/, '') // Remove any remaining filepath patterns
-                .trim();
-
-            const additionalTitle = (cleanedDisplayTitle && cleanedDisplayTitle !== fileNameWithoutExt) ? cleanedDisplayTitle : '';
-
-            if (additionalTitle) {
-                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                return `${linkHtml} ${renderFn ? renderFn(additionalTitle) : additionalTitle}`;
-            } else {
-                return linkHtml;
-            }
+            // Just return the include link - displayTitle is not shown because it's the file content, not metadata
+            return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
         } else {
             // Normal task - render displayTitle as-is
             const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');

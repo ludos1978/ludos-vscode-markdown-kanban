@@ -90,10 +90,13 @@ export class IncludeFileManager {
                                 fullContent += task.description;
                             }
 
-                            // Update file content (marks as unsaved if changed)
-                            file.setTaskDescription(fullContent);
-
-                            console.log(`[trackIncludeFileUnsavedChanges] After setTaskDescription, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
+                            // Only update if content actually changed
+                            // Reader/writer are now symmetric so exact comparison works
+                            const currentContent = file.getContent();
+                            if (fullContent !== currentContent) {
+                                // Update file content (marks as unsaved if changed)
+                                file.setTaskDescription(fullContent);
+                            }
                         }
                     }
                 }
