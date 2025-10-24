@@ -41,20 +41,12 @@ export class MarkdownKanbanParser {
       // First parse with original content to preserve raw descriptions
       const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-      // Detect all include files in the content
-      let includedFiles: string[] = [];
-      const includeRegex = /!!!include\(([^)]+)\)!!!/gi;
-      let match;
-      while ((match = includeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!includedFiles.includes(includeFile)) {
-              includedFiles.push(includeFile);
-          }
-      }
-
-      // Column and task includes now also use !!!include()!!! syntax
-      // Location determines behavior (column header vs task title vs description)
-      // We'll detect them during parsing based on context
+      // Location-based include detection:
+      // - Column includes: !!!include()!!! in column headers (## header)
+      // - Task includes: !!!include()!!! in task titles (- [ ] title)
+      // - Regular includes: !!!include()!!! in task descriptions (indented lines)
+      // We detect these during parsing based on context, not upfront
+      let includedFiles: string[] = []; // Regular includes only (from descriptions)
       let columnIncludeFiles: string[] = [];
       let taskIncludeFiles: string[] = [];
       const board: KanbanBoard = {
@@ -265,6 +257,9 @@ export class MarkdownKanbanParser {
       // Process task includes AFTER normal parsing
       this.processTaskIncludes(board, basePath, taskIncludeFiles);
 
+      // Detect regular includes in task descriptions (not handled by parser, but tracked for file watching)
+      this.detectRegularIncludes(board, includedFiles);
+
       return { board, includedFiles, columnIncludeFiles, taskIncludeFiles };
   }
 
@@ -337,6 +332,32 @@ export class MarkdownKanbanParser {
           task.originalTitle = task.title; // Keep original title with include syntax
           task.displayTitle = includeTitle || 'Untitled'; // Display title from file
           task.description = includeDescription; // Description from file
+        }
+      }
+    }
+  }
+
+  private static detectRegularIncludes(board: KanbanBoard, includedFiles: string[]): void {
+    // Scan all task descriptions for !!!include()!!! patterns (regular includes)
+    const includeRegex = /!!!include\(([^)]+)\)!!!/gi;
+
+    for (const column of board.columns) {
+      for (const task of column.tasks) {
+        // Skip tasks with includeMode - they are task includes, not regular includes
+        if (task.includeMode) {
+          continue;
+        }
+
+        if (task.description) {
+          let match;
+          // Reset regex state
+          includeRegex.lastIndex = 0;
+          while ((match = includeRegex.exec(task.description)) !== null) {
+            const includeFile = match[1].trim();
+            if (!includedFiles.includes(includeFile)) {
+              includedFiles.push(includeFile);
+            }
+          }
         }
       }
     }

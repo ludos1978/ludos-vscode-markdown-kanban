@@ -81,12 +81,13 @@ export interface IncludeMode {
 }
 
 /**
- * Types of include markers
+ * Types of include processing behavior
+ * Note: All use unified !!!include()!!! syntax - type indicates processing behavior determined by location
  */
 export type IncludeType =
-    | 'include'        // !!!include(...)!!!
-    | 'columninclude'  // !!!columninclude(...)!!!
-    | 'taskinclude';   // !!!taskinclude(...)!!!
+    | 'include'        // Regular include (in task description) - inline display
+    | 'columninclude'  // Column include (in column header) - parse as Marp slides
+    | 'taskinclude';   // Task include (in task title) - first line as title
 
 /**
  * Export-specific options

@@ -408,8 +408,8 @@ export class MessageHandler {
                 const currentBoard = this._getCurrentBoard();
                 const column = currentBoard?.columns.find(col => col.id === message.columnId);
 
-                // Check if the new title contains column include syntax
-                const hasColumnIncludeMatches = message.title.match(/!!!columninclude\(([^)]+)\)!!!/g);
+                // Check if the new title contains include syntax (location-based: column include)
+                const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
                 if (hasColumnIncludeMatches) {
                     // Check if this column currently has unsaved changes
@@ -447,7 +447,7 @@ export class MessageHandler {
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
                     hasColumnIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!columninclude\(([^)]+)\)!!!/, '$1').trim();
+                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
                         newIncludeFiles.push(filePath);
                     });
 
@@ -475,8 +475,8 @@ export class MessageHandler {
                 const targetColumn = currentBoardForTask?.columns.find(col => col.id === message.columnId);
                 const task = targetColumn?.tasks.find(t => t.id === message.taskId);
 
-                // Check if the new title contains task include syntax
-                const hasTaskIncludeMatches = message.title.match(/!!!taskinclude\(([^)]+)\)!!!/g);
+                // Check if the new title contains include syntax (location-based: task include)
+                const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
                 if (hasTaskIncludeMatches) {
 
@@ -515,7 +515,7 @@ export class MessageHandler {
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
                     hasTaskIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!taskinclude\(([^)]+)\)!!!/, '$1').trim();
+                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
                         newIncludeFiles.push(filePath);
                     });
 
@@ -1900,35 +1900,45 @@ export class MessageHandler {
 
     private async handleRequestIncludeFileName(message: any): Promise<void> {
         try {
-            const fileName = await vscode.window.showInputBox({
-                prompt: 'Enter the path to the presentation file',
-                placeHolder: 'e.g., presentation.md or slides/intro.md',
-                validateInput: (value) => {
-                    if (!value || !value.trim()) {
-                        return 'Please enter a file path';
-                    }
-                    if (!value.endsWith('.md')) {
-                        return 'File should be a markdown file (.md)';
-                    }
-                    return undefined;
-                }
+            // Use file picker dialog for better UX
+            const currentDocument = this._fileManager.getDocument();
+            if (!currentDocument) {
+                vscode.window.showErrorMessage('No active document');
+                return;
+            }
+
+            const currentDir = path.dirname(currentDocument.uri.fsPath);
+
+            const fileUris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                defaultUri: vscode.Uri.file(currentDir),
+                filters: {
+                    'Markdown files': ['md']
+                },
+                title: 'Select include file for column'
             });
 
-            if (fileName && fileName.trim()) {
-                // User provided a file name - send message back to webview to proceed
+            if (fileUris && fileUris.length > 0) {
+                // Convert absolute path to relative path
+                const absolutePath = fileUris[0].fsPath;
+                const relativePath = path.relative(currentDir, absolutePath);
+
+                // User selected a file - send message back to webview to proceed
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'proceedEnableIncludeMode',
                         columnId: message.columnId,
-                        fileName: fileName.trim()
+                        fileName: relativePath
                     });
                 }
             }
             // If cancelled, do nothing
 
         } catch (error) {
-            console.error('[requestIncludeFileName] Error handling input request:', error);
+            console.error('[requestIncludeFileName] Error handling file picker:', error);
         }
     }
 
@@ -1969,33 +1979,51 @@ export class MessageHandler {
                 }
             }
 
-            // Now show the file name input dialog
-            console.log('[requestEditIncludeFileName] Showing input box with current value:', currentFile);
-            const fileName = await vscode.window.showInputBox({
-                prompt: 'Edit the path to the presentation file',
-                value: currentFile,
-                placeHolder: 'e.g., presentation.md or slides/intro.md',
-                validateInput: (value) => {
-                    if (!value || !value.trim()) {
-                        return 'Please enter a file path';
-                    }
-                    if (!value.endsWith('.md')) {
-                        return 'File should be a markdown file (.md)';
-                    }
-                    return undefined;
+            // Now show the file picker dialog
+            console.log('[requestEditIncludeFileName] Showing file picker with current file:', currentFile);
+
+            const currentDocument = this._fileManager.getDocument();
+            if (!currentDocument) {
+                vscode.window.showErrorMessage('No active document');
+                return;
+            }
+
+            const currentDir = path.dirname(currentDocument.uri.fsPath);
+
+            // Set default URI to current file if it exists
+            let defaultUri = vscode.Uri.file(currentDir);
+            if (currentFile) {
+                const currentAbsolutePath = path.resolve(currentDir, currentFile);
+                if (fs.existsSync(currentAbsolutePath)) {
+                    defaultUri = vscode.Uri.file(currentAbsolutePath);
                 }
+            }
+
+            const fileUris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                defaultUri: defaultUri,
+                filters: {
+                    'Markdown files': ['md']
+                },
+                title: 'Select new include file for column'
             });
 
-            console.log('[requestEditIncludeFileName] User entered fileName:', fileName);
-            if (fileName && fileName.trim()) {
-                // User provided a file name - send message back to webview to proceed
+            console.log('[requestEditIncludeFileName] User selected file:', fileUris?.[0]?.fsPath);
+            if (fileUris && fileUris.length > 0) {
+                // Convert absolute path to relative path
+                const absolutePath = fileUris[0].fsPath;
+                const relativePath = path.relative(currentDir, absolutePath);
+
+                // User selected a file - send message back to webview to proceed
                 const panel = this._getWebviewPanel();
                 console.log('[requestEditIncludeFileName] Sending proceedUpdateIncludeFile message');
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'proceedUpdateIncludeFile',
                         columnId: message.columnId,
-                        newFileName: fileName.trim(),
+                        newFileName: relativePath,
                         currentFile: currentFile
                     });
                     console.log('[requestEditIncludeFileName] Message sent successfully');
@@ -2003,7 +2031,7 @@ export class MessageHandler {
                     console.error('[requestEditIncludeFileName] No panel or panel._panel available!');
                 }
             } else {
-                console.log('[requestEditIncludeFileName] User cancelled or entered empty filename');
+                console.log('[requestEditIncludeFileName] User cancelled file selection');
             }
             // If cancelled, do nothing
 
@@ -2052,31 +2080,48 @@ export class MessageHandler {
                 }
             }
 
-            // Now show the file name input dialog
-            const fileName = await vscode.window.showInputBox({
-                prompt: 'Edit the path to the task include file',
-                value: currentFile,
-                placeHolder: 'e.g., task-notes.md or includes/task-details.md',
-                validateInput: (value) => {
-                    if (!value || !value.trim()) {
-                        return 'Please enter a file path';
-                    }
-                    if (!value.endsWith('.md')) {
-                        return 'File should be a markdown file (.md)';
-                    }
-                    return undefined;
+            // Now show the file picker dialog
+            const currentDocument = this._fileManager.getDocument();
+            if (!currentDocument) {
+                vscode.window.showErrorMessage('No active document');
+                return;
+            }
+
+            const currentDir = path.dirname(currentDocument.uri.fsPath);
+
+            // Set default URI to current file if it exists
+            let defaultUri = vscode.Uri.file(currentDir);
+            if (currentFile) {
+                const currentAbsolutePath = path.resolve(currentDir, currentFile);
+                if (fs.existsSync(currentAbsolutePath)) {
+                    defaultUri = vscode.Uri.file(currentAbsolutePath);
                 }
+            }
+
+            const fileUris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                defaultUri: defaultUri,
+                filters: {
+                    'Markdown files': ['md']
+                },
+                title: 'Select new include file for task'
             });
 
-            if (fileName && fileName.trim()) {
-                // User provided a file name - send message back to webview to proceed
+            if (fileUris && fileUris.length > 0) {
+                // Convert absolute path to relative path
+                const absolutePath = fileUris[0].fsPath;
+                const relativePath = path.relative(currentDir, absolutePath);
+
+                // User selected a file - send message back to webview to proceed
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'proceedUpdateTaskIncludeFile',
                         taskId: taskId,
                         columnId: columnId,
-                        newFileName: fileName.trim(),
+                        newFileName: relativePath,
                         currentFile: currentFile
                     });
                 }
@@ -2318,37 +2363,46 @@ export class MessageHandler {
      */
     private async handleRequestTaskIncludeFileName(taskId: string, columnId: string): Promise<void> {
         try {
-            // Request filename from user using input box
-            const fileName = await vscode.window.showInputBox({
-                prompt: 'Enter the task include file name (e.g., task-content.md)',
-                placeHolder: 'task-content.md',
-                validateInput: (value) => {
-                    if (!value || value.trim() === '') {
-                        return 'File name cannot be empty';
-                    }
-                    if (!value.trim().endsWith('.md')) {
-                        return 'File name must end with .md';
-                    }
-                    return null;
-                }
+            // Use file picker dialog for better UX
+            const currentDocument = this._fileManager.getDocument();
+            if (!currentDocument) {
+                vscode.window.showErrorMessage('No active document');
+                return;
+            }
+
+            const currentDir = path.dirname(currentDocument.uri.fsPath);
+
+            const fileUris = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                defaultUri: vscode.Uri.file(currentDir),
+                filters: {
+                    'Markdown files': ['md']
+                },
+                title: 'Select include file for task'
             });
 
-            if (fileName && fileName.trim()) {
-                // User provided a file name - enable task include mode
+            if (fileUris && fileUris.length > 0) {
+                // Convert absolute path to relative path
+                const absolutePath = fileUris[0].fsPath;
+                const relativePath = path.relative(currentDir, absolutePath);
+
+                // User selected a file - enable task include mode
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'enableTaskIncludeMode',
                         taskId: taskId,
                         columnId: columnId,
-                        fileName: fileName.trim()
+                        fileName: relativePath
                     });
                 }
             }
             // If cancelled, do nothing
 
         } catch (error) {
-            console.error('[requestTaskIncludeFileName] Error handling input request:', error);
+            console.error('[requestTaskIncludeFileName] Error handling file picker:', error);
         }
     }
 
