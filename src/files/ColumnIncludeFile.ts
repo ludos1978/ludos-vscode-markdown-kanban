@@ -70,22 +70,38 @@ export class ColumnIncludeFile extends IncludeFile {
     // ============= PARSING =============
 
     /**
-     * Parse presentation format into tasks
+     * Find existing task by title to preserve ID during re-parse
      */
-    public parseToTasks(): KanbanTask[] {
+    private findExistingTask(existingTasks: KanbanTask[] | undefined, title: string): KanbanTask | undefined {
+        if (!existingTasks) {
+            return undefined;
+        }
+        return existingTasks.find(task => task.title === title);
+    }
+
+    /**
+     * Parse presentation format into tasks, preserving IDs for existing tasks
+     * @param existingTasks Optional array of existing tasks to preserve IDs from
+     */
+    public parseToTasks(existingTasks?: KanbanTask[]): KanbanTask[] {
         console.log(`[ColumnIncludeFile] Parsing presentation to tasks: ${this._relativePath}`);
 
         // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
         const tasks = PresentationParser.slidesToTasks(slides);
 
-        // Update task IDs to include column information and reset includeMode
-        return tasks.map((task, index) => ({
-            ...task,
-            id: `task-${this._columnId}-${index}`,
-            includeMode: false, // Tasks from columninclude are NOT individual includes
-            includeFiles: undefined // Column has the includeFiles, not individual tasks
-        }));
+        // Update task IDs, preserving existing IDs when task titles match
+        return tasks.map((task, index) => {
+            // Try to find existing task with same title to preserve ID
+            const existingTask = this.findExistingTask(existingTasks, task.title);
+
+            return {
+                ...task,
+                id: existingTask?.id || `task-${this._columnId}-${index}`,
+                includeMode: false, // Tasks from columninclude are NOT individual includes
+                includeFiles: undefined // Column has the includeFiles, not individual tasks
+            };
+        });
     }
 
     /**

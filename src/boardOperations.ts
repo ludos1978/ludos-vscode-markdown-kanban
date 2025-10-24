@@ -43,12 +43,33 @@ export class BoardOperations {
         const fromColumn = this.findColumn(board, fromColumnId);
         const toColumn = this.findColumn(board, toColumnId);
 
-        if (!fromColumn || !toColumn) {return false;}
+        if (!fromColumn || !toColumn) {
+            return false;
+        }
 
         const taskIndex = fromColumn.tasks.findIndex(task => task.id === taskId);
-        if (taskIndex === -1) {return false;}
+        if (taskIndex === -1) {
+            return false;
+        }
 
         const task = fromColumn.tasks.splice(taskIndex, 1)[0];
+
+        // Log detailed task move information
+        console.log('====== BACKEND MOVE TASK ======');
+        console.log(`Task ID: ${task.id}`);
+        console.log(`Task Title: ${task.title}`);
+        console.log(`Task Description (first 100 chars): ${task.description?.substring(0, 100) || '(empty)'}`);
+        console.log(`Task includeMode: ${task.includeMode}`);
+        console.log(`Task includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
+        console.log(`From Column: ${fromColumn.title} (ID: ${fromColumnId})`);
+        console.log(`To Column: ${toColumn.title} (ID: ${toColumnId})`);
+        console.log(`From Index: ${taskIndex}, To Index: ${newIndex}`);
+        console.log(`From Column includeMode: ${fromColumn.includeMode}`);
+        console.log(`From Column includeFiles: ${fromColumn.includeFiles?.join(', ') || '(none)'}`);
+        console.log(`To Column includeMode: ${toColumn.includeMode}`);
+        console.log(`To Column includeFiles: ${toColumn.includeFiles?.join(', ') || '(none)'}`);
+        console.log('===============================');
+
         toColumn.tasks.splice(newIndex, 0, task);
         return true;
     }

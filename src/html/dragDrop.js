@@ -725,6 +725,22 @@ function setupGlobalDragAndDrop() {
                 if (taskIndex >= 0) {
                     const [task] = originalColumn.tasks.splice(taskIndex, 1);
 
+                    // Log detailed task move information BEFORE the move
+                    console.log('====== FRONTEND MOVE TASK ======');
+                    console.log(`Task ID: ${task.id}`);
+                    console.log(`Task Title: ${task.title}`);
+                    console.log(`Task Description (first 100 chars): ${task.description?.substring(0, 100) || '(empty)'}`);
+                    console.log(`Task includeMode: ${task.includeMode}`);
+                    console.log(`Task includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
+                    console.log(`From Column: ${originalColumn.title} (ID: ${originalColumnId})`);
+                    console.log(`To Column: ${finalColumn.title} (ID: ${finalColumnId})`);
+                    console.log(`From Index: ${taskIndex}, To Index: ${dropIndex}`);
+                    console.log(`From Column includeMode: ${originalColumn.includeMode}`);
+                    console.log(`From Column includeFiles: ${originalColumn.includeFiles?.join(', ') || '(none)'}`);
+                    console.log(`To Column includeMode: ${finalColumn.includeMode}`);
+                    console.log(`To Column includeFiles: ${finalColumn.includeFiles?.join(', ') || '(none)'}`);
+                    console.log('================================');
+
                     // Add task to new column at correct position
                     const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);
                     finalColumn.tasks.splice(insertIndex, 0, task);

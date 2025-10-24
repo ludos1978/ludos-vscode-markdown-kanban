@@ -354,6 +354,8 @@ export class KanbanFileService {
             if (forceReload) {
                 const mainFile = this.fileRegistry.getMainFile();
                 if (mainFile) {
+                    // Always discard to reset state
+                    // discardChanges() internally checks if content changed before emitting events
                     mainFile.discardChanges();
                 }
             }
@@ -453,6 +455,8 @@ export class KanbanFileService {
                 console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged, skipping save');
                 const mainFile = this.fileRegistry.getMainFile();
                 if (mainFile) {
+                    // Always discard to reset unsaved state
+                    // discardChanges() internally checks if content changed before emitting events
                     mainFile.discardChanges();
                 }
                 return;
@@ -505,6 +509,13 @@ export class KanbanFileService {
             // Save the document to disk (if requested)
             if (triggerSave) {
                 console.log(`[KanbanFileService.saveToMarkdown] Calling document.save()...`);
+
+                // Pause file watcher before saving to prevent our own save from triggering "external" change
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
+                    mainFile.stopWatching();
+                }
+
                 try {
                     await document.save();
                     console.log(`[KanbanFileService.saveToMarkdown] document.save() completed successfully`);
@@ -523,6 +534,12 @@ export class KanbanFileService {
                         );
                     } else {
                         throw saveError; // Re-throw if it's a different error
+                    }
+                } finally {
+                    // Resume file watcher after save completes
+                    // Note: Include files pause/resume their own watchers in MarkdownFile.save()
+                    if (mainFile) {
+                        mainFile.startWatching();
                     }
                 }
             } else {

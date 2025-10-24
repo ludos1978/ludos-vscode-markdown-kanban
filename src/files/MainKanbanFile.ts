@@ -59,7 +59,8 @@ export class MainKanbanFile extends MarkdownFile {
      */
     public parseToBoard(): KanbanBoard {
         console.log(`[MainKanbanFile] Parsing content to board: ${this._relativePath}`);
-        const parseResult = this._parser.parseMarkdown(this._content);
+        // Pass existing board to preserve task/column IDs during re-parse
+        const parseResult = this._parser.parseMarkdown(this._content, undefined, this._board);
         this._board = parseResult.board;
         this._includedFiles = parseResult.includedFiles || [];
 
@@ -263,10 +264,12 @@ export class MainKanbanFile extends MarkdownFile {
      * Override reload to also parse board
      */
     public async reload(): Promise<void> {
+        const baselineBeforeReload = this._baseline;
         await super.reload();
 
-        // Parse the loaded content
-        if (this._content) {
+        // Only parse if content actually changed (not a false alarm)
+        // This prevents generating new column/task IDs on false alarm reloads
+        if (this._baseline !== baselineBeforeReload && this._content) {
             this.parseToBoard();
         }
     }

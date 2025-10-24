@@ -407,6 +407,13 @@ export class KanbanWebviewPanel {
                         return;
                     }
 
+                    // CRITICAL: Update cached board BEFORE any file operations
+                    // This ensures file watchers triggered by saves see the latest board state
+                    if (cachedBoard) {
+                        this._board = cachedBoard;
+                        this._cachedBoardFromWebview = cachedBoard;
+                    }
+
                     if (hasChanges && cachedBoard) {
                         // Track changes in include files
                         console.log('[markUnsavedChanges callback] Tracking unsaved changes with board having', cachedBoard.columns?.length, 'columns');
@@ -418,7 +425,10 @@ export class KanbanWebviewPanel {
                         if (mainFile && !onlyIncludeChanges) {
                             // Main file has changes - generate markdown and mark as unsaved
                             const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                            mainFile.setContent(markdown, false); // false = not saved yet
+                            // Only call setContent if markdown actually changed to prevent spurious events
+                            if (markdown !== mainFile.getContent()) {
+                                mainFile.setContent(markdown, false); // false = not saved yet
+                            }
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -444,19 +454,15 @@ export class KanbanWebviewPanel {
                             const mainFile = this._getMainFile();
                             if (mainFile) {
                                 const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                                mainFile.setContent(markdown, false); // false = not saved yet
+                                // Only call setContent if markdown actually changed to prevent spurious events
+                                if (markdown !== mainFile.getContent()) {
+                                    mainFile.setContent(markdown, false); // false = not saved yet
+                                }
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
                             console.warn('[markUnsavedChanges callback] hasChanges=true but no cachedBoard provided');
                         }
-                    }
-
-                    if (cachedBoard) {
-                        // CRITICAL: Store the cached board data immediately for saving
-                        // This ensures we always have the latest data even if webview is disposed
-                        this._board = cachedBoard;
-                        this._cachedBoardFromWebview = cachedBoard; // Keep a separate reference
                     }
                 }
             }
@@ -584,7 +590,10 @@ export class KanbanWebviewPanel {
             const mainFile = this._getMainFile();
             if (mainFile && this._board) {
                 const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
-                mainFile.setContent(markdown, false); // false = not saved yet
+                // Only call setContent if markdown actually changed to prevent spurious events
+                if (markdown !== mainFile.getContent()) {
+                    mainFile.setContent(markdown, false); // false = not saved yet
+                }
             }
 
             await this.sendBoardUpdate();
@@ -1416,7 +1425,8 @@ export class KanbanWebviewPanel {
                             for (const relativePath of column.includeFiles) {
                                 const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                                 if (file) {
-                                    const tasks = file.parseToTasks();
+                                    // Pass existing tasks to preserve IDs during re-parse
+                                    const tasks = file.parseToTasks(column.tasks);
                                     column.tasks = tasks;
 
                                     // Send update to frontend
@@ -1455,8 +1465,8 @@ export class KanbanWebviewPanel {
 
         for (const column of this._board.columns) {
             if (column.includeFiles && column.includeFiles.includes(file.getRelativePath())) {
-                // Parse tasks from the updated file
-                const tasks = file.parseToTasks();
+                // Parse tasks from the updated file, preserving existing IDs
+                const tasks = file.parseToTasks(column.tasks);
                 console.log(`[KanbanWebviewPanel] Parsed ${tasks.length} tasks from updated column include`);
 
                 // Update column in cached board
@@ -1745,8 +1755,13 @@ export class KanbanWebviewPanel {
         if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && this._board) {
             if (result.newHasUnsavedChanges) {
                 const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
-                mainFile.setContent(markdown, false);
+                // Only call setContent if markdown actually changed to prevent spurious events
+                if (markdown !== mainFile.getContent()) {
+                    mainFile.setContent(markdown, false);
+                }
             } else {
+                // Always discard to reset state when transitioning to saved
+                // discardChanges() internally checks if content changed before emitting events
                 mainFile.discardChanges();
             }
         }
@@ -1787,6 +1802,8 @@ export class KanbanWebviewPanel {
         // Clear unsaved changes flag and prevent closing flags
         const mainFile = this._getMainFile();
         if (mainFile) {
+            // Always discard to reset state on dispose
+            // discardChanges() internally checks if content changed before emitting events
             mainFile.discardChanges();
         }
         this._isClosingPrevented = false;
@@ -1945,6 +1962,9 @@ export class KanbanWebviewPanel {
         // Update the column's include files
         column.includeFiles = newIncludeFiles;
 
+        // Keep existing tasks to preserve IDs during re-parse
+        const existingTasks = column.tasks;
+
         // Load content from the include files
         const allTasks: KanbanTask[] = [];
         for (const relativePath of newIncludeFiles) {
@@ -1973,7 +1993,8 @@ export class KanbanWebviewPanel {
                 console.log('[updateIncludeContentUnified] Reloading file content:', relativePath);
                 await columnFile.reload();
 
-                const tasks = columnFile.parseToTasks();
+                // Pass existing tasks to preserve IDs during re-parse
+                const tasks = columnFile.parseToTasks(existingTasks);
                 console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
                 allTasks.push(...tasks);
             }

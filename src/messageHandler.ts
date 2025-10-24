@@ -1660,6 +1660,29 @@ export class MessageHandler {
                 return;
             }
 
+            // Log the board received from frontend with ALL task details
+            console.log('====== BACKEND RECEIVED BOARD FROM FRONTEND ======');
+            console.log(`Board has ${board.columns?.length || 0} columns`);
+            if (board.columns) {
+                board.columns.forEach((col: any, colIdx: number) => {
+                    console.log(`\nColumn ${colIdx}: "${col.title}" (ID: ${col.id})`);
+                    console.log(`  includeMode: ${col.includeMode}`);
+                    console.log(`  includeFiles: ${col.includeFiles?.join(', ') || '(none)'}`);
+                    console.log(`  Tasks: ${col.tasks?.length || 0}`);
+                    if (col.tasks) {
+                        col.tasks.forEach((task: any, taskIdx: number) => {
+                            console.log(`    Task ${taskIdx}:`);
+                            console.log(`      ID: ${task.id}`);
+                            console.log(`      Title: ${task.title}`);
+                            console.log(`      Description (first 100): ${task.description?.substring(0, 100) || '(empty)'}`);
+                            console.log(`      includeMode: ${task.includeMode}`);
+                            console.log(`      includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
+                        });
+                    }
+                });
+            }
+            console.log('==================================================');
+
             // CRITICAL: Check for unsaved changes in include files BEFORE updating the board
             const panel = this._getWebviewPanel();
             const oldBoard = this._getCurrentBoard();
@@ -2199,16 +2222,19 @@ export class MessageHandler {
                 // Ensure file has content loaded (may be empty if file was just created or content was cleared)
                 if (!newFile.getContent() || newFile.getContent().length === 0) {
                     const content = await newFile.readFromDisk();
-                    if (content) {
+                    if (content !== null) {
                         newFile.setContent(content, true); // true = update baseline too
+                    } else {
+                        console.warn(`[switchColumnIncludeFile] Could not load content from file: ${newFilePath}`);
                     }
                 }
 
-                const tasks = newFile.parseToTasks();
-                console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
-
                 // 5. Get updated column metadata from board
                 const column = board?.columns.find((c: any) => c.id === columnId);
+
+                // Parse tasks, preserving existing IDs from column
+                const tasks = newFile.parseToTasks(column?.tasks);
+                console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
 
                 // 6. Send updated content to frontend with all required fields
                 panel._panel?.webview.postMessage({
@@ -2308,8 +2334,10 @@ export class MessageHandler {
                 // Ensure file has content loaded (may be empty if file was just created or content was cleared)
                 if (!newFile.getContent() || newFile.getContent().length === 0) {
                     const content = await newFile.readFromDisk();
-                    if (content) {
+                    if (content !== null) {
                         newFile.setContent(content, true); // true = update baseline too
+                    } else {
+                        console.warn(`[switchTaskIncludeFile] Could not load content from file: ${newFilePath}`);
                     }
                 }
 

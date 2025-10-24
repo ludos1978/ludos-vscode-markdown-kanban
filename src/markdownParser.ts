@@ -36,8 +36,23 @@ export interface KanbanBoard {
 export class MarkdownKanbanParser {
   // Runtime-only ID generation - no persistence to markdown
 
+  /**
+   * Find existing column by title to preserve ID
+   */
+  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string): KanbanColumn | undefined {
+    if (!existingBoard) return undefined;
+    return existingBoard.columns.find(col => col.title === title);
+  }
 
-  static parseMarkdown(content: string, basePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
+  /**
+   * Find existing task by title in a column to preserve ID
+   */
+  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string): KanbanTask | undefined {
+    if (!existingColumn) return undefined;
+    return existingColumn.tasks.find(task => task.title === title);
+  }
+
+  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
       // First parse with original content to preserve raw descriptions
       const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
@@ -170,8 +185,10 @@ export class MarkdownKanbanParser {
               displayTitle = path.basename(includeFiles[0], path.extname(includeFiles[0]));
             }
 
+            // Preserve existing column ID if found
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle);
             currentColumn = {
-              id: IdGenerator.generateColumnId(),
+              id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle, // Keep full title with include syntax for editing
               tasks: includeTasks,
               includeMode: true,
@@ -180,9 +197,10 @@ export class MarkdownKanbanParser {
               displayTitle: displayTitle || 'Included Column' // Store cleaned title for display
             };
           } else {
-            // Regular column
+            // Regular column - preserve existing ID if found
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle);
             currentColumn = {
-              id: IdGenerator.generateColumnId(),
+              id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle,
               tasks: []
             };
@@ -204,8 +222,12 @@ export class MarkdownKanbanParser {
             // Only parse tasks for non-include columns
             const taskTitle = line.substring(6);
 
+            // Preserve existing task ID if found
+            const existingCol = this.findExistingColumn(existingBoard, currentColumn.title);
+            const existingTask = this.findExistingTask(existingCol, taskTitle);
+
             currentTask = {
-              id: IdGenerator.generateTaskId(),
+              id: existingTask?.id || IdGenerator.generateTaskId(),
               title: taskTitle,
               description: ''
             };

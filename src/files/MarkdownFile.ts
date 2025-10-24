@@ -147,13 +147,14 @@ export abstract class MarkdownFile implements vscode.Disposable {
         if (updateBaseline) {
             this._baseline = content;
             this._hasUnsavedChanges = false;
+            // Do NOT emit 'content' event when updateBaseline=true
+            // This is used after saving to update internal state - not an actual change
         } else {
             this._hasUnsavedChanges = (this._content !== this._baseline);
-        }
-
-        // Emit change event if content actually changed
-        if (oldContent !== content) {
-            this._emitChange('content');
+            // Only emit 'content' event for actual unsaved changes
+            if (oldContent !== content) {
+                this._emitChange('content');
+            }
         }
     }
 
@@ -213,19 +214,24 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         const content = await this._readFromDiskWithVerification();
         if (content !== null) {
-            this._content = content;
-            this._baseline = content;
-            this._hasUnsavedChanges = false;
-            this._hasFileSystemChanges = false;
-            this._lastModified = await this._getFileModifiedTime();
+            // Check if content actually changed (verification returns baseline if unchanged)
+            if (content !== this._baseline) {
+                this._content = content;
+                this._baseline = content;
+                this._hasUnsavedChanges = false;
+                this._hasFileSystemChanges = false;
+                this._lastModified = await this._getFileModifiedTime();
 
-            this._emitChange('reloaded');
-            console.log(`[${this.getFileType()}] Reloaded successfully: ${this._relativePath}`);
+                this._emitChange('reloaded');
+                console.log(`[${this.getFileType()}] Reloaded successfully: ${this._relativePath}`);
+            } else {
+                // Content unchanged - verification returned baseline, this is a false alarm
+                console.log(`[${this.getFileType()}] Content unchanged - false alarm from watcher, keeping existing content`);
+                this._hasFileSystemChanges = false;
+                this._lastModified = await this._getFileModifiedTime();
+            }
         } else {
-            console.warn(`[${this.getFileType()}] ⚠ Verification failed - content unchanged. Keeping content cleared.`);
-            console.warn(`[${this.getFileType()}] This may be a false alarm from file watcher. Content will remain empty until actual change detected.`);
-            // Keep content cleared (_content is already empty from handleExternalChange)
-            // Don't update baseline - next watcher event will try again
+            console.warn(`[${this.getFileType()}] ⚠ Reload failed - null returned`);
         }
     }
 
@@ -250,8 +256,8 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 console.log(`[${this.getFileType()}]   Cached:  ${this._lastModified.toISOString()}`);
 
                 if (!mtimeChanged && attempt === 0) {
-                    console.warn(`[${this.getFileType()}] ⚠ File mtime unchanged - false alarm from watcher!`);
-                    return null;
+                    console.warn(`[${this.getFileType()}] ⚠ File mtime unchanged - false alarm from watcher, keeping content`);
+                    return this._baseline; // Return baseline to keep existing content, prevent reload failure
                 }
             }
 
@@ -271,15 +277,23 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 return content;
             }
 
-            // Content unchanged - file write may be incomplete, wait and retry
+            // Content unchanged - this could be a false alarm or legitimate no-change
+            // If mtime changed but content is the same, the file was touched but not modified
+            // Return baseline to indicate "no actual change" rather than error
+            if (attempt === 0) {
+                console.log(`[${this.getFileType()}] Content unchanged from baseline - false alarm or touch without modification`);
+                return this._baseline; // Return baseline to skip reload, keep existing content
+            }
+
+            // Content unchanged after waiting - file write may be incomplete, wait and retry
             if (attempt < maxRetries - 1) {
                 console.log(`[${this.getFileType()}] Content unchanged, waiting for complete write (attempt ${attempt + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             } else {
-                console.error(`[${this.getFileType()}] ✗✗✗ Content STILL unchanged after ${maxRetries} attempts!`);
-                console.error(`[${this.getFileType()}] Baseline: ${this._baseline.substring(0, 100)}...`);
-                console.error(`[${this.getFileType()}] Disk:     ${content.substring(0, 100)}...`);
-                return null;
+                // After max retries, content still equals baseline - this is OK, not an error
+                // The file was genuinely not modified (false alarm from watcher)
+                console.log(`[${this.getFileType()}] Content unchanged after ${maxRetries} attempts - treating as false alarm, keeping content`);
+                return this._baseline; // Return baseline to keep existing content
             }
         }
 
@@ -299,14 +313,27 @@ export abstract class MarkdownFile implements vscode.Disposable {
             throw new Error(`Cannot save ${this._relativePath}: ${errors}`);
         }
 
-        await this.writeToDisk(this._content);
-        this._baseline = this._content;
-        this._hasUnsavedChanges = false;
-        this._hasFileSystemChanges = false;
-        this._lastModified = new Date();
+        // Pause file watcher before saving to prevent our own save from triggering "external" change
+        const wasWatching = this._isWatching;
+        if (wasWatching) {
+            this.stopWatching();
+        }
 
-        this._emitChange('saved');
-        console.log(`[${this.getFileType()}] Saved successfully: ${this._relativePath}`);
+        try {
+            await this.writeToDisk(this._content);
+            this._baseline = this._content;
+            this._hasUnsavedChanges = false;
+            this._hasFileSystemChanges = false;
+            this._lastModified = new Date();
+
+            this._emitChange('saved');
+            console.log(`[${this.getFileType()}] Saved successfully: ${this._relativePath}`);
+        } finally {
+            // Resume file watcher after save
+            if (wasWatching) {
+                this.startWatching();
+            }
+        }
     }
 
     /**
@@ -316,7 +343,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
         console.log(`[${this.getFileType()}] Discarding unsaved changes: ${this._relativePath}`);
         this._content = this._baseline;
         this._hasUnsavedChanges = false;
-        this._emitChange('content');
+
+        // NEVER emit 'content' event when discarding changes
+        // We're reverting to baseline (what's on disk) - nothing on disk changed
+        // Board was already parsed from this baseline content, no need to re-parse
     }
 
     // ============= CONFLICT RESOLUTION =============

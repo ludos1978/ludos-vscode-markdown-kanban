@@ -228,18 +228,8 @@ export abstract class IncludeFile extends MarkdownFile {
     // ============= OVERRIDES =============
 
     /**
-     * Override reload to also notify parent
+     * Note: We don't override save() or reload() to call notifyParentOfChange()
+     * The event system handles updates via onDidChange listeners in _handleFileRegistryChange
+     * This prevents redundant parent notifications and board re-parsing
      */
-    public async reload(): Promise<void> {
-        await super.reload();
-        await this.notifyParentOfChange();
-    }
-
-    /**
-     * Override save to also notify parent
-     */
-    public async save(): Promise<void> {
-        await super.save();
-        await this.notifyParentOfChange();
-    }
 }

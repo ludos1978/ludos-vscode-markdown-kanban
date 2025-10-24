@@ -45,27 +45,20 @@ export class IncludeFileManager {
     }
 
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard, documentGetter: any, filePathGetter: any): Promise<boolean> {
-        console.log('[trackIncludeFileUnsavedChanges] ENTRY - Tracking unsaved changes in include files');
-
         // Update ColumnIncludeFile instances with current task content (without saving to disk)
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file) {
-                        console.log(`[trackIncludeFileUnsavedChanges] ========== ColumnInclude: ${relativePath} ==========`);
-                        console.log(`[trackIncludeFileUnsavedChanges] Column has ${column.tasks.length} tasks`);
-                        console.log(`[trackIncludeFileUnsavedChanges] Current file content (first 200 chars):\n${file.getContent().substring(0, 200)}`);
-
                         // Generate content from current tasks
                         const content = file.generateFromTasks(column.tasks);
-                        console.log(`[trackIncludeFileUnsavedChanges] Generated content (first 200 chars):\n${content.substring(0, 200)}`);
-                        console.log(`[trackIncludeFileUnsavedChanges] Content is same as current: ${content === file.getContent()}`);
+                        const currentContent = file.getContent();
 
-                        // Update file content (marks as unsaved if changed)
-                        file.setContent(content, false); // false = NOT saved yet
-
-                        console.log(`[trackIncludeFileUnsavedChanges] After setContent, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
+                        // Only update if content actually changed to prevent infinite loop
+                        if (content !== currentContent) {
+                            file.setContent(content, false); // false = NOT saved yet
+                        }
                     } else {
                         console.log(`[trackIncludeFileUnsavedChanges] ⚠️  File NOT found in registry: ${relativePath}`);
                     }
@@ -80,8 +73,6 @@ export class IncludeFileManager {
                     for (const relativePath of task.includeFiles) {
                         const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file) {
-                            console.log(`[trackIncludeFileUnsavedChanges] Updating TaskIncludeFile: ${relativePath}`);
-
                             // Reconstruct full content: displayTitle + description
                             let fullContent = '';
                             if (task.displayTitle) {
@@ -113,18 +104,9 @@ export class IncludeFileManager {
         for (const relativePath of column.includeFiles) {
             const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
             if (file) {
-                console.log(`[saveColumnIncludeChanges] Processing ${relativePath} with ${column.tasks.length} tasks`);
-                console.log(`[saveColumnIncludeChanges] Current file content length: ${file.getContent().length}`);
-
                 const content = file.generateFromTasks(column.tasks);
-                console.log(`[saveColumnIncludeChanges] Generated content length: ${content.length}`);
-                console.log(`[saveColumnIncludeChanges] Generated content:\n${content}`);
-
                 file.setContent(content);
-                console.log(`[saveColumnIncludeChanges] After setContent, hasUnsavedChanges: ${file.hasUnsavedChanges()}`);
-
                 await file.save();
-                console.log(`[saveColumnIncludeChanges] Save completed for ${relativePath}`);
             }
         }
         return true;
