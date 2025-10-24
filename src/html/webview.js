@@ -2150,7 +2150,7 @@ window.addEventListener('message', event => {
     const message = event.data;
     
     switch (message.type) {
-        case 'updateBoard':
+        case 'boardUpdate':
             const previousBoard = window.cachedBoard;
             
             // Clear card focus when board is updated
@@ -2626,22 +2626,9 @@ window.addEventListener('message', event => {
             break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
-            console.log('[FRONTEND updateColumnContent] ========================================');
-            console.log('[FRONTEND updateColumnContent] RECEIVED MESSAGE FROM BACKEND');
-            console.log('[FRONTEND updateColumnContent] columnId:', message.columnId);
-            console.log('[FRONTEND updateColumnContent] tasks count:', message.tasks ? message.tasks.length : 0);
-            if (message.tasks && message.tasks.length > 0) {
-                console.log('[FRONTEND updateColumnContent] First task title:', message.tasks[0].title ? message.tasks[0].title.substring(0, 100) : '');
-            }
-            console.log('[FRONTEND updateColumnContent] ========================================');
-
-            // Update the column in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
-                    console.log('[FRONTEND updateColumnContent] Found column in cached board');
-                    console.log('[FRONTEND updateColumnContent] Column current tasks:', column.tasks ? column.tasks.length : 0);
-
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
                     column.title = message.columnTitle || column.title;
@@ -2655,12 +2642,9 @@ window.addEventListener('message', event => {
                         column.includeFiles = message.includeFiles;
                     }
 
-                    console.log('[FRONTEND updateColumnContent] Column updated - new tasks count:', column.tasks.length);
-
-
                     // Re-render just this column
-                    if (typeof renderSingleColumn === 'function') {
-                        renderSingleColumn(message.columnId, column);
+                    if (typeof window.renderSingleColumn === 'function') {
+                        window.renderSingleColumn(message.columnId, column);
                     } else {
                         if (typeof window.renderBoard === 'function') {
                             window.renderBoard();

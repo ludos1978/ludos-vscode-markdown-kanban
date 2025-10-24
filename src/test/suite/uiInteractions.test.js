@@ -377,7 +377,7 @@ describe('UI Interactions', () => {
             // Simulate board update message from VS Code
             const messageEvent = new MessageEvent('message', {
                 data: {
-                    type: 'updateBoard',
+                    type: 'boardUpdate',
                     board: mockBoard
                 }
             });

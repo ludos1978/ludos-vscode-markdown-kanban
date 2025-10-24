@@ -87,7 +87,7 @@ export class KanbanWebviewPanel {
             // Send the board data to the refreshed webview
             setTimeout(async () => {
                 this._panel.webview.postMessage({
-                    type: 'updateBoard',
+                    type: 'boardUpdate',
                     board: this._board,
                     columnWidth: configService.getConfig('columnWidth', '350px'),
                     taskMinHeight: configService.getConfig('taskMinHeight'),
@@ -933,7 +933,7 @@ export class KanbanWebviewPanel {
 
         setTimeout(() => {
             this._panel.webview.postMessage({
-                type: 'updateBoard',
+                type: 'boardUpdate',
                 board: board,
                 imageMappings: imageMappings,
                 tagColors: tagColors,
@@ -1408,20 +1408,14 @@ export class KanbanWebviewPanel {
                 const board = mainFile.getBoard();
 
                 if (board && board.valid) {
-                    console.log('[KanbanWebviewPanel] Syncing include files after main file content change');
                     this._syncIncludeFilesWithRegistry(board);
 
                     // Load content for all column includes and update the columns
-                    console.log(`[KanbanWebviewPanel] Board has ${board.columns.length} columns`);
                     for (const column of board.columns) {
-                        console.log(`[KanbanWebviewPanel] Checking column ${column.id}, includeFiles:`, column.includeFiles);
                         if (column.includeFiles && column.includeFiles.length > 0) {
                             for (const relativePath of column.includeFiles) {
-                                console.log(`[KanbanWebviewPanel] Looking for file in registry: ${relativePath}`);
                                 const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
-                                console.log(`[KanbanWebviewPanel] File found:`, !!file, `Type:`, file?.getFileType());
                                 if (file) {
-                                    console.log(`[KanbanWebviewPanel] Loading and updating column for: ${relativePath}`);
                                     const tasks = file.parseToTasks();
                                     column.tasks = tasks;
 
@@ -1441,8 +1435,6 @@ export class KanbanWebviewPanel {
                             }
                         }
                     }
-                } else {
-                    console.warn('[KanbanWebviewPanel] Main file changed but board is invalid');
                 }
             }
         }
@@ -1949,7 +1941,7 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
-        // Note: Unsaved changes check happens in handleUpdateBoard BEFORE this is called
+        // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
         // Update the column's include files
         column.includeFiles = newIncludeFiles;
 
@@ -2013,7 +2005,7 @@ export class KanbanWebviewPanel {
                 return;
             }
 
-            // Note: Unsaved changes check happens in handleUpdateBoard BEFORE this is called
+            // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
             const basePath = path.dirname(currentDocument.uri.fsPath);
 
             // For now, handle single file includes

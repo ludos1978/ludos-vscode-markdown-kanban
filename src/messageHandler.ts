@@ -139,8 +139,8 @@ export class MessageHandler {
                 break;
 
             // Update board with new data (used for immediate column include changes)
-            case 'updateBoard':
-                await this.handleUpdateBoard(message);
+            case 'boardUpdate':
+                await this.handleBoardUpdate(message);
                 break;
 
             // Confirm disable include mode (uses VS Code dialog)
@@ -1652,11 +1652,11 @@ export class MessageHandler {
         }
     }
 
-    private async handleUpdateBoard(message: any): Promise<void> {
+    private async handleBoardUpdate(message: any): Promise<void> {
         try {
             const board = message.board;
             if (!board) {
-                console.error('[updateBoard] No board data provided');
+                console.error('[boardUpdate] No board data provided');
                 return;
             }
 
@@ -1664,12 +1664,12 @@ export class MessageHandler {
             const panel = this._getWebviewPanel();
             const oldBoard = this._getCurrentBoard();
 
-            console.log('[handleUpdateBoard] ========== UNSAVED CHANGES CHECK ==========');
-            console.log('[handleUpdateBoard] oldBoard exists:', !!oldBoard);
-            console.log('[handleUpdateBoard] panel exists:', !!panel);
+            console.log('[handleBoardUpdate] ========== UNSAVED CHANGES CHECK ==========');
+            console.log('[handleBoardUpdate] oldBoard exists:', !!oldBoard);
+            console.log('[handleBoardUpdate] panel exists:', !!panel);
 
             if (oldBoard && panel) {
-                console.log('[handleUpdateBoard] Checking columns for include file changes...');
+                console.log('[handleBoardUpdate] Checking columns for include file changes...');
 
                 // Check column includes
                 for (let i = 0; i < board.columns.length && i < oldBoard.columns.length; i++) {
@@ -1678,24 +1678,24 @@ export class MessageHandler {
 
                     const oldIncludeFiles = oldCol.includeFiles || [];
                     const newIncludeFiles = newCol.includeFiles || [];
-                    console.log(`[handleUpdateBoard] Column ${i} "${newCol.title}":`);
-                    console.log(`[handleUpdateBoard]   Old includeFiles:`, oldIncludeFiles);
-                    console.log(`[handleUpdateBoard]   New includeFiles:`, newIncludeFiles);
+                    console.log(`[handleBoardUpdate] Column ${i} "${newCol.title}":`);
+                    console.log(`[handleBoardUpdate]   Old includeFiles:`, oldIncludeFiles);
+                    console.log(`[handleBoardUpdate]   New includeFiles:`, newIncludeFiles);
 
                     const removedFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
-                    console.log(`[handleUpdateBoard]   Removed files:`, removedFiles);
+                    console.log(`[handleBoardUpdate]   Removed files:`, removedFiles);
 
                     for (const removedPath of removedFiles) {
                         const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
-                        console.log(`[handleUpdateBoard]   Checking file "${removedPath}"`);
-                        console.log(`[handleUpdateBoard]     File exists in registry:`, !!oldFile);
+                        console.log(`[handleBoardUpdate]   Checking file "${removedPath}"`);
+                        console.log(`[handleBoardUpdate]     File exists in registry:`, !!oldFile);
                         if (oldFile) {
-                            console.log(`[handleUpdateBoard]     File type:`, oldFile.getFileType());
-                            console.log(`[handleUpdateBoard]     Has unsaved changes:`, oldFile.hasUnsavedChanges());
+                            console.log(`[handleBoardUpdate]     File type:`, oldFile.getFileType());
+                            console.log(`[handleBoardUpdate]     Has unsaved changes:`, oldFile.hasUnsavedChanges());
                         }
 
                         if (oldFile && oldFile.hasUnsavedChanges()) {
-                            console.log(`[handleUpdateBoard] ⚠️  Column include file being removed has unsaved changes: ${removedPath}`);
+                            console.log(`[handleBoardUpdate] ⚠️  Column include file being removed has unsaved changes: ${removedPath}`);
 
                             const choice = await vscode.window.showWarningMessage(
                                 `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
@@ -1710,7 +1710,7 @@ export class MessageHandler {
                             } else if (choice === 'Discard and Continue') {
                                 oldFile.discardChanges();
                             } else {
-                                console.log('[handleUpdateBoard] User cancelled - aborting board update');
+                                console.log('[handleBoardUpdate] User cancelled - aborting board update');
                                 return; // Cancel the entire update
                             }
                         }
@@ -1727,7 +1727,7 @@ export class MessageHandler {
                             for (const removedPath of removedTaskFiles) {
                                 const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
                                 if (oldFile && oldFile.hasUnsavedChanges()) {
-                                    console.log(`[handleUpdateBoard] Task include file being removed has unsaved changes: ${removedPath}`);
+                                    console.log(`[handleBoardUpdate] Task include file being removed has unsaved changes: ${removedPath}`);
 
                                     const choice = await vscode.window.showWarningMessage(
                                         `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
@@ -1742,7 +1742,7 @@ export class MessageHandler {
                                     } else if (choice === 'Discard and Continue') {
                                         oldFile.discardChanges();
                                     } else {
-                                        console.log('[handleUpdateBoard] User cancelled - aborting board update');
+                                        console.log('[handleBoardUpdate] User cancelled - aborting board update');
                                         return; // Cancel the entire update
                                     }
                                 }
@@ -1774,7 +1774,7 @@ export class MessageHandler {
             }
 
         } catch (error) {
-            console.error('[updateBoard] Error handling board update:', error);
+            console.error('[boardUpdate] Error handling board update:', error);
         }
     }
 

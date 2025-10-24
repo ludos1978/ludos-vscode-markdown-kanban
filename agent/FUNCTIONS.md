@@ -241,7 +241,7 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/messageHandler-MessageHandler_handleSaveClipboardImage - Handle clipboard image save
 - src/messageHandler-MessageHandler_handleSaveClipboardImageWithPath - Handle clipboard image save with path
 - src/messageHandler-MessageHandler_handlePasteImageIntoField - Handle image paste into field
-- src/messageHandler-MessageHandler_handleUpdateBoard - Handle board update from webview
+- src/messageHandler-MessageHandler_handleBoardUpdate - Handle board update from webview
 - src/messageHandler-MessageHandler_handleConfirmDisableIncludeMode - Handle include mode disable confirmation
 - src/messageHandler-MessageHandler_handleRequestIncludeFile - Handle include file request
 - src/messageHandler-MessageHandler_handleRegisterInlineInclude - Handle inline include registration
@@ -666,7 +666,7 @@ Total functions documented: **523**
 - src/files/RegularIncludeFile-RegularIncludeFile_getBoard - Get parsed board (cached)
 - src/files/RegularIncludeFile-RegularIncludeFile_parseToBoard - Parse kanban format to board
 - src/files/RegularIncludeFile-RegularIncludeFile_generateFromBoard - Generate markdown from board
-- src/files/RegularIncludeFile-RegularIncludeFile_updateBoard - Update board (regenerate content)
+- src/files/RegularIncludeFile-RegularIncludeFile_boardUpdate - Update board (regenerate content)
 - src/files/RegularIncludeFile-RegularIncludeFile_validate - Validate kanban format content
 
 ## src/files/MarkdownFileRegistry.ts - MarkdownFileRegistry

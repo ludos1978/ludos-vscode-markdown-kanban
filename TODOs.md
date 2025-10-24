@@ -6,7 +6,7 @@ kanban-plugin: board
 
 - [ ] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
 
-- [ ] Conflict tracking behaviour:
+- [x] Conflict tracking behaviour:
   - if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode. then the conflict manager must ask the user:
       - wether he wants to ignore the external changes (nothing happens, remember we still have unsaved changes in the kanban)
       - overwrite the external file with the kanban c$ontents (the kanban is then in an unedited state)
@@ -14,8 +14,15 @@ kanban-plugin: board
       - discard the changes in the kanban and reload from the external edit.
   - if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
   - if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
+  
+  do this for the main kanban file and each columninclude and taskincluded and the regular include files individually.
 
-  do this for the main kanban file and each columninclude and taskincluded files individually. the include files (not the columninclude & taskinclude) should automatically update on a modification externally, they cannot be modified internally. 
+  include files:
+  the include itself should be handled as if it would be a layout tag, when displaying it show a short title include(relative/path/to/markdown.md), when alt+clicking the filename, it should open the source file. the rest of the content with the !!!include()!!!is displayed as content for the line, for example tags can be added this way.
+  - columnincludes can only be used in a column header and parses a marp-presentation format as individual kanban-tasks for each slide (already implemented)
+  - taskincludes can only be used in a task header and includes the first line of the included file as.
+  - regular includes can only be used within a task description. they should be shown within a border area where a title line shows the include(filename.md) while in the markdown text it is defined as !!!include(included.md)!!!.
+  - i later plan to change the individial tag names that all are called !!!include()!!! and the position of it defined the behaviour!
 
   ONLY THIS BEHAVIOUR. ALL OTHER BEHAVIOURS OR COMMENTS HOW IT WORKS ARE WRONG AND MUST BE MODIFIED OR REMOVED FROM THE CODE!!!
 
@@ -529,7 +536,7 @@ ultrathink
 	- discard the changes in the kanban and reload from the external edit.
 - if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
 - if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
-do this for the kanban and each column and task included files individually. the include files should automatically update on a modification externally, they cannot be modified internally.
+do this for the kanban and each column and task included files individually..
 
 
 - [x] add an option to the export as in which style to export. it can be eigher kanbanstyle (does not modify the style) or it can be presentation style (which uses the same method as when copying the columns and cards as markdown.

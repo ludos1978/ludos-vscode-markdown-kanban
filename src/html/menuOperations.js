@@ -1227,7 +1227,7 @@ function enableColumnIncludeMode(columnId, fileName) {
 
 		// Send update to backend
 		vscode.postMessage({
-				type: 'updateBoard',
+				type: 'boardUpdate',
 				board: window.cachedBoard
 		});
 
@@ -1276,11 +1276,6 @@ function editColumnIncludeFile(columnId) {
 
 // Function called from backend after user provides edited include file name
 function updateColumnIncludeFile(columnId, newFileName, currentFile) {
-    console.log('[updateColumnIncludeFile] ===== CALLED =====');
-    console.log('[updateColumnIncludeFile] columnId:', columnId);
-    console.log('[updateColumnIncludeFile] newFileName:', newFileName);
-    console.log('[updateColumnIncludeFile] currentFile:', currentFile);
-
     if (!window.cachedBoard) {
         console.error('[updateColumnIncludeFile] No cached board available');
         return;
@@ -1292,12 +1287,7 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         return;
     }
 
-    console.log('[updateColumnIncludeFile] Column found, title:', column.title);
-    console.log('[updateColumnIncludeFile] Column includeFiles:', column.includeFiles);
-
     if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
-        console.log('[updateColumnIncludeFile] newFileName is different from currentFile, proceeding...');
-
         // Extract the clean title (without include syntax)
         let cleanTitle = column.title || '';
 
@@ -1306,10 +1296,6 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
 
         // Create new title with updated include syntax
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
-
-        console.log('[updateColumnIncludeFile] cleanTitle:', cleanTitle);
-        console.log('[updateColumnIncludeFile] newTitle:', newTitle);
-        console.log('[updateColumnIncludeFile] Sending switchColumnIncludeFile message...');
 
         // Send request to backend to switch the include file
         // Backend will: save old file if needed, load new file, update column content
@@ -1322,12 +1308,8 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
             newTitle: newTitle
         });
 
-        console.log('[updateColumnIncludeFile] Message sent!');
-
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
         updateRefreshButtonState('unsaved', 1);
-    } else {
-        console.log('[updateColumnIncludeFile] Skipping - newFileName same as currentFile or empty');
     }
 }
 
@@ -1373,7 +1355,7 @@ function disableColumnIncludeMode(columnId) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
@@ -1427,7 +1409,7 @@ function enableTaskIncludeMode(taskId, columnId, fileName) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
@@ -1480,12 +1462,6 @@ function editTaskIncludeFile(taskId, columnId) {
 
 // Function called from backend after user provides new include file name
 function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
-    console.log('[updateTaskIncludeFile] ===== CALLED =====');
-    console.log('[updateTaskIncludeFile] taskId:', taskId);
-    console.log('[updateTaskIncludeFile] columnId:', columnId);
-    console.log('[updateTaskIncludeFile] newFileName:', newFileName);
-    console.log('[updateTaskIncludeFile] currentFile:', currentFile);
-
     if (!window.cachedBoard) {
         console.error('[updateTaskIncludeFile] No cached board available');
         return;
@@ -1503,12 +1479,7 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         return;
     }
 
-    console.log('[updateTaskIncludeFile] Task found, title:', task.title);
-    console.log('[updateTaskIncludeFile] Task includeFiles:', task.includeFiles);
-
     if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
-        console.log('[updateTaskIncludeFile] newFileName is different from currentFile, proceeding...');
-
         // Update task title with new include file
         let cleanTitle = task.title || '';
 
@@ -1517,10 +1488,6 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
 
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
-
-        console.log('[updateTaskIncludeFile] cleanTitle:', cleanTitle);
-        console.log('[updateTaskIncludeFile] newTitle:', newTitle);
-        console.log('[updateTaskIncludeFile] Sending switchTaskIncludeFile message...');
 
         // Send request to backend to switch the include file
         // Backend will: save old file if needed, load new file, update task content
@@ -1534,12 +1501,8 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
             newTitle: newTitle
         });
 
-        console.log('[updateTaskIncludeFile] Message sent!');
-
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
         updateRefreshButtonState('unsaved', 1);
-    } else {
-        console.log('[updateTaskIncludeFile] Skipping - newFileName same as currentFile or empty');
     }
 }
 
@@ -1593,7 +1556,7 @@ function disableTaskIncludeMode(taskId, columnId) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
