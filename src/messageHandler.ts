@@ -1963,16 +1963,11 @@ export class MessageHandler {
                 );
 
                 if (choice === 'Save and Switch') {
-                    // Save the current include file first
-                    const panel = this._getWebviewPanel();
-                    if (panel) {
-                        await panel.saveIncludeFileChanges(file.getRelativePath());
-                    }
+                    // Save the current include file
+                    await file.save();
                 } else if (choice === 'Discard and Switch') {
-                    // Clear unsaved changes flag - reload from disk to discard changes
-                    if (file) {
-                        await file.reload();
-                    }
+                    // Discard changes
+                    file.discardChanges();
                 } else {
                     // User cancelled - don't proceed with switching
                     return;
@@ -2064,16 +2059,11 @@ export class MessageHandler {
                 );
 
                 if (choice === 'Save and Switch') {
-                    // Save the current include file first
-                    const panel = this._getWebviewPanel();
-                    if (panel) {
-                        await panel.saveIncludeFileChanges(file.getRelativePath());
-                    }
+                    // Save the current include file
+                    await file.save();
                 } else if (choice === 'Discard and Switch') {
-                    // Clear unsaved changes flag - reload from disk to discard changes
-                    if (file) {
-                        await file.reload();
-                    }
+                    // Discard changes
+                    file.discardChanges();
                 } else {
                     // User cancelled - don't proceed with switching
                     return;
