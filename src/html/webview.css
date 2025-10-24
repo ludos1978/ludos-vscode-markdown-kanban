@@ -4587,3 +4587,50 @@ figcaption {
   text-align: center;
 }
 
+
+/* =================== LOADING INDICATORS =================== */
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--vscode-editor-background);
+    opacity: 0.9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 12px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--vscode-editor-foreground);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    opacity: 0.6;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: var(--vscode-editor-foreground);
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.column-loading {
+    position: relative;
+}
+
+.task-loading {
+    position: relative;
+}
+

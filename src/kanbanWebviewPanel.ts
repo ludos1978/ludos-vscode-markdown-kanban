@@ -1298,8 +1298,14 @@ export class KanbanWebviewPanel {
             // Step 1: Create include file instances in registry
             this._syncIncludeFilesWithRegistry(this._board);
 
-            // Step 2: Load and parse content from all include files
-            await this._loadIncludeContent(this._board);
+            // Step 2: Mark includes as loading (sets loading flags on columns/tasks)
+            this._markIncludesAsLoading(this._board);
+
+            // Step 3: Load content asynchronously (will send updates as each include loads)
+            // Don't await - let it run in background while we send initial board
+            this._loadIncludeContentAsync(this._board).catch(error => {
+                console.error('[_syncMainFileToRegistry] Error loading include content:', error);
+            });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
         }
@@ -1309,70 +1315,168 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Load and parse content from all include files into the board
-     * Called on initial load to populate include content before sending to frontend
+     * Mark all columns/tasks with includes as loading
      */
-    private async _loadIncludeContent(board: KanbanBoard): Promise<void> {
-        console.log('[_loadIncludeContent] Loading content from all include files');
+    private _markIncludesAsLoading(board: KanbanBoard): void {
+        console.log('[_markIncludesAsLoading] Marking includes with loading flags');
 
-        // Load column includes
+        // Mark column includes as loading
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                column.isLoadingContent = true;
+            }
+        }
+
+        // Mark task includes as loading
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    task.isLoadingContent = true;
+                }
+            }
+        }
+    }
+
+    /**
+     * Load and parse content from all include files, sending incremental updates
+     * Runs asynchronously in background, sending updates as each include loads
+     */
+    private async _loadIncludeContentAsync(board: KanbanBoard): Promise<void> {
+        console.log('[_loadIncludeContentAsync] Loading content from all include files');
+
+        // Load column includes - send update for each one
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file) {
-                        // Reload from disk and parse to tasks
-                        await file.reload();
-                        const tasks = file.parseToTasks(column.tasks);
-                        column.tasks = tasks;
-                        console.log(`[_loadIncludeContent] Loaded ${tasks.length} tasks from ${relativePath}`);
-                    }
-                }
-            }
-        }
-
-        // Load task includes
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
-                        if (file) {
-                            // Reload from disk and get content
+                        try {
+                            // Reload from disk and parse to tasks
                             await file.reload();
-                            const description = file.getContent();
+                            const tasks = file.parseToTasks(column.tasks);
+                            column.tasks = tasks;
+                            column.isLoadingContent = false; // Clear loading flag
 
-                            // Parse displayTitle and description
-                            const lines = description.split('\n');
-                            let displayTitle = '';
-                            let taskDescription = '';
-                            let titleFound = false;
-                            const descriptionLines: string[] = [];
+                            console.log(`[_loadIncludeContentAsync] Loaded ${tasks.length} tasks from ${relativePath}`);
 
-                            for (let i = 0; i < lines.length; i++) {
-                                const line = lines[i].trim();
-                                if (!titleFound && line) {
-                                    displayTitle = lines[i];
-                                    titleFound = true;
-                                } else if (titleFound && line) {
-                                    descriptionLines.push(lines[i]);
-                                } else if (titleFound && descriptionLines.length > 0) {
-                                    descriptionLines.push(lines[i]);
-                                }
+                            // Send update to frontend
+                            if (this._panel) {
+                                this._panel.webview.postMessage({
+                                    type: 'updateColumnContent',
+                                    columnId: column.id,
+                                    tasks: tasks,
+                                    columnTitle: column.title,
+                                    displayTitle: column.displayTitle,
+                                    includeMode: true,
+                                    includeFiles: column.includeFiles,
+                                    isLoadingContent: false
+                                });
                             }
+                        } catch (error) {
+                            console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
+                            column.isLoadingContent = false; // Clear loading flag even on error
 
-                            taskDescription = descriptionLines.join('\n');
-                            task.displayTitle = displayTitle;
-                            task.description = taskDescription;
-
-                            console.log(`[_loadIncludeContent] Loaded task include ${relativePath}`);
+                            // Send error state to frontend
+                            if (this._panel) {
+                                this._panel.webview.postMessage({
+                                    type: 'updateColumnContent',
+                                    columnId: column.id,
+                                    tasks: [],
+                                    columnTitle: column.title,
+                                    displayTitle: column.displayTitle,
+                                    includeMode: true,
+                                    includeFiles: column.includeFiles,
+                                    isLoadingContent: false,
+                                    loadError: true
+                                });
+                            }
                         }
                     }
                 }
             }
         }
 
-        console.log('[_loadIncludeContent] All include content loaded');
+        // Load task includes - send update for each one
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
+                        if (file) {
+                            try {
+                                // Reload from disk and get content
+                                await file.reload();
+                                const description = file.getContent();
+
+                                // Parse displayTitle and description
+                                const lines = description.split('\n');
+                                let displayTitle = '';
+                                let taskDescription = '';
+                                let titleFound = false;
+                                const descriptionLines: string[] = [];
+
+                                for (let i = 0; i < lines.length; i++) {
+                                    const line = lines[i].trim();
+                                    if (!titleFound && line) {
+                                        displayTitle = lines[i];
+                                        titleFound = true;
+                                    } else if (titleFound && line) {
+                                        descriptionLines.push(lines[i]);
+                                    } else if (titleFound && descriptionLines.length > 0) {
+                                        descriptionLines.push(lines[i]);
+                                    }
+                                }
+
+                                taskDescription = descriptionLines.join('\n');
+                                task.displayTitle = displayTitle;
+                                task.description = taskDescription;
+                                task.isLoadingContent = false; // Clear loading flag
+
+                                console.log(`[_loadIncludeContentAsync] Loaded task include ${relativePath}`);
+
+                                // Send update to frontend
+                                if (this._panel) {
+                                    this._panel.webview.postMessage({
+                                        type: 'updateTaskContent',
+                                        columnId: column.id,
+                                        taskId: task.id,
+                                        description: taskDescription,
+                                        displayTitle: displayTitle,
+                                        taskTitle: task.title,
+                                        originalTitle: task.originalTitle,
+                                        includeMode: true,
+                                        includeFiles: task.includeFiles,
+                                        isLoadingContent: false
+                                    });
+                                }
+                            } catch (error) {
+                                console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
+                                task.isLoadingContent = false; // Clear loading flag even on error
+
+                                // Send error state to frontend
+                                if (this._panel) {
+                                    this._panel.webview.postMessage({
+                                        type: 'updateTaskContent',
+                                        columnId: column.id,
+                                        taskId: task.id,
+                                        description: '',
+                                        displayTitle: task.displayTitle || '',
+                                        taskTitle: task.title,
+                                        originalTitle: task.originalTitle,
+                                        includeMode: true,
+                                        includeFiles: task.includeFiles,
+                                        isLoadingContent: false,
+                                        loadError: true
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log('[_loadIncludeContentAsync] All include content loaded');
     }
 
     /**

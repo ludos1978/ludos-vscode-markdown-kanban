@@ -45,6 +45,8 @@ export class IncludeFileManager {
     }
 
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard, documentGetter: any, filePathGetter: any): Promise<boolean> {
+        console.log('[trackIncludeFileUnsavedChanges] ===== TRACKING INCLUDE CHANGES =====');
+
         // Update ColumnIncludeFile instances with current task content (without saving to disk)
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
@@ -54,10 +56,20 @@ export class IncludeFileManager {
                         // Generate content from current tasks
                         const content = file.generateFromTasks(column.tasks);
                         const currentContent = file.getContent();
+                        const hasUnsaved = file.hasUnsavedChanges();
+
+                        console.log(`[trackIncludeFileUnsavedChanges] Column include: ${relativePath}`);
+                        console.log(`  Generated content length: ${content.length}`);
+                        console.log(`  Current content length: ${currentContent.length}`);
+                        console.log(`  Content changed: ${content !== currentContent}`);
+                        console.log(`  Already has unsaved: ${hasUnsaved}`);
 
                         // Only update if content actually changed to prevent infinite loop
                         if (content !== currentContent) {
+                            console.log(`  → Updating content (marking as unsaved)`);
                             file.setContent(content, false); // false = NOT saved yet
+                        } else {
+                            console.log(`  → No change, skipping`);
                         }
                     } else {
                         console.log(`[trackIncludeFileUnsavedChanges] ⚠️  File NOT found in registry: ${relativePath}`);
@@ -85,15 +97,32 @@ export class IncludeFileManager {
                             // Only update if content actually changed
                             // Reader/writer are now symmetric so exact comparison works
                             const currentContent = file.getContent();
+                            const hasUnsaved = file.hasUnsavedChanges();
+
+                            console.log(`[trackIncludeFileUnsavedChanges] Task include: ${relativePath}`);
+                            console.log(`  task.displayTitle: "${task.displayTitle}"`);
+                            console.log(`  task.description (first 100 chars): "${task.description?.substring(0, 100)}"`);
+                            console.log(`  Full content length: ${fullContent.length}`);
+                            console.log(`  Full content (first 150 chars): "${fullContent.substring(0, 150)}"`);
+                            console.log(`  Current content length: ${currentContent.length}`);
+                            console.log(`  Current content (first 150 chars): "${currentContent.substring(0, 150)}"`);
+                            console.log(`  Content changed: ${fullContent !== currentContent}`);
+                            console.log(`  Already has unsaved: ${hasUnsaved}`);
+
                             if (fullContent !== currentContent) {
+                                console.log(`  → Updating content (marking as unsaved)`);
                                 // Update file content (marks as unsaved if changed)
                                 file.setTaskDescription(fullContent);
+                            } else {
+                                console.log(`  → No change, skipping`);
                             }
                         }
                     }
                 }
             }
         }
+
+        console.log('[trackIncludeFileUnsavedChanges] ===== DONE =====');
 
         return false; // Return false = main file also needs saving
     }

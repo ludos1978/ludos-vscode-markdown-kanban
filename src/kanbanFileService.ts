@@ -426,9 +426,8 @@ export class KanbanFileService {
                 }
             }
 
-            // NOTE: Include files are NOT auto-saved during main file save
-            // They must be explicitly saved by user through menu actions
-            // The cache (setContent) has already been updated by trackIncludeFileUnsavedChanges()
+            // NOTE: Include file caches are updated by trackIncludeFileUnsavedChanges()
+            // They will be saved to disk after the main file save completes
 
             console.log('[KanbanFileService.saveToMarkdown] About to generate markdown for main file');
             console.log(`[KanbanFileService.saveToMarkdown] Board has ${this.board()!.columns.length} columns`);
@@ -450,9 +449,14 @@ export class KanbanFileService {
             // Check if content has actually changed before applying edit
             const currentContent = document.getText();
             console.log(`[KanbanFileService.saveToMarkdown] Current content (${currentContent.length} chars), Generated (${markdown.length} chars)`);
-            if (currentContent === markdown) {
+
+            // Check if include files have unsaved changes
+            const unsavedIncludeFiles = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
+            console.log(`[KanbanFileService.saveToMarkdown] Unsaved include files: ${unsavedIncludeFiles.length}`);
+
+            if (currentContent === markdown && unsavedIncludeFiles.length === 0) {
                 // No changes needed, skip the edit to avoid unnecessary re-renders
-                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged, skipping save');
+                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged and no unsaved includes, skipping save');
                 const mainFile = this.fileRegistry.getMainFile();
                 if (mainFile) {
                     // Always discard to reset unsaved state
@@ -461,7 +465,12 @@ export class KanbanFileService {
                 }
                 return;
             }
-            console.log('[KanbanFileService.saveToMarkdown] Content has changed, proceeding with save');
+
+            if (currentContent === markdown) {
+                console.log('[KanbanFileService.saveToMarkdown] Main file unchanged but include files have changes - proceeding to save includes only');
+            } else {
+                console.log('[KanbanFileService.saveToMarkdown] Main file content has changed, proceeding with full save');
+            }
 
             const edit = new vscode.WorkspaceEdit();
             edit.replace(
@@ -548,6 +557,17 @@ export class KanbanFileService {
 
             // After successful save, create a backup (respects minimum interval)
             await this.backupManager.createBackup(document);
+
+            // CRITICAL: Save all include files that have unsaved changes
+            console.log('[KanbanFileService.saveToMarkdown] Checking for unsaved include files...');
+            const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
+            if (unsavedIncludes.length > 0) {
+                console.log(`[KanbanFileService.saveToMarkdown] Saving ${unsavedIncludes.length} include files...`);
+                await Promise.all(unsavedIncludes.map(f => f.save()));
+                console.log('[KanbanFileService.saveToMarkdown] All include files saved');
+            } else {
+                console.log('[KanbanFileService.saveToMarkdown] No unsaved include files');
+            }
 
             // Clear unsaved changes flag after successful save
             const mainFile = this.fileRegistry.getMainFile();

@@ -2641,6 +2641,10 @@ window.addEventListener('message', event => {
                     if (message.includeFiles !== undefined) {
                         column.includeFiles = message.includeFiles;
                     }
+                    // Update loading state for includes
+                    if (message.isLoadingContent !== undefined) {
+                        column.isLoadingContent = message.isLoadingContent;
+                    }
 
                     // Re-render just this column
                     if (typeof window.renderSingleColumn === 'function') {
@@ -2708,6 +2712,10 @@ window.addEventListener('message', event => {
                     }
                     if (message.includeFiles !== undefined) {
                         foundTask.includeFiles = message.includeFiles;
+                    }
+                    // Update loading state for includes
+                    if (message.isLoadingContent !== undefined) {
+                        foundTask.isLoadingContent = message.isLoadingContent;
                     }
 
                     console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');

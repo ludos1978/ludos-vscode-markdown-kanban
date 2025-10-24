@@ -13,6 +13,7 @@ export interface KanbanTask {
   includeFiles?: string[]; // Paths to included files
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
+  isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
 }
 
 export interface KanbanColumn {
@@ -23,6 +24,7 @@ export interface KanbanColumn {
   includeFiles?: string[]; // Paths to included presentation files
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
+  isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
 }
 
 export interface KanbanBoard {

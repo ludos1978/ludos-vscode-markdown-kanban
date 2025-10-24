@@ -1795,8 +1795,9 @@ function createColumnElement(column, columnIndex) {
 								</div>
 						</div>
 				</div>
-        <div class="column-inner">
+        <div class="column-inner${column.isLoadingContent ? ' column-loading' : ''}">
             <div class="column-content">
+                ${column.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading include content...</div></div>' : ''}
                 <div class="tasks-container" id="tasks-${column.id}">
                     ${column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')}
                     ${column.tasks.length === 0 ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
@@ -1902,11 +1903,15 @@ function createTaskElement(task, columnId, taskIndex) {
     const headerBarsHtml = headerBarsData.html || '';
     const footerBarsHtml = footerBarsData.html || '';
     
+    const loadingClass = task.isLoadingContent ? ' task-loading' : '';
+    const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
+
     return `
-        <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}"
+        <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
              data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
+            ${loadingOverlay}
             ${headerBarsHtml}
             ${cornerBadgesHtml}
             <div class="task-header">
