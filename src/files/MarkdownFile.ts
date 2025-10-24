@@ -239,7 +239,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * Read from disk with verification that content has actually changed
      * Retries if file appears unchanged (incomplete write)
      */
-    private async _readFromDiskWithVerification(): Promise<string | null> {
+    protected async _readFromDiskWithVerification(): Promise<string | null> {
         const maxRetries = 10;
         const retryDelay = 100;
 

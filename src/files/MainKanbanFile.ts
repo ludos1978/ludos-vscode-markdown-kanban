@@ -264,13 +264,36 @@ export class MainKanbanFile extends MarkdownFile {
      * Override reload to also parse board
      */
     public async reload(): Promise<void> {
+        console.log(`[MainKanbanFile] Starting reload override`);
         const baselineBeforeReload = this._baseline;
-        await super.reload();
 
-        // Only parse if content actually changed (not a false alarm)
-        // This prevents generating new column/task IDs on false alarm reloads
-        if (this._baseline !== baselineBeforeReload && this._content) {
-            this.parseToBoard();
+        // Read and update content WITHOUT emitting events yet
+        const content = await this._readFromDiskWithVerification();
+        if (content !== null) {
+            // Check if content actually changed
+            if (content !== this._baseline) {
+                console.log(`[MainKanbanFile] Content changed, updating and re-parsing board`);
+                this._content = content;
+                this._baseline = content;
+                this._hasUnsavedChanges = false;
+                this._hasFileSystemChanges = false;
+                this._lastModified = await this._getFileModifiedTime();
+
+                // CRITICAL: Re-parse board BEFORE emitting event
+                // This ensures event handlers see the updated board
+                this.parseToBoard();
+
+                // Now emit the event
+                this._emitChange('reloaded');
+                console.log(`[MainKanbanFile] Reloaded successfully with updated board: ${this._relativePath}`);
+            } else {
+                // Content unchanged - false alarm from watcher
+                console.log(`[MainKanbanFile] Content unchanged - false alarm from watcher, keeping existing content`);
+                this._hasFileSystemChanges = false;
+                this._lastModified = await this._getFileModifiedTime();
+            }
+        } else {
+            console.warn(`[MainKanbanFile] ⚠ Reload failed - null returned`);
         }
     }
 

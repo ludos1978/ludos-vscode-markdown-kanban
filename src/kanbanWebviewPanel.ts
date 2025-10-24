@@ -1428,22 +1428,39 @@ export class KanbanWebviewPanel {
                                     // Pass existing tasks to preserve IDs during re-parse
                                     const tasks = file.parseToTasks(column.tasks);
                                     column.tasks = tasks;
-
-                                    // Send update to frontend
-                                    if (this._panel) {
-                                        this._panel.webview.postMessage({
-                                            type: 'updateColumnContent',
-                                            columnId: column.id,
-                                            tasks: tasks,
-                                            columnTitle: column.title,
-                                            displayTitle: column.displayTitle,
-                                            includeMode: true,
-                                            includeFiles: column.includeFiles
-                                        });
-                                    }
                                 }
                             }
                         }
+                    }
+
+                    // Update cached board
+                    this._board = board;
+                    this._cachedBoardFromWebview = board;
+
+                    // Send full board update to frontend for external changes
+                    // This ensures regular columns (non-include) are updated too
+                    if (event.changeType === 'reloaded' && this._panel) {
+                        console.log('[KanbanWebviewPanel] Sending full board update to frontend after external reload');
+                        this._panel.webview.postMessage({
+                            type: 'boardUpdate',
+                            board: board,
+                            columnWidth: configService.getConfig('columnWidth', '350px'),
+                            taskMinHeight: configService.getConfig('taskMinHeight'),
+                            sectionHeight: configService.getConfig('sectionHeight'),
+                            taskSectionHeight: configService.getConfig('taskSectionHeight'),
+                            fontSize: configService.getConfig('fontSize'),
+                            fontFamily: configService.getConfig('fontFamily'),
+                            whitespace: configService.getConfig('whitespace', '8px'),
+                            layoutRows: configService.getConfig('layoutRows'),
+                            rowHeight: configService.getConfig('rowHeight'),
+                            layoutPreset: configService.getConfig('layoutPreset', 'normal'),
+                            layoutPresets: this._getLayoutPresetsConfiguration(),
+                            maxRowHeight: configService.getConfig('maxRowHeight', 0),
+                            tagColors: configService.getConfig('tagColors', {}),
+                            enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
+                            enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
+                            customTagCategories: configService.getCustomTagCategories()
+                        });
                     }
                 }
             }
