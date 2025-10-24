@@ -306,8 +306,7 @@ export class KanbanWebviewPanel {
         this._fileFactory = new FileFactory(
             this._fileManager,
             this._conflictResolver,
-            this._backupManager,
-            () => this._getIncludeFilesUnsavedStatus()
+            this._backupManager
         );
 
         // Subscribe to registry change events

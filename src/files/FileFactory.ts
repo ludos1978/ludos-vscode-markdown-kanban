@@ -19,16 +19,11 @@ import { BackupManager } from '../backupManager';
  *   const columnInclude = factory.createColumnInclude('./includes/column.md', mainFile);
  */
 export class FileFactory {
-    private getIncludeUnsavedChanges?: () => { hasChanges: boolean; changedFiles: string[] };
-
     constructor(
         private fileManager: FileManager,
         private conflictResolver: ConflictResolver,
-        private backupManager: BackupManager,
-        getIncludeUnsavedChanges?: () => { hasChanges: boolean; changedFiles: string[] }
-    ) {
-        this.getIncludeUnsavedChanges = getIncludeUnsavedChanges;
-    }
+        private backupManager: BackupManager
+    ) {}
 
     // ============= MAIN FILE =============
 
@@ -40,8 +35,7 @@ export class FileFactory {
             filePath,
             this.fileManager,
             this.conflictResolver,
-            this.backupManager,
-            this.getIncludeUnsavedChanges
+            this.backupManager
         );
     }
 

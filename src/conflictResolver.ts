@@ -228,40 +228,7 @@ export class ConflictResolver {
             };
         }
 
-        // Has unsaved changes OR in edit mode - show dialog
-        if (!hasAnyUnsavedChanges && isInEditMode) {
-            // In edit mode but no unsaved changes - simplified options
-            const reloadFromFile = 'Reload from file';
-            const ignoreExternalChanges = 'Ignore external changes';
-
-            const choice = await vscode.window.showInformationMessage(
-                `The file "${context.fileName}" has been modified externally.`,
-                reloadFromFile,
-                ignoreExternalChanges
-            );
-
-            if (choice === reloadFromFile) {
-                return {
-                    action: 'discard_local',
-                    shouldProceed: true,
-                    shouldCreateBackup: false,
-                    shouldSave: false,
-                    shouldReload: true,
-                    shouldIgnore: false
-                };
-            } else {
-                return {
-                    action: 'ignore',
-                    shouldProceed: true,
-                    shouldCreateBackup: false,
-                    shouldSave: false,
-                    shouldReload: false,
-                    shouldIgnore: true
-                };
-            }
-        }
-
-        // Has unsaved changes - full option set
+        // Has unsaved changes OR in edit mode - show full 4-option dialog
         // Build include files list if present
         const includeFilesList = context.changedIncludeFiles && context.changedIncludeFiles.length > 0
             ? '\n\nChanged include files:\n' + context.changedIncludeFiles.map(f => `  • ${f}`).join('\n')
