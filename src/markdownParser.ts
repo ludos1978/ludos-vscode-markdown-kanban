@@ -52,25 +52,11 @@ export class MarkdownKanbanParser {
           }
       }
 
-      // Detect column include files in column titles
+      // Column and task includes now also use !!!include()!!! syntax
+      // Location determines behavior (column header vs task title vs description)
+      // We'll detect them during parsing based on context
       let columnIncludeFiles: string[] = [];
-      const columnIncludeRegex = /!!!columninclude\(([^)]+)\)!!!/gi;
-      while ((match = columnIncludeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!columnIncludeFiles.includes(includeFile)) {
-              columnIncludeFiles.push(includeFile);
-          }
-      }
-
-      // Detect task include files in task titles
       let taskIncludeFiles: string[] = [];
-      const taskIncludeRegex = /!!!taskinclude\(([^)]+)\)!!!/gi;
-      while ((match = taskIncludeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!taskIncludeFiles.includes(includeFile)) {
-              taskIncludeFiles.push(includeFile);
-          }
-      }
       const board: KanbanBoard = {
         valid: false,
         title: '',
@@ -149,15 +135,19 @@ export class MarkdownKanbanParser {
 
           const columnTitle = line.substring(3);
 
-          // Check for column include syntax
-          const columnIncludeMatches = columnTitle.match(/!!!columninclude\(([^)]+)\)!!!/g);
+          // Check for include syntax in column header (location-based: column includes)
+          const columnIncludeMatches = columnTitle.match(/!!!include\(([^)]+)\)!!!/g);
 
           if (columnIncludeMatches && columnIncludeMatches.length > 0) {
-            // This is a column include - process included files
+            // This is a column include - process included files as Marp presentations
             const includeFiles: string[] = [];
             columnIncludeMatches.forEach(match => {
-              const filePath = match.replace(/!!!columninclude\(([^)]+)\)!!!/, '$1').trim();
+              const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
               includeFiles.push(filePath);
+              // Track for file watching
+              if (!columnIncludeFiles.includes(filePath)) {
+                columnIncludeFiles.push(filePath);
+              }
             });
 
             // Generate tasks from included files
@@ -273,23 +263,27 @@ export class MarkdownKanbanParser {
       }
 
       // Process task includes AFTER normal parsing
-      this.processTaskIncludes(board, basePath);
+      this.processTaskIncludes(board, basePath, taskIncludeFiles);
 
       return { board, includedFiles, columnIncludeFiles, taskIncludeFiles };
   }
 
-  private static processTaskIncludes(board: KanbanBoard, basePath?: string): void {
+  private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[]): void {
     for (const column of board.columns) {
       for (const task of column.tasks) {
-        // Check if task title contains taskinclude syntax
-        const taskIncludeMatches = task.title.match(/!!!taskinclude\(([^)]+)\)!!!/g);
+        // Check if task title contains include syntax (location-based: task includes)
+        const taskIncludeMatches = task.title.match(/!!!include\(([^)]+)\)!!!/g);
 
         if (taskIncludeMatches && taskIncludeMatches.length > 0) {
-          // Process this task as a task include
+          // This is a task include - process included file (first line as title, rest as description)
           const includeFiles: string[] = [];
           taskIncludeMatches.forEach(match => {
-            const filePath = match.replace(/!!!taskinclude\(([^)]+)\)!!!/, '$1').trim();
+            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
             includeFiles.push(filePath);
+            // Track for file watching
+            if (taskIncludeFiles && !taskIncludeFiles.includes(filePath)) {
+              taskIncludeFiles.push(filePath);
+            }
           });
 
           // Read content from included files

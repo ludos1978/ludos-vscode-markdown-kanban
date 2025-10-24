@@ -778,9 +778,9 @@ class TaskEditor {
 
                         this.lastEditContext = editContext;
 
-                        // Check for column include syntax changes
-                        const oldIncludeMatches = (column.title || '').match(/!!!columninclude\(([^)]+)\)!!!/g) || [];
-                        const newIncludeMatches = newTitle.match(/!!!columninclude\(([^)]+)\)!!!/g) || [];
+                        // Check for include syntax changes in column header (location-based column include)
+                        const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
+                        const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
 
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||
@@ -936,9 +936,9 @@ class TaskEditor {
                     const originalDescription = task.description || '';
 
                     if (type === 'task-title') {
-                        // Handle task title - check for include syntax first
-                        const newIncludeMatches = value.match(/!!!taskinclude\(([^)]+)\)!!!/g) || [];
-                        const oldIncludeMatches = (task.title || '').match(/!!!taskinclude\(([^)]+)\)!!!/g) || [];
+                        // Handle task title - check for include syntax (location-based task include)
+                        const newIncludeMatches = value.match(/!!!include\(([^)]+)\)!!!/g) || [];
+                        const oldIncludeMatches = (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
 
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||

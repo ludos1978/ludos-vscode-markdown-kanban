@@ -1208,9 +1208,9 @@ function enableColumnIncludeMode(columnId, fileName) {
         return;
     }
 
-		// Update column title to include the syntax
+		// Update column title to include the syntax (location-based column include)
 		const currentTitle = column.title || '';
-		const newTitle = `${currentTitle} !!!columninclude(${fileName.trim()})!!!`.trim();
+		const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
 		// Update the cached board
 		column.originalTitle = currentTitle;
@@ -1301,11 +1301,11 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         // Extract the clean title (without include syntax)
         let cleanTitle = column.title || '';
 
-        // Remove all existing columninclude patterns
-        cleanTitle = cleanTitle.replace(/!!!columninclude\([^)]+\)!!!/g, '').trim();
+        // Remove all existing include patterns (location-based column include)
+        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
         // Create new title with updated include syntax
-        const newTitle = `${cleanTitle} !!!columninclude(${newFileName.trim()})!!!`.trim();
+        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
         console.log('[updateColumnIncludeFile] cleanTitle:', cleanTitle);
         console.log('[updateColumnIncludeFile] newTitle:', newTitle);
@@ -1346,7 +1346,7 @@ function disableColumnIncludeMode(columnId) {
 
     // Extract the clean title (without include syntax)
     let cleanTitle = column.title || '';
-    cleanTitle = cleanTitle.replace(/!!!columninclude\([^)]+\)!!!/g, '').trim();
+    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
     // If no clean title remains, use the filename
     if (!cleanTitle && column.includeFiles && column.includeFiles.length > 0) {
@@ -1405,9 +1405,9 @@ function enableTaskIncludeMode(taskId, columnId, fileName) {
         return;
     }
 
-    // Update task title to include the syntax
+    // Update task title to include the syntax (location-based task include)
     const currentTitle = task.title || '';
-    const newTitle = `${currentTitle} !!!taskinclude(${fileName.trim()})!!!`.trim();
+    const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
     // Update the cached board
     task.originalTitle = currentTitle;
@@ -1512,11 +1512,11 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         // Update task title with new include file
         let cleanTitle = task.title || '';
 
-        // Remove all existing taskinclude patterns
-        cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
+        // Remove all existing include patterns (location-based task include)
+        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
         // Add new include pattern
-        const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
+        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
         console.log('[updateTaskIncludeFile] cleanTitle:', cleanTitle);
         console.log('[updateTaskIncludeFile] newTitle:', newTitle);
@@ -1567,7 +1567,7 @@ function disableTaskIncludeMode(taskId, columnId) {
 
     // Clean title to remove include syntax
     let cleanTitle = task.title || '';
-    cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
+    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
     // Update cached board
     task.title = cleanTitle;

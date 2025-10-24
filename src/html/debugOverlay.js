@@ -664,12 +664,12 @@ function getIncludeTypeDescription(fileType) {
             return 'Regular include (!!!include()) - read-only content insertion';
         case 'include-column':
         case 'column':
-            return 'Column include (!!!columninclude()) - bidirectional sync for column tasks';
+            return 'Column include (!!!include() in column header) - bidirectional sync for column tasks';
         case 'include-task':
         case 'task':
-            return 'Task include (!!!taskinclude()) - bidirectional sync for individual tasks';
+            return 'Task include (!!!include() in task title) - bidirectional sync for individual tasks';
         default:
-            return 'Regular include (!!!include()) - read-only content insertion';
+            return 'Regular include (!!!include() in task description) - inline content display';
     }
 }
 
@@ -852,11 +852,11 @@ function createFileStatesList(allFiles) {
                         </div>
                         <div class="legend-item">
                             <span class="include-type-label column legend-badge">[COLINC]</span>
-                            <span class="legend-text">!!!columninclude() - bidirectional</span>
+                            <span class="legend-text">!!!include() in column header - bidirectional</span>
                         </div>
                         <div class="legend-item">
                             <span class="include-type-label task legend-badge">[TASKINC]</span>
-                            <span class="legend-text">!!!taskinclude() - bidirectional</span>
+                            <span class="legend-text">!!!include() in task title - bidirectional</span>
                         </div>
                     </div>
                 </div>
