@@ -2199,12 +2199,21 @@ export class MessageHandler {
                         false
                     );
                     panel.fileRegistry.register(columnInclude);
+                    columnInclude.startWatching();
                 }
             }
 
-            // 4. Load content from new file and parse tasks
+            // 4. Load content from file and parse tasks
             const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
             if (newFile && newFile.parseToTasks) {
+                // Ensure file has content loaded (may be empty if file was just created or content was cleared)
+                if (!newFile.getContent() || newFile.getContent().length === 0) {
+                    const content = await newFile.readFromDisk();
+                    if (content) {
+                        newFile.setContent(content, true); // true = update baseline too
+                    }
+                }
+
                 const tasks = newFile.parseToTasks();
                 console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
 
@@ -2299,12 +2308,21 @@ export class MessageHandler {
                         false
                     );
                     panel.fileRegistry.register(taskInclude);
+                    taskInclude.startWatching();
                 }
             }
 
-            // 4. Load content from new file
+            // 4. Load content from file
             const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
             if (newFile && newFile.getTaskDescription) {
+                // Ensure file has content loaded (may be empty if file was just created or content was cleared)
+                if (!newFile.getContent() || newFile.getContent().length === 0) {
+                    const content = await newFile.readFromDisk();
+                    if (content) {
+                        newFile.setContent(content, true); // true = update baseline too
+                    }
+                }
+
                 const description = newFile.getTaskDescription();
                 console.log(`[switchTaskIncludeFile] Loaded content from new file (${description.length} chars)`);
 
