@@ -27,16 +27,19 @@ export class MainKanbanFile extends MarkdownFile {
     // ============= DEPENDENCIES =============
     private _fileManager: FileManager;
     private _parser: typeof MarkdownKanbanParser;
+    private _getIncludeUnsavedChanges?: () => { hasChanges: boolean; changedFiles: string[] };
 
     constructor(
         filePath: string,
         fileManager: FileManager,
         conflictResolver: ConflictResolver,
-        backupManager: BackupManager
+        backupManager: BackupManager,
+        getIncludeUnsavedChanges?: () => { hasChanges: boolean; changedFiles: string[] }
     ) {
         super(filePath, filePath, conflictResolver, backupManager);
         this._fileManager = fileManager;
         this._parser = MarkdownKanbanParser;
+        this._getIncludeUnsavedChanges = getIncludeUnsavedChanges;
     }
 
     // ============= FILE TYPE =============
@@ -244,15 +247,18 @@ export class MainKanbanFile extends MarkdownFile {
     // ============= CONFLICT CONTEXT =============
 
     protected getConflictContext(): ConflictContext {
+        // Check for include file unsaved changes
+        const includeStatus = this._getIncludeUnsavedChanges ? this._getIncludeUnsavedChanges() : { hasChanges: false, changedFiles: [] };
+
         return {
             type: 'external_main',
             fileType: 'main',
             filePath: this._path,
             fileName: path.basename(this._path),
             hasMainUnsavedChanges: this._hasUnsavedChanges,
-            hasIncludeUnsavedChanges: false,
+            hasIncludeUnsavedChanges: includeStatus.hasChanges,
             hasExternalChanges: this._hasFileSystemChanges,
-            changedIncludeFiles: [],
+            changedIncludeFiles: includeStatus.changedFiles,
             isClosing: false,
             isInEditMode: this._isInEditMode
         };

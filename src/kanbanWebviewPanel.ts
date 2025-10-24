@@ -306,7 +306,8 @@ export class KanbanWebviewPanel {
         this._fileFactory = new FileFactory(
             this._fileManager,
             this._conflictResolver,
-            this._backupManager
+            this._backupManager,
+            () => this._getIncludeFilesUnsavedStatus()
         );
 
         // Subscribe to registry change events
@@ -1657,6 +1658,21 @@ export class KanbanWebviewPanel {
      */
     private _getFilesThatNeedReload(): MarkdownFile[] {
         return this._fileRegistry.getFilesThatNeedReload();
+    }
+
+    /**
+     * Get include files unsaved status (for main file conflict context)
+     */
+    private _getIncludeFilesUnsavedStatus(): { hasChanges: boolean; changedFiles: string[] } {
+        const includeFiles = this._fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
+        const changedFiles = includeFiles
+            .filter(f => f.hasUnsavedChanges())
+            .map(f => f.getRelativePath());
+
+        return {
+            hasChanges: changedFiles.length > 0,
+            changedFiles: changedFiles
+        };
     }
 
     /**

@@ -868,40 +868,38 @@ export class KanbanFileService {
             return true; // No document, nothing to check
         }
 
-        // Check main file external changes
-        if (this._hasExternalUnsavedChanges) {
-            const currentContent = document.getText();
-            const hasRealChanges = currentContent !== this._lastKnownFileContent;
+        // Check main file external changes using MainKanbanFile state
+        const mainFile = this.fileRegistry.getMainFile();
+        if (mainFile && mainFile.hasExternalChanges()) {
+            // Real external changes detected in main file
+            const fileName = path.basename(document.fileName);
 
-            if (hasRealChanges) {
-                // Real external unsaved changes detected in main file
-                const fileName = path.basename(document.fileName);
+            // Get include file unsaved status
+            const includeFiles = this.fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
+            const changedIncludeFiles = includeFiles
+                .filter(f => f.hasUnsavedChanges())
+                .map(f => f.getRelativePath());
 
-                // Use unified file state for consistent data
-                const fileState = { hasInternalChanges: true }; // Simplified - this would come from messageHandler
+            const context: ConflictContext = {
+                type: 'presave_check',
+                fileType: 'main',
+                filePath: document.uri.fsPath,
+                fileName: fileName,
+                hasMainUnsavedChanges: mainFile.hasUnsavedChanges(), // We're in the process of saving
+                hasIncludeUnsavedChanges: changedIncludeFiles.length > 0,
+                changedIncludeFiles: changedIncludeFiles
+            };
 
-                const context: ConflictContext = {
-                    type: 'presave_check',
-                    fileType: 'main',
-                    filePath: document.uri.fsPath,
-                    fileName: fileName,
-                    hasMainUnsavedChanges: fileState?.hasInternalChanges || true, // We're in the process of saving
-                    hasIncludeUnsavedChanges: false,
-                    changedIncludeFiles: []
-                };
-
-                try {
-                    const resolution = await this.showConflictDialog(context);
-                    if (!resolution || !resolution.shouldProceed) {
-                        return false; // User chose not to proceed
-                    }
-                } catch (error) {
-                    console.error('[checkForExternalUnsavedChanges] Error in main file conflict resolution:', error);
-                    return false;
+            try {
+                const resolution = await this.showConflictDialog(context);
+                if (!resolution || !resolution.shouldProceed) {
+                    console.log('[checkForExternalUnsavedChanges] User chose not to proceed (cancel save)');
+                    return false; // User chose not to proceed
                 }
-            } else {
-                // False alarm - no real external changes
-                this._hasExternalUnsavedChanges = false;
+                console.log('[checkForExternalUnsavedChanges] User chose to overwrite external changes');
+            } catch (error) {
+                console.error('[checkForExternalUnsavedChanges] Error in main file conflict resolution:', error);
+                return false;
             }
         }
 
