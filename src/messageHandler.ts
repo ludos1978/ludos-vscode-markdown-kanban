@@ -408,6 +408,9 @@ export class MessageHandler {
                 const currentBoard = this._getCurrentBoard();
                 const column = currentBoard?.columns.find(col => col.id === message.columnId);
 
+                // Save original column state BEFORE any changes (for rollback if needed)
+                const originalColumn = column ? { ...column, includeFiles: column.includeFiles ? [...column.includeFiles] : [] } : null;
+
                 // Check if the new title contains include syntax (location-based: column include)
                 const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
@@ -456,9 +459,53 @@ export class MessageHandler {
                     const updatedColumn = updatedBoard?.columns.find(col => col.id === message.columnId);
 
                     if (updatedColumn && newIncludeFiles.length > 0) {
-                        // Use the webview panel to load the new content
+                        // CRITICAL: Check if OLD include files have unsaved changes before switching
+                        const oldIncludeFiles = originalColumn?.includeFiles || [];
+                        const unloadingFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
+
+                        if (unloadingFiles.length > 0) {
+                            const panel = this._getWebviewPanel();
+                            const unsavedFiles = unloadingFiles.filter((filePath: string) => {
+                                const file = panel.fileRegistry.getByRelativePath(filePath);
+                                return file && file.hasUnsavedChanges();
+                            });
+
+                            if (unsavedFiles.length > 0) {
+                                // Ask user if they want to save before unloading
+                                const choice = await vscode.window.showWarningMessage(
+                                    `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before switching?`,
+                                    'Save and Switch',
+                                    'Discard Changes',
+                                    'Cancel'
+                                );
+
+                                if (choice === 'Save and Switch') {
+                                    // Save the unsaved files
+                                    for (const filePath of unsavedFiles) {
+                                        const file = panel.fileRegistry.getByRelativePath(filePath);
+                                        if (file) {
+                                            await file.save();
+                                        }
+                                    }
+                                } else if (choice === 'Cancel') {
+                                    // Abort the switch - restore original title
+                                    await this.performBoardActionSilent(() =>
+                                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, originalColumn?.title || '')
+                                    );
+                                    return;
+                                }
+                                // If 'Discard Changes', just continue with the switch
+                            }
+                        }
+
+                        // Route through unified handler to handle include switch properly
                         const panel = this._getWebviewPanel();
-                        await panel.updateIncludeContentUnified(updatedColumn, newIncludeFiles, 'column_title_edit');
+                        const oldIncludeFilesForSwitch = originalColumn?.includeFiles || [];
+                        await panel.handleIncludeSwitch({
+                            columnId: message.columnId,
+                            oldFiles: oldIncludeFilesForSwitch,
+                            newFiles: newIncludeFiles
+                        });
                     } else if (newIncludeFiles.length > 0) {
                         console.error(`[MessageHandler Error] Could not find updated column ${message.columnId} after title edit`);
                     }
@@ -525,9 +572,14 @@ export class MessageHandler {
                     const updatedTask = updatedColumn?.tasks.find(t => t.id === message.taskId);
 
                     if (updatedTask && newIncludeFiles.length > 0) {
-                        // Use the existing method that works
+                        // Route through unified handler to handle include switch properly
                         const panel = this._getWebviewPanel();
-                        await panel.loadNewTaskIncludeContent(updatedTask, newIncludeFiles);
+                        const oldTaskIncludeFiles = task?.includeFiles || [];
+                        await panel.handleIncludeSwitch({
+                            taskId: message.taskId,
+                            oldFiles: oldTaskIncludeFiles,
+                            newFiles: newIncludeFiles
+                        });
                     } else if (newIncludeFiles.length > 0) {
                         console.error(`[MessageHandler Error] Could not find updated task ${message.taskId} in column ${message.columnId} after title edit`);
                     }

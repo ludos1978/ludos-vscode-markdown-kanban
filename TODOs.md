@@ -4,6 +4,20 @@ kanban-plugin: board
 
 ## Open Todos
 
+- [ ] CHANGING CACHED CONTENT SHOUD WORK LIKE THIS AND IT WORK NOWHERE DIFFERENTLY!!! IF IT NEEDS OTHER EXECUTION PATHS DISCUSS IT WITH ME!!!
+
+on any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
+- check if it's a change of content in main file, change of content of included files and/or a switch of included files. Then do this in the defined order:
+- verify if any of the include files that are switched or unloaded has any unsaved content, if so ask the user if he wants to save the changes before unloading/switching.
+- load any new included files and update the cache.
+- if any of the included files has changes: change the content in the frontend & backend for the included files.
+- if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
+- only update the contents that have been modified in the frontend.
+
+DO NOT SAVE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES.
+
+
+
 - [ ] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
 
 - [x] Conflict tracking behaviour:

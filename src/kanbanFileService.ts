@@ -426,9 +426,9 @@ export class KanbanFileService {
                 }
             }
 
-            // First, save any changes to column and task include files (bidirectional editing)
-            await this.includeFileManager.saveAllColumnIncludeChanges();
-            await this.includeFileManager.saveAllTaskIncludeChanges();
+            // NOTE: Include files are NOT auto-saved during main file save
+            // They must be explicitly saved by user through menu actions
+            // The cache (setContent) has already been updated by trackIncludeFileUnsavedChanges()
 
             console.log('[KanbanFileService.saveToMarkdown] About to generate markdown for main file');
             console.log(`[KanbanFileService.saveToMarkdown] Board has ${this.board()!.columns.length} columns`);
@@ -552,8 +552,14 @@ export class KanbanFileService {
             // Clear unsaved changes flag after successful save
             const mainFile = this.fileRegistry.getMainFile();
             if (mainFile) {
-                // Mark as saved and update baseline to current content
-                mainFile.setContent(markdown, true); // true = already saved
+                // CRITICAL: Update board AND content to ensure they stay in sync
+                // If we only update content, next save() will regenerate from stale board
+                const currentBoard = this.board();
+                if (currentBoard) {
+                    mainFile.updateFromBoard(currentBoard);
+                    // updateFromBoard sets updateBaseline=false, so we need to mark as saved manually
+                    mainFile.setContent(markdown, true); // true = already saved, update baseline
+                }
             }
             console.log('[KanbanFileService.saveToMarkdown] Save completed successfully, clearing unsaved changes');
 

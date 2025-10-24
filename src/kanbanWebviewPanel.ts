@@ -415,20 +415,19 @@ export class KanbanWebviewPanel {
                     }
 
                     if (hasChanges && cachedBoard) {
-                        // Track changes in include files
-                        console.log('[markUnsavedChanges callback] Tracking unsaved changes with board having', cachedBoard.columns?.length, 'columns');
-                        const onlyIncludeChanges = await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
-                        console.log('[markUnsavedChanges callback] trackIncludeFileUnsavedChanges returned:', onlyIncludeChanges);
+                        // User edited the board - update backend cache via unified handler
+                        // NOTE: This updates cache (setContent), NOT disk. Saving is separate.
+                        console.log('[markUnsavedChanges callback] User edited board - updating backend cache');
 
-                        // Update main file unsaved changes - generate markdown and set on MarkdownFile
+                        // Track changes in include files (updates their cache)
+                        await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
+
+                        // Update main file cache - CRITICAL: use updateFromBoard to update BOTH content AND board object
                         const mainFile = this._getMainFile();
-                        if (mainFile && !onlyIncludeChanges) {
-                            // Main file has changes - generate markdown and mark as unsaved
-                            const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                            // Only call setContent if markdown actually changed to prevent spurious events
-                            if (markdown !== mainFile.getContent()) {
-                                mainFile.setContent(markdown, false); // false = not saved yet
-                            }
+                        if (mainFile) {
+                            // updateFromBoard() updates both this._board and this._content
+                            // This ensures that when save() is called, it has the correct board to regenerate from
+                            mainFile.updateFromBoard(cachedBoard);
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -451,13 +450,10 @@ export class KanbanWebviewPanel {
                         // If we get here, it's a valid state change from frontend (marking something as changed)
                         if (cachedBoard) {
                             // Frontend sent board changes - mark main file as having unsaved changes
+                            // CRITICAL: use updateFromBoard to update BOTH content AND board object
                             const mainFile = this._getMainFile();
                             if (mainFile) {
-                                const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                                // Only call setContent if markdown actually changed to prevent spurious events
-                                if (markdown !== mainFile.getContent()) {
-                                    mainFile.setContent(markdown, false); // false = not saved yet
-                                }
+                                mainFile.updateFromBoard(cachedBoard);
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
@@ -589,11 +585,8 @@ export class KanbanWebviewPanel {
             // The user will need to manually save to persist the changes
             const mainFile = this._getMainFile();
             if (mainFile && this._board) {
-                const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
-                // Only call setContent if markdown actually changed to prevent spurious events
-                if (markdown !== mainFile.getContent()) {
-                    mainFile.setContent(markdown, false); // false = not saved yet
-                }
+                // CRITICAL: use updateFromBoard to update BOTH content AND board object
+                mainFile.updateFromBoard(this._board);
             }
 
             await this.sendBoardUpdate();
@@ -1302,13 +1295,84 @@ export class KanbanWebviewPanel {
         // Load include files if board is available
         console.log(`[_syncMainFileToRegistry] Board exists: ${!!this._board}, Board valid: ${this._board?.valid}`);
         if (this._board && this._board.valid) {
+            // Step 1: Create include file instances in registry
             this._syncIncludeFilesWithRegistry(this._board);
+
+            // Step 2: Load and parse content from all include files
+            await this._loadIncludeContent(this._board);
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
         }
 
         // Log registry statistics
         this._fileRegistry.logStatistics();
+    }
+
+    /**
+     * Load and parse content from all include files into the board
+     * Called on initial load to populate include content before sending to frontend
+     */
+    private async _loadIncludeContent(board: KanbanBoard): Promise<void> {
+        console.log('[_loadIncludeContent] Loading content from all include files');
+
+        // Load column includes
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    if (file) {
+                        // Reload from disk and parse to tasks
+                        await file.reload();
+                        const tasks = file.parseToTasks(column.tasks);
+                        column.tasks = tasks;
+                        console.log(`[_loadIncludeContent] Loaded ${tasks.length} tasks from ${relativePath}`);
+                    }
+                }
+            }
+        }
+
+        // Load task includes
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
+                        if (file) {
+                            // Reload from disk and get content
+                            await file.reload();
+                            const description = file.getContent();
+
+                            // Parse displayTitle and description
+                            const lines = description.split('\n');
+                            let displayTitle = '';
+                            let taskDescription = '';
+                            let titleFound = false;
+                            const descriptionLines: string[] = [];
+
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i].trim();
+                                if (!titleFound && line) {
+                                    displayTitle = lines[i];
+                                    titleFound = true;
+                                } else if (titleFound && line) {
+                                    descriptionLines.push(lines[i]);
+                                } else if (titleFound && descriptionLines.length > 0) {
+                                    descriptionLines.push(lines[i]);
+                                }
+                            }
+
+                            taskDescription = descriptionLines.join('\n');
+                            task.displayTitle = displayTitle;
+                            task.description = taskDescription;
+
+                            console.log(`[_loadIncludeContent] Loaded task include ${relativePath}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log('[_loadIncludeContent] All include content loaded');
     }
 
     /**
@@ -1392,40 +1456,174 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Handle file registry change events
+     * UNIFIED CONTENT CHANGE HANDLER
+     *
+     * Single entry point for ALL content changes (external, edits, switches)
+     * Implements the execution path from TODOs.md:
+     * 1. Detect what changed (main content / include content / include switch)
+     * 2. Check unsaved includes being unloaded → ask user
+     * 3. Load new includes → update cache
+     * 4. Update frontend & backend cache for includes
+     * 5. Update frontend & backend cache for main
+     *
+     * NOTE: This does NOT save files - saving is separate, user-triggered
      */
-    private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
-        console.log(`[KanbanWebviewPanel] File registry change: ${event.file.getRelativePath()} (${event.changeType})`);
+    private async _handleContentChange(params: {
+        source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
+        mainFileChanged?: boolean;
+        changedIncludes?: string[];
+        switchedIncludes?: { columnId: string; oldFiles: string[]; newFiles: string[] }[];
+    }): Promise<void> {
+        console.log(`[UNIFIED] handleContentChange from ${params.source}`);
 
-        const file = event.file;
-        const fileType = file.getFileType();
+        // Step 1: Detect what changed
+        const hasMainChange = params.mainFileChanged || false;
+        const hasIncludeChanges = (params.changedIncludes?.length || 0) > 0;
+        const hasSwitches = (params.switchedIncludes?.length || 0) > 0;
 
-        // Handle different file types
-        if (fileType === 'include-column') {
-            await this._handleColumnIncludeChange(file as ColumnIncludeFile, event.changeType);
-        } else if (fileType === 'include-task') {
-            await this._handleTaskIncludeChange(file as TaskIncludeFile, event.changeType);
-        } else if (fileType === 'include-regular') {
-            await this._handleRegularIncludeChange(file as RegularIncludeFile, event.changeType);
-        } else if (fileType === 'main') {
-            // Main file content changed - sync include files with the new board
-            console.log('[KanbanWebviewPanel] Main file change detected');
+        console.log(`[UNIFIED] Changes: main=${hasMainChange}, includes=${hasIncludeChanges}, switches=${hasSwitches}`);
 
-            if (event.changeType === 'content' || event.changeType === 'reloaded') {
-                // Get the updated board from the main file
-                const mainFile = file as MainKanbanFile;
+        // Step 2: Check for unsaved includes being unloaded/switched
+        if (hasSwitches) {
+            for (const switchInfo of params.switchedIncludes!) {
+                const unloadingFiles = switchInfo.oldFiles.filter(old => !switchInfo.newFiles.includes(old));
+
+                if (unloadingFiles.length > 0) {
+                    const unsavedFiles = unloadingFiles.filter(path => {
+                        const file = this._fileRegistry.getByRelativePath(path);
+                        return file && file.hasUnsavedChanges();
+                    });
+
+                    if (unsavedFiles.length > 0) {
+                        const choice = await vscode.window.showWarningMessage(
+                            `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before unloading?`,
+                            'Save',
+                            'Discard',
+                            'Cancel'
+                        );
+
+                        if (choice === 'Save') {
+                            for (const filePath of unsavedFiles) {
+                                const file = this._fileRegistry.getByRelativePath(filePath);
+                                if (file) {
+                                    await file.save();
+                                }
+                            }
+                        } else if (choice === 'Cancel') {
+                            console.log('[UNIFIED] User cancelled - aborting content change');
+                            return; // Abort the change
+                        }
+                        // If 'Discard', continue
+                    }
+                }
+            }
+        }
+
+        // Step 3: Load new includes (update cache)
+        if (hasSwitches) {
+            for (const switchInfo of params.switchedIncludes!) {
+                const column = this._board?.columns.find(c => c.id === switchInfo.columnId);
+                if (column) {
+                    await this.updateIncludeContentUnified(column, switchInfo.newFiles, params.source as any);
+                }
+            }
+        }
+
+        // Step 4: Update frontend & backend cache for changed includes
+        if (hasIncludeChanges) {
+            for (const relativePath of params.changedIncludes!) {
+                const file = this._fileRegistry.getByRelativePath(relativePath);
+                if (!file) {
+                    continue;
+                }
+
+                const fileType = file.getFileType();
+
+                if (fileType === 'include-column') {
+                    // Column include changed - update column tasks
+                    const columnFile = file as ColumnIncludeFile;
+                    const column = this._board?.columns.find(c =>
+                        c.includeFiles && c.includeFiles.includes(relativePath)
+                    );
+
+                    if (column) {
+                        // Parse tasks from updated file
+                        const tasks = columnFile.parseToTasks(column.tasks);
+                        column.tasks = tasks;
+
+                        // Send update to frontend
+                        if (this._panel) {
+                            this._panel.webview.postMessage({
+                                type: 'updateColumnContent',
+                                columnId: column.id,
+                                tasks: tasks,
+                                columnTitle: column.title,
+                                displayTitle: column.displayTitle,
+                                includeMode: true,
+                                includeFiles: column.includeFiles
+                            });
+                        }
+                    }
+                } else if (fileType === 'include-task') {
+                    // Task include changed - update task description
+                    const taskFile = file as TaskIncludeFile;
+                    let foundTask: KanbanTask | undefined;
+                    let foundColumn: KanbanColumn | undefined;
+
+                    // Find the task that references this file
+                    for (const column of this._board?.columns || []) {
+                        for (const task of column.tasks) {
+                            if (task.includeFiles && task.includeFiles.includes(relativePath)) {
+                                foundTask = task;
+                                foundColumn = column;
+                                break;
+                            }
+                        }
+                        if (foundTask) {
+                            break;
+                        }
+                    }
+
+                    if (foundTask && foundColumn) {
+                        // Parse description from file
+                        const description = taskFile.getContent();
+                        foundTask.description = description;
+
+                        // Send update to frontend
+                        if (this._panel) {
+                            this._panel.webview.postMessage({
+                                type: 'updateTaskContent',
+                                columnId: foundColumn.id,
+                                taskId: foundTask.id,
+                                description: description
+                            });
+                        }
+                    }
+                } else if (fileType === 'include-regular') {
+                    // Regular include - need to update task/column that references it
+                    // For now, just mark that we need a full board update
+                    console.log('[UNIFIED] Regular include changed - may need full re-parse');
+                }
+            }
+        }
+
+        // Step 5: Update frontend & backend cache for main file
+        if (hasMainChange) {
+            const mainFile = this._fileRegistry.getMainFile();
+            if (mainFile) {
+                // Re-parse board from updated content
                 const board = mainFile.getBoard();
 
                 if (board && board.valid) {
+                    // Sync include files with registry
                     this._syncIncludeFilesWithRegistry(board);
 
-                    // Load content for all column includes and update the columns
+                    // Load content for all column includes
                     for (const column of board.columns) {
                         if (column.includeFiles && column.includeFiles.length > 0) {
                             for (const relativePath of column.includeFiles) {
                                 const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                                 if (file) {
-                                    // Pass existing tasks to preserve IDs during re-parse
                                     const tasks = file.parseToTasks(column.tasks);
                                     column.tasks = tasks;
                                 }
@@ -1437,10 +1635,8 @@ export class KanbanWebviewPanel {
                     this._board = board;
                     this._cachedBoardFromWebview = board;
 
-                    // Send full board update to frontend for external changes
-                    // This ensures regular columns (non-include) are updated too
-                    if (event.changeType === 'reloaded' && this._panel) {
-                        console.log('[KanbanWebviewPanel] Sending full board update to frontend after external reload');
+                    // Send full board to frontend
+                    if (this._panel) {
                         this._panel.webview.postMessage({
                             type: 'boardUpdate',
                             board: board,
@@ -1465,137 +1661,93 @@ export class KanbanWebviewPanel {
                 }
             }
         }
+
+        console.log('[UNIFIED] Content change complete');
     }
 
     /**
-     * Handle columninclude file change - update column content
+     * PUBLIC API: Handle include file switch triggered by user edit (column/task title)
+     * Routes through the unified content change handler to ensure proper flow
+     *
+     * @param params Switch parameters (columnId or taskId with old/new files)
+     * @returns true if switch proceeded, false if cancelled
      */
-    private async _handleColumnIncludeChange(file: ColumnIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
-            return; // Only update UI for saved, external, loaded, or reloaded changes
+    public async handleIncludeSwitch(params: {
+        columnId?: string;
+        taskId?: string;
+        oldFiles: string[];
+        newFiles: string[];
+    }): Promise<boolean> {
+        console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through unified handler`);
+
+        if (params.columnId) {
+            // Column include switch
+            await this._handleContentChange({
+                source: 'user_edit',
+                switchedIncludes: [{
+                    columnId: params.columnId,
+                    oldFiles: params.oldFiles,
+                    newFiles: params.newFiles
+                }]
+            });
+            return true;
+        } else if (params.taskId) {
+            // Task include switch - for now, just load the new content
+            // TODO: Integrate task include switches into unified handler fully
+            const column = this._board?.columns.find(col =>
+                col.tasks.some(t => t.id === params.taskId)
+            );
+            const task = column?.tasks.find(t => t.id === params.taskId);
+
+            if (task && params.newFiles.length > 0) {
+                await this.loadNewTaskIncludeContent(task, params.newFiles);
+            }
+            return true;
         }
 
-        console.log(`[KanbanWebviewPanel] Updating column for include file: ${file.getRelativePath()}`);
+        return false;
+    }
 
-        // Find the column that uses this include file
-        if (!this._board) return;
+    /**
+     * Handle file registry change events - ROUTES TO UNIFIED HANDLER
+     */
+    private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
+        console.log(`[KanbanWebviewPanel] File registry change: ${event.file.getRelativePath()} (${event.changeType})`);
 
-        for (const column of this._board.columns) {
-            if (column.includeFiles && column.includeFiles.includes(file.getRelativePath())) {
-                // Parse tasks from the updated file, preserving existing IDs
-                const tasks = file.parseToTasks(column.tasks);
-                console.log(`[KanbanWebviewPanel] Parsed ${tasks.length} tasks from updated column include`);
+        const file = event.file;
+        const fileType = file.getFileType();
 
-                // Update column in cached board
-                column.tasks = tasks;
+        // CRITICAL: Only route EXTERNAL changes to unified handler
+        // 'content' events are internal cache updates from user edits - DON'T reload!
+        // 'external' events are from file watchers - DO reload!
+        // 'reloaded' events are explicit reload requests - DO reload!
+        if (event.changeType === 'content' || event.changeType === 'saved') {
+            // Internal cache update - do NOT trigger reload
+            console.log(`[KanbanWebviewPanel] Ignoring ${event.changeType} event - internal cache update`);
+            return;
+        }
 
-                // Send update to frontend with all required metadata
-                this._panel.webview.postMessage({
-                    type: 'updateColumnContent',
-                    columnId: column.id,
-                    tasks: tasks,
-                    columnTitle: column.title,
-                    displayTitle: column.displayTitle,
-                    includeMode: true,  // CRITICAL: Must send this to preserve includeMode in frontend
-                    includeFiles: column.includeFiles
+        // Route external/reload events to unified content change handler
+        if (fileType === 'main') {
+            if (event.changeType === 'external' || event.changeType === 'reloaded') {
+                // Main file changed externally
+                await this._handleContentChange({
+                    source: 'file_watcher',
+                    mainFileChanged: true
                 });
-
-                break;
+            }
+        } else if (fileType === 'include-column' || fileType === 'include-task' || fileType === 'include-regular') {
+            if (event.changeType === 'external' || event.changeType === 'reloaded') {
+                // Include file changed externally
+                await this._handleContentChange({
+                    source: 'file_watcher',
+                    changedIncludes: [file.getRelativePath()]
+                });
             }
         }
     }
 
-    /**
-     * Handle taskinclude file change - update task content
-     */
-    private async _handleTaskIncludeChange(file: TaskIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
-            return; // Only update UI for saved, external, loaded, or reloaded changes
-        }
-
-        console.log(`[KanbanWebviewPanel] Updating task for include file: ${file.getRelativePath()}`);
-
-        // Find the task that uses this include file
-        if (!this._board) return;
-
-        for (const column of this._board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.includes(file.getRelativePath())) {
-                    // Get description from file
-                    const description = file.getTaskDescription();
-
-                    // Parse displayTitle and description (same logic as parsing)
-                    const lines = description.split('\n');
-                    let displayTitle = '';
-                    let taskDescription = '';
-
-                    let titleFound = false;
-                    let descriptionLines: string[] = [];
-
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!titleFound && line) {
-                            displayTitle = lines[i];
-                            titleFound = true;
-                        } else if (titleFound && line) {
-                            // Skip blank lines immediately after title (writer adds \n\n separator)
-                            descriptionLines.push(lines[i]);
-                        } else if (titleFound && descriptionLines.length > 0) {
-                            // Once we have content, preserve blank lines (including trailing)
-                            descriptionLines.push(lines[i]);
-                        }
-                    }
-
-                    // Preserve trailing whitespace for symmetric read/write
-                    taskDescription = descriptionLines.join('\n');
-
-                    console.log(`[KanbanWebviewPanel] Updating task content - displayTitle: ${displayTitle}`);
-
-                    // Update task in cached board
-                    task.displayTitle = displayTitle;
-                    task.description = taskDescription;
-
-                    // Send update to frontend with all required metadata
-                    this._panel.webview.postMessage({
-                        type: 'updateTaskContent',
-                        taskId: task.id,
-                        columnId: column.id,
-                        displayTitle: displayTitle,
-                        description: taskDescription,
-                        taskTitle: task.title,
-                        includeMode: true,  // CRITICAL: Must send this to preserve includeMode in frontend
-                        includeFiles: task.includeFiles,
-                        originalTitle: task.originalTitle
-                    });
-
-                    return; // Found the task, done
-                }
-            }
-        }
-    }
-
-    /**
-     * Handle regular include file change - update frontend cache
-     */
-    private async _handleRegularIncludeChange(file: RegularIncludeFile, changeType: string): Promise<void> {
-        if (changeType !== 'saved' && changeType !== 'external' && changeType !== 'loaded' && changeType !== 'reloaded') {
-            return; // Only update UI for saved, external, loaded, or reloaded changes
-        }
-
-        console.log(`[KanbanWebviewPanel] Updating include cache for: ${file.getRelativePath()}`);
-
-        // Get the updated content from the file
-        const content = file.getContent();
-
-        // Send content to frontend to update markdown-it-include cache
-        this._panel.webview.postMessage({
-            type: 'includeFileContent',
-            filePath: file.getRelativePath(),
-            content: content
-        });
-
-        console.log(`[KanbanWebviewPanel] Sent ${content.length} characters to frontend cache`);
-    }
+    // OLD HANDLERS REMOVED - Now using unified _handleContentChange() handler
 
     // ============= FILE REGISTRY HELPER METHODS =============
 
@@ -1786,11 +1938,8 @@ export class KanbanWebviewPanel {
         // NOTE: newHasUnsavedChanges should be applied to MarkdownFile, not stored locally
         if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && this._board) {
             if (result.newHasUnsavedChanges) {
-                const markdown = MarkdownKanbanParser.generateMarkdown(this._board);
-                // Only call setContent if markdown actually changed to prevent spurious events
-                if (markdown !== mainFile.getContent()) {
-                    mainFile.setContent(markdown, false);
-                }
+                // CRITICAL: use updateFromBoard to update BOTH content AND board object
+                mainFile.updateFromBoard(this._board);
             } else {
                 // Always discard to reset state when transitioning to saved
                 // discardChanges() internally checks if content changed before emitting events

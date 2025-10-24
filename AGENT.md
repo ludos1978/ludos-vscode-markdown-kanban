@@ -5,6 +5,7 @@
 - Never modify the save data without the users permission.
 
 ## General rules about the code:
+- Make the changes as minimal as necessary to fulfill the request of the user. Do not add any unrequired complexity when implementing features.
 - use KISS when creating code.
 	- create classes if some parts of the data is mostly only handled by the contained functions.
   - create functions if their functionality is used in more then one place.
