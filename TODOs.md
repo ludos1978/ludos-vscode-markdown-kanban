@@ -8,8 +8,9 @@ kanban-plugin: board
 
 on any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
 - check if it's a change of content in main file, change of content of included files and/or a switch of included files. Then do this in the defined order:
-- verify if any of the include files that are switched or unloaded has any unsaved content, if so ask the user if he wants to save the changes before unloading/switching.
-- load any new included files and update the cache.
+- verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
+- unset the includefiles for the switched files and clear the cache in front and backend.
+- set the includefiles, load and update the cache in backend (and frontend?).
 - if any of the included files has changes: change the content in the frontend & backend for the included files.
 - if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
 - only update the contents that have been modified in the frontend.
