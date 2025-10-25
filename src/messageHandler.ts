@@ -554,11 +554,6 @@ export class MessageHandler {
                         }
                     }
 
-                    // Update the task title first
-                    await this.performBoardActionSilent(() =>
-                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
-                    );
-
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
                     hasTaskIncludeMatches.forEach((match: string) => {
@@ -566,23 +561,31 @@ export class MessageHandler {
                         newIncludeFiles.push(filePath);
                     });
 
-                    // Get the updated task and load new content
-                    const updatedBoard = this._getCurrentBoard();
-                    const updatedColumn = updatedBoard?.columns.find(col => col.id === message.columnId);
-                    const updatedTask = updatedColumn?.tasks.find(t => t.id === message.taskId);
-
-                    if (updatedTask && newIncludeFiles.length > 0) {
-                        // Route through unified handler to handle include switch properly
+                    // CRITICAL: Route through unified handler BEFORE updating title
+                    // This follows TODOs.md: unset → clear → set → load sequence
+                    // This prevents OLD content from being written to NEW file
+                    if (newIncludeFiles.length > 0 && task) {
+                        console.log('[editTaskTitle] Routing task include switch through unified handler...');
                         const panel = this._getWebviewPanel();
-                        const oldTaskIncludeFiles = task?.includeFiles || [];
-                        await panel.handleIncludeSwitch({
-                            taskId: message.taskId,
-                            oldFiles: oldTaskIncludeFiles,
-                            newFiles: newIncludeFiles
+                        const oldTaskIncludeFiles = task.includeFiles || [];
+
+                        // Access private method - unified handler
+                        await (panel as any)._handleContentChange({
+                            source: 'user_edit',
+                            switchedIncludes: [{
+                                taskId: message.taskId,
+                                columnIdForTask: message.columnId,
+                                oldFiles: oldTaskIncludeFiles,
+                                newFiles: newIncludeFiles
+                            }]
                         });
-                    } else if (newIncludeFiles.length > 0) {
-                        console.error(`[MessageHandler Error] Could not find updated task ${message.taskId} in column ${message.columnId} after title edit`);
+                        console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
                     }
+
+                    // Now update the task title (this will trigger markUnsavedChanges with CORRECT content)
+                    await this.performBoardActionSilent(() =>
+                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
+                    );
                 } else {
                     // Regular title edit without include syntax
                     await this.performBoardActionSilent(() =>

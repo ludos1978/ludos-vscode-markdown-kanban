@@ -1576,7 +1576,7 @@ export class KanbanWebviewPanel {
         source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
         mainFileChanged?: boolean;
         changedIncludes?: string[];
-        switchedIncludes?: { columnId: string; oldFiles: string[]; newFiles: string[] }[];
+        switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[] }[];
     }): Promise<void> {
         console.log(`[UNIFIED] handleContentChange from ${params.source}`);
 
@@ -1623,12 +1623,86 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Step 3: Load new includes (update cache)
+        // Step 3: Unset old includes, clear cache, set new includes, load new content
         if (hasSwitches) {
             for (const switchInfo of params.switchedIncludes!) {
-                const column = this._board?.columns.find(c => c.id === switchInfo.columnId);
-                if (column) {
-                    await this.updateIncludeContentUnified(column, switchInfo.newFiles, params.source as any);
+                if (switchInfo.columnId) {
+                    // Column include switch
+                    const column = this._board?.columns.find(c => c.id === switchInfo.columnId);
+                    if (column) {
+                        console.log(`[UNIFIED] Column switch: unsetting old includes, clearing cache`);
+
+                        // CRITICAL: Clear backend cache (file instance) for old includes
+                        for (const oldFile of switchInfo.oldFiles) {
+                            const fileInstance = this._fileRegistry.getByRelativePath(oldFile);
+                            if (fileInstance) {
+                                console.log(`[UNIFIED]   Clearing backend cache for: ${oldFile}`);
+                                fileInstance.discardChanges(); // Revert to baseline (disk content)
+                            }
+                        }
+
+                        // Unset old includeFiles and clear frontend cache
+                        column.includeFiles = [];
+                        column.tasks = [];
+                        column.includeMode = false;
+
+                        // Set new includeFiles and load content
+                        column.includeFiles = switchInfo.newFiles;
+                        column.includeMode = switchInfo.newFiles.length > 0;
+
+                        console.log(`[UNIFIED] Column switch: loading new includes`);
+                        await this.updateIncludeContentUnified(column, switchInfo.newFiles, params.source as any);
+                    }
+                } else if (switchInfo.taskId && switchInfo.columnIdForTask) {
+                    // Task include switch
+                    const column = this._board?.columns.find(c => c.id === switchInfo.columnIdForTask);
+                    const task = column?.tasks.find(t => t.id === switchInfo.taskId);
+
+                    if (task) {
+                        console.log(`[UNIFIED] Task switch: unsetting old includes, clearing cache`);
+                        console.log(`[UNIFIED]   Old: includeFiles=${task.includeFiles}, displayTitle="${task.displayTitle}", description length=${task.description?.length || 0}`);
+
+                        // CRITICAL: Clear backend cache (file instance) for old includes
+                        for (const oldFile of switchInfo.oldFiles) {
+                            const fileInstance = this._fileRegistry.getByRelativePath(oldFile);
+                            if (fileInstance) {
+                                console.log(`[UNIFIED]   Clearing backend cache for: ${oldFile}`);
+                                fileInstance.discardChanges(); // Revert to baseline (disk content)
+                            }
+                        }
+
+                        // Unset old includeFiles and clear frontend cache
+                        task.includeFiles = [];
+                        task.displayTitle = '';
+                        task.description = '';
+                        task.includeMode = false;
+
+                        // Set new includeFiles
+                        task.includeFiles = switchInfo.newFiles;
+                        task.includeMode = switchInfo.newFiles.length > 0;
+
+                        // Load new content from file
+                        if (switchInfo.newFiles.length > 0) {
+                            console.log(`[UNIFIED] Task switch: loading new content from ${switchInfo.newFiles[0]}`);
+                            await this.loadNewTaskIncludeContent(task, switchInfo.newFiles);
+                            console.log(`[UNIFIED]   New: displayTitle="${task.displayTitle}", description length=${task.description?.length || 0}`);
+                        }
+
+                        // Update frontend
+                        if (this._panel && column) {
+                            this._panel.webview.postMessage({
+                                type: 'updateTaskContent',
+                                columnId: column.id,
+                                taskId: task.id,
+                                description: task.description,
+                                displayTitle: task.displayTitle,
+                                taskTitle: task.title,
+                                originalTitle: task.originalTitle,
+                                includeMode: task.includeMode,
+                                includeFiles: task.includeFiles
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -1689,9 +1763,31 @@ export class KanbanWebviewPanel {
                     }
 
                     if (foundTask && foundColumn) {
-                        // Parse description from file
-                        const description = taskFile.getContent();
-                        foundTask.description = description;
+                        // Parse description from file - CRITICAL: split title and description!
+                        const fullContent = taskFile.getContent();
+
+                        // Parse displayTitle and description the same way as _loadIncludeContentAsync
+                        const lines = fullContent.split('\n');
+                        let displayTitle = '';
+                        let taskDescription = '';
+                        let titleFound = false;
+                        const descriptionLines: string[] = [];
+
+                        for (let i = 0; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!titleFound && line) {
+                                displayTitle = lines[i];
+                                titleFound = true;
+                            } else if (titleFound && line) {
+                                descriptionLines.push(lines[i]);
+                            } else if (titleFound && descriptionLines.length > 0) {
+                                descriptionLines.push(lines[i]);
+                            }
+                        }
+
+                        taskDescription = descriptionLines.join('\n');
+                        foundTask.displayTitle = displayTitle;
+                        foundTask.description = taskDescription;
 
                         // Send update to frontend
                         if (this._panel) {
@@ -1699,7 +1795,8 @@ export class KanbanWebviewPanel {
                                 type: 'updateTaskContent',
                                 columnId: foundColumn.id,
                                 taskId: foundTask.id,
-                                description: description
+                                description: taskDescription,
+                                displayTitle: displayTitle
                             });
                         }
                     }
