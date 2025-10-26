@@ -79,6 +79,9 @@ export class KanbanWebviewPanel {
     private _recentlyReloadedFiles: Set<string> = new Set(); // Track files that were just reloaded from external
     private _conflictResolver: ConflictResolver;
 
+    // CRITICAL: Prevent board regeneration during editing
+    private _isEditingInProgress: boolean = false;  // Track if user is actively editing
+
     // Method to force refresh webview content (useful during development)
     public async refreshWebviewContent() {
         if (this._panel && this._board) {
@@ -1810,6 +1813,12 @@ export class KanbanWebviewPanel {
 
         // Step 5: Update frontend & backend cache for main file
         if (hasMainChange) {
+            // CRITICAL: Block board regeneration if user is editing
+            if (this._isEditingInProgress) {
+                console.log(`[handleContentChange] BLOCKING board regeneration - editing in progress! Source: ${params.source}`);
+                return; // Don't regenerate board while user is editing
+            }
+
             console.log(`[CRITICAL] Main file changed - this will regenerate ALL column/task IDs!`);
             console.log(`[CRITICAL] Source: ${params.source}`);
             console.log(`[CRITICAL] Stack trace:`, new Error().stack);
@@ -1871,6 +1880,14 @@ export class KanbanWebviewPanel {
         }
 
         console.log('[UNIFIED] Content change complete');
+    }
+
+    /**
+     * Set editing in progress flag to block board regenerations
+     */
+    public setEditingInProgress(isEditing: boolean): void {
+        this._isEditingInProgress = isEditing;
+        console.log(`[KanbanWebviewPanel] Editing in progress: ${isEditing}`);
     }
 
     /**

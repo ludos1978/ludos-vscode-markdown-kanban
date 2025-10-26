@@ -41,16 +41,31 @@ export class MarkdownKanbanParser {
   /**
    * Find existing column by title to preserve ID
    */
-  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string): KanbanColumn | undefined {
+  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number): KanbanColumn | undefined {
     if (!existingBoard) return undefined;
+
+    // CRITICAL: Match by position (columnIndex) to preserve IDs when content changes
+    // This allows columns to keep their IDs even when title/includes change
+    if (columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
+      return existingBoard.columns[columnIndex];
+    }
+
+    // Fallback: match by title (for backwards compatibility)
     return existingBoard.columns.find(col => col.title === title);
   }
 
   /**
-   * Find existing task by title in a column to preserve ID
+   * Find existing task by position (or title fallback) to preserve ID
    */
-  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string): KanbanTask | undefined {
+  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, taskIndex?: number): KanbanTask | undefined {
     if (!existingColumn) return undefined;
+
+    // CRITICAL: Match by position (taskIndex) to preserve IDs when content changes
+    if (taskIndex !== undefined && taskIndex >= 0 && taskIndex < existingColumn.tasks.length) {
+      return existingColumn.tasks[taskIndex];
+    }
+
+    // Fallback: match by title
     return existingColumn.tasks.find(task => task.title === title);
   }
 
@@ -187,8 +202,8 @@ export class MarkdownKanbanParser {
               displayTitle = path.basename(includeFiles[0], path.extname(includeFiles[0]));
             }
 
-            // Preserve existing column ID if found
-            const existingCol = this.findExistingColumn(existingBoard, columnTitle);
+            // Preserve existing column ID by position (NOT title - title changes with include switches!)
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle, columnIndex);
             currentColumn = {
               id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle, // Keep full title with include syntax for editing
@@ -199,8 +214,8 @@ export class MarkdownKanbanParser {
               displayTitle: displayTitle || 'Included Column' // Store cleaned title for display
             };
           } else {
-            // Regular column - preserve existing ID if found
-            const existingCol = this.findExistingColumn(existingBoard, columnTitle);
+            // Regular column - preserve existing ID by position
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle, columnIndex);
             currentColumn = {
               id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle,
@@ -224,9 +239,9 @@ export class MarkdownKanbanParser {
             // Only parse tasks for non-include columns
             const taskTitle = line.substring(6);
 
-            // Preserve existing task ID if found
-            const existingCol = this.findExistingColumn(existingBoard, currentColumn.title);
-            const existingTask = this.findExistingTask(existingCol, taskTitle);
+            // Preserve existing task ID by column position
+            const existingCol = this.findExistingColumn(existingBoard, currentColumn.title, columnIndex - 1);
+            const existingTask = this.findExistingTask(existingCol, taskTitle, taskIndexInColumn);
 
             currentTask = {
               id: existingTask?.id || IdGenerator.generateTaskId(),

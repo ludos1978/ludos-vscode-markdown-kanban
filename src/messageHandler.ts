@@ -402,7 +402,16 @@ export class MessageHandler {
                     this._boardOperations.sortColumn(this._getCurrentBoard()!, message.columnId, message.sortType)
                 );
                 break;
+            case 'editingStarted':
+                // User started editing - block board regenerations
+                console.log(`[MessageHandler] Editing started - blocking board regenerations`);
+                this._getWebviewPanel().setEditingInProgress(true);
+                break;
+
             case 'editColumnTitle':
+                // User finished editing - allow board regenerations again
+                console.log(`[MessageHandler] Edit completed - allowing board regenerations`);
+                this._getWebviewPanel().setEditingInProgress(false);
 
                 // Check if this might be a column include file change
                 const currentBoard = this._getCurrentBoard();
