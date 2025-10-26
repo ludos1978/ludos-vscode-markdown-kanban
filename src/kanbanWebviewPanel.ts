@@ -1810,12 +1810,19 @@ export class KanbanWebviewPanel {
 
         // Step 5: Update frontend & backend cache for main file
         if (hasMainChange) {
+            console.log(`[CRITICAL] Main file changed - this will regenerate ALL column/task IDs!`);
+            console.log(`[CRITICAL] Source: ${params.source}`);
+            console.log(`[CRITICAL] Stack trace:`, new Error().stack);
+
             const mainFile = this._fileRegistry.getMainFile();
             if (mainFile) {
                 // Re-parse board from updated content
                 const board = mainFile.getBoard();
 
                 if (board && board.valid) {
+                    console.log(`[CRITICAL] About to regenerate board with ${board.columns.length} columns - IDs will change!`);
+                    console.log(`[CRITICAL] New column IDs will be:`, board.columns.map(c => c.id));
+
                     // Sync include files with registry
                     this._syncIncludeFilesWithRegistry(board);
 

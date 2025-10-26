@@ -406,6 +406,12 @@ export class MessageHandler {
 
                 // Check if this might be a column include file change
                 const currentBoard = this._getCurrentBoard();
+                console.log(`[MessageHandler] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
+                console.log(`[MessageHandler] Looking for column ID: ${message.columnId}`);
+                if (currentBoard?.columns) {
+                    console.log(`[MessageHandler] Available column IDs: ${currentBoard.columns.map(c => c.id).join(', ')}`);
+                }
+
                 const column = currentBoard?.columns.find(col => col.id === message.columnId);
 
                 // Save original column state BEFORE any changes (for rollback if needed)
@@ -418,6 +424,11 @@ export class MessageHandler {
                     // CRITICAL: Verify column exists
                     if (!column) {
                         console.error(`[MessageHandler Error] Column ${message.columnId} not found in board for include switch`);
+                        console.error(`[MessageHandler Error] Board state:`, {
+                            hasBoard: !!currentBoard,
+                            columnCount: currentBoard?.columns?.length || 0,
+                            columnIds: currentBoard?.columns?.map(c => c.id) || []
+                        });
                         break;
                     }
 

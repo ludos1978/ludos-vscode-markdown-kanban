@@ -1648,6 +1648,11 @@ function updateColumnRowTag(columnId, newRow) {
     }
     
     // Send update to backend with the full title including row tag
+    console.log(`[Frontend] Sending editColumnTitle - columnId: ${columnId}, title: ${column.title}`);
+    console.log(`[Frontend] Current board has ${currentBoard?.columns?.length || 0} columns`);
+    if (currentBoard?.columns) {
+        console.log(`[Frontend] Column IDs in frontend board:`, currentBoard.columns.map(c => c.id));
+    }
     vscode.postMessage({
         type: 'editColumnTitle',
         columnId: columnId,

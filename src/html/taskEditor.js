@@ -790,10 +790,35 @@ class TaskEditor {
 
                         // If include syntax changed, send editColumnTitle message immediately for backend processing
                         if (hasIncludeChanges) {
+                            // CRITICAL: Get current column ID from board in case IDs changed during editing
+                            // The element being edited is inside a column, need to find the column container
+                            let columnElement = element;
+
+                            // Walk up the DOM tree to find the column container
+                            while (columnElement && !columnElement.hasAttribute('data-column-id')) {
+                                columnElement = columnElement.parentElement;
+                            }
+
+                            let currentColumnId = columnId; // Default to stored ID
+                            let columnIndex = -1;
+
+                            if (columnElement && columnElement.hasAttribute('data-column-id')) {
+                                // Found the column element, get all columns in DOM order
+                                const allColumnElements = Array.from(document.querySelectorAll('[data-column-id]'));
+                                columnIndex = allColumnElements.indexOf(columnElement);
+
+                                if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+                                    // Successfully found the column by index
+                                    currentColumnId = window.currentBoard.columns[columnIndex].id;
+                                }
+                            }
+
+                            console.log(`[TaskEditor] Include change - stored ID: ${columnId}, current ID from board: ${currentColumnId}, index: ${columnIndex}`);
+
                             // Send editColumnTitle message to trigger proper include handling in backend
                             vscode.postMessage({
                                 type: 'editColumnTitle',
-                                columnId: columnId,
+                                columnId: currentColumnId, // Use current ID, not stored ID
                                 title: newTitle
                             });
 
