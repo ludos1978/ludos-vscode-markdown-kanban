@@ -6,7 +6,7 @@ import { KanbanTask } from '../markdownParser';
 import { PresentationParser } from '../presentationParser';
 
 /**
- * Represents a column include file (columninclude syntax).
+ * Represents a column include file (position-based: !!!include()!!! in column header).
  *
  * Column includes use presentation format where each slide becomes a task.
  *
@@ -98,7 +98,7 @@ export class ColumnIncludeFile extends IncludeFile {
             return {
                 ...task,
                 id: existingTask?.id || `task-${this._columnId}-${index}`,
-                includeMode: false, // Tasks from columninclude are NOT individual includes
+                includeMode: false, // Tasks from column includes are NOT individual includes
                 includeFiles: undefined // Column has the includeFiles, not individual tasks
             };
         });

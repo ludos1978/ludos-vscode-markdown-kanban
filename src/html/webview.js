@@ -2646,27 +2646,34 @@ window.addEventListener('message', event => {
                         column.isLoadingContent = message.isLoadingContent;
                     }
 
-                    // Re-render just this column
-                    if (typeof window.renderSingleColumn === 'function') {
-                        window.renderSingleColumn(message.columnId, column);
-                    } else {
-                        if (typeof window.renderBoard === 'function') {
-                            window.renderBoard();
+                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+
+                    if (!isEditing) {
+                        // Re-render just this column
+                        if (typeof window.renderSingleColumn === 'function') {
+                            window.renderSingleColumn(message.columnId, column);
+                        } else {
+                            if (typeof window.renderBoard === 'function') {
+                                window.renderBoard();
+                            }
                         }
-                    }
 
-                    // Inject header/footer bars after rendering
-                    if (typeof window.injectStackableBars === 'function') {
-                        requestAnimationFrame(() => {
-                            window.injectStackableBars();
-                        });
-                    }
+                        // Inject header/footer bars after rendering
+                        if (typeof window.injectStackableBars === 'function') {
+                            requestAnimationFrame(() => {
+                                window.injectStackableBars();
+                            });
+                        }
 
-                    // Recalculate stacked column heights after include content update
-                    if (typeof window.applyStackedColumnStyles === 'function') {
-                        requestAnimationFrame(() => {
-                            window.applyStackedColumnStyles();
-                        });
+                        // Recalculate stacked column heights after include content update
+                        if (typeof window.applyStackedColumnStyles === 'function') {
+                            requestAnimationFrame(() => {
+                                window.applyStackedColumnStyles();
+                            });
+                        }
+                    } else {
+                        console.log('[Frontend updateColumnContent] Skipping render - user is editing');
                     }
                 }
             } else {
@@ -2721,28 +2728,34 @@ window.addEventListener('message', event => {
                     console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
                     console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
+                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    const isEditing = window.taskEditor && window.taskEditor.currentEditor;
 
-                    // Re-render just this column to reflect the task update
-                    if (typeof renderSingleColumn === 'function') {
-                        renderSingleColumn(foundColumn.id, foundColumn);
-                    } else {
-                        if (typeof window.renderBoard === 'function') {
-                            window.renderBoard();
+                    if (!isEditing) {
+                        // Re-render just this column to reflect the task update
+                        if (typeof renderSingleColumn === 'function') {
+                            renderSingleColumn(foundColumn.id, foundColumn);
+                        } else {
+                            if (typeof window.renderBoard === 'function') {
+                                window.renderBoard();
+                            }
                         }
-                    }
 
-                    // Inject header/footer bars after rendering
-                    if (typeof window.injectStackableBars === 'function') {
-                        requestAnimationFrame(() => {
-                            window.injectStackableBars();
-                        });
-                    }
+                        // Inject header/footer bars after rendering
+                        if (typeof window.injectStackableBars === 'function') {
+                            requestAnimationFrame(() => {
+                                window.injectStackableBars();
+                            });
+                        }
 
-                    // Recalculate stacked column heights after task include content update
-                    if (typeof window.applyStackedColumnStyles === 'function') {
-                        requestAnimationFrame(() => {
-                            window.applyStackedColumnStyles();
-                        });
+                        // Recalculate stacked column heights after task include content update
+                        if (typeof window.applyStackedColumnStyles === 'function') {
+                            requestAnimationFrame(() => {
+                                window.applyStackedColumnStyles();
+                            });
+                        }
+                    } else {
+                        console.log('[Frontend updateTaskContent] Skipping render - user is editing');
                     }
                 }
             }

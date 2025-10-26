@@ -106,9 +106,9 @@ export class ExportService {
     // For taskinclude, match the entire task line including the checkbox prefix
     // This prevents checkbox duplication when replacing with converted content
     private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!taskinclude\s*\(([^)]+)\)\s*!!!/gm;
-    // For columninclude, match the entire column header line
+    // For column includes (position-based: !!!include()!!! in column header), match the entire column header line
     // Captures: prefix title, file path, and suffix (tags/other content)
-    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!columninclude\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
+    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
 
     // Track MD5 hashes to detect duplicates
     private static fileHashMap = new Map<string, string>();
@@ -258,9 +258,9 @@ export class ExportService {
             },
             {
                 pattern: this.COLUMN_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}!!!columninclude(${filename})!!!${suffix}`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}!!!include(${filename})!!!${suffix}`,
                 shouldWriteSeparateFile: !mergeIncludes,
-                includeType: 'columninclude'
+                includeType: 'columninclude' // Internal type identifier (position-based detection)
             }
         ];
 
@@ -347,7 +347,7 @@ export class ExportService {
                     // If merging into kanban format and include is presentation format,
                     // convert presentation slides to kanban tasks
                     if (mergeIncludes && !convertToPresentation && !isKanbanFormat) {
-                        exportedContent = this.convertPresentationToKanban(exportedContent, match[0]);
+                        exportedContent = this.convertPresentationToKanban(exportedContent, includeType);
                     }
 
                     if (shouldWriteSeparateFile) {
@@ -1251,11 +1251,11 @@ export class ExportService {
      * Convert presentation format to kanban format
      * For column includes and task includes that are in presentation format
      */
-    private static convertPresentationToKanban(presentationContent: string, includeMarker: string): string {
+    private static convertPresentationToKanban(presentationContent: string, includeType: string): string {
 
-        // Determine the include type from the marker
-        const isColumnInclude = includeMarker.includes('!!!columninclude');
-        const isTaskInclude = includeMarker.includes('!!!taskinclude');
+        // Determine the include type (position-based: 'columninclude', 'taskinclude', or 'include')
+        const isColumnInclude = includeType === 'columninclude';
+        const isTaskInclude = includeType === 'taskinclude';
 
         // Parse presentation content into slides
         const slides = PresentationParser.parsePresentation(presentationContent);

@@ -325,14 +325,14 @@ export class BoardOperations {
         // Simply save the title as provided - all tag handling is done in frontend
         column.title = title;
 
-        // Check for column include syntax changes
-        const columnIncludeMatches = column.title.match(/!!!columninclude\(([^)]+)\)!!!/g);
+        // Check for column include syntax changes (position-based: column header uses !!!include()!!!)
+        const columnIncludeMatches = column.title.match(/!!!include\(([^)]+)\)!!!/g);
 
         if (columnIncludeMatches && columnIncludeMatches.length > 0) {
             // Extract new include files from the title
             const newIncludeFiles: string[] = [];
             columnIncludeMatches.forEach(match => {
-                const filePath = match.replace(/!!!columninclude\(([^)]+)\)!!!/, '$1').trim();
+                const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
                 newIncludeFiles.push(filePath);
             });
 

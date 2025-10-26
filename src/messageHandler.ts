@@ -456,6 +456,10 @@ export class MessageHandler {
 
                     // Get the updated column and load new content
                     const updatedBoard = this._getCurrentBoard();
+                    console.log(`[editColumnTitle] Looking for column ${message.columnId} in board with ${updatedBoard?.columns?.length || 0} columns`);
+                    if (updatedBoard) {
+                        console.log(`[editColumnTitle] Available column IDs: ${updatedBoard.columns.map(c => c.id).join(', ')}`);
+                    }
                     const updatedColumn = updatedBoard?.columns.find(col => col.id === message.columnId);
 
                     if (updatedColumn && newIncludeFiles.length > 0) {
