@@ -2,7 +2,37 @@
 
 This document catalogs ALL singleton instances, global state, and data instances (actual runtime instances, not just type definitions) in the Markdown Kanban Obsidian extension.
 
-**Last Updated:** 2025-10-21
+**Last Updated:** 2025-10-26
+
+---
+
+## Recent Architecture Changes
+
+### Column Include Switch Architecture (2025-10-26)
+**Critical Change**: Column include file switches no longer trigger full board regeneration
+
+**Previous Flow** (BROKEN):
+1. User switches column include file
+2. `performBoardActionSilent()` called → triggers save
+3. Save regenerates markdown and re-parses board
+4. All column/task IDs regenerated (runtime-only, not persisted)
+5. Code tries to find column by old ID → **FAILS: Column not found**
+
+**New Flow** (FIXED):
+1. User switches column include file
+2. Direct `editColumnTitle()` call on board object
+3. Column ID preserved (no board regeneration)
+4. Include switch completes successfully
+5. `markUnsavedChanges()` called to track changes
+
+**Key Files**:
+- [src/messageHandler.ts:445-448](src/messageHandler.ts#L445-L448) - Direct title update
+- [src/messageHandler.ts:511](src/messageHandler.ts#L511) - Changed to `this._markUnsavedChanges()`
+
+### Include Syntax System (2025-10-26)
+**User-facing syntax**: Always `!!!include(filepath.md)!!!`
+**Internal routing**: TypeScript uses `includeType: 'columninclude' | 'taskinclude' | 'include'` for logic
+**Behavior**: Determined by position (column header, task title, or task description)
 
 ---
 

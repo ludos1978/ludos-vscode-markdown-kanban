@@ -2,8 +2,35 @@
 
 This document lists all functions in the JavaScript codebase for the Markdown Kanban extension (webview/frontend code).
 
+**Last Updated:** 2025-10-26
+
 ## Format
 Each entry follows: `path_to_filename-functionname` with a brief description
+
+---
+
+## Recent Critical Fixes
+
+### Edit Mode Protection (2025-10-26)
+**Files:** [src/html/webview.js:2650-2677](src/html/webview.js#L2650-L2677), [src/html/webview.js:2732-2759](src/html/webview.js#L2732-L2759)
+
+**Problem**: During edit mode, backend sends content updates that trigger DOM re-rendering, destroying the active editor and causing editing failures.
+
+**Solution**: Added `isEditing` guard to content update handlers:
+```javascript
+const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+if (!isEditing) {
+    // Re-render column/task
+} else {
+    console.log('Skipping render - user is editing');
+}
+```
+
+**Affected Functions**:
+- `updateColumnContent` - Skips rendering when user is editing
+- `updateTaskContent` - Skips rendering when user is editing
+
+**Key Check**: `window.taskEditor.currentEditor` - active editor instance
 
 ---
 

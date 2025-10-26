@@ -30,20 +30,20 @@ DO NOT SAVE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE 
   - if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
   - if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
   
-  do this for the main kanban file and each columninclude and taskincluded and the regular include files individually.
+  do this for the main kanban file and each column include, task include and regular include files individually.
 
   include files:
   the include itself should be handled as if it would be a layout tag, when displaying it show a short title include(relative/path/to/markdown.md), when alt+clicking the filename, it should open the source file. the rest of the content with the !!!include()!!!is displayed as content for the line, for example tags can be added this way.
-  - columnincludes can only be used in a column header and parses a marp-presentation format as individual kanban-tasks for each slide (already implemented)
-  - taskincludes can only be used in a task header and includes the first line of the included file as.
-  - regular includes can only be used within a task description. they should be shown within a border area where a title line shows the include(filename.md) while in the markdown text it is defined as !!!include(included.md)!!!.
-  - i later plan to change the individial tag names that all are called !!!include()!!! and the position of it defined the behaviour!
+  - column includes use !!!include()!!! in a column header and parses a marp-presentation format as individual kanban-tasks for each slide (already implemented)
+  - task includes use !!!include()!!! in a task header and includes the first line of the included file as the title.
+  - regular includes use !!!include()!!! within a task description. they should be shown within a border area where a title line shows the include(filename.md) while in the markdown text it is defined as !!!include(included.md)!!!.
+  - POSITION DETERMINES BEHAVIOR: ALL use !!!include()!!! - column header = column include, task title = task include, task description = regular include!
 
   ONLY THIS BEHAVIOUR. ALL OTHER BEHAVIOURS OR COMMENTS HOW IT WORKS ARE WRONG AND MUST BE MODIFIED OR REMOVED FROM THE CODE!!!
 
   ULTRATHINK THINK PLAN
 
-- [ ] test the different situatuons when files are included into the kanban using taskinclude or columninclude. they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
+- [ ] test the different situatuons when files are included into the kanban using task includes (!!!include in task title) or column includes (!!!include in column header). they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
 
 - [x] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
 
@@ -307,18 +307,18 @@ create me the tag list with the colors, think about which ones are better suited
 - [x] sometimes i cant drop an column after the last column in a row into a stack, why? dont modify only research.
 - [x] when adding a new column after a column in a stack, add #stack as default tag (add it to the stack below)
 
-- [x] when exporting as "convert to presentation format" with "pack assets", without "merge includes into main file" and all selected, then it doesnt include include/columninclude/taskinclude files that are in any other directories or subdirectories. fix it for all parameter combinations of exporting. make sure files with the same filename dont overwrite each other when coming from different folders. use indexes after the filename to make sure they are distinctive in the filename. reuse files that have the same content, verify it by using an md5 hash, for large files limit the md5 hash to the first megabyte. this code has been in the codebase before, maybe you can reuse it.
+- [x] when exporting as "convert to presentation format" with "pack assets", without "merge includes into main file" and all selected, then it doesnt include regular include/column include/task include files that are in any other directories or subdirectories. fix it for all parameter combinations of exporting. make sure files with the same filename dont overwrite each other when coming from different folders. use indexes after the filename to make sure they are distinctive in the filename. reuse files that have the same content, verify it by using an md5 hash, for large files limit the md5 hash to the first megabyte. this code has been in the codebase before, maybe you can reuse it.
 
 - [x] OPEN BUGS:
 - files included with !!!include(root/include-2.md)!!! are not updated automatically when they are changed externally. it seems to work with a path that has ./ in front of it.
 - files included with !!!include(./folder%20with%20space/include-1.md)!!! or !!!include(folder%20with%20space/include-2.md)!!! are not found/loaded.
 - when drag & dropping a file from the explorer into the view the path to it is not url encoded. use the existing functions to url encode the path that are also used by the drag&drop source.
-- when i edit the column title with a !!!columninclude(markdown-presentation-b.md)!!! the title should show the filename (markdown-presentation-b.md). this is correct after loading the file. but not after editing the title.
+- when i edit the column title with a !!!include(markdown-presentation-b.md)!!! in the column header, the title should show the filename (markdown-presentation-b.md). this is correct after loading the file. but not after editing the title.
 - when i edit a !!!taskinclude(filename.md)!!! it asks me if i want to overwrite, even if the file has not been externally modified. this should only be asked if the user did change the filename.md since we included the file. The same when switching the file for another !!!taskinclude(filename-b.md)!!! , it asks if i want to save my changes to the previously included file, even if the included parts has not been edited in the kanban.
 
-- [x] currently an included markdown file (using columninclude) detects a title of a task using the h7 format (#######). we must change this to use the first non-empty line within the first 3 lines after a slide break (---). remove the adding of H7 and replace it with the same logic, place the header of the task on the second line and have an empty one after that.
+- [x] currently an included markdown file (using !!!include in column header) detects a title of a task using the h7 format (#######). we must change this to use the first non-empty line within the first 3 lines after a slide break (---). remove the adding of H7 and replace it with the same logic, place the header of the task on the second line and have an empty one after that.
 
-- [x] when exporting to kanban and using the "Merge Includes into Main File" then externally included files that are not in the markdown-kanban format (columnincludes or taskincludes) must be converted into the markdown-kanban format.
+- [x] when exporting to kanban and using the "Merge Includes into Main File" then externally included files that are not in the markdown-kanban format (column includes or task includes) must be converted into the markdown-kanban format.
 
 - [x] we need to unify the save, backup and export with all the features in all these versions.
 - we need a third export format type:
@@ -427,7 +427,7 @@ ultrathink, plan.
 - [x] in some situations it doesnt open a link i opened before. 
 - [x] Failed to update stickyStackMode preference: CodeExpectedError: In Arbeitsbereichseinstellungen kann nicht geschrieben werden, weil markdown-kanban.stickyStackMode keine registrierte Konfiguration ist.
 - [x] pressing alt on an image should open the file externally if it's found, othervise the replacement file search should be activated. but it currently doesnt. the code should be in the codebase already, but it currently doesnt seem to be active.
-- [x] modifying a columntitle with a !!!columninclude()!!! does not set the title correctly according to the rule: link to filename that is clickable included with the rest of the title and tags
+- [x] modifying a column title with a !!!include()!!! (column include - position-based) does not set the title correctly according to the rule: link to filename that is clickable included with the rest of the title and tags
 - [x] when restoring kanban views all views restore one kanban file. not individual files they contained before.
 - [x] move the corner-badges-container into the column-header div verify that all css is corrected for the new location. ultrathink
 - [x] a horizontally folded column with a tag header doesnt add the tag above outside above, but overlaying above the normal header. this is one of the broken examples : TO ADD AN EXMAPLE
@@ -436,7 +436,7 @@ ultrathink, plan.
 - [x] if i delete a task recalculate the full stacks heights reuse the existing function for that
 - [x] make sure that in columns the "column-header.header-bars-container" contains the "header-bar" and "column-footer.footer-bars-container" contains the "footer-bar" in all circumstances.
 - [x] disable the vertical column folding mode
-- [x] the title when inserting of a columninclude should only show thae filename included and he remainder of the contents. 
+- [x] the title when inserting a column include (!!!include in column header) should only show the filename included and the remainder of the contents. 
 - [x] On start drag fix the tags of the source stack (where we took the column from). On end drag fix the tags of the destination stack (where we put the column)
 - [x] Corrected Summary of Implementation:
 CSS Changes:

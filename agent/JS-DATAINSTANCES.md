@@ -2,8 +2,29 @@
 
 This document lists all data instances (global variables, module-level state, singleton instances) in the JavaScript codebase.
 
+**Last Updated:** 2025-10-26
+
 ## Format
 Each entry follows: `path_to_filename-instancename` with a brief description
+
+---
+
+## Edit Mode Detection
+
+### Critical Instance: `window.taskEditor.currentEditor`
+**Location**: Global window object
+**Type**: `null | object` (editor instance)
+**Purpose**: Indicates whether user is actively editing a task/column
+
+**Usage in Content Updates**:
+```javascript
+const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+if (isEditing) {
+    // Skip DOM re-rendering to preserve active editor
+}
+```
+
+**Why Important**: DOM re-rendering during edit mode destroys the active editor, causing editing failures. This guard prevents that issue.
 
 ---
 

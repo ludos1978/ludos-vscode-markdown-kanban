@@ -2,8 +2,20 @@
 
 This document lists all data structures (classes, object prototypes, configuration objects) in the JavaScript codebase.
 
+**Last Updated:** 2025-10-26
+
 ## Format
 Each entry follows: `path_to_filename-structurename` with a brief description
+
+---
+
+## Include Syntax System
+
+**User-facing syntax**: Always `!!!include(filepath.md)!!!`
+- Position in markdown determines behavior:
+  - Column header → Column include (Marp presentation to tasks)
+  - Task title → Task include (first line as title)
+  - Task description → Regular include (full content)
 
 ---
 

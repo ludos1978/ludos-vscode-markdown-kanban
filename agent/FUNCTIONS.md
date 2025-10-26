@@ -2,8 +2,26 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
+**Last Updated:** 2025-10-26
+
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Critical Fixes
+
+### Column Include Switch Fix (2025-10-26)
+**File:** [src/messageHandler.ts:445-448](src/messageHandler.ts#L445-L448)
+- Changed from `performBoardActionSilent()` to direct `editColumnTitle()` call
+- **Why**: `performBoardActionSilent` triggers save → board reload → ID regeneration, causing column not found errors
+- **Solution**: Direct board object update preserves column IDs during include file switches
+
+### Edit Mode Protection (2025-10-26)
+**Files:** [src/html/webview.js:2650-2677](src/html/webview.js#L2650-L2677), [src/html/webview.js:2732-2759](src/html/webview.js#L2732-L2759)
+- Added `isEditing` guards to `updateColumnContent` and `updateTaskContent`
+- **Why**: DOM re-rendering during edit mode destroys active editor, causing editing failures
+- **Solution**: Skip rendering when `window.taskEditor.currentEditor` is active
 
 ---
 

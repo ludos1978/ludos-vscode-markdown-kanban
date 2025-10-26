@@ -2,6 +2,24 @@
 
 This document provides a comprehensive overview of all interfaces, types, classes, and enums that define data structures in the Markdown Kanban codebase.
 
+**Last Updated:** 2025-10-26
+
+---
+
+## IMPORTANT: Include Syntax System
+
+The Markdown Kanban extension uses a **unified position-based include syntax**:
+
+- **User-facing syntax**: ALWAYS `!!!include(filepath.md)!!!`
+- **Behavior determined by position**:
+  - **Column header** (`## Title !!!include(file.md)!!!`) → Column include (Marp presentation format, slides become tasks)
+  - **Task title** (`- [ ] !!!include(file.md)!!!`) → Task include (first line becomes task title)
+  - **Task description** (within description) → Regular include (full content embedded)
+
+- **Internal routing**: TypeScript uses `includeType: 'columninclude' | 'taskinclude' | 'include'` for internal logic, but the user NEVER sees these type names. The syntax is always `!!!include()!!!`.
+
+- **NEVER use `!!!columninclude()!!!` or `!!!taskinclude()!!!`** - these are deprecated and have been removed from the codebase.
+
 ---
 
 ## Table of Contents
