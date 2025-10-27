@@ -72,6 +72,11 @@ export class KanbanWebviewPanel {
     private _lastDocumentUri?: string;  // Track current document for serialization
     private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
     private _unsavedFilesToPrompt: string[] = [];  // Files with unsaved changes that need user prompt
+
+    // Dirty tracking: Items with unrendered changes (cache updated but DOM not synced)
+    private _dirtyColumns = new Set<string>();  // Column IDs with unrendered changes
+    private _dirtyTasks = new Set<string>();    // Task IDs with unrendered changes
+
     private _panelId: string;  // Unique identifier for this panel
     private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management
 
@@ -832,6 +837,9 @@ export class KanbanWebviewPanel {
                 if (e.webviewPanel.visible) {
                     // Panel became visible - send file info
                     this._fileManager.sendFileInfo();
+
+                    // Sync any pending DOM updates (items with unrendered changes)
+                    this._syncDirtyItems();
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
@@ -1825,6 +1833,95 @@ export class KanbanWebviewPanel {
     public setEditingInProgress(isEditing: boolean): void {
         this._isEditingInProgress = isEditing;
         console.log(`[KanbanWebviewPanel] Editing in progress: ${isEditing}`);
+    }
+
+    /**
+     * Mark a column as having unrendered changes (cache updated, DOM not synced)
+     */
+    public markColumnDirty(columnId: string): void {
+        this._dirtyColumns.add(columnId);
+        console.log(`[KanbanWebviewPanel] Marked column ${columnId} as dirty`);
+    }
+
+    /**
+     * Mark a task as having unrendered changes (cache updated, DOM not synced)
+     */
+    public markTaskDirty(taskId: string): void {
+        this._dirtyTasks.add(taskId);
+        console.log(`[KanbanWebviewPanel] Marked task ${taskId} as dirty`);
+    }
+
+    /**
+     * Clear dirty flag for a column (render completed successfully)
+     */
+    public clearColumnDirty(columnId: string): void {
+        this._dirtyColumns.delete(columnId);
+        console.log(`[KanbanWebviewPanel] Cleared dirty flag for column ${columnId}`);
+    }
+
+    /**
+     * Clear dirty flag for a task (render completed successfully)
+     */
+    public clearTaskDirty(taskId: string): void {
+        this._dirtyTasks.delete(taskId);
+        console.log(`[KanbanWebviewPanel] Cleared dirty flag for task ${taskId}`);
+    }
+
+    /**
+     * Sync dirty items to frontend (Optimization 2: Batched sync)
+     * Called when view becomes visible to apply any pending DOM updates
+     */
+    private _syncDirtyItems(): void {
+        if (!this._board || !this._panel) return;
+
+        if (this._dirtyColumns.size === 0 && this._dirtyTasks.size === 0) {
+            return; // Nothing to sync
+        }
+
+        console.log(`[syncDirtyItems] Syncing ${this._dirtyColumns.size} columns, ${this._dirtyTasks.size} tasks`);
+
+        // Collect dirty columns
+        const dirtyColumns: any[] = [];
+        for (const columnId of this._dirtyColumns) {
+            const column = this._board.columns.find(c => c.id === columnId);
+            if (column) {
+                dirtyColumns.push({
+                    columnId: column.id,
+                    title: column.title,
+                    displayTitle: column.displayTitle,
+                    includeMode: column.includeMode,
+                    includeFiles: column.includeFiles
+                });
+            }
+        }
+
+        // Collect dirty tasks
+        const dirtyTasks: any[] = [];
+        for (const taskId of this._dirtyTasks) {
+            for (const column of this._board.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    dirtyTasks.push({
+                        columnId: column.id,
+                        taskId: task.id,
+                        displayTitle: task.displayTitle,
+                        description: task.description
+                    });
+                    break;
+                }
+            }
+        }
+
+        // Send single batched message
+        this._panel.webview.postMessage({
+            type: 'syncDirtyItems',
+            columns: dirtyColumns,
+            tasks: dirtyTasks
+        });
+
+        // Clear dirty flags after sending
+        this._dirtyColumns.clear();
+        this._dirtyTasks.clear();
     }
 
     /**

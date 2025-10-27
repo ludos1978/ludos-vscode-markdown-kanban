@@ -2698,8 +2698,23 @@ window.addEventListener('message', event => {
                                 window.applyStackedColumnStyles();
                             });
                         }
+
+                        // OPTIMIZATION 3: Confirm successful render
+                        vscode.postMessage({
+                            type: 'renderCompleted',
+                            itemType: 'column',
+                            itemId: message.columnId
+                        });
                     } else {
                         console.log('[Frontend updateColumnContent] Skipping render - user is editing');
+
+                        // OPTIMIZATION 1: Tell backend this render was skipped
+                        vscode.postMessage({
+                            type: 'renderSkipped',
+                            reason: 'editing',
+                            itemType: 'column',
+                            itemId: message.columnId
+                        });
                     }
                 }
             } else {
@@ -2801,8 +2816,69 @@ window.addEventListener('message', event => {
                                 window.applyStackedColumnStyles();
                             });
                         }
+
+                        // OPTIMIZATION 3: Confirm successful render
+                        vscode.postMessage({
+                            type: 'renderCompleted',
+                            itemType: 'task',
+                            itemId: message.taskId
+                        });
                     } else {
                         console.log('[Frontend updateTaskContent] Skipping render - user is editing');
+
+                        // OPTIMIZATION 1: Tell backend this render was skipped
+                        vscode.postMessage({
+                            type: 'renderSkipped',
+                            reason: 'editing',
+                            itemType: 'task',
+                            itemId: message.taskId
+                        });
+                    }
+                }
+            }
+            break;
+        case 'syncDirtyItems':
+            // OPTIMIZATION 2: Batch update multiple items with unrendered changes
+            if (window.cachedBoard) {
+                console.log(`[Frontend syncDirtyItems] Syncing ${message.columns.length} columns, ${message.tasks.length} tasks`);
+
+                // Update columns
+                for (const colData of message.columns) {
+                    const column = window.cachedBoard.columns.find(c => c.id === colData.columnId);
+                    if (column) {
+                        // Update cache
+                        column.title = colData.title;
+                        column.displayTitle = colData.displayTitle;
+                        column.includeMode = colData.includeMode;
+                        column.includeFiles = colData.includeFiles;
+
+                        // Update DOM directly (minimal update, no full re-render)
+                        const headerEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-header`);
+                        if (headerEl && typeof window.getColumnDisplayTitle === 'function') {
+                            headerEl.innerHTML = window.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        }
+                    }
+                }
+
+                // Update tasks
+                for (const taskData of message.tasks) {
+                    const column = window.cachedBoard.columns.find(c => c.id === taskData.columnId);
+                    if (column) {
+                        const task = column.tasks.find(t => t.id === taskData.taskId);
+                        if (task) {
+                            // Update cache
+                            task.displayTitle = taskData.displayTitle;
+                            task.description = taskData.description;
+
+                            // Update DOM directly (minimal update)
+                            const taskEl = document.querySelector(`[data-task-id="${taskData.taskId}"]`);
+                            if (taskEl) {
+                                // Re-render just this task element
+                                if (typeof window.renderSingleTask === 'function') {
+                                    window.renderSingleTask(taskData.columnId, taskData.taskId, task);
+                                }
+                            }
+                        }
                     }
                 }
             }

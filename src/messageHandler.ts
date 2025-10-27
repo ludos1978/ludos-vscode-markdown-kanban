@@ -522,6 +522,32 @@ export class MessageHandler {
                 }
                 break;
 
+            case 'renderSkipped':
+                // OPTIMIZATION 1: Frontend reports it skipped a render - mark as dirty
+                console.log(`[MessageHandler] Frontend skipped render for ${message.itemType} ${message.itemId} (reason: ${message.reason})`);
+                {
+                    const panel = this._getWebviewPanel();
+                    if (message.itemType === 'column') {
+                        panel.markColumnDirty(message.itemId);
+                    } else if (message.itemType === 'task') {
+                        panel.markTaskDirty(message.itemId);
+                    }
+                }
+                break;
+
+            case 'renderCompleted':
+                // OPTIMIZATION 3: Frontend successfully rendered - clear dirty flag
+                console.log(`[MessageHandler] Frontend confirmed render for ${message.itemType} ${message.itemId}`);
+                {
+                    const panel = this._getWebviewPanel();
+                    if (message.itemType === 'column') {
+                        panel.clearColumnDirty(message.itemId);
+                    } else if (message.itemType === 'task') {
+                        panel.clearTaskDirty(message.itemId);
+                    }
+                }
+                break;
+
             case 'columnsUnfolded':
                 // Frontend confirms columns have been unfolded (response to unfoldColumnsBeforeUpdate request)
                 if (message.requestId) {
