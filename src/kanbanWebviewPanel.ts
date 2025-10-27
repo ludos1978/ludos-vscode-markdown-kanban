@@ -1738,285 +1738,14 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Step 4: Update frontend & backend cache for changed includes
+        // Step 4: External include changes handled by file instances
+        // STRATEGY 1: Files handle their own external changes autonomously via file.handleExternalChange()
+        // The unified handler only responds to user actions (edits, switches)
+        // This prevents duplicate dialogs and ensures single responsibility
         if (hasIncludeChanges) {
-            for (const relativePath of params.changedIncludes!) {
-                const file = this._fileRegistry.getByRelativePath(relativePath);
-                if (!file) {
-                    continue;
-                }
-
-                const fileType = file.getFileType();
-
-                if (fileType === 'include-column') {
-                    // Column include changed - check for conflicts
-                    const columnFile = file as ColumnIncludeFile;
-                    const hasUnsavedChanges = columnFile.hasUnsavedChanges();
-
-                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
-                    if (this._isEditingInProgress || hasUnsavedChanges) {
-                        console.log('[UNIFIED] Column include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
-
-                        // Stop editing
-                        if (this._panel) {
-                            this._panel.webview.postMessage({ type: 'stopEditing' });
-                        }
-                        this._isEditingInProgress = false;
-
-                        const resolution = await this._conflictResolver.resolveConflict({
-                            type: 'external_include',
-                            fileName: relativePath,
-                            fileType: 'include',
-                            filePath: relativePath,
-                            hasMainUnsavedChanges: false,
-                            hasIncludeUnsavedChanges: hasUnsavedChanges,
-                            hasExternalChanges: true,
-                            changedIncludeFiles: [relativePath],
-                            isInEditMode: this._isEditingInProgress
-                        });
-
-                        if (resolution.shouldIgnore) {
-                            console.log('[UNIFIED] User chose to ignore external changes');
-                            return;
-                        }
-
-                        if (resolution.shouldSave) {
-                            // Save current changes
-                            await columnFile.save();
-                        } else if (resolution.shouldCreateBackup) {
-                            // Create backup and reload
-                            if (this._backupManager) {
-                                const doc = await vscode.workspace.openTextDocument(columnFile.getPath());
-                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
-                            }
-                            await columnFile.reload();
-                        } else if (resolution.shouldReload) {
-                            // Discard local changes and reload
-                            columnFile.discardChanges();
-                            await columnFile.reload();
-                        }
-                    }
-
-                    // Update column with new content
-                    const column = this._board?.columns.find(c =>
-                        c.includeFiles && c.includeFiles.includes(relativePath)
-                    );
-
-                    if (column) {
-                        // Parse tasks from updated file
-                        const tasks = columnFile.parseToTasks(column.tasks);
-                        column.tasks = tasks;
-
-                        // Send update to frontend
-                        if (this._panel) {
-                            this._panel.webview.postMessage({
-                                type: 'updateColumnContent',
-                                columnId: column.id,
-                                tasks: tasks,
-                                columnTitle: column.title,
-                                displayTitle: column.displayTitle,
-                                includeMode: true,
-                                includeFiles: column.includeFiles
-                            });
-                        }
-                    }
-                } else if (fileType === 'include-task') {
-                    // Task include changed - check for conflicts
-                    const taskFile = file as TaskIncludeFile;
-                    const hasUnsavedChanges = taskFile.hasUnsavedChanges();
-
-                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
-                    if (this._isEditingInProgress || hasUnsavedChanges) {
-                        console.log('[UNIFIED] Task include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
-
-                        // Stop editing
-                        if (this._panel) {
-                            this._panel.webview.postMessage({ type: 'stopEditing' });
-                        }
-                        this._isEditingInProgress = false;
-
-                        const resolution = await this._conflictResolver.resolveConflict({
-                            type: 'external_include',
-                            fileName: relativePath,
-                            fileType: 'include',
-                            filePath: relativePath,
-                            hasMainUnsavedChanges: false,
-                            hasIncludeUnsavedChanges: hasUnsavedChanges,
-                            hasExternalChanges: true,
-                            changedIncludeFiles: [relativePath],
-                            isInEditMode: this._isEditingInProgress
-                        });
-
-                        if (resolution.shouldIgnore) {
-                            console.log('[UNIFIED] User chose to ignore external changes');
-                            return;
-                        }
-
-                        if (resolution.shouldSave) {
-                            // Save current changes
-                            await taskFile.save();
-                        } else if (resolution.shouldCreateBackup) {
-                            // Create backup and reload
-                            if (this._backupManager) {
-                                const doc = await vscode.workspace.openTextDocument(taskFile.getPath());
-                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
-                            }
-                            await taskFile.reload();
-                        } else if (resolution.shouldReload) {
-                            // Discard local changes and reload
-                            taskFile.discardChanges();
-                            await taskFile.reload();
-                        }
-                    }
-
-                    // Update task with new content
-                    let foundTask: KanbanTask | undefined;
-                    let foundColumn: KanbanColumn | undefined;
-
-                    // Find the task that references this file
-                    for (const column of this._board?.columns || []) {
-                        for (const task of column.tasks) {
-                            if (task.includeFiles && task.includeFiles.includes(relativePath)) {
-                                foundTask = task;
-                                foundColumn = column;
-                                break;
-                            }
-                        }
-                        if (foundTask) {
-                            break;
-                        }
-                    }
-
-                    if (foundTask && foundColumn) {
-                        // Parse description from file - CRITICAL: split title and description!
-                        const fullContent = taskFile.getContent();
-
-                        // Parse displayTitle and description the same way as _loadIncludeContentAsync
-                        const lines = fullContent.split('\n');
-                        let displayTitle = '';
-                        let taskDescription = '';
-                        let titleFound = false;
-                        const descriptionLines: string[] = [];
-
-                        for (let i = 0; i < lines.length; i++) {
-                            const line = lines[i].trim();
-                            if (!titleFound && line) {
-                                displayTitle = lines[i];
-                                titleFound = true;
-                            } else if (titleFound && line) {
-                                descriptionLines.push(lines[i]);
-                            } else if (titleFound && descriptionLines.length > 0) {
-                                descriptionLines.push(lines[i]);
-                            }
-                        }
-
-                        taskDescription = descriptionLines.join('\n');
-                        foundTask.displayTitle = displayTitle;
-                        foundTask.description = taskDescription;
-
-                        // Send update to frontend
-                        if (this._panel) {
-                            this._panel.webview.postMessage({
-                                type: 'updateTaskContent',
-                                columnId: foundColumn.id,
-                                taskId: foundTask.id,
-                                description: taskDescription,
-                                displayTitle: displayTitle
-                            });
-                        }
-                    }
-                } else if (fileType === 'include-regular') {
-                    // Regular include - embedded in markdown, need full board re-parse
-                    const regularFile = file as RegularIncludeFile;
-                    const hasUnsavedChanges = regularFile.hasUnsavedChanges();
-
-                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
-                    if (this._isEditingInProgress || hasUnsavedChanges) {
-                        console.log('[UNIFIED] Regular include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
-
-                        // Stop editing
-                        if (this._panel) {
-                            this._panel.webview.postMessage({ type: 'stopEditing' });
-                        }
-                        this._isEditingInProgress = false;
-
-                        const resolution = await this._conflictResolver.resolveConflict({
-                            type: 'external_include',
-                            fileName: relativePath,
-                            fileType: 'include',
-                            filePath: relativePath,
-                            hasMainUnsavedChanges: false,
-                            hasIncludeUnsavedChanges: hasUnsavedChanges,
-                            hasExternalChanges: true,
-                            changedIncludeFiles: [relativePath],
-                            isInEditMode: this._isEditingInProgress
-                        });
-
-                        if (resolution.shouldIgnore) {
-                            console.log('[UNIFIED] User chose to ignore external changes');
-                            return;
-                        }
-
-                        if (resolution.shouldSave) {
-                            // Save current changes
-                            await regularFile.save();
-                        } else if (resolution.shouldCreateBackup) {
-                            // Create backup and reload
-                            if (this._backupManager) {
-                                const doc = await vscode.workspace.openTextDocument(regularFile.getPath());
-                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
-                            }
-                            await regularFile.reload();
-                        } else if (resolution.shouldReload) {
-                            // Discard local changes and reload
-                            regularFile.discardChanges();
-                            await regularFile.reload();
-                        }
-                    }
-
-                    // Re-parse board with updated include content
-                    console.log('[UNIFIED] Regular include changed - triggering full board re-parse');
-
-                    const mainFile = this._fileRegistry.getMainFile();
-                    if (mainFile) {
-                        // Force reload from disk to pick up updated include content
-                        await mainFile.reload();
-                        const board = mainFile.getBoard();
-
-                        if (board && board.valid) {
-                            console.log(`[UNIFIED] Re-parsed board after regular include change`);
-
-                            // Update cached board
-                            this._board = board;
-                            this._cachedBoardFromWebview = board;
-
-                            // Send full board update to frontend
-                            if (this._panel) {
-                                this._panel.webview.postMessage({
-                                    type: 'boardUpdate',
-                                    board: board,
-                                    columnWidth: configService.getConfig('columnWidth', '350px'),
-                                    taskMinHeight: configService.getConfig('taskMinHeight'),
-                                    sectionHeight: configService.getConfig('sectionHeight'),
-                                    taskSectionHeight: configService.getConfig('taskSectionHeight'),
-                                    fontSize: configService.getConfig('fontSize'),
-                                    fontFamily: configService.getConfig('fontFamily'),
-                                    whitespace: configService.getConfig('whitespace', '8px'),
-                                    layoutRows: configService.getConfig('layoutRows'),
-                                    rowHeight: configService.getConfig('rowHeight'),
-                                    layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                                    layoutPresets: this._getLayoutPresetsConfiguration(),
-                                    maxRowHeight: configService.getConfig('maxRowHeight', 0),
-                                    tagColors: configService.getConfig('tagColors', {}),
-                                    enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-                                    enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-                                    customTagCategories: configService.getCustomTagCategories()
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+            console.log('[UNIFIED] External include changes detected - files will handle autonomously');
+            // Files already handle their own external changes via file.handleExternalChange()
+            // No action needed here - this prevents duplicate dialogs
         }
 
         // Step 5: Update frontend & backend cache for main file
@@ -2101,51 +1830,39 @@ export class KanbanWebviewPanel {
     /**
      * PUBLIC API: Handle include file switch triggered by user edit (column/task title)
      * Routes through the unified content change handler to ensure proper flow
+     * Changes always apply - use undo to revert if needed
      *
      * @param params Switch parameters (columnId or taskId with old/new files)
-     * @returns true if switch proceeded, false if cancelled
      */
     public async handleIncludeSwitch(params: {
         columnId?: string;
         taskId?: string;
         oldFiles: string[];
         newFiles: string[];
-    }): Promise<boolean> {
+    }): Promise<void> {
         console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through unified handler`);
 
-        try {
-            if (params.columnId) {
-                // Column include switch
-                await this._handleContentChange({
-                    source: 'user_edit',
-                    switchedIncludes: [{
-                        columnId: params.columnId,
-                        oldFiles: params.oldFiles,
-                        newFiles: params.newFiles
-                    }]
-                });
-                return true; // Switch succeeded
-            } else if (params.taskId) {
-                // Task include switch - for now, just load the new content
-                // TODO: Integrate task include switches into unified handler fully
-                const column = this._board?.columns.find(col =>
-                    col.tasks.some(t => t.id === params.taskId)
-                );
-                const task = column?.tasks.find(t => t.id === params.taskId);
+        if (params.columnId) {
+            // Column include switch
+            await this._handleContentChange({
+                source: 'user_edit',
+                switchedIncludes: [{
+                    columnId: params.columnId,
+                    oldFiles: params.oldFiles,
+                    newFiles: params.newFiles
+                }]
+            });
+        } else if (params.taskId) {
+            // Task include switch - for now, just load the new content
+            // TODO: Integrate task include switches into unified handler fully
+            const column = this._board?.columns.find(col =>
+                col.tasks.some(t => t.id === params.taskId)
+            );
+            const task = column?.tasks.find(t => t.id === params.taskId);
 
-                if (task && params.newFiles.length > 0) {
-                    await this.loadNewTaskIncludeContent(task, params.newFiles);
-                }
-                return true; // Switch succeeded
+            if (task && params.newFiles.length > 0) {
+                await this.loadNewTaskIncludeContent(task, params.newFiles);
             }
-
-            return false; // No valid switch params
-        } catch (error: any) {
-            if (error.message === 'USER_CANCELLED') {
-                console.log('[handleIncludeSwitch] User cancelled the switch');
-                return false; // Switch cancelled
-            }
-            throw error; // Re-throw other errors
         }
     }
 

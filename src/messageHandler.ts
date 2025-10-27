@@ -565,27 +565,23 @@ export class MessageHandler {
                         newIncludeFiles.push(filePath);
                     });
 
-                    // STRATEGY A: Route through unified handler - it will check unsaved changes ONCE
-                    // All duplicate checks have been removed (lines 562-661 deleted)
+                    // STEP 1: Save undo state and update title FIRST
+                    // This ensures: (1) undo is saved, (2) displayTitle updated before content loads
+                    await this.performBoardActionSilent(() =>
+                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title)
+                    );
+
+                    // STEP 2: Switch includes - will send updated displayTitle to frontend
                     const panel = this._getWebviewPanel();
                     const oldIncludeFilesForSwitch = originalColumn?.includeFiles || [];
-                    const switchSucceeded = await panel.handleIncludeSwitch({
+                    await panel.handleIncludeSwitch({
                         columnId: message.columnId,
                         oldFiles: oldIncludeFilesForSwitch,
                         newFiles: newIncludeFiles
                     });
 
-                    // CRITICAL FIX: Only update title if switch succeeded (user didn't cancel)
-                    if (switchSucceeded) {
-                        // Update title directly in board object WITHOUT performBoardActionSilent
-                        // performBoardActionSilent would regenerate the board and change all IDs
-                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title);
-
-                        // Mark board as having unsaved changes after include switch
-                        this._markUnsavedChanges(true, this._getCurrentBoard());
-                    } else {
-                        console.log('[editColumnTitle] Switch cancelled by user - keeping original title and content');
-                    }
+                    // Mark board as having unsaved changes after include switch
+                    this._markUnsavedChanges(true, this._getCurrentBoard());
                 } else {
                     // Regular title edit without include syntax
                     await this.performBoardActionSilent(() =>
