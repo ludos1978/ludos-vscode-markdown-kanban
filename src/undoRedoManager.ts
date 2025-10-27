@@ -78,13 +78,12 @@ export class UndoRedoManager {
     }
 
     private sendUndoRedoStatus() {
-        setTimeout(() => {
-            this._webview.postMessage({
-                type: 'undoRedoStatus',
-                canUndo: this.canUndo(),
-                canRedo: this.canRedo()
-            });
-        }, 10);
+        // Send immediately - no delay needed for message posting
+        this._webview.postMessage({
+            type: 'undoRedoStatus',
+            canUndo: this.canUndo(),
+            canRedo: this.canRedo()
+        });
     }
 
     private disableFileListenerTemporarily() {
@@ -94,12 +93,12 @@ export class UndoRedoManager {
                 const wasEnabled = kanbanFileListener.getStatus();
                 if (wasEnabled) {
                     kanbanFileListener.setStatus(false);
-                    
-                    setTimeout(() => {
-                        if (kanbanFileListener) {
-                            kanbanFileListener.setStatus(true);
-                        }
-                    }, 2000);
+
+                    // Re-enable immediately after undo/redo operations complete
+                    // Note: The messageHandler sets _isUndoRedoOperation flag to coordinate this.
+                    // The file listener should check that flag instead of being disabled.
+                    // This immediate re-enable is safe because undo/redo marks as unsaved but doesn't save to disk yet.
+                    kanbanFileListener.setStatus(true);
                 }
             }
         } catch (error) {

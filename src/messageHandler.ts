@@ -43,6 +43,10 @@ export class MessageHandler {
     private _pendingStopEditingRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
     private _stopEditingRequestCounter = 0;
 
+    // Request-response pattern for unfoldColumns
+    private _pendingUnfoldRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
+    private _unfoldRequestCounter = 0;
+
     constructor(
         fileManager: FileManager,
         undoRedoManager: UndoRedoManager,
@@ -121,6 +125,56 @@ export class MessageHandler {
             pending.resolve();
         } else {
             console.warn(`[_handleEditingStopped] No pending request found for: ${requestId}`);
+        }
+    }
+
+    /**
+     * Request frontend to unfold columns and wait for response
+     * Returns a Promise that resolves when frontend confirms columns are unfolded
+     */
+    private async _requestUnfoldColumns(columnIds: string[]): Promise<void> {
+        const requestId = `unfold-${++this._unfoldRequestCounter}`;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.warn('[_requestUnfoldColumns] No panel or webview available');
+            return;
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            // Set timeout in case frontend doesn't respond
+            const timeout = setTimeout(() => {
+                this._pendingUnfoldRequests.delete(requestId);
+                console.warn('[_requestUnfoldColumns] Timeout waiting for frontend response');
+                resolve(); // Don't reject, just continue
+            }, 2000);
+
+            // Store promise resolver
+            this._pendingUnfoldRequests.set(requestId, { resolve, reject, timeout });
+
+            // Send request to frontend
+            console.log(`[_requestUnfoldColumns] Sending unfold request: ${requestId}, columns: ${columnIds.join(', ')}`);
+            panel.webview.postMessage({
+                type: 'unfoldColumnsBeforeUpdate',
+                requestId,
+                columnIds
+            });
+        });
+    }
+
+    /**
+     * Handle response from frontend that columns have been unfolded
+     */
+    private _handleColumnsUnfolded(requestId: string): void {
+        console.log(`[_handleColumnsUnfolded] Received response for: ${requestId}`);
+        const pending = this._pendingUnfoldRequests.get(requestId);
+
+        if (pending) {
+            clearTimeout(pending.timeout);
+            this._pendingUnfoldRequests.delete(requestId);
+            pending.resolve();
+        } else {
+            console.warn(`[_handleColumnsUnfolded] No pending request found for: ${requestId}`);
         }
     }
 
@@ -468,6 +522,13 @@ export class MessageHandler {
                 }
                 break;
 
+            case 'columnsUnfolded':
+                // Frontend confirms columns have been unfolded (response to unfoldColumnsBeforeUpdate request)
+                if (message.requestId) {
+                    this._handleColumnsUnfolded(message.requestId);
+                }
+                break;
+
             case 'editColumnTitle':
                 // Check if this might be a column include file change
                 const currentBoard = this._getCurrentBoard();
@@ -497,61 +558,6 @@ export class MessageHandler {
                         break;
                     }
 
-                    // Check if this column currently has unsaved changes
-                    if (column.includeMode && column.includeFiles && column.includeFiles.length > 0) {
-                        const panel = this._getWebviewPanel();
-                        const hasUnsavedChanges = await panel.checkColumnIncludeUnsavedChanges(column);
-
-                        // CRITICAL: Use unified conflict resolver for consistency with external file changes
-                        if (hasUnsavedChanges) {
-                            console.log('[editColumnTitle] Column include has unsaved changes - resolving conflict');
-
-                            // Stop editing and wait for frontend confirmation
-                            await this._requestStopEditing();
-                            (panel as any)._isEditingInProgress = false;
-
-                            // Get conflict resolver from panel
-                            const conflictResolver = (panel as any)._conflictResolver;
-                            const resolution = await conflictResolver.resolveConflict({
-                                type: 'external_include',
-                                fileName: column.includeFiles[0],
-                                fileType: 'include',
-                                filePath: column.includeFiles[0],
-                                hasMainUnsavedChanges: false,
-                                hasIncludeUnsavedChanges: hasUnsavedChanges,
-                                hasExternalChanges: false, // Not external, user is switching
-                                changedIncludeFiles: column.includeFiles,
-                                isInEditMode: true
-                            });
-
-                            if (resolution.shouldIgnore) {
-                                console.log('[editColumnTitle] User chose to ignore - canceling switch');
-                                return; // Don't switch to new file
-                            }
-
-                            if (resolution.shouldSave) {
-                                // Save current changes before switching
-                                await panel.saveColumnIncludeChanges(column);
-                            } else if (resolution.shouldCreateBackup) {
-                                // Create backup and continue with switch
-                                const fileRegistry = (panel as any)._fileRegistry;
-                                const columnIncludeFile = fileRegistry.getColumnIncludeFiles().find((f: any) =>
-                                    f.getRelativePath() === column.includeFiles![0]
-                                );
-                                if (columnIncludeFile && (panel as any)._backupManager) {
-                                    const doc = await vscode.workspace.openTextDocument(columnIncludeFile.getPath());
-                                    await (panel as any)._backupManager.createBackup(doc, { label: 'include-switch', forceCreate: true });
-                                }
-                            }
-                            // If shouldReload, just discard and continue with switch
-                        }
-                    }
-
-                    // CRITICAL: Update title directly in board object WITHOUT performBoardActionSilent
-                    // performBoardActionSilent would regenerate the board and change all IDs
-                    // We need to preserve the column ID to handle the include switch
-                    this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title);
-
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
                     hasColumnIncludeMatches.forEach((match: string) => {
@@ -559,58 +565,27 @@ export class MessageHandler {
                         newIncludeFiles.push(filePath);
                     });
 
-                    // CRITICAL: Check if OLD include files have unsaved changes before switching
-                    const oldIncludeFiles = originalColumn?.includeFiles || [];
-                    const unloadingFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
-
-                    if (unloadingFiles.length > 0) {
-                        const panel = this._getWebviewPanel();
-                        const unsavedFiles = unloadingFiles.filter((filePath: string) => {
-                            const file = panel.fileRegistry.getByRelativePath(filePath);
-                            return file && file.hasUnsavedChanges();
-                        });
-
-                        if (unsavedFiles.length > 0) {
-                            // Ask user if they want to save before unloading
-                            const choice = await vscode.window.showWarningMessage(
-                                `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before switching?`,
-                                { modal: true },
-                                'Save and Switch',
-                                'Discard Changes',
-                                'Cancel'
-                            );
-
-                            if (choice === 'Save and Switch') {
-                                // Save the unsaved files
-                                for (const filePath of unsavedFiles) {
-                                    const file = panel.fileRegistry.getByRelativePath(filePath);
-                                    if (file) {
-                                        await file.save();
-                                    }
-                                }
-                            } else if (choice === 'Cancel') {
-                                // Abort the switch - restore original title
-                                await this.performBoardActionSilent(() =>
-                                    this._boardOperations.editColumnTitle(currentBoard!, message.columnId, originalColumn?.title || '')
-                                );
-                                return;
-                            }
-                            // If 'Discard Changes', just continue with the switch
-                        }
-                    }
-
-                    // Route through unified handler to handle include switch properly
+                    // STRATEGY A: Route through unified handler - it will check unsaved changes ONCE
+                    // All duplicate checks have been removed (lines 562-661 deleted)
                     const panel = this._getWebviewPanel();
                     const oldIncludeFilesForSwitch = originalColumn?.includeFiles || [];
-                    await panel.handleIncludeSwitch({
+                    const switchSucceeded = await panel.handleIncludeSwitch({
                         columnId: message.columnId,
                         oldFiles: oldIncludeFilesForSwitch,
                         newFiles: newIncludeFiles
                     });
 
-                    // CRITICAL: Mark board as having unsaved changes after include switch
-                    // The title was updated + new content loaded, so board state has changed
-                    this._markUnsavedChanges(true, this._getCurrentBoard());
+                    // CRITICAL FIX: Only update title if switch succeeded (user didn't cancel)
+                    if (switchSucceeded) {
+                        // Update title directly in board object WITHOUT performBoardActionSilent
+                        // performBoardActionSilent would regenerate the board and change all IDs
+                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title);
+
+                        // Mark board as having unsaved changes after include switch
+                        this._markUnsavedChanges(true, this._getCurrentBoard());
+                    } else {
+                        console.log('[editColumnTitle] Switch cancelled by user - keeping original title and content');
+                    }
                 } else {
                     // Regular title edit without include syntax
                     await this.performBoardActionSilent(() =>
@@ -633,57 +608,6 @@ export class MessageHandler {
                 const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
                 if (hasTaskIncludeMatches) {
-
-                    // Check if this task currently has unsaved changes
-                    if (task && task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-                        const panel = this._getWebviewPanel();
-                        const hasUnsavedChanges = await panel.checkTaskIncludeUnsavedChanges(task);
-
-                        // CRITICAL: Use unified conflict resolver for consistency with external file changes
-                        if (hasUnsavedChanges) {
-                            console.log('[editTaskTitle] Task include has unsaved changes - resolving conflict');
-
-                            // Stop editing and wait for frontend confirmation
-                            await this._requestStopEditing();
-                            (panel as any)._isEditingInProgress = false;
-
-                            // Get conflict resolver from panel
-                            const conflictResolver = (panel as any)._conflictResolver;
-                            const resolution = await conflictResolver.resolveConflict({
-                                type: 'external_include',
-                                fileName: task.includeFiles[0],
-                                fileType: 'include',
-                                filePath: task.includeFiles[0],
-                                hasMainUnsavedChanges: false,
-                                hasIncludeUnsavedChanges: hasUnsavedChanges,
-                                hasExternalChanges: false, // Not external, user is switching
-                                changedIncludeFiles: task.includeFiles,
-                                isInEditMode: true
-                            });
-
-                            if (resolution.shouldIgnore) {
-                                console.log('[editTaskTitle] User chose to ignore - canceling switch');
-                                return; // Don't switch to new file
-                            }
-
-                            if (resolution.shouldSave) {
-                                // Save current changes before switching
-                                await panel.saveTaskIncludeChanges(task);
-                            } else if (resolution.shouldCreateBackup) {
-                                // Create backup and continue with switch
-                                const fileRegistry = (panel as any)._fileRegistry;
-                                const taskIncludeFile = fileRegistry.getTaskIncludeFiles().find((f: any) =>
-                                    f.getRelativePath() === task.includeFiles![0]
-                                );
-                                if (taskIncludeFile && (panel as any)._backupManager) {
-                                    const doc = await vscode.workspace.openTextDocument(taskIncludeFile.getPath());
-                                    await (panel as any)._backupManager.createBackup(doc, { label: 'include-switch', forceCreate: true });
-                                }
-                            }
-                            // If shouldReload, just discard and continue with switch
-                        }
-                    }
-
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
                     hasTaskIncludeMatches.forEach((match: string) => {
@@ -691,32 +615,44 @@ export class MessageHandler {
                         newIncludeFiles.push(filePath);
                     });
 
-                    // CRITICAL: Route through unified handler BEFORE updating title
-                    // This follows TODOs.md: unset → clear → set → load sequence
-                    // This prevents OLD content from being written to NEW file
+                    // STRATEGY A: Route through unified handler - it will check unsaved changes ONCE
+                    // All duplicate checks have been removed (lines 612-660 deleted)
                     if (newIncludeFiles.length > 0 && task) {
                         console.log('[editTaskTitle] Routing task include switch through unified handler...');
                         const panel = this._getWebviewPanel();
                         const oldTaskIncludeFiles = task.includeFiles || [];
 
-                        // Access private method - unified handler
-                        await (panel as any)._handleContentChange({
-                            source: 'user_edit',
-                            switchedIncludes: [{
-                                taskId: message.taskId,
-                                columnIdForTask: message.columnId,
-                                oldFiles: oldTaskIncludeFiles,
-                                newFiles: newIncludeFiles,
-                                newTitle: message.title  // CRITICAL: Pass new title so frontend gets updated
-                            }]
-                        });
-                        console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
-                    }
+                        // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
+                        // This ensures user can't edit description while content is loading
+                        await this._requestStopEditing();
+                        (panel as any)._isEditingInProgress = false;
 
-                    // Now update the task title (this will trigger markUnsavedChanges with CORRECT content)
-                    await this.performBoardActionSilent(() =>
-                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
-                    );
+                        try {
+                            // Route through unified handler - it checks unsaved changes once
+                            await (panel as any)._handleContentChange({
+                                source: 'user_edit',
+                                switchedIncludes: [{
+                                    taskId: message.taskId,
+                                    columnIdForTask: message.columnId,
+                                    oldFiles: oldTaskIncludeFiles,
+                                    newFiles: newIncludeFiles,
+                                    newTitle: message.title
+                                }]
+                            });
+                            console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
+
+                            // Update the task title (this will trigger markUnsavedChanges with CORRECT content)
+                            await this.performBoardActionSilent(() =>
+                                this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
+                            );
+                        } catch (error: any) {
+                            if (error.message === 'USER_CANCELLED') {
+                                console.log('[editTaskTitle] Switch cancelled by user - keeping original title and content');
+                            } else {
+                                throw error; // Re-throw other errors
+                            }
+                        }
+                    }
                 } else {
                     // Regular title edit without include syntax
                     await this.performBoardActionSilent(() =>
@@ -892,11 +828,9 @@ export class MessageHandler {
                 this.sendFocusTargets(focusTargets);
             } else {
             }
-            
-            // Reset flag after operations complete
-            setTimeout(() => {
-                this._setUndoRedoOperation(false);
-            }, 2000);
+
+            // Reset flag immediately after operations complete (no delay needed)
+            this._setUndoRedoOperation(false);
         }
     }
 
@@ -984,16 +918,8 @@ export class MessageHandler {
         });
         
         if (columnsToUnfold.size > 0) {
-            const webviewPanel = this._getWebviewPanel();
-            if (webviewPanel && webviewPanel._panel && webviewPanel._panel.webview) {
-                webviewPanel._panel.webview.postMessage({
-                    type: 'unfoldColumnsBeforeUpdate',
-                    columnIds: Array.from(columnsToUnfold)
-                });
-                
-                // Wait a bit for the unfolding to happen before proceeding
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
+            // Use request-response pattern to ensure columns are unfolded before proceeding
+            await this._requestUnfoldColumns(Array.from(columnsToUnfold));
         }
     }
 
@@ -1036,11 +962,9 @@ export class MessageHandler {
                 this.sendFocusTargets(focusTargets);
             } else {
             }
-            
-            // Reset flag after operations complete
-            setTimeout(() => {
-                this._setUndoRedoOperation(false);
-            }, 2000);
+
+            // Reset flag immediately after operations complete (no delay needed)
+            this._setUndoRedoOperation(false);
         }
     }
 

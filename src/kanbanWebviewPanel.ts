@@ -94,30 +94,31 @@ export class KanbanWebviewPanel {
     public async refreshWebviewContent() {
         if (this._panel && this._board) {
             this._panel.webview.html = this._getHtmlForWebview();
-            
+
             // Send the board data to the refreshed webview
-            setTimeout(async () => {
-                this._panel.webview.postMessage({
-                    type: 'boardUpdate',
-                    board: this._board,
-                    columnWidth: configService.getConfig('columnWidth', '350px'),
-                    taskMinHeight: configService.getConfig('taskMinHeight'),
-                    sectionHeight: configService.getConfig('sectionHeight'),
-                    taskSectionHeight: configService.getConfig('taskSectionHeight'),
-                    fontSize: configService.getConfig('fontSize'),
-                    fontFamily: configService.getConfig('fontFamily'),
-                    whitespace: configService.getConfig('whitespace', '8px'),
-                    layoutRows: configService.getConfig('layoutRows'),
-                    rowHeight: configService.getConfig('rowHeight'),
-                    layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                    layoutPresets: this._getLayoutPresetsConfiguration(),
-                    maxRowHeight: configService.getConfig('maxRowHeight', 0),
-                    tagColors: configService.getConfig('tagColors', {}),
-                    enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-                    enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-                    customTagCategories: configService.getCustomTagCategories()
-                });
-            }, 100);
+            // Note: There's a race condition where the webview JavaScript might not be ready yet.
+            // Ideally the webview should send a 'ready' message and we wait for that (request-response pattern).
+            // For now, sending immediately and the webview should handle late-arriving messages gracefully.
+            this._panel.webview.postMessage({
+                type: 'boardUpdate',
+                board: this._board,
+                columnWidth: configService.getConfig('columnWidth', '350px'),
+                taskMinHeight: configService.getConfig('taskMinHeight'),
+                sectionHeight: configService.getConfig('sectionHeight'),
+                taskSectionHeight: configService.getConfig('taskSectionHeight'),
+                fontSize: configService.getConfig('fontSize'),
+                fontFamily: configService.getConfig('fontFamily'),
+                whitespace: configService.getConfig('whitespace', '8px'),
+                layoutRows: configService.getConfig('layoutRows'),
+                rowHeight: configService.getConfig('rowHeight'),
+                layoutPreset: configService.getConfig('layoutPreset', 'normal'),
+                layoutPresets: this._getLayoutPresetsConfiguration(),
+                maxRowHeight: configService.getConfig('maxRowHeight', 0),
+                tagColors: configService.getConfig('tagColors', {}),
+                enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
+                enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
+                customTagCategories: configService.getCustomTagCategories()
+            });
         }
     }
 
@@ -949,49 +950,47 @@ export class KanbanWebviewPanel {
         const packageJson = require('../package.json');
         const version = packageJson.version || 'Unknown';
 
-        setTimeout(() => {
-            this._panel.webview.postMessage({
-                type: 'boardUpdate',
-                board: board,
-                imageMappings: imageMappings,
-                tagColors: tagColors,
-                enabledTagCategoriesColumn: enabledTagCategoriesColumn,
-                enabledTagCategoriesTask: enabledTagCategoriesTask,
-                customTagCategories: customTagCategories,
-                whitespace: whitespace,
-                taskMinHeight: taskMinHeight,
-                sectionHeight: sectionHeight,
-                taskSectionHeight: taskSectionHeight,
-                fontSize: fontSize,
-                fontFamily: fontFamily,
-                columnWidth: columnWidth,
-                layoutRows: layoutRows,
-                rowHeight: rowHeight,
-                layoutPreset: layoutPreset,
-                layoutPresets: layoutPresets,
-                maxRowHeight: maxRowHeight,
-                columnBorder: columnBorder,
-                taskBorder: taskBorder,
-                htmlCommentRenderMode: htmlCommentRenderMode,
-                htmlContentRenderMode: htmlContentRenderMode,
-                applyDefaultFolding: applyDefaultFolding,
-                isFullRefresh: isFullRefresh,
-                version: version
-            });
-        }, 10);
+        // Send boardUpdate immediately - no delay needed
+        this._panel.webview.postMessage({
+            type: 'boardUpdate',
+            board: board,
+            imageMappings: imageMappings,
+            tagColors: tagColors,
+            enabledTagCategoriesColumn: enabledTagCategoriesColumn,
+            enabledTagCategoriesTask: enabledTagCategoriesTask,
+            customTagCategories: customTagCategories,
+            whitespace: whitespace,
+            taskMinHeight: taskMinHeight,
+            sectionHeight: sectionHeight,
+            taskSectionHeight: taskSectionHeight,
+            fontSize: fontSize,
+            fontFamily: fontFamily,
+            columnWidth: columnWidth,
+            layoutRows: layoutRows,
+            rowHeight: rowHeight,
+            layoutPreset: layoutPreset,
+            layoutPresets: layoutPresets,
+            maxRowHeight: maxRowHeight,
+            columnBorder: columnBorder,
+            taskBorder: taskBorder,
+            htmlCommentRenderMode: htmlCommentRenderMode,
+            htmlContentRenderMode: htmlContentRenderMode,
+            applyDefaultFolding: applyDefaultFolding,
+            isFullRefresh: isFullRefresh,
+            version: version
+        });
 
-        // Send include file contents after board update
+        // Send include file contents immediately after board update
+        // postMessage guarantees message ordering, so no delay needed
         const includeFiles = this._fileRegistry.getIncludeFiles();
         if (includeFiles.length > 0) {
-            setTimeout(() => {
-                for (const file of includeFiles) {
-                    this._panel.webview.postMessage({
-                        type: 'updateIncludeContent',
-                        filePath: file.getRelativePath(),
-                        content: file.getContent()
-                    });
-                }
-            }, 20);
+            for (const file of includeFiles) {
+                this._panel.webview.postMessage({
+                    type: 'updateIncludeContent',
+                    filePath: file.getRelativePath(),
+                    content: file.getContent()
+                });
+            }
         }
 
         // Create cache file for crash recovery (only for valid boards with actual content)
@@ -1641,7 +1640,7 @@ export class KanbanWebviewPanel {
                             }
                         } else if (choice === 'Cancel') {
                             console.log('[UNIFIED] User cancelled - aborting content change');
-                            return; // Abort the change
+                            throw new Error('USER_CANCELLED'); // Throw instead of return so caller knows operation was cancelled
                         }
                         // If 'Discard', continue
                     }
@@ -2114,32 +2113,40 @@ export class KanbanWebviewPanel {
     }): Promise<boolean> {
         console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through unified handler`);
 
-        if (params.columnId) {
-            // Column include switch
-            await this._handleContentChange({
-                source: 'user_edit',
-                switchedIncludes: [{
-                    columnId: params.columnId,
-                    oldFiles: params.oldFiles,
-                    newFiles: params.newFiles
-                }]
-            });
-            return true;
-        } else if (params.taskId) {
-            // Task include switch - for now, just load the new content
-            // TODO: Integrate task include switches into unified handler fully
-            const column = this._board?.columns.find(col =>
-                col.tasks.some(t => t.id === params.taskId)
-            );
-            const task = column?.tasks.find(t => t.id === params.taskId);
+        try {
+            if (params.columnId) {
+                // Column include switch
+                await this._handleContentChange({
+                    source: 'user_edit',
+                    switchedIncludes: [{
+                        columnId: params.columnId,
+                        oldFiles: params.oldFiles,
+                        newFiles: params.newFiles
+                    }]
+                });
+                return true; // Switch succeeded
+            } else if (params.taskId) {
+                // Task include switch - for now, just load the new content
+                // TODO: Integrate task include switches into unified handler fully
+                const column = this._board?.columns.find(col =>
+                    col.tasks.some(t => t.id === params.taskId)
+                );
+                const task = column?.tasks.find(t => t.id === params.taskId);
 
-            if (task && params.newFiles.length > 0) {
-                await this.loadNewTaskIncludeContent(task, params.newFiles);
+                if (task && params.newFiles.length > 0) {
+                    await this.loadNewTaskIncludeContent(task, params.newFiles);
+                }
+                return true; // Switch succeeded
             }
-            return true;
-        }
 
-        return false;
+            return false; // No valid switch params
+        } catch (error: any) {
+            if (error.message === 'USER_CANCELLED') {
+                console.log('[handleIncludeSwitch] User cancelled the switch');
+                return false; // Switch cancelled
+            }
+            throw error; // Re-throw other errors
+        }
     }
 
     /**

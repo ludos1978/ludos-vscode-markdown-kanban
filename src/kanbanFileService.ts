@@ -488,10 +488,8 @@ export class KanbanFileService {
                 // Check if the document actually contains our changes before failing
                 console.warn('⚠️ workspace.applyEdit returned false, checking if changes were applied...');
 
-                // Small delay to let the edit settle
-                await new Promise(resolve => setTimeout(resolve, 100));
-
                 // Check if the document content matches what we tried to write
+                // Note: VS Code's document.getText() should be synchronous and return current state
                 const currentContent = document.getText();
                 const expectedContent = markdown;
 
@@ -625,9 +623,8 @@ export class KanbanFileService {
                 });
             }
         } finally {
-            setTimeout(() => {
-                this._isUpdatingFromPanel = false;
-            }, 1000);
+            // Reset flag immediately - no delay needed since all async operations have completed
+            this._isUpdatingFromPanel = false;
         }
     }
 

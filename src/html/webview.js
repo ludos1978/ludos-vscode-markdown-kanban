@@ -2545,6 +2545,15 @@ window.addEventListener('message', event => {
                     unfoldColumnIfCollapsed(columnId);
                 });
             }
+
+            // Send confirmation back to backend
+            if (message.requestId) {
+                console.log('[Frontend] Confirming columns unfolded:', message.requestId);
+                vscode.postMessage({
+                    type: 'columnsUnfolded',
+                    requestId: message.requestId
+                });
+            }
             break;
         case 'focusAfterUndoRedo':
             // Store focus targets to be processed after rendering completes

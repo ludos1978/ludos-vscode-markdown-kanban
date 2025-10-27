@@ -93,12 +93,11 @@ export class FileManager {
             isLocked: this._isFileLocked
         };
 
-        setTimeout(() => {
-            this._webview.postMessage({
-                type: 'updateFileInfo',
-                fileInfo: fileInfo
-            });
-        }, 10);
+        // Send immediately - no delay needed for message posting
+        this._webview.postMessage({
+            type: 'updateFileInfo',
+            fileInfo: fileInfo
+        });
     }
 
     public async selectFile(): Promise<vscode.TextDocument | null> {

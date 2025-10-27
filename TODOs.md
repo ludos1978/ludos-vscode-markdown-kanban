@@ -6,9 +6,9 @@ kanban-plugin: board
 
 - it still behaves problematically if the user switches to edit the task-description by using tab after editing the task-header which has a taskinclude. when a include change is detected (after the backend has processed it), then stop the edit that is currently active. store the changes from the edit to cache, if there are changes detected between cache and file ask the user what to do with the data (conflict handling if conflict, save handling if unsaved). 
 
-- [ ] CHANGING CACHED CONTENT SHOUD WORK LIKE THIS AND IT WORK NOWHERE DIFFERENTLY!!! IF IT NEEDS OTHER EXECUTION PATHS DISCUSS IT WITH ME!!!
+- [ ] Include files and cache handling:
 
-on any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
+On any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
 - check if it's a change of content in main file, change of content of included files and/or a switch of included files. Then do this in the defined order:
 - verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
 - unset the includefiles for the switched files and clear the cache in front and backend.
@@ -18,6 +18,13 @@ on any external change or any internal kanban change such as finish editing a co
 - only update the contents that have been modified in the frontend.
 
 DO NOT SAVE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES.
+
+The Taskinclude, columninclude and regular include (include in task/column header or in task content):
+- shows the shortened !!!include(path/to/file.md)!!! as inlcude(path/to/file.md) with all the tags and other content.
+
+It currently shows a conflict and a save dialogue. Also it doesnt allwys properly and consistently load the data from the newly imported file.
+
+find 5 possible solutions to the problem and check the probability it solves the problem properly.
 
 
 
