@@ -2328,8 +2328,24 @@ export class MessageHandler {
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (column) {
                     column.title = newTitle;
-                    column.includeFiles = [newFilePath];
+                    // FIX: Normalize path before storing
+                    const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(newFilePath) || newFilePath;
+                    column.includeFiles = [normalizedPath];
                     column.originalTitle = newTitle;
+                }
+            }
+
+            // FIX #2c: Cleanup old include file that is being replaced
+            if (oldFilePath && oldFilePath !== newFilePath) {
+                // FIX: Normalize oldFilePath for consistent registry lookup
+                const normalizedOldPath = (panel as any)._includeFileManager?._normalizeIncludePath(oldFilePath) || oldFilePath;
+                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(normalizedOldPath);
+                if (oldFileToCleanup) {
+                    console.log(`[switchColumnIncludeFile] Cleaning up old include file: ${normalizedOldPath}`);
+                    oldFileToCleanup.stopWatching();
+                    // FIX: Don't call dispose() - unregister() does it internally
+                    panel.fileRegistry.unregister(oldFileToCleanup.getPath());
+                    console.log(`[switchColumnIncludeFile] ✓ Old file unregistered and disposed`);
                 }
             }
 
@@ -2441,8 +2457,24 @@ export class MessageHandler {
                     const task = column.tasks.find((t: any) => t.id === taskId);
                     if (task) {
                         task.title = newTitle;
-                        task.includeFiles = [newFilePath];
+                        // FIX: Normalize path before storing
+                        const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(newFilePath) || newFilePath;
+                        task.includeFiles = [normalizedPath];
                     }
+                }
+            }
+
+            // FIX #2b: Cleanup old include file that is being replaced
+            if (oldFilePath && oldFilePath !== newFilePath) {
+                // FIX: Normalize oldFilePath for consistent registry lookup
+                const normalizedOldPath = (panel as any)._includeFileManager?._normalizeIncludePath(oldFilePath) || oldFilePath;
+                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(normalizedOldPath);
+                if (oldFileToCleanup) {
+                    console.log(`[switchTaskIncludeFile] Cleaning up old include file: ${normalizedOldPath}`);
+                    oldFileToCleanup.stopWatching();
+                    // FIX: Don't call dispose() - unregister() does it internally
+                    panel.fileRegistry.unregister(oldFileToCleanup.getPath());
+                    console.log(`[switchTaskIncludeFile] ✓ Old file unregistered and disposed`);
                 }
             }
 
@@ -2474,33 +2506,14 @@ export class MessageHandler {
                     }
                 }
 
-                const description = newFile.getTaskDescription();
-                console.log(`[switchTaskIncludeFile] Loaded content from new file (${description.length} chars)`);
+                const fullFileContent = newFile.getTaskDescription();
+                console.log(`[switchTaskIncludeFile] Loaded content from new file (${fullFileContent.length} chars)`);
 
-                // 5. Parse displayTitle and description (same logic as parsing)
-                const lines = description.split('\n');
-                let displayTitle = '';
-                let taskDescription = '';
-
-                let titleFound = false;
-                let descriptionLines: string[] = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!titleFound && line) {
-                        displayTitle = lines[i];
-                        titleFound = true;
-                    } else if (titleFound && line) {
-                        // Skip blank lines immediately after title (writer adds \n\n separator)
-                        descriptionLines.push(lines[i]);
-                    } else if (titleFound && descriptionLines.length > 0) {
-                        // Once we have content, preserve blank lines (including trailing)
-                        descriptionLines.push(lines[i]);
-                    }
-                }
-
-                // Preserve trailing whitespace for symmetric read/write
-                taskDescription = descriptionLines.join('\n');
+                // FIX BUG #5: No-parsing approach
+                // Load COMPLETE file content without parsing into title/description
+                // displayTitle is just a UI indicator showing which file is included
+                const displayTitle = `# include in ${newFilePath}`;
+                const taskDescription = fullFileContent;  // Complete content, no parsing!
 
                 // 6. Get updated task metadata from board
                 const task = board?.columns.find((c: any) => c.id === columnId)?.tasks.find((t: any) => t.id === taskId);

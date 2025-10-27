@@ -1438,31 +1438,19 @@ export class KanbanWebviewPanel {
                             try {
                                 // Reload from disk and get content
                                 await file.reload();
-                                const description = file.getContent();
+                                const fullFileContent = file.getContent();
 
-                                // Parse displayTitle and description
-                                const lines = description.split('\n');
-                                let displayTitle = '';
-                                let taskDescription = '';
-                                let titleFound = false;
-                                const descriptionLines: string[] = [];
+                                // FIX BUG #4: No-parsing approach
+                                // Load COMPLETE file content into task.description (no parsing!)
+                                // displayTitle is just a UI indicator showing which file is included
+                                const displayTitle = `# include in ${relativePath}`;
 
-                                for (let i = 0; i < lines.length; i++) {
-                                    const line = lines[i].trim();
-                                    if (!titleFound && line) {
-                                        displayTitle = lines[i];
-                                        titleFound = true;
-                                    } else if (titleFound && line) {
-                                        descriptionLines.push(lines[i]);
-                                    } else if (titleFound && descriptionLines.length > 0) {
-                                        descriptionLines.push(lines[i]);
-                                    }
-                                }
-
-                                taskDescription = descriptionLines.join('\n');
-                                task.displayTitle = displayTitle;
-                                task.description = taskDescription;
+                                task.displayTitle = displayTitle;  // UI indicator only
+                                task.description = fullFileContent;  // COMPLETE file content!
                                 task.isLoadingContent = false; // Clear loading flag
+
+                                // Sync baseline to prevent false "unsaved" detection
+                                file.setContent(fullFileContent, true);
 
                                 console.log(`[_loadIncludeContentAsync] Loaded task include ${relativePath}`);
 
@@ -1472,7 +1460,7 @@ export class KanbanWebviewPanel {
                                         type: 'updateTaskContent',
                                         columnId: column.id,
                                         taskId: task.id,
-                                        description: taskDescription,
+                                        description: fullFileContent,
                                         displayTitle: displayTitle,
                                         taskTitle: task.title,
                                         originalTitle: task.originalTitle,
@@ -2516,15 +2504,34 @@ export class KanbanWebviewPanel {
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
         // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
-        // Update the column's include files
-        column.includeFiles = newIncludeFiles;
+
+        // FIX #2d: Cleanup old include files that are being replaced
+        const oldIncludeFiles = column.includeFiles || [];
+        // FIX: Normalize all paths for consistent comparison
+        const normalizedNewFiles = newIncludeFiles.map(f => this._includeFileManager._normalizeIncludePath(f));
+        const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager._normalizeIncludePath(f));
+        const filesToRemove = normalizedOldFiles.filter(old => !normalizedNewFiles.includes(old));
+
+        for (const oldFilePath of filesToRemove) {
+            const oldFile = this._fileRegistry.getByRelativePath(oldFilePath);
+            if (oldFile) {
+                console.log(`[updateIncludeContentUnified] Cleaning up old include file: ${oldFilePath}`);
+                oldFile.stopWatching();
+                // FIX: Don't call dispose() - unregister() does it internally
+                this._fileRegistry.unregister(oldFile.getPath());
+                console.log(`[updateIncludeContentUnified] ✓ Old file unregistered and disposed`);
+            }
+        }
+
+        // FIX: Normalize paths before storing
+        column.includeFiles = normalizedNewFiles;
 
         // Keep existing tasks to preserve IDs during re-parse
         const existingTasks = column.tasks;
 
-        // Load content from the include files
+        // Load content from the include files (use normalized paths)
         const allTasks: KanbanTask[] = [];
-        for (const relativePath of newIncludeFiles) {
+        for (const relativePath of normalizedNewFiles) {
             // Create new include file in registry if it doesn't exist
             if (!this._fileRegistry.hasByRelativePath(relativePath)) {
                 const mainFile = this._fileRegistry.getMainFile();
@@ -2560,7 +2567,7 @@ export class KanbanWebviewPanel {
         // Update the column with the loaded tasks
         column.tasks = allTasks;
 
-        // Send update to frontend
+        // Send update to frontend (use normalized paths)
         if (this._panel) {
             this._panel.webview.postMessage({
                 type: 'updateColumnContent',
@@ -2569,7 +2576,7 @@ export class KanbanWebviewPanel {
                 columnTitle: column.title,
                 displayTitle: column.displayTitle,
                 includeMode: true,
-                includeFiles: newIncludeFiles
+                includeFiles: normalizedNewFiles
             });
             console.log(`[updateIncludeContentUnified] Sent updateColumnContent with ${allTasks.length} tasks to frontend`);
         }
@@ -2593,6 +2600,24 @@ export class KanbanWebviewPanel {
             // Normalize the path to match keys in _includeFiles map
             const normalizedIncludeFile = this._includeFileManager._normalizeIncludePath(fileState);
 
+            // FIX #2a: Cleanup old include files that are being replaced
+            const oldIncludeFiles = task.includeFiles || [];
+            const normalizedNewFiles = [normalizedIncludeFile];
+            const filesToRemove = oldIncludeFiles
+                .map(f => this._includeFileManager._normalizeIncludePath(f))
+                .filter(old => !normalizedNewFiles.includes(old));
+
+            for (const oldFilePath of filesToRemove) {
+                const oldFile = this.fileRegistry?.getByRelativePath(oldFilePath);
+                if (oldFile) {
+                    console.log(`[loadNewTaskIncludeContent] Cleaning up old include file: ${oldFilePath}`);
+                    oldFile.stopWatching();
+                    // FIX: Don't call dispose() here - unregister() does it internally
+                    this.fileRegistry.unregister(oldFile.getPath());
+                    console.log(`[loadNewTaskIncludeContent] ✓ Old file unregistered and disposed`);
+                }
+            }
+
             // Create new include file in registry if it doesn't exist
             if (!this.fileRegistry?.hasByRelativePath(normalizedIncludeFile)) {
                 const mainFile = this.fileRegistry.getMainFile();
@@ -2604,6 +2629,10 @@ export class KanbanWebviewPanel {
                         false
                     );
                     this.fileRegistry.register(taskInclude);
+
+                    // FIX #1: Start watching for external changes immediately
+                    taskInclude.startWatching();
+                    console.log('[loadNewTaskIncludeContent] Started watching new TaskIncludeFile:', normalizedIncludeFile);
                 }
             }
 
@@ -2619,8 +2648,22 @@ export class KanbanWebviewPanel {
             }
 
             // Get COMPLETE content from file (NO PARSING!)
-            const fullFileContent = includeFile.getContent();
+            let fullFileContent = includeFile.getContent();
             console.log(`[loadNewTaskIncludeContent] Loaded ${fullFileContent.length} chars from registry`);
+
+            // FIX: Handle case where reload() failed silently and content is empty
+            if (!fullFileContent || fullFileContent.length === 0) {
+                console.warn(`[loadNewTaskIncludeContent] ⚠ Content is empty! Attempting manual reload...`);
+                await includeFile.reload();
+                fullFileContent = includeFile.getContent();
+
+                if (!fullFileContent || fullFileContent.length === 0) {
+                    console.error(`[loadNewTaskIncludeContent] ❌ Reload failed - file has no content: ${normalizedIncludeFile}`);
+                    return; // Abort - don't update task with empty content
+                }
+
+                console.log(`[loadNewTaskIncludeContent] ✓ Manual reload succeeded: ${fullFileContent.length} chars`);
+            }
 
             if (fullFileContent !== null && fullFileContent !== undefined) {
                 // Generate displayTitle for UI (visual indicator only, not part of file content)
@@ -2628,7 +2671,12 @@ export class KanbanWebviewPanel {
 
                 // Update task with COMPLETE file content (NO PARSING, NO TRUNCATION)
                 task.includeMode = true;
-                task.includeFiles = newIncludeFiles;
+
+                // FIX: Normalize paths before storing to ensure consistent registry lookups
+                task.includeFiles = newIncludeFiles.map(f =>
+                    this._includeFileManager._normalizeIncludePath(f)
+                );
+
                 task.originalTitle = task.title; // Preserve the include syntax
                 task.displayTitle = displayTitle; // UI header only
                 task.description = fullFileContent; // COMPLETE file content, no parsing!
