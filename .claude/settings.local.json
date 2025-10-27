@@ -53,7 +53,8 @@
       "Bash(done)",
       "Bash(while read file)",
       "Bash(do basename \"$file\")",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(tac:*)"
     ],
     "deny": [],
     "ask": []

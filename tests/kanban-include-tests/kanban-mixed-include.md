@@ -6,9 +6,9 @@ kanban-plugin: board
 
 ## Normal column
 - [ ] normal task
-  some content
-  
-  whatever
+  A
+- [ ] normal task
+  B
 
 ## standard includes #stack
 - [ ] different includes
@@ -17,8 +17,8 @@ kanban-plugin: board
   !!!include(./root/root-include-1.md)!!!
 
 ## task includes
-- [ ] !!!taskinclude(./root/root-include-2.md)!!!
+- [ ] !!!include(root/root-include-2.md)!!!
 
-## !!!columninclude(./root/root-include-3alt.md)!!! #stack
+## #stack !!!include(root/root-include-3.md)!!!
 
 
