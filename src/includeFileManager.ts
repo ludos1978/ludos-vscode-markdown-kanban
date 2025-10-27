@@ -85,36 +85,23 @@ export class IncludeFileManager {
                     for (const relativePath of task.includeFiles) {
                         const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file) {
-                            // CRITICAL: Validate displayTitle is NOT a formatted header before using it
-                            // Formatted headers like "# include in ./path/file.md" should be ignored
-                            let cleanDisplayTitle = task.displayTitle;
-                            if (cleanDisplayTitle && cleanDisplayTitle.match(/^#\s*include\s+in\s+\./i)) {
-                                console.warn(`[trackIncludeFileUnsavedChanges] Ignoring formatted header in displayTitle: "${cleanDisplayTitle}"`);
-                                cleanDisplayTitle = ''; // Don't use formatted headers in comparison
-                            }
+                            // STRATEGY 1: No-parsing approach
+                            // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
+                            // task.description contains the COMPLETE file content (no parsing, no truncation)
 
-                            // Reconstruct full content: cleanDisplayTitle + description
-                            let fullContent = '';
-                            if (cleanDisplayTitle) {
-                                fullContent = cleanDisplayTitle + '\n\n';
-                            }
-                            if (task.description) {
-                                fullContent += task.description;
-                            }
+                            // Get full content from task (no reconstruction needed!)
+                            const fullContent = task.description || '';
 
-                            // Only update if content actually changed
-                            // Reader/writer are now symmetric so exact comparison works
+                            // Get current content from file
                             const currentContent = file.getContent();
                             const hasUnsaved = file.hasUnsavedChanges();
 
                             console.log(`[trackIncludeFileUnsavedChanges] Task include: ${relativePath}`);
-                            console.log(`  task.displayTitle: "${task.displayTitle}"`);
-                            console.log(`  cleanDisplayTitle: "${cleanDisplayTitle}"`);
+                            console.log(`  task.displayTitle: "${task.displayTitle}" (UI header only)`);
+                            console.log(`  task.description length: ${task.description?.length || 0}`);
                             console.log(`  task.description (first 100 chars): "${task.description?.substring(0, 100)}"`);
-                            console.log(`  Full content length: ${fullContent.length}`);
-                            console.log(`  Full content (first 150 chars): "${fullContent.substring(0, 150)}"`);
-                            console.log(`  Current content length: ${currentContent.length}`);
-                            console.log(`  Current content (first 150 chars): "${currentContent.substring(0, 150)}"`);
+                            console.log(`  file.getContent() length: ${currentContent.length}`);
+                            console.log(`  file.getContent() (first 100 chars): "${currentContent.substring(0, 100)}"`);
                             console.log(`  Content changed: ${fullContent !== currentContent}`);
                             console.log(`  Already has unsaved: ${hasUnsaved}`);
 
@@ -156,32 +143,24 @@ export class IncludeFileManager {
         for (const relativePath of task.includeFiles) {
             const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
             if (file) {
-                // Reconstruct full content: displayTitle (header) + description
-                // When parsing, the first line is stored as displayTitle and the rest as description
-                // We need to combine them back when saving with a blank line separator
-                let fullContent = '';
+                // STRATEGY 1: No-parsing approach
+                // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
+                // task.description contains the COMPLETE file content (no parsing, no reconstruction needed)
 
-                // CRITICAL: Validate displayTitle is NOT a formatted header
-                // Formatted headers look like "# include in ./path/file.md"
-                // These should NEVER be saved to the file
-                let cleanDisplayTitle = task.displayTitle;
-                if (cleanDisplayTitle && cleanDisplayTitle.match(/^#\s*include\s+in\s+\./i)) {
-                    console.warn(`[saveTaskIncludeChanges] Detected formatted header in displayTitle, skipping: "${cleanDisplayTitle}"`);
-                    cleanDisplayTitle = ''; // Don't save formatted headers
-                }
+                // Just use task.description directly - it contains the full file content
+                const fullContent = task.description || '';
 
-                if (cleanDisplayTitle) {
-                    fullContent = cleanDisplayTitle + '\n\n'; // Add blank line after header
-                }
+                console.log(`[saveTaskIncludeChanges] Saving ${relativePath}`);
+                console.log(`  task.displayTitle: "${task.displayTitle}" (UI header only, not saved)`);
+                console.log(`  task.description length: ${fullContent.length}`);
+                console.log(`  task.description (first 100 chars): "${fullContent.substring(0, 100)}"`);
 
-                if (task.description) {
-                    fullContent += task.description;
-                }
-
-                // Only save if there's content (either header or description)
+                // Only save if there's content
                 if (fullContent.trim()) {
                     file.setTaskDescription(fullContent);
                     await file.save();
+                } else {
+                    console.warn(`[saveTaskIncludeChanges] Skipping save - content is empty`);
                 }
             }
         }

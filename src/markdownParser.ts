@@ -343,38 +343,17 @@ export class MarkdownKanbanParser {
             }
           });
 
-          // Read content from included files
-          let includeTitle = '';
-          let includeDescription = '';
+          // STRATEGY 1: Load full content without parsing
+          // Read complete file content without parsing into title/description
+          let fullFileContent = '';
 
           for (const filePath of includeFiles) {
             const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
             try {
               if (fs.existsSync(resolvedPath)) {
-                const fileContent = fs.readFileSync(resolvedPath, 'utf8');
-                const lines = fileContent.split('\n');
-
-                // Find first non-empty line for title
-                let titleFound = false;
-                let descriptionLines: string[] = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                  const line = lines[i].trim();
-                  if (!titleFound && line) {
-                    includeTitle = lines[i]; // Use original line with indentation
-                    titleFound = true;
-                  } else if (titleFound && line) {
-                    // Skip blank lines immediately after title (writer adds \n\n separator)
-                    descriptionLines.push(lines[i]);
-                  } else if (titleFound && descriptionLines.length > 0) {
-                    // Once we have content, preserve blank lines (including trailing)
-                    descriptionLines.push(lines[i]);
-                  }
-                }
-
-                // Join remaining lines as description - preserve trailing whitespace for symmetric read/write
-                includeDescription = descriptionLines.join('\n');
-
+                // Read COMPLETE file content (NO PARSING!)
+                fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
+                console.log(`[Parser] Loaded ${fullFileContent.length} chars from ${filePath} (no parsing)`);
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
               }
@@ -383,17 +362,17 @@ export class MarkdownKanbanParser {
             }
           }
 
-          // If no title found in file, use filename
-          if (!includeTitle && includeFiles.length > 0) {
-            includeTitle = path.basename(includeFiles[0], path.extname(includeFiles[0]));
-          }
+          // Generate displayTitle for UI (visual indicator only, not part of file content)
+          const displayTitle = includeFiles.length > 0
+            ? `# include in ${includeFiles[0]}`
+            : '# include';
 
           // Update task properties for include mode
           task.includeMode = true;
           task.includeFiles = includeFiles;
           task.originalTitle = task.title; // Keep original title with include syntax
-          task.displayTitle = includeTitle || 'Untitled'; // Display title from file
-          task.description = includeDescription; // Description from file
+          task.displayTitle = displayTitle; // UI header only
+          task.description = fullFileContent; // COMPLETE file content, no parsing!
         }
       }
     }

@@ -2686,35 +2686,37 @@ export class KanbanWebviewPanel {
                 }
             }
 
-            // Reload the file content and then read it
+            // STRATEGY 1: Load full content without parsing
+            // Reload the file content from disk first
             await this._includeFileManager.readAndUpdateIncludeContent(normalizedIncludeFile, () => this._fileManager.getDocument());
-            const fileContent = await this._includeFileManager.readFileContent(normalizedIncludeFile, () => this._fileManager.getDocument());
 
-            if (fileContent !== null) {
-                const lines = fileContent.split('\n');
+            // Get file instance from registry
+            const includeFile = this.fileRegistry.getByRelativePath(normalizedIncludeFile);
+            if (!includeFile) {
+                console.error('[loadNewTaskIncludeContent] File not found in registry:', normalizedIncludeFile);
+                return;
+            }
 
-                // Parse first non-empty line as title, rest as description
-                let titleFound = false;
-                let newTitle = '';
-                let descriptionLines: string[] = [];
+            // Get COMPLETE content from file (NO PARSING!)
+            const fullFileContent = includeFile.getContent();
+            console.log(`[loadNewTaskIncludeContent] Loaded ${fullFileContent.length} chars from registry`);
 
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!titleFound && line) {
-                        newTitle = lines[i]; // Use original line with indentation
-                        titleFound = true;
-                    } else if (titleFound) {
-                        descriptionLines.push(lines[i]);
-                    }
-                }
+            if (fullFileContent !== null && fullFileContent !== undefined) {
+                // Generate displayTitle for UI (visual indicator only, not part of file content)
+                const displayTitle = `# include in ${normalizedIncludeFile}`;
 
-                // Update the task with parsed content
-                // Keep the original title (with include syntax) and set display properties
+                // Update task with COMPLETE file content (NO PARSING, NO TRUNCATION)
                 task.includeMode = true;
                 task.includeFiles = newIncludeFiles;
                 task.originalTitle = task.title; // Preserve the include syntax
-                task.displayTitle = newTitle || 'Untitled'; // Title from file
-                task.description = descriptionLines.join('\n').trim(); // Description from file
+                task.displayTitle = displayTitle; // UI header only
+                task.description = fullFileContent; // COMPLETE file content, no parsing!
+
+                // CRITICAL: Update file baseline to match task content
+                // This prevents false "unsaved" detection in trackIncludeFileUnsavedChanges
+                // setContent with updateBaseline=true syncs both content and baseline
+                includeFile.setContent(fullFileContent, true);
+                console.log(`[loadNewTaskIncludeContent] ✓ File baseline synced with task content`);
 
                 console.log(`[loadNewTaskIncludeContent] ======== TASK UPDATED AFTER RELOAD ========`);
                 console.log(`[loadNewTaskIncludeContent] File: ${normalizedIncludeFile}`);
