@@ -986,16 +986,12 @@ class TaskEditor {
 
                             return; // Skip local updates, let backend handle
                         } else if (task.includeMode && oldIncludeMatches.length > 0) {
-                            // This is editing the display content of an existing include task
-                            // (the user is editing what appears to be the title but it's actually the display content)
-                            const editContext = `${type}-${taskId}-${columnId}`;
-                            this.saveUndoStateImmediately('editTaskTitle', taskId, columnId);
-                            this.lastEditContext = editContext;
-
-                            // Update displayTitle instead of title for include tasks
-                            task.displayTitle = value;
-                            // title stays the same (contains include syntax)
-                            // No backend message - this is just local editing
+                            // FIX BUG #2: Don't update displayTitle for task includes
+                            // If we reach here, the include syntax hasn't changed (caught by line 971)
+                            // displayTitle should stay as "# include in path" (UI indicator only, read-only)
+                            // Nothing to do - include syntax is unchanged
+                            console.log('[TaskEditor] Task include title unchanged, skipping');
+                            return;
                         } else {
                             // Regular task title editing
                             if (task.title !== value) {
@@ -1010,25 +1006,15 @@ class TaskEditor {
                     } else if (type === 'task-description') {
                         // Handle task description
                         if (task.includeMode) {
-                            // For task includes, the description field contains the ENTIRE file content
-                            // Parse it to extract the first line (new displayTitle) and rest (new description)
-                            const lines = value.split('\n');
-                            const newDisplayTitle = lines[0] || '';
-
-                            // Remove the first line and any immediately following empty lines
-                            let remainingLines = lines.slice(1);
-                            while (remainingLines.length > 0 && remainingLines[0].trim() === '') {
-                                remainingLines.shift();
-                            }
-                            const newDescription = remainingLines.join('\n');
-
+                            // FIX BUG #1: No-parsing approach
+                            // The description field contains the COMPLETE file content - don't parse it!
+                            // displayTitle stays as "# include in path" (UI indicator only)
                             const editContext = `${type}-${taskId}-${columnId}`;
                             this.saveUndoStateImmediately('editTaskDescription', taskId, columnId);
                             this.lastEditContext = editContext;
 
-                            // Update both displayTitle and description
-                            task.displayTitle = newDisplayTitle;
-                            task.description = newDescription; // Only the content after the first line
+                            // Update description only - NO PARSING!
+                            task.description = value;  // Complete file content
                         } else {
                             // Regular task description handling
                             const currentRawValue = task.description || '';

@@ -1820,14 +1820,10 @@ function createColumnElement(column, columnIndex) {
  * For regular tasks, this is just the description
  */
 function getTaskEditContent(task) {
-    if (task.includeMode && task.displayTitle) {
-        // For task includes, combine displayTitle and description to reconstruct complete file content
-        let fullContent = task.displayTitle;
-        if (task.description && task.description.trim()) {
-            fullContent += '\n\n' + task.description;
-        }
-        return fullContent;
-    }
+    // FIX BUG #3: No-parsing approach
+    // For task includes, task.description ALREADY contains the complete file content
+    // displayTitle is just "# include in path" (UI indicator only, not part of file)
+    // Don't reconstruct - just return description directly!
     return task.description || '';
 }
 

@@ -1999,19 +1999,126 @@ export class KanbanWebviewPanel {
                 });
             }
         } else if (fileType === 'include-column' || fileType === 'include-task' || fileType === 'include-regular') {
-            if (event.changeType === 'external' || event.changeType === 'reloaded') {
+            // OPTION A: Files handle external changes autonomously
+            // 'external' events → File's handleExternalChange() handles it → emits 'reloaded'
+            // 'reloaded' events → Send frontend update
+
+            if (event.changeType === 'external') {
+                // Files handle external changes independently via handleExternalChange()
+                // They will show dialogs, reload, and emit 'reloaded' event
+                // We just wait for the 'reloaded' event to update frontend
+                console.log(`[KanbanWebviewPanel] External change detected - file will handle autonomously: ${file.getRelativePath()}`);
+                return;
+            }
+
+            if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
                 // These are just loading content for the first time, not actual changes
-                if (event.changeType === 'reloaded' && this._isInitialBoardLoad) {
+                if (this._isInitialBoardLoad) {
                     console.log(`[KanbanWebviewPanel] Skipping reloaded event during initial board load: ${file.getRelativePath()}`);
                     return;
                 }
 
-                // Include file changed externally
-                await this._handleContentChange({
-                    source: 'file_watcher',
-                    changedIncludes: [file.getRelativePath()]
+                // File has been reloaded (either from external change or manual reload)
+                // Send updated content to frontend
+                console.log(`[KanbanWebviewPanel] File reloaded - sending frontend update: ${file.getRelativePath()}`);
+                await this._sendIncludeFileUpdateToFrontend(file);
+            }
+        }
+    }
+
+    /**
+     * Send updated include file content to frontend
+     * Called after file has been reloaded (from external change or manual reload)
+     */
+    private async _sendIncludeFileUpdateToFrontend(file: MarkdownFile): Promise<void> {
+        if (!this._board || !this._panel) {
+            console.warn(`[_sendIncludeFileUpdateToFrontend] No board or panel available`);
+            return;
+        }
+
+        const relativePath = file.getRelativePath();
+        const fileType = file.getFileType();
+
+        console.log(`[_sendIncludeFileUpdateToFrontend] Sending update for ${fileType}: ${relativePath}`);
+
+        if (fileType === 'include-column') {
+            // Find column that uses this include file
+            const column = this._board.columns.find(c =>
+                c.includeFiles && c.includeFiles.includes(relativePath)
+            );
+
+            if (column) {
+                // Parse tasks from updated file
+                const columnFile = file as any; // ColumnIncludeFile
+                const tasks = columnFile.parseToTasks(column.tasks);
+                column.tasks = tasks;
+
+                // Send update to frontend
+                this._panel.webview.postMessage({
+                    type: 'updateColumnContent',
+                    columnId: column.id,
+                    tasks: tasks,
+                    columnTitle: column.title,
+                    displayTitle: column.displayTitle,
+                    includeMode: true,
+                    includeFiles: column.includeFiles
                 });
+
+                console.log(`[_sendIncludeFileUpdateToFrontend] Sent column update with ${tasks.length} tasks`);
+            }
+        } else if (fileType === 'include-task') {
+            // Find task that uses this include file
+            let foundTask: KanbanTask | undefined;
+            let foundColumn: KanbanColumn | undefined;
+
+            for (const column of this._board.columns) {
+                for (const task of column.tasks) {
+                    if (task.includeFiles && task.includeFiles.includes(relativePath)) {
+                        foundTask = task;
+                        foundColumn = column;
+                        break;
+                    }
+                }
+                if (foundTask) break;
+            }
+
+            if (foundTask && foundColumn) {
+                // Get updated content from file (already using no-parsing approach)
+                const fullContent = file.getContent();
+                const displayTitle = `# include in ${relativePath}`;
+
+                // Update task
+                foundTask.displayTitle = displayTitle;
+                foundTask.description = fullContent;
+
+                // Send update to frontend
+                this._panel.webview.postMessage({
+                    type: 'updateTaskContent',
+                    columnId: foundColumn.id,
+                    taskId: foundTask.id,
+                    description: fullContent,
+                    displayTitle: displayTitle,
+                    taskTitle: foundTask.title,
+                    originalTitle: foundTask.originalTitle,
+                    includeMode: true,
+                    includeFiles: foundTask.includeFiles
+                });
+
+                console.log(`[_sendIncludeFileUpdateToFrontend] Sent task update with ${fullContent.length} chars`);
+            }
+        } else if (fileType === 'include-regular') {
+            // Regular include - need full board re-parse
+            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - triggering full board refresh`);
+            const mainFile = this._fileRegistry.getMainFile();
+            if (mainFile) {
+                await mainFile.reload();
+                const board = mainFile.getBoard();
+                if (board && board.valid) {
+                    this._board = board;
+                    this._cachedBoardFromWebview = board;
+                    await this.sendBoardUpdate(false, true);
+                }
             }
         }
     }
