@@ -797,11 +797,27 @@ class TaskEditor {
 
                         // If include syntax changed, send editColumnTitle message immediately for backend processing
                         if (hasIncludeChanges) {
+                            // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
+                            // DOM might have stale IDs if a boardUpdate just arrived
+                            let currentColumnId = columnId; // Default to what we have
+
+                            // Find column's position in DOM to match with current board
+                            const columnElement = element.closest('.kanban-full-height-column');
+                            if (columnElement) {
+                                const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
+                                const columnIndex = allColumns.indexOf(columnElement);
+
+                                if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+                                    // Match by position - use current ID from board at this position
+                                    currentColumnId = window.currentBoard.columns[columnIndex].id;
+                                    console.log(`[TaskEditor] Column position ${columnIndex}: stored ID ${columnId}, current ID ${currentColumnId}`);
+                                }
+                            }
+
                             // Send editColumnTitle message to trigger proper include handling in backend
-                            // Use the columnId that was captured when editing started
                             vscode.postMessage({
                                 type: 'editColumnTitle',
-                                columnId: columnId,
+                                columnId: currentColumnId, // Use current ID from board
                                 title: newTitle
                             });
 

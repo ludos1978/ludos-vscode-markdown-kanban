@@ -1629,7 +1629,7 @@ function updateColumnRowTag(columnId, newRow) {
     }
     
     // Update the visual element immediately
-    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`)?.closest('.kanban-full-height-column');
     if (columnElement) {
         columnElement.setAttribute('data-row', newRow);
         
@@ -1647,15 +1647,27 @@ function updateColumnRowTag(columnId, newRow) {
         }
     }
     
-    // Send update to backend with the full title including row tag
-    console.log(`[Frontend] Sending editColumnTitle - columnId: ${columnId}, title: ${column.title}`);
-    console.log(`[Frontend] Current board has ${currentBoard?.columns?.length || 0} columns`);
-    if (currentBoard?.columns) {
-        console.log(`[Frontend] Column IDs in frontend board:`, currentBoard.columns.map(c => c.id));
+    // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
+    // DOM might have stale IDs if a boardUpdate just arrived
+    let currentColumnId = columnId; // Default to what we have
+
+    // Find column's position in DOM to match with current board
+    if (columnElement) {
+        const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
+        const columnIndex = allColumns.indexOf(columnElement);
+
+        if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+            // Match by position - use current ID from board at this position
+            currentColumnId = window.currentBoard.columns[columnIndex].id;
+            console.log(`[Frontend] Column position ${columnIndex}: DOM ID ${columnId}, currentBoard ID ${currentColumnId}`);
+        }
     }
+
+    // Send update to backend with the full title including row tag
+    console.log(`[Frontend] Sending editColumnTitle - columnId: ${currentColumnId}, title: ${column.title}`);
     vscode.postMessage({
         type: 'editColumnTitle',
-        columnId: columnId,
+        columnId: currentColumnId,
         title: column.title
     });
 }
@@ -2735,6 +2747,27 @@ window.addEventListener('message', event => {
 
                     // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+
+                    // CRITICAL: If user is editing THIS task, update the editor value with new content
+                    if (isEditing && window.taskEditor.currentEditor.taskId === message.taskId) {
+                        if (window.taskEditor.currentEditor.type === 'task-title') {
+                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task title:', message.taskTitle);
+                            window.taskEditor.currentEditor.element.value = message.taskTitle;
+                            window.taskEditor.currentEditor.originalValue = message.taskTitle;
+                            // Auto-resize the textarea if needed
+                            if (typeof window.taskEditor.autoResize === 'function') {
+                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
+                            }
+                        } else if (window.taskEditor.currentEditor.type === 'task-description') {
+                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task description (length:', message.description ? message.description.length : 0, ')');
+                            window.taskEditor.currentEditor.element.value = message.description || '';
+                            window.taskEditor.currentEditor.originalValue = message.description || '';
+                            // Auto-resize the textarea if needed
+                            if (typeof window.taskEditor.autoResize === 'function') {
+                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
+                            }
+                        }
+                    }
 
                     if (!isEditing) {
                         // Re-render just this column to reflect the task update

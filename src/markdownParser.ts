@@ -39,34 +39,60 @@ export class MarkdownKanbanParser {
   // Runtime-only ID generation - no persistence to markdown
 
   /**
-   * Find existing column by title to preserve ID
+   * Find existing column by position with content verification
+   * Backend markdown is source of truth - preserve IDs only when content matches
    */
-  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number): KanbanColumn | undefined {
+  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number, newTasks?: KanbanTask[]): KanbanColumn | undefined {
     if (!existingBoard) return undefined;
 
-    // CRITICAL: Match by position (columnIndex) to preserve IDs when content changes
-    // This allows columns to keep their IDs even when title/includes change
+    // Try to match by position first
     if (columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
-      return existingBoard.columns[columnIndex];
+      const candidateColumn = existingBoard.columns[columnIndex];
+
+      // CRITICAL VERIFICATION: For columns, verify task composition hasn't changed
+      // If we're checking a column with tasks, verify all task IDs are present
+      if (newTasks && newTasks.length > 0) {
+        const newTaskIds = new Set(newTasks.map(t => t.id));
+        const oldTaskIds = new Set(candidateColumn.tasks.map(t => t.id));
+
+        // If task IDs match, it's the same column (even if title changed)
+        const sameTaskIds =
+          newTaskIds.size === oldTaskIds.size &&
+          [...newTaskIds].every(id => oldTaskIds.has(id));
+
+        if (sameTaskIds) {
+          return candidateColumn;
+        }
+        // Task composition changed - this is a DIFFERENT column, don't preserve ID
+        return undefined;
+      }
+
+      // For columns without tasks or include columns, match by title
+      if (candidateColumn.title === title) {
+        return candidateColumn;
+      }
+
+      return undefined;
     }
 
-    // Fallback: match by title (for backwards compatibility)
+    // Fallback: match by title
     return existingBoard.columns.find(col => col.title === title);
   }
 
   /**
-   * Find existing task by position (or title fallback) to preserve ID
+   * Find existing task by CONTENT (title + description)
+   * Backend markdown is source of truth - match by complete content, not position
+   * Position can change when tasks are reordered, but content is the identifier
    */
-  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, taskIndex?: number): KanbanTask | undefined {
+  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, description?: string): KanbanTask | undefined {
     if (!existingColumn) return undefined;
 
-    // CRITICAL: Match by position (taskIndex) to preserve IDs when content changes
-    if (taskIndex !== undefined && taskIndex >= 0 && taskIndex < existingColumn.tasks.length) {
-      return existingColumn.tasks[taskIndex];
-    }
-
-    // Fallback: match by title
-    return existingColumn.tasks.find(task => task.title === title);
+    // CRITICAL: Match by CONTENT (title + description), not position
+    // If both title AND description match exactly, it's the same task
+    return existingColumn.tasks.find(task =>
+      task.title === title &&
+      task.description === (description || '')
+    );
   }
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
@@ -133,7 +159,7 @@ export class MarkdownKanbanParser {
         // Handle Kanban footer
         if (line.startsWith('%%')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
           inKanbanFooter = true;
@@ -149,7 +175,7 @@ export class MarkdownKanbanParser {
         // Parse column with runtime UUID generation
         if (line.startsWith('## ')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
           currentTask = null;
@@ -231,7 +257,7 @@ export class MarkdownKanbanParser {
         // Parse task with runtime UUID generation
         if (line.startsWith('- ')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
 
@@ -239,12 +265,9 @@ export class MarkdownKanbanParser {
             // Only parse tasks for non-include columns
             const taskTitle = line.substring(6);
 
-            // Preserve existing task ID by column position
-            const existingCol = this.findExistingColumn(existingBoard, currentColumn.title, columnIndex - 1);
-            const existingTask = this.findExistingTask(existingCol, taskTitle, taskIndexInColumn);
-
+            // Create task with temporary ID - will be matched by content during finalization
             currentTask = {
-              id: existingTask?.id || IdGenerator.generateTaskId(),
+              id: IdGenerator.generateTaskId(), // Temporary, replaced if content matches
               title: taskTitle,
               description: ''
             };
@@ -283,7 +306,7 @@ export class MarkdownKanbanParser {
 
       // Add the last task and column
       if (collectingDescription) {
-        this.finalizeCurrentTask(currentTask, currentColumn);
+        this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
       }
       if (currentColumn) {
         board.columns.push(currentColumn);
@@ -402,7 +425,7 @@ export class MarkdownKanbanParser {
     }
   }
 
-  private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null): void {
+  private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null, existingBoard?: KanbanBoard, columnIndex?: number): void {
     if (!task || !column) {return;}
 
     // Clean up description
@@ -412,6 +435,24 @@ export class MarkdownKanbanParser {
         delete task.description;
       }
     }
+
+    // CRITICAL: Match by content to preserve ID (Backend is source of truth)
+    // Find existing column by POSITION (title may have changed with include switch!)
+    let existingCol: KanbanColumn | undefined;
+    if (existingBoard && columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
+      existingCol = existingBoard.columns[columnIndex];
+    }
+
+    if (existingCol) {
+      // Try to find matching task by complete content (title + description)
+      const existingTask = this.findExistingTask(existingCol, task.title, task.description);
+      if (existingTask) {
+        // Content matches - preserve the existing ID
+        task.id = existingTask.id;
+        console.log(`[Parser] Task content matched - preserving ID ${existingTask.id} for "${task.title.substring(0, 30)}..."`);
+      }
+    }
+
     column.tasks.push(task);
   }
 

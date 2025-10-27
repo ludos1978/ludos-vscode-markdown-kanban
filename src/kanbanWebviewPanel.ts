@@ -82,6 +82,9 @@ export class KanbanWebviewPanel {
     // CRITICAL: Prevent board regeneration during editing
     private _isEditingInProgress: boolean = false;  // Track if user is actively editing
 
+    // CRITICAL: Prevent board regeneration during initial include file loading
+    private _isInitialBoardLoad: boolean = false;  // Track if we're loading include files for first time
+
     // Method to force refresh webview content (useful during development)
     public async refreshWebviewContent() {
         if (this._panel && this._board) {
@@ -876,6 +879,11 @@ export class KanbanWebviewPanel {
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
+        // CRITICAL: Set initial board load flag BEFORE loading main file
+        // This prevents the main file's 'reloaded' event from triggering board regeneration
+        this._isInitialBoardLoad = true;
+        console.log('[loadMarkdownFile] Starting initial board load - blocking reloaded events');
+
         await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
         // Sync state back from file service
         const state = this._fileService.getState();
@@ -1306,9 +1314,18 @@ export class KanbanWebviewPanel {
 
             // Step 3: Load content asynchronously (will send updates as each include loads)
             // Don't await - let it run in background while we send initial board
-            this._loadIncludeContentAsync(this._board).catch(error => {
-                console.error('[_syncMainFileToRegistry] Error loading include content:', error);
-            });
+            // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
+
+            this._loadIncludeContentAsync(this._board)
+                .then(() => {
+                    this._isInitialBoardLoad = false;
+                    console.log('[_syncMainFileToRegistry] Initial board load complete - allowing reloaded events');
+                })
+                .catch(error => {
+                    console.error('[_syncMainFileToRegistry] Error loading include content:', error);
+                    this._isInitialBoardLoad = false;
+                    console.log('[_syncMainFileToRegistry] Initial board load failed - allowing reloaded events');
+                });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
         }
@@ -1579,7 +1596,7 @@ export class KanbanWebviewPanel {
         source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
         mainFileChanged?: boolean;
         changedIncludes?: string[];
-        switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[] }[];
+        switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[]; newTitle?: string }[];
     }): Promise<void> {
         console.log(`[UNIFIED] handleContentChange from ${params.source}`);
 
@@ -1684,6 +1701,12 @@ export class KanbanWebviewPanel {
                         task.includeFiles = switchInfo.newFiles;
                         task.includeMode = switchInfo.newFiles.length > 0;
 
+                        // CRITICAL: Update title if provided (task include switch)
+                        if (switchInfo.newTitle) {
+                            task.title = switchInfo.newTitle;
+                            console.log(`[UNIFIED] Updated task title to: ${switchInfo.newTitle}`);
+                        }
+
                         // Load new content from file
                         if (switchInfo.newFiles.length > 0) {
                             console.log(`[UNIFIED] Task switch: loading new content from ${switchInfo.newFiles[0]}`);
@@ -1699,7 +1722,7 @@ export class KanbanWebviewPanel {
                                 taskId: task.id,
                                 description: task.description,
                                 displayTitle: task.displayTitle,
-                                taskTitle: task.title,
+                                taskTitle: switchInfo.newTitle || task.title,  // CRITICAL: Use new title if provided
                                 originalTitle: task.originalTitle,
                                 includeMode: task.includeMode,
                                 includeFiles: task.includeFiles
@@ -1955,6 +1978,13 @@ export class KanbanWebviewPanel {
         // Route external/reload events to unified content change handler
         if (fileType === 'main') {
             if (event.changeType === 'external' || event.changeType === 'reloaded') {
+                // CRITICAL: Skip 'reloaded' events during initial board load
+                // This is just loading the main file for the first time, not an actual change
+                if (event.changeType === 'reloaded' && this._isInitialBoardLoad) {
+                    console.log(`[KanbanWebviewPanel] Skipping main file reloaded event during initial board load`);
+                    return;
+                }
+
                 // Main file changed externally
                 await this._handleContentChange({
                     source: 'file_watcher',
@@ -1963,6 +1993,13 @@ export class KanbanWebviewPanel {
             }
         } else if (fileType === 'include-column' || fileType === 'include-task' || fileType === 'include-regular') {
             if (event.changeType === 'external' || event.changeType === 'reloaded') {
+                // CRITICAL: Skip 'reloaded' events during initial board load
+                // These are just loading content for the first time, not actual changes
+                if (event.changeType === 'reloaded' && this._isInitialBoardLoad) {
+                    console.log(`[KanbanWebviewPanel] Skipping reloaded event during initial board load: ${file.getRelativePath()}`);
+                    return;
+                }
+
                 // Include file changed externally
                 await this._handleContentChange({
                     source: 'file_watcher',

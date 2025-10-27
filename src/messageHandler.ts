@@ -409,10 +409,6 @@ export class MessageHandler {
                 break;
 
             case 'editColumnTitle':
-                // User finished editing - allow board regenerations again
-                console.log(`[MessageHandler] Edit completed - allowing board regenerations`);
-                this._getWebviewPanel().setEditingInProgress(false);
-
                 // Check if this might be a column include file change
                 const currentBoard = this._getCurrentBoard();
                 console.log(`[MessageHandler] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
@@ -537,6 +533,11 @@ export class MessageHandler {
                         this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title)
                     );
                 }
+
+                // CRITICAL: Clear editing flag AFTER all processing is complete
+                // This prevents board regenerations during the edit processing above
+                console.log(`[MessageHandler] Edit completed - allowing board regenerations`);
+                this._getWebviewPanel().setEditingInProgress(false);
                 break;
             case 'editTaskTitle':
                 // Check if this might be a task include file change
@@ -598,7 +599,8 @@ export class MessageHandler {
                                 taskId: message.taskId,
                                 columnIdForTask: message.columnId,
                                 oldFiles: oldTaskIncludeFiles,
-                                newFiles: newIncludeFiles
+                                newFiles: newIncludeFiles,
+                                newTitle: message.title  // CRITICAL: Pass new title so frontend gets updated
                             }]
                         });
                         console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
