@@ -4,6 +4,8 @@ kanban-plugin: board
 
 ## Open Todos
 
+- it still behaves problematically if the user switches to edit the task-description by using tab after editing the task-header which has a taskinclude. when a include change is detected (after the backend has processed it), then stop the edit that is currently active. store the changes from the edit to cache, if there are changes detected between cache and file ask the user what to do with the data (conflict handling if conflict, save handling if unsaved). 
+
 - [ ] CHANGING CACHED CONTENT SHOUD WORK LIKE THIS AND IT WORK NOWHERE DIFFERENTLY!!! IF IT NEEDS OTHER EXECUTION PATHS DISCUSS IT WITH ME!!!
 
 on any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.

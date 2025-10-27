@@ -2798,6 +2798,27 @@ window.addEventListener('message', event => {
                 }
             }
             break;
+        case 'stopEditing':
+            // Backend requests to stop editing (e.g., due to external file conflict)
+            if (window.taskEditor && window.taskEditor.currentEditor) {
+                console.log('[Frontend] Stopping editing due to backend request');
+                // Save current field before stopping
+                if (typeof window.taskEditor.saveCurrentField === 'function') {
+                    window.taskEditor.saveCurrentField();
+                }
+                // Clear editor state
+                window.taskEditor.currentEditor = null;
+            }
+
+            // Send confirmation back to backend
+            if (message.requestId) {
+                console.log('[Frontend] Confirming editing stopped:', message.requestId);
+                vscode.postMessage({
+                    type: 'editingStopped',
+                    requestId: message.requestId
+                });
+            }
+            break;
         case 'exportDefaultFolder':
             setExportDefaultFolder(message.folderPath);
             break;

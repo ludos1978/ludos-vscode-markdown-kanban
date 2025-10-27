@@ -234,7 +234,7 @@ export class ConflictResolver {
             ? '\n\nChanged include files:\n' + context.changedIncludeFiles.map(f => `  • ${f}`).join('\n')
             : '';
 
-        let message = `The file "${context.fileName}" has been modified externally.`;
+        let message = `"${context.fileName}"\nhas been modified externally.`;
         if (context.hasMainUnsavedChanges && context.hasIncludeUnsavedChanges) {
             message += ` Your current kanban changes and column include file changes may be lost if you reload.${includeFilesList}`;
         } else if (context.hasMainUnsavedChanges) {
@@ -366,7 +366,7 @@ export class ConflictResolver {
         const discardMyChanges = 'Discard kanban changes and reload from external';
 
         // Message focuses on the conflict without suggesting data loss
-        const message = `The include file "${context.fileName}" has been modified externally and you have unsaved changes in your kanban. How would you like to resolve this conflict?`;
+        const message = `"${context.fileName}"\nhas been modified externally`;
 
         const choice = await vscode.window.showWarningMessage(
             message,

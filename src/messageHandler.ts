@@ -39,6 +39,10 @@ export class MessageHandler {
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
     private _autoExportSettings: any = null;
 
+    // Request-response pattern for stopEditing
+    private _pendingStopEditingRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
+    private _stopEditingRequestCounter = 0;
+
     constructor(
         fileManager: FileManager,
         undoRedoManager: UndoRedoManager,
@@ -69,6 +73,55 @@ export class MessageHandler {
         this._getWebviewPanel = callbacks.getWebviewPanel;
         this._saveWithBackup = callbacks.saveWithBackup;
         this._markUnsavedChanges = callbacks.markUnsavedChanges;
+    }
+
+    /**
+     * Request frontend to stop editing and wait for response
+     * Returns a Promise that resolves when frontend confirms editing has stopped
+     */
+    private async _requestStopEditing(): Promise<void> {
+        const requestId = `stop-edit-${++this._stopEditingRequestCounter}`;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.warn('[_requestStopEditing] No panel or webview available');
+            return;
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            // Set timeout in case frontend doesn't respond
+            const timeout = setTimeout(() => {
+                this._pendingStopEditingRequests.delete(requestId);
+                console.warn('[_requestStopEditing] Timeout waiting for frontend response');
+                resolve(); // Don't reject, just continue
+            }, 2000);
+
+            // Store promise resolver
+            this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });
+
+            // Send request to frontend
+            console.log(`[_requestStopEditing] Sending stopEditing request: ${requestId}`);
+            panel.webview.postMessage({
+                type: 'stopEditing',
+                requestId
+            });
+        });
+    }
+
+    /**
+     * Handle response from frontend that editing has stopped
+     */
+    private _handleEditingStopped(requestId: string): void {
+        console.log(`[_handleEditingStopped] Received response for: ${requestId}`);
+        const pending = this._pendingStopEditingRequests.get(requestId);
+
+        if (pending) {
+            clearTimeout(pending.timeout);
+            this._pendingStopEditingRequests.delete(requestId);
+            pending.resolve();
+        } else {
+            console.warn(`[_handleEditingStopped] No pending request found for: ${requestId}`);
+        }
     }
 
     private async startOperation(operationId: string, type: string, description: string) {
@@ -408,6 +461,13 @@ export class MessageHandler {
                 this._getWebviewPanel().setEditingInProgress(true);
                 break;
 
+            case 'editingStopped':
+                // Frontend confirms editing has stopped (response to stopEditing request)
+                if (message.requestId) {
+                    this._handleEditingStopped(message.requestId);
+                }
+                break;
+
             case 'editColumnTitle':
                 // Check if this might be a column include file change
                 const currentBoard = this._getCurrentBoard();
@@ -442,25 +502,48 @@ export class MessageHandler {
                         const panel = this._getWebviewPanel();
                         const hasUnsavedChanges = await panel.checkColumnIncludeUnsavedChanges(column);
 
+                        // CRITICAL: Use unified conflict resolver for consistency with external file changes
                         if (hasUnsavedChanges) {
-                            let saveChoice: string | undefined;
+                            console.log('[editColumnTitle] Column include has unsaved changes - resolving conflict');
 
-                            // Keep asking until user makes a definitive choice (not Cancel/Escape)
-                            do {
-                                saveChoice = await vscode.window.showWarningMessage(
-                                    `The included file "${column.includeFiles[0]}" has unsaved changes. Do you want to save before switching to a new file?`,
-                                    { modal: true },
-                                    'Save and Switch',
-                                    'Discard and Switch',
-                                    'Cancel'
-                                );
-                            } while (saveChoice === 'Cancel' || !saveChoice);
+                            // Stop editing and wait for frontend confirmation
+                            await this._requestStopEditing();
+                            (panel as any)._isEditingInProgress = false;
 
-                            if (saveChoice === 'Save and Switch') {
-                                // Save current changes first
-                                await panel.saveColumnIncludeChanges(column);
+                            // Get conflict resolver from panel
+                            const conflictResolver = (panel as any)._conflictResolver;
+                            const resolution = await conflictResolver.resolveConflict({
+                                type: 'external_include',
+                                fileName: column.includeFiles[0],
+                                fileType: 'include',
+                                filePath: column.includeFiles[0],
+                                hasMainUnsavedChanges: false,
+                                hasIncludeUnsavedChanges: hasUnsavedChanges,
+                                hasExternalChanges: false, // Not external, user is switching
+                                changedIncludeFiles: column.includeFiles,
+                                isInEditMode: true
+                            });
+
+                            if (resolution.shouldIgnore) {
+                                console.log('[editColumnTitle] User chose to ignore - canceling switch');
+                                return; // Don't switch to new file
                             }
-                            // If 'Discard and Switch', just continue without saving
+
+                            if (resolution.shouldSave) {
+                                // Save current changes before switching
+                                await panel.saveColumnIncludeChanges(column);
+                            } else if (resolution.shouldCreateBackup) {
+                                // Create backup and continue with switch
+                                const fileRegistry = (panel as any)._fileRegistry;
+                                const columnIncludeFile = fileRegistry.getColumnIncludeFiles().find((f: any) =>
+                                    f.getRelativePath() === column.includeFiles![0]
+                                );
+                                if (columnIncludeFile && (panel as any)._backupManager) {
+                                    const doc = await vscode.workspace.openTextDocument(columnIncludeFile.getPath());
+                                    await (panel as any)._backupManager.createBackup(doc, { label: 'include-switch', forceCreate: true });
+                                }
+                            }
+                            // If shouldReload, just discard and continue with switch
                         }
                     }
 
@@ -491,6 +574,7 @@ export class MessageHandler {
                             // Ask user if they want to save before unloading
                             const choice = await vscode.window.showWarningMessage(
                                 `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before switching?`,
+                                { modal: true },
                                 'Save and Switch',
                                 'Discard Changes',
                                 'Cancel'
@@ -555,25 +639,48 @@ export class MessageHandler {
                         const panel = this._getWebviewPanel();
                         const hasUnsavedChanges = await panel.checkTaskIncludeUnsavedChanges(task);
 
+                        // CRITICAL: Use unified conflict resolver for consistency with external file changes
                         if (hasUnsavedChanges) {
-                            let saveChoice: string | undefined;
+                            console.log('[editTaskTitle] Task include has unsaved changes - resolving conflict');
 
-                            // Keep asking until user makes a definitive choice (not Cancel/Escape)
-                            do {
-                                saveChoice = await vscode.window.showWarningMessage(
-                                    `The included file "${task.includeFiles[0]}" has unsaved changes. Do you want to save before switching to a new file?`,
-                                    { modal: true },
-                                    'Save and Switch',
-                                    'Discard and Switch',
-                                    'Cancel'
-                                );
-                            } while (saveChoice === 'Cancel' || !saveChoice);
+                            // Stop editing and wait for frontend confirmation
+                            await this._requestStopEditing();
+                            (panel as any)._isEditingInProgress = false;
 
-                            if (saveChoice === 'Save and Switch') {
-                                // Save current changes first
-                                await panel.saveTaskIncludeChanges(task);
+                            // Get conflict resolver from panel
+                            const conflictResolver = (panel as any)._conflictResolver;
+                            const resolution = await conflictResolver.resolveConflict({
+                                type: 'external_include',
+                                fileName: task.includeFiles[0],
+                                fileType: 'include',
+                                filePath: task.includeFiles[0],
+                                hasMainUnsavedChanges: false,
+                                hasIncludeUnsavedChanges: hasUnsavedChanges,
+                                hasExternalChanges: false, // Not external, user is switching
+                                changedIncludeFiles: task.includeFiles,
+                                isInEditMode: true
+                            });
+
+                            if (resolution.shouldIgnore) {
+                                console.log('[editTaskTitle] User chose to ignore - canceling switch');
+                                return; // Don't switch to new file
                             }
-                            // If 'Discard and Switch', just continue without saving
+
+                            if (resolution.shouldSave) {
+                                // Save current changes before switching
+                                await panel.saveTaskIncludeChanges(task);
+                            } else if (resolution.shouldCreateBackup) {
+                                // Create backup and continue with switch
+                                const fileRegistry = (panel as any)._fileRegistry;
+                                const taskIncludeFile = fileRegistry.getTaskIncludeFiles().find((f: any) =>
+                                    f.getRelativePath() === task.includeFiles![0]
+                                );
+                                if (taskIncludeFile && (panel as any)._backupManager) {
+                                    const doc = await vscode.workspace.openTextDocument(taskIncludeFile.getPath());
+                                    await (panel as any)._backupManager.createBackup(doc, { label: 'include-switch', forceCreate: true });
+                                }
+                            }
+                            // If shouldReload, just discard and continue with switch
                         }
                     }
 
@@ -2326,7 +2433,8 @@ export class MessageHandler {
                     includeFiles: [newFilePath]
                 });
 
-                vscode.window.showInformationMessage(`Switched to include file: ${newFilePath}`);
+                // Success - no notification needed, user can see the change in the board
+                console.log(`[switchColumnIncludeFile] Successfully switched to: ${newFilePath}`);
             }
 
         } catch (error) {
@@ -2464,7 +2572,8 @@ export class MessageHandler {
                     originalTitle: task?.originalTitle
                 });
 
-                vscode.window.showInformationMessage(`Switched to task include file: ${newFilePath}`);
+                // Success - no notification needed, user can see the change in the board
+                console.log(`[switchTaskIncludeFile] Successfully switched to: ${newFilePath}`);
             }
 
         } catch (error) {

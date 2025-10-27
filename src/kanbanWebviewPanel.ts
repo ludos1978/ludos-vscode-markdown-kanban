@@ -85,6 +85,11 @@ export class KanbanWebviewPanel {
     // CRITICAL: Prevent board regeneration during initial include file loading
     private _isInitialBoardLoad: boolean = false;  // Track if we're loading include files for first time
 
+    // Public getter for webview to allow proper access from messageHandler
+    public get webview(): vscode.Webview {
+        return this._panel.webview;
+    }
+
     // Method to force refresh webview content (useful during development)
     public async refreshWebviewContent() {
         if (this._panel && this._board) {
@@ -1621,6 +1626,7 @@ export class KanbanWebviewPanel {
                     if (unsavedFiles.length > 0) {
                         const choice = await vscode.window.showWarningMessage(
                             `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before unloading?`,
+                            { modal: true },
                             'Save',
                             'Discard',
                             'Cancel'
@@ -1744,8 +1750,55 @@ export class KanbanWebviewPanel {
                 const fileType = file.getFileType();
 
                 if (fileType === 'include-column') {
-                    // Column include changed - update column tasks
+                    // Column include changed - check for conflicts
                     const columnFile = file as ColumnIncludeFile;
+                    const hasUnsavedChanges = columnFile.hasUnsavedChanges();
+
+                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
+                    if (this._isEditingInProgress || hasUnsavedChanges) {
+                        console.log('[UNIFIED] Column include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
+
+                        // Stop editing
+                        if (this._panel) {
+                            this._panel.webview.postMessage({ type: 'stopEditing' });
+                        }
+                        this._isEditingInProgress = false;
+
+                        const resolution = await this._conflictResolver.resolveConflict({
+                            type: 'external_include',
+                            fileName: relativePath,
+                            fileType: 'include',
+                            filePath: relativePath,
+                            hasMainUnsavedChanges: false,
+                            hasIncludeUnsavedChanges: hasUnsavedChanges,
+                            hasExternalChanges: true,
+                            changedIncludeFiles: [relativePath],
+                            isInEditMode: this._isEditingInProgress
+                        });
+
+                        if (resolution.shouldIgnore) {
+                            console.log('[UNIFIED] User chose to ignore external changes');
+                            return;
+                        }
+
+                        if (resolution.shouldSave) {
+                            // Save current changes
+                            await columnFile.save();
+                        } else if (resolution.shouldCreateBackup) {
+                            // Create backup and reload
+                            if (this._backupManager) {
+                                const doc = await vscode.workspace.openTextDocument(columnFile.getPath());
+                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
+                            }
+                            await columnFile.reload();
+                        } else if (resolution.shouldReload) {
+                            // Discard local changes and reload
+                            columnFile.discardChanges();
+                            await columnFile.reload();
+                        }
+                    }
+
+                    // Update column with new content
                     const column = this._board?.columns.find(c =>
                         c.includeFiles && c.includeFiles.includes(relativePath)
                     );
@@ -1769,8 +1822,55 @@ export class KanbanWebviewPanel {
                         }
                     }
                 } else if (fileType === 'include-task') {
-                    // Task include changed - update task description
+                    // Task include changed - check for conflicts
                     const taskFile = file as TaskIncludeFile;
+                    const hasUnsavedChanges = taskFile.hasUnsavedChanges();
+
+                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
+                    if (this._isEditingInProgress || hasUnsavedChanges) {
+                        console.log('[UNIFIED] Task include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
+
+                        // Stop editing
+                        if (this._panel) {
+                            this._panel.webview.postMessage({ type: 'stopEditing' });
+                        }
+                        this._isEditingInProgress = false;
+
+                        const resolution = await this._conflictResolver.resolveConflict({
+                            type: 'external_include',
+                            fileName: relativePath,
+                            fileType: 'include',
+                            filePath: relativePath,
+                            hasMainUnsavedChanges: false,
+                            hasIncludeUnsavedChanges: hasUnsavedChanges,
+                            hasExternalChanges: true,
+                            changedIncludeFiles: [relativePath],
+                            isInEditMode: this._isEditingInProgress
+                        });
+
+                        if (resolution.shouldIgnore) {
+                            console.log('[UNIFIED] User chose to ignore external changes');
+                            return;
+                        }
+
+                        if (resolution.shouldSave) {
+                            // Save current changes
+                            await taskFile.save();
+                        } else if (resolution.shouldCreateBackup) {
+                            // Create backup and reload
+                            if (this._backupManager) {
+                                const doc = await vscode.workspace.openTextDocument(taskFile.getPath());
+                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
+                            }
+                            await taskFile.reload();
+                        } else if (resolution.shouldReload) {
+                            // Discard local changes and reload
+                            taskFile.discardChanges();
+                            await taskFile.reload();
+                        }
+                    }
+
+                    // Update task with new content
                     let foundTask: KanbanTask | undefined;
                     let foundColumn: KanbanColumn | undefined;
 
@@ -1827,9 +1927,95 @@ export class KanbanWebviewPanel {
                         }
                     }
                 } else if (fileType === 'include-regular') {
-                    // Regular include - need to update task/column that references it
-                    // For now, just mark that we need a full board update
-                    console.log('[UNIFIED] Regular include changed - may need full re-parse');
+                    // Regular include - embedded in markdown, need full board re-parse
+                    const regularFile = file as RegularIncludeFile;
+                    const hasUnsavedChanges = regularFile.hasUnsavedChanges();
+
+                    // CRITICAL: If user is editing or has unsaved changes, resolve conflict
+                    if (this._isEditingInProgress || hasUnsavedChanges) {
+                        console.log('[UNIFIED] Regular include changed - resolving conflict (editing:', this._isEditingInProgress, ', unsaved:', hasUnsavedChanges, ')');
+
+                        // Stop editing
+                        if (this._panel) {
+                            this._panel.webview.postMessage({ type: 'stopEditing' });
+                        }
+                        this._isEditingInProgress = false;
+
+                        const resolution = await this._conflictResolver.resolveConflict({
+                            type: 'external_include',
+                            fileName: relativePath,
+                            fileType: 'include',
+                            filePath: relativePath,
+                            hasMainUnsavedChanges: false,
+                            hasIncludeUnsavedChanges: hasUnsavedChanges,
+                            hasExternalChanges: true,
+                            changedIncludeFiles: [relativePath],
+                            isInEditMode: this._isEditingInProgress
+                        });
+
+                        if (resolution.shouldIgnore) {
+                            console.log('[UNIFIED] User chose to ignore external changes');
+                            return;
+                        }
+
+                        if (resolution.shouldSave) {
+                            // Save current changes
+                            await regularFile.save();
+                        } else if (resolution.shouldCreateBackup) {
+                            // Create backup and reload
+                            if (this._backupManager) {
+                                const doc = await vscode.workspace.openTextDocument(regularFile.getPath());
+                                await this._backupManager.createBackup(doc, { label: 'external-conflict', forceCreate: true });
+                            }
+                            await regularFile.reload();
+                        } else if (resolution.shouldReload) {
+                            // Discard local changes and reload
+                            regularFile.discardChanges();
+                            await regularFile.reload();
+                        }
+                    }
+
+                    // Re-parse board with updated include content
+                    console.log('[UNIFIED] Regular include changed - triggering full board re-parse');
+
+                    const mainFile = this._fileRegistry.getMainFile();
+                    if (mainFile) {
+                        // Force reload from disk to pick up updated include content
+                        await mainFile.reload();
+                        const board = mainFile.getBoard();
+
+                        if (board && board.valid) {
+                            console.log(`[UNIFIED] Re-parsed board after regular include change`);
+
+                            // Update cached board
+                            this._board = board;
+                            this._cachedBoardFromWebview = board;
+
+                            // Send full board update to frontend
+                            if (this._panel) {
+                                this._panel.webview.postMessage({
+                                    type: 'boardUpdate',
+                                    board: board,
+                                    columnWidth: configService.getConfig('columnWidth', '350px'),
+                                    taskMinHeight: configService.getConfig('taskMinHeight'),
+                                    sectionHeight: configService.getConfig('sectionHeight'),
+                                    taskSectionHeight: configService.getConfig('taskSectionHeight'),
+                                    fontSize: configService.getConfig('fontSize'),
+                                    fontFamily: configService.getConfig('fontFamily'),
+                                    whitespace: configService.getConfig('whitespace', '8px'),
+                                    layoutRows: configService.getConfig('layoutRows'),
+                                    rowHeight: configService.getConfig('rowHeight'),
+                                    layoutPreset: configService.getConfig('layoutPreset', 'normal'),
+                                    layoutPresets: this._getLayoutPresetsConfiguration(),
+                                    maxRowHeight: configService.getConfig('maxRowHeight', 0),
+                                    tagColors: configService.getConfig('tagColors', {}),
+                                    enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
+                                    enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
+                                    customTagCategories: configService.getCustomTagCategories()
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }

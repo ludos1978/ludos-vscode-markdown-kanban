@@ -85,10 +85,18 @@ export class IncludeFileManager {
                     for (const relativePath of task.includeFiles) {
                         const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file) {
-                            // Reconstruct full content: displayTitle + description
+                            // CRITICAL: Validate displayTitle is NOT a formatted header before using it
+                            // Formatted headers like "# include in ./path/file.md" should be ignored
+                            let cleanDisplayTitle = task.displayTitle;
+                            if (cleanDisplayTitle && cleanDisplayTitle.match(/^#\s*include\s+in\s+\./i)) {
+                                console.warn(`[trackIncludeFileUnsavedChanges] Ignoring formatted header in displayTitle: "${cleanDisplayTitle}"`);
+                                cleanDisplayTitle = ''; // Don't use formatted headers in comparison
+                            }
+
+                            // Reconstruct full content: cleanDisplayTitle + description
                             let fullContent = '';
-                            if (task.displayTitle) {
-                                fullContent = task.displayTitle + '\n\n';
+                            if (cleanDisplayTitle) {
+                                fullContent = cleanDisplayTitle + '\n\n';
                             }
                             if (task.description) {
                                 fullContent += task.description;
@@ -101,6 +109,7 @@ export class IncludeFileManager {
 
                             console.log(`[trackIncludeFileUnsavedChanges] Task include: ${relativePath}`);
                             console.log(`  task.displayTitle: "${task.displayTitle}"`);
+                            console.log(`  cleanDisplayTitle: "${cleanDisplayTitle}"`);
                             console.log(`  task.description (first 100 chars): "${task.description?.substring(0, 100)}"`);
                             console.log(`  Full content length: ${fullContent.length}`);
                             console.log(`  Full content (first 150 chars): "${fullContent.substring(0, 150)}"`);
@@ -152,8 +161,17 @@ export class IncludeFileManager {
                 // We need to combine them back when saving with a blank line separator
                 let fullContent = '';
 
-                if (task.displayTitle) {
-                    fullContent = task.displayTitle + '\n\n'; // Add blank line after header
+                // CRITICAL: Validate displayTitle is NOT a formatted header
+                // Formatted headers look like "# include in ./path/file.md"
+                // These should NEVER be saved to the file
+                let cleanDisplayTitle = task.displayTitle;
+                if (cleanDisplayTitle && cleanDisplayTitle.match(/^#\s*include\s+in\s+\./i)) {
+                    console.warn(`[saveTaskIncludeChanges] Detected formatted header in displayTitle, skipping: "${cleanDisplayTitle}"`);
+                    cleanDisplayTitle = ''; // Don't save formatted headers
+                }
+
+                if (cleanDisplayTitle) {
+                    fullContent = cleanDisplayTitle + '\n\n'; // Add blank line after header
                 }
 
                 if (task.description) {
