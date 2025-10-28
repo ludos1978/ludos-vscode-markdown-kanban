@@ -5,6 +5,7 @@ import { IncludeFile } from './IncludeFile';
 import { ColumnIncludeFile } from './ColumnIncludeFile';
 import { TaskIncludeFile } from './TaskIncludeFile';
 import { RegularIncludeFile } from './RegularIncludeFile';
+import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -372,6 +373,87 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     public logStatistics(): void {
         const stats = this.getStatistics();
         console.log('[MarkdownFileRegistry] Statistics:', stats);
+    }
+
+    // ============= BOARD GENERATION (STATE-2) =============
+
+    /**
+     * STATE-2: Generate complete KanbanBoard from registry files
+     *
+     * This is the single source of truth for board generation.
+     * Replaces dual board state (_board and _cachedBoardFromWebview).
+     *
+     * Process:
+     * 1. Get main file's parsed board
+     * 2. For each column with includeFiles, load tasks from ColumnIncludeFiles
+     * 3. For each task with includeFiles, load description from TaskIncludeFiles
+     * 4. Return complete board
+     *
+     * @returns KanbanBoard with all include content loaded, or undefined if main file not ready
+     */
+    public generateBoard(): KanbanBoard | undefined {
+        console.log('[MarkdownFileRegistry] generateBoard() - Generating board from registry');
+
+        // Step 1: Get main file
+        const mainFile = this.getMainFile();
+        if (!mainFile) {
+            console.warn('[MarkdownFileRegistry] generateBoard() - No main file found');
+            return undefined;
+        }
+
+        // Step 2: Get parsed board from main file
+        const board = mainFile.getBoard();
+        if (!board) {
+            console.warn('[MarkdownFileRegistry] generateBoard() - Main file has no board');
+            return undefined;
+        }
+
+        if (!board.valid) {
+            console.warn('[MarkdownFileRegistry] generateBoard() - Board is invalid');
+            return board; // Return invalid board so caller can handle
+        }
+
+        console.log(`[MarkdownFileRegistry] generateBoard() - Base board has ${board.columns.length} columns`);
+
+        // Step 3: Load content for column includes
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                console.log(`[MarkdownFileRegistry] generateBoard() - Column "${column.title}" has ${column.includeFiles.length} includes`);
+
+                for (const relativePath of column.includeFiles) {
+                    const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    if (file && file.getFileType() === 'include-column') {
+                        // Parse tasks from include file, preserving existing task IDs
+                        const tasks = file.parseToTasks(column.tasks);
+                        column.tasks = tasks;
+                        console.log(`[MarkdownFileRegistry] generateBoard() - Loaded ${tasks.length} tasks from ${relativePath}`);
+                    } else {
+                        console.warn(`[MarkdownFileRegistry] generateBoard() - Column include not found: ${relativePath}`);
+                    }
+                }
+            }
+
+            // Step 4: Load content for task includes (if any)
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    console.log(`[MarkdownFileRegistry] generateBoard() - Task "${task.title}" has ${task.includeFiles.length} includes`);
+
+                    for (const relativePath of task.includeFiles) {
+                        const file = this.getByRelativePath(relativePath) as TaskIncludeFile;
+                        if (file && file.getFileType() === 'include-task') {
+                            // Load description from task include file
+                            task.description = file.getContent();
+                            console.log(`[MarkdownFileRegistry] generateBoard() - Loaded description from ${relativePath}`);
+                        } else {
+                            console.warn(`[MarkdownFileRegistry] generateBoard() - Task include not found: ${relativePath}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log('[MarkdownFileRegistry] generateBoard() - Board generation complete');
+        return board;
     }
 
     // ============= CLEANUP =============

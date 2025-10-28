@@ -59,7 +59,11 @@ export class KanbanWebviewPanel {
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
 
-    // State
+    // STATE-2: Board caching infrastructure (replaces dual board state)
+    private _cachedBoard: KanbanBoard | null = null;  // Cached generated board
+    private _boardCacheValid: boolean = false;        // Cache validity flag
+
+    // DEPRECATED: Will be removed in STATE-2 cleanup
     private _board?: KanbanBoard;
     private _isInitialized: boolean = false;
     public _isUpdatingFromPanel: boolean = false;  // Made public for external access
@@ -405,9 +409,13 @@ export class KanbanWebviewPanel {
                 onBoardUpdate: this.sendBoardUpdate.bind(this),
                 onSaveToMarkdown: this.saveToMarkdown.bind(this),
                 onInitializeFile: this.initializeFile.bind(this),
-                getCurrentBoard: () => this._board,
+                // STATE-2: Use new getBoard() method (single source of truth)
+                getCurrentBoard: () => this.getBoard(),
                 setBoard: (board: KanbanBoard) => {
-                    this._board = board;
+                    // STATE-2: Update cached board and invalidate old _board
+                    this._cachedBoard = board;
+                    this._boardCacheValid = true;
+                    this._board = board;  // DEPRECATED: Keep for compatibility during migration
                 },
                 setUndoRedoOperation: (isOperation: boolean) => {
                     this._isUndoRedoOperation = isOperation;
@@ -2350,6 +2358,47 @@ export class KanbanWebviewPanel {
      */
     private _isRegistryReady(): boolean {
         return this._fileRegistry.getMainFile() !== undefined;
+    }
+
+    // ============= STATE-2: Board Caching Methods =============
+
+    /**
+     * STATE-2: Get board (single source of truth)
+     *
+     * Returns cached board if valid, otherwise generates fresh board from registry.
+     * This replaces direct access to _board and _cachedBoardFromWebview.
+     *
+     * @returns KanbanBoard with all include content, or undefined if not ready
+     */
+    public getBoard(): KanbanBoard | undefined {
+        // Check if cache is valid
+        if (this._boardCacheValid && this._cachedBoard) {
+            console.log('[STATE-2] getBoard() - Returning cached board');
+            return this._cachedBoard;
+        }
+
+        // Generate fresh board from registry
+        console.log('[STATE-2] getBoard() - Cache invalid, generating fresh board');
+        const board = this._fileRegistry.generateBoard();
+
+        // Cache the result
+        if (board) {
+            this._cachedBoard = board;
+            this._boardCacheValid = true;
+        }
+
+        return board;
+    }
+
+    /**
+     * STATE-2: Invalidate board cache
+     *
+     * Call this whenever registry files change to force fresh board generation on next access.
+     * Examples: file reload, content change, include switch, etc.
+     */
+    public invalidateBoardCache(): void {
+        console.log('[STATE-2] invalidateBoardCache() - Cache invalidated');
+        this._boardCacheValid = false;
     }
 
     /**
