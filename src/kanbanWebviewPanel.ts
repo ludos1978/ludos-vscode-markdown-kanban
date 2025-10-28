@@ -59,19 +59,16 @@ export class KanbanWebviewPanel {
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
 
-    // STATE-2: Board caching infrastructure (replaces dual board state)
+    // STATE-2: Board caching infrastructure (single source of truth)
     private _cachedBoard: KanbanBoard | null = null;  // Cached generated board
     private _boardCacheValid: boolean = false;        // Cache validity flag
 
-    // DEPRECATED: Will be removed in STATE-2 cleanup
-    private _board?: KanbanBoard;
+    // State
     private _isInitialized: boolean = false;
     public _isUpdatingFromPanel: boolean = false;  // Made public for external access
     private _lastDocumentVersion: number = -1;  // Track document version
     private _isUndoRedoOperation: boolean = false;  // Track undo/redo operations
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
-    // REMOVED: _hasUnsavedChanges - now queried from MarkdownFile (single source of truth)
-    private _cachedBoardFromWebview: any = null;  // Store the latest cached board from webview
     private _isClosingPrevented: boolean = false;  // Flag to prevent recursive closing attempts
     private _lastDocumentUri?: string;  // Track current document for serialization
     private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
@@ -101,7 +98,8 @@ export class KanbanWebviewPanel {
 
     // Method to force refresh webview content (useful during development)
     public async refreshWebviewContent() {
-        if (this._panel && this._board) {
+        const board = this.getBoard();
+        if (this._panel && board) {
             this._panel.webview.html = this._getHtmlForWebview();
 
             // Send the board data to the refreshed webview
@@ -110,7 +108,7 @@ export class KanbanWebviewPanel {
             // For now, sending immediately and the webview should handle late-arriving messages gracefully.
             this._panel.webview.postMessage({
                 type: 'boardUpdate',
-                board: this._board,
+                board: board,
                 columnWidth: configService.getConfig('columnWidth', '350px'),
                 taskMinHeight: configService.getConfig('taskMinHeight'),
                 sectionHeight: configService.getConfig('sectionHeight'),
@@ -344,10 +342,10 @@ export class KanbanWebviewPanel {
             this._conflictResolver,
             this._backupManager,
             () => this._fileManager.getFilePath(),
-            () => this._board,
+            () => this.getBoard(),
             (message) => this._panel?.webview.postMessage(message),
             () => this._isUpdatingFromPanel,
-            () => this._cachedBoardFromWebview
+            () => this.getBoard()
         );
 
         // Initialize ConflictService
@@ -355,7 +353,7 @@ export class KanbanWebviewPanel {
             this._fileRegistry,
             this._conflictResolver,
             this._backupManager,
-            () => this._board,
+            () => this.getBoard(),
             this._fileManager,
             () => this.saveToMarkdown(false),  // don't update version on conflict saves
             () => this.forceReloadFromFile(),
@@ -370,8 +368,11 @@ export class KanbanWebviewPanel {
             this._includeFileManager,
             this._backupManager,
             this._boardOperations,
-            () => this._board,
-            (board) => { this._board = board; },
+            () => this.getBoard(),
+            (board) => {
+                this._cachedBoard = board;
+                this._boardCacheValid = true;
+            },
             (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
             () => this._panel,
             () => this._context,
@@ -380,7 +381,7 @@ export class KanbanWebviewPanel {
                 document,
                 () => this._messageHandler?.getUnifiedFileState(),
                 this._undoRedoManager,
-                this._cachedBoardFromWebview
+                this.getBoard()
             ),
             () => this._updateWebviewPermissions(),
             () => this._undoRedoManager.clear(),
@@ -409,13 +410,10 @@ export class KanbanWebviewPanel {
                 onBoardUpdate: this.sendBoardUpdate.bind(this),
                 onSaveToMarkdown: this.saveToMarkdown.bind(this),
                 onInitializeFile: this.initializeFile.bind(this),
-                // STATE-2: Use new getBoard() method (single source of truth)
                 getCurrentBoard: () => this.getBoard(),
                 setBoard: (board: KanbanBoard) => {
-                    // STATE-2: Update cached board and invalidate old _board
                     this._cachedBoard = board;
                     this._boardCacheValid = true;
-                    this._board = board;  // DEPRECATED: Keep for compatibility during migration
                 },
                 setUndoRedoOperation: (isOperation: boolean) => {
                     this._isUndoRedoOperation = isOperation;
@@ -435,8 +433,8 @@ export class KanbanWebviewPanel {
                     // CRITICAL: Update cached board BEFORE any file operations
                     // This ensures file watchers triggered by saves see the latest board state
                     if (cachedBoard) {
-                        this._board = cachedBoard;
-                        this._cachedBoardFromWebview = cachedBoard;
+                        this._cachedBoard = cachedBoard;
+                        this._boardCacheValid = true;
                     }
 
                     if (hasChanges && cachedBoard) {
@@ -493,7 +491,7 @@ export class KanbanWebviewPanel {
         this._fileService.initializeState(
             this._isUpdatingFromPanel,
             // REMOVED: _hasUnsavedChanges parameter - now managed by MarkdownFile
-            this._cachedBoardFromWebview,
+            this.getBoard(),
             this._lastDocumentVersion,
             this._lastDocumentUri,
             this._trackedDocumentUri,
@@ -515,9 +513,10 @@ export class KanbanWebviewPanel {
     // ============= END UNIFIED INCLUDE FILE SYSTEM METHODS =============
 
     private async handleLinkReplacement(originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) {
-        if (!this._board || !this._board.valid) { return; }
+        const board = this.getBoard();
+        if (!board || !board.valid) { return; }
 
-        this._undoRedoManager.saveStateForUndo(this._board);
+        this._undoRedoManager.saveStateForUndo(board);
 
         let modified = false;
 
@@ -529,7 +528,7 @@ export class KanbanWebviewPanel {
         // If we have specific context, target only that link instance
         if (taskId && columnId) {
             // Find the specific column and task
-            const targetColumn = this._board.columns.find(col => col.id === columnId);
+            const targetColumn = board.columns.find(col => col.id === columnId);
             if (!targetColumn) {
                 console.warn(`Column ${columnId} not found for link replacement`);
                 return;
@@ -559,7 +558,7 @@ export class KanbanWebviewPanel {
         }
         // If no specific context but we have a columnId, target only that column
         else if (columnId && !taskId) {
-            const targetColumn = this._board.columns.find(col => col.id === columnId);
+            const targetColumn = board.columns.find(col => col.id === columnId);
             if (!targetColumn) {
                 console.warn(`Column ${columnId} not found for link replacement`);
                 return;
@@ -580,7 +579,7 @@ export class KanbanWebviewPanel {
             };
 
             // Search and replace in all columns and tasks
-            for (const column of this._board.columns) {
+            for (const column of board.columns) {
                 const newTitle = replaceLink(column.title);
                 if (newTitle !== column.title) {
                     column.title = newTitle;
@@ -609,9 +608,9 @@ export class KanbanWebviewPanel {
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
             const mainFile = this._getMainFile();
-            if (mainFile && this._board) {
+            if (mainFile && board) {
                 // CRITICAL: use updateFromBoard to update BOTH content AND board object
-                mainFile.updateFromBoard(this._board);
+                mainFile.updateFromBoard(board);
             }
 
             await this.sendBoardUpdate();
@@ -857,7 +856,7 @@ export class KanbanWebviewPanel {
                         // 1. Board hasn't been initialized yet, OR
                         // 2. Board is null/undefined (needs initialization)
                         // Don't refresh just because the panel regained visibility after showing a message
-                        if (!this._board || !this._isInitialized) {
+                        if (!this.getBoard() || !this._isInitialized) {
                             this._ensureBoardAndSendUpdate();
                         }
                     }
@@ -893,8 +892,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
@@ -910,8 +912,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
@@ -923,7 +928,7 @@ export class KanbanWebviewPanel {
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
         if (!this._panel.webview) { return; }
 
-        let board = this._board || {
+        let board = this.getBoard() || {
             valid: false,
             title: 'Please open a Markdown Kanban file',
             columns: [],
@@ -1049,8 +1054,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
@@ -1061,8 +1069,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
@@ -1180,7 +1191,8 @@ export class KanbanWebviewPanel {
     private _collectAssetDirectories(): string[] {
         const assetDirs = new Set<string>();
 
-        if (!this._board) {
+        const board = this.getBoard();
+        if (!board) {
             console.log('[AssetDirs] No board available');
             return [];
         }
@@ -1200,7 +1212,7 @@ export class KanbanWebviewPanel {
         const htmlMediaRegex = /<(?:img|video|audio)[^>]+src=["']([^"']+)["'][^>]*>/gi;
 
         // Scan all columns and tasks
-        for (const column of this._board.columns) {
+        for (const column of board.columns) {
             // Check column title
             this._extractAssetDirs(column.title, documentDir, assetDirs, imageRegex, htmlMediaRegex);
 
@@ -1324,19 +1336,20 @@ export class KanbanWebviewPanel {
         }
 
         // Load include files if board is available
-        console.log(`[_syncMainFileToRegistry] Board exists: ${!!this._board}, Board valid: ${this._board?.valid}`);
-        if (this._board && this._board.valid) {
+        const board = this.getBoard();
+        console.log(`[_syncMainFileToRegistry] Board exists: ${!!board}, Board valid: ${board?.valid}`);
+        if (board && board.valid) {
             // Step 1: Create include file instances in registry
-            this._syncIncludeFilesWithRegistry(this._board);
+            this._syncIncludeFilesWithRegistry(board);
 
             // Step 2: Mark includes as loading (sets loading flags on columns/tasks)
-            this._markIncludesAsLoading(this._board);
+            this._markIncludesAsLoading(board);
 
             // Step 3: Load content asynchronously (will send updates as each include loads)
             // Don't await - let it run in background while we send initial board
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
 
-            this._loadIncludeContentAsync(this._board)
+            this._loadIncludeContentAsync(board)
                 .then(() => {
                     this._isInitialBoardLoad = false;
                     console.log('[_syncMainFileToRegistry] Initial board load complete - allowing reloaded events');
@@ -1656,10 +1669,11 @@ export class KanbanWebviewPanel {
 
         // Step 3: Unset old includes, clear cache, set new includes, load new content
         if (hasSwitches) {
+            const board = this.getBoard();
             for (const switchInfo of params.switchedIncludes!) {
                 if (switchInfo.columnId) {
                     // Column include switch
-                    const column = this._board?.columns.find(c => c.id === switchInfo.columnId);
+                    const column = board?.columns.find(c => c.id === switchInfo.columnId);
                     if (column) {
                         console.log(`[UNIFIED] Column switch: unsetting old includes, clearing cache`);
 
@@ -1686,7 +1700,7 @@ export class KanbanWebviewPanel {
                     }
                 } else if (switchInfo.taskId && switchInfo.columnIdForTask) {
                     // Task include switch
-                    const column = this._board?.columns.find(c => c.id === switchInfo.columnIdForTask);
+                    const column = board?.columns.find(c => c.id === switchInfo.columnIdForTask);
                     const task = column?.tasks.find(t => t.id === switchInfo.taskId);
 
                     if (task) {
@@ -1792,8 +1806,8 @@ export class KanbanWebviewPanel {
                     }
 
                     // Update cached board
-                    this._board = board;
-                    this._cachedBoardFromWebview = board;
+                    this._cachedBoard = board;
+                    this._boardCacheValid = true;
 
                     // Send full board to frontend
                     if (this._panel) {
@@ -1870,7 +1884,8 @@ export class KanbanWebviewPanel {
      * Called when view becomes visible to apply any pending DOM updates
      */
     private _syncDirtyItems(): void {
-        if (!this._board || !this._panel) return;
+        const board = this.getBoard();
+        if (!board || !this._panel) return;
 
         if (this._dirtyColumns.size === 0 && this._dirtyTasks.size === 0) {
             return; // Nothing to sync
@@ -1881,7 +1896,7 @@ export class KanbanWebviewPanel {
         // Collect dirty columns
         const dirtyColumns: any[] = [];
         for (const columnId of this._dirtyColumns) {
-            const column = this._board.columns.find(c => c.id === columnId);
+            const column = board.columns.find(c => c.id === columnId);
             if (column) {
                 dirtyColumns.push({
                     columnId: column.id,
@@ -1896,7 +1911,7 @@ export class KanbanWebviewPanel {
         // Collect dirty tasks
         const dirtyTasks: any[] = [];
         for (const taskId of this._dirtyTasks) {
-            for (const column of this._board.columns) {
+            for (const column of board.columns) {
                 const task = column.tasks.find(t => t.id === taskId);
                 if (task) {
                     dirtyTasks.push({
@@ -1950,7 +1965,8 @@ export class KanbanWebviewPanel {
         } else if (params.taskId) {
             // Task include switch - for now, just load the new content
             // TODO: Integrate task include switches into unified handler fully
-            const column = this._board?.columns.find(col =>
+            const board = this.getBoard();
+            const column = board?.columns.find(col =>
                 col.tasks.some(t => t.id === params.taskId)
             );
             const task = column?.tasks.find(t => t.id === params.taskId);
@@ -1997,7 +2013,7 @@ export class KanbanWebviewPanel {
         console.log(`[SWITCH-1]   newTitle: "${newTitle}"`);
 
         // STEP 0: Verify column exists
-        const board = this._board;
+        const board = this.getBoard();
         if (!board) {
             throw new Error('[SWITCH-1] No board loaded');
         }
@@ -2224,7 +2240,8 @@ export class KanbanWebviewPanel {
      * Called after file has been reloaded (from external change or manual reload)
      */
     private async _sendIncludeFileUpdateToFrontend(file: MarkdownFile): Promise<void> {
-        if (!this._board || !this._panel) {
+        const board = this.getBoard();
+        if (!board || !this._panel) {
             console.warn(`[_sendIncludeFileUpdateToFrontend] No board or panel available`);
             return;
         }
@@ -2237,7 +2254,7 @@ export class KanbanWebviewPanel {
         if (fileType === 'include-column') {
             // Find column that uses this include file
             // FOUNDATION-1: Use normalized path comparison instead of === comparison
-            const column = this._board.columns.find(c =>
+            const column = board.columns.find(c =>
                 c.includeFiles && c.includeFiles.some(p => MarkdownFile.isSameFile(p, relativePath))
             );
 
@@ -2265,7 +2282,7 @@ export class KanbanWebviewPanel {
             let foundTask: KanbanTask | undefined;
             let foundColumn: KanbanColumn | undefined;
 
-            for (const column of this._board.columns) {
+            for (const column of board.columns) {
                 for (const task of column.tasks) {
                     // FOUNDATION-1: Use normalized comparison
                     if (task.includeFiles && task.includeFiles.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
@@ -2309,8 +2326,8 @@ export class KanbanWebviewPanel {
                 await mainFile.reload();
                 const board = mainFile.getBoard();
                 if (board && board.valid) {
-                    this._board = board;
-                    this._cachedBoardFromWebview = board;
+                    this._cachedBoard = board;
+                    this._boardCacheValid = true;
                     await this.sendBoardUpdate(false, true);
                 }
             }
@@ -2528,11 +2545,6 @@ export class KanbanWebviewPanel {
     // ============= END FILE REGISTRY HELPER METHODS =============
 
     private async _handlePanelClose() {
-        // Use the cached board that was already sent when changes were made
-        if (this._cachedBoardFromWebview) {
-            this._board = this._cachedBoardFromWebview;
-        }
-
         // Query current unsaved changes state from MarkdownFile
         const mainFile = this._getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
@@ -2541,16 +2553,17 @@ export class KanbanWebviewPanel {
             () => this._messageHandler?.getUnifiedFileState(),
             hasUnsavedChanges,
             this._isClosingPrevented,
-            this._cachedBoardFromWebview,
+            this.getBoard(),
             () => this.dispose()
         );
 
         // Update state from result
         // NOTE: newHasUnsavedChanges should be applied to MarkdownFile, not stored locally
-        if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && this._board) {
+        const board = this.getBoard();
+        if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && board) {
             if (result.newHasUnsavedChanges) {
                 // CRITICAL: use updateFromBoard to update BOTH content AND board object
-                mainFile.updateFromBoard(this._board);
+                mainFile.updateFromBoard(board);
             } else {
                 // Always discard to reset state when transitioning to saved
                 // discardChanges() internally checks if content changed before emitting events
@@ -2558,7 +2571,10 @@ export class KanbanWebviewPanel {
             }
         }
         this._isClosingPrevented = result.newIsClosingPrevented;
-        this._cachedBoardFromWebview = result.newCachedBoard;
+        if (result.newCachedBoard) {
+            this._cachedBoard = result.newCachedBoard;
+            this._boardCacheValid = true;
+        }
 
         // Handle recursive call if user cancelled
         if (result.shouldPreventClose && !result.newIsClosingPrevented) {
@@ -2693,8 +2709,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
@@ -3013,11 +3032,12 @@ export class KanbanWebviewPanel {
      * Save all modified column includes when the board is saved
      */
     public async saveAllColumnIncludeChanges(): Promise<void> {
-        if (!this._board) {
+        const board = this.getBoard();
+        if (!board) {
             return;
         }
 
-        const includeColumns = this._board.columns.filter(col => col.includeMode);
+        const includeColumns = board.columns.filter(col => col.includeMode);
 
         // Filter out columns whose include files were recently reloaded from external
         const columnsToSave = includeColumns.filter(col => {
@@ -3047,13 +3067,14 @@ export class KanbanWebviewPanel {
      * Save all modified task includes when the board is saved
      */
     public async saveAllTaskIncludeChanges(): Promise<void> {
-        if (!this._board) {
+        const board = this.getBoard();
+        if (!board) {
             return;
         }
 
         // Collect all tasks with include mode from all columns
         const includeTasks: KanbanTask[] = [];
-        for (const column of this._board.columns) {
+        for (const column of board.columns) {
             for (const task of column.tasks) {
                 if (task.includeMode) {
                     // Check if any of the task's include files were recently reloaded
@@ -3099,8 +3120,11 @@ export class KanbanWebviewPanel {
         // Sync state back from file service
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // REMOVED: _hasUnsavedChanges sync - now queried from MarkdownFile
-        this._cachedBoardFromWebview = state.cachedBoardFromWebview;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._cachedBoard = state.cachedBoardFromWebview;
+            this._boardCacheValid = true;
+        }
         this._lastDocumentVersion = state.lastDocumentVersion;
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
