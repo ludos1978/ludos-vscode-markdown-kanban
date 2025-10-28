@@ -51,9 +51,8 @@ export class IncludeFileManager {
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    // FIX BUG #C: Normalize path before registry lookup
-                    const normalizedPath = this._normalizeIncludePath(relativePath);
-                    const file = this.fileRegistry.getByRelativePath(normalizedPath) as ColumnIncludeFile;
+                    // FOUNDATION-1: Registry handles normalization internally
+                    const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file) {
                         // Generate content from current tasks
                         const content = file.generateFromTasks(column.tasks);
@@ -85,9 +84,8 @@ export class IncludeFileManager {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        // FIX BUG #C: Normalize path before registry lookup
-                        const normalizedPath = this._normalizeIncludePath(relativePath);
-                        const file = this.fileRegistry.getByRelativePath(normalizedPath) as TaskIncludeFile;
+                        // FOUNDATION-1: Registry handles normalization internally
+                        const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file) {
                             // STRATEGY 1: No-parsing approach
                             // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
@@ -131,9 +129,8 @@ export class IncludeFileManager {
         if (!column.includeFiles || column.includeFiles.length === 0) return true;
 
         for (const relativePath of column.includeFiles) {
-            // FIX BUG #C: Normalize path before registry lookup
-            const normalizedPath = this._normalizeIncludePath(relativePath);
-            const file = this.fileRegistry.getByRelativePath(normalizedPath) as ColumnIncludeFile;
+            // FOUNDATION-1: Registry handles normalization internally
+            const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
             if (file) {
                 const content = file.generateFromTasks(column.tasks);
                 file.setContent(content);
@@ -147,9 +144,8 @@ export class IncludeFileManager {
         if (!task.includeFiles || task.includeFiles.length === 0) return true;
 
         for (const relativePath of task.includeFiles) {
-            // FIX BUG #C: Normalize path before registry lookup
-            const normalizedPath = this._normalizeIncludePath(relativePath);
-            const file = this.fileRegistry.getByRelativePath(normalizedPath) as TaskIncludeFile;
+            // FOUNDATION-1: Registry handles normalization internally
+            const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
             if (file) {
                 // STRATEGY 1: No-parsing approach
                 // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
@@ -208,9 +204,8 @@ export class IncludeFileManager {
         if (!column.includeFiles) return false;
 
         for (const relativePath of column.includeFiles) {
-            // FIX BUG #C: Normalize path before registry lookup
-            const normalizedPath = this._normalizeIncludePath(relativePath);
-            const file = this.fileRegistry.getByRelativePath(normalizedPath);
+            // FOUNDATION-1: Registry handles normalization internally
+            const file = this.fileRegistry.getByRelativePath(relativePath);
             if (file?.hasUnsavedChanges()) return true;
         }
         return false;
@@ -220,9 +215,8 @@ export class IncludeFileManager {
         if (!task.includeFiles) return false;
 
         for (const relativePath of task.includeFiles) {
-            // FIX BUG #C: Normalize path before registry lookup
-            const normalizedPath = this._normalizeIncludePath(relativePath);
-            const file = this.fileRegistry.getByRelativePath(normalizedPath);
+            // FOUNDATION-1: Registry handles normalization internally
+            const file = this.fileRegistry.getByRelativePath(relativePath);
             if (file?.hasUnsavedChanges()) return true;
         }
         return false;
@@ -329,13 +323,18 @@ export class IncludeFileManager {
         return Promise.resolve();
     }
 
+    // FOUNDATION-1: Use MarkdownFile helpers instead of manual normalization
     public _isSameIncludePath(path1: string, path2: string): boolean {
-        return this._normalizeIncludePath(path1) === this._normalizeIncludePath(path2);
+        // Import MarkdownFile at top if not already imported
+        const { MarkdownFile } = require('./files/MarkdownFile');
+        return MarkdownFile.isSameFile(path1, path2);
     }
 
-    public _normalizeIncludePath(includePath: string): string {
-        return includePath.trim().toLowerCase().replace(/\\/g, '/');
-    }
+    // FOUNDATION-1: DELETED - Use MarkdownFile.normalizeRelativePath() instead
+    // Registry handles normalization internally, no need for manual normalization
+    // public _normalizeIncludePath(includePath: string): string {
+    //     return includePath.trim().toLowerCase().replace(/\\/g, '/');
+    // }
 
     public _recheckIncludeFileChanges(): void {
         // Registry tracks changes automatically

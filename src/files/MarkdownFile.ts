@@ -28,7 +28,8 @@ export interface FileChangeEvent {
 export abstract class MarkdownFile implements vscode.Disposable {
     // ============= FILE IDENTITY =============
     protected _path: string;                  // Absolute file path
-    protected _relativePath: string;          // Relative path (for includes, same as _path for main)
+    protected _relativePath: string;          // Relative path (for includes, same as _path for main) - ORIGINAL CASING
+    protected _normalizedRelativePath: string; // Normalized relative path (lowercase, forward slashes) - FOR LOOKUPS
 
     // ============= CONTENT STATE =============
     protected _content: string = '';          // Current content in memory
@@ -65,8 +66,20 @@ export abstract class MarkdownFile implements vscode.Disposable {
         conflictResolver: ConflictResolver,
         backupManager: BackupManager
     ) {
+        // FOUNDATION-1: Validate relative path before normalization
+        this._validateRelativePath(relativePath);
+
         this._path = path;
         this._relativePath = relativePath;
+
+        // FOUNDATION-1: Normalize and cache the normalized path
+        this._normalizedRelativePath = MarkdownFile.normalizeRelativePath(relativePath);
+
+        // Log normalization for debugging (only if different)
+        if (this._relativePath !== this._normalizedRelativePath) {
+            console.log(`[MarkdownFile] Path normalized: "${this._relativePath}" → "${this._normalizedRelativePath}"`);
+        }
+
         this._conflictResolver = conflictResolver;
         this._backupManager = backupManager;
 
@@ -105,14 +118,142 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     protected abstract getConflictContext(): ConflictContext;
 
+    // ============= PATH NORMALIZATION (FOUNDATION-1) =============
+
+    /**
+     * Centralized normalization function for relative paths
+     *
+     * Rules:
+     * 1. Trim whitespace
+     * 2. Convert to lowercase (case-insensitive comparison)
+     * 3. Convert backslashes to forward slashes (Windows compatibility)
+     *
+     * IMPORTANT:
+     * - Does NOT resolve relative paths (./file stays ./file)
+     * - Does NOT handle absolute paths (not intended for absolute paths)
+     * - Use this for all path normalization throughout the codebase
+     *
+     * @param relativePath The relative path to normalize
+     * @returns Normalized path (lowercase, forward slashes, trimmed)
+     *
+     * @example
+     * normalizeRelativePath("Folder/File.md")     // "folder/file.md"
+     * normalizeRelativePath("Folder\\File.md")    // "folder/file.md"
+     * normalizeRelativePath("  folder/file.md  ") // "folder/file.md"
+     */
+    public static normalizeRelativePath(relativePath: string): string {
+        if (!relativePath) {
+            return '';
+        }
+
+        return relativePath
+            .trim()
+            .toLowerCase()
+            .replace(/\\/g, '/');
+    }
+
+    /**
+     * Compare two paths for equality (normalized comparison)
+     *
+     * Use this instead of === when comparing paths to ensure case-insensitive
+     * and platform-independent comparison.
+     *
+     * @param path1 First path to compare
+     * @param path2 Second path to compare
+     * @returns true if paths are equivalent (after normalization)
+     *
+     * @example
+     * isSameFile("Folder/File.md", "folder/file.md")   // true
+     * isSameFile("Folder\\File.md", "folder/file.md")  // true
+     * isSameFile("Folder/File.md", "Other/File.md")    // false
+     */
+    public static isSameFile(path1: string, path2: string): boolean {
+        return MarkdownFile.normalizeRelativePath(path1) ===
+               MarkdownFile.normalizeRelativePath(path2);
+    }
+
+    /**
+     * Validate relative path before normalization
+     * Detects common issues like pre-normalization, empty paths, etc.
+     *
+     * @param relativePath The relative path to validate
+     * @throws Error if path is invalid
+     */
+    private _validateRelativePath(relativePath: string): void {
+        // Check 1: Empty path
+        if (!relativePath || relativePath.trim().length === 0) {
+            throw new Error('[MarkdownFile] Relative path cannot be empty');
+        }
+
+        // Check 2: Absolute path passed as relative (security/correctness issue)
+        if (path.isAbsolute(relativePath)) {
+            throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
+        }
+
+        // Check 3: Already normalized (suspicious - likely pre-normalized)
+        // If path is all lowercase AND has path separators AND is trimmed, it's likely pre-normalized
+        const trimmed = relativePath.trim();
+        if (trimmed === relativePath.toLowerCase() &&
+            (trimmed.includes('/') || trimmed.includes('\\')) &&
+            trimmed === relativePath) {
+            console.warn(`[MarkdownFile] ⚠️  Path appears pre-normalized: "${relativePath}"`);
+            console.warn('  Expected: Original casing (e.g., "Folder/File.md")');
+            console.warn('  Received: All lowercase (e.g., "folder/file.md")');
+            console.warn('  This may indicate double normalization!');
+            console.warn('  Stack trace:');
+            console.warn(new Error().stack);
+        }
+
+        // Check 4: Excessive parent directory traversal (potential security concern)
+        const normalized = path.normalize(relativePath);
+        const parentDirCount = (normalized.match(/\.\.\//g) || []).length;
+        if (parentDirCount > 3) {
+            console.warn(`[MarkdownFile] ⚠️  Excessive parent directory traversal (${parentDirCount} levels): "${relativePath}"`);
+        }
+    }
+
     // ============= IDENTITY & INFO =============
 
     public getPath(): string {
         return this._path;
     }
 
+    /**
+     * Get the original relative path (preserves casing)
+     *
+     * Use for:
+     * - Display in UI
+     * - Logging
+     * - User messages
+     *
+     * DO NOT use for:
+     * - Path comparisons (use isSameFile() instead)
+     * - Registry lookups (use getNormalizedRelativePath() or let registry handle it)
+     *
+     * @example
+     * console.log(`Loading ${file.getRelativePath()}`);  // Shows "Folder/File.md"
+     */
     public getRelativePath(): string {
         return this._relativePath;
+    }
+
+    /**
+     * Get the normalized relative path (lowercase, forward slashes)
+     *
+     * Use for:
+     * - Registry operations (internal use)
+     * - Path comparisons (or use isSameFile() helper)
+     * - Map keys
+     *
+     * DO NOT use for:
+     * - Display in UI (use getRelativePath() for original casing)
+     * - User messages (use getRelativePath())
+     *
+     * @example
+     * const file = registry.getByRelativePath(file.getNormalizedRelativePath());
+     */
+    public getNormalizedRelativePath(): string {
+        return this._normalizedRelativePath;
     }
 
     public getFileName(): string {

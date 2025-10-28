@@ -150,7 +150,8 @@ export class BoardOperations {
             // FIX BUG #B: Normalize paths when copying to ensure consistent registry lookups
             // All includeFiles paths MUST be normalized (lowercase, forward slashes)
             includeFiles: result.task.includeFiles
-                ? result.task.includeFiles.map(f => f.trim().toLowerCase().replace(/\\/g, '/'))
+                // FOUNDATION-1: Store original paths (just trim whitespace)
+                ? result.task.includeFiles.map(f => f.trim())
                 : undefined,
             originalTitle: result.task.originalTitle,
             displayTitle: result.task.displayTitle

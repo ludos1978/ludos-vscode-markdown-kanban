@@ -1380,9 +1380,8 @@ export class KanbanWebviewPanel {
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    // FIX BUG #C: Normalize path before registry lookup
-                    const normalizedPath = this._includeFileManager._normalizeIncludePath(relativePath);
-                    const file = this._fileRegistry.getByRelativePath(normalizedPath) as ColumnIncludeFile;
+                    // FOUNDATION-1: Registry handles normalization internally
+                    const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file) {
                         try {
                             // Reload from disk and parse to tasks
@@ -1435,9 +1434,8 @@ export class KanbanWebviewPanel {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        // FIX BUG #C: Normalize path before registry lookup
-                        const normalizedPath = this._includeFileManager._normalizeIncludePath(relativePath);
-                        const file = this._fileRegistry.getByRelativePath(normalizedPath) as TaskIncludeFile;
+                        // FOUNDATION-1: Registry handles normalization internally
+                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file) {
                             try {
                                 // Reload from disk and get content
@@ -2036,8 +2034,9 @@ export class KanbanWebviewPanel {
 
         if (fileType === 'include-column') {
             // Find column that uses this include file
+            // FOUNDATION-1: Use normalized path comparison instead of === comparison
             const column = this._board.columns.find(c =>
-                c.includeFiles && c.includeFiles.includes(relativePath)
+                c.includeFiles && c.includeFiles.some(p => MarkdownFile.isSameFile(p, relativePath))
             );
 
             if (column) {
@@ -2066,7 +2065,8 @@ export class KanbanWebviewPanel {
 
             for (const column of this._board.columns) {
                 for (const task of column.tasks) {
-                    if (task.includeFiles && task.includeFiles.includes(relativePath)) {
+                    // FOUNDATION-1: Use normalized comparison
+                    if (task.includeFiles && task.includeFiles.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
                         foundTask = task;
                         foundColumn = column;
                         break;
@@ -2512,8 +2512,9 @@ export class KanbanWebviewPanel {
         // FIX #2d: Cleanup old include files that are being replaced
         const oldIncludeFiles = column.includeFiles || [];
         // FIX: Normalize all paths for consistent comparison
-        const normalizedNewFiles = newIncludeFiles.map(f => this._includeFileManager._normalizeIncludePath(f));
-        const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager._normalizeIncludePath(f));
+        // FOUNDATION-1: Use original paths directly (registry normalizes internally)
+        const normalizedNewFiles = newIncludeFiles;
+        const normalizedOldFiles = oldIncludeFiles;
         const filesToRemove = normalizedOldFiles.filter(old => !normalizedNewFiles.includes(old));
 
         for (const oldFilePath of filesToRemove) {
@@ -2601,15 +2602,16 @@ export class KanbanWebviewPanel {
             const fileState = newIncludeFiles[0];
             const absolutePath = PathResolver.resolve(basePath, fileState);
 
-            // Normalize the path to match keys in _includeFiles map
-            const normalizedIncludeFile = this._includeFileManager._normalizeIncludePath(fileState);
+            // FOUNDATION-1: Use original path (registry handles normalization)
+            const normalizedIncludeFile = fileState;
 
             // FIX #2a: Cleanup old include files that are being replaced
             const oldIncludeFiles = task.includeFiles || [];
             const normalizedNewFiles = [normalizedIncludeFile];
+            // FOUNDATION-1: Use MarkdownFile.isSameFile for comparison
+            const { MarkdownFile } = require('./files/MarkdownFile');
             const filesToRemove = oldIncludeFiles
-                .map(f => this._includeFileManager._normalizeIncludePath(f))
-                .filter(old => !normalizedNewFiles.includes(old));
+                .filter(old => !normalizedNewFiles.some(newFile => MarkdownFile.isSameFile(old, newFile)));
 
             for (const oldFilePath of filesToRemove) {
                 const oldFile = this.fileRegistry?.getByRelativePath(oldFilePath);
@@ -2677,9 +2679,8 @@ export class KanbanWebviewPanel {
                 task.includeMode = true;
 
                 // FIX: Normalize paths before storing to ensure consistent registry lookups
-                task.includeFiles = newIncludeFiles.map(f =>
-                    this._includeFileManager._normalizeIncludePath(f)
-                );
+                // FOUNDATION-1: Store original paths (no normalization)
+                task.includeFiles = newIncludeFiles;
 
                 task.originalTitle = task.title; // Preserve the include syntax
                 task.displayTitle = displayTitle; // UI header only

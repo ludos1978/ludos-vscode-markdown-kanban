@@ -2,6 +2,7 @@ import { IdGenerator } from './utils/idGenerator';
 import { PresentationParser } from './presentationParser';
 import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
+import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -194,8 +195,8 @@ export class MarkdownKanbanParser {
             columnIncludeMatches.forEach(match => {
               const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
               includeFiles.push(filePath);
-              // Track for file watching
-              if (!columnIncludeFiles.includes(filePath)) {
+              // Track for file watching (FOUNDATION-1: Use normalized comparison)
+              if (!columnIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
                 columnIncludeFiles.push(filePath);
               }
             });
@@ -337,8 +338,8 @@ export class MarkdownKanbanParser {
           taskIncludeMatches.forEach(match => {
             const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
             includeFiles.push(filePath);
-            // Track for file watching
-            if (taskIncludeFiles && !taskIncludeFiles.includes(filePath)) {
+            // Track for file watching (FOUNDATION-1: Use normalized comparison)
+            if (taskIncludeFiles && !taskIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
               taskIncludeFiles.push(filePath);
             }
           });
@@ -369,9 +370,10 @@ export class MarkdownKanbanParser {
 
           // Update task properties for include mode
           task.includeMode = true;
-          // FIX BUG #A: Normalize paths before storing to ensure consistent registry lookups
-          // All includeFiles paths MUST be normalized (lowercase, forward slashes) for consistent registry lookups
-          task.includeFiles = includeFiles.map(f => f.trim().toLowerCase().replace(/\\/g, '/'));
+          // FOUNDATION-1: Store ORIGINAL paths (preserve casing)
+          // Registry will normalize internally for lookups
+          // DO NOT normalize here - files need original paths for display
+          task.includeFiles = includeFiles.map(f => f.trim()); // Just trim whitespace, keep original casing
           task.originalTitle = task.title; // Keep original title with include syntax
           task.displayTitle = displayTitle; // UI header only
           task.description = fullFileContent; // COMPLETE file content, no parsing!

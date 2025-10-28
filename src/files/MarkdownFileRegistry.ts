@@ -34,16 +34,32 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
     /**
      * Register a file in the registry
+     *
+     * FOUNDATION-1: Uses normalized relative path as key for case-insensitive lookups
      */
     public register(file: MarkdownFile): void {
         const path = file.getPath();
         const relativePath = file.getRelativePath();
+        const normalizedRelativePath = file.getNormalizedRelativePath();
 
-        console.log(`[MarkdownFileRegistry] Registering file: ${relativePath} (${file.getFileType()})`);
+        // FOUNDATION-1: Check for duplicates BEFORE registering (collision detection)
+        const existingFile = this._filesByRelativePath.get(normalizedRelativePath);
+        if (existingFile && existingFile !== file) {
+            console.warn(`[MarkdownFileRegistry] ⚠️  Duplicate file detected!`);
+            console.warn(`  Normalized path: ${normalizedRelativePath}`);
+            console.warn(`  Existing original: ${existingFile.getRelativePath()}`);
+            console.warn(`  New original: ${relativePath}`);
+            console.warn(`  Action: Overwriting existing file`);
 
-        // Store by both absolute and relative paths
+            // Dispose old file to prevent memory leak
+            existingFile.dispose();
+        }
+
+        console.log(`[MarkdownFileRegistry] Registering: "${relativePath}" → "${normalizedRelativePath}" (${file.getFileType()})`);
+
+        // Store by absolute path (unchanged) and NORMALIZED relative path
         this._files.set(path, file);
-        this._filesByRelativePath.set(relativePath, file);
+        this._filesByRelativePath.set(normalizedRelativePath, file);
 
         // Subscribe to file changes and forward them
         const subscription = file.onDidChange((event) => {
@@ -55,6 +71,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
     /**
      * Unregister a file from the registry
+     *
+     * FOUNDATION-1: Uses normalized relative path for map key deletion
      */
     public unregister(path: string): void {
         const file = this._files.get(path);
@@ -63,10 +81,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             return;
         }
 
-        console.log(`[MarkdownFileRegistry] Unregistering file: ${file.getRelativePath()}`);
+        const normalizedRelativePath = file.getNormalizedRelativePath();
+        console.log(`[MarkdownFileRegistry] Unregistering: "${file.getRelativePath()}" (${normalizedRelativePath})`);
 
         this._files.delete(path);
-        this._filesByRelativePath.delete(file.getRelativePath());
+        this._filesByRelativePath.delete(normalizedRelativePath); // FOUNDATION-1: Use normalized key
 
         // Dispose the file
         file.dispose();
@@ -98,9 +117,28 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
     /**
      * Get file by relative path
+     *
+     * FOUNDATION-1: Normalizes the lookup path for case-insensitive matching
+     *
+     * @param relativePath The relative path to look up (any casing)
+     * @returns The file if found, undefined otherwise
+     *
+     * @example
+     * // These all return the same file:
+     * registry.getByRelativePath("Folder/File.md")
+     * registry.getByRelativePath("folder/file.md")
+     * registry.getByRelativePath("FOLDER/FILE.MD")
      */
     public getByRelativePath(relativePath: string): MarkdownFile | undefined {
-        return this._filesByRelativePath.get(relativePath);
+        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        const file = this._filesByRelativePath.get(normalized);
+
+        // Debug logging for lookup misses (helps catch issues)
+        if (!file && relativePath) {
+            console.debug(`[MarkdownFileRegistry] Lookup miss: "${relativePath}" (normalized: "${normalized}")`);
+        }
+
+        return file;
     }
 
     /**
@@ -119,9 +157,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
     /**
      * Check if file is registered by relative path
+     *
+     * FOUNDATION-1: Normalizes the check path for case-insensitive matching
+     *
+     * @param relativePath The relative path to check (any casing)
+     * @returns true if file exists in registry
      */
     public hasByRelativePath(relativePath: string): boolean {
-        return this._filesByRelativePath.has(relativePath);
+        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        return this._filesByRelativePath.has(normalized);
     }
 
     /**

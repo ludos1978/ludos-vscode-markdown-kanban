@@ -2,6 +2,7 @@ import { FileManager } from './fileManager';
 import { UndoRedoManager } from './undoRedoManager';
 import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
+import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
 import { configService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
@@ -420,13 +421,13 @@ export class MessageHandler {
                         const panel = this._getWebviewPanel();
 
                         for (const relativePath of task.includeFiles) {
-                            const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(relativePath);
-                            const file = panel.fileRegistry?.getByRelativePath(normalizedPath);
+                            // FOUNDATION-1: Registry handles normalization internally
+                            const file = panel.fileRegistry?.getByRelativePath(relativePath);
 
                             if (file) {
                                 // Update file content immediately (marks as unsaved)
                                 // This ensures "text modification" path calls the SAME function as "edit include file" path
-                                console.log(`[editTask] Updating file content for: ${normalizedPath}`);
+                                console.log(`[editTask] Updating file content for: ${relativePath}`);
                                 console.log(`[editTask]   Old content length: ${file.getContent().length}`);
                                 console.log(`[editTask]   New content length: ${message.taskData.description.length}`);
 
@@ -436,7 +437,7 @@ export class MessageHandler {
 
                                 console.log(`[editTask]   File marked as unsaved: ${file.hasUnsavedChanges()}`);
                             } else {
-                                console.warn(`[editTask] File not found in registry: ${normalizedPath}`);
+                                console.warn(`[editTask] File not found in registry: ${relativePath}`);
                                 console.warn(`[editTask]   This might indicate the file was never loaded`);
                                 // File will be created when markUnsavedChanges → trackIncludeFileUnsavedChanges is called
                             }
@@ -1877,7 +1878,10 @@ export class MessageHandler {
                     console.log(`[handleBoardUpdate]   Old includeFiles:`, oldIncludeFiles);
                     console.log(`[handleBoardUpdate]   New includeFiles:`, newIncludeFiles);
 
-                    const removedFiles = oldIncludeFiles.filter((oldPath: string) => !newIncludeFiles.includes(oldPath));
+                    // FOUNDATION-1: Use normalized comparison
+                    const removedFiles = oldIncludeFiles.filter((oldPath: string) =>
+                        !newIncludeFiles.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
+                    );
                     console.log(`[handleBoardUpdate]   Removed files:`, removedFiles);
 
                     for (const removedPath of removedFiles) {
@@ -1917,7 +1921,10 @@ export class MessageHandler {
                         if (oldTask) {
                             const oldTaskIncludes = oldTask.includeFiles || [];
                             const newTaskIncludes = newTask.includeFiles || [];
-                            const removedTaskFiles = oldTaskIncludes.filter((oldPath: string) => !newTaskIncludes.includes(oldPath));
+                            // FOUNDATION-1: Use normalized comparison
+                            const removedTaskFiles = oldTaskIncludes.filter((oldPath: string) =>
+                                !newTaskIncludes.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
+                            );
 
                             for (const removedPath of removedTaskFiles) {
                                 const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
@@ -2368,20 +2375,18 @@ export class MessageHandler {
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (column) {
                     column.title = newTitle;
-                    // FIX: Normalize path before storing
-                    const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(newFilePath) || newFilePath;
-                    column.includeFiles = [normalizedPath];
+                    // FOUNDATION-1: Store ORIGINAL path (no normalization)
+                    column.includeFiles = [newFilePath];
                     column.originalTitle = newTitle;
                 }
             }
 
             // FIX #2c: Cleanup old include file that is being replaced
             if (oldFilePath && oldFilePath !== newFilePath) {
-                // FIX: Normalize oldFilePath for consistent registry lookup
-                const normalizedOldPath = (panel as any)._includeFileManager?._normalizeIncludePath(oldFilePath) || oldFilePath;
-                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(normalizedOldPath);
+                // FOUNDATION-1: Registry handles normalization internally
+                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(oldFilePath);
                 if (oldFileToCleanup) {
-                    console.log(`[switchColumnIncludeFile] Cleaning up old include file: ${normalizedOldPath}`);
+                    console.log(`[switchColumnIncludeFile] Cleaning up old include file: ${oldFilePath}`);
                     oldFileToCleanup.stopWatching();
                     // FIX: Don't call dispose() - unregister() does it internally
                     panel.fileRegistry.unregister(oldFileToCleanup.getPath());
@@ -2498,19 +2503,18 @@ export class MessageHandler {
                     if (task) {
                         task.title = newTitle;
                         // FIX: Normalize path before storing
-                        const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(newFilePath) || newFilePath;
-                        task.includeFiles = [normalizedPath];
+                        // FOUNDATION-1: Store ORIGINAL path (no normalization)
+                        task.includeFiles = [newFilePath];
                     }
                 }
             }
 
             // FIX #2b: Cleanup old include file that is being replaced
             if (oldFilePath && oldFilePath !== newFilePath) {
-                // FIX: Normalize oldFilePath for consistent registry lookup
-                const normalizedOldPath = (panel as any)._includeFileManager?._normalizeIncludePath(oldFilePath) || oldFilePath;
-                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(normalizedOldPath);
+                // FOUNDATION-1: Registry handles normalization internally
+                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(oldFilePath);
                 if (oldFileToCleanup) {
-                    console.log(`[switchTaskIncludeFile] Cleaning up old include file: ${normalizedOldPath}`);
+                    console.log(`[switchTaskIncludeFile] Cleaning up old include file: ${oldFilePath}`);
                     oldFileToCleanup.stopWatching();
                     // FIX: Don't call dispose() - unregister() does it internally
                     panel.fileRegistry.unregister(oldFileToCleanup.getPath());
