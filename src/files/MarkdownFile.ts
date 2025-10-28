@@ -55,6 +55,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
     protected _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
     public readonly onDidChange = this._onDidChange.event;
 
+    // ============= CANCELLATION (FOUNDATION-2) =============
+    private _currentReloadSequence: number = 0;     // Sequence counter for reload operations
+
     // ============= DEPENDENCIES =============
     protected _conflictResolver: ConflictResolver;
     protected _backupManager: BackupManager;
@@ -170,6 +173,40 @@ export abstract class MarkdownFile implements vscode.Disposable {
     public static isSameFile(path1: string, path2: string): boolean {
         return MarkdownFile.normalizeRelativePath(path1) ===
                MarkdownFile.normalizeRelativePath(path2);
+    }
+
+    // ============= CANCELLATION HELPERS (FOUNDATION-2) =============
+
+    /**
+     * Start a new reload operation, invalidating all previous operations
+     * FOUNDATION-2: Pattern 2 (Helper Method)
+     *
+     * @returns The sequence number for this operation
+     */
+    private _startNewReload(): number {
+        this._currentReloadSequence++;
+        const sequence = this._currentReloadSequence;
+        console.log(`[${this.getFileType()}] 🔄 Starting reload sequence ${sequence} for ${this._relativePath}`);
+        return sequence;
+    }
+
+    /**
+     * Check if this reload operation has been cancelled by a newer operation
+     * FOUNDATION-2: Pattern 2 (Helper Method)
+     *
+     * @param mySequence - The sequence number of this operation
+     * @param stage - Description of where the check is happening
+     * @returns true if cancelled, false if still current
+     */
+    private _checkReloadCancelled(mySequence: number, stage: string): boolean {
+        if (mySequence !== this._currentReloadSequence) {
+            console.log(
+                `[${this.getFileType()}] ❌ Reload sequence ${mySequence} cancelled ${stage} ` +
+                `(current: ${this._currentReloadSequence}) for ${this._relativePath}`
+            );
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -349,14 +386,27 @@ export abstract class MarkdownFile implements vscode.Disposable {
     /**
      * Reload content from disk and update baseline
      * Verifies content has actually changed before accepting
+     * FOUNDATION-2: Protected against race conditions via sequence counter
      */
     public async reload(): Promise<void> {
-        console.log(`[${this.getFileType()}] Reloading from disk: ${this._relativePath}`);
+        // FOUNDATION-2: Start new reload sequence, invalidating previous operations
+        const mySequence = this._startNewReload();
 
         const content = await this._readFromDiskWithVerification();
+
+        // FOUNDATION-2: Check if this reload was cancelled during async operation
+        if (this._checkReloadCancelled(mySequence, 'after disk read')) {
+            return;
+        }
+
         if (content !== null) {
             // Check if content actually changed (verification returns baseline if unchanged)
             if (content !== this._baseline) {
+                // FOUNDATION-2: Final check before applying changes
+                if (this._checkReloadCancelled(mySequence, 'before applying changes')) {
+                    return;
+                }
+
                 this._content = content;
                 this._baseline = content;
                 this._hasUnsavedChanges = false;
@@ -364,7 +414,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 this._lastModified = await this._getFileModifiedTime();
 
                 this._emitChange('reloaded');
-                console.log(`[${this.getFileType()}] Reloaded successfully: ${this._relativePath}`);
+                console.log(`[${this.getFileType()}] ✅ Reload sequence ${mySequence} completed successfully: ${this._relativePath}`);
             } else {
                 // Content unchanged - verification returned baseline, this is a false alarm
                 console.log(`[${this.getFileType()}] Content unchanged - false alarm from watcher, keeping existing content`);
@@ -725,6 +775,11 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public dispose(): void {
         console.log(`[${this.getFileType()}] Disposing: ${this._relativePath}`);
+
+        // FOUNDATION-2: Cancel any in-flight reload operations
+        this._currentReloadSequence++;
+        console.log(`[${this.getFileType()}] 🗑️  Disposed, reload sequence now ${this._currentReloadSequence}`);
+
         this.stopWatching();
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];

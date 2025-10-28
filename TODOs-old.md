@@ -1,0 +1,582 @@
+---
+kanban-plugin: board
+---
+
+## Open Todos
+
+- it still behaves problematically if the user switches to edit the task-description by using tab after editing the task-header which has a taskinclude. when a include change is detected (after the backend has processed it), then stop the edit that is currently active. store the changes from the edit to cache, if there are changes detected between cache and file ask the user what to do with the data (conflict handling if conflict, save handling if unsaved). 
+
+- [ ] Include files and cache handling:
+
+On any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
+- check if it's a change of content in main file, change of content of included files and/or a switch of included files. Then do this in the defined order:
+- verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
+- unset the includefiles for the switched files and clear the cache in front and backend.
+- set the includefiles, load and update the cache in backend (and frontend?).
+- if any of the included files has changes: change the content in the frontend & backend for the included files.
+- if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
+- only update the contents that have been modified in the frontend.
+
+DO NOT SAVE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES.
+
+The Taskinclude, columninclude and regular include (include in task/column header or in task content):
+- shows the shortened !!!include(path/to/file.md)!!! as inlcude(path/to/file.md) with all the tags and other content.
+
+It currently shows a conflict and a save dialogue. Also it doesnt allwys properly and consistently load the data from the newly imported file.
+
+find 5 possible solutions to the problem and check the probability it solves the problem properly.
+
+
+
+- [ ] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
+
+- [x] Conflict tracking behaviour:
+  - if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode. then the conflict manager must ask the user:
+      - wether he wants to ignore the external changes (nothing happens, remember we still have unsaved changes in the kanban)
+      - overwrite the external file with the kanban c$ontents (the kanban is then in an unedited state)
+      - save the kanban as a backup file and reload the kanban from the external changes (original kanban is stored in a backup file, the external changes of the markdown are loaded into the kanban)
+      - discard the changes in the kanban and reload from the external edit.
+  - if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
+  - if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
+  
+  do this for the main kanban file and each column include, task include and regular include files individually.
+
+  include files:
+  the include itself should be handled as if it would be a layout tag, when displaying it show a short title include(relative/path/to/markdown.md), when alt+clicking the filename, it should open the source file. the rest of the content with the !!!include()!!!is displayed as content for the line, for example tags can be added this way.
+  - column includes use !!!include()!!! in a column header and parses a marp-presentation format as individual kanban-tasks for each slide (already implemented)
+  - task includes use !!!include()!!! in a task header and includes the first line of the included file as the title.
+  - regular includes use !!!include()!!! within a task description. they should be shown within a border area where a title line shows the include(filename.md) while in the markdown text it is defined as !!!include(included.md)!!!.
+  - POSITION DETERMINES BEHAVIOR: ALL use !!!include()!!! - column header = column include, task title = task include, task description = regular include!
+
+  ONLY THIS BEHAVIOUR. ALL OTHER BEHAVIOURS OR COMMENTS HOW IT WORKS ARE WRONG AND MUST BE MODIFIED OR REMOVED FROM THE CODE!!!
+
+  ULTRATHINK THINK PLAN
+
+- [ ] test the different situatuons when files are included into the kanban using task includes (!!!include in task title) or column includes (!!!include in column header). they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
+
+- [x] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
+
+html comments should be:
+- hidden (as it's handled by normal markdown renderer)
+- rendered as normal text (as it currently is)
+
+html content: anything that starts with <div or similar, but make sure not to accidentially handle <https://links.to/websites> should be:
+- rendered as normal text (similar to html comments)
+- rendered as html (whats usually happening in markdown rendering)
+
+- [x] - the font color calculation (it detects wether it should be white or black) doesnt work properly in the dark mode. it seems not to take the right background color to calculate the font color. 
+- also the styles for dark and light should allways be dynamically generated. it should only require to add a css value to change between light and dark mode. 
+
+- [x] do we have an rewrite links, so when a file is referenced using a relative link, that we can rewrite the path relative to the new folder the file is exported into? this should be an alternative selection when exporting, to eighter pack the file or to rewrite file links.
+
+- [x] why is there rewriteLinksForExport if processAssets changes it anyway?!?
+
+- [x] it doesnt add the column stacks (the ones used to create new stacks when dropping columns on) in the second row or later. it only creates them on the first row. this gives us no gap inbetween the rows, and dropping into new rows is also impossible.
+
+- [x] when copying as markdown it should only copy the object, that the function called. if can be the column or the task, but not the full kanban as it currently does!
+
+- [x] it still convert this:
+  """
+  ## # Day 3 - World Scale 2
+  - [ ] ## World Scale in Games
+    Video game scale is weird
+    
+    ## h2
+    
+    The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
+    
+    <https://book.leveldesignbook.com/process/blockout/metrics#scale>
+  """
+
+  to this:
+  """
+  # Day 3 - World Scale 2
+
+  ---
+
+  ## World Scale in Games
+
+  Video game scale is weird
+
+  ---
+
+  h2
+  """
+
+  the text is missing the link is gone and addiitonal --- are added where they should not be placed
+
+  this would be correct:
+  """
+  # Day 3 - World Scale 2
+
+  ---
+
+  ## World Scale in Games
+
+  Video game scale is weird
+
+  ## h2
+
+  The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
+
+  <https://book.leveldesignbook.com/process/blockout/metrics#scale>
+  """
+
+  ultrathink plan think
+
+
+- [x] when the user selects "auto export on save" or ("use marp" and "live preview") then the stop running button should be shown. when the stop button is pressed both activities should be stopped. The marp process must only be started once and be kept running in the background, DO NOT RESTART THE MARP PROCESS ON SAVE! . The auto export on save should be repeated using the same export settings until the stop button is pressed. 
+
+  when the board is exported again it should first stop the running processes as if the stop button is pressed. 
+
+  Maybe show a animated image that shows an active export or marp in the kanban header.
+
+  Integrate the changes into the existing functions. DO NOT CREATE ALTERNATIVE CODE PATHS FOR THESE CHANGES!
+
+  Ultrathink think ultrathink think plan
+
+- [x] There are currently multiple export system functions. It must be unified to one new export system. The current structure is extremely broken as it's not unifying the processes properly.
+
+  - What i need:
+    - Presentation/Export Mode.
+      - Export parts of the kanban as kanbanMarkdown.
+      - All kanban can be combined into one main file (merge includes)
+      - filter the tags according to the export settings
+      - Export as Marp (html, pdf, pptx)
+      - (optional) Export with everything included (pack files).
+      - (optional) Rewrite the paths to the included files.
+    
+    - Export the kanban
+      - Export with everything included (pack files)
+      - Export keeping the structure.
+      - Does not need partial export.
+
+  - process flow:
+    - unified export system
+    - select the parts of the kanbanMarkdown we need to export
+    - combine the contents into one datastream when merge includes is active.
+    - filter the tags according to the export settings
+    - create a list of media that has is included (if pack or rewrite is active) from the files in the kanbanMarkdown data.
+      - if new files are detected in the data, copy and add them to the list
+      - or add the rewritten path to the files.
+    - rewrite the media paths according to the list of media files.
+    - run marp until realtime is stopped.
+
+  - functions we need:
+    - column_to_presentationMarkdown
+      - copy a column as markdown ( title, task-title & task-content, next task-title & task-content, repeated, combined using "---" )
+      - can be used when copying column as markdown-presentation-format.
+      - can also be used when exporting
+      - can be used when exporting and converting using marp
+      - updates the exported file when "auto_update on save" is active
+    - run_marp
+      - run marp to convert from presentationMarkdown to html, pdf, pptx
+      - run marp in background and abort when realtime aborted.
+
+  - reuse the existing functionalities such as the interface from the export.
+
+  - completely remove the functions
+    - handleGenerateCopyContent
+    - handleUnifiedExport
+    - handleExportWithMarp
+    - handlePresentWithMarp
+    - handleStartAutoExport
+
+- [x] What are all the different ExportService.exportUnified usage for?
+  - analyze where they are called from and determine what is unused, obsolete or still in use.
+
+- [ ] analyze the functions in blocks, try to split it up into blocks consisting of lines of code from 3 to 15 lines of code (rather small then big). where each block has a limited number of input and output data. determine the input values, the way the data is processed, read or put on the interface as well as the output values. determine the order of blocks as well. write your observations into different files in the agent folder. in a later step we will try to find duplicate or obsolete code. start now with the analysis. analyze in depth and generalize using similar descriptions as in parts you already discovered.
+
+- [ ] find functionality, functions, data, data structure and well as html structure duplicates in the code. first create lists of all these aspects in all the code files. structure it well to search for duplicates later on. be careful  to process all ts and js and html files in the src folder. Store the results into the agent folder.
+
+- [x] is the ExportOptions in exportService.ts still in use? it seems obsolete. can you verify and remove it.
+
+- [x] Create Preset for export:
+  - Marp Presentation:
+    - Export format: Convert to Presentation format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: No Tags
+    - Auto-export on save: On
+    - Use Marp: On
+      - Output Fomat: HTML
+      - Style: (last selected style)
+      - Browser: Chrome
+      - Live Preview: On
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Export/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export Folder: Off
+  
+  - Marp PDF:
+    - Export format: Convert to Presentation format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: No Tags
+    - Auto-export on save: On
+    - Use Marp: On
+      - Output Fomat: PDF
+      - Style: (last selected style)
+      - Browser: Chrome
+      - Live Preview: Off
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Export/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export Folder: Off
+  
+  - Share Content:
+    - Export format: Keep original format
+    - Merge Includes into Main File: Off
+    - Tag Visibility: All Tags
+    - Use Marp: Off
+    - Content to Export: default value is all, but user must costomize (remember last setting)
+    - Export folder: _Full_Export_Date/{originalfilename}-{selectedelements}.md
+    - Pack Assets into Export folder: On
+      - Rewrite Links: On
+      - Included Files: On
+      - Images: On
+      - Videos: On
+      - Other Media: On
+      - Documents: On
+      - File size limit: 100mb
+
+  put the presets at the top. when selecting a preset, set all values accordingly. the user might change the values afterwards. so the configuration must be defined by the individual values. if something is unclear, ask me.
+
+
+
+
+
+- [x] Drag & Dropping in any row below the first one doesnt work.
+
+- [x] Move the "Merge Includes into Main File" to be next to "Auto-export on save". Also set "Pack Assets into Export Folder" off by default.
+
+- [x] Add Rewrite Links Rules into the "Pack Assets into Export Folder". It defines how links are changed to be correct for the exported file:
+  - for absolute paths it doesnt change them.
+  - for relative paths, depending on how the export folder is, fix it accordingly.
+
+
+- [x] if i set 2 rows (or any number) and i "+ add column" in the second row, it places the new column in the first row. it also automatically reduces to the number of existing rows. this should not be modified without user intervention.
+
+- [x] exclude tests and tmp from being included in the build, also the .folders and files dont need to go in there. verify what is required and minimize build size
+
+- [x] consolidate the functions exportUnified, exportUnifiedV2 and exportWithMarp . 
+
+- [x] currently the export format also includes different marp export solutions. however the export format is only the first stage of data presentation. the second would be the conversion with marp. so i want you to remove the marp export variants from the export format. 
+
+add a checkbox "use marp" below that is available if the export format is "presentation format". within the use marp section:
+- the 3 options from marp (html, pdf, powerpoint) should be in a new dropdown that is activated when marp is active, the "marp markdown" can be removed. 
+- put the theme, the browser also in this submenu.
+- the open in browser could be removed, but we should add a checkbox that adds "--preview" for "live preview"
+
+move the "auto-export on save" to the main features (export format), as it should make sure that the export is repeated when the markdown or any included files are changed.
+
+- [x] when opening as presentation with "open browser after export" it doesnt open a browser.
+
+
+- [x] when the mouse cursor leaves the view during a drag&drop and reenters it doesnt keep drag&dropping anymore. can we solve this issue somehow and cleanly handle it? can we still receive mouse button releases outside the view?
+
+- [x] when clicking "add column" it should allways create a new column in a new stack, dont do the same as when "insert list after" is clicked. also it seems that it sometimes puts the columns in other rows then where i create them. ultrathink
+
+- [x] i get the error: "console.ts:137 [Extension Host] Cannot save: no document or invalid board (at console.<anonymous> (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:175:30205))" i think it happens after the board is reloaded
+kanban-full-height-column:col-51d89dd3-bcfc-4156-bf6c-31acc496f45c
+- [x] can you analyze the ability to export as pdf. maybe we could even integrate marp or require the marp plugin to be installed and use it to create different export formats from the kanban directly? the export feature does most of the preparation. do a tourough analysis before we start working on it.also we could integrate marp (maybe using the marp plugin in vscode). to directly start presentations from the kanban viewer? also the different export options of marp would be interesting. we would need to integrate the markdown-it plugins into the marp workflow. we could require the user to install marp and just deliver the engine.js and the node modules required. ultrathink think plan
+
+- [x] add the auto export, it should keep an active export icon in the top, maybe a play/stop button which uses the last settings from export. when it's a one time export, it's just exporting again, but if it's a browser opening is play/stop.
+
+- [x] when placing the cursor in an title of an card or and column, place the text cursor in front of the first tag + one space character. when adding #row{number} or #stack tags we should add a space in front of them if there isnt one (specifically applies to when it's the first characters in the title).
+
+- [x] when i create a new card it seems to completely redraw the kanban. can you only update the changed parts without a complete redraw? also focus the added column or task when it's added.
+
+- [x] tags still show with white text and i dont know where this happens. all text in the light mode should be black.
+
+- [x] the time format is 2 hours off, i think you are using gmt which is not our local time format.
+
+- [x] when exporting to presentation mode with "Merge Includes into Main File" the title of a task should not be separated into as a single slide in the export. Also dont remove ## from the lines.
+
+
+
+- [x] can you analyze the ability to export as pdf. maybe we could even integrate marp or require the marp plugin to be installed and use it to create different export formats from the kanban directly? the export feature does most of the preparation. do a tourough analysis before we start working on it.
+
+- [x] combine the title and the content while editing. when the columns is folded it only shows the title, while unfolded it shows the full content as markdown rendered style.
+ 
+- [x] make the hidden html tag <!-- --> show up when it's used in the tasks content, title or column title. show it similar to the markers that show the style of elements. add an option to the main-burger menu that allows showing and hiding of the html-comments. make sure it's accessable from the layout presets.
+
+- [x] can you make a concept for the tags and colors. One of the core aspects i want, is for designing teaching materials. 
+- where each task is a slide on a topic. so the task may need to be improved, might be obsolete, might be more or less important, also think of other situations i might forget about right now.
+- another usage case is for designing products such as games, user experience or software. add all relevant project states that might be used for columns. also add the possible states of each row, as well as for tasks that might be importancy. 
+
+make the styles be equal. for example the tags that are meant for columns can have footers or headers, but in one category, each should eighter have eigher one, or not. also think about the colors, make more important aspects a bright and strong colors, less important things less colorful or bright. think about good colors and dark and light states as well.
+
+all tags must be with # there is only dates and persons with the @-tag. also for the colors, make a dark, medium and light and a accessible color palette with at least 12 colors that are well dispersed on the visible color range. the accessible colors should be (#332288, #117733, #44AA99, #88CCEE, #DDCC77, #CC6677, #AA4499, #882255)
+
+ultrathink think plan
+
+add grays to the colors. ultrathink think and plan again to verify the usability on each process and suggest other aspects that might be useful.
+
+create me the tag list with the colors, think about which ones are better suited for tasks/slides/todos vs categories/topics and assign the headers/footers/stickers and border colors accordingly! make good use of the categories
+
+- [x] there should be 4 groups of colors. dark colors, normal colors, light colors that have 12 colors and a gray and accessible colors (#332288, #117733, #44AA99, #88CCEE, #DDCC77, #CC6677, #AA4499, #882255) make sure they still have dark and light styles as required in the 
+
+- [x] sometimes i cant drop an column after the last column in a row into a stack, why? dont modify only research.
+- [x] when adding a new column after a column in a stack, add #stack as default tag (add it to the stack below)
+
+- [x] when exporting as "convert to presentation format" with "pack assets", without "merge includes into main file" and all selected, then it doesnt include regular include/column include/task include files that are in any other directories or subdirectories. fix it for all parameter combinations of exporting. make sure files with the same filename dont overwrite each other when coming from different folders. use indexes after the filename to make sure they are distinctive in the filename. reuse files that have the same content, verify it by using an md5 hash, for large files limit the md5 hash to the first megabyte. this code has been in the codebase before, maybe you can reuse it.
+
+- [x] OPEN BUGS:
+- files included with !!!include(root/include-2.md)!!! are not updated automatically when they are changed externally. it seems to work with a path that has ./ in front of it.
+- files included with !!!include(./folder%20with%20space/include-1.md)!!! or !!!include(folder%20with%20space/include-2.md)!!! are not found/loaded.
+- when drag & dropping a file from the explorer into the view the path to it is not url encoded. use the existing functions to url encode the path that are also used by the drag&drop source.
+- when i edit the column title with a !!!include(markdown-presentation-b.md)!!! in the column header, the title should show the filename (markdown-presentation-b.md). this is correct after loading the file. but not after editing the title.
+- when i edit a !!!taskinclude(filename.md)!!! it asks me if i want to overwrite, even if the file has not been externally modified. this should only be asked if the user did change the filename.md since we included the file. The same when switching the file for another !!!taskinclude(filename-b.md)!!! , it asks if i want to save my changes to the previously included file, even if the included parts has not been edited in the kanban.
+
+- [x] currently an included markdown file (using !!!include in column header) detects a title of a task using the h7 format (#######). we must change this to use the first non-empty line within the first 3 lines after a slide break (---). remove the adding of H7 and replace it with the same logic, place the header of the task on the second line and have an empty one after that.
+
+- [x] when exporting to kanban and using the "Merge Includes into Main File" then externally included files that are not in the markdown-kanban format (column includes or task includes) must be converted into the markdown-kanban format.
+
+- [x] we need to unify the save, backup and export with all the features in all these versions.
+- we need a third export format type:
+  - keep file formats: does not change the output format
+  - individual file format: choose an individual file format for all files which then allows
+    - export all as kanban: converts all files to the markdown-kanban format (## columns, - [ ] tasks)
+    - export all as presentation: all column headers are stored as separate slides, as well as the complete content (including the title) of a card.
+- we want the kanban/row/stack/column selection to be integrated, but when saving and doing backups we just select the full board. only when exporting we only export parts. it should also work for situations where we only save individual files (for example included files or theyr backups).
+- the pack feature is an additional feature that is not activated on normal saves, but allows rewriting the paths and copying the included and or linked files. this might also lead to another feature that allows copying or moving included content into a specific folder and rewriting the links in the file. 
+- the tag visibility needs to be defineable when exporting, but usuallly is all tags when saving.
+- the export/output folder definition for each file, which is usually the folder where they are loaded from.
+- in this step we can also unify the title and description of the cards into one data structure. The display of the title is only for visualizing when folded, but is othervise not handled separately from the rest of the content.
+
+we should be able to remove tons of individual usages of conversions etc. with this. think about what we can remove. analyze what we can remove and analyze everything that happens within that functions. create a file with the plan for this feature that we can continue to work on until we have a solid and sound idea. there should only be one place we use functions such as tasksToPresentations and all similar functions. Analyze for duplicate or similar code we can remove.
+
+ultrathink, plan.
+
+- [x] there should be an option that combines all the include files into one file and another one that allows exporting with the includes preserved. now for that to work i think the conversion to presentation format needs to happen after selecting the content to export and deciding which files they should go into. after that the conversion might be done, depending wether the original file format was the kanban-markdown format. if it already was an included presentation it does not need to be converted.
+
+- [x] i encountered this error "webview.js?v=1759945056175:4383 Uncaught TypeError: Cannot read properties of null (reading 'value')
+    at setColumnExportDefaultFolder (webview.js?v=1759945056175:4383:16)
+    at webview.js?v=1759945056175:2633:13"
+
+
+- [x] the export functionality should be unified. add a function to the export view that allows selecting which columns to export, structure it the same way as the columns are structured with rows, stacks and columns (but of course only show the titles.) where a user might select the full kanban, a row, a stack or a single column. add the option to select which format it should export "kanban" format exports it in the same format as the kanban has, "presentation" format converts it the same way as "copy as markdown does". the pack feature should be optional, so it might leave the links as they are, or the user might select to pack all or some (same selections as it currently has) of the assets into the export folder. the copy as markdown should also use the same function, just use the preset values such as the task, the column etc and presentation mode. ultrathink plan think ultraplan ultrathink
+- [x] if i deselect a column from a active stack, the stack must be disabled as well, if i select all columns in a stack, also select the stack. likewise for the row, if a stack is deseleted (can also be because a deselected column), deselect the row, if all stacks are selected in a row, also activate the row. for the kanban do the same.
+
+- [x] make the folder path line multiline if it's longer then the width of the field. use less spacing around the dialogue. make the dialogue use 80% of width and 80% of height. use less space around the options. put the tag visibility on the same line as the export format. make the export format use a dropdop as well.
+
+- [x] move the presentation format and the tag style include settings above the column-selection view.
+
+
+- [x] move the "export tags" from the file info burger menu to the export function so it's chosen individually when exporting something
+
+- [x] remove the image fill mode and all code that is using it if it's not used for something else. preserve functionality that is outside the usage of the image scaling. """        "markdown-kanban.imageFill": {
+          "type": "string",
+          "default": "fit",
+          "description": "Control how images are sized within cards",
+          "enum": [
+            "fit",
+            "fill"
+          ],
+          "enumDescriptions": [
+            "Images size to their natural dimensions",
+            "Images fill available space while keeping aspect ratio"
+          ]
+        },""" 
+
+- [x] Cleanup the configuration and the functions that use it. we currently have """        "markdown-kanban.stickyHeaders": {
+          "type": "string",
+          "default": "enabled",
+          "description": "Control sticky positioning of column headers",
+          "enum": [
+            "enabled",
+            "disabled"
+          ],
+          "enumDescriptions": [
+            "Column headers stick to top when scrolling",
+            "Column headers scroll normally with content"
+          ]
+        },
+        "markdown-kanban.stickyStackMode": {
+          "type": "string",
+          "default": "titleonly",
+          "description": "Control sticky positioning behavior in column stacks",
+          "enum": [
+            "full",
+            "titleonly",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Header, title, footer & margin all sticky (original behavior)",
+            "Only title sticky (default)",
+            "Nothing sticky in stacks"
+          ]
+        },""" 
+	with the stickyStackMode the stickyHeaders are obsolete and can be removed. migrate all functions that are not a duplicate to the stickyStackMode.
+	
+- [x] cleanup the configuration and the functions that use it.  i think the """
+        "markdown-kanban.showRowTags": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show row tags (#row2, #row3, #row4) in column headers"
+        },
+        "markdown-kanban.tagVisibility": {
+          "type": "string",
+          "default": "all",
+          "description": "Control which types of tags are displayed on cards",
+          "enum": [
+            "all",
+            "standard",
+            "custom",
+            "mentions",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Show all tags including #span, #row, and @ tags",
+            "Show all except #span and #row (includes @ tags)",
+            "Show only custom tags (not configured ones) and @ tags",
+            "Show only @ tags",
+            "Hide all tags"
+          ]
+        },""" are doing the same thing, or rather showRowTags are obsolete.
+
+
+- [x] in some situations it doesnt open a link i opened before. 
+- [x] Failed to update stickyStackMode preference: CodeExpectedError: In Arbeitsbereichseinstellungen kann nicht geschrieben werden, weil markdown-kanban.stickyStackMode keine registrierte Konfiguration ist.
+- [x] pressing alt on an image should open the file externally if it's found, othervise the replacement file search should be activated. but it currently doesnt. the code should be in the codebase already, but it currently doesnt seem to be active.
+- [x] modifying a column title with a !!!include()!!! (column include - position-based) does not set the title correctly according to the rule: link to filename that is clickable included with the rest of the title and tags
+- [x] when restoring kanban views all views restore one kanban file. not individual files they contained before.
+- [x] move the corner-badges-container into the column-header div verify that all css is corrected for the new location. ultrathink
+- [x] a horizontally folded column with a tag header doesnt add the tag above outside above, but overlaying above the normal header. this is one of the broken examples : TO ADD AN EXMAPLE
+- [x] after i moved away a card from a column i cant fold it anymore.
+- [x] lets make columns vertical folding working again. a column that is alone in a stack should by default fold as vertical. if there are multiple columns in a stack the folding should be horizontal. by pressing alt+fold-button the column switches between horizontal and vertical folding. all the functions and styles should be available already.
+- [x] if i delete a task recalculate the full stacks heights reuse the existing function for that
+- [x] make sure that in columns the "column-header.header-bars-container" contains the "header-bar" and "column-footer.footer-bars-container" contains the "footer-bar" in all circumstances.
+- [x] disable the vertical column folding mode
+- [x] the title when inserting a column include (!!!include in column header) should only show the filename included and the remainder of the contents. 
+- [x] On start drag fix the tags of the source stack (where we took the column from). On end drag fix the tags of the destination stack (where we put the column)
+- [x] Corrected Summary of Implementation:
+CSS Changes:
+- Grid overlay structure: All stacked columns overlay in single grid cell
+- Full viewport height: Each column min-height: 100vh so sticky works across entire scroll
+- Sticky headers: Position sticky at top with cumulative offsets (0px, 29px, 58px...)
+- Sticky footers: Position sticky at bottom with cumulative offsets (58px, 29px, 0px...)
+- Drag&drop compatible: All handlers preserved on original elements
+JavaScript #stack Tag Logic:
+- Drop between stacked columns or at the end → Adds #stack to dropped column
+- Drop as first in stack → Removes #stack from dropped column, adds #stack to next column
+- Drop outside stack → Removes #stack from dropped column
+What the Implementation Does:
+Stacked columns overlay in same grid position with full viewport height
+Headers stick to top, footers stick to bottom
+Content scrolls naturally as before
+#stack tags automatically managed when dragging columns
+- [x] When moving a task into a folded column while pressing alt, the column should not unfold as it usually does.
+- [x] Columns that are in a "vertical stack" have a #stack tag or the next column has a #stack tag. Add a feature to make the columns fold horizontally, but keep the vertical folding function available. An column in a "vertical stack" stack should by default folds to horizontal folding state, a column in outside a stack should fold to vertical fold state. If <alt> is pressed while pressing the fold button again, the horizontal/vertical folding should switch. when pressing <alt> while it's unfolded, fold to the not-default-state. When <alt> is not pressed a folded column unfolds.
+
+- [x] Export and pack of the kanban does not generate the default folder name it should export into (based on the filename of the main kanban file combined with the date-time like "YYYYMMDD-HHmm").
+
+- [x] if multiple columns are in a vertical stack. can you make all the sticky headers to stick, eighter at the top or the bottom? so if 3 columns are above each other, allways show the headers of all columns. it's to be able to drop items into all rows at all the time.
+
+- [x] vertically folded columns should allways be next to each other, even if they have the #stack tag.
+
+- [x] it still converts this
+
+"""
+~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~
+middle
+~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~
+third
+~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~
+  ![image](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/folder%20with%20space/image-512x512.png)
+"""
+
+to this
+
+"""
+~~~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~ ![image](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/folder%20with%20space/image-512x512.png)~~
+middle
+~~~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~ ![image](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/folder%20with%20space/image-512x512.png)~~
+third
+~~~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~ ![image](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/folder%20with%20space/image-512x512.png)~~
+  ![image](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/folder%20with%20space/image-512x512.png)
+"""
+
+when i try to fix the first broken link. it should only modify the first link when i search for the corrected file and replace the original (already striked trough) link to
+
+"""
+~~~~![image](https://file%2B.vscode-resource.vscode-cdn.net/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/foldeapace/image-512x512.png)~~~~
+"""
+
+but!
+
+this breaks the rendering. so even better would be to have an already striked trough link remain striked trough. add the corrected link after without strike-trough. and add a style to the strike-trough so a broken image or media is also striked trough in the rendered content. Is this possible? ULTRATHINK ULTRATHINK
+
+- [ ] when searching and replacing replacement text, the striketrough is not
+  properly placed. there are multiple types of links that must be properly
+  striked-trough and the alternative path must be added in the same
+  style. the types of links may be: ![]() -> ~~![]()~~ , []() -> ~~[]()~~
+  , <> -> ~~<>~~ or [[]] -> ~~[[]]~~ maybe there is others i dont know of.
+  currently i think the stiketrough does not take the minimum sized item
+  according to the above rules, but sometimes takes a larger area that is
+  striked trough.ß
+
+- [ ] add an option to the export as in which style to export. it can be eigher kanbanstyle (does not modify the style, copies the markdown as in the original markdown) or it can be presentation style (which uses the same method as when copying the columns and cards as markdown.)
+- the copy as markdown will allways use presentation mode
+- the export functionality of tasks and columns gets a dropdown selection with "presentation" and "kanbanstyle"
+
+- [x] Failed to create backup: TypeError: Cannot read properties of undefined (reading 'getText')
+	at BackupManager.createBackup (/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/extension.js:8513:32)
+	at MessageHandler.handlePageHiddenWithUnsavedChanges (/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/extension.js:7344:42)
+	at MessageHandler.handleMessage (/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/extension.js:6782:20)
+	at Ah.value (/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/extension.js:9935:38)
+	at D.B (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2375)
+	at D.fire (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2593)
+	at wB.$onMessage (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:135:95573)
+	at i4.S (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:115936)
+	at i4.Q (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:115716)
+	at i4.M (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:114805)
+	at i4.L (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:114043)
+	at Ah.value (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:112707)
+	at D.B (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2375)
+	at D.fire (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2593)
+	at Jn.fire (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:9459)
+	at Ah.value (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:197:3917)
+	at D.B (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2375)
+	at D.fire (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:27:2593)
+	at Jn.fire (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:29:9459)
+	at MessagePortMain.<anonymous> (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:197:2209)
+	at MessagePortMain.emit (node:events:518:28)
+	at MessagePortMain._internalPort.emit (node:electron/js2c/utility_init:2:2949)
+	at Object.callbackTrampoline (node:internal/async_hooks:130:17) (at console.<anonymous> (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:175:30205))
+
+- [x] the addon that delets a text which is strike-trough (between two ~~) converts the remaining contents to html, instead of leaving it as markdown. this is very wrong 
+ultrathink
+- [x] the plugin that generates class multicolumn by adding "---:", ":--:", ":---" sometimes generates the same content twice. can you find a reason why? ultrathink ultrathink ultrathink ultrathink 
+
+- [x] i dont see any reason, but after some time the kanban just closes. maybe this has something to do with it? """console.ts:137 [Extension Host] deleteChain called from files/closed (at console.<anonymous> (file:///Applications/Visual%20Studio%20Code.app/Contents/Resources/app/out/vs/workbench/api/node/extensionHostProcess.js:175:30205))"""
+
+- [x] bug that closes the kanban: "runtime-tracker.js:360 Failed to save runtime report to localStorage: QuotaExceededError: Failed to execute 'setItem' on 'Storage': Setting the value of 'runtimeReport_session_1758956943015_6drhykryu' exceeded the quota.
+    at RuntimeTracker.saveReport (runtime-tracker.js:358:26)
+    at runtime-tracker.js:84:22"
+
+- [x] conflict tracking behaviour:
+- if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode:
+	- the conflict manager must ask the user wether he wants to (default) ignore the external changes (nothing happens, remember we still have unsaved changes in the kanban)
+	- overwrite the external file with the kanban contents (the kanban is then in an unedited state)
+	- save the kanban as a backup file and reload the kanban from the external changes (original kanban is stored in a backup file, the external changes of the markdown are loaded into the kanban)
+	- discard the changes in the kanban and reload from the external edit.
+- if the external file is modified and saved and the kanban has no saved or unsaved changes and is not in edit mode. the kanban can reload the modified data immediately.
+- if the kanban is modified and saved and the external file has unsaved changes and is later saved. we rely on the default change detection of vscode.
+do this for the kanban and each column and task included files individually..
+
+
+- [x] add an option to the export as in which style to export. it can be eigher kanbanstyle (does not modify the style) or it can be presentation style (which uses the same method as when copying the columns and cards as markdown.
+- [x] OBSOLETE, WRONG ASSUMPTION. 1. Clicking on the task description to edit it: 2. Changing the text from !!!include(./markdown-include-2.md)!!! to something like   !!!include(. markdown-include-1.md)!!! 3. stop editing the field. - should result in an modfied included content. but does not. Instead it shows Loading: newfilename.md forever. i think the backend is missing an editTaskDescription that handles the contents similar to the editTaskTitle which checks for includes and handles it there. or where does that happen?
+- ok, i did an error. the !!!include()!!! must be run in the frontend only, as it's genearted with the markdown-ti. i undid all changes. try to get it running again with in this style.
+- [x] EditTask message is send when the view looses focus afaik. but it should be sent when the edit of a task ends. can you verify and fix that?
+- [x] if a broken file link search has a url encoding (it contains a %) try decoding using url encoding before searching for it. only if it's a valid decoding search for it.
+
+
+## General work order
+
+Create a file FUNCTIONS.md that keeps track of all functions in files in front and backend. Each functions is described as: 
+- path_to_filename-classname_functionname or -functionname when it's not in a class.
+- a description of the functionality in 1 or 2 lines of keywords or sentences.
+
+Implmement the requested features according to the request. Keep changes small. Suggest DRY cleanups if you find functions get similar functionality. Before creating a new functionality or creating larger code parts allways consult the FUNCTIONS.md. Never modify the save data without the users permission. After modifying the code update the FUNCTIONS.md according to the rules:
+Each functions is described as: 
+- path_to_filename-classname_functionname or -functionname when it's not in a class.
+- a description of the functionality in 1 or 2 lines of keywords or sentences.

@@ -2507,66 +2507,80 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
+        console.log(`[updateIncludeContentUnified] Called with ${newIncludeFiles.length} files:`, newIncludeFiles);
+        console.log(`[updateIncludeContentUnified] Column ID: ${column.id}, Column title: ${column.title}`);
+
         // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
 
-        // FIX #2d: Cleanup old include files that are being replaced
+        // SOLUTION 3: NUCLEAR OPTION - Always create fresh file instances, never reuse
+        // Normalize all paths for consistent operations
+        const normalizedNewFiles = newIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
         const oldIncludeFiles = column.includeFiles || [];
-        // FIX: Normalize all paths for consistent comparison
-        // FOUNDATION-1: Use original paths directly (registry normalizes internally)
-        const normalizedNewFiles = newIncludeFiles;
-        const normalizedOldFiles = oldIncludeFiles;
-        const filesToRemove = normalizedOldFiles.filter(old => !normalizedNewFiles.includes(old));
+        const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
 
+        const filesToRemove = normalizedOldFiles.filter((old: string) =>
+            !normalizedNewFiles.includes(old)
+        );
+
+        console.log(`[updateIncludeContentUnified] Files to remove: ${filesToRemove.length}`, filesToRemove);
+
+        // STEP 1: Cleanup old files
         for (const oldFilePath of filesToRemove) {
             const oldFile = this._fileRegistry.getByRelativePath(oldFilePath);
             if (oldFile) {
                 console.log(`[updateIncludeContentUnified] Cleaning up old include file: ${oldFilePath}`);
                 oldFile.stopWatching();
-                // FIX: Don't call dispose() - unregister() does it internally
                 this._fileRegistry.unregister(oldFile.getPath());
                 console.log(`[updateIncludeContentUnified] ✓ Old file unregistered and disposed`);
             }
         }
 
-        // FIX: Normalize paths before storing
+        // STEP 2: ALWAYS unregister existing files (even if we're switching back)
+        // This ensures fresh state and prevents stale baseline issues
+        for (const newFilePath of normalizedNewFiles) {
+            const existingFile = this._fileRegistry.getByRelativePath(newFilePath);
+            if (existingFile) {
+                console.log(`[updateIncludeContentUnified] Unregistering existing file for fresh start: ${newFilePath}`);
+                existingFile.stopWatching();
+                this._fileRegistry.unregister(existingFile.getPath());
+            }
+        }
+
+        // Store normalized paths
         column.includeFiles = normalizedNewFiles;
 
         // Keep existing tasks to preserve IDs during re-parse
         const existingTasks = column.tasks;
 
-        // Load content from the include files (use normalized paths)
+        // STEP 3: ALWAYS create new file instances (never reuse)
         const allTasks: KanbanTask[] = [];
         for (const relativePath of normalizedNewFiles) {
-            // Create new include file in registry if it doesn't exist
-            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-                const mainFile = this._fileRegistry.getMainFile();
-                if (mainFile) {
-                    console.log('[updateIncludeContentUnified] Creating new ColumnIncludeFile in registry:', relativePath);
-                    const columnInclude = this._fileFactory.createColumnInclude(
-                        relativePath,
-                        mainFile,
-                        false
-                    );
-                    columnInclude.setColumnId(column.id);
-                    columnInclude.setColumnTitle(column.title);
-                    this._fileRegistry.register(columnInclude);
-                    columnInclude.startWatching();
-                }
+            const mainFile = this._fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error('[updateIncludeContentUnified] ❌ No main file found!');
+                continue;
             }
 
-            const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file && file.getFileType() === 'include-column') {
-                const columnFile = file as any; // ColumnIncludeFile
+            // ALWAYS create fresh instance (Solution 3)
+            console.log('[updateIncludeContentUnified] Creating fresh ColumnIncludeFile instance:', relativePath);
+            const columnInclude = this._fileFactory.createColumnInclude(
+                relativePath,
+                mainFile,
+                false
+            );
+            columnInclude.setColumnId(column.id);
+            columnInclude.setColumnTitle(column.title);
+            this._fileRegistry.register(columnInclude);
+            columnInclude.startWatching();
 
-                // Reload the file content from disk before parsing
-                console.log('[updateIncludeContentUnified] Reloading file content:', relativePath);
-                await columnFile.reload();
+            // Reload the file content from disk before parsing
+            console.log('[updateIncludeContentUnified] Reloading file content:', relativePath);
+            await columnInclude.reload();
 
-                // Pass existing tasks to preserve IDs during re-parse
-                const tasks = columnFile.parseToTasks(existingTasks);
-                console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
-                allTasks.push(...tasks);
-            }
+            // Pass existing tasks to preserve IDs during re-parse
+            const tasks = columnInclude.parseToTasks(existingTasks);
+            console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
+            allTasks.push(...tasks);
         }
 
         // Update the column with the loaded tasks
@@ -2602,45 +2616,53 @@ export class KanbanWebviewPanel {
             const fileState = newIncludeFiles[0];
             const absolutePath = PathResolver.resolve(basePath, fileState);
 
-            // FOUNDATION-1: Use original path (registry handles normalization)
-            const normalizedIncludeFile = fileState;
+            // FIX: Must normalize path - registry does NOT normalize internally!
+            const normalizedIncludeFile = this._includeFileManager.normalizeIncludePath(fileState);
 
-            // FIX #2a: Cleanup old include files that are being replaced
+            // SOLUTION 3: NUCLEAR OPTION - Always create fresh file instances, never reuse
             const oldIncludeFiles = task.includeFiles || [];
             const normalizedNewFiles = [normalizedIncludeFile];
-            // FOUNDATION-1: Use MarkdownFile.isSameFile for comparison
-            const { MarkdownFile } = require('./files/MarkdownFile');
-            const filesToRemove = oldIncludeFiles
-                .filter(old => !normalizedNewFiles.some(newFile => MarkdownFile.isSameFile(old, newFile)));
+            const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
 
+            const filesToRemove = normalizedOldFiles.filter(old => !normalizedNewFiles.includes(old));
+
+            // STEP 1: Cleanup old files
             for (const oldFilePath of filesToRemove) {
                 const oldFile = this.fileRegistry?.getByRelativePath(oldFilePath);
                 if (oldFile) {
                     console.log(`[loadNewTaskIncludeContent] Cleaning up old include file: ${oldFilePath}`);
                     oldFile.stopWatching();
-                    // FIX: Don't call dispose() here - unregister() does it internally
                     this.fileRegistry.unregister(oldFile.getPath());
                     console.log(`[loadNewTaskIncludeContent] ✓ Old file unregistered and disposed`);
                 }
             }
 
-            // Create new include file in registry if it doesn't exist
-            if (!this.fileRegistry?.hasByRelativePath(normalizedIncludeFile)) {
-                const mainFile = this.fileRegistry.getMainFile();
-                if (mainFile) {
-                    console.log('[loadNewTaskIncludeContent] Creating new TaskIncludeFile in registry:', normalizedIncludeFile);
-                    const taskInclude = this._fileFactory.createTaskInclude(
-                        normalizedIncludeFile,
-                        mainFile,
-                        false
-                    );
-                    this.fileRegistry.register(taskInclude);
-
-                    // FIX #1: Start watching for external changes immediately
-                    taskInclude.startWatching();
-                    console.log('[loadNewTaskIncludeContent] Started watching new TaskIncludeFile:', normalizedIncludeFile);
-                }
+            // STEP 2: ALWAYS unregister existing file (even if switching back)
+            // This ensures fresh state and prevents stale baseline issues
+            const existingFile = this.fileRegistry?.getByRelativePath(normalizedIncludeFile);
+            if (existingFile) {
+                console.log(`[loadNewTaskIncludeContent] Unregistering existing file for fresh start: ${normalizedIncludeFile}`);
+                existingFile.stopWatching();
+                this.fileRegistry.unregister(existingFile.getPath());
             }
+
+            // STEP 3: ALWAYS create fresh instance (Solution 3)
+            const mainFile = this.fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error('[loadNewTaskIncludeContent] ❌ No main file found!');
+                return;
+            }
+
+            console.log('[loadNewTaskIncludeContent] Creating fresh TaskIncludeFile instance:', normalizedIncludeFile);
+            const taskInclude = this._fileFactory.createTaskInclude(
+                normalizedIncludeFile,
+                mainFile,
+                false
+            );
+            taskInclude.setTaskId(task.id);
+            this.fileRegistry.register(taskInclude);
+            taskInclude.startWatching();
+            console.log('[loadNewTaskIncludeContent] ✓ Created and registered TaskIncludeFile:', normalizedIncludeFile);
 
             // STRATEGY 1: Load full content without parsing
             // Reload the file content from disk first
@@ -2678,9 +2700,9 @@ export class KanbanWebviewPanel {
                 // Update task with COMPLETE file content (NO PARSING, NO TRUNCATION)
                 task.includeMode = true;
 
-                // FIX: Normalize paths before storing to ensure consistent registry lookups
-                // FOUNDATION-1: Store original paths (no normalization)
-                task.includeFiles = newIncludeFiles;
+                // FIX: MUST normalize paths before storing - this is CRITICAL for consistent registry lookups!
+                // Store normalized paths so all future lookups will work (registry does NOT normalize internally)
+                task.includeFiles = newIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
 
                 task.originalTitle = task.title; // Preserve the include syntax
                 task.displayTitle = displayTitle; // UI header only

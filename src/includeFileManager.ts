@@ -330,11 +330,13 @@ export class IncludeFileManager {
         return MarkdownFile.isSameFile(path1, path2);
     }
 
-    // FOUNDATION-1: DELETED - Use MarkdownFile.normalizeRelativePath() instead
-    // Registry handles normalization internally, no need for manual normalization
-    // public _normalizeIncludePath(includePath: string): string {
-    //     return includePath.trim().toLowerCase().replace(/\\/g, '/');
-    // }
+    /**
+     * Normalize include paths for consistent registry lookups
+     * CRITICAL: Registry does NOT normalize internally - we MUST normalize before ALL registry lookups!
+     */
+    public normalizeIncludePath(includePath: string): string {
+        return includePath.trim().toLowerCase().replace(/\\/g, '/');
+    }
 
     public _recheckIncludeFileChanges(): void {
         // Registry tracks changes automatically

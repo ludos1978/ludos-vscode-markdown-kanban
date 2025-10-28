@@ -421,8 +421,9 @@ export class MessageHandler {
                         const panel = this._getWebviewPanel();
 
                         for (const relativePath of task.includeFiles) {
-                            // FOUNDATION-1: Registry handles normalization internally
-                            const file = panel.fileRegistry?.getByRelativePath(relativePath);
+                            // FIX: Must normalize path before registry lookup (registry does NOT normalize internally)
+                            const normalizedPath = (panel as any)._includeFileManager?.normalizeIncludePath(relativePath);
+                            const file = panel.fileRegistry?.getByRelativePath(normalizedPath);
 
                             if (file) {
                                 // Update file content immediately (marks as unsaved)
