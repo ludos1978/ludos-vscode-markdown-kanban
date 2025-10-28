@@ -147,7 +147,11 @@ export class BoardOperations {
             title: result.task.title,
             description: result.task.description,
             includeMode: result.task.includeMode,
-            includeFiles: result.task.includeFiles ? [...result.task.includeFiles] : undefined,
+            // FIX BUG #B: Normalize paths when copying to ensure consistent registry lookups
+            // All includeFiles paths MUST be normalized (lowercase, forward slashes)
+            includeFiles: result.task.includeFiles
+                ? result.task.includeFiles.map(f => f.trim().toLowerCase().replace(/\\/g, '/'))
+                : undefined,
             originalTitle: result.task.originalTitle,
             displayTitle: result.task.displayTitle
         };

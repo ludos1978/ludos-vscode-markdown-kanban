@@ -369,7 +369,9 @@ export class MarkdownKanbanParser {
 
           // Update task properties for include mode
           task.includeMode = true;
-          task.includeFiles = includeFiles;
+          // FIX BUG #A: Normalize paths before storing to ensure consistent registry lookups
+          // All includeFiles paths MUST be normalized (lowercase, forward slashes) for consistent registry lookups
+          task.includeFiles = includeFiles.map(f => f.trim().toLowerCase().replace(/\\/g, '/'));
           task.originalTitle = task.title; // Keep original title with include syntax
           task.displayTitle = displayTitle; // UI header only
           task.description = fullFileContent; // COMPLETE file content, no parsing!

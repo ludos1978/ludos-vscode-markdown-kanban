@@ -400,12 +400,52 @@ export class MessageHandler {
         
             // Task operations
             case 'editTask':
+                // CRITICAL FIX: Unified execution path for task include content updates
+                // Both "edit include file" and "text modification" must call the same functions
+
+                // First, update the board state (in-memory task object)
                 await this.performBoardActionSilent(() =>
                     this._boardOperations.editTask(this._getCurrentBoard()!, message.taskId, message.columnId, message.taskData)
                 );
 
-                // Note: Task include changes are now only saved when the main kanban file is saved,
-                // not automatically on every edit. This prevents unwanted overwrites of external files.
+                // NEW: If this is a task include and description was updated, update the file instance immediately
+                // This unifies Path 1 (edit include file) and Path 2 (text modification) to call the same functions
+                if (message.taskData.description !== undefined) {
+                    const board = this._getCurrentBoard();
+                    const column = board?.columns.find((c: any) => c.id === message.columnId);
+                    const task = column?.tasks.find((t: any) => t.id === message.taskId);
+
+                    if (task && task.includeMode && task.includeFiles) {
+                        console.log(`[editTask] Task include detected - updating file instance for: ${task.includeFiles.join(', ')}`);
+                        const panel = this._getWebviewPanel();
+
+                        for (const relativePath of task.includeFiles) {
+                            const normalizedPath = (panel as any)._includeFileManager?._normalizeIncludePath(relativePath);
+                            const file = panel.fileRegistry?.getByRelativePath(normalizedPath);
+
+                            if (file) {
+                                // Update file content immediately (marks as unsaved)
+                                // This ensures "text modification" path calls the SAME function as "edit include file" path
+                                console.log(`[editTask] Updating file content for: ${normalizedPath}`);
+                                console.log(`[editTask]   Old content length: ${file.getContent().length}`);
+                                console.log(`[editTask]   New content length: ${message.taskData.description.length}`);
+
+                                // Update the file content (marks as unsaved, does NOT sync baseline)
+                                // Baseline will be synced when file is saved
+                                file.setContent(message.taskData.description, false);
+
+                                console.log(`[editTask]   File marked as unsaved: ${file.hasUnsavedChanges()}`);
+                            } else {
+                                console.warn(`[editTask] File not found in registry: ${normalizedPath}`);
+                                console.warn(`[editTask]   This might indicate the file was never loaded`);
+                                // File will be created when markUnsavedChanges → trackIncludeFileUnsavedChanges is called
+                            }
+                        }
+                    }
+                }
+
+                // Note: Task include changes are saved when the main kanban file is saved
+                // The file instance has been updated above, so saving will write the correct content
                 break;
             case 'updateTaskFromStrikethroughDeletion':
                 await this.handleUpdateTaskFromStrikethroughDeletion(message);

@@ -1380,7 +1380,9 @@ export class KanbanWebviewPanel {
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    // FIX BUG #C: Normalize path before registry lookup
+                    const normalizedPath = this._includeFileManager._normalizeIncludePath(relativePath);
+                    const file = this._fileRegistry.getByRelativePath(normalizedPath) as ColumnIncludeFile;
                     if (file) {
                         try {
                             // Reload from disk and parse to tasks
@@ -1433,7 +1435,9 @@ export class KanbanWebviewPanel {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
+                        // FIX BUG #C: Normalize path before registry lookup
+                        const normalizedPath = this._includeFileManager._normalizeIncludePath(relativePath);
+                        const file = this._fileRegistry.getByRelativePath(normalizedPath) as TaskIncludeFile;
                         if (file) {
                             try {
                                 // Reload from disk and get content
