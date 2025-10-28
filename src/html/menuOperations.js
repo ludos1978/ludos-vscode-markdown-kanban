@@ -1297,15 +1297,12 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         // Create new title with updated include syntax
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-        // Send request to backend to switch the include file
-        // Backend will: save old file if needed, load new file, update column content
-        // WITHOUT saving the main kanban file
+        // SWITCH-4: Use editColumnTitle message (unified path)
+        // Backend's updateColumnIncludeFile() handles: undo, unsaved prompts, cleanup, loading, updates
         vscode.postMessage({
-            type: 'switchColumnIncludeFile',
+            type: 'editColumnTitle',
             columnId: columnId,
-            newFilePath: newFileName.trim(),
-            oldFilePath: currentFile,
-            newTitle: newTitle
+            title: newTitle
         });
 
         // Update button state to show unsaved changes (path changed but not saved to main file yet)

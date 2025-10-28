@@ -281,10 +281,7 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
-            // Switch column include file (load new file without saving main file)
-            case 'switchColumnIncludeFile':
-                await this.handleSwitchColumnIncludeFile(message);
-                break;
+            // SWITCH-3: Removed 'switchColumnIncludeFile' - now handled via 'editColumnTitle' → updateColumnIncludeFile()
 
             // Switch task include file (load new file without saving main file)
             case 'switchTaskIncludeFile':
@@ -598,33 +595,28 @@ export class MessageHandler {
                 break;
 
             case 'editColumnTitle':
-                // Check if this might be a column include file change
+                // SWITCH-2: Route through unified column include switch function
                 const currentBoard = this._getCurrentBoard();
-                console.log(`[MessageHandler] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
-                console.log(`[MessageHandler] Looking for column ID: ${message.columnId}`);
-                if (currentBoard?.columns) {
-                    console.log(`[MessageHandler] Available column IDs: ${currentBoard.columns.map(c => c.id).join(', ')}`);
+                console.log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
+                console.log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
+
+                if (!currentBoard) {
+                    console.error(`[SWITCH-2] No board loaded`);
+                    break;
                 }
 
-                const column = currentBoard?.columns.find(col => col.id === message.columnId);
-
-                // Save original column state BEFORE any changes (for rollback if needed)
-                const originalColumn = column ? { ...column, includeFiles: column.includeFiles ? [...column.includeFiles] : [] } : null;
+                const column = currentBoard.columns.find(col => col.id === message.columnId);
+                if (!column) {
+                    console.error(`[SWITCH-2] Column ${message.columnId} not found`);
+                    break;
+                }
 
                 // Check if the new title contains include syntax (location-based: column include)
                 const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
                 if (hasColumnIncludeMatches) {
-                    // CRITICAL: Verify column exists
-                    if (!column) {
-                        console.error(`[MessageHandler Error] Column ${message.columnId} not found in board for include switch`);
-                        console.error(`[MessageHandler Error] Board state:`, {
-                            hasBoard: !!currentBoard,
-                            columnCount: currentBoard?.columns?.length || 0,
-                            columnIds: currentBoard?.columns?.map(c => c.id) || []
-                        });
-                        break;
-                    }
+                    // Column include switch - use UNIFIED function
+                    console.log(`[SWITCH-2] Detected column include syntax, routing to updateColumnIncludeFile`);
 
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
@@ -633,33 +625,39 @@ export class MessageHandler {
                         newIncludeFiles.push(filePath);
                     });
 
-                    // STEP 1: Save undo state and update title FIRST
-                    // This ensures: (1) undo is saved, (2) displayTitle updated before content loads
-                    await this.performBoardActionSilent(() =>
-                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title)
-                    );
+                    // Get old include files for cleanup
+                    const oldIncludeFiles = column.includeFiles || [];
 
-                    // STEP 2: Switch includes - will send updated displayTitle to frontend
+                    // Call unified switch function
+                    // It handles: undo state, unsaved prompts, cleanup, loading, updates
                     const panel = this._getWebviewPanel();
-                    const oldIncludeFilesForSwitch = originalColumn?.includeFiles || [];
-                    await panel.handleIncludeSwitch({
-                        columnId: message.columnId,
-                        oldFiles: oldIncludeFilesForSwitch,
-                        newFiles: newIncludeFiles
-                    });
-
-                    // Mark board as having unsaved changes after include switch
-                    this._markUnsavedChanges(true, this._getCurrentBoard());
+                    try {
+                        await panel.updateColumnIncludeFile(
+                            message.columnId,
+                            oldIncludeFiles,
+                            newIncludeFiles,
+                            message.title
+                        );
+                        console.log(`[SWITCH-2] Column include switch completed successfully`);
+                    } catch (error: any) {
+                        if (error.message === 'USER_CANCELLED') {
+                            console.log(`[SWITCH-2] User cancelled switch, no changes made`);
+                        } else {
+                            console.error(`[SWITCH-2] Error during column include switch:`, error);
+                            vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
+                        }
+                    }
                 } else {
                     // Regular title edit without include syntax
+                    console.log(`[SWITCH-2] Regular column title edit (no include syntax)`);
                     await this.performBoardActionSilent(() =>
-                        this._boardOperations.editColumnTitle(currentBoard!, message.columnId, message.title)
+                        this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title)
                     );
                 }
 
                 // CRITICAL: Clear editing flag AFTER all processing is complete
                 // This prevents board regenerations during the edit processing above
-                console.log(`[MessageHandler] Edit completed - allowing board regenerations`);
+                console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
                 this._getWebviewPanel().setEditingInProgress(false);
                 break;
             case 'editTaskTitle':
@@ -2326,130 +2324,7 @@ export class MessageHandler {
         }
     }
 
-    /**
-     * Switch column include file without saving the main file
-     * - Saves old include file if it has unsaved changes
-     * - Creates and loads new include file
-     * - Updates column with new content
-     * - Does NOT save the main kanban file
-     */
-    private async handleSwitchColumnIncludeFile(message: any): Promise<void> {
-        try {
-            const panel = this._getWebviewPanel();
-            if (!panel) {
-                console.error('[switchColumnIncludeFile] No panel found');
-                return;
-            }
-
-            const { columnId, newFilePath, oldFilePath, newTitle } = message;
-            console.log(`[switchColumnIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for column ${columnId}`);
-
-            // 1. Check if old include file has unsaved changes and prompt user
-            const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
-            if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log('[switchColumnIncludeFile] Old file has unsaved changes, prompting user');
-
-                const choice = await vscode.window.showWarningMessage(
-                    `The include file "${oldFilePath}" has unsaved changes. What would you like to do?`,
-                    { modal: true },
-                    'Save and Switch',
-                    'Discard and Switch',
-                    'Cancel'
-                );
-
-                if (choice === 'Save and Switch') {
-                    console.log('[switchColumnIncludeFile] User chose to save and switch');
-                    await oldFile.save();
-                } else if (choice === 'Discard and Switch') {
-                    console.log('[switchColumnIncludeFile] User chose to discard changes and switch');
-                    oldFile.discardChanges();
-                } else {
-                    // Cancel or closed dialog
-                    console.log('[switchColumnIncludeFile] User cancelled switch');
-                    return;
-                }
-            }
-
-            // 2. Update board with new include path
-            const board = this._getCurrentBoard();
-            if (board) {
-                const column = board.columns.find((c: any) => c.id === columnId);
-                if (column) {
-                    column.title = newTitle;
-                    // FOUNDATION-1: Store ORIGINAL path (no normalization)
-                    column.includeFiles = [newFilePath];
-                    column.originalTitle = newTitle;
-                }
-            }
-
-            // FIX #2c: Cleanup old include file that is being replaced
-            if (oldFilePath && oldFilePath !== newFilePath) {
-                // FOUNDATION-1: Registry handles normalization internally
-                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(oldFilePath);
-                if (oldFileToCleanup) {
-                    console.log(`[switchColumnIncludeFile] Cleaning up old include file: ${oldFilePath}`);
-                    oldFileToCleanup.stopWatching();
-                    // FIX: Don't call dispose() - unregister() does it internally
-                    panel.fileRegistry.unregister(oldFileToCleanup.getPath());
-                    console.log(`[switchColumnIncludeFile] ✓ Old file unregistered and disposed`);
-                }
-            }
-
-            // 3. Create new include file in registry if it doesn't exist
-            if (!panel.fileRegistry?.hasByRelativePath(newFilePath)) {
-                const mainFile = panel.fileRegistry.getMainFile();
-                if (mainFile) {
-                    console.log('[switchColumnIncludeFile] Creating new ColumnIncludeFile');
-                    const columnInclude = panel._fileFactory.createColumnInclude(
-                        newFilePath,
-                        mainFile,
-                        false
-                    );
-                    panel.fileRegistry.register(columnInclude);
-                    columnInclude.startWatching();
-                }
-            }
-
-            // 4. Load content from file and parse tasks
-            const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
-            if (newFile && newFile.parseToTasks) {
-                // Ensure file has content loaded (may be empty if file was just created or content was cleared)
-                if (!newFile.getContent() || newFile.getContent().length === 0) {
-                    const content = await newFile.readFromDisk();
-                    if (content !== null) {
-                        newFile.setContent(content, true); // true = update baseline too
-                    } else {
-                        console.warn(`[switchColumnIncludeFile] Could not load content from file: ${newFilePath}`);
-                    }
-                }
-
-                // 5. Get updated column metadata from board
-                const column = board?.columns.find((c: any) => c.id === columnId);
-
-                // Parse tasks, preserving existing IDs from column
-                const tasks = newFile.parseToTasks(column?.tasks);
-                console.log(`[switchColumnIncludeFile] Loaded ${tasks.length} tasks from new file`);
-
-                // 6. Send updated content to frontend with all required fields
-                panel._panel?.webview.postMessage({
-                    type: 'updateColumnContent',
-                    columnId: columnId,
-                    tasks: tasks,
-                    columnTitle: column?.title || newTitle,
-                    displayTitle: column?.displayTitle,
-                    includeMode: true,
-                    includeFiles: [newFilePath]
-                });
-
-                // Success - no notification needed, user can see the change in the board
-                console.log(`[switchColumnIncludeFile] Successfully switched to: ${newFilePath}`);
-            }
-
-        } catch (error) {
-            console.error('[switchColumnIncludeFile] Error:', error);
-            vscode.window.showErrorMessage(`Failed to switch include file: ${error}`);
-        }
-    }
+    // SWITCH-3: Deleted handleSwitchColumnIncludeFile() - replaced by updateColumnIncludeFile() in KanbanWebviewPanel
 
     /**
      * Switch task include file without saving the main file

@@ -1954,6 +1954,200 @@ export class KanbanWebviewPanel {
     }
 
     /**
+     * SWITCH-1: UNIFIED COLUMN INCLUDE SWITCH
+     *
+     * Single unified function for ALL column include file switching operations.
+     * This is THE ONLY way to switch column include files - ensures consistency.
+     *
+     * Complete flow in ONE place:
+     * 1. Save undo state (via board action)
+     * 2. Prompt for unsaved changes in old files
+     * 3. Cleanup old files (stopWatching + unregister)
+     * 4. Update board state (title + includeFiles)
+     * 5. Register new file instances
+     * 6. Load new content (with FOUNDATION-2 cancellation)
+     * 7. Send updateColumnContent to frontend
+     * 8. Send full boardUpdate
+     * 9. Mark unsaved changes
+     *
+     * @param columnId The column ID to update
+     * @param oldFiles Array of old include file paths (for cleanup)
+     * @param newFiles Array of new include file paths (to load)
+     * @param newTitle The new column title (contains !!!include()!!! syntax)
+     * @throws Error if column not found or user cancels
+     */
+    public async updateColumnIncludeFile(
+        columnId: string,
+        oldFiles: string[],
+        newFiles: string[],
+        newTitle: string
+    ): Promise<void> {
+        console.log(`[SWITCH-1] updateColumnIncludeFile START`);
+        console.log(`[SWITCH-1]   columnId: ${columnId}`);
+        console.log(`[SWITCH-1]   oldFiles: [${oldFiles.join(', ')}]`);
+        console.log(`[SWITCH-1]   newFiles: [${newFiles.join(', ')}]`);
+        console.log(`[SWITCH-1]   newTitle: "${newTitle}"`);
+
+        // STEP 0: Verify column exists
+        const board = this._board;
+        if (!board) {
+            throw new Error('[SWITCH-1] No board loaded');
+        }
+
+        const column = board.columns.find(c => c.id === columnId);
+        if (!column) {
+            throw new Error(`[SWITCH-1] Column ${columnId} not found in board`);
+        }
+
+        console.log(`[SWITCH-1] Column found: "${column.title}"`);
+
+        // STEP 1: Save undo state FIRST (before ANY changes)
+        // This captures the current state so undo can restore it
+        console.log(`[SWITCH-1] STEP 1: Saving undo state`);
+        this._undoRedoManager.saveStateForUndo(board);
+
+        // STEP 2: Prompt for unsaved changes in old files
+        console.log(`[SWITCH-1] STEP 2: Checking for unsaved changes in old files`);
+        const filesToUnload = oldFiles.filter(old => !newFiles.includes(old));
+
+        if (filesToUnload.length > 0) {
+            const unsavedFiles = filesToUnload.filter(relativePath => {
+                const file = this._fileRegistry.getByRelativePath(relativePath);
+                return file && file.hasUnsavedChanges();
+            });
+
+            if (unsavedFiles.length > 0) {
+                console.log(`[SWITCH-1] Found ${unsavedFiles.length} unsaved files: [${unsavedFiles.join(', ')}]`);
+
+                const choice = await vscode.window.showWarningMessage(
+                    `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before switching?`,
+                    { modal: true },
+                    'Save',
+                    'Discard',
+                    'Cancel'
+                );
+
+                if (choice === 'Save') {
+                    console.log(`[SWITCH-1] User chose to save unsaved files`);
+                    for (const relativePath of unsavedFiles) {
+                        const file = this._fileRegistry.getByRelativePath(relativePath);
+                        if (file) {
+                            await file.save();
+                        }
+                    }
+                } else if (choice === 'Cancel') {
+                    console.log(`[SWITCH-1] User cancelled switch`);
+                    throw new Error('USER_CANCELLED');
+                }
+                // If 'Discard', continue
+                console.log(`[SWITCH-1] User chose to discard changes, continuing`);
+            }
+        }
+
+        // STEP 3: Cleanup old files (stopWatching + unregister)
+        console.log(`[SWITCH-1] STEP 3: Cleaning up old files`);
+        for (const relativePath of filesToUnload) {
+            const file = this._fileRegistry.getByRelativePath(relativePath);
+            if (file) {
+                console.log(`[SWITCH-1]   Cleaning up: ${relativePath}`);
+                file.stopWatching();
+                this._fileRegistry.unregister(file.getPath());
+                // Note: unregister() calls dispose() internally
+            }
+        }
+
+        // STEP 4: Update board state (title + includeFiles + includeMode)
+        console.log(`[SWITCH-1] STEP 4: Updating board state`);
+        column.title = newTitle;
+        column.originalTitle = newTitle;
+        column.includeFiles = [...newFiles]; // Store ORIGINAL paths (no normalization)
+        column.includeMode = newFiles.length > 0;
+
+        // Clear tasks until new content loads
+        column.tasks = [];
+
+        // Parse display title (remove !!!include()!!! syntax for UI)
+        column.displayTitle = newTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+        if (!column.displayTitle) {
+            column.displayTitle = 'Untitled Column';
+        }
+
+        console.log(`[SWITCH-1]   Updated column.title: "${column.title}"`);
+        console.log(`[SWITCH-1]   Updated column.displayTitle: "${column.displayTitle}"`);
+        console.log(`[SWITCH-1]   Updated column.includeFiles: [${column.includeFiles.join(', ')}]`);
+        console.log(`[SWITCH-1]   Updated column.includeMode: ${column.includeMode}`);
+
+        // STEP 5: Register new file instances (if not already registered)
+        console.log(`[SWITCH-1] STEP 5: Registering new file instances`);
+        const mainFile = this._fileRegistry.getMainFile();
+        if (!mainFile) {
+            throw new Error('[SWITCH-1] Main file not found in registry');
+        }
+
+        for (const relativePath of newFiles) {
+            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
+                console.log(`[SWITCH-1]   Creating new ColumnIncludeFile: ${relativePath}`);
+                const columnIncludeFile = this._fileFactory.createColumnInclude(
+                    relativePath,
+                    mainFile,
+                    false // autoLoad=false, we'll load manually next
+                );
+                this._fileRegistry.register(columnIncludeFile);
+                columnIncludeFile.startWatching();
+            } else {
+                console.log(`[SWITCH-1]   File already registered: ${relativePath}`);
+            }
+        }
+
+        // STEP 6: Load new content (with FOUNDATION-2 cancellation protection)
+        console.log(`[SWITCH-1] STEP 6: Loading new content`);
+        const tasks: KanbanTask[] = [];
+
+        for (const relativePath of newFiles) {
+            const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+            if (!file) {
+                console.warn(`[SWITCH-1] File not found after registration: ${relativePath}`);
+                continue;
+            }
+
+            // Ensure file has content loaded (reload() has cancellation protection from FOUNDATION-2)
+            if (!file.getContent() || file.getContent().length === 0) {
+                console.log(`[SWITCH-1]   Loading content from disk: ${relativePath}`);
+                await file.reload();
+            }
+
+            // Parse tasks from file content
+            if (file.parseToTasks) {
+                const fileTasks = file.parseToTasks(column.tasks); // Preserve existing task IDs if any
+                console.log(`[SWITCH-1]   Parsed ${fileTasks.length} tasks from ${relativePath}`);
+                tasks.push(...fileTasks);
+            }
+        }
+
+        // Update column with loaded tasks
+        column.tasks = tasks;
+        console.log(`[SWITCH-1]   Total tasks loaded: ${tasks.length}`);
+
+        // STEP 7: Send updateColumnContent to frontend
+        console.log(`[SWITCH-1] STEP 7: Sending updateColumnContent to frontend`);
+        this._panel?.webview.postMessage({
+            type: 'updateColumnContent',
+            columnId: column.id,
+            tasks: column.tasks,
+            columnTitle: column.title,
+            displayTitle: column.displayTitle,
+            includeMode: column.includeMode,
+            includeFiles: column.includeFiles
+        });
+
+        // STEP 8: REMOVED - sendBoardUpdate() causes full board redraw
+        // updateColumnContent (Step 7) is sufficient - only updates the switched column
+        // Avoids unnecessary visual flickering and performance issues
+
+        console.log(`[SWITCH-1] updateColumnIncludeFile COMPLETE ✓`);
+    }
+
+    /**
      * Handle file registry change events - ROUTES TO UNIFIED HANDLER
      */
     private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
