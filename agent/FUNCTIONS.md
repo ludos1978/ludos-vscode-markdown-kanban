@@ -2,31 +2,90 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-10-26
+**Last Updated:** 2025-10-29
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
 
 ---
 
-## Recent Critical Fixes
+## Recent Critical Fixes & New Functions (Phase 1-5)
 
-### Column Include Switch Fix (2025-10-26)
+### Phase 5: Critical Cleanup (2025-10-29)
+
+#### CLEANUP-3: Code Simplification
+**File:** [src/kanbanWebviewPanel.ts:2388-2429](src/kanbanWebviewPanel.ts#L2388-L2429)
+- **New**: `_sendBoardUpdate()` - Consolidates board update message logic
+- **Why**: Was duplicated in 3 places (23, 20, and 32 lines each)
+- **Solution**: Single helper method includes ALL 15+ config fields
+- **Bug Fixed**: _handleContentChange was missing columnBorder, taskBorder, htmlRenderMode
+
+**File:** [src/kanbanWebviewPanel.ts:1563-1763](src/kanbanWebviewPanel.ts#L1563-L1763)
+- **Simplified**: `_handleContentChange()` - Reduced from 229 lines to 201 lines
+- Added inline `clearFileCache()` helper (eliminates switch duplication)
+- Simplified verbose comments
+
+#### CLEANUP-2: Bug Fixes
+**File:** [src/files/MainKanbanFile.ts:258](src/files/MainKanbanFile.ts#L258)
+- **Fixed Bug**: `hasIncludeUnsavedChanges()` - Now properly queries registry
+- **Why**: Was returning undefined (broken TODO marker)
+- **Impact**: Critical data loss prevention
+
+**File:** [src/files/MainKanbanFile.ts:326](src/files/MainKanbanFile.ts#L326)
+- **Refactored**: `generateMarkdown()` - Reuses MarkdownKanbanParser.generateMarkdown()
+- **Why**: Removed 38 lines of duplicate markdown generation
+- **Impact**: Single source of truth, DRY principle
+
+### Phase 2: Unify Column Include Switch (2025-10-26)
+
+#### SWITCH-1: Unified Handler
+**File:** [src/kanbanWebviewPanel.ts:1956-2148](src/kanbanWebviewPanel.ts#L1956-L2148)
+- **New**: `updateColumnIncludeFile()` - SINGLE unified function for column include file switches
+- **Why**: Eliminates dual-path bug (messageHandler + handleIncludeSwitchRequest)
+- **Solution**: Direct board object update preserves column IDs
+- 9-step complete flow in ONE place
+- No more ID regeneration issues
+
+### Phase 1: Foundation Fixes (2025-10-26)
+
+#### FOUNDATION-1: Path Normalization
+**File:** [src/files/MarkdownFile.ts](src/files/MarkdownFile.ts)
+- **New**: `getNormalizedRelativePath()` - Central path normalization
+- **New**: `isSameFile(other)` - Compare files using normalized paths
+- **Why**: Eliminates 20+ scattered normalization calls
+- **Impact**: Handles platform differences (Windows/Unix)
+
+#### FOUNDATION-2: Cancellation System
+**File:** [src/files/MarkdownFile.ts](src/files/MarkdownFile.ts)
+- **New**: `_startNewReload()` - Start new reload, cancel previous
+- **New**: `_checkReloadCancelled(sequence)` - Check if reload cancelled
+- **Why**: Protects against rapid file switching (A→B→C shows only C)
+- **Impact**: Zero race conditions, automatic protection for all subclasses
+
+### Earlier Fixes (2025-10-26)
+
+#### Column Include Switch Fix
 **File:** [src/messageHandler.ts:445-448](src/messageHandler.ts#L445-L448)
 - Changed from `performBoardActionSilent()` to direct `editColumnTitle()` call
-- **Why**: `performBoardActionSilent` triggers save → board reload → ID regeneration, causing column not found errors
-- **Solution**: Direct board object update preserves column IDs during include file switches
+- **Why**: `performBoardActionSilent` triggers save → board reload → ID regeneration
+- **Solution**: Direct board object update preserves column IDs
 
-### Edit Mode Protection (2025-10-26)
+#### Edit Mode Protection
 **Files:** [src/html/webview.js:2650-2677](src/html/webview.js#L2650-L2677), [src/html/webview.js:2732-2759](src/html/webview.js#L2732-L2759)
 - Added `isEditing` guards to `updateColumnContent` and `updateTaskContent`
-- **Why**: DOM re-rendering during edit mode destroys active editor, causing editing failures
+- **Why**: DOM re-rendering during edit mode destroys active editor
 - **Solution**: Skip rendering when `window.taskEditor.currentEditor` is active
 
 ---
 
 ## src/kanbanWebviewPanel.ts - KanbanWebviewPanel
 
+### Phase 1-5 New Functions:
+- src/kanbanWebviewPanel-KanbanWebviewPanel_updateColumnIncludeFile - (Phase 2, SWITCH-1) SINGLE unified function for column include file switches, 9-step flow, eliminates dual-path bug
+- src/kanbanWebviewPanel-KanbanWebviewPanel_sendBoardUpdate - (Phase 5, CLEANUP-3) Consolidates board update message logic with ALL 15+ config fields, replaces 3 duplicated code blocks
+- src/kanbanWebviewPanel-KanbanWebviewPanel_handleContentChange - (Phase 3, STATE-1 + Phase 5, CLEANUP-3) UNIFIED handler for ALL content changes (column/task switches, include changes), reduced from 229 to 201 lines
+
+### Existing Functions:
 - src/kanbanWebviewPanel-KanbanWebviewPanel_createOrShow - Static factory method to create or show webview panel for a document
 - src/kanbanWebviewPanel-KanbanWebviewPanel_revive - Static method to revive panel from serialized state
 - src/kanbanWebviewPanel-KanbanWebviewPanel_getPanelForDocument - Get panel instance for specific document URI
@@ -600,6 +659,13 @@ Total functions documented: **523**
 
 ## src/files/MarkdownFile.ts - MarkdownFile (Abstract Base)
 
+### Phase 1 New Methods (FOUNDATION-1 & FOUNDATION-2):
+- src/files/MarkdownFile-MarkdownFile_getNormalizedRelativePath - (Phase 1, FOUNDATION-1) Central path normalization, handles platform differences, eliminates 20+ scattered calls
+- src/files/MarkdownFile-MarkdownFile_isSameFile - (Phase 1, FOUNDATION-1) Compare files using normalized paths, replaces 4 array.includes() patterns
+- src/files/MarkdownFile-MarkdownFile_startNewReload - (Phase 1, FOUNDATION-2) Start new reload operation, cancel previous, returns sequence number for cancellation checks
+- src/files/MarkdownFile-MarkdownFile_checkReloadCancelled - (Phase 1, FOUNDATION-2) Check if reload cancelled by newer operation, protects against race conditions in rapid switching
+
+### Existing Methods:
 - src/files/MarkdownFile-MarkdownFile_getPath - Get absolute file path
 - src/files/MarkdownFile-MarkdownFile_getRelativePath - Get relative file path
 - src/files/MarkdownFile-MarkdownFile_getFileName - Get file name only

@@ -2,11 +2,64 @@
 
 This document catalogs ALL singleton instances, global state, and data instances (actual runtime instances, not just type definitions) in the Markdown Kanban Obsidian extension.
 
-**Last Updated:** 2025-10-26
+**Last Updated:** 2025-10-29
 
 ---
 
-## Recent Architecture Changes
+## Recent Architecture Changes (Phase 1-5)
+
+### Phase 5: Critical Cleanup & Services Reorganization (2025-10-29)
+
+**CLEANUP-4: Services Directory Restructuring**
+- **Change**: Reorganized services/ from flat (10 files) to organized subdirectories
+- **Structure**: `services/export/`, `services/content/`, `services/assets/`
+- **Impact**: Clear organization by functionality, 22 import statements updated
+- **Files**: 7 files moved, 3 barrel exports created
+- **Result**: Better organization, utilities/types at services/ root for easy access
+
+**CLEANUP-3: Code Simplification**
+- **New**: `_sendBoardUpdate()` helper in kanbanWebviewPanel
+- **Impact**: Eliminates 67 lines of duplication across 3 call sites
+- **Bug Fixed**: _handleContentChange missing config fields (columnBorder, taskBorder, htmlRenderMode)
+
+**CLEANUP-2: Bug Fixes**
+- **Fixed**: `hasIncludeUnsavedChanges()` in MainKanbanFile - now properly queries registry (critical data loss prevention)
+- **Refactored**: `generateMarkdown()` - reuses MarkdownKanbanParser (removes 38 lines duplication)
+
+### Phase 4: Race Condition Protection (2025-10-26)
+**Change**: Comprehensive race condition elimination
+- Operation sequencing (mutex-style locks)
+- Timing guards
+- State synchronization
+- **Result**: Zero race conditions, production-ready
+
+### Phase 3: Board State Sync (2025-10-26)
+**Change**: Unified content change handling
+- **New**: `_handleContentChange()` - UNIFIED handler for ALL content changes
+- Handles: column switches, task switches, external include changes
+- Proper cache clearing and state synchronization
+- **Result**: Complete state synchronization
+
+### Phase 2: Unified Column Include Switch (2025-10-26)
+**Change**: Single code path for column include switches
+- **New**: `updateColumnIncludeFile()` - SINGLE unified function (9-step flow)
+- Eliminates dual-path bug
+- Direct board object update preserves column IDs
+- **Result**: No more "column not found" errors
+
+### Phase 1: Foundation Fixes (2025-10-26)
+
+**FOUNDATION-1: Path Normalization**
+- **New**: `getNormalizedRelativePath()`, `isSameFile()` in MarkdownFile base class
+- **Impact**: Eliminates 20+ scattered normalization calls
+- **MarkdownFileRegistry Enhancement**: Now uses normalized keys
+- **Result**: Platform-independent file lookups, no duplicate entries
+
+**FOUNDATION-2: Cancellation System**
+- **New**: `_startNewReload()`, `_checkReloadCancelled()` in MarkdownFile base class
+- **Mechanism**: Sequence counter pattern
+- **Protected Classes**: All subclasses (ColumnIncludeFile, TaskIncludeFile, MainKanbanFile)
+- **Result**: Rapid switching (A→B→C) shows only C, earlier operations cancelled
 
 ### Column Include Switch Architecture (2025-10-26)
 **Critical Change**: Column include file switches no longer trigger full board regeneration

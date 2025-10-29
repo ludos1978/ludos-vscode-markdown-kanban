@@ -2,7 +2,7 @@
 
 This document provides a comprehensive overview of all interfaces, types, classes, and enums that define data structures in the Markdown Kanban codebase.
 
-**Last Updated:** 2025-10-26
+**Last Updated:** 2025-10-29
 
 ---
 
@@ -151,6 +151,40 @@ interface FileResolutionResult {
 ```
 
 **Purpose**: Provides detailed information about file path resolution attempts.
+
+---
+
+## Services Organization (Phase 5, 2025-10-29)
+
+### Services Directory Structure
+
+**Location**: `/src/services/`
+
+The services directory is organized by functionality into subdirectories:
+
+```
+src/services/
+├── export/                      (Export-related services)
+│   ├── MarpExportService.ts     - Marp CLI integration (592 lines)
+│   ├── FormatConverter.ts       - Format transformations (336 lines)
+│   ├── MarpConverter.ts         - Kanban → Marp conversion (273 lines)
+│   ├── MarpExtensionService.ts  - VS Code Marp extension (203 lines)
+│   └── index.ts                 - Barrel export
+├── content/                     (Content processing services)
+│   ├── ContentPipelineService.ts - Content pipeline (456 lines)
+│   ├── IncludeProcessor.ts       - Include processing (404 lines)
+│   └── index.ts                  - Barrel export
+├── assets/                      (Asset handling services)
+│   ├── AssetHandler.ts           - Asset operations (410 lines)
+│   └── index.ts                  - Barrel export
+├── OperationOptions.ts          - Type definitions (416 lines)
+├── FileWriter.ts                - File writing utilities (309 lines)
+└── PathResolver.ts              - Path resolution (242 lines)
+```
+
+**Purpose**: Clear organization by functionality (export vs content vs assets). Utilities and types remain at services/ root for easy access.
+
+**Note**: This restructuring was completed in Phase 5 (CLEANUP-4). 22 import statements were updated across 9 files.
 
 ---
 
@@ -734,6 +768,22 @@ Abstract base class for all markdown files with integrated change detection.
 - Integrated file watching and change detection
 - Event emitter for state changes
 - Polymorphic file operations
+- **Path normalization** (Phase 1, FOUNDATION-1): getNormalizedRelativePath(), isSameFile()
+- **Cancellation system** (Phase 1, FOUNDATION-2): _startNewReload(), _checkReloadCancelled()
+
+**Phase 1 Enhancements** (2025-10-26):
+
+1. **Path Normalization Methods**:
+   - `getNormalizedRelativePath(): string` - Returns normalized relative path for consistent lookups
+   - `isSameFile(other: MarkdownFile): boolean` - Compares files using normalized paths
+   - **Purpose**: Eliminates 20+ scattered normalization calls, handles platform differences
+
+2. **Cancellation System**:
+   - `_currentReloadSequence: number` - Sequence counter for cancellation
+   - `_startNewReload(): number` - Starts new reload, cancels previous operations
+   - `_checkReloadCancelled(sequence: number): boolean` - Checks if reload cancelled
+   - **Purpose**: Protects against race conditions in rapid file switching (A→B→C shows only C)
+   - **Automatic protection**: All subclasses inherit cancellation (ColumnIncludeFile, TaskIncludeFile, MainKanbanFile)
 
 ### `/src/files/MainKanbanFile.ts`
 
@@ -820,6 +870,12 @@ Central registry for all markdown files.
 - Bulk operations (saveAll(), reloadAll(), etc.)
 - Statistics and monitoring
 - Event aggregation
+
+**Phase 1 Enhancement** (2025-10-26):
+- **Normalized keys**: Registry now uses `file.getNormalizedRelativePath()` as keys
+- **Platform-independent**: Eliminates duplicate entries for same file (Windows vs Unix paths)
+- **Consistent lookups**: All lookups normalized automatically
+- **Impact**: Fixes path comparison bugs across platforms
 
 ### `/src/files/FileFactory.ts`
 

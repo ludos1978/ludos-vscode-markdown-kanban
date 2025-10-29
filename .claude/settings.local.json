@@ -54,7 +54,8 @@
       "Bash(while read file)",
       "Bash(do basename \"$file\")",
       "Bash(wc:*)",
-      "Bash(tac:*)"
+      "Bash(tac:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
