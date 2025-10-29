@@ -3725,12 +3725,10 @@ export class MessageHandler {
                 line ? `${indent}${line}` : indent.trimEnd()
             ).join('\n');
 
-            // Create replacement with commented PlantUML + image, preserving indentation
-            return `${indent}<!-- PlantUML converted to SVG
-${indent}\`\`\`plantuml
+            // Create replacement with disabled PlantUML block + image, preserving indentation
+            return `${indent}\`\`\`plantuml-disabled
 ${indentedCode}
 ${indent}\`\`\`
-${indent}-->
 
 ${indent}![PlantUML Diagram](${svgRelativePath})`;
         });
@@ -3778,11 +3776,9 @@ ${indent}![PlantUML Diagram](${svgRelativePath})`;
         if (bestMatch) {
             console.log(`[PlantUML] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
 
-            const replacement = `<!-- PlantUML converted to SVG
-\`\`\`plantuml
+            const replacement = `\`\`\`plantuml-disabled
 ${plantUMLCode}
 \`\`\`
--->
 
 ![PlantUML Diagram](${svgRelativePath})`;
 
@@ -3945,12 +3941,10 @@ ${plantUMLCode}
                 line ? `${indent}${line}` : indent.trimEnd()
             ).join('\n');
 
-            // Create replacement with commented Mermaid + image, preserving indentation
-            return `${indent}<!-- Mermaid converted to SVG
-${indent}\`\`\`mermaid
+            // Create replacement with disabled Mermaid block + image, preserving indentation
+            return `${indent}\`\`\`mermaid-disabled
 ${indentedCode}
 ${indent}\`\`\`
-${indent}-->
 
 ${indent}![Mermaid Diagram](${svgRelativePath})`;
         });
@@ -3998,11 +3992,9 @@ ${indent}![Mermaid Diagram](${svgRelativePath})`;
         if (bestMatch) {
             console.log(`[Mermaid] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
 
-            const replacement = `<!-- Mermaid converted to SVG
-\`\`\`mermaid
+            const replacement = `\`\`\`mermaid-disabled
 ${mermaidCode}
 \`\`\`
--->
 
 ![Mermaid Diagram](${svgRelativePath})`;
 

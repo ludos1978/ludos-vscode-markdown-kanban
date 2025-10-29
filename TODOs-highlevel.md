@@ -9,3 +9,6 @@
   - [x] Package size: 4.2MB jar + 17MB jar.js (one-time load, then cached)
 
 - [ ] Add mermaid rendering into the kanban and the export!
+- [ ] Could we add a feature that we could add full pdf files or individual pages from pdf files, where each page is a task? 
+  - the format would be something like ![](path/to/document.pdf p13)  for page 13 of the pdf.
+  - best if you create a markdown-it plugin for it. as it should also work in the export.

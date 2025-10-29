@@ -17,3 +17,5 @@ src/test/extension.test.js
 tools/reports
 code-analysis-report.json
 tests/kanban-huge-test
+tests/kanban-graph-tools/_Export
+tests/kanban-graph-tools/Media-kanban-graphs
