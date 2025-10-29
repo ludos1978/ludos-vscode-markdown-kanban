@@ -8,6 +8,40 @@ import * as vscode from 'vscode';
  */
 export class PlantUMLService {
     private graphvizWarningShown = false;
+
+    /**
+     * Check if Graphviz is installed on the system
+     * @returns true if Graphviz is available, false otherwise
+     */
+    private isGraphvizInstalled(): boolean {
+        try {
+            execSync('dot -V', { stdio: 'pipe' });
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Show a warning to the user if Graphviz is not installed
+     */
+    private showGraphvizWarning(): void {
+        if (this.graphvizWarningShown) {
+            return; // Only show once per session
+        }
+
+        this.graphvizWarningShown = true;
+
+        const message = 'Graphviz is not installed. Some PlantUML diagrams (class, activity, state, component) may not render correctly. Install Graphviz for full diagram support.';
+        const installButton = 'How to Install';
+
+        vscode.window.showWarningMessage(message, installButton).then(selection => {
+            if (selection === installButton) {
+                vscode.env.openExternal(vscode.Uri.parse('https://graphviz.org/download/'));
+            }
+        });
+    }
+
     /**
      * Render PlantUML code to SVG format
      * @param code PlantUML code (should include @startuml/@enduml wrapper)
@@ -18,6 +52,12 @@ export class PlantUMLService {
             try {
                 console.log('[PlantUML Service] Starting SVG render (direct Java spawn)...');
                 console.log('[PlantUML Service] Code length:', code.length);
+
+                // Check if Graphviz is installed and warn user if not
+                if (!this.isGraphvizInstalled()) {
+                    console.warn('[PlantUML Service] Graphviz not found - some diagrams may not render correctly');
+                    this.showGraphvizWarning();
+                }
 
                 // Bypass node-plantuml and spawn Java directly
                 // node-plantuml doesn't work in VS Code extension context
