@@ -6,11 +6,11 @@ import * as crypto from 'crypto';
 import { TagUtils, TagVisibility } from './utils/tagUtils';
 import { MarkdownKanbanParser } from './markdownParser';
 import { PresentationParser } from './presentationParser';
-import { ContentPipelineService } from './services/ContentPipelineService';
+import { ContentPipelineService } from './services/content/ContentPipelineService';
 import { OperationOptionsBuilder, OperationOptions, FormatStrategy } from './services/OperationOptions';
 import { PathResolver } from './services/PathResolver';
-import { MarpConverter, MarpConversionOptions } from './services/MarpConverter';
-import { MarpExportService, MarpOutputFormat } from './services/MarpExportService';
+import { MarpConverter, MarpConversionOptions } from './services/export/MarpConverter';
+import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
 
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';

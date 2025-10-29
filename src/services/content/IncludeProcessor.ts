@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PathResolver } from './PathResolver';
-import { FormatConverter } from './FormatConverter';
-import { IncludeMode, IncludeType } from './OperationOptions';
+import { PathResolver } from '../PathResolver';
+import { FormatConverter } from '../export/FormatConverter';
+import { IncludeMode, IncludeType } from '../OperationOptions';
 
 /**
  * Unified include file processing utility

@@ -1,5 +1,5 @@
-import { PresentationParser } from '../presentationParser';
-import { KanbanColumn, KanbanTask } from '../markdownParser';
+import { PresentationParser } from '../../presentationParser';
+import { KanbanColumn, KanbanTask } from '../../markdownParser';
 
 /**
  * Unified format conversion utility

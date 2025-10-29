@@ -1,14 +1,14 @@
 import * as path from 'path';
-import { PathResolver } from './PathResolver';
-import { FileWriter, FileToWrite } from './FileWriter';
-import { FormatConverter } from './FormatConverter';
+import { PathResolver } from '../PathResolver';
+import { FileWriter, FileToWrite } from '../FileWriter';
+import { FormatConverter } from '../export/FormatConverter';
 import { IncludeProcessor } from './IncludeProcessor';
-import { AssetHandler } from './AssetHandler';
+import { AssetHandler } from '../assets/AssetHandler';
 import {
     OperationOptions,
     OperationResult,
     FileWriteInfo
-} from './OperationOptions';
+} from '../OperationOptions';
 
 /**
  * Unified content pipeline service

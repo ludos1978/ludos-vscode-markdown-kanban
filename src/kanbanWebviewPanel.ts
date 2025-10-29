@@ -14,7 +14,7 @@ import { ConflictResolver, ConflictContext, ConflictResolution } from './conflic
 import { configService, ConfigurationService } from './configurationService';
 import { PathResolver } from './services/PathResolver';
 import { FileWriter } from './services/FileWriter';
-import { FormatConverter } from './services/FormatConverter';
+import { FormatConverter } from './services/export/FormatConverter';
 import { SaveEventCoordinator } from './saveEventCoordinator';
 import { IncludeFileManager } from './includeFileManager';
 import { KanbanFileService } from './kanbanFileService';
@@ -113,26 +113,7 @@ export class KanbanWebviewPanel {
             // Note: There's a race condition where the webview JavaScript might not be ready yet.
             // Ideally the webview should send a 'ready' message and we wait for that (request-response pattern).
             // For now, sending immediately and the webview should handle late-arriving messages gracefully.
-            this._panel.webview.postMessage({
-                type: 'boardUpdate',
-                board: board,
-                columnWidth: configService.getConfig('columnWidth', '350px'),
-                taskMinHeight: configService.getConfig('taskMinHeight'),
-                sectionHeight: configService.getConfig('sectionHeight'),
-                taskSectionHeight: configService.getConfig('taskSectionHeight'),
-                fontSize: configService.getConfig('fontSize'),
-                fontFamily: configService.getConfig('fontFamily'),
-                whitespace: configService.getConfig('whitespace', '8px'),
-                layoutRows: configService.getConfig('layoutRows'),
-                rowHeight: configService.getConfig('rowHeight'),
-                layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                layoutPresets: this._getLayoutPresetsConfiguration(),
-                maxRowHeight: configService.getConfig('maxRowHeight', 0),
-                tagColors: configService.getConfig('tagColors', {}),
-                enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-                enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-                customTagCategories: configService.getCustomTagCategories()
-            });
+            this._sendBoardUpdate(board);
         }
     }
 
@@ -952,63 +933,17 @@ export class KanbanWebviewPanel {
 
         // Generate image path mappings without modifying the board content
         const imageMappings = await this._generateImageMappings(board);
-        
-        // Get all configuration values
-        const tagColors = configService.getConfig('tagColors', {});
-        const enabledTagCategoriesColumn = configService.getEnabledTagCategoriesColumn();
-        const enabledTagCategoriesTask = configService.getEnabledTagCategoriesTask();
-        const customTagCategories = configService.getCustomTagCategories();
-        const whitespace = configService.getConfig('whitespace', '8px');
-        const taskMinHeight = configService.getConfig('taskMinHeight');
-        const sectionHeight = configService.getConfig('sectionHeight');
-        const taskSectionHeight = configService.getConfig('taskSectionHeight');
-        const fontSize = configService.getConfig('fontSize');
-        const fontFamily = configService.getConfig('fontFamily');
-        const columnWidth = configService.getConfig('columnWidth', '350px');
-        const layoutRows = configService.getConfig('layoutRows');
-        const rowHeight = configService.getConfig('rowHeight');
-        const layoutPreset = configService.getConfig('layoutPreset', 'normal');
-        const layoutPresets = await this._getLayoutPresetsConfiguration();
-        const maxRowHeight = configService.getConfig('maxRowHeight', 0);
-        const columnBorder = configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)');
-        const taskBorder = configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)');
-        const htmlCommentRenderMode = configService.getConfig('htmlCommentRenderMode', 'hidden');
-        const htmlContentRenderMode = configService.getConfig('htmlContentRenderMode', 'html');
-
-        console.log('[Border-Debug] About to send via postMessage - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
         // Get version from package.json
         const packageJson = require('../package.json');
         const version = packageJson.version || 'Unknown';
 
         // Send boardUpdate immediately - no delay needed
-        this._panel.webview.postMessage({
-            type: 'boardUpdate',
-            board: board,
-            imageMappings: imageMappings,
-            tagColors: tagColors,
-            enabledTagCategoriesColumn: enabledTagCategoriesColumn,
-            enabledTagCategoriesTask: enabledTagCategoriesTask,
-            customTagCategories: customTagCategories,
-            whitespace: whitespace,
-            taskMinHeight: taskMinHeight,
-            sectionHeight: sectionHeight,
-            taskSectionHeight: taskSectionHeight,
-            fontSize: fontSize,
-            fontFamily: fontFamily,
-            columnWidth: columnWidth,
-            layoutRows: layoutRows,
-            rowHeight: rowHeight,
-            layoutPreset: layoutPreset,
-            layoutPresets: layoutPresets,
-            maxRowHeight: maxRowHeight,
-            columnBorder: columnBorder,
-            taskBorder: taskBorder,
-            htmlCommentRenderMode: htmlCommentRenderMode,
-            htmlContentRenderMode: htmlContentRenderMode,
-            applyDefaultFolding: applyDefaultFolding,
-            isFullRefresh: isFullRefresh,
-            version: version
+        this._sendBoardUpdate(board, {
+            imageMappings,
+            isFullRefresh,
+            applyDefaultFolding,
+            version
         });
 
         // Send include file contents immediately after board update
@@ -1682,21 +1617,25 @@ export class KanbanWebviewPanel {
         // Step 3: Unset old includes, clear cache, set new includes, load new content
         if (hasSwitches) {
             const board = this.getBoard();
+
+            // Helper: Clear backend cache for files being unloaded
+            const clearFileCache = (files: string[], label: string) => {
+                for (const file of files) {
+                    const instance = this._fileRegistry.getByRelativePath(file);
+                    if (instance) {
+                        console.log(`[UNIFIED] ${label}: Clearing cache for ${file}`);
+                        instance.discardChanges(); // Revert to baseline (disk content)
+                    }
+                }
+            };
+
             for (const switchInfo of params.switchedIncludes!) {
                 if (switchInfo.columnId) {
                     // Column include switch
                     const column = board?.columns.find(c => c.id === switchInfo.columnId);
                     if (column) {
                         console.log(`[UNIFIED] Column switch: unsetting old includes, clearing cache`);
-
-                        // CRITICAL: Clear backend cache (file instance) for old includes
-                        for (const oldFile of switchInfo.oldFiles) {
-                            const fileInstance = this._fileRegistry.getByRelativePath(oldFile);
-                            if (fileInstance) {
-                                console.log(`[UNIFIED]   Clearing backend cache for: ${oldFile}`);
-                                fileInstance.discardChanges(); // Revert to baseline (disk content)
-                            }
-                        }
+                        clearFileCache(switchInfo.oldFiles, 'Column switch');
 
                         // Unset old includeFiles and clear frontend cache
                         column.includeFiles = [];
@@ -1718,15 +1657,7 @@ export class KanbanWebviewPanel {
                     if (task) {
                         console.log(`[UNIFIED] Task switch: unsetting old includes, clearing cache`);
                         console.log(`[UNIFIED]   Old: includeFiles=${task.includeFiles}, displayTitle="${task.displayTitle}", description length=${task.description?.length || 0}`);
-
-                        // CRITICAL: Clear backend cache (file instance) for old includes
-                        for (const oldFile of switchInfo.oldFiles) {
-                            const fileInstance = this._fileRegistry.getByRelativePath(oldFile);
-                            if (fileInstance) {
-                                console.log(`[UNIFIED]   Clearing backend cache for: ${oldFile}`);
-                                fileInstance.discardChanges(); // Revert to baseline (disk content)
-                            }
-                        }
+                        clearFileCache(switchInfo.oldFiles, 'Task switch');
 
                         // Unset old includeFiles and clear frontend cache
                         task.includeFiles = [];
@@ -1770,14 +1701,10 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Step 4: External include changes handled by file instances
-        // STRATEGY 1: Files handle their own external changes autonomously via file.handleExternalChange()
-        // The unified handler only responds to user actions (edits, switches)
-        // This prevents duplicate dialogs and ensures single responsibility
+        // Step 4: External include changes are handled autonomously by file instances
+        // (prevents duplicate dialogs, maintains single responsibility)
         if (hasIncludeChanges) {
             console.log('[UNIFIED] External include changes detected - files will handle autonomously');
-            // Files already handle their own external changes via file.handleExternalChange()
-            // No action needed here - this prevents duplicate dialogs
         }
 
         // Step 5: Update frontend & backend cache for main file
@@ -1822,28 +1749,7 @@ export class KanbanWebviewPanel {
                     this._boardCacheValid = true;
 
                     // Send full board to frontend
-                    if (this._panel) {
-                        this._panel.webview.postMessage({
-                            type: 'boardUpdate',
-                            board: board,
-                            columnWidth: configService.getConfig('columnWidth', '350px'),
-                            taskMinHeight: configService.getConfig('taskMinHeight'),
-                            sectionHeight: configService.getConfig('sectionHeight'),
-                            taskSectionHeight: configService.getConfig('taskSectionHeight'),
-                            fontSize: configService.getConfig('fontSize'),
-                            fontFamily: configService.getConfig('fontFamily'),
-                            whitespace: configService.getConfig('whitespace', '8px'),
-                            layoutRows: configService.getConfig('layoutRows'),
-                            rowHeight: configService.getConfig('rowHeight'),
-                            layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                            layoutPresets: this._getLayoutPresetsConfiguration(),
-                            maxRowHeight: configService.getConfig('maxRowHeight', 0),
-                            tagColors: configService.getConfig('tagColors', {}),
-                            enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-                            enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-                            customTagCategories: configService.getCustomTagCategories()
-                        });
-                    }
+                    this._sendBoardUpdate(board);
                 }
             }
         }
@@ -2383,6 +2289,49 @@ export class KanbanWebviewPanel {
                 }
             }
         }
+    }
+
+    /**
+     * Send full board update to frontend with all configuration
+     * Helper to consolidate board update message logic
+     */
+    private _sendBoardUpdate(board: KanbanBoard, options: {
+        imageMappings?: Record<string, string>;
+        isFullRefresh?: boolean;
+        applyDefaultFolding?: boolean;
+        version?: string;
+    } = {}): void {
+        if (!this._panel) return;
+
+        this._panel.webview.postMessage({
+            type: 'boardUpdate',
+            board: board,
+            columnWidth: configService.getConfig('columnWidth', '350px'),
+            taskMinHeight: configService.getConfig('taskMinHeight'),
+            sectionHeight: configService.getConfig('sectionHeight'),
+            taskSectionHeight: configService.getConfig('taskSectionHeight'),
+            fontSize: configService.getConfig('fontSize'),
+            fontFamily: configService.getConfig('fontFamily'),
+            whitespace: configService.getConfig('whitespace', '8px'),
+            layoutRows: configService.getConfig('layoutRows'),
+            rowHeight: configService.getConfig('rowHeight'),
+            layoutPreset: configService.getConfig('layoutPreset', 'normal'),
+            layoutPresets: this._getLayoutPresetsConfiguration(),
+            maxRowHeight: configService.getConfig('maxRowHeight', 0),
+            columnBorder: configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)'),
+            taskBorder: configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)'),
+            htmlCommentRenderMode: configService.getConfig('htmlCommentRenderMode', 'hidden'),
+            htmlContentRenderMode: configService.getConfig('htmlContentRenderMode', 'html'),
+            tagColors: configService.getConfig('tagColors', {}),
+            enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
+            enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
+            customTagCategories: configService.getCustomTagCategories(),
+            // Optional fields for full board loads
+            ...(options.imageMappings && { imageMappings: options.imageMappings }),
+            ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
+            ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
+            ...(options.version && { version: options.version })
+        });
     }
 
     /**

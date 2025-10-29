@@ -1,3 +1,7 @@
+## Most important RULEs
+- For every task make 3 suggestions how to solve or approach the issue, each with an expected quality. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
+- if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
+
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.
 - use the data chache to store modifications unless the user saves the data.

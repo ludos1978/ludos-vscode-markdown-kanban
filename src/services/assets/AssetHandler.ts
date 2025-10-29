@@ -1,10 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { PathResolver } from './PathResolver';
-import { FileWriter } from './FileWriter';
-import { AssetStrategy } from './OperationOptions';
-import { MIME_TYPE_MAP } from '../shared/fileTypeDefinitions';
+import { PathResolver } from '../PathResolver';
+import { FileWriter } from '../FileWriter';
+import { AssetStrategy } from '../OperationOptions';
+import { MIME_TYPE_MAP } from '../../shared/fileTypeDefinitions';
 
 /**
  * Unified asset handling utility

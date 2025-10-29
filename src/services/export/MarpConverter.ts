@@ -1,5 +1,5 @@
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
-import { TagUtils, TagVisibility } from '../utils/tagUtils';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
+import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 
 export interface MarpConversionOptions {
     /** Marp theme to use */

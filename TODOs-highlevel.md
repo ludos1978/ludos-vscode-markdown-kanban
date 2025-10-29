@@ -1,0 +1,2 @@
+- plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
+- analyze how we could incorporate the https://github.com/plantuml/plantuml.js rendering engine into the markdown renderer. but i want the use the normal code render syntax ```plantuml ... ``` instead of @startuml as it's by default in this addon if that can be done without modifying the plantuml.js code .
