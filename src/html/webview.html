@@ -10,7 +10,10 @@
     <!-- Only load essential plugins that are available on cdnjs.cloudflare.com for CSP compliance -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-emoji/3.0.0/markdown-it-emoji.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-footnote/4.0.0/markdown-it-footnote.min.js"></script>
-    
+
+    <!-- Mermaid for diagram rendering (completely offline after loading) -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
     <!-- Note: Most markdown-it plugins are not available on cdnjs.cloudflare.com due to CSP restrictions -->
     <!-- Advanced plugin functionality will be provided via npm packages and bundling -->
     
@@ -163,6 +166,123 @@
         }
 
         .task-description-container .markdown-content img[src*="plantuml"] {
+            max-width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+            width: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* ============================================================================
+           Mermaid Diagram Styles
+           ============================================================================ */
+
+        /* Placeholder (shown while rendering) */
+        .mermaid-placeholder {
+            margin: 1em 0;
+            padding: 2em 1em;
+            background: var(--vscode-editor-background);
+            border: 2px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Rendered diagram container */
+        .mermaid-diagram {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            position: relative;
+        }
+
+        .mermaid-diagram svg {
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            display: inline-block;
+            object-fit: contain;
+        }
+
+        /* Ensure aspect ratio is preserved in task descriptions */
+        .task-description-container .mermaid-diagram svg {
+            max-width: 100% !important;
+            max-height: none !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* Action buttons */
+        .mermaid-actions {
+            margin-top: 0.5em;
+            padding-top: 0.5em;
+            border-top: 1px solid var(--vscode-panel-border);
+            text-align: right;
+        }
+
+        .mermaid-convert-btn {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 0.4em 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .mermaid-convert-btn:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        .mermaid-convert-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Error display */
+        .mermaid-error {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-inputValidation-errorBackground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            border-radius: 6px;
+            color: var(--vscode-errorForeground);
+        }
+
+        .mermaid-error strong {
+            display: block;
+            margin-bottom: 0.5em;
+            font-size: 1.1em;
+        }
+
+        .mermaid-error pre {
+            margin: 0.5em 0 0 0;
+            padding: 0.5em;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Converted Mermaid SVG images (embedded as markdown images) */
+        .markdown-content img[src*="mermaid"] {
+            max-width: 100% !important;
+            height: auto !important;
+            width: auto !important;
+            display: block !important;
+            margin: 1em auto !important;
+        }
+
+        .task-description-container .markdown-content img[src*="mermaid"] {
             max-width: 100% !important;
             max-height: none !important;
             height: auto !important;

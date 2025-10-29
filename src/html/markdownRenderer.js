@@ -549,8 +549,166 @@ async function processPlantUMLQueue() {
     console.log('[PlantUML] Queue processing complete');
 }
 
+// ============================================================================
+// Mermaid Rendering System
+// ============================================================================
+
+// Initialize Mermaid (browser-based, pure JavaScript)
+let mermaidReady = false;
+let mermaidInitialized = false;
+
+function initializeMermaid() {
+    if (mermaidInitialized) {
+        return;
+    }
+
+    if (typeof mermaid === 'undefined') {
+        console.warn('[Mermaid] Library not loaded yet');
+        return;
+    }
+
+    try {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'inherit'
+        });
+        mermaidReady = true;
+        mermaidInitialized = true;
+        console.log('[Mermaid] Initialized successfully');
+    } catch (error) {
+        console.error('[Mermaid] Initialization error:', error);
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeMermaid);
+} else {
+    initializeMermaid();
+}
+
+// Queue for pending Mermaid diagrams
+const pendingMermaidQueue = [];
+let mermaidQueueProcessing = false;
+
+// Cache for rendered Mermaid diagrams (code → svg)
+const mermaidRenderCache = new Map();
+window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
+
 /**
- * Add PlantUML fence renderer to markdown-it instance
+ * Queue a Mermaid diagram for rendering
+ * @param {string} id - Unique placeholder ID
+ * @param {string} code - Mermaid source code
+ */
+function queueMermaidRender(id, code) {
+    pendingMermaidQueue.push({ id, code });
+    console.log(`[Mermaid] Queued diagram: ${id}`);
+
+    // Process queue after a short delay (allows multiple diagrams to queue)
+    setTimeout(() => processMermaidQueue(), 10);
+}
+
+/**
+ * Render Mermaid code to SVG (browser-based, pure JavaScript)
+ * @param {string} code - Mermaid source code
+ * @returns {Promise<string>} SVG content
+ */
+async function renderMermaid(code) {
+    // Check cache first
+    if (mermaidRenderCache.has(code)) {
+        console.log('[Mermaid] Using cached SVG');
+        return mermaidRenderCache.get(code);
+    }
+
+    if (!mermaidReady) {
+        throw new Error('Mermaid not initialized');
+    }
+
+    try {
+        const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Use mermaid.render() to generate SVG
+        const { svg } = await mermaid.render(diagramId, code);
+
+        console.log('[Mermaid] ✅ Diagram rendered successfully');
+
+        // Cache the result
+        mermaidRenderCache.set(code, svg);
+
+        return svg;
+    } catch (error) {
+        console.error('[Mermaid] Rendering error:', error);
+        throw error;
+    }
+}
+
+// Make renderMermaid globally accessible for conversion handler
+window.renderMermaid = renderMermaid;
+
+/**
+ * Process all pending Mermaid diagrams in the queue
+ */
+async function processMermaidQueue() {
+    if (mermaidQueueProcessing || pendingMermaidQueue.length === 0) {
+        return;
+    }
+
+    mermaidQueueProcessing = true;
+
+    console.log(`[Mermaid] Processing ${pendingMermaidQueue.length} diagrams...`);
+
+    while (pendingMermaidQueue.length > 0) {
+        const item = pendingMermaidQueue.shift();
+
+        const element = document.getElementById(item.id);
+        if (!element) {
+            console.warn(`[Mermaid] Placeholder not found: ${item.id}`);
+            continue;
+        }
+
+        try {
+            const svg = await renderMermaid(item.code);
+
+            // Replace placeholder with diagram container
+            const container = document.createElement('div');
+            container.className = 'mermaid-diagram';
+            container.innerHTML = svg;
+
+            // Add convert button
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'mermaid-actions';
+            buttonContainer.innerHTML = `
+                <button class="mermaid-convert-btn"
+                        data-code="${escapeHtml(item.code)}"
+                        title="Convert to SVG file">
+                    💾 Convert to SVG
+                </button>
+            `;
+            container.appendChild(buttonContainer);
+
+            element.replaceWith(container);
+        } catch (error) {
+            console.error('[Mermaid] Rendering error:', error);
+
+            // Replace placeholder with error
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mermaid-error';
+            errorDiv.innerHTML = `
+                <strong>Mermaid Error:</strong><br>
+                <pre>${escapeHtml(error.message)}</pre>
+            `;
+            element.replaceWith(errorDiv);
+        }
+    }
+
+    mermaidQueueProcessing = false;
+    console.log('[Mermaid] Queue processing complete');
+}
+
+/**
+ * Add PlantUML and Mermaid fence renderer to markdown-it instance
  */
 function addPlantUMLRenderer(md) {
     // Store original fence renderer
@@ -576,6 +734,21 @@ function addPlantUMLRenderer(md) {
             return `<div id="${diagramId}" class="plantuml-placeholder">
                 <div class="placeholder-spinner"></div>
                 <div class="placeholder-text">Rendering PlantUML diagram...</div>
+            </div>`;
+        }
+
+        // Check if this is a Mermaid block
+        if (langName.toLowerCase() === 'mermaid') {
+            const code = token.content;
+            const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Queue for async processing
+            queueMermaidRender(diagramId, code);
+
+            // Return placeholder immediately (synchronous)
+            return `<div id="${diagramId}" class="mermaid-placeholder">
+                <div class="placeholder-spinner"></div>
+                <div class="placeholder-text">Rendering Mermaid diagram...</div>
             </div>`;
         }
 
