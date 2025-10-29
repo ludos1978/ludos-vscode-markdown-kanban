@@ -3900,7 +3900,12 @@
         },
         "markdown-kanban.marp.browser": {
           "type": "string",
-          "enum": ["auto", "chrome", "edge", "firefox"],
+          "enum": [
+            "auto",
+            "chrome",
+            "edge",
+            "firefox"
+          ],
           "default": "chrome",
           "description": "Browser to use for Marp preview",
           "enumDescriptions": [
@@ -4055,6 +4060,7 @@
     "markdown-it-mark": "^4.0.0",
     "markdown-it-sub": "^2.0.0",
     "markdown-it-sup": "^2.0.0",
+    "plantuml-encoder": "^1.4.0",
     "tslib": "^2.8.1"
   },
   "extensionDependencies": [

@@ -887,6 +887,11 @@ export class MessageHandler {
                 }
                 break;
 
+            // PlantUML to SVG conversion
+            case 'convertPlantUMLToSVG':
+                await this.handleConvertPlantUMLToSVG(message);
+                break;
+
             default:
                 console.error('handleMessage : Unknown message type:', message.type);
                 break;
@@ -3562,5 +3567,199 @@ export class MessageHandler {
 
         coordinator.registerHandler(handler);
         console.log('[kanban.messageHandler.handleAutoExportMode] Handler registered');
+    }
+
+    /**
+     * Handle PlantUML to SVG conversion
+     */
+    private async handleConvertPlantUMLToSVG(message: any): Promise<void> {
+        try {
+            const { filePath, plantUMLCode, svgContent } = message;
+
+            // Get file info
+            const fileDir = path.dirname(filePath);
+            const fileName = path.basename(filePath, path.extname(filePath));
+
+            // Create Media folder
+            const mediaFolder = path.join(fileDir, `Media-${fileName}`);
+            await fs.promises.mkdir(mediaFolder, { recursive: true });
+
+            // Generate unique SVG filename
+            const timestamp = Date.now();
+            const svgFileName = `plantuml-${timestamp}.svg`;
+            const svgFilePath = path.join(mediaFolder, svgFileName);
+
+            // Save SVG file
+            await fs.promises.writeFile(svgFilePath, svgContent, 'utf8');
+
+            // Calculate relative path for markdown
+            const relativePath = path.join(`Media-${fileName}`, svgFileName);
+
+            // Read current file content
+            const currentContent = await fs.promises.readFile(filePath, 'utf8');
+
+            // Find and replace PlantUML block with commented version + image
+            const updatedContent = this.replacePlantUMLWithSVG(
+                currentContent,
+                plantUMLCode,
+                relativePath
+            );
+
+            // Write updated content
+            await fs.promises.writeFile(filePath, updatedContent, 'utf8');
+
+            // Notify success
+            const panel = this._getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    command: 'plantUMLConvertSuccess',
+                    svgPath: relativePath
+                });
+            }
+
+            console.log(`[PlantUML] Converted to SVG: ${svgFilePath}`);
+        } catch (error) {
+            console.error('[PlantUML] Conversion failed:', error);
+            const panel = this._getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    command: 'plantUMLConvertError',
+                    error: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+    }
+
+    /**
+     * Replace PlantUML code block with commented version + SVG image
+     */
+    private replacePlantUMLWithSVG(
+        content: string,
+        plantUMLCode: string,
+        svgRelativePath: string
+    ): string {
+        // Escape special regex characters in code
+        const escapedCode = plantUMLCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Create regex to match ```plantuml ... ``` block
+        const regex = new RegExp(
+            '```plantuml\\s*\\n' + escapedCode + '\\n```',
+            'g'
+        );
+
+        // Create replacement with commented PlantUML + image
+        const replacement = `<!-- PlantUML converted to SVG
+\`\`\`plantuml
+${plantUMLCode}
+\`\`\`
+-->
+![PlantUML Diagram](${svgRelativePath})`;
+
+        // Replace first occurrence
+        const updatedContent = content.replace(regex, replacement);
+
+        // Check if replacement happened
+        if (updatedContent === content) {
+            console.warn('[PlantUML] No matching PlantUML block found for replacement');
+            // Try fuzzy matching as fallback
+            return this.replacePlantUMLWithSVGFuzzy(content, plantUMLCode, svgRelativePath);
+        }
+
+        return updatedContent;
+    }
+
+    /**
+     * Fuzzy matching fallback for PlantUML replacement
+     */
+    private replacePlantUMLWithSVGFuzzy(
+        content: string,
+        plantUMLCode: string,
+        svgRelativePath: string
+    ): string {
+        const fuzzyRegex = /```plantuml\s*\n([\s\S]*?)\n```/g;
+        let match;
+        let bestMatch = null;
+        let bestMatchIndex = -1;
+        let similarity = 0;
+
+        while ((match = fuzzyRegex.exec(content)) !== null) {
+            const blockCode = match[1].trim();
+            const targetCode = plantUMLCode.trim();
+
+            // Calculate simple similarity
+            const matchRatio = this.calculateSimilarity(blockCode, targetCode);
+
+            if (matchRatio > similarity && matchRatio > 0.8) { // 80% similarity threshold
+                similarity = matchRatio;
+                bestMatch = match;
+                bestMatchIndex = match.index;
+            }
+        }
+
+        if (bestMatch) {
+            console.log(`[PlantUML] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
+
+            const replacement = `<!-- PlantUML converted to SVG
+\`\`\`plantuml
+${plantUMLCode}
+\`\`\`
+-->
+![PlantUML Diagram](${svgRelativePath})`;
+
+            const beforeMatch = content.substring(0, bestMatchIndex);
+            const afterMatch = content.substring(bestMatchIndex + bestMatch[0].length);
+            return beforeMatch + replacement + afterMatch;
+        }
+
+        // If no fuzzy match found, return original content unchanged
+        console.warn('[PlantUML] No fuzzy match found, content unchanged');
+        return content;
+    }
+
+    /**
+     * Calculate similarity between two strings (0 = no match, 1 = exact match)
+     */
+    private calculateSimilarity(str1: string, str2: string): number {
+        if (str1 === str2) return 1.0;
+        if (str1.length === 0 || str2.length === 0) return 0.0;
+
+        const longer = str1.length > str2.length ? str1 : str2;
+        const shorter = str1.length > str2.length ? str2 : str1;
+
+        const longerLength = longer.length;
+        if (longerLength === 0) return 1.0;
+
+        return (longerLength - this.editDistance(longer, shorter)) / longerLength;
+    }
+
+    /**
+     * Calculate Levenshtein edit distance between two strings
+     */
+    private editDistance(str1: string, str2: string): number {
+        const matrix: number[][] = [];
+
+        for (let i = 0; i <= str2.length; i++) {
+            matrix[i] = [i];
+        }
+
+        for (let j = 0; j <= str1.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= str2.length; i++) {
+            for (let j = 1; j <= str1.length; j++) {
+                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+
+        return matrix[str2.length][str1.length];
     }
 }

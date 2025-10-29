@@ -6,7 +6,10 @@
     <title>Enhanced Markdown Kanban</title>
     <link href="webview.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
-    
+
+    <!-- PlantUML encoder for server-based rendering (local bundle) -->
+    <script src="plantuml-encoder-browser.js"></script>
+
     <!-- Only load essential plugins that are available on cdnjs.cloudflare.com for CSP compliance -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-emoji/3.0.0/markdown-it-emoji.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-footnote/4.0.0/markdown-it-footnote.min.js"></script>
@@ -32,6 +35,115 @@
     <!-- markdown-it-strikethrough-alt, markdown-it-underline, markdown-it-footnote-here, -->
     <!-- markdown-it-image-figures, markdown-it-anchor, markdown-it-toc-done-right, markdown-it-checkboxes -->
     <style>
+        /* ============================================================================
+           PlantUML Diagram Styles
+           ============================================================================ */
+
+        /* Placeholder (shown while rendering) */
+        .plantuml-placeholder {
+            margin: 1em 0;
+            padding: 2em 1em;
+            background: var(--vscode-editor-background);
+            border: 2px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Spinner animation */
+        .placeholder-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--vscode-panel-border);
+            border-top-color: var(--vscode-button-background);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1em;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .placeholder-text {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        /* Rendered diagram container */
+        .plantuml-diagram {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            position: relative;
+        }
+
+        .plantuml-diagram svg {
+            max-width: 100%;
+            height: auto;
+            display: inline-block;
+        }
+
+        /* Action buttons */
+        .plantuml-actions {
+            margin-top: 0.5em;
+            padding-top: 0.5em;
+            border-top: 1px solid var(--vscode-panel-border);
+            text-align: right;
+        }
+
+        .plantuml-convert-btn {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 0.4em 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .plantuml-convert-btn:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        .plantuml-convert-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Error display */
+        .plantuml-error {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-inputValidation-errorBackground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            border-radius: 6px;
+            color: var(--vscode-errorForeground);
+        }
+
+        .plantuml-error strong {
+            display: block;
+            margin-bottom: 0.5em;
+            font-size: 1.1em;
+        }
+
+        .plantuml-error pre {
+            margin: 0.5em 0 0 0;
+            padding: 0.5em;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
 </head>
 <body>
@@ -469,6 +581,7 @@
 
     <!-- Core modules -->
     <script src="unifiedOperations.js"></script>
+    <script src="webview.js"></script>
     <script src="markdownRenderer.js"></script>
     <script src="taskEditor.js"></script>
     <script src="boardRenderer.js"></script>
@@ -476,7 +589,6 @@
     <script src="menuOperations.js"></script>
     <script src="search.js"></script>
     <script src="debugOverlay.js"></script>
-    <script src="webview.js"></script>
     <div id="path-context-menu" class="context-menu" style="display: none;">
         <div class="context-menu-item" onclick="copyFullPath()">Copy Full OS Path</div>
         <div class="context-menu-item" onclick="copyStoredPath()">Copy Stored Path</div>

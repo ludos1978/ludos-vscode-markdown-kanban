@@ -1031,7 +1031,7 @@ export class KanbanWebviewPanel {
         const nonce = this._getNonce();
         const cspSource = this._panel.webview.cspSource;
 
-        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none';">`;
+        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; connect-src https://www.plantuml.com https://plantuml.com; frame-src 'none'; worker-src blob:; child-src blob:;">`;
 
         if (!html.includes('Content-Security-Policy')) {
             html = html.replace('<head>', `<head>\n    ${cspMeta}`);
@@ -1105,6 +1105,7 @@ export class KanbanWebviewPanel {
             'search.js',
             'debugOverlay.js',
             'webview.js',
+            'plantuml-encoder-browser.js',
             'markdown-it-media-browser.js',
             'markdown-it-multicolumn-browser.js',
             'markdown-it-mark-browser.js',

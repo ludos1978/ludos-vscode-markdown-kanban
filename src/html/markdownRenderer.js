@@ -386,6 +386,176 @@ function htmlCommentPlugin(md, options = {}) {
     };
 }
 
+// ============================================================================
+// PlantUML Rendering System
+// ============================================================================
+
+// Queue for pending PlantUML diagrams
+const pendingPlantUMLQueue = [];
+let plantumlQueueProcessing = false;
+
+// Cache for rendered PlantUML diagrams (code → svg)
+const plantumlRenderCache = new Map();
+window.plantumlRenderCache = plantumlRenderCache; // Make globally accessible
+
+/**
+ * Queue a PlantUML diagram for rendering
+ * @param {string} id - Unique placeholder ID
+ * @param {string} code - PlantUML source code
+ */
+function queuePlantUMLRender(id, code) {
+    pendingPlantUMLQueue.push({ id, code, timestamp: Date.now() });
+}
+
+/**
+ * Render PlantUML code to SVG using server-based rendering
+ * @param {string} code - PlantUML source code (without @startuml/@enduml)
+ * @returns {Promise<string>} SVG content
+ */
+async function renderPlantUML(code) {
+    if (!window.plantumlReady) {
+        throw new Error('PlantUML is not initialized');
+    }
+
+    // Check cache first
+    if (plantumlRenderCache.has(code)) {
+        return plantumlRenderCache.get(code);
+    }
+
+    // Wrap content with required delimiters
+    const wrappedCode = `@startuml\n${code.trim()}\n@enduml`;
+
+    try {
+        // Encode the PlantUML diagram
+        const encoded = plantumlEncoder.encode(wrappedCode);
+
+        // Fetch SVG from PlantUML server
+        const serverUrl = window.plantumlServerUrl || 'https://www.plantuml.com/plantuml';
+        const svgUrl = `${serverUrl}/svg/${encoded}`;
+
+        console.log(`[PlantUML] Fetching diagram from: ${svgUrl.substring(0, 100)}...`);
+
+        const response = await fetch(svgUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'image/svg+xml'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+
+        const svg = await response.text();
+
+        // Cache the result
+        plantumlRenderCache.set(code, svg);
+
+        console.log('[PlantUML] ✅ Diagram rendered successfully');
+        return svg;
+    } catch (error) {
+        throw new Error(`PlantUML rendering failed: ${error.message}`);
+    }
+}
+
+// Make renderPlantUML globally accessible for conversion handler
+window.renderPlantUML = renderPlantUML;
+
+/**
+ * Process all pending PlantUML diagrams in the queue
+ */
+async function processPlantUMLQueue() {
+    if (plantumlQueueProcessing || pendingPlantUMLQueue.length === 0) {
+        return;
+    }
+
+    plantumlQueueProcessing = true;
+
+    console.log(`[PlantUML] Processing ${pendingPlantUMLQueue.length} diagrams...`);
+
+    while (pendingPlantUMLQueue.length > 0) {
+        const item = pendingPlantUMLQueue.shift();
+        const element = document.getElementById(item.id);
+
+        if (!element) {
+            console.warn(`[PlantUML] Placeholder not found: ${item.id}`);
+            continue;
+        }
+
+        try {
+            const svg = await renderPlantUML(item.code);
+
+            // Replace placeholder with diagram container
+            const container = document.createElement('div');
+            container.className = 'plantuml-diagram';
+            container.innerHTML = svg;
+
+            // Add convert button
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'plantuml-actions';
+            buttonContainer.innerHTML = `
+                <button class="plantuml-convert-btn"
+                        data-code="${escapeHtml(item.code)}"
+                        title="Convert to SVG file">
+                    💾 Convert to SVG
+                </button>
+            `;
+            container.appendChild(buttonContainer);
+
+            element.replaceWith(container);
+        } catch (error) {
+            console.error('[PlantUML] Rendering error:', error);
+
+            // Replace placeholder with error
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'plantuml-error';
+            errorDiv.innerHTML = `
+                <strong>PlantUML Error:</strong><br>
+                <pre>${escapeHtml(error.message)}</pre>
+            `;
+            element.replaceWith(errorDiv);
+        }
+    }
+
+    plantumlQueueProcessing = false;
+    console.log('[PlantUML] Queue processing complete');
+}
+
+/**
+ * Add PlantUML fence renderer to markdown-it instance
+ */
+function addPlantUMLRenderer(md) {
+    // Store original fence renderer
+    const originalFence = md.renderer.rules.fence || function(tokens, idx, options, env, self) {
+        return self.renderToken(tokens, idx, options);
+    };
+
+    // Override fence renderer (SYNCHRONOUS)
+    md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+        const token = tokens[idx];
+        const info = token.info ? token.info.trim() : '';
+        const langName = info.split(/\s+/g)[0];
+
+        // Check if this is a PlantUML block
+        if (langName.toLowerCase() === 'plantuml') {
+            const code = token.content;
+            const diagramId = `plantuml-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Queue for async processing
+            queuePlantUMLRender(diagramId, code);
+
+            // Return placeholder immediately (synchronous)
+            return `<div id="${diagramId}" class="plantuml-placeholder">
+                <div class="placeholder-spinner"></div>
+                <div class="placeholder-text">Rendering PlantUML diagram...</div>
+            </div>`;
+        }
+
+        // Use original renderer for other languages
+        return originalFence(tokens, idx, options, env, self);
+    };
+}
+
 function renderMarkdown(text) {
     if (!text) {return '';}
 
@@ -570,14 +740,23 @@ function renderMarkdown(text) {
             }
             return '</a>';
         };
-        
+
+        // Add PlantUML renderer
+        addPlantUMLRenderer(md);
+
         const rendered = md.render(text);
-        
+
+        // Trigger PlantUML queue processing after render completes
+        if (pendingPlantUMLQueue.length > 0) {
+            // Use microtask to ensure DOM is updated first
+            Promise.resolve().then(() => processPlantUMLQueue());
+        }
+
         // Remove paragraph wrapping for single line content
         if (!text.includes('\n') && rendered.startsWith('<p>') && rendered.endsWith('</p>\n')) {
             return rendered.slice(3, -5);
         }
-        
+
         return rendered;
     } catch (error) {
         console.error('Error rendering markdown:', error);

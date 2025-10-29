@@ -37,6 +37,101 @@ let currentTaskMinHeight = 'auto';
 let currentLayoutRows = 1;
 
 // ============================================================================
+// PlantUML Initialization
+// ============================================================================
+
+let plantumlReady = false;
+window.plantumlServerUrl = 'https://www.plantuml.com/plantuml';
+
+/**
+ * Initialize PlantUML (server-based encoding)
+ */
+function initializePlantUML() {
+    console.log('[PlantUML] Starting initialization...');
+
+    // Check if plantuml-encoder library is loaded
+    if (typeof plantumlEncoder === 'undefined' || typeof plantumlEncoder.encode === 'undefined') {
+        console.error('[PlantUML] plantuml-encoder library not loaded');
+        console.log('[PlantUML] Available:', typeof plantumlEncoder);
+        plantumlReady = false;
+        window.plantumlReady = false;
+        return;
+    }
+
+    console.log('[PlantUML] plantuml-encoder found');
+    plantumlReady = true;
+    window.plantumlReady = true;
+    console.log('[PlantUML] ✅ Initialized successfully (server-based rendering)');
+}
+
+// Call during webview initialization
+// No delay needed - script loaded synchronously before this runs
+console.log('[PlantUML] Attempting initialization...');
+initializePlantUML();
+
+// ============================================================================
+// PlantUML SVG Conversion
+// ============================================================================
+
+/**
+ * Handle click on "Convert to SVG" button
+ */
+async function handlePlantUMLConvert(button) {
+    const code = button.getAttribute('data-code');
+    if (!code) {
+        console.error('[PlantUML] No code found for conversion');
+        return;
+    }
+
+    // Disable button during processing
+    button.disabled = true;
+    button.textContent = '⏳ Converting...';
+
+    try {
+        // Get SVG from cache or render it
+        let svg;
+        if (plantumlRenderCache && plantumlRenderCache.has(code)) {
+            svg = plantumlRenderCache.get(code);
+        } else {
+            // This shouldn't happen (already rendered), but handle it
+            svg = await renderPlantUML(code);
+        }
+
+        // Get current board file path
+        const currentFilePath = window.currentKanbanFilePath;
+        if (!currentFilePath) {
+            throw new Error('No kanban file currently open');
+        }
+
+        // Send message to backend to save SVG and update markdown
+        vscode.postMessage({
+            command: 'convertPlantUMLToSVG',
+            filePath: currentFilePath,
+            plantUMLCode: code,
+            svgContent: svg
+        });
+
+        // Button will be updated when file reloads
+        button.textContent = '✓ Converting...';
+    } catch (error) {
+        console.error('[PlantUML] Conversion error:', error);
+        button.disabled = false;
+        button.textContent = '❌ Convert Failed';
+
+        setTimeout(() => {
+            button.textContent = '💾 Convert to SVG';
+        }, 3000);
+    }
+}
+
+// Event delegation for convert buttons
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('plantuml-convert-btn')) {
+        handlePlantUMLConvert(e.target);
+    }
+});
+
+// ============================================================================
 // Menu Configuration
 // ============================================================================
 // Font size configuration
@@ -2471,6 +2566,7 @@ window.addEventListener('message', event => {
             // Set current file path for export functions
             if (currentFileInfo && currentFileInfo.documentPath) {
                 window.currentFilePath = currentFileInfo.documentPath;
+                window.currentKanbanFilePath = currentFileInfo.documentPath; // For PlantUML conversion
             }
             
             // Only update document URI if it actually changed
