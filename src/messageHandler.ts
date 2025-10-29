@@ -900,6 +900,11 @@ export class MessageHandler {
                 await this.handleConvertPlantUMLToSVG(message);
                 break;
 
+            // Mermaid to SVG conversion
+            case 'convertMermaidToSVG':
+                await this.handleConvertMermaidToSVG(message);
+                break;
+
             default:
                 console.error('handleMessage : Unknown message type:', message.type);
                 break;
@@ -3836,5 +3841,178 @@ ${plantUMLCode}
         }
 
         return matrix[str2.length][str1.length];
+    }
+
+    /**
+     * Handle Mermaid to SVG conversion
+     */
+    private async handleConvertMermaidToSVG(message: any): Promise<void> {
+        try {
+            const { filePath, mermaidCode, svgContent } = message;
+
+            // Get file info
+            const fileDir = path.dirname(filePath);
+            const fileName = path.basename(filePath, path.extname(filePath));
+
+            // Create Media folder
+            const mediaFolder = path.join(fileDir, `Media-${fileName}`);
+            await fs.promises.mkdir(mediaFolder, { recursive: true });
+
+            // Generate unique SVG filename
+            const timestamp = Date.now();
+            const svgFileName = `mermaid-${timestamp}.svg`;
+            const svgFilePath = path.join(mediaFolder, svgFileName);
+
+            // Save SVG file
+            await fs.promises.writeFile(svgFilePath, svgContent, 'utf8');
+
+            // Calculate relative path for markdown
+            const relativePath = path.join(`Media-${fileName}`, svgFileName);
+
+            // Read current file content
+            const currentContent = await fs.promises.readFile(filePath, 'utf8');
+
+            // Find and replace Mermaid block with commented version + image
+            const updatedContent = this.replaceMermaidWithSVG(
+                currentContent,
+                mermaidCode,
+                relativePath
+            );
+
+            // Write updated content
+            await fs.promises.writeFile(filePath, updatedContent, 'utf8');
+
+            // Notify success
+            const panel = this._getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    type: 'mermaidConvertSuccess',
+                    svgPath: relativePath
+                });
+            }
+
+            console.log(`[Mermaid] Converted to SVG: ${svgFilePath}`);
+        } catch (error) {
+            console.error('[Mermaid] Conversion failed:', error);
+            const panel = this._getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    type: 'mermaidConvertError',
+                    error: error instanceof Error ? error.message : String(error)
+                });
+            }
+        }
+    }
+
+    /**
+     * Replace Mermaid code block with commented version + SVG image
+     */
+    private replaceMermaidWithSVG(
+        content: string,
+        mermaidCode: string,
+        svgRelativePath: string
+    ): string {
+        console.log('[Mermaid] replaceMermaidWithSVG called');
+        console.log('[Mermaid] Mermaid code length:', mermaidCode.length);
+        console.log('[Mermaid] Mermaid code:', mermaidCode);
+        console.log('[Mermaid] SVG path:', svgRelativePath);
+
+        // Escape special regex characters in code
+        const escapedCode = mermaidCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Split the code into lines to handle per-line matching with indentation
+        const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
+        console.log('[Mermaid] Code has', codeLines.length, 'non-empty lines');
+        const escapedLines = codeLines.map(line =>
+            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        );
+        // Each line can have any indentation, then the trimmed content
+        const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
+
+        // Create regex to match ```mermaid ... ``` block with any indentation
+        const regexPattern = '([ \\t]*)```mermaid\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
+        console.log('[Mermaid] Testing regex match...');
+        const regex = new RegExp(regexPattern, 'g');
+
+        // Replace with custom function to preserve indentation
+        let replacementCount = 0;
+        let updatedContent = content.replace(regex, (_match, indent) => {
+            replacementCount++;
+            console.log('[Mermaid] Replacement #' + replacementCount + ', indent:', JSON.stringify(indent));
+
+            // Indent each line of the code
+            const indentedCode = mermaidCode.split('\n').map(line =>
+                line ? `${indent}${line}` : indent.trimEnd()
+            ).join('\n');
+
+            // Create replacement with commented Mermaid + image, preserving indentation
+            return `${indent}<!-- Mermaid converted to SVG
+${indent}\`\`\`mermaid
+${indentedCode}
+${indent}\`\`\`
+${indent}-->
+
+${indent}![Mermaid Diagram](${svgRelativePath})`;
+        });
+
+        // Check if replacement happened
+        if (updatedContent === content) {
+            console.warn('[Mermaid] No matching Mermaid block found for replacement');
+            console.log('[Mermaid] Trying fuzzy matching...');
+            // Try fuzzy matching as fallback
+            return this.replaceMermaidWithSVGFuzzy(content, mermaidCode, svgRelativePath);
+        }
+
+        console.log('[Mermaid] Replacement successful, count:', replacementCount);
+        return updatedContent;
+    }
+
+    /**
+     * Fuzzy matching fallback for Mermaid replacement
+     */
+    private replaceMermaidWithSVGFuzzy(
+        content: string,
+        mermaidCode: string,
+        svgRelativePath: string
+    ): string {
+        const fuzzyRegex = /```mermaid\s*\n([\s\S]*?)\n```/g;
+        let match;
+        let bestMatch = null;
+        let bestMatchIndex = -1;
+        let similarity = 0;
+
+        while ((match = fuzzyRegex.exec(content)) !== null) {
+            const blockCode = match[1].trim();
+            const targetCode = mermaidCode.trim();
+
+            // Calculate simple similarity
+            const matchRatio = this.calculateSimilarity(blockCode, targetCode);
+
+            if (matchRatio > similarity && matchRatio > 0.8) { // 80% similarity threshold
+                similarity = matchRatio;
+                bestMatch = match;
+                bestMatchIndex = match.index;
+            }
+        }
+
+        if (bestMatch) {
+            console.log(`[Mermaid] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
+
+            const replacement = `<!-- Mermaid converted to SVG
+\`\`\`mermaid
+${mermaidCode}
+\`\`\`
+-->
+
+![Mermaid Diagram](${svgRelativePath})`;
+
+            const beforeMatch = content.substring(0, bestMatchIndex);
+            const afterMatch = content.substring(bestMatchIndex + bestMatch[0].length);
+            return beforeMatch + replacement + afterMatch;
+        }
+
+        // If no fuzzy match found, return original content unchanged
+        console.warn('[Mermaid] No fuzzy match found, content unchanged');
+        return content;
     }
 }

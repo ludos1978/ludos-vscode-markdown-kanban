@@ -55,7 +55,18 @@
       "Bash(do basename \"$file\")",
       "Bash(wc:*)",
       "Bash(tac:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(curl:*)",
+      "Bash(git clone:*)",
+      "Bash(npm search:*)",
+      "Bash(npm view:*)",
+      "Bash(unzip:*)",
+      "Bash(java:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(/opt/homebrew/bin/node /opt/homebrew/bin/npx tsc)"
     ],
     "deny": [],
     "ask": []

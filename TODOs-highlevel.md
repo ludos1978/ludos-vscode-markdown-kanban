@@ -7,3 +7,5 @@
   - [x] Complete offline rendering - NO network calls to plantuml.com
   - [x] SVG rendering via com.plantuml.wasm.v1.Svg Java class
   - [x] Package size: 4.2MB jar + 17MB jar.js (one-time load, then cached)
+
+- [ ] Add mermaid rendering into the kanban and the export!

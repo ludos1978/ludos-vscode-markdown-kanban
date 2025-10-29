@@ -114,7 +114,79 @@ document.addEventListener('click', (e) => {
         console.log('[PlantUML] Convert button clicked');
         handlePlantUMLConvert(e.target);
     }
+
+    if (e.target.classList.contains('mermaid-convert-btn')) {
+        console.log('[Mermaid] Convert button clicked');
+        handleMermaidConvert(e.target);
+    }
 });
+
+// ============================================================================
+// Mermaid Diagram Conversion
+// ============================================================================
+
+/**
+ * Handle "Convert to SVG" button click for Mermaid diagrams
+ * @param {HTMLElement} button - The clicked button element
+ */
+async function handleMermaidConvert(button) {
+    console.log('[Mermaid] Convert button clicked');
+    const code = button.getAttribute('data-code');
+    console.log('[Mermaid] Code:', code);
+
+    if (!code) {
+        console.error('[Mermaid] No code found in button data-code attribute');
+        return;
+    }
+
+    // Disable button during processing
+    button.disabled = true;
+    button.textContent = '⏳ Converting...';
+    console.log('[Mermaid] Button updated to "Converting..."');
+
+    try {
+        // Get SVG from cache or render it
+        let svg;
+        if (mermaidRenderCache && mermaidRenderCache.has(code)) {
+            svg = mermaidRenderCache.get(code);
+            console.log('[Mermaid] Got SVG from cache');
+        } else {
+            // This shouldn't happen (already rendered), but handle it
+            console.log('[Mermaid] Rendering SVG (not in cache)');
+            svg = await renderMermaid(code);
+        }
+        console.log('[Mermaid] SVG length:', svg ? svg.length : 'null');
+
+        // Get current board file path
+        const currentFilePath = window.currentKanbanFilePath;
+        console.log('[Mermaid] Current file path:', currentFilePath);
+
+        if (!currentFilePath) {
+            throw new Error('No kanban file currently open');
+        }
+
+        // Send message to backend to save SVG and update markdown
+        console.log('[Mermaid] Sending convertMermaidToSVG message to backend');
+        vscode.postMessage({
+            type: 'convertMermaidToSVG',
+            filePath: currentFilePath,
+            mermaidCode: code,
+            svgContent: svg
+        });
+
+        // Button will be updated when file reloads
+        button.textContent = '✓ Converting...';
+        console.log('[Mermaid] Message sent, waiting for backend response');
+    } catch (error) {
+        console.error('[Mermaid] Conversion error:', error);
+        button.disabled = false;
+        button.textContent = '❌ Convert Failed';
+
+        setTimeout(() => {
+            button.textContent = '💾 Convert to SVG';
+        }, 3000);
+    }
+}
 
 // ============================================================================
 // Menu Configuration
