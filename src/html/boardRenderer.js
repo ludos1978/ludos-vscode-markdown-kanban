@@ -1497,7 +1497,8 @@ function renderBoard() {
     // - Calls getBoundingClientRect() forcing layout recalculations
     // - With 50 columns = 500 forced layouts per second during scroll
     // - Feature is currently disabled anyway (see setupCompactViewHandler)
-    // TODO: Replace with IntersectionObserver for proper implementation
+    // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
+    // Recommendation: Remove entirely OR wait for user request before reimplementing
     // setupCompactViewHandler();
 }
 
@@ -3890,10 +3891,6 @@ window.updateColumnDisplay = updateColumnDisplay;
 
 // Expose rendering functions for include file updates
 window.renderSingleColumn = renderSingleColumn;
-
-// TODO: These functions are not defined - commenting out to prevent errors
-// window.getAllHeaderBarsHtml = getAllHeaderBarsHtml;
-// window.getAllFooterBarsHtml = getAllFooterBarsHtml;
 window.injectStackableBars = injectStackableBars;
 window.isDarkTheme = isDarkTheme;
 

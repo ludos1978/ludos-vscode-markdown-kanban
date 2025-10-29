@@ -63,6 +63,13 @@ export class KanbanWebviewPanel {
     private _cachedBoard: KanbanBoard | null = null;  // Cached generated board
     private _boardCacheValid: boolean = false;        // Cache validity flag
 
+    // RACE-3: Track last processed timestamp per file to prevent stale updates
+    private _lastProcessedTimestamps: Map<string, Date> = new Map();
+
+    // RACE-4: Operation locking to prevent concurrent operations from interfering
+    private _operationInProgress: string | null = null;  // Track which operation is running
+    private _pendingOperations: Array<{name: string; operation: () => Promise<void>}> = [];  // Queue
+
     // State
     private _isInitialized: boolean = false;
     public _isUpdatingFromPanel: boolean = false;  // Made public for external access
@@ -325,7 +332,8 @@ export class KanbanWebviewPanel {
         this._fileFactory = new FileFactory(
             this._fileManager,
             this._conflictResolver,
-            this._backupManager
+            this._backupManager,
+            this._fileRegistry
         );
 
         // Subscribe to registry change events
@@ -490,7 +498,6 @@ export class KanbanWebviewPanel {
         // Initialize state in KanbanFileService
         this._fileService.initializeState(
             this._isUpdatingFromPanel,
-            // REMOVED: _hasUnsavedChanges parameter - now managed by MarkdownFile
             this.getBoard(),
             this._lastDocumentVersion,
             this._lastDocumentUri,
@@ -846,7 +853,7 @@ export class KanbanWebviewPanel {
                     this._fileManager.sendFileInfo();
 
                     // Sync any pending DOM updates (items with unrendered changes)
-                    this._syncDirtyItems();
+                    this.syncDirtyItems();
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
@@ -903,26 +910,29 @@ export class KanbanWebviewPanel {
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
-        // CRITICAL: Set initial board load flag BEFORE loading main file
-        // This prevents the main file's 'reloaded' event from triggering board regeneration
-        this._isInitialBoardLoad = true;
-        console.log('[loadMarkdownFile] Starting initial board load - blocking reloaded events');
+        // RACE-4: Wrap entire operation with lock to prevent concurrent file loads
+        return this._withLock('loadMarkdownFile', async () => {
+            // CRITICAL: Set initial board load flag BEFORE loading main file
+            // This prevents the main file's 'reloaded' event from triggering board regeneration
+            this._isInitialBoardLoad = true;
+            console.log('[loadMarkdownFile] Starting initial board load - blocking reloaded events');
 
-        await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._cachedBoard = state.cachedBoardFromWebview;
-            this._boardCacheValid = true;
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+            await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
+            // Sync state back from file service
+            const state = this._fileService.getState();
+            this._isUpdatingFromPanel = state.isUpdatingFromPanel;
+            // STATE-2: Cache board if available
+            if (state.cachedBoardFromWebview) {
+                this._cachedBoard = state.cachedBoardFromWebview;
+                this._boardCacheValid = true;
+            }
+            this._lastDocumentVersion = state.lastDocumentVersion;
+            this._lastDocumentUri = state.lastDocumentUri;
+            this._trackedDocumentUri = state.trackedDocumentUri;
 
-        // Phase 1: Create or update MainKanbanFile instance
-        await this._syncMainFileToRegistry(document);
+            // Phase 1: Create or update MainKanbanFile instance
+            await this._syncMainFileToRegistry(document);
+        });
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
@@ -1621,7 +1631,9 @@ export class KanbanWebviewPanel {
         changedIncludes?: string[];
         switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[]; newTitle?: string }[];
     }): Promise<void> {
-        console.log(`[UNIFIED] handleContentChange from ${params.source}`);
+        // RACE-4: Wrap entire operation with lock to prevent concurrent content changes
+        return this._withLock('handleContentChange', async () => {
+            console.log(`[UNIFIED] handleContentChange from ${params.source}`);
 
         // Step 1: Detect what changed
         const hasMainChange = params.mainFileChanged || false;
@@ -1836,7 +1848,12 @@ export class KanbanWebviewPanel {
             }
         }
 
-        console.log('[UNIFIED] Content change complete');
+            // RACE-4: Invalidate cache after content changes
+            // Board state has been modified (switches, reloads, external changes)
+            this.invalidateBoardCache();
+
+            console.log('[UNIFIED] Content change complete');
+        });
     }
 
     /**
@@ -1880,10 +1897,12 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Sync dirty items to frontend (Optimization 2: Batched sync)
-     * Called when view becomes visible to apply any pending DOM updates
+     * RACE-2: Sync dirty items to frontend (Optimization 2: Batched sync)
+     *
+     * Called when view becomes visible to apply any pending DOM updates.
+     * Also called after editing stops to ensure skipped updates are applied.
      */
-    private _syncDirtyItems(): void {
+    public syncDirtyItems(): void {
         const board = this.getBoard();
         if (!board || !this._panel) return;
 
@@ -1964,7 +1983,8 @@ export class KanbanWebviewPanel {
             });
         } else if (params.taskId) {
             // Task include switch - for now, just load the new content
-            // TODO: Integrate task include switches into unified handler fully
+            // DEFERRED: Integrate task include switches into unified handler (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #1)
+            // Will be addressed in Phase 6 (Major Refactors) to create updateTaskIncludeFile() similar to updateColumnIncludeFile()
             const board = this.getBoard();
             const column = board?.columns.find(col =>
                 col.tasks.some(t => t.id === params.taskId)
@@ -1998,15 +2018,19 @@ export class KanbanWebviewPanel {
      * @param oldFiles Array of old include file paths (for cleanup)
      * @param newFiles Array of new include file paths (to load)
      * @param newTitle The new column title (contains !!!include()!!! syntax)
+     * @param onComplete Optional callback when all async operations complete (RACE-1 fix)
      * @throws Error if column not found or user cancels
      */
     public async updateColumnIncludeFile(
         columnId: string,
         oldFiles: string[],
         newFiles: string[],
-        newTitle: string
+        newTitle: string,
+        onComplete?: () => void
     ): Promise<void> {
-        console.log(`[SWITCH-1] updateColumnIncludeFile START`);
+        // RACE-4: Wrap entire operation with lock to prevent concurrent include switches
+        return this._withLock('updateColumnIncludeFile', async () => {
+            console.log(`[SWITCH-1] updateColumnIncludeFile START`);
         console.log(`[SWITCH-1]   columnId: ${columnId}`);
         console.log(`[SWITCH-1]   oldFiles: [${oldFiles.join(', ')}]`);
         console.log(`[SWITCH-1]   newFiles: [${newFiles.join(', ')}]`);
@@ -2166,9 +2190,21 @@ export class KanbanWebviewPanel {
 
         // STEP 8: REMOVED - sendBoardUpdate() causes full board redraw
         // updateColumnContent (Step 7) is sufficient - only updates the switched column
-        // Avoids unnecessary visual flickering and performance issues
+            // Avoids unnecessary visual flickering and performance issues
 
-        console.log(`[SWITCH-1] updateColumnIncludeFile COMPLETE ✓`);
+            console.log(`[SWITCH-1] updateColumnIncludeFile COMPLETE ✓`);
+
+            // RACE-4: Invalidate cache after include switch
+            // Board structure has changed (includeFiles, tasks), next getBoard() should regenerate
+            this.invalidateBoardCache();
+
+            // RACE-1: Call completion callback (if provided)
+            // This allows caller to unblock board regenerations safely
+            if (onComplete) {
+                console.log(`[SWITCH-1] Calling completion callback`);
+                onComplete();
+            }
+        });
     }
 
     /**
@@ -2227,6 +2263,14 @@ export class KanbanWebviewPanel {
                     return;
                 }
 
+                // RACE-3: Only process if this event is newer than last processed
+                // When multiple external changes happen rapidly, reloads can complete out of order.
+                // This ensures only the newest data is applied to the frontend.
+                if (!this._isEventNewer(file, event.timestamp)) {
+                    console.log(`[RACE-3] Skipping stale reloaded event for ${file.getRelativePath()}`);
+                    return;
+                }
+
                 // File has been reloaded (either from external change or manual reload)
                 // Send updated content to frontend
                 console.log(`[KanbanWebviewPanel] File reloaded - sending frontend update: ${file.getRelativePath()}`);
@@ -2276,6 +2320,10 @@ export class KanbanWebviewPanel {
                 });
 
                 console.log(`[_sendIncludeFileUpdateToFrontend] Sent column update with ${tasks.length} tasks`);
+
+                // RACE-4: Invalidate cache after modifying board
+                // The cached board now contains updated data, but next operation should regenerate from files
+                this.invalidateBoardCache();
             }
         } else if (fileType === 'include-task') {
             // Find task that uses this include file
@@ -2317,6 +2365,9 @@ export class KanbanWebviewPanel {
                 });
 
                 console.log(`[_sendIncludeFileUpdateToFrontend] Sent task update with ${fullContent.length} chars`);
+
+                // RACE-4: Invalidate cache after modifying board
+                this.invalidateBoardCache();
             }
         } else if (fileType === 'include-regular') {
             // Regular include - need full board re-parse
@@ -2332,6 +2383,93 @@ export class KanbanWebviewPanel {
                 }
             }
         }
+    }
+
+    /**
+     * RACE-4: Execute operation with exclusive lock
+     *
+     * Prevents concurrent operations from interfering with each other.
+     * If an operation is already running, queues the new operation.
+     *
+     * @param operationName Name for logging
+     * @param operation The async operation to execute
+     */
+    private async _withLock<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
+        // If operation already in progress, queue this one
+        if (this._operationInProgress) {
+            console.log(`[RACE-4] Operation "${operationName}" waiting for "${this._operationInProgress}" to complete`);
+
+            return new Promise((resolve, reject) => {
+                this._pendingOperations.push({
+                    name: operationName,
+                    operation: async () => {
+                        try {
+                            const result = await operation();
+                            resolve(result);
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Acquire lock
+        this._operationInProgress = operationName;
+        console.log(`[RACE-4] Operation "${operationName}" started (lock acquired)`);
+
+        try {
+            const result = await operation();
+            return result;
+        } finally {
+            // Release lock
+            this._operationInProgress = null;
+            console.log(`[RACE-4] Operation "${operationName}" completed (lock released)`);
+
+            // Process next queued operation
+            const next = this._pendingOperations.shift();
+            if (next) {
+                console.log(`[RACE-4] Processing queued operation "${next.name}"`);
+                // Run next operation (it will acquire lock)
+                next.operation().catch(error => {
+                    console.error(`[RACE-4] Queued operation "${next.name}" failed:`, error);
+                });
+            }
+        }
+    }
+
+    /**
+     * RACE-3: Check if event is newer than last processed event for this file
+     *
+     * Prevents old events from overriding newer ones. When multiple external changes
+     * happen rapidly, reloads can complete out of order. This ensures only the newest
+     * data is applied to the frontend.
+     *
+     * @param file The file that emitted the event
+     * @param eventTimestamp The timestamp from the event
+     * @returns true if event should be processed, false if it's stale
+     */
+    private _isEventNewer(file: MarkdownFile, eventTimestamp: Date): boolean {
+        const relativePath = file.getRelativePath();
+        const lastProcessed = this._lastProcessedTimestamps.get(relativePath);
+
+        if (!lastProcessed) {
+            // First event for this file - accept it
+            this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
+            console.log(`[RACE-3] First event for ${relativePath}, accepting`);
+            return true;
+        }
+
+        if (eventTimestamp > lastProcessed) {
+            // Newer event - accept and update timestamp
+            console.log(`[RACE-3] Newer event for ${relativePath} (${eventTimestamp.toISOString()} > ${lastProcessed.toISOString()})`);
+            this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
+            return true;
+        }
+
+        // Older or same timestamp - reject
+        console.log(`[RACE-3] Ignoring stale event for ${relativePath} (${eventTimestamp.toISOString()} <= ${lastProcessed.toISOString()})`);
+        return false;
     }
 
     // OLD HANDLERS REMOVED - Now using unified _handleContentChange() handler
@@ -2636,6 +2774,13 @@ export class KanbanWebviewPanel {
 
         // Clear panel state
         KanbanWebviewPanel.panelStates.delete(this._panelId);
+
+        // RACE-3: Clear timestamp tracking
+        this._lastProcessedTimestamps.clear();
+
+        // RACE-4: Clear operation queue and lock
+        this._pendingOperations = [];
+        this._operationInProgress = null;
 
         // Unregister from SaveEventCoordinator
         const document = this._fileManager.getDocument();

@@ -6,7 +6,6 @@ import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path c
 import { KanbanBoard } from './markdownParser';
 import { configService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
-// Removed: FileStateManager import - now using MarkdownFileRegistry via panel.fileRegistry
 import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/MarpExtensionService';
 import { MarpExportService } from './services/MarpExportService';
@@ -124,6 +123,13 @@ export class MessageHandler {
             clearTimeout(pending.timeout);
             this._pendingStopEditingRequests.delete(requestId);
             pending.resolve();
+
+            // RACE-2: Sync dirty items after editing stops
+            // When user was editing, frontend skipped rendering updateColumnContent.
+            // Backend marked those items as dirty. Now apply all skipped updates.
+            console.log(`[RACE-2] Editing stopped - syncing dirty items`);
+            const panel = this._getWebviewPanel();
+            panel.syncDirtyItems();
         } else {
             console.warn(`[_handleEditingStopped] No pending request found for: ${requestId}`);
         }
@@ -281,8 +287,6 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
-            // SWITCH-3: Removed 'switchColumnIncludeFile' - now handled via 'editColumnTitle' → updateColumnIncludeFile()
-
             // Switch task include file (load new file without saving main file)
             case 'switchTaskIncludeFile':
                 await this.handleSwitchTaskIncludeFile(message);
@@ -402,8 +406,10 @@ export class MessageHandler {
                 // Both "edit include file" and "text modification" must call the same functions
 
                 // First, update the board state (in-memory task object)
-                await this.performBoardActionSilent(() =>
-                    this._boardOperations.editTask(this._getCurrentBoard()!, message.taskId, message.columnId, message.taskData)
+                // STATE-3: Frontend already updated (live editing), don't echo back
+                await this.performBoardAction(() =>
+                    this._boardOperations.editTask(this._getCurrentBoard()!, message.taskId, message.columnId, message.taskData),
+                    { sendUpdate: false }
                 );
 
                 // NEW: If this is a task include and description was updated, update the file instance immediately
@@ -632,14 +638,23 @@ export class MessageHandler {
                     // It handles: undo state, unsaved prompts, cleanup, loading, updates
                     const panel = this._getWebviewPanel();
                     try {
+                        // RACE-1: Pass completion callback to clear editing flag when truly done
                         await panel.updateColumnIncludeFile(
                             message.columnId,
                             oldIncludeFiles,
                             newIncludeFiles,
-                            message.title
+                            message.title,
+                            () => {
+                                // Clear editing flag only after all async operations complete
+                                console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
+                                this._getWebviewPanel().setEditingInProgress(false);
+                            }
                         );
                         console.log(`[SWITCH-2] Column include switch completed successfully`);
                     } catch (error: any) {
+                        // RACE-1: On error, still clear editing flag
+                        this._getWebviewPanel().setEditingInProgress(false);
+
                         if (error.message === 'USER_CANCELLED') {
                             console.log(`[SWITCH-2] User cancelled switch, no changes made`);
                         } else {
@@ -650,15 +665,16 @@ export class MessageHandler {
                 } else {
                     // Regular title edit without include syntax
                     console.log(`[SWITCH-2] Regular column title edit (no include syntax)`);
-                    await this.performBoardActionSilent(() =>
-                        this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title)
+                    // STATE-3: Frontend already updated title, don't echo back
+                    await this.performBoardAction(() =>
+                        this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title),
+                        { sendUpdate: false }
                     );
-                }
 
-                // CRITICAL: Clear editing flag AFTER all processing is complete
-                // This prevents board regenerations during the edit processing above
-                console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
-                this._getWebviewPanel().setEditingInProgress(false);
+                    // RACE-1: Clear editing flag after regular title edit
+                    console.log(`[SWITCH-2] Regular edit completed - allowing board regenerations`);
+                    this._getWebviewPanel().setEditingInProgress(false);
+                }
                 break;
             case 'editTaskTitle':
                 // Check if this might be a task include file change
@@ -687,7 +703,6 @@ export class MessageHandler {
                         // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
                         // This ensures user can't edit description while content is loading
                         await this._requestStopEditing();
-                        (panel as any)._isEditingInProgress = false;
 
                         try {
                             // Route through unified handler - it checks unsaved changes once
@@ -704,10 +719,19 @@ export class MessageHandler {
                             console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
 
                             // Update the task title (this will trigger markUnsavedChanges with CORRECT content)
-                            await this.performBoardActionSilent(() =>
-                                this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
+                            // STATE-3: Frontend already has include content, don't echo back
+                            await this.performBoardAction(() =>
+                                this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
+                                { sendUpdate: false }
                             );
+
+                            // RACE-1: Clear editing flag after task include switch completes
+                            console.log('[editTaskTitle] Task include switch completed - allowing board regenerations');
+                            panel.setEditingInProgress(false);
                         } catch (error: any) {
+                            // RACE-1: On error, still clear editing flag
+                            panel.setEditingInProgress(false);
+
                             if (error.message === 'USER_CANCELLED') {
                                 console.log('[editTaskTitle] Switch cancelled by user - keeping original title and content');
                             } else {
@@ -717,9 +741,15 @@ export class MessageHandler {
                     }
                 } else {
                     // Regular title edit without include syntax
-                    await this.performBoardActionSilent(() =>
-                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title })
+                    // STATE-3: Frontend already updated title, don't echo back
+                    await this.performBoardAction(() =>
+                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
+                        { sendUpdate: false }
                     );
+
+                    // RACE-1: Clear editing flag after regular title edit
+                    console.log('[editTaskTitle] Regular edit completed - allowing board regenerations');
+                    this._getWebviewPanel().setEditingInProgress(false);
                 }
                 break;
             case 'moveColumnWithRowUpdate':
@@ -1206,7 +1236,26 @@ export class MessageHandler {
         // No board update needed - webview state is already correct
     }
 
-    private async performBoardAction(action: () => boolean, saveUndo: boolean = true) {
+    /**
+     * STATE-3: Unified board action method
+     *
+     * Performs a board modification action with explicit control over update behavior.
+     *
+     * @param action The action to perform (returns true on success)
+     * @param options Configuration options
+     * @param options.saveUndo Whether to save undo state (default: true)
+     * @param options.sendUpdate Whether to send board update to frontend (default: true)
+     *                           Set to false when frontend already has the change (e.g., live editing)
+     */
+    private async performBoardAction(
+        action: () => boolean,
+        options: {
+            saveUndo?: boolean;
+            sendUpdate?: boolean;
+        } = {}
+    ) {
+        const { saveUndo = true, sendUpdate = true } = options;
+
         const board = this._getCurrentBoard();
         if (!board) {return;}
 
@@ -1217,27 +1266,16 @@ export class MessageHandler {
         const success = action();
 
         if (success) {
-            // Use cache-first architecture: mark as unsaved instead of direct save
-            this._markUnsavedChanges(true);
-            await this._onBoardUpdate();
-        }
-    }
-
-    private async performBoardActionSilent(action: () => boolean, saveUndo: boolean = true) {
-        const board = this._getCurrentBoard();
-        if (!board) {return;}
-
-        if (saveUndo) {
-            this._undoRedoManager.saveStateForUndo(board);
-        }
-
-        const success = action();
-
-        if (success) {
-            // Use cache-first architecture: mark as unsaved but don't send board update
-            // The frontend already has the correct state from immediate updates
-            // CRITICAL: Pass the current board so that trackIncludeFileUnsavedChanges is called
-            this._markUnsavedChanges(true, this._getCurrentBoard());
+            if (sendUpdate) {
+                // Backend-initiated change: mark unsaved and send update to frontend
+                this._markUnsavedChanges(true);
+                await this._onBoardUpdate();
+            } else {
+                // Frontend-initiated change: just mark backend as unsaved
+                // The frontend already has the correct state from immediate updates
+                // CRITICAL: Pass the current board so that trackIncludeFileUnsavedChanges is called
+                this._markUnsavedChanges(true, this._getCurrentBoard());
+            }
         }
     }
 

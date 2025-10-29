@@ -597,7 +597,8 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async createBackup(label: string = 'manual'): Promise<void> {
         console.log(`[${this.getFileType()}] Creating backup with label '${label}': ${this._relativePath}`);
-        // TODO: Implement backup logic
+        // DEFERRED: Implement backup logic (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #2)
+        // Decision needed: Is backup functionality required, or can this be removed?
         // For now, this is a placeholder that subclasses can override
         // to integrate with BackupManager which requires a TextDocument
     }

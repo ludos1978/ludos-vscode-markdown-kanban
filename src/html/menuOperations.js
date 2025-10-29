@@ -2707,10 +2707,6 @@ function markUnsavedChanges() {
 function markSavedChanges() {
     window.hasUnsavedChanges = false;
     updateRefreshButtonState('default');
-
-    // REMOVED: Frontend should NOT tell backend save is complete
-    // Backend controls saving, so only backend should clear its unsaved changes flag
-    // Frontend will receive a message from backend when save actually completes
 }
 
 /**

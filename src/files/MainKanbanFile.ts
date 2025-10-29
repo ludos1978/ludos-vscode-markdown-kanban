@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
+import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { KanbanBoard, MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
@@ -26,13 +27,15 @@ export class MainKanbanFile extends MarkdownFile {
 
     // ============= DEPENDENCIES =============
     private _fileManager: FileManager;
+    private _fileRegistry: MarkdownFileRegistry;
     private _parser: typeof MarkdownKanbanParser;
 
     constructor(
         filePath: string,
         fileManager: FileManager,
         conflictResolver: ConflictResolver,
-        backupManager: BackupManager
+        backupManager: BackupManager,
+        fileRegistry: MarkdownFileRegistry
     ) {
         // FOUNDATION-1: For main file, use basename as relative path
         // Main file doesn't have a "parent", so relative path = filename
@@ -41,6 +44,7 @@ export class MainKanbanFile extends MarkdownFile {
 
         super(filePath, relativePath, conflictResolver, backupManager);
         this._fileManager = fileManager;
+        this._fileRegistry = fileRegistry;
         this._parser = MarkdownKanbanParser;
     }
 
@@ -249,13 +253,19 @@ export class MainKanbanFile extends MarkdownFile {
     // ============= CONFLICT CONTEXT =============
 
     protected getConflictContext(): ConflictContext {
+        // Check if any include files have unsaved changes
+        const includeFiles = this._fileRegistry.getIncludeFiles();
+        const hasIncludeUnsavedChanges = includeFiles.some(file =>
+            file.hasUnsavedChanges()
+        );
+
         return {
             type: 'external_main',
             fileType: 'main',
             filePath: this._path,
             fileName: path.basename(this._path),
             hasMainUnsavedChanges: this._hasUnsavedChanges,
-            hasIncludeUnsavedChanges: false, // TODO: Get from registry
+            hasIncludeUnsavedChanges: hasIncludeUnsavedChanges,
             hasExternalChanges: this._hasFileSystemChanges,
             changedIncludeFiles: [],
             isClosing: false,
@@ -319,49 +329,11 @@ export class MainKanbanFile extends MarkdownFile {
     // ============= PRIVATE HELPERS =============
 
     /**
-     * Generate markdown from board structure
-     * (This is a placeholder - actual implementation would use existing generation logic)
+     * Generate markdown from board structure using the shared parser logic
      */
     private _generateMarkdownFromBoard(board: KanbanBoard): string {
-        // TODO: Use the existing markdown generation logic from KanbanFileService
-        // For now, this is a placeholder that maintains the structure
-
-        let markdown = '';
-
-        // Add YAML header if present
-        if (this._yamlHeader) {
-            markdown += this._yamlHeader + '\n\n';
-        }
-
-        // Add board title
-        if (board.title) {
-            markdown += `# ${board.title}\n\n`;
-        }
-
-        // Add columns
-        for (const column of board.columns) {
-            markdown += `## ${column.title}\n\n`;
-
-            // Add tasks
-            for (const task of column.tasks) {
-                markdown += `- ${task.title}\n`;
-                if (task.description) {
-                    // Indent description
-                    const indentedDesc = task.description
-                        .split('\n')
-                        .map(line => `  ${line}`)
-                        .join('\n');
-                    markdown += indentedDesc + '\n';
-                }
-                markdown += '\n';
-            }
-        }
-
-        // Add footer if present
-        if (this._kanbanFooter) {
-            markdown += '\n' + this._kanbanFooter;
-        }
-
-        return markdown;
+        // Use the existing markdown generation logic from MarkdownKanbanParser
+        // This ensures consistency with how the main save process generates markdown
+        return this._parser.generateMarkdown(board);
     }
 }

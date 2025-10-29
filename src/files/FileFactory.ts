@@ -3,6 +3,7 @@ import { ColumnIncludeFile } from './ColumnIncludeFile';
 import { TaskIncludeFile } from './TaskIncludeFile';
 import { RegularIncludeFile } from './RegularIncludeFile';
 import { MarkdownFile } from './MarkdownFile';
+import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { FileManager } from '../fileManager';
 import { ConflictResolver } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
@@ -22,7 +23,8 @@ export class FileFactory {
     constructor(
         private fileManager: FileManager,
         private conflictResolver: ConflictResolver,
-        private backupManager: BackupManager
+        private backupManager: BackupManager,
+        private fileRegistry: MarkdownFileRegistry
     ) {}
 
     // ============= MAIN FILE =============
@@ -35,7 +37,8 @@ export class FileFactory {
             filePath,
             this.fileManager,
             this.conflictResolver,
-            this.backupManager
+            this.backupManager,
+            this.fileRegistry
         );
     }
 

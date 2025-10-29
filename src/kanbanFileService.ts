@@ -23,7 +23,6 @@ export class KanbanFileService {
     private _lastKnownFileContent: string = '';
     private _hasExternalUnsavedChanges: boolean = false;
     private _isUpdatingFromPanel: boolean = false;
-    // REMOVED: _hasUnsavedChanges - now queried from MarkdownFile (single source of truth)
     private _cachedBoardFromWebview: any = null;
     private _lastDocumentUri?: string;
     private _panelId: string;
@@ -56,7 +55,6 @@ export class KanbanFileService {
      */
     public initializeState(
         isUpdatingFromPanel: boolean,
-        // REMOVED: hasUnsavedChanges parameter - set directly on MarkdownFile
         cachedBoardFromWebview: any,
         lastDocumentVersion: number,
         lastDocumentUri?: string,
@@ -64,7 +62,6 @@ export class KanbanFileService {
         panelId?: string
     ): void {
         this._isUpdatingFromPanel = isUpdatingFromPanel;
-        // REMOVED: this._hasUnsavedChanges = hasUnsavedChanges;
         this._cachedBoardFromWebview = cachedBoardFromWebview;
         this._lastDocumentVersion = lastDocumentVersion;
         this._lastDocumentUri = lastDocumentUri;

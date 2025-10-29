@@ -2035,9 +2035,6 @@ function isCurrentlyEditing() {
            window.taskEditor.currentEditor.element.style.display !== 'none';
 }
 
-// REMOVED: Focus handler that was causing board refresh and losing folding state
-// The panel reuse mechanism now handles board updates properly
-
 // Callback for when board rendering is complete
 window.onBoardRenderingComplete = function() {
     if (window.pendingFocusTargets && window.pendingFocusTargets.length > 0) {
@@ -3101,9 +3098,6 @@ if (typeof MutationObserver !== 'undefined') {
         });
     }
 }
-
-// REMOVED: Duplicate focus handler that was causing board refresh and losing folding state
-// The panel reuse mechanism now handles board updates properly
 
 // Card navigation functions
 function updateCardList() {
