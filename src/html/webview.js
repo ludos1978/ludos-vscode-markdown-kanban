@@ -3205,6 +3205,34 @@ window.addEventListener('message', event => {
             console.error('[PlantUML] Conversion error:', message.error);
             alert(`PlantUML conversion failed: ${message.error}`);
             break;
+
+        // Mermaid export rendering (for PDF/Marp export)
+        case 'renderMermaidForExport':
+            console.log('[Webview] Received Mermaid export render request:', message.requestId);
+
+            // Use existing renderMermaid function to render the diagram
+            renderMermaid(message.code)
+                .then(svg => {
+                    console.log('[Webview] Mermaid rendered successfully for export:', message.requestId);
+
+                    // Send success response back to backend
+                    vscode.postMessage({
+                        type: 'mermaidExportSuccess',
+                        requestId: message.requestId,
+                        svg: svg
+                    });
+                })
+                .catch(error => {
+                    console.error('[Webview] Mermaid render failed for export:', message.requestId, error);
+
+                    // Send error response back to backend
+                    vscode.postMessage({
+                        type: 'mermaidExportError',
+                        requestId: message.requestId,
+                        error: error.message || String(error)
+                    });
+                });
+            break;
     }
 });
 

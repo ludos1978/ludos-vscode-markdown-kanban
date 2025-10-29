@@ -11,6 +11,8 @@ import { OperationOptionsBuilder, OperationOptions, FormatStrategy } from './ser
 import { PathResolver } from './services/PathResolver';
 import { MarpConverter, MarpConversionOptions } from './services/export/MarpConverter';
 import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
+import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
+import { getMermaidExportService } from './services/export/MermaidExportService';
 
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
@@ -733,7 +735,25 @@ export class ExportService {
             return content;
         }
 
-        let modifiedContent = content;
+        // Extract code blocks to protect them from link rewriting
+        const codeBlocks: string[] = [];
+        const codeBlockPlaceholder = '___CODE_BLOCK_PLACEHOLDER___';
+
+        // Match both fence blocks (```) and inline code (`...`)
+        const fenceBlockPattern = /```[\s\S]*?```/g;
+        const inlineCodePattern = /`[^`]+`/g;
+
+        // Replace fence blocks with placeholders
+        let modifiedContent = content.replace(fenceBlockPattern, (match) => {
+            codeBlocks.push(match);
+            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
+        });
+
+        // Replace inline code with placeholders
+        modifiedContent = modifiedContent.replace(inlineCodePattern, (match) => {
+            codeBlocks.push(match);
+            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
+        });
 
         // Pattern to match all types of links
         // 1. Markdown images: ![alt](path)
@@ -745,6 +765,11 @@ export class ExportService {
 
         modifiedContent = modifiedContent.replace(linkPattern, (match) => {
             return this.processLink(match, sourceDir, exportFolder, fileBasename);
+        });
+
+        // Restore code blocks
+        modifiedContent = modifiedContent.replace(new RegExp(`${codeBlockPlaceholder}(\\d+)${codeBlockPlaceholder}`, 'g'), (match, index) => {
+            return codeBlocks[parseInt(index)];
         });
 
         return modifiedContent;
@@ -1773,7 +1798,7 @@ export class ExportService {
 
         // Handle Marp conversion
         if (options.format === 'marp') {
-            return await this.runMarpConversion(markdownPath, options);
+            return await this.runMarpConversion(markdownPath, sourcePath, options);
         }
 
         // Regular save succeeded
@@ -1787,9 +1812,12 @@ export class ExportService {
     /**
      * Run Marp conversion
      * Helper for outputContentNew
+     * @param markdownPath - Path to the exported markdown file (in _Export folder)
+     * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
      */
     private static async runMarpConversion(
         markdownPath: string,
+        sourceFilePath: string,
         options: NewExportOptions
     ): Promise<ExportResult> {
 
@@ -1798,6 +1826,76 @@ export class ExportService {
         // Build output path
         const dir = path.dirname(markdownPath);
         const baseName = path.basename(markdownPath, '.md');
+
+        // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Marp processing
+        // This ensures diagrams work in PDF exports
+        let processedMarkdownPath = markdownPath;
+        let preprocessCleanup: (() => Promise<void>) | undefined;
+
+        try {
+            // Get the webview panel for the SOURCE document (needed for Mermaid rendering)
+            // NOTE: Use sourceFilePath, not markdownPath (which is the exported file)
+            const docUri = vscode.Uri.file(sourceFilePath).toString();
+            console.log('[ExportService] Looking for webview panel for SOURCE file:', sourceFilePath);
+            console.log('[ExportService] Source URI:', docUri);
+
+            const { KanbanWebviewPanel } = await import('./kanbanWebviewPanel');
+            const webviewPanel = KanbanWebviewPanel.getPanelForDocument(docUri);
+
+            console.log('[ExportService] Webview panel found:', webviewPanel ? 'YES' : 'NO');
+
+            if (webviewPanel) {
+                console.log('[ExportService] Setting webview panel on MermaidExportService');
+                // Set up Mermaid export service with webview
+                const mermaidService = getMermaidExportService();
+                mermaidService.setWebviewPanel(webviewPanel.getPanel());
+                console.log('[ExportService] MermaidExportService ready:', mermaidService.isReady());
+            } else {
+                console.warn('[ExportService] ⚠️ No webview panel found for document. Mermaid diagrams will not be converted.');
+                console.warn('[ExportService] Document URI:', docUri);
+                console.warn('[ExportService] Available panels:', KanbanWebviewPanel.getAllPanels().length);
+            }
+
+            // Create diagram preprocessor
+            const preprocessor = new DiagramPreprocessor(webviewPanel ? webviewPanel.getPanel() : undefined);
+
+            // Preprocess diagrams
+            console.log('[ExportService] Preprocessing diagrams for Marp export...');
+            const preprocessResult = await preprocessor.preprocess(
+                markdownPath,
+                dir,
+                baseName
+            );
+
+            // If diagrams were processed, write to temp file
+            if (preprocessResult.diagramFiles.length > 0) {
+                console.log(`[ExportService] Processed ${preprocessResult.diagramFiles.length} diagrams`);
+
+                // Write processed markdown to temp file
+                const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
+                await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
+
+                processedMarkdownPath = tempFile;
+
+                // Setup cleanup function
+                preprocessCleanup = async () => {
+                    try {
+                        await fs.promises.unlink(tempFile);
+                        console.log('[ExportService] Cleaned up preprocessed markdown file');
+                    } catch (error) {
+                        // Ignore cleanup errors
+                    }
+                };
+            } else {
+                console.log('[ExportService] No diagrams found, using original markdown');
+            }
+        } catch (error) {
+            console.error('[ExportService] Diagram preprocessing failed:', error);
+            // Continue with original file if preprocessing fails
+            vscode.window.showWarningMessage(
+                'Diagram preprocessing failed. Exporting without diagram conversion.'
+            );
+        }
         let ext = '.html';
         switch (marpFormat) {
             case 'pdf': ext = '.pdf'; break;
@@ -1811,6 +1909,7 @@ export class ExportService {
         if (options.marpWatch) {
             // Check if Marp is already watching this file
             if (MarpExportService.isWatching(markdownPath)) {
+                // DON'T cleanup - Marp is still watching the preprocessed file
                 return {
                     success: true,
                     message: 'Markdown updated, Marp watch active',
@@ -1820,13 +1919,17 @@ export class ExportService {
 
             try {
                 await MarpExportService.export({
-                    inputFilePath: markdownPath,
+                    inputFilePath: processedMarkdownPath, // Use preprocessed markdown
                     format: marpFormat,
                     outputPath: outputPath,
                     watchMode: true,
                     enginePath: options.marpEnginePath,
                     theme: options.marpTheme
                 });
+
+                // DON'T cleanup in watch mode - Marp needs the preprocessed file to continue watching
+                // The file will be cleaned up when watch mode is stopped
+
                 return {
                     success: true,
                     message: 'Marp preview started',
@@ -1834,6 +1937,12 @@ export class ExportService {
                 };
             } catch (error) {
                 console.error(`[kanban.exportService.runMarpConversionNew] Realtime export failed:`, error);
+
+                // Cleanup on error since Marp didn't start
+                if (preprocessCleanup) {
+                    await preprocessCleanup();
+                }
+
                 return {
                     success: false,
                     message: `Marp preview failed: ${error instanceof Error ? error.message : String(error)}`
@@ -1844,7 +1953,7 @@ export class ExportService {
         // MODE: SAVE (single conversion)
         try {
             await MarpExportService.export({
-                inputFilePath: markdownPath,
+                inputFilePath: processedMarkdownPath, // Use preprocessed markdown
                 format: marpFormat,
                 outputPath: outputPath,
                 enginePath: options.marpEnginePath,
@@ -1861,6 +1970,11 @@ export class ExportService {
                 success: false,
                 message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
             };
+        } finally {
+            // Cleanup preprocessed file
+            if (preprocessCleanup) {
+                await preprocessCleanup();
+            }
         }
     }
 

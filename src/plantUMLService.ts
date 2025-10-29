@@ -11,15 +11,44 @@ export class PlantUMLService {
 
     /**
      * Check if Graphviz is installed on the system
+     * Checks multiple common installation locations since VS Code extension
+     * may not have Homebrew in PATH
      * @returns true if Graphviz is available, false otherwise
      */
     private isGraphvizInstalled(): boolean {
+        // Try to execute 'dot -V' with default PATH
         try {
             execSync('dot -V', { stdio: 'pipe' });
+            console.log('[PlantUML Service] Graphviz found in PATH');
             return true;
         } catch (error) {
-            return false;
+            // Not in PATH, check common installation locations
         }
+
+        // Common Graphviz installation paths
+        const commonPaths = [
+            '/opt/homebrew/bin/dot',      // Homebrew on Apple Silicon
+            '/usr/local/bin/dot',          // Homebrew on Intel Mac
+            '/opt/local/bin/dot',          // MacPorts
+            '/usr/bin/dot',                // System installation
+        ];
+
+        const fs = require('fs');
+        for (const dotPath of commonPaths) {
+            try {
+                if (fs.existsSync(dotPath)) {
+                    // Verify it's executable by running it
+                    execSync(`${dotPath} -V`, { stdio: 'pipe' });
+                    console.log(`[PlantUML Service] Graphviz found at: ${dotPath}`);
+                    return true;
+                }
+            } catch (error) {
+                // This path doesn't work, try next
+            }
+        }
+
+        console.warn('[PlantUML Service] Graphviz not found in PATH or common locations');
+        return false;
     }
 
     /**

@@ -287,6 +287,10 @@ export class KanbanWebviewPanel {
         return this._panelId;
     }
 
+    public getPanel(): vscode.WebviewPanel {
+        return this._panel;
+    }
+
     public hasUnsavedChanges(): boolean {
         // Query main file for unsaved changes (single source of truth)
         const mainFile = this._fileRegistry.getMainFile();

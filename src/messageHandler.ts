@@ -11,6 +11,7 @@ import { MarpExtensionService } from './services/export/MarpExtensionService';
 import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { PlantUMLService } from './plantUMLService';
+import { getMermaidExportService } from './services/export/MermaidExportService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -903,6 +904,15 @@ export class MessageHandler {
             // Mermaid to SVG conversion
             case 'convertMermaidToSVG':
                 await this.handleConvertMermaidToSVG(message);
+                break;
+
+            // Mermaid export rendering (via webview for export)
+            case 'mermaidExportSuccess':
+                getMermaidExportService().handleRenderSuccess(message.requestId, message.svg);
+                break;
+
+            case 'mermaidExportError':
+                getMermaidExportService().handleRenderError(message.requestId, message.error);
                 break;
 
             default:

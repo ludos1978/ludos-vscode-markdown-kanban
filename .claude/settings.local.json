@@ -66,7 +66,10 @@
       "Bash(echo:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
-      "Bash(/opt/homebrew/bin/node /opt/homebrew/bin/npx tsc)"
+      "Bash(/opt/homebrew/bin/node /opt/homebrew/bin/npx tsc)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(/usr/bin/find:*)",
+      "Bash(brew list:*)"
     ],
     "deny": [],
     "ask": []

@@ -60,6 +60,19 @@ export class MarpExportService {
                 console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
             }
             this.marpProcessPids.delete(filePath);
+
+            // Cleanup preprocessed markdown file if it exists
+            if (filePath.endsWith('.preprocessed.md')) {
+                const fs = require('fs');
+                try {
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`[kanban.MarpExportService] Cleaned up preprocessed file: ${filePath}`);
+                    }
+                } catch (error) {
+                    console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
+                }
+            }
         }
     }
 
@@ -75,12 +88,26 @@ export class MarpExportService {
      */
     public static stopAllMarpWatches(): void {
         console.log(`[kanban.MarpExportService] Stopping all Marp watch processes (${this.marpProcessPids.size} processes)`);
+        const fs = require('fs');
+
         for (const [filePath, pid] of this.marpProcessPids.entries()) {
             try {
                 process.kill(pid);
                 console.log(`[kanban.MarpExportService] Killed Marp process ${pid} for ${filePath}`);
             } catch (error) {
                 console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
+            }
+
+            // Cleanup preprocessed markdown file if it exists
+            if (filePath.endsWith('.preprocessed.md')) {
+                try {
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`[kanban.MarpExportService] Cleaned up preprocessed file: ${filePath}`);
+                    }
+                } catch (error) {
+                    console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
+                }
             }
         }
         this.marpProcessPids.clear();
