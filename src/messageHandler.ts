@@ -3612,7 +3612,7 @@ export class MessageHandler {
             const panel = this._getWebviewPanel();
             if (panel && panel.webview) {
                 panel.webview.postMessage({
-                    command: 'plantUMLConvertSuccess',
+                    type: 'plantUMLConvertSuccess',
                     svgPath: relativePath
                 });
             }
@@ -3623,7 +3623,7 @@ export class MessageHandler {
             const panel = this._getWebviewPanel();
             if (panel && panel.webview) {
                 panel.webview.postMessage({
-                    command: 'plantUMLConvertError',
+                    type: 'plantUMLConvertError',
                     error: error instanceof Error ? error.message : String(error)
                 });
             }
@@ -3638,33 +3638,59 @@ export class MessageHandler {
         plantUMLCode: string,
         svgRelativePath: string
     ): string {
-        // Escape special regex characters in code
+        console.log('[PlantUML] replacePlantUMLWithSVG called');
+        console.log('[PlantUML] PlantUML code length:', plantUMLCode.length);
+        console.log('[PlantUML] PlantUML code:', plantUMLCode);
+        console.log('[PlantUML] SVG path:', svgRelativePath);
+
+        // Escape special regex characters in code, accounting for indentation
         const escapedCode = plantUMLCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        // Create regex to match ```plantuml ... ``` block
-        const regex = new RegExp(
-            '```plantuml\\s*\\n' + escapedCode + '\\n```',
-            'g'
+        // Split the code into lines to handle per-line matching with indentation
+        // NOTE: The frontend sends TRIMMED code, but the file may have indented code
+        const codeLines = plantUMLCode.split('\n').filter(line => line.trim().length > 0);
+        console.log('[PlantUML] Code has', codeLines.length, 'non-empty lines');
+        const escapedLines = codeLines.map(line =>
+            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         );
+        // Each line can have any indentation, then the trimmed content
+        const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
 
-        // Create replacement with commented PlantUML + image
-        const replacement = `<!-- PlantUML converted to SVG
-\`\`\`plantuml
-${plantUMLCode}
-\`\`\`
--->
-![PlantUML Diagram](${svgRelativePath})`;
+        // Create regex to match ```plantuml ... ``` block with any indentation
+        const regexPattern = '([ \\t]*)```plantuml\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
+        console.log('[PlantUML] Testing regex match...');
+        const regex = new RegExp(regexPattern, 'g');
 
-        // Replace first occurrence
-        const updatedContent = content.replace(regex, replacement);
+        // Replace with custom function to preserve indentation
+        let replacementCount = 0;
+        let updatedContent = content.replace(regex, (_match, indent) => {
+            replacementCount++;
+            console.log('[PlantUML] Replacement #' + replacementCount + ', indent:', JSON.stringify(indent));
+
+            // Indent each line of the code
+            const indentedCode = plantUMLCode.split('\n').map(line =>
+                line ? `${indent}${line}` : indent.trimEnd()
+            ).join('\n');
+
+            // Create replacement with commented PlantUML + image, preserving indentation
+            return `${indent}<!-- PlantUML converted to SVG
+${indent}\`\`\`plantuml
+${indentedCode}
+${indent}\`\`\`
+${indent}-->
+
+${indent}![PlantUML Diagram](${svgRelativePath})`;
+        });
 
         // Check if replacement happened
         if (updatedContent === content) {
             console.warn('[PlantUML] No matching PlantUML block found for replacement');
+            console.log('[PlantUML] Trying fuzzy matching...');
             // Try fuzzy matching as fallback
             return this.replacePlantUMLWithSVGFuzzy(content, plantUMLCode, svgRelativePath);
         }
 
+        console.log('[PlantUML] Replacement successful, count:', replacementCount);
         return updatedContent;
     }
 
@@ -3704,6 +3730,7 @@ ${plantUMLCode}
 ${plantUMLCode}
 \`\`\`
 -->
+
 ![PlantUML Diagram](${svgRelativePath})`;
 
             const beforeMatch = content.substring(0, bestMatchIndex);

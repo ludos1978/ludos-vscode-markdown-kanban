@@ -40,34 +40,7 @@ let currentLayoutRows = 1;
 // PlantUML Initialization
 // ============================================================================
 
-let plantumlReady = false;
-window.plantumlServerUrl = 'https://www.plantuml.com/plantuml';
-
-/**
- * Initialize PlantUML (server-based encoding)
- */
-function initializePlantUML() {
-    console.log('[PlantUML] Starting initialization...');
-
-    // Check if plantuml-encoder library is loaded
-    if (typeof plantumlEncoder === 'undefined' || typeof plantumlEncoder.encode === 'undefined') {
-        console.error('[PlantUML] plantuml-encoder library not loaded');
-        console.log('[PlantUML] Available:', typeof plantumlEncoder);
-        plantumlReady = false;
-        window.plantumlReady = false;
-        return;
-    }
-
-    console.log('[PlantUML] plantuml-encoder found');
-    plantumlReady = true;
-    window.plantumlReady = true;
-    console.log('[PlantUML] ✅ Initialized successfully (server-based rendering)');
-}
-
-// Call during webview initialization
-// No delay needed - script loaded synchronously before this runs
-console.log('[PlantUML] Attempting initialization...');
-initializePlantUML();
+// NOTE: PlantUML is now initialized in markdownRenderer.js (before markdown processing)
 
 // ============================================================================
 // PlantUML SVG Conversion
@@ -77,7 +50,10 @@ initializePlantUML();
  * Handle click on "Convert to SVG" button
  */
 async function handlePlantUMLConvert(button) {
+    console.log('[PlantUML] handlePlantUMLConvert called');
     const code = button.getAttribute('data-code');
+    console.log('[PlantUML] Code length:', code ? code.length : 'null');
+
     if (!code) {
         console.error('[PlantUML] No code found for conversion');
         return;
@@ -86,26 +62,33 @@ async function handlePlantUMLConvert(button) {
     // Disable button during processing
     button.disabled = true;
     button.textContent = '⏳ Converting...';
+    console.log('[PlantUML] Button updated to "Converting..."');
 
     try {
         // Get SVG from cache or render it
         let svg;
         if (plantumlRenderCache && plantumlRenderCache.has(code)) {
             svg = plantumlRenderCache.get(code);
+            console.log('[PlantUML] Got SVG from cache');
         } else {
             // This shouldn't happen (already rendered), but handle it
+            console.log('[PlantUML] Rendering SVG (not in cache)');
             svg = await renderPlantUML(code);
         }
+        console.log('[PlantUML] SVG length:', svg ? svg.length : 'null');
 
         // Get current board file path
         const currentFilePath = window.currentKanbanFilePath;
+        console.log('[PlantUML] Current file path:', currentFilePath);
+
         if (!currentFilePath) {
             throw new Error('No kanban file currently open');
         }
 
         // Send message to backend to save SVG and update markdown
+        console.log('[PlantUML] Sending convertPlantUMLToSVG message to backend');
         vscode.postMessage({
-            command: 'convertPlantUMLToSVG',
+            type: 'convertPlantUMLToSVG',
             filePath: currentFilePath,
             plantUMLCode: code,
             svgContent: svg
@@ -113,6 +96,7 @@ async function handlePlantUMLConvert(button) {
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
+        console.log('[PlantUML] Message sent, waiting for backend response');
     } catch (error) {
         console.error('[PlantUML] Conversion error:', error);
         button.disabled = false;
@@ -127,6 +111,7 @@ async function handlePlantUMLConvert(button) {
 // Event delegation for convert buttons
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('plantuml-convert-btn')) {
+        console.log('[PlantUML] Convert button clicked');
         handlePlantUMLConvert(e.target);
     }
 });
@@ -3137,6 +3122,16 @@ window.addEventListener('message', event => {
                     indicator.style.display = 'none';
                 }
             }, 100);
+            break;
+
+        case 'plantUMLConvertSuccess':
+            console.log('[PlantUML] Conversion successful:', message.svgPath);
+            // File will reload automatically, which will show the updated content
+            break;
+
+        case 'plantUMLConvertError':
+            console.error('[PlantUML] Conversion error:', message.error);
+            alert(`PlantUML conversion failed: ${message.error}`);
             break;
     }
 });

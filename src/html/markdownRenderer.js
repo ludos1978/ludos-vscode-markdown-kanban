@@ -390,6 +390,21 @@ function htmlCommentPlugin(md, options = {}) {
 // PlantUML Rendering System
 // ============================================================================
 
+// Initialize PlantUML immediately when this script loads
+(function initializePlantUMLImmediately() {
+    console.log('[PlantUML] Initializing in markdownRenderer.js...');
+
+    if (typeof plantumlEncoder === 'undefined' || typeof plantumlEncoder.encode === 'undefined') {
+        console.error('[PlantUML] plantuml-encoder library not loaded');
+        window.plantumlReady = false;
+        return;
+    }
+
+    window.plantumlReady = true;
+    window.plantumlServerUrl = 'https://www.plantuml.com/plantuml';
+    console.log('[PlantUML] ✅ Initialized successfully (server-based rendering)');
+})();
+
 // Queue for pending PlantUML diagrams
 const pendingPlantUMLQueue = [];
 let plantumlQueueProcessing = false;

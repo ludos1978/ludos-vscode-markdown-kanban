@@ -144,6 +144,23 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+
+        /* Converted PlantUML SVG images (embedded as markdown images) */
+        .markdown-content img[src*="plantuml"] {
+            max-width: 100% !important;
+            height: auto !important;
+            width: auto !important;
+            display: block !important;
+            margin: 1em auto !important;
+        }
+
+        .task-description-container .markdown-content img[src*="plantuml"] {
+            max-width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+            width: auto !important;
+            object-fit: contain !important;
+        }
     </style>
 </head>
 <body>
@@ -581,7 +598,6 @@
 
     <!-- Core modules -->
     <script src="unifiedOperations.js"></script>
-    <script src="webview.js"></script>
     <script src="markdownRenderer.js"></script>
     <script src="taskEditor.js"></script>
     <script src="boardRenderer.js"></script>
@@ -589,6 +605,7 @@
     <script src="menuOperations.js"></script>
     <script src="search.js"></script>
     <script src="debugOverlay.js"></script>
+    <script src="webview.js"></script>
     <div id="path-context-menu" class="context-menu" style="display: none;">
         <div class="context-menu-item" onclick="copyFullPath()">Copy Full OS Path</div>
         <div class="context-menu-item" onclick="copyStoredPath()">Copy Stored Path</div>
