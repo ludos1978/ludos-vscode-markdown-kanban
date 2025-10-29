@@ -390,20 +390,10 @@ function htmlCommentPlugin(md, options = {}) {
 // PlantUML Rendering System
 // ============================================================================
 
-// Initialize PlantUML immediately when this script loads
-(function initializePlantUMLImmediately() {
-    console.log('[PlantUML] Initializing in markdownRenderer.js...');
-
-    if (typeof plantumlEncoder === 'undefined' || typeof plantumlEncoder.encode === 'undefined') {
-        console.error('[PlantUML] plantuml-encoder library not loaded');
-        window.plantumlReady = false;
-        return;
-    }
-
-    window.plantumlReady = true;
-    window.plantumlServerUrl = 'https://www.plantuml.com/plantuml';
-    console.log('[PlantUML] ✅ Initialized successfully (server-based rendering)');
-})();
+// PlantUML is now rendered in the extension backend (Node.js)
+// No initialization needed in webview
+window.plantumlReady = true; // Always ready - backend handles rendering
+console.log('[PlantUML] Using backend rendering (Java + node-plantuml)');
 
 // Queue for pending PlantUML diagrams
 const pendingPlantUMLQueue = [];
@@ -422,59 +412,82 @@ function queuePlantUMLRender(id, code) {
     pendingPlantUMLQueue.push({ id, code, timestamp: Date.now() });
 }
 
+// Map to store pending render requests
+const plantUMLRenderRequests = new Map();
+let plantUMLRequestId = 0;
+
 /**
- * Render PlantUML code to SVG using server-based rendering
+ * Render PlantUML code to SVG using backend (Node.js + Java)
  * @param {string} code - PlantUML source code (without @startuml/@enduml)
  * @returns {Promise<string>} SVG content
  */
 async function renderPlantUML(code) {
-    if (!window.plantumlReady) {
-        throw new Error('PlantUML is not initialized');
-    }
-
     // Check cache first
     if (plantumlRenderCache.has(code)) {
+        console.log('[PlantUML] Using cached SVG');
         return plantumlRenderCache.get(code);
     }
 
     // Wrap content with required delimiters
     const wrappedCode = `@startuml\n${code.trim()}\n@enduml`;
 
-    try {
-        // Encode the PlantUML diagram
-        const encoded = plantumlEncoder.encode(wrappedCode);
+    return new Promise((resolve, reject) => {
+        const requestId = `plantuml-${++plantUMLRequestId}`;
 
-        // Fetch SVG from PlantUML server
-        const serverUrl = window.plantumlServerUrl || 'https://www.plantuml.com/plantuml';
-        const svgUrl = `${serverUrl}/svg/${encoded}`;
+        console.log('[PlantUML] Sending render request to backend:', requestId);
 
-        console.log(`[PlantUML] Fetching diagram from: ${svgUrl.substring(0, 100)}...`);
+        // Store promise callbacks
+        plantUMLRenderRequests.set(requestId, { resolve, reject, code });
 
-        const response = await fetch(svgUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'image/svg+xml'
-            }
+        // Send request to extension backend
+        vscode.postMessage({
+            type: 'renderPlantUML',
+            requestId: requestId,
+            code: wrappedCode
         });
 
-        if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-
-        const svg = await response.text();
-
-        // Cache the result
-        plantumlRenderCache.set(code, svg);
-
-        console.log('[PlantUML] ✅ Diagram rendered successfully');
-        return svg;
-    } catch (error) {
-        throw new Error(`PlantUML rendering failed: ${error.message}`);
-    }
+        // Timeout after 30 seconds
+        setTimeout(() => {
+            if (plantUMLRenderRequests.has(requestId)) {
+                plantUMLRenderRequests.delete(requestId);
+                reject(new Error('PlantUML rendering timeout'));
+            }
+        }, 30000);
+    });
 }
 
 // Make renderPlantUML globally accessible for conversion handler
 window.renderPlantUML = renderPlantUML;
+
+// Handle PlantUML render responses from backend
+window.addEventListener('message', event => {
+    const message = event.data;
+
+    if (message.type === 'plantUMLRenderSuccess') {
+        const { requestId, svg } = message;
+        const request = plantUMLRenderRequests.get(requestId);
+
+        if (request) {
+            console.log('[PlantUML] ✅ Diagram rendered successfully (backend)');
+
+            // Cache the result
+            plantumlRenderCache.set(request.code, svg);
+
+            // Resolve promise
+            request.resolve(svg);
+            plantUMLRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'plantUMLRenderError') {
+        const { requestId, error } = message;
+        const request = plantUMLRenderRequests.get(requestId);
+
+        if (request) {
+            console.error('[PlantUML] Rendering failed:', error);
+            request.reject(new Error(error));
+            plantUMLRenderRequests.delete(requestId);
+        }
+    }
+});
 
 /**
  * Process all pending PlantUML diagrams in the queue

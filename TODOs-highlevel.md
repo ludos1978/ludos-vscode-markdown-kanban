@@ -1,6 +1,9 @@
 - [ ] plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
-- [x] COMPLETED: PlantUML integration
-  - [x] Renders ```plantuml code blocks as SVG diagrams (server-based, 28KB local encoder)
+- [x] COMPLETED: PlantUML integration (LOCAL WASM)
+  - [x] Renders ```plantuml code blocks as SVG diagrams using LOCAL WASM (no server!)
+  - [x] Uses @sakirtemel/plantuml.js with CheerpJ for browser-based Java execution
   - [x] Convert to SVG button saves diagram and comments out code
   - [x] Files saved to Media-{markdown-filename}/ folder
-  - [x] See: tmp/PLANTUML_IMPLEMENTATION_COMPLETE.md for details
+  - [x] Complete offline rendering - NO network calls to plantuml.com
+  - [x] SVG rendering via com.plantuml.wasm.v1.Svg Java class
+  - [x] Package size: 4.2MB jar + 17MB jar.js (one-time load, then cached)

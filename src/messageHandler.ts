@@ -10,6 +10,7 @@ import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/export/MarpExtensionService';
 import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
+import { PlantUMLService } from './plantUMLService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -26,6 +27,7 @@ export class MessageHandler {
     private _undoRedoManager: UndoRedoManager;
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
+    private _plantUMLService: PlantUMLService;
     private _onBoardUpdate: () => Promise<void>;
     private _onSaveToMarkdown: () => Promise<void>;
     private _onInitializeFile: () => Promise<void>;
@@ -68,6 +70,7 @@ export class MessageHandler {
         this._undoRedoManager = undoRedoManager;
         this._boardOperations = boardOperations;
         this._linkHandler = linkHandler;
+        this._plantUMLService = new PlantUMLService();
         this._onBoardUpdate = callbacks.onBoardUpdate;
         this._onSaveToMarkdown = callbacks.onSaveToMarkdown;
         this._onInitializeFile = callbacks.onInitializeFile;
@@ -885,6 +888,11 @@ export class MessageHandler {
                     await this.endOperation(newExportId);
                     throw error;
                 }
+                break;
+
+            // PlantUML rendering (backend)
+            case 'renderPlantUML':
+                await this.handleRenderPlantUML(message);
                 break;
 
             // PlantUML to SVG conversion
@@ -3567,6 +3575,46 @@ export class MessageHandler {
 
         coordinator.registerHandler(handler);
         console.log('[kanban.messageHandler.handleAutoExportMode] Handler registered');
+    }
+
+    /**
+     * Handle PlantUML rendering request from webview
+     * Uses backend Node.js PlantUML service for completely offline rendering
+     */
+    private async handleRenderPlantUML(message: any): Promise<void> {
+        const { requestId, code } = message;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[handleRenderPlantUML] No panel or webview available');
+            return;
+        }
+
+        try {
+            console.log('[PlantUML Backend] Rendering diagram...');
+
+            // Render using backend service (Java + PlantUML JAR)
+            const svg = await this._plantUMLService.renderSVG(code);
+
+            console.log('[PlantUML Backend] ✅ Diagram rendered successfully');
+
+            // Send success response to webview
+            panel.webview.postMessage({
+                type: 'plantUMLRenderSuccess',
+                requestId,
+                svg
+            });
+
+        } catch (error) {
+            console.error('[PlantUML Backend] Render error:', error);
+
+            // Send error response to webview
+            panel.webview.postMessage({
+                type: 'plantUMLRenderError',
+                requestId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
     }
 
     /**
