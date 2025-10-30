@@ -2323,19 +2323,19 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // At least one column is expanded or horizontally folded - display vertically
             stack.classList.remove('all-vertical-folded');
 
-            // First pass: reset all padding/margins to get accurate natural heights
-            columns.forEach(col => {
-                col.style.paddingTop = '';
-                const columnOffset = col.querySelector('.column-offset');
-                if (columnOffset) {
-                    columnOffset.style.marginTop = '';
-                }
+            // OPTIMIZATION: Measure heights WITHOUT clearing styles first to prevent visual flicker
+            // Instead of reset → reflow → measure → apply (causes flash)
+            // We now: measure → calculate → apply in one batch (smooth)
+
+            // Read current padding values to account for them in measurements
+            const currentPaddings = new Map();
+            columns.forEach((col, idx) => {
+                const computedStyle = window.getComputedStyle(col);
+                const currentPaddingTop = parseFloat(computedStyle.paddingTop) || 0;
+                currentPaddings.set(idx, currentPaddingTop);
             });
 
-            // Force a reflow to ensure padding reset takes effect
-            void stack.offsetHeight;
-
-            // Second pass: measure actual content heights
+            // Measure actual content heights (with current padding included)
             const columnData = [];
             columns.forEach((col, idx) => {
                 const isVerticallyFolded = col.classList.contains('collapsed-vertical');
@@ -2468,8 +2468,11 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                 cumulativePadding += pos.totalHeight + pos.marginHeight;
             });
 
-            // Apply all calculated positions
-            positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
+            // OPTIMIZATION: Batch all DOM writes in requestAnimationFrame to prevent visual flicker
+            // This ensures all style changes happen in a single rendering frame
+            requestAnimationFrame(() => {
+                // Apply all calculated positions
+                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
                 col.dataset.columnHeaderTop = columnHeaderTop;
                 col.dataset.headerTop = headerTop;
                 col.dataset.footerTop = footerTop;
@@ -2551,15 +2554,16 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                         columnMargin.style.zIndex = '';
                     }
                 }
-            });
+                });
 
-            // Update scroll handler data with all columns (including horizontally folded)
-            window.stackedColumnsData = positions.map(pos => ({
-                col: pos.col,
-                headerHeight: pos.headerHeight,
-                footerHeight: pos.footerHeight,
-                totalHeight: pos.totalHeight
-            }));
+                // Update scroll handler data with all columns (including horizontally folded)
+                window.stackedColumnsData = positions.map(pos => ({
+                    col: pos.col,
+                    headerHeight: pos.headerHeight,
+                    footerHeight: pos.footerHeight,
+                    totalHeight: pos.totalHeight
+                }));
+            }); // End requestAnimationFrame
         }
     });
 }

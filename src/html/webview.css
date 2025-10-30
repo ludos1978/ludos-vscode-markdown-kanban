@@ -1842,7 +1842,7 @@ button.file-bar-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  /* padding: 8px 12px; */
 }
 
 .span-width-label {
@@ -1860,8 +1860,8 @@ button.file-bar-menu-item {
   background: var(--vscode-button-background);
   border: 1px solid var(--vscode-button-border, transparent);
   color: var(--vscode-button-foreground);
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1893,7 +1893,7 @@ button.file-bar-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  /* padding: 8px 12px; */
 }
 
 .stack-label {
@@ -1905,8 +1905,8 @@ button.file-bar-menu-item {
   background: var(--vscode-button-background);
   border: 1px solid var(--vscode-button-border, transparent);
   color: var(--vscode-button-foreground);
-  padding: 4px 12px;
-  height: 22px;
+  padding: 4px 8px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;

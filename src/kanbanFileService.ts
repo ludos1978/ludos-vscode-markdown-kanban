@@ -10,6 +10,17 @@ import { ConflictContext, ConflictResolution } from './conflictResolver';
 import { BoardOperations } from './boardOperations';
 
 /**
+ * Save operation state for hybrid state machine + version tracking
+ *
+ * Replaces timing-dependent boolean flag with explicit states for reliability
+ */
+enum SaveState {
+    IDLE,        // No save operation in progress
+    SAVING,      // Save operation active (applying edits, saving files)
+    RECOVERING   // Error recovery in progress
+}
+
+/**
  * KanbanFileService
  *
  * Handles all file operations for the Kanban board including:
@@ -17,12 +28,21 @@ import { BoardOperations } from './boardOperations';
  * - Saving board state to markdown
  * - File state tracking and conflict detection
  * - File utilities (lock, open, etc.)
+ *
+ * RELIABILITY UPGRADE: Uses hybrid state machine + version tracking for
+ * defense-in-depth change detection (replaces _isUpdatingFromPanel flag)
  */
 export class KanbanFileService {
     private _lastDocumentVersion: number = -1;
     private _lastKnownFileContent: string = '';
     private _hasExternalUnsavedChanges: boolean = false;
-    private _isUpdatingFromPanel: boolean = false;
+
+    // HYBRID STATE MACHINE: State + Version tracking for defense-in-depth
+    private _saveState: SaveState = SaveState.IDLE;
+    private _saveStartVersion: number | null = null;
+    private _saveEndVersion: number | null = null;
+    private _saveOperationTimestamp: Date | null = null;
+
     private _cachedBoardFromWebview: any = null;
     private _lastDocumentUri?: string;
     private _panelId: string;
@@ -52,6 +72,7 @@ export class KanbanFileService {
 
     /**
      * Initialize state tracking values
+     * NOTE: Backwards compatibility - converts old boolean flag to new state machine
      */
     public initializeState(
         isUpdatingFromPanel: boolean,
@@ -61,7 +82,9 @@ export class KanbanFileService {
         trackedDocumentUri?: string,
         panelId?: string
     ): void {
-        this._isUpdatingFromPanel = isUpdatingFromPanel;
+        // STATE MACHINE: Convert old boolean to new state (backwards compatibility)
+        this._saveState = isUpdatingFromPanel ? SaveState.SAVING : SaveState.IDLE;
+
         this._cachedBoardFromWebview = cachedBoardFromWebview;
         this._lastDocumentVersion = lastDocumentVersion;
         this._lastDocumentUri = lastDocumentUri;
@@ -73,6 +96,7 @@ export class KanbanFileService {
 
     /**
      * Get current state values for syncing back to panel
+     * NOTE: Backwards compatibility - converts state machine to boolean
      */
     public getState(): {
         isUpdatingFromPanel: boolean;
@@ -89,8 +113,11 @@ export class KanbanFileService {
         const mainFile = this.fileRegistry.getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
 
+        // STATE MACHINE: Convert to boolean for backwards compatibility
+        const isUpdatingFromPanel = this._saveState !== SaveState.IDLE;
+
         return {
-            isUpdatingFromPanel: this._isUpdatingFromPanel,
+            isUpdatingFromPanel,
             hasUnsavedChanges: hasUnsavedChanges,
             cachedBoardFromWebview: this._cachedBoardFromWebview,
             lastDocumentVersion: this._lastDocumentVersion,
@@ -192,7 +219,9 @@ export class KanbanFileService {
      */
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false): Promise<void> {
 
-        if (this._isUpdatingFromPanel) {
+        // STATE MACHINE: Don't reload during save operations
+        if (this._saveState !== SaveState.IDLE) {
+            console.log(`[SaveStateMachine] Skipping loadMarkdownFile during save (state=${SaveState[this._saveState]})`);
             return;
         }
 
@@ -240,7 +269,7 @@ export class KanbanFileService {
             // But notify user if external changes detected (but NOT on editor focus)
             const hasExternalChanges = this._lastDocumentVersion !== -1 &&
                                      this._lastDocumentVersion < document.version &&
-                                     !this._isUpdatingFromPanel &&
+                                     this._saveState === SaveState.IDLE &&
                                      !isFromEditorFocus; // Don't show dialog on editor focus
 
             if (hasExternalChanges) {
@@ -300,7 +329,7 @@ export class KanbanFileService {
 
             // Handle undo/redo history
             const isUndoRedoOperation = false; // This would need to be passed as parameter if needed
-            if (isDifferentDocument && !isUndoRedoOperation && !this._isUpdatingFromPanel && !forceReload) {
+            if (isDifferentDocument && !isUndoRedoOperation && this._saveState === SaveState.IDLE && !forceReload) {
                 // Only clear history when switching to completely different documents
                 // Don't clear on force reload of same document (e.g., external changes)
                 this.undoRedoManagerClear();
@@ -382,6 +411,29 @@ export class KanbanFileService {
     }
 
     /**
+     * Helper: Check if a document change is from our save operation
+     * Uses hybrid state + version tracking for defense-in-depth
+     */
+    private isOurChange(documentVersion: number): boolean {
+        // Primary check: State machine
+        const isSaving = this._saveState === SaveState.SAVING;
+
+        // Backup check: Version range tracking
+        const isInVersionRange =
+            this._saveEndVersion !== null &&
+            documentVersion <= this._saveEndVersion;
+
+        // Defense in depth: Either check passes = our change
+        const result = isSaving || isInVersionRange;
+
+        if (result) {
+            console.log(`[SaveStateMachine] Detected our own change (state=${SaveState[this._saveState]}, v=${documentVersion}, saveEnd=${this._saveEndVersion})`);
+        }
+
+        return result;
+    }
+
+    /**
      * Save board to markdown file
      */
     /**
@@ -398,8 +450,20 @@ export class KanbanFileService {
             return;
         }
 
+        // STATE MACHINE: Check if already saving
+        if (this._saveState !== SaveState.IDLE) {
+            console.warn(`[SaveStateMachine] Save already in progress (state=${SaveState[this._saveState]}), operation will be queued by RACE-4 lock`);
+            // Note: RACE-4 operation lock in KanbanWebviewPanel will queue this
+            return;
+        }
+
         console.log(`[KanbanFileService.saveToMarkdown] Proceeding with save`);
-        this._isUpdatingFromPanel = true;
+
+        // STATE MACHINE: Transition to SAVING state and record version
+        this._saveState = SaveState.SAVING;
+        this._saveStartVersion = document.version;
+        this._saveOperationTimestamp = new Date();
+        console.log(`[SaveStateMachine] IDLE → SAVING (startVersion=${this._saveStartVersion})`);
 
         try{
             // Check if document is still valid/open
@@ -504,6 +568,10 @@ export class KanbanFileService {
                     throw new Error('Failed to apply workspace edit: Content mismatch detected');
                 }
             }
+
+            // STATE MACHINE: Record end version after edit applied
+            this._saveEndVersion = document.version;
+            console.log(`[SaveStateMachine] Edit applied (saveEndVersion=${this._saveEndVersion})`);
 
             // Update document version after successful edit (only if tracking is enabled)
             if (updateVersionTracking) {
@@ -619,9 +687,31 @@ export class KanbanFileService {
                     error: error instanceof Error ? error.message : String(error)
                 });
             }
+
+            // STATE MACHINE: Transition to RECOVERING state for error handling
+            console.log(`[SaveStateMachine] SAVING → RECOVERING (error occurred)`);
+            this._saveState = SaveState.RECOVERING;
+
+            // Error recovery: Reset state after brief delay to allow any pending events to settle
+            setTimeout(() => {
+                if (this._saveState === SaveState.RECOVERING) {
+                    this._saveState = SaveState.IDLE;
+                    this._saveStartVersion = null;
+                    this._saveEndVersion = null;
+                    console.log(`[SaveStateMachine] RECOVERING → IDLE (error recovery complete)`);
+                }
+            }, 500);
         } finally {
-            // Reset flag immediately - no delay needed since all async operations have completed
-            this._isUpdatingFromPanel = false;
+            // STATE MACHINE: Transition back to IDLE if save completed successfully
+            if (this._saveState === SaveState.SAVING) {
+                this._saveState = SaveState.IDLE;
+                // Keep version tracking for a short time as backup
+                setTimeout(() => {
+                    this._saveStartVersion = null;
+                    this._saveEndVersion = null;
+                }, 1000);
+                console.log(`[SaveStateMachine] SAVING → IDLE (save complete)`);
+            }
         }
     }
 
@@ -664,7 +754,10 @@ export class KanbanFileService {
             return;
         }
 
-        this._isUpdatingFromPanel = true;
+        // STATE MACHINE: Transition to SAVING
+        this._saveState = SaveState.SAVING;
+        this._saveStartVersion = document.version;
+        console.log(`[SaveStateMachine] initializeFile: IDLE → SAVING`);
 
         const kanbanHeader = "---\n\nkanban-plugin: board\n\n---\n\n";
         const currentContent = document.getText();
@@ -679,16 +772,26 @@ export class KanbanFileService {
 
         try {
             await vscode.workspace.applyEdit(edit);
+            this._saveEndVersion = document.version;
             await document.save();
 
             // Reload the file after successful initialization
-            // Keep _isUpdatingFromPanel = true during reload to prevent undo stack clearing
+            // Keep SAVING state during reload to prevent undo stack clearing
             await this.loadMarkdownFile(document);
-            this._isUpdatingFromPanel = false;
+
+            // STATE MACHINE: Transition to IDLE
+            this._saveState = SaveState.IDLE;
+            this._saveStartVersion = null;
+            this._saveEndVersion = null;
+            console.log(`[SaveStateMachine] initializeFile: SAVING → IDLE`);
 
             vscode.window.showInformationMessage('Kanban board initialized successfully');
         } catch (error) {
-            this._isUpdatingFromPanel = false;
+            // STATE MACHINE: Error recovery
+            this._saveState = SaveState.IDLE;
+            this._saveStartVersion = null;
+            this._saveEndVersion = null;
+            console.log(`[SaveStateMachine] initializeFile: SAVING → IDLE (error recovery)`);
             vscode.window.showErrorMessage(`Failed to initialize file: ${error}`);
         }
     }
@@ -703,9 +806,16 @@ export class KanbanFileService {
             if (currentDocument && event.document === currentDocument) {
                 // Registry tracks editor changes automatically via file watchers
 
+                // HYBRID STATE MACHINE: Check if this change is from our save operation
+                // Uses defense-in-depth: both state check AND version tracking
+                const isOurChange = this.isOurChange(event.document.version);
+
                 // Document was modified externally (not by our kanban save operation)
-                if (!this._isUpdatingFromPanel) {
+                if (!isOurChange) {
                     this._hasExternalUnsavedChanges = true;
+                    console.log(`[SaveStateMachine] External change detected (v=${event.document.version})`);
+                } else {
+                    console.log(`[SaveStateMachine] Our change detected, ignoring (v=${event.document.version})`);
                 }
 
                 // Notify debug overlay of document state change so it can update editor state
