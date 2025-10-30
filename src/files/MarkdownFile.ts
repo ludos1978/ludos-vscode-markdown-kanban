@@ -78,11 +78,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
         // FOUNDATION-1: Normalize and cache the normalized path
         this._normalizedRelativePath = MarkdownFile.normalizeRelativePath(relativePath);
 
-        // Log normalization for debugging (only if different)
-        if (this._relativePath !== this._normalizedRelativePath) {
-            console.log(`[MarkdownFile] Path normalized: "${this._relativePath}" → "${this._normalizedRelativePath}"`);
-        }
-
         this._conflictResolver = conflictResolver;
         this._backupManager = backupManager;
 
@@ -227,21 +222,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
         }
 
-        // Check 3: Already normalized (suspicious - likely pre-normalized)
-        // If path is all lowercase AND has path separators AND is trimmed, it's likely pre-normalized
-        const trimmed = relativePath.trim();
-        if (trimmed === relativePath.toLowerCase() &&
-            (trimmed.includes('/') || trimmed.includes('\\')) &&
-            trimmed === relativePath) {
-            console.warn(`[MarkdownFile] ⚠️  Path appears pre-normalized: "${relativePath}"`);
-            console.warn('  Expected: Original casing (e.g., "Folder/File.md")');
-            console.warn('  Received: All lowercase (e.g., "folder/file.md")');
-            console.warn('  This may indicate double normalization!');
-            console.warn('  Stack trace:');
-            console.warn(new Error().stack);
-        }
-
-        // Check 4: Excessive parent directory traversal (potential security concern)
+        // Check 3: Excessive parent directory traversal (potential security concern)
         const normalized = path.normalize(relativePath);
         const parentDirCount = (normalized.match(/\.\.\//g) || []).length;
         if (parentDirCount > 3) {
@@ -577,12 +558,14 @@ export abstract class MarkdownFile implements vscode.Disposable {
         const resolution = await this._conflictResolver.resolveConflict(context);
 
         if (resolution && resolution.shouldProceed) {
-            if (resolution.shouldSave) {
+            // Check shouldCreateBackup FIRST because backup-and-reload sets both flags
+            if (resolution.shouldCreateBackup) {
+                // resolveConflict('backup') creates backup AND reloads
+                await this.resolveConflict('backup');
+            } else if (resolution.shouldSave) {
                 await this.save();
             } else if (resolution.shouldReload) {
                 await this.reload();
-            } else if (resolution.shouldCreateBackup) {
-                await this.resolveConflict('backup');
             }
         }
 
@@ -610,11 +593,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public startWatching(): void {
         if (this._isWatching) {
-            console.log(`[${this.getFileType()}] Already watching: ${this._relativePath}`);
             return;
         }
 
-        console.log(`[${this.getFileType()}] Starting to watch: ${this._relativePath}`);
+        console.log(`[${this.getFileType()}] Starting file watch: ${this._relativePath}`);
 
         const pattern = new vscode.RelativePattern(
             path.dirname(this._path),
@@ -625,19 +607,16 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         // Watch for modifications
         this._fileWatcher.onDidChange(async (uri) => {
-            console.log(`[${this.getFileType()}] File changed on disk: ${uri.fsPath}`);
             await this._onFileSystemChange('modified');
         });
 
         // Watch for deletion
         this._fileWatcher.onDidDelete(async (uri) => {
-            console.log(`[${this.getFileType()}] File deleted: ${uri.fsPath}`);
             await this._onFileSystemChange('deleted');
         });
 
         // Watch for creation
         this._fileWatcher.onDidCreate(async (uri) => {
-            console.log(`[${this.getFileType()}] File created: ${uri.fsPath}`);
             await this._onFileSystemChange('created');
         });
 

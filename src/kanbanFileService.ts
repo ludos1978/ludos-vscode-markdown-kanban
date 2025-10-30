@@ -829,33 +829,19 @@ export class KanbanFileService {
                 }
             }
 
-            // DISABLED: Don't track unsaved editor changes, only track saved changes
-            // The user only wants conflict detection for:
-            // 1. Changes made in kanban UI (tracked by frontend.hasUnsavedChanges)
-            // 2. Not for unsaved edits in text editor (backend.isDirtyInEditor removed)
+            // NOTE: Document change tracking behavior
+            // =========================================
+            // We DO track unsaved changes in kanban-managed files for conflict detection:
+            // - Main kanban file: Tracked via document.isDirty check in MainKanbanFile.hasConflict()
+            // - Include files: Tracked via internal _hasUnsavedChanges flag
             //
-            // If you're editing in VS Code but haven't saved yet, and someone saves externally,
-            // that's fine - you haven't committed to your changes. Only saved changes matter.
-
-            /* COMMENTED OUT - User doesn't want unsaved editor change tracking
-            // Check if this is an included file
-            for (const fileState of this.fileRegistry.getIncludeFiles().map(f => f.toFileState())) {
-                if (event.document.uri.fsPath === fileState.path) {
-                    console.log(`[DocumentChangeListener] Include file edited in VS Code editor: ${fileState.relativePath}`);
-                    console.log(`[DocumentChangeListener] isDirty: ${event.document.isDirty}`);
-
-                    // Registry tracks editor changes automatically
-
-                    // Notify debug overlay to update
-                    this._panel.webview.postMessage({
-                        type: 'includeFileStateChanged',
-                        filePath: fileState.relativePath,
-                        isUnsavedInEditor: event.document.isDirty
-                    });
-                    break;
-                }
-            }
-            */
+            // We DO NOT track unsaved changes in external non-kanban files:
+            // - External files being edited in VSCode are not tracked
+            // - Only SAVED external changes trigger conflict detection via file watcher
+            //
+            // This ensures:
+            // - User's kanban/include edits are protected from external overwrites
+            // - External file edits don't interfere until actually saved to disk
         });
         disposables.push(changeDisposable);
 

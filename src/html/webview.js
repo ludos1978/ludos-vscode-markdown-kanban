@@ -2718,8 +2718,8 @@ window.addEventListener('message', event => {
 
         case 'updateIncludeContent':
             // Handle processed include content from backend
-            if (typeof window.updateIncludeContent === 'function') {
-                window.updateIncludeContent(message.filePath, message.content);
+            if (typeof window.updateIncludeFileCache === 'function') {
+                window.updateIncludeFileCache(message.filePath, message.content);
             }
             break;
 

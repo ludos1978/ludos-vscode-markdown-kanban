@@ -190,11 +190,17 @@ export class MainKanbanFile extends MarkdownFile {
      * Handle external file change (file changed on disk)
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        console.log(`[MainKanbanFile] Handling external change: ${changeType} - ${this._relativePath}`);
+        console.log(`[MainKanbanFile.handleExternalChange] TRIGGERED:`, {
+            changeType,
+            file: this._relativePath,
+            hasUnsaved: this._hasUnsavedChanges,
+            hasFileSystemChanges: this._hasFileSystemChanges,
+            isInEditMode: this._isInEditMode
+        });
 
         if (changeType === 'deleted') {
             this._exists = false;
-            console.warn(`[MainKanbanFile] Main file was deleted: ${this._path}`);
+            console.warn(`[MainKanbanFile.handleExternalChange] FILE-DELETED: ${this._path}`);
             return;
         }
 
@@ -203,14 +209,24 @@ export class MainKanbanFile extends MarkdownFile {
         }
 
         // Check for conflict FIRST - only clear content if auto-reloading
-        if (this.hasConflict()) {
-            console.log(`[MainKanbanFile] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
+        const hasConflict = this.hasConflict();
+        const needsReload = this.needsReload();
+
+        console.log(`[MainKanbanFile.handleExternalChange] DECISION-FACTORS:`, {
+            hasConflict,
+            needsReload,
+            hasUnsaved: this._hasUnsavedChanges,
+            isInEditMode: this._isInEditMode
+        });
+
+        if (hasConflict) {
+            console.log(`[MainKanbanFile.handleExternalChange] CONFLICT-DIALOG: Showing dialog to user (keeping current content for potential save)`);
             await this.showConflictDialog();
-        } else if (this.needsReload()) {
-            console.log(`[MainKanbanFile] ⚠ Auto-reload: Reloading from disk`);
+        } else if (needsReload) {
+            console.log(`[MainKanbanFile.handleExternalChange] AUTO-RELOAD: Reloading from disk (no conflict detected)`);
             await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
         } else {
-            console.log(`[MainKanbanFile] ⏸ External change detected but neither conflict nor reload needed`);
+            console.log(`[MainKanbanFile.handleExternalChange] NO-ACTION: External change detected but neither conflict nor reload needed`);
         }
     }
 
@@ -259,12 +275,21 @@ export class MainKanbanFile extends MarkdownFile {
             file.hasUnsavedChanges()
         );
 
+        // Check if VSCode document is dirty (text editor unsaved changes)
+        const document = this._fileManager.getDocument();
+        const documentIsDirty = !!(document && document.uri.fsPath === this._path && document.isDirty);
+
+        // Main has unsaved changes if either:
+        // - Internal state flag is true (from kanban UI edits)
+        // - OR VSCode document is dirty (from text editor edits)
+        const hasMainUnsavedChanges = this._hasUnsavedChanges || documentIsDirty;
+
         return {
             type: 'external_main',
             fileType: 'main',
             filePath: this._path,
             fileName: path.basename(this._path),
-            hasMainUnsavedChanges: this._hasUnsavedChanges,
+            hasMainUnsavedChanges: hasMainUnsavedChanges,
             hasIncludeUnsavedChanges: hasIncludeUnsavedChanges,
             hasExternalChanges: this._hasFileSystemChanges,
             changedIncludeFiles: [],
@@ -274,6 +299,37 @@ export class MainKanbanFile extends MarkdownFile {
     }
 
     // ============= OVERRIDES =============
+
+    /**
+     * Override hasConflict to also check VSCode document dirty status
+     * This ensures conflicts are detected when editing in text editor (not just kanban UI)
+     */
+    public hasConflict(): boolean {
+        // Check base class flags (kanban UI changes)
+        const baseHasConflict = super.hasConflict();
+
+        // Also check if VSCode document is dirty (text editor changes)
+        const document = this._fileManager.getDocument();
+        const documentIsDirty = !!(document && document.uri.fsPath === this._path && document.isDirty);
+
+        // Conflict if:
+        // - Base class detects conflict (kanban UI changes + external changes)
+        // - OR document is dirty (text editor changes) AND has external changes
+        const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
+
+        if (hasConflict) {
+            console.log(`[MainKanbanFile.hasConflict] CONFLICT DETECTED:`, {
+                file: this._relativePath,
+                baseConflict: baseHasConflict,
+                documentIsDirty: documentIsDirty,
+                hasFileSystemChanges: this._hasFileSystemChanges,
+                hasUnsavedChanges: this._hasUnsavedChanges,
+                isInEditMode: this._isInEditMode
+            });
+        }
+
+        return hasConflict;
+    }
 
     /**
      * Override reload to also parse board

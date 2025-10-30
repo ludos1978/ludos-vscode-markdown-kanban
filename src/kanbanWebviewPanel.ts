@@ -2280,17 +2280,22 @@ export class KanbanWebviewPanel {
                 this.invalidateBoardCache();
             }
         } else if (fileType === 'include-regular') {
-            // Regular include - need full board re-parse
-            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - triggering full board refresh`);
-            const mainFile = this._fileRegistry.getMainFile();
-            if (mainFile) {
-                await mainFile.reload();
-                const board = mainFile.getBoard();
-                if (board && board.valid) {
-                    this._cachedBoard = board;
-                    this._boardCacheValid = true;
-                    await this.sendBoardUpdate(false, true);
-                }
+            // Regular include - regenerate board from registry
+            // Note: Main file structure hasn't changed, but include content has
+            // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
+            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - regenerating board`);
+
+            // Invalidate cache and regenerate from registry
+            // This ensures column/task includes are properly loaded
+            this.invalidateBoardCache();
+            const board = this.getBoard();
+
+            if (board && board.valid) {
+                console.log(`[_sendIncludeFileUpdateToFrontend] Board regenerated, sending update to frontend`);
+                // Send full board update - frontend will re-render markdown with updated includes
+                await this.sendBoardUpdate(false, true);
+            } else {
+                console.warn(`[_sendIncludeFileUpdateToFrontend] Board regeneration failed or invalid`);
             }
         }
     }

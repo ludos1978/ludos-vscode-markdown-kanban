@@ -134,11 +134,17 @@ export abstract class IncludeFile extends MarkdownFile {
      * Handle external file change
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        console.log(`[${this.getFileType()}] Handling external change: ${changeType} - ${this._relativePath}`);
+        console.log(`[${this.getFileType()}.handleExternalChange] TRIGGERED:`, {
+            changeType,
+            file: this._relativePath,
+            hasUnsaved: this._hasUnsavedChanges,
+            hasFileSystemChanges: this._hasFileSystemChanges,
+            isInEditMode: this._isInEditMode
+        });
 
         if (changeType === 'deleted') {
             this._exists = false;
-            console.warn(`[${this.getFileType()}] Include file was deleted: ${this._relativePath}`);
+            console.warn(`[${this.getFileType()}.handleExternalChange] FILE-DELETED: ${this._relativePath}`);
             await this.notifyParentOfChange();
             return;
         }
@@ -148,14 +154,24 @@ export abstract class IncludeFile extends MarkdownFile {
         }
 
         // Check for conflict FIRST - only clear content if auto-reloading
-        if (this.hasConflict()) {
-            console.log(`[${this.getFileType()}] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
+        const hasConflict = this.hasConflict();
+        const needsReload = this.needsReload();
+
+        console.log(`[${this.getFileType()}.handleExternalChange] DECISION-FACTORS:`, {
+            hasConflict,
+            needsReload,
+            hasUnsaved: this._hasUnsavedChanges,
+            isInEditMode: this._isInEditMode
+        });
+
+        if (hasConflict) {
+            console.log(`[${this.getFileType()}.handleExternalChange] CONFLICT-DIALOG: Showing dialog to user (keeping current content for potential save)`);
             await this.showConflictDialog();
-        } else if (this.needsReload()) {
-            console.log(`[${this.getFileType()}] ⚠ Auto-reload: Reloading from disk`);
+        } else if (needsReload) {
+            console.log(`[${this.getFileType()}.handleExternalChange] AUTO-RELOAD: Reloading from disk (no conflict detected)`);
             await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
         } else {
-            console.log(`[${this.getFileType()}] ⏸ External change detected but neither conflict nor reload needed`);
+            console.log(`[${this.getFileType()}.handleExternalChange] NO-ACTION: External change detected but neither conflict nor reload needed`);
         }
     }
 

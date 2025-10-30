@@ -215,8 +215,17 @@ export class ConflictResolver {
         const hasAnyUnsavedChanges = context.hasMainUnsavedChanges || context.hasIncludeUnsavedChanges;
         const isInEditMode = context.isInEditMode || false;
 
+        console.log('[ConflictResolver.showExternalMainFileDialog] ENTRY:', {
+            fileName: context.fileName,
+            hasMainUnsaved: context.hasMainUnsavedChanges,
+            hasIncludeUnsaved: context.hasIncludeUnsavedChanges,
+            hasAnyUnsavedChanges,
+            isInEditMode
+        });
+
         // SPEC: Auto-reload if no unsaved changes AND not in edit mode (no dialog)
         if (!hasAnyUnsavedChanges && !isInEditMode) {
+            console.log('[ConflictResolver.showExternalMainFileDialog] AUTO-RELOAD: No unsaved changes + not in edit mode');
             // Auto-reload immediately without showing dialog
             return {
                 action: 'discard_local',
@@ -227,6 +236,8 @@ export class ConflictResolver {
                 shouldIgnore: false
             };
         }
+
+        console.log('[ConflictResolver.showExternalMainFileDialog] SHOW-DIALOG: Has unsaved changes or is in edit mode');
 
         // Has unsaved changes OR in edit mode - show full 4-option dialog
         // Build include files list if present
@@ -323,14 +334,15 @@ export class ConflictResolver {
         const hasExternalChanges = context.hasExternalChanges ?? true; // Default to true for safety
         const isInEditMode = context.isInEditMode || false;
 
-        console.log('[ConflictResolver.showExternalIncludeFileDialog] ENTRY:', JSON.stringify({
+        console.log('[ConflictResolver.showExternalIncludeFileDialog] ENTRY:', {
+            fileName: context.fileName,
             hasIncludeChanges,
             hasExternalChanges,
             isInEditMode
-        }));
+        });
 
         if (!hasIncludeChanges && !hasExternalChanges) {
-            console.log('[ConflictResolver] Case: No changes - returning ignore');
+            console.log('[ConflictResolver.showExternalIncludeFileDialog] AUTO-IGNORE: No internal or external changes detected');
             // No unsaved changes and no external changes - nothing to do
             return {
                 action: 'ignore',
@@ -344,7 +356,7 @@ export class ConflictResolver {
 
         // SPEC: Auto-reload if no unsaved changes AND not in edit mode AND has external changes
         if (!hasIncludeChanges && !isInEditMode && hasExternalChanges) {
-            console.log('[ConflictResolver] Case: Auto-reload (no unsaved, not in edit mode) - returning discard_local');
+            console.log('[ConflictResolver.showExternalIncludeFileDialog] AUTO-RELOAD: No unsaved changes + not in edit mode + has external changes');
             // External changes but no internal changes and not in edit mode - auto-reload immediately
             return {
                 action: 'discard_local',
@@ -356,7 +368,7 @@ export class ConflictResolver {
             };
         }
 
-        console.log('[ConflictResolver] Case: Should show dialog - hasIncludeChanges OR isInEditMode');
+        console.log('[ConflictResolver.showExternalIncludeFileDialog] SHOW-DIALOG: Has unsaved changes or is in edit mode');
 
         // Has unsaved include file changes OR is in edit mode - show conflict dialog per specification
         // Option order matches specification with "ignore external changes" as default

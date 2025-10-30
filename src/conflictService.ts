@@ -44,14 +44,26 @@ export class ConflictService {
     public async showConflictDialog(context: ConflictContext): Promise<ConflictResolution | null> {
         const now = Date.now();
 
+        console.log(`[ConflictService.showConflictDialog] ENTRY:`, {
+            type: context.type,
+            fileType: context.fileType,
+            fileName: context.fileName,
+            hasMainUnsaved: context.hasMainUnsavedChanges,
+            hasIncludeUnsaved: context.hasIncludeUnsavedChanges,
+            isInEditMode: context.isInEditMode,
+            changedIncludeFiles: context.changedIncludeFiles
+        });
+
         // If there's already an active dialog, wait for it to complete first
         if (this._activeConflictDialog) {
+            console.log(`[ConflictService.showConflictDialog] WAITING: Active dialog already exists`);
             await this._activeConflictDialog;
         }
 
         // Throttle dialog frequency to prevent spam
         const timeSinceLastDialog = now - this._lastDialogTimestamp;
         if (timeSinceLastDialog < this._MIN_DIALOG_INTERVAL) {
+            console.log(`[ConflictService.showConflictDialog] THROTTLED: Dialog skipped (${timeSinceLastDialog}ms < ${this._MIN_DIALOG_INTERVAL}ms)`);
             return null; // Skip this dialog
         }
 
@@ -63,6 +75,14 @@ export class ConflictService {
 
         try {
             const resolution = await this._activeConflictDialog;
+            console.log(`[ConflictService.showConflictDialog] RESOLVED:`, {
+                action: resolution.action,
+                shouldProceed: resolution.shouldProceed,
+                shouldSave: resolution.shouldSave,
+                shouldReload: resolution.shouldReload,
+                shouldIgnore: resolution.shouldIgnore,
+                shouldCreateBackup: resolution.shouldCreateBackup
+            });
             return resolution;
         } finally {
             this._activeConflictDialog = null;
