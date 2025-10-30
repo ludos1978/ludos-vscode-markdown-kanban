@@ -2,6 +2,7 @@ import { IdGenerator } from './utils/idGenerator';
 import { PresentationParser } from './presentationParser';
 import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
+import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,6 +14,7 @@ export interface KanbanTask {
   includeFiles?: string[]; // Paths to included files
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
+  isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
 }
 
 export interface KanbanColumn {
@@ -23,6 +25,7 @@ export interface KanbanColumn {
   includeFiles?: string[]; // Paths to included presentation files
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
+  isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
 }
 
 export interface KanbanBoard {
@@ -36,41 +39,75 @@ export interface KanbanBoard {
 export class MarkdownKanbanParser {
   // Runtime-only ID generation - no persistence to markdown
 
+  /**
+   * Find existing column by position with content verification
+   * Backend markdown is source of truth - preserve IDs only when content matches
+   */
+  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number, newTasks?: KanbanTask[]): KanbanColumn | undefined {
+    if (!existingBoard) return undefined;
 
-  static parseMarkdown(content: string, basePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
+    // Try to match by position first
+    if (columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
+      const candidateColumn = existingBoard.columns[columnIndex];
+
+      // CRITICAL VERIFICATION: For columns, verify task composition hasn't changed
+      // If we're checking a column with tasks, verify all task IDs are present
+      if (newTasks && newTasks.length > 0) {
+        const newTaskIds = new Set(newTasks.map(t => t.id));
+        const oldTaskIds = new Set(candidateColumn.tasks.map(t => t.id));
+
+        // If task IDs match, it's the same column (even if title changed)
+        const sameTaskIds =
+          newTaskIds.size === oldTaskIds.size &&
+          [...newTaskIds].every(id => oldTaskIds.has(id));
+
+        if (sameTaskIds) {
+          return candidateColumn;
+        }
+        // Task composition changed - this is a DIFFERENT column, don't preserve ID
+        return undefined;
+      }
+
+      // For columns without tasks or include columns, match by title
+      if (candidateColumn.title === title) {
+        return candidateColumn;
+      }
+
+      return undefined;
+    }
+
+    // Fallback: match by title
+    return existingBoard.columns.find(col => col.title === title);
+  }
+
+  /**
+   * Find existing task by CONTENT (title + description)
+   * Backend markdown is source of truth - match by complete content, not position
+   * Position can change when tasks are reordered, but content is the identifier
+   */
+  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, description?: string): KanbanTask | undefined {
+    if (!existingColumn) return undefined;
+
+    // CRITICAL: Match by CONTENT (title + description), not position
+    // If both title AND description match exactly, it's the same task
+    return existingColumn.tasks.find(task =>
+      task.title === title &&
+      task.description === (description || '')
+    );
+  }
+
+  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
       // First parse with original content to preserve raw descriptions
       const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
-      // Detect all include files in the content
-      let includedFiles: string[] = [];
-      const includeRegex = /!!!include\(([^)]+)\)!!!/gi;
-      let match;
-      while ((match = includeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!includedFiles.includes(includeFile)) {
-              includedFiles.push(includeFile);
-          }
-      }
-
-      // Detect column include files in column titles
+      // Location-based include detection:
+      // - Column includes: !!!include()!!! in column headers (## header)
+      // - Task includes: !!!include()!!! in task titles (- [ ] title)
+      // - Regular includes: !!!include()!!! in task descriptions (indented lines)
+      // We detect these during parsing based on context, not upfront
+      let includedFiles: string[] = []; // Regular includes only (from descriptions)
       let columnIncludeFiles: string[] = [];
-      const columnIncludeRegex = /!!!columninclude\(([^)]+)\)!!!/gi;
-      while ((match = columnIncludeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!columnIncludeFiles.includes(includeFile)) {
-              columnIncludeFiles.push(includeFile);
-          }
-      }
-
-      // Detect task include files in task titles
       let taskIncludeFiles: string[] = [];
-      const taskIncludeRegex = /!!!taskinclude\(([^)]+)\)!!!/gi;
-      while ((match = taskIncludeRegex.exec(content)) !== null) {
-          const includeFile = match[1].trim();
-          if (!taskIncludeFiles.includes(includeFile)) {
-              taskIncludeFiles.push(includeFile);
-          }
-      }
       const board: KanbanBoard = {
         valid: false,
         title: '',
@@ -123,7 +160,7 @@ export class MarkdownKanbanParser {
         // Handle Kanban footer
         if (line.startsWith('%%')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
           inKanbanFooter = true;
@@ -139,7 +176,7 @@ export class MarkdownKanbanParser {
         // Parse column with runtime UUID generation
         if (line.startsWith('## ')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
           currentTask = null;
@@ -149,15 +186,19 @@ export class MarkdownKanbanParser {
 
           const columnTitle = line.substring(3);
 
-          // Check for column include syntax
-          const columnIncludeMatches = columnTitle.match(/!!!columninclude\(([^)]+)\)!!!/g);
+          // Check for include syntax in column header (location-based: column includes)
+          const columnIncludeMatches = columnTitle.match(/!!!include\(([^)]+)\)!!!/g);
 
           if (columnIncludeMatches && columnIncludeMatches.length > 0) {
-            // This is a column include - process included files
+            // This is a column include - process included files as Marp presentations
             const includeFiles: string[] = [];
             columnIncludeMatches.forEach(match => {
-              const filePath = match.replace(/!!!columninclude\(([^)]+)\)!!!/, '$1').trim();
+              const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
               includeFiles.push(filePath);
+              // Track for file watching (FOUNDATION-1: Use normalized comparison)
+              if (!columnIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
+                columnIncludeFiles.push(filePath);
+              }
             });
 
             // Generate tasks from included files
@@ -188,8 +229,10 @@ export class MarkdownKanbanParser {
               displayTitle = path.basename(includeFiles[0], path.extname(includeFiles[0]));
             }
 
+            // Preserve existing column ID by position (NOT title - title changes with include switches!)
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle, columnIndex);
             currentColumn = {
-              id: IdGenerator.generateColumnId(),
+              id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle, // Keep full title with include syntax for editing
               tasks: includeTasks,
               includeMode: true,
@@ -198,9 +241,10 @@ export class MarkdownKanbanParser {
               displayTitle: displayTitle || 'Included Column' // Store cleaned title for display
             };
           } else {
-            // Regular column
+            // Regular column - preserve existing ID by position
+            const existingCol = this.findExistingColumn(existingBoard, columnTitle, columnIndex);
             currentColumn = {
-              id: IdGenerator.generateColumnId(),
+              id: existingCol?.id || IdGenerator.generateColumnId(),
               title: columnTitle,
               tasks: []
             };
@@ -214,7 +258,7 @@ export class MarkdownKanbanParser {
         // Parse task with runtime UUID generation
         if (line.startsWith('- ')) {
           if (collectingDescription) {
-            this.finalizeCurrentTask(currentTask, currentColumn);
+            this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
             collectingDescription = false;
           }
 
@@ -222,8 +266,9 @@ export class MarkdownKanbanParser {
             // Only parse tasks for non-include columns
             const taskTitle = line.substring(6);
 
+            // Create task with temporary ID - will be matched by content during finalization
             currentTask = {
-              id: IdGenerator.generateTaskId(),
+              id: IdGenerator.generateTaskId(), // Temporary, replaced if content matches
               title: taskTitle,
               description: ''
             };
@@ -262,7 +307,7 @@ export class MarkdownKanbanParser {
 
       // Add the last task and column
       if (collectingDescription) {
-        this.finalizeCurrentTask(currentTask, currentColumn);
+        this.finalizeCurrentTask(currentTask, currentColumn, existingBoard, columnIndex - 1);
       }
       if (currentColumn) {
         board.columns.push(currentColumn);
@@ -273,53 +318,43 @@ export class MarkdownKanbanParser {
       }
 
       // Process task includes AFTER normal parsing
-      this.processTaskIncludes(board, basePath);
+      this.processTaskIncludes(board, basePath, taskIncludeFiles);
+
+      // Detect regular includes in task descriptions (not handled by parser, but tracked for file watching)
+      this.detectRegularIncludes(board, includedFiles);
 
       return { board, includedFiles, columnIncludeFiles, taskIncludeFiles };
   }
 
-  private static processTaskIncludes(board: KanbanBoard, basePath?: string): void {
+  private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[]): void {
     for (const column of board.columns) {
       for (const task of column.tasks) {
-        // Check if task title contains taskinclude syntax
-        const taskIncludeMatches = task.title.match(/!!!taskinclude\(([^)]+)\)!!!/g);
+        // Check if task title contains include syntax (location-based: task includes)
+        const taskIncludeMatches = task.title.match(/!!!include\(([^)]+)\)!!!/g);
 
         if (taskIncludeMatches && taskIncludeMatches.length > 0) {
-          // Process this task as a task include
+          // This is a task include - process included file (first line as title, rest as description)
           const includeFiles: string[] = [];
           taskIncludeMatches.forEach(match => {
-            const filePath = match.replace(/!!!taskinclude\(([^)]+)\)!!!/, '$1').trim();
+            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
             includeFiles.push(filePath);
+            // Track for file watching (FOUNDATION-1: Use normalized comparison)
+            if (taskIncludeFiles && !taskIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
+              taskIncludeFiles.push(filePath);
+            }
           });
 
-          // Read content from included files
-          let includeTitle = '';
-          let includeDescription = '';
+          // STRATEGY 1: Load full content without parsing
+          // Read complete file content without parsing into title/description
+          let fullFileContent = '';
 
           for (const filePath of includeFiles) {
             const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
             try {
               if (fs.existsSync(resolvedPath)) {
-                const fileContent = fs.readFileSync(resolvedPath, 'utf8');
-                const lines = fileContent.split('\n');
-
-                // Find first non-empty line for title
-                let titleFound = false;
-                let descriptionLines: string[] = [];
-
-                for (let i = 0; i < lines.length; i++) {
-                  const line = lines[i].trim();
-                  if (!titleFound && line) {
-                    includeTitle = lines[i]; // Use original line with indentation
-                    titleFound = true;
-                  } else if (titleFound) {
-                    descriptionLines.push(lines[i]);
-                  }
-                }
-
-                // Join remaining lines as description
-                includeDescription = descriptionLines.join('\n').trim();
-
+                // Read COMPLETE file content (NO PARSING!)
+                fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
+                console.log(`[Parser] Loaded ${fullFileContent.length} chars from ${filePath} (no parsing)`);
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
               }
@@ -328,23 +363,52 @@ export class MarkdownKanbanParser {
             }
           }
 
-          // If no title found in file, use filename
-          if (!includeTitle && includeFiles.length > 0) {
-            includeTitle = path.basename(includeFiles[0], path.extname(includeFiles[0]));
-          }
+          // Generate displayTitle for UI (visual indicator only, not part of file content)
+          const displayTitle = includeFiles.length > 0
+            ? `# include in ${includeFiles[0]}`
+            : '# include';
 
           // Update task properties for include mode
           task.includeMode = true;
-          task.includeFiles = includeFiles;
+          // FOUNDATION-1: Store ORIGINAL paths (preserve casing)
+          // Registry will normalize internally for lookups
+          // DO NOT normalize here - files need original paths for display
+          task.includeFiles = includeFiles.map(f => f.trim()); // Just trim whitespace, keep original casing
           task.originalTitle = task.title; // Keep original title with include syntax
-          task.displayTitle = includeTitle || 'Untitled'; // Display title from file
-          task.description = includeDescription; // Description from file
+          task.displayTitle = displayTitle; // UI header only
+          task.description = fullFileContent; // COMPLETE file content, no parsing!
         }
       }
     }
   }
 
-  private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null): void {
+  private static detectRegularIncludes(board: KanbanBoard, includedFiles: string[]): void {
+    // Scan all task descriptions for !!!include()!!! patterns (regular includes)
+    const includeRegex = /!!!include\(([^)]+)\)!!!/gi;
+
+    for (const column of board.columns) {
+      for (const task of column.tasks) {
+        // Skip tasks with includeMode - they are task includes, not regular includes
+        if (task.includeMode) {
+          continue;
+        }
+
+        if (task.description) {
+          let match;
+          // Reset regex state
+          includeRegex.lastIndex = 0;
+          while ((match = includeRegex.exec(task.description)) !== null) {
+            const includeFile = match[1].trim();
+            if (!includedFiles.includes(includeFile)) {
+              includedFiles.push(includeFile);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null, existingBoard?: KanbanBoard, columnIndex?: number): void {
     if (!task || !column) {return;}
 
     // Clean up description
@@ -354,6 +418,24 @@ export class MarkdownKanbanParser {
         delete task.description;
       }
     }
+
+    // CRITICAL: Match by content to preserve ID (Backend is source of truth)
+    // Find existing column by POSITION (title may have changed with include switch!)
+    let existingCol: KanbanColumn | undefined;
+    if (existingBoard && columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
+      existingCol = existingBoard.columns[columnIndex];
+    }
+
+    if (existingCol) {
+      // Try to find matching task by complete content (title + description)
+      const existingTask = this.findExistingTask(existingCol, task.title, task.description);
+      if (existingTask) {
+        // Content matches - preserve the existing ID
+        task.id = existingTask.id;
+        console.log(`[Parser] Task content matched - preserving ID ${existingTask.id} for "${task.title.substring(0, 30)}..."`);
+      }
+    }
+
     column.tasks.push(task);
   }
 
@@ -376,11 +458,14 @@ export class MarkdownKanbanParser {
 
     // Add columns (no ID persistence - runtime only)
     for (const column of sortedColumns) {
+      console.log(`[generateMarkdown] Column "${column.title}" includeMode=${column.includeMode}, includeFiles=${column.includeFiles?.join(',')}, tasks=${column.tasks.length}`);
+
       if (column.includeMode) {
         // For include columns, use the current title (which may have been updated with tags)
         // column.title should contain the include syntax plus any added tags
         const titleToUse = column.title;
         markdown += `## ${titleToUse}\n`;
+        console.log(`[generateMarkdown] Skipping ${column.tasks.length} tasks for includeMode column`);
         // Skip generating tasks for include columns - they remain as includes
       } else {
         // Regular column processing

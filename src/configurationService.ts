@@ -15,7 +15,8 @@ export interface KanbanConfiguration {
     maxRowHeight: number;
     tagColors: { [key: string]: string };
     taskMinHeight: string;
-    sectionMaxHeight: string;
+    sectionHeight: string;
+    taskSectionHeight: string;
     fontSize: string;
     fontFamily: string;
     columnWidth: string;
@@ -27,7 +28,8 @@ export interface KanbanConfiguration {
     layoutPresets: { [key: string]: any };
     tagVisibility: string;
     exportTagVisibility: boolean;
-    showHtmlComments: boolean;
+    htmlCommentRenderMode: string;
+    htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
     // Marp configuration
     marp: {
@@ -49,7 +51,8 @@ export interface ConfigurationDefaults {
     whitespace: string;
     maxRowHeight: number;
     taskMinHeight: string;
-    sectionMaxHeight: string;
+    sectionHeight: string;
+    taskSectionHeight: string;
     fontSize: string;
     fontFamily: string;
     columnWidth: string;
@@ -60,7 +63,8 @@ export interface ConfigurationDefaults {
     layoutPreset: string;
     tagVisibility: string;
     exportTagVisibility: boolean;
-    showHtmlComments: boolean;
+    htmlCommentRenderMode: string;
+    htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
     // Marp configuration defaults
     marp: {
@@ -88,7 +92,8 @@ export class ConfigurationService {
         whitespace: 'normal',
         maxRowHeight: 0,
         taskMinHeight: 'auto',
-        sectionMaxHeight: 'auto',
+        sectionHeight: 'auto',
+        taskSectionHeight: 'auto',
         fontSize: 'medium',
         fontFamily: 'default',
         columnWidth: 'auto',
@@ -99,7 +104,8 @@ export class ConfigurationService {
         layoutPreset: 'default',
         tagVisibility: 'visible',
         exportTagVisibility: true,
-        showHtmlComments: false,
+        htmlCommentRenderMode: 'hidden',
+        htmlContentRenderMode: 'html',
         arrowKeyFocusScroll: 'center',
         // Marp defaults
         marp: {
@@ -270,7 +276,8 @@ export class ConfigurationService {
         return {
             whitespace: this.getConfig('whitespace'),
             taskMinHeight: this.getConfig('taskMinHeight'),
-            sectionMaxHeight: this.getConfig('sectionMaxHeight'),
+            sectionHeight: this.getConfig('sectionHeight'),
+            taskSectionHeight: this.getConfig('taskSectionHeight'),
             fontSize: this.getConfig('fontSize'),
             fontFamily: this.getConfig('fontFamily'),
             columnWidth: this.getConfig('columnWidth'),

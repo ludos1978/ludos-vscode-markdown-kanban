@@ -35,7 +35,8 @@ class ConfigManager {
             exportTagVisibility: true,
             arrowKeyFocusScroll: 'center',
             tagColors: {},
-            showHtmlComments: false
+            htmlCommentRenderMode: 'hidden',
+            htmlContentRenderMode: 'html'
         };
     }
 

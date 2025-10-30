@@ -69,27 +69,26 @@
 
       // Render the content as markdown
       try {
-        let rendered;
-        let wrapperTag;
-        let wrapperClass;
+        // Always render as block content for regular includes
+        const rendered = md.render(content);
 
-        // Check if content has block-level elements (headers, lists, etc.)
-        const hasBlockContent = /^#{1,6}\s|^\*\s|^\d+\.\s|^\>|^```|^\|/m.test(content);
+        // Create filename display (show just the basename)
+        const fileName = filePath.split('/').pop() || filePath;
 
-        if (hasBlockContent || isBlock) {
-          // Use div for block content and full render
-          rendered = md.render(content);
-          wrapperTag = 'div';
-          wrapperClass = 'included-content-block';
-        } else {
-          // Use span for inline content and renderInline
-          rendered = md.renderInline(content);
-          wrapperTag = 'span';
-          wrapperClass = 'included-content-inline';
-        }
-
-        // Each include gets its own wrapper
-        return `<${wrapperTag} class="${wrapperClass}" data-include-file="${escapeHtml(filePath)}">${rendered}</${wrapperTag}>`;
+        // Build bordered container with title bar
+        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
+          <div class="include-title-bar">
+            <span class="include-filename-link"
+                  data-file-path="${escapeHtml(filePath)}"
+                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
+                  title="Alt+click to open file: ${escapeHtml(filePath)}">
+              include(${escapeHtml(fileName)})
+            </span>
+          </div>
+          <div class="include-content-area">
+            ${rendered}
+          </div>
+        </div>`;
       } catch (error) {
         console.error('Error rendering included content:', error);
         return `<span class="include-error" title="Error rendering included content">Error including: ${escapeHtml(filePath)}</span>`;

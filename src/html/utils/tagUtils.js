@@ -589,6 +589,46 @@ class TagUtils {
             return renderFn ? renderFn(displayTitle) : displayTitle;
         }
     }
+
+    /**
+     * Get display title for a task, handling taskinclude specially to make filepaths clickable
+     * Uses same format as column includes: "include(path/filename.md)"
+     * @param {Object} task - Task object with displayTitle, includeMode, includeFiles
+     * @returns {string} HTML string for display
+     */
+    getTaskDisplayTitle(task) {
+        if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
+            // For taskinclude, show as "include(...path/filename.md)" format - same as column includes
+            const fileName = task.includeFiles[0];
+            const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
+            const baseFileName = parts[parts.length - 1];
+
+            // Get path (everything except filename), limit to 10 characters
+            let pathPart = '';
+            if (parts.length > 1) {
+                const fullPath = parts.slice(0, -1).join('/');
+                if (fullPath.length > 10) {
+                    // Show last 10 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-10);
+                } else {
+                    pathPart = fullPath;
+                }
+            }
+
+            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
+            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+
+            const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+            // Just return the include link - displayTitle is not shown because it's the file content, not metadata
+            return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
+        } else {
+            // Normal task - render displayTitle as-is
+            const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
+            const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+            return renderFn ? renderFn(displayTitle) : displayTitle;
+        }
+    }
 }
 
 // Create singleton instance

@@ -1,63 +1,84 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as crypto from 'crypto';
 import { TagUtils, TagVisibility } from './utils/tagUtils';
 import { MarkdownKanbanParser } from './markdownParser';
 import { PresentationParser } from './presentationParser';
-import { ContentPipelineService } from './services/ContentPipelineService';
+import { ContentPipelineService } from './services/content/ContentPipelineService';
 import { OperationOptionsBuilder, OperationOptions, FormatStrategy } from './services/OperationOptions';
 import { PathResolver } from './services/PathResolver';
-import { MarpConverter, MarpConversionOptions } from './services/MarpConverter';
-import { MarpExportService, MarpOutputFormat } from './services/MarpExportService';
+import { MarpConverter, MarpConversionOptions } from './services/export/MarpConverter';
+import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
+import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
+import { getMermaidExportService } from './services/export/MermaidExportService';
 
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
-export interface ExportOptions {
-    targetFolder: string;
-    includeFiles: boolean;
-    includeImages: boolean;
-    includeVideos: boolean;
-    includeOtherMedia: boolean;
-    includeDocuments: boolean;
-    fileSizeLimitMB: number;
-    tagVisibility?: TagVisibility;
-}
+/**
+ * Export options - SINGLE unified system for ALL exports
+ */
+export interface NewExportOptions {
+    // SELECTION: Column indexes to export (empty or undefined = full board)
+    columnIndexes?: number[];
 
-export interface ColumnExportOptions extends ExportOptions {
-    columnIndex: number;
-    columnTitle?: string;
-}
+    // SCOPE: What to export
+    scope?: 'board' | 'column' | 'task';
 
-export interface UnifiedExportOptions {
-    targetFolder?: string;
-    scope: ExportScope;
-    format: ExportFormat;
-    tagVisibility: TagVisibility;
-    packAssets: boolean;
-    mergeIncludes?: boolean;  // If true, merge all includes into one file; if false, keep as separate files
-    packOptions?: {
-        includeFiles: boolean;
-        includeImages: boolean;
-        includeVideos: boolean;
-        includeOtherMedia: boolean;
-        includeDocuments: boolean;
-        fileSizeLimitMB: number;
-    };
-    selection: {
-        rowNumber?: number;
-        stackIndex?: number;
+    // SELECTION: Specific item to export (for column/task scope)
+    selection?: {
         columnIndex?: number;
         taskId?: string;
-        columnId?: string;
     };
-    // New export behavior options
-    autoExportOnSave?: boolean;  // If true, automatically re-export when file is saved
-    openAfterExport?: boolean;   // If true, open exported file in browser/viewer after export
-    marpTheme?: string;          // Marp theme (for Marp exports)
-    marpBrowser?: string;        // Browser for Marp exports (chrome, edge, firefox, auto)
-    marpPreview?: boolean;       // If true, add --preview flag for live preview
+
+    // MODE: Operation mode
+    mode: 'copy' | 'save' | 'auto' | 'preview';
+    // - copy: Return content only (for clipboard operations)
+    // - save: Write to disk
+    // - auto: Auto-export on save (registers save handler)
+    // - preview: Open in Marp preview (realtime watch)
+
+    // FORMAT: Output format
+    format: 'kanban' | 'presentation' | 'marp';
+    marpFormat?: 'markdown' | 'html' | 'pdf' | 'pptx';
+
+    // TRANSFORMATIONS
+    mergeIncludes?: boolean;
+    tagVisibility: TagVisibility;
+
+    // PACKING & LINK HANDLING
+    linkHandlingMode?: 'rewrite-only' | 'pack-linked' | 'pack-all' | 'no-modify';
+    packAssets: boolean;
+    packOptions?: {
+        includeFiles?: boolean;
+        includeImages?: boolean;
+        includeVideos?: boolean;
+        includeOtherMedia?: boolean;
+        includeDocuments?: boolean;
+        fileSizeLimitMB?: number;
+    };
+
+    // OUTPUT
+    targetFolder?: string;              // Required for save/auto/preview modes
+    openAfterExport?: boolean;
+
+    // MARP SPECIFIC
+    marpTheme?: string;
+    marpBrowser?: string;
+    marpEnginePath?: string;
+    marpWatch?: boolean;            // Run Marp in watch mode
+}
+
+/**
+ * Result of export operation
+ */
+export interface ExportResult {
+    success: boolean;
+    message: string;
+    content?: string;                   // For mode: 'copy'
+    exportedPath?: string;              // For mode: 'save'
 }
 
 export interface AssetInfo {
@@ -87,21 +108,25 @@ export class ExportService {
     // For taskinclude, match the entire task line including the checkbox prefix
     // This prevents checkbox duplication when replacing with converted content
     private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!taskinclude\s*\(([^)]+)\)\s*!!!/gm;
-    // For columninclude, match the entire column header line
+    // For column includes (position-based: !!!include()!!! in column header), match the entire column header line
     // Captures: prefix title, file path, and suffix (tags/other content)
-    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!columninclude\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
+    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
 
     // Track MD5 hashes to detect duplicates
     private static fileHashMap = new Map<string, string>();
     private static exportedFiles = new Map<string, string>(); // MD5 -> exported path
+    
+    // Track Marp watch processes to avoid multiple instances
+    private static marpWatchProcesses = new Map<string, boolean>(); // markdownPath -> isWatching
+    private static marpProcessPids = new Map<string, number>(); // markdownPath -> process PID
 
     /**
      * Apply tag filtering to content based on export options
      * DRY method to avoid duplication
      */
-    private static applyTagFiltering(content: string, options: ExportOptions): string {
-        if (options.tagVisibility && options.tagVisibility !== 'all') {
-            return TagUtils.processMarkdownContent(content, options.tagVisibility);
+    private static applyTagFiltering(content: string, tagVisibility: TagVisibility): string {
+        if (tagVisibility && tagVisibility !== 'all') {
+            return TagUtils.processMarkdownContent(content, tagVisibility);
         }
         return content;
     }
@@ -125,237 +150,14 @@ export class ExportService {
     }
 
     /**
-     * Export markdown file with selected assets
-     */
-    public static async exportWithAssets(
-        sourceDocument: vscode.TextDocument,
-        options: ExportOptions
-    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
-        try {
-
-            // Validate inputs
-            if (!sourceDocument || !sourceDocument.uri) {
-                throw new Error('Invalid source document provided');
-            }
-
-            if (!options.targetFolder || options.targetFolder.trim() === '') {
-                throw new Error('Target folder path is empty or invalid');
-            }
-
-            // Clear tracking maps for new export
-            this.fileHashMap.clear();
-            this.exportedFiles.clear();
-
-            const sourcePath = sourceDocument.uri.fsPath;
-            const sourceDir = path.dirname(sourcePath);
-            const sourceBasename = path.basename(sourcePath, '.md');
-
-            // Validate source file exists
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source markdown file not found: ${sourcePath}`);
-            }
-
-            // Ensure target folder exists
-            try {
-                if (!fs.existsSync(options.targetFolder)) {
-                    fs.mkdirSync(options.targetFolder, { recursive: true });
-                }
-            } catch (error) {
-                throw new Error(`Failed to create target folder "${options.targetFolder}": ${error}`);
-            }
-
-            // Check write permissions on target folder
-            try {
-                const testFile = path.join(options.targetFolder, '.write-test');
-                fs.writeFileSync(testFile, 'test');
-                fs.unlinkSync(testFile);
-            } catch (error) {
-                throw new Error(`No write permission for target folder "${options.targetFolder}": ${error}`);
-            }
-
-            // Process main markdown file
-            let exportedContent, notIncludedAssets, stats;
-            try {
-                const result = await this.processMarkdownFile(
-                    sourcePath,
-                    options.targetFolder,
-                    sourceBasename,
-                    options,
-                    new Set() // Track processed includes to avoid circular references
-                );
-                exportedContent = result.exportedContent;
-                notIncludedAssets = result.notIncludedAssets;
-                stats = result.stats;
-
-                // Tag filtering is now applied within processMarkdownFile/processMarkdownContent
-            } catch (error) {
-                throw new Error(`Failed to process markdown file "${sourcePath}": ${error}`);
-            }
-
-            // Ensure YAML frontmatter (exportWithAssets always exports kanban format)
-            exportedContent = this.ensureYamlFrontmatter(exportedContent);
-
-            // Write the main markdown file to export folder
-            const targetMarkdownPath = path.join(options.targetFolder, path.basename(sourcePath));
-            try {
-                fs.writeFileSync(targetMarkdownPath, exportedContent, 'utf8');
-            } catch (error) {
-                throw new Error(`Failed to write main markdown file to "${targetMarkdownPath}": ${error}`);
-            }
-
-            // Create _not_included.md if there are excluded assets
-            if (notIncludedAssets.length > 0) {
-                try {
-                    await this.createNotIncludedFile(notIncludedAssets, options.targetFolder);
-                } catch (error) {
-                    console.warn(`Failed to create _not_included.md: ${error}`);
-                    // Don't fail the entire export for this
-                }
-            }
-
-            const successMessage = `Export completed successfully!\n${stats.includedCount} assets included, ${stats.excludedCount} assets excluded.\n${stats.includeFiles} included files processed.`;
-
-            return {
-                success: true,
-                message: successMessage,
-                exportedPath: targetMarkdownPath
-            };
-
-        } catch (error) {
-            const errorMessage = `Export failed: ${error instanceof Error ? error.message : String(error)}`;
-            console.error('❌ Export failed:', error);
-            console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
-
-            return {
-                success: false,
-                message: errorMessage
-            };
-        }
-    }
-
-    /**
-     * Export a single column from a kanban board
-     */
-    public static async exportColumn(
-        sourceDocument: vscode.TextDocument,
-        options: ColumnExportOptions
-    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
-        try {
-            // Clear tracking maps for new export
-            this.fileHashMap.clear();
-            this.exportedFiles.clear();
-
-            const sourcePath = sourceDocument.uri.fsPath;
-            const sourceBasename = path.basename(sourcePath, '.md');
-
-            // Validate source file exists
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source markdown file not found: ${sourcePath}`);
-            }
-
-            // Read the full markdown content
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
-
-            // Extract column content
-            const columnContent = this.extractColumnContent(fullContent, options.columnIndex);
-            if (!columnContent) {
-                throw new Error(`Column ${options.columnIndex} not found or empty`);
-            }
-
-            // Generate sanitized column name
-            const sanitizedColumnName = this.sanitizeColumnName(options.columnTitle, options.columnIndex);
-            const columnFileName = `${sourceBasename}-${sanitizedColumnName}`;
-
-            // Ensure target folder exists
-            try {
-                if (!fs.existsSync(options.targetFolder)) {
-                    fs.mkdirSync(options.targetFolder, { recursive: true });
-                }
-            } catch (error) {
-                throw new Error(`Failed to create target folder "${options.targetFolder}": ${error}`);
-            }
-
-            // Verify write permissions
-            try {
-                const testFile = path.join(options.targetFolder, '.write-test');
-                fs.writeFileSync(testFile, 'test');
-                fs.unlinkSync(testFile);
-            } catch (error) {
-                throw new Error(`No write permission for target folder "${options.targetFolder}": ${error}`);
-            }
-
-            // Process the column content and its assets
-            const sourceDir = path.dirname(sourcePath);
-            let exportedContent: string;
-            let notIncludedAssets: AssetInfo[];
-            let stats: { includedCount: number; excludedCount: number; includeFiles: number };
-
-            try {
-                const result = await this.processMarkdownContent(
-                    columnContent,
-                    sourceDir,
-                    columnFileName,
-                    options.targetFolder,
-                    options,
-                    new Set<string>()
-                );
-                exportedContent = result.exportedContent;
-                notIncludedAssets = result.notIncludedAssets;
-                stats = result.stats;
-
-                // Tag filtering is now applied within processMarkdownFile/processMarkdownContent
-            } catch (error) {
-                throw new Error(`Failed to process column content: ${error}`);
-            }
-
-            // Ensure YAML frontmatter (column export is kanban format)
-            exportedContent = this.ensureYamlFrontmatter(exportedContent);
-
-            // Write the column markdown file to export folder
-            const targetMarkdownPath = path.join(options.targetFolder, `${columnFileName}.md`);
-            try {
-                fs.writeFileSync(targetMarkdownPath, exportedContent, 'utf8');
-            } catch (error) {
-                throw new Error(`Failed to write column markdown file to "${targetMarkdownPath}": ${error}`);
-            }
-
-            // Create _not_included.md if there are excluded assets
-            if (notIncludedAssets.length > 0) {
-                try {
-                    await this.createNotIncludedFile(notIncludedAssets, options.targetFolder);
-                } catch (error) {
-                    console.warn(`Failed to create _not_included.md: ${error}`);
-                    // Don't fail the entire export for this
-                }
-            }
-
-            const successMessage = `Column export completed successfully!\n${stats.includedCount} assets included, ${stats.excludedCount} assets excluded.\n${stats.includeFiles} included files processed.`;
-
-            return {
-                success: true,
-                message: successMessage,
-                exportedPath: targetMarkdownPath
-            };
-
-        } catch (error) {
-            const errorMessage = `Column export failed: ${error instanceof Error ? error.message : String(error)}`;
-            console.error('❌ Column export failed:', error);
-
-            return {
-                success: false,
-                message: errorMessage
-            };
-        }
-    }
-
-    /**
      * Process a markdown file and its assets
+     * uses obsolete data structures: ExportOptions
      */
     private static async processMarkdownFile(
         markdownPath: string,
         exportFolder: string,
         fileBasename: string,
-        options: ExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false
     ): Promise<{
@@ -380,12 +182,23 @@ export class ExportService {
             convertToPresentation
         );
 
+        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
+        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
+        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
+            processedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            true
+        ) : processedContent;
+
         // Filter assets based on options
         const assetsToInclude = this.filterAssets(assets, options);
 
-        // Process assets and update content
+        // Process assets and update content (this also rewrites paths for packed assets)
         const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            processedContent,
+            rewrittenContent,
             assetsToInclude,
             assets,
             mediaFolder,
@@ -400,7 +213,7 @@ export class ExportService {
 
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        const filteredContent = this.applyTagFiltering(modifiedContent, options);
+        const filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
         return {
             exportedContent: filteredContent,
@@ -411,17 +224,18 @@ export class ExportService {
 
     /**
      * Process included markdown files
+     * uses obsolete data structures: ExportOptions
      */
     private static async processIncludedFiles(
         content: string,
         sourceDir: string,
         exportFolder: string,
-        options: ExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
     ): Promise<{ processedContent: string; includeStats: number }> {
-        if (!options.includeFiles) {
+        if (!options.packOptions?.includeFiles || false) {
             return { processedContent: content, includeStats: 0 };
         }
 
@@ -446,16 +260,15 @@ export class ExportService {
             },
             {
                 pattern: this.COLUMN_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}!!!columninclude(${filename})!!!${suffix}`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}!!!include(${filename})!!!${suffix}`,
                 shouldWriteSeparateFile: !mergeIncludes,
-                includeType: 'columninclude'
+                includeType: 'columninclude' // Internal type identifier (position-based detection)
             }
         ];
 
         // Process each include pattern
         for (const { pattern, replacement, shouldWriteSeparateFile, includeType } of includePatterns) {
             const regex = new RegExp(pattern.source, pattern.flags);
-            console.log(`[kanban.exportService.processIncludedFiles] Searching with pattern: ${pattern.source}`);
 
             // Collect all matches first before modifying content
             const matches: RegExpExecArray[] = [];
@@ -467,7 +280,6 @@ export class ExportService {
             // Process matches in reverse order to maintain correct string positions
             for (let i = matches.length - 1; i >= 0; i--) {
                 match = matches[i];
-                console.log(`[kanban.exportService.processIncludedFiles] Found match: ${match[0]}`);
 
                 // Extract data based on include type
                 // taskinclude: match[1]=indentation, match[2]=path
@@ -488,15 +300,11 @@ export class ExportService {
                     includePath = match[1].trim();
                 }
 
-                console.log(`[kanban.exportService.processIncludedFiles]   includePath: "${includePath}"`);
                 // PathResolver.resolve() handles URL decoding
                 const resolvedPath = PathResolver.resolve(sourceDir, includePath);
-                console.log(`[kanban.exportService.processIncludedFiles]   resolvedPath: "${resolvedPath}"`);
-                console.log(`[kanban.exportService.processIncludedFiles]   exists: ${fs.existsSync(resolvedPath)}`);
 
                 // Avoid circular references
                 if (processedIncludes.has(resolvedPath)) {
-                    console.log(`[kanban.exportService.processIncludedFiles]   Skipping (circular reference)`);
                     continue;
                 }
 
@@ -505,9 +313,6 @@ export class ExportService {
                     includeCount++;
 
                     const includeBasename = path.basename(resolvedPath, '.md');
-
-                    console.log(`[kanban.exportService.processIncludedFiles] Processing include: ${resolvedPath}`);
-                    console.log(`[kanban.exportService.processIncludedFiles]   mergeIncludes: ${mergeIncludes}, shouldWriteSeparateFile: ${shouldWriteSeparateFile}`);
 
                     // Detect if the included file is already in presentation format
                     const includeContent = fs.readFileSync(resolvedPath, 'utf8');
@@ -518,14 +323,7 @@ export class ExportService {
                     if (convertToPresentation) {
                         // Exporting to presentation: convert if include is kanban format
                         shouldConvertInclude = isKanbanFormat;
-                    } else if (mergeIncludes && !isKanbanFormat) {
-                        // Exporting to kanban AND merging: convert if include is NOT kanban format
-                        // When merging into a kanban file, presentation includes must be converted to kanban
-                        // This will be handled differently - we need to convert presentation to kanban
-                        console.log(`[kanban.exportService.processIncludedFiles]   Include is presentation format, needs conversion to kanban for merge`);
                     }
-
-                    console.log(`[kanban.exportService.processIncludedFiles]   isKanbanFormat: ${isKanbanFormat}, shouldConvertInclude: ${shouldConvertInclude}`);
 
                     // Process the included file recursively
                     // IMPORTANT: When merging into presentation, don't convert - keep raw format
@@ -545,15 +343,13 @@ export class ExportService {
                     } else {
                         // When merging, use raw content without processing
                         // This preserves ## headers and slide structure
-                        console.log(`[kanban.exportService.processIncludedFiles]   Using raw content for merge (no conversion)`);
                         exportedContent = includeContent;
                     }
 
                     // If merging into kanban format and include is presentation format,
                     // convert presentation slides to kanban tasks
                     if (mergeIncludes && !convertToPresentation && !isKanbanFormat) {
-                        console.log(`[kanban.exportService.processIncludedFiles]   Converting presentation to kanban format for merge`);
-                        exportedContent = this.convertPresentationToKanban(exportedContent, match[0]);
+                        exportedContent = this.convertPresentationToKanban(exportedContent, includeType);
                     }
 
                     if (shouldWriteSeparateFile) {
@@ -562,13 +358,17 @@ export class ExportService {
                         const includeBuffer = Buffer.from(exportedContent, 'utf8');
                         const md5Hash = crypto.createHash('md5').update(includeBuffer).digest('hex');
 
+                        // Ensure export folder exists
+                        if (!fs.existsSync(exportFolder)) {
+                            fs.mkdirSync(exportFolder, { recursive: true });
+                        }
+
                         // Check if we already exported this exact content
                         let exportedRelativePath: string;
                         if (this.exportedFiles.has(md5Hash)) {
                             // Use existing exported file
                             const existingPath = this.exportedFiles.get(md5Hash)!;
                             exportedRelativePath = path.relative(exportFolder, existingPath).replace(/\\/g, '/');
-                            console.log(`[kanban.exportService.processIncludedFiles]   Reusing existing file (MD5 match): ${exportedRelativePath}`);
                         } else {
                             // Generate unique filename if needed
                             const fileName = path.basename(resolvedPath);
@@ -597,9 +397,6 @@ export class ExportService {
                             if (!fs.existsSync(targetIncludePath)) {
                                 fs.writeFileSync(targetIncludePath, exportedContent, 'utf8');
                                 this.exportedFiles.set(md5Hash, targetIncludePath);
-                                console.log(`[kanban.exportService.processIncludedFiles]   Wrote separate file: ${targetIncludePath}`);
-                            } else {
-                                console.log(`[kanban.exportService.processIncludedFiles]   File already exists with same content: ${targetIncludePath}`);
                             }
 
                             exportedRelativePath = exportedFileName;
@@ -613,9 +410,6 @@ export class ExportService {
                     } else {
                         // Mode: Merge includes into main file
                         // Replace the marker with the actual content
-                        console.log(`[kanban.exportService.processIncludedFiles]   Merging content inline (${exportedContent.length} chars)`);
-                        console.log(`[kanban.exportService.processIncludedFiles]   First 200 chars: ${exportedContent.substring(0, 200)}`);
-
                         let contentToInsert = exportedContent;
 
                         // Handle different include types
@@ -755,24 +549,38 @@ export class ExportService {
 
     /**
      * Filter assets based on export options
+     * uses obsolete data structures: ExportOptions
      */
-    private static filterAssets(assets: AssetInfo[], options: ExportOptions): AssetInfo[] {
+    private static filterAssets(assets: AssetInfo[], options: NewExportOptions): AssetInfo[] {
+        // If packing is disabled or no pack options, return empty array
+        if (!options.packAssets || !options.packOptions) {
+            return [];
+        }
+        const packOptions = options.packOptions;
+        const linkHandlingMode = options.linkHandlingMode || 'rewrite-only';
+
         return assets.filter(asset => {
             // Check if asset exists
             if (!asset.exists) { return false; }
 
             // Check file size limit
             const sizeMB = asset.size / (1024 * 1024);
-            if (sizeMB > options.fileSizeLimitMB) { return false; }
+            const fileSizeLimitMB = packOptions.fileSizeLimitMB ?? 100;
+            if (sizeMB > fileSizeLimitMB) { return false; }
 
-            // Check type-specific inclusion
+            // For pack-linked mode: include ALL assets (regardless of type)
+            if (linkHandlingMode === 'pack-linked') {
+                return true;
+            }
+
+            // For pack-all mode: check type-specific inclusion
             switch (asset.type) {
-                case 'markdown': return options.includeFiles; // Markdown files handled separately
-                case 'image': return options.includeImages;
-                case 'video': return options.includeVideos;
-                case 'audio': return options.includeOtherMedia;
-                case 'document': return options.includeDocuments;
-                case 'file': return options.includeFiles;
+                case 'markdown': return packOptions.includeFiles ?? false;
+                case 'image': return packOptions.includeImages ?? false;
+                case 'video': return packOptions.includeVideos ?? false;
+                case 'audio': return packOptions.includeOtherMedia ?? false;
+                case 'document': return packOptions.includeDocuments ?? false;
+                case 'file': return packOptions.includeFiles ?? false;
                 default: return false;
             }
         });
@@ -847,8 +655,11 @@ export class ExportService {
                     this.exportedFiles.set(md5, targetPath);
                 }
 
-                // Update path in content - use relative path from markdown to media folder
-                const relativePath = path.join(`${fileBasename}-Media`, exportedFileName);
+                // Update path in content - calculate relative path from exported markdown file to packed asset
+                // mediaFolder is at exportFolder/fileBasename-Media
+                // Exported markdown is at exportFolder/fileBasename.md
+                // So relative path from markdown to media is just the folder name
+                const relativePath = path.join(`${fileBasename}-Media`, exportedFileName).replace(/\\/g, '/');
                 modifiedContent = this.replaceAssetPath(modifiedContent, asset.originalPath, relativePath);
 
             } catch (error) {
@@ -905,9 +716,190 @@ export class ExportService {
     }
 
     /**
+     * Rewrite all links in content to be correct for the exported file location
+     * @param content The markdown content
+     * @param sourceDir Original source directory
+     * @param exportFolder Export folder directory
+     * @param fileBasename Base name of the exported file
+     * @param rewriteLinks Whether to rewrite links or keep them as-is
+     * @returns Modified content with rewritten links
+     */
+    private static rewriteLinksForExport(
+        content: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string,
+        rewriteLinks: boolean
+    ): string {
+        if (!rewriteLinks) {
+            return content;
+        }
+
+        // Extract code blocks to protect them from link rewriting
+        const codeBlocks: string[] = [];
+        const codeBlockPlaceholder = '___CODE_BLOCK_PLACEHOLDER___';
+
+        // Match both fence blocks (```) and inline code (`...`)
+        const fenceBlockPattern = /```[\s\S]*?```/g;
+        const inlineCodePattern = /`[^`]+`/g;
+
+        // Replace fence blocks with placeholders
+        let modifiedContent = content.replace(fenceBlockPattern, (match) => {
+            codeBlocks.push(match);
+            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
+        });
+
+        // Replace inline code with placeholders
+        modifiedContent = modifiedContent.replace(inlineCodePattern, (match) => {
+            codeBlocks.push(match);
+            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
+        });
+
+        // Pattern to match all types of links
+        // 1. Markdown images: ![alt](path)
+        // 2. Markdown links: [text](path)
+        // 3. HTML img/video/audio tags with src attribute
+        // 4. Wiki-style links: [[path]] or [[path|text]]
+        // 5. Angle bracket links: <path>
+        const linkPattern = /(!\[[^\]]*\]\([^)]+\))|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])|(<[^>]+>)/g;
+
+        modifiedContent = modifiedContent.replace(linkPattern, (match) => {
+            return this.processLink(match, sourceDir, exportFolder, fileBasename);
+        });
+
+        // Restore code blocks
+        modifiedContent = modifiedContent.replace(new RegExp(`${codeBlockPlaceholder}(\\d+)${codeBlockPlaceholder}`, 'g'), (match, index) => {
+            return codeBlocks[parseInt(index)];
+        });
+
+        return modifiedContent;
+    }
+
+    /**
+     * Process a single link and rewrite it if necessary
+     */
+    private static processLink(
+        link: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string
+    ): string {
+        let filePath: string | null = null;
+        let linkStart = '';
+        let linkEnd = '';
+
+        // Extract path from different link types
+        if (link.startsWith('![')) {
+            // Markdown image: ![alt](path)
+            const match = link.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+            if (match) {
+                const altText = match[1];
+                filePath = match[2];
+                linkStart = `![${altText}](`;
+                linkEnd = ')';
+            }
+        } else if (link.startsWith('[') && !link.startsWith('[[')) {
+            // Markdown link: [text](path)
+            const match = link.match(/^\[([^\]]*)\]\(([^)]+)\)/);
+            if (match) {
+                const linkText = match[1];
+                filePath = match[2];
+                linkStart = `[${linkText}](`;
+                linkEnd = ')';
+            }
+        } else if (link.match(/^<(?:img|video|audio)/i)) {
+            // HTML tag: <tag src="path">
+            const match = link.match(/src=["']([^"']+)["']/i);
+            if (match) {
+                filePath = match[1];
+                // For HTML tags, we need to rebuild the tag
+                return this.rewriteHtmlTag(link, filePath, sourceDir, exportFolder, fileBasename);
+            }
+        } else if (link.startsWith('[[')) {
+            // Wiki link: [[path]] or [[path|text]]
+            const match = link.match(/^\[\[([^\]]+)\]\]/);
+            if (match) {
+                filePath = match[1].split('|')[0]; // Get path before | if present
+                linkStart = '[[';
+                linkEnd = ']]';
+            }
+        } else if (link.startsWith('<') && link.endsWith('>')) {
+            // Angle bracket link: <path>
+            filePath = link.slice(1, -1);
+            linkStart = '<';
+            linkEnd = '>';
+        }
+
+        if (!filePath) {
+            return link; // No path found, return original
+        }
+
+        // Clean the path (remove title attributes, etc.)
+        const cleanPath = filePath.replace(/\s+"[^"]*"$/, '').replace(/\s+'[^']*'$/, '');
+
+        // Check if it's an absolute path or URL
+        if (this.isAbsolutePath(cleanPath) || this.isUrl(cleanPath)) {
+            return link; // Don't modify absolute paths or URLs
+        }
+
+        // Step 1: Convert the original relative path to absolute (relative to source directory)
+        const absoluteTargetPath = path.resolve(sourceDir, cleanPath);
+
+        // Step 2: Define the absolute path of the exported markdown file
+        const exportedFilePath = path.join(exportFolder, fileBasename + '.md');
+
+        // Step 3: Calculate relative path from exported file to target
+        const exportedFileDir = path.dirname(exportedFilePath);
+        const relativePath = path.relative(exportedFileDir, absoluteTargetPath).replace(/\\/g, '/');
+
+        // Rebuild the link with the new path
+        if (link.match(/^<(?:img|video|audio)/i)) {
+            // Already handled above
+            return link;
+        } else {
+            return `${linkStart}${relativePath}${linkEnd}`;
+        }
+    }
+
+    /**
+     * Rewrite HTML tag with new src path
+     */
+    private static rewriteHtmlTag(
+        tag: string,
+        oldPath: string,
+        sourceDir: string,
+        exportFolder: string,
+        fileBasename: string
+    ): string {
+        const absoluteSourcePath = path.resolve(sourceDir, oldPath);
+        const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
+        
+        return tag.replace(/src=["'][^"']+["']/i, `src="${relativePath}"`);
+    }
+
+    /**
+     * Check if a path is absolute
+     */
+    private static isAbsolutePath(filePath: string): boolean {
+        return path.isAbsolute(filePath) || filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath);
+    }
+
+    /**
+     * Check if a path is a URL
+     */
+    private static isUrl(filePath: string): boolean {
+        return /^https?:\/\//i.test(filePath) || /^ftp:\/\//i.test(filePath) || /^mailto:/i.test(filePath);
+    }
+
+    /**
      * Create _not_included.md file with excluded assets
      */
     private static async createNotIncludedFile(notIncludedAssets: AssetInfo[], targetFolder: string): Promise<void> {
+        // Ensure target folder exists
+        if (!fs.existsSync(targetFolder)) {
+            fs.mkdirSync(targetFolder, { recursive: true });
+        }
+
         const content = [
             '# Assets Not Included in Export',
             '',
@@ -957,8 +949,10 @@ export class ExportService {
      * Format: {filename}-YYYYMMDD-HHmm (using local time)
      */
     public static generateDefaultExportFolder(sourceDocumentPath: string): string {
-        const sourceDir = path.dirname(sourceDocumentPath);
-        const sourceBasename = path.basename(sourceDocumentPath, '.md');
+        // Ensure we have an absolute path
+        const absoluteSourcePath = path.resolve(sourceDocumentPath);
+        const sourceDir = path.dirname(absoluteSourcePath);
+        const sourceBasename = path.basename(absoluteSourcePath, '.md');
         const now = new Date();
 
         // Use local time instead of UTC (toISOString uses UTC/GMT)
@@ -969,7 +963,8 @@ export class ExportService {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const timestamp = `${year}${month}${day}-${hours}${minutes}`;  // YYYYMMDD-HHmm
 
-        return path.join(sourceDir, `${sourceBasename}-${timestamp}`);
+        const exportFolder = path.join(sourceDir, `${sourceBasename}-${timestamp}`);
+        return exportFolder;
     }
 
     /**
@@ -980,7 +975,7 @@ export class ExportService {
         sourceDir: string,
         fileBasename: string,
         exportFolder: string,
-        options: ExportOptions,
+        options: NewExportOptions,
         processedIncludes: Set<string>,
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
@@ -995,7 +990,6 @@ export class ExportService {
         const assets = this.findAssets(content, sourceDir);
 
         // Find and process included markdown files
-        console.log(`[kanban.exportService.processMarkdownContent] Before processIncludedFiles, content contains ${content.match(/!!!include/g)?.length || 0} include markers`);
         const { processedContent, includeStats } = await this.processIncludedFiles(
             content,
             sourceDir,
@@ -1005,14 +999,24 @@ export class ExportService {
             convertToPresentation,
             mergeIncludes
         );
-        console.log(`[kanban.exportService.processMarkdownContent] After processIncludedFiles, content contains ${processedContent.match(/!!!include/g)?.length || 0} include markers`);
+
+        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
+        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
+        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
+        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
+            processedContent,
+            sourceDir,
+            exportFolder,
+            fileBasename,
+            true
+        ) : processedContent;
 
         // Filter assets based on options
         const assetsToInclude = this.filterAssets(assets, options);
 
-        // Process assets and update content
+        // Process assets and update content (this also rewrites paths for packed assets)
         const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            processedContent,
+            rewrittenContent,
             assetsToInclude,
             assets,
             mediaFolder,
@@ -1027,16 +1031,11 @@ export class ExportService {
 
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(modifiedContent, options);
+        let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
         // Convert to presentation format if requested
-        // When merging includes, skip conversion to preserve raw merged content
-        console.log(`[kanban.exportService.processMarkdownContent] convertToPresentation: ${convertToPresentation}, mergeIncludes: ${mergeIncludes}`);
-        if (convertToPresentation && !mergeIncludes) {
+        if (convertToPresentation) {
             filteredContent = this.convertToPresentationFormat(filteredContent, false);
-            console.log(`[kanban.exportService.processMarkdownContent] After conversion, content contains ${filteredContent.match(/!!!include/g)?.length || 0} include markers`);
-        } else if (convertToPresentation && mergeIncludes) {
-            console.log(`[kanban.exportService.processMarkdownContent] Skipping conversion - using raw merged content to preserve structure`);
         }
 
         return {
@@ -1177,7 +1176,6 @@ export class ExportService {
      * A stack includes: base column (without #stack) + all consecutive #stack columns after it
      */
     private static extractStackContent(markdownContent: string, rowNumber: number, stackIndex: number): string | null {
-        console.log(`[kanban.exportService.extractStackContent] Extracting row ${rowNumber}, stack ${stackIndex}`);
 
         const isKanban = markdownContent.includes('kanban-plugin: board');
         if (!isKanban) { return null; }
@@ -1217,11 +1215,6 @@ export class ExportService {
             });
         }
 
-        console.log(`[kanban.exportService.extractStackContent] Found ${rowColumns.length} columns in row ${rowNumber}:`);
-        rowColumns.forEach((col, i) => {
-            console.log(`  [${i}] stacked:${col.stacked} title:"${col.title}"`);
-        });
-
         // Now group columns into stacks (matching frontend logic)
         // A stack is: base column + all consecutive #stack columns
         const stacks: string[][] = [];
@@ -1229,29 +1222,22 @@ export class ExportService {
 
         while (i < rowColumns.length) {
             const currentStack = [rowColumns[i].content]; // Start with base column
-            console.log(`[kanban.exportService.extractStackContent] Starting stack ${stacks.length} with base: "${rowColumns[i].title}"`);
             i++;
 
             // Add all consecutive #stack columns to this stack
             while (i < rowColumns.length && rowColumns[i].stacked) {
-                console.log(`[kanban.exportService.extractStackContent]   Adding stacked: "${rowColumns[i].title}"`);
                 currentStack.push(rowColumns[i].content);
                 i++;
             }
 
-            console.log(`[kanban.exportService.extractStackContent] Stack ${stacks.length} has ${currentStack.length} columns`);
             stacks.push(currentStack);
         }
 
-        console.log(`[kanban.exportService.extractStackContent] Total stacks: ${stacks.length}, requesting index: ${stackIndex}`);
-
         if (stackIndex >= stacks.length) {
-            console.log(`[kanban.exportService.extractStackContent] Stack index ${stackIndex} out of bounds (only ${stacks.length} stacks)`);
             return null;
         }
 
         const result = stacks[stackIndex].join('\n\n');
-        console.log(`[kanban.exportService.extractStackContent] Returning stack ${stackIndex} with ${stacks[stackIndex].length} columns, ${result.split('## ').length - 1} column headers`);
         return result;
     }
 
@@ -1290,12 +1276,11 @@ export class ExportService {
      * Convert presentation format to kanban format
      * For column includes and task includes that are in presentation format
      */
-    private static convertPresentationToKanban(presentationContent: string, includeMarker: string): string {
-        console.log('[kanban.exportService.convertPresentationToKanban] Converting presentation to kanban format');
+    private static convertPresentationToKanban(presentationContent: string, includeType: string): string {
 
-        // Determine the include type from the marker
-        const isColumnInclude = includeMarker.includes('!!!columninclude');
-        const isTaskInclude = includeMarker.includes('!!!taskinclude');
+        // Determine the include type (position-based: 'columninclude', 'taskinclude', or 'include')
+        const isColumnInclude = includeType === 'columninclude';
+        const isTaskInclude = includeType === 'taskinclude';
 
         // Parse presentation content into slides
         const slides = PresentationParser.parsePresentation(presentationContent);
@@ -1321,7 +1306,6 @@ export class ExportService {
                 }
             }
 
-            console.log(`[kanban.exportService.convertPresentationToKanban] Converted ${slides.length} slides to ${tasks.length} tasks (columninclude - no header)`);
             return kanbanContent;
 
         } else if (isTaskInclude) {
@@ -1355,14 +1339,109 @@ export class ExportService {
                 }
             }
 
-            console.log(`[kanban.exportService.convertPresentationToKanban] Converted taskinclude to single task with title: "${title}"`);
             return kanbanContent;
 
         } else {
             // Regular include - just return as-is or wrapped in a column
-            console.log(`[kanban.exportService.convertPresentationToKanban] Regular include, returning as-is`);
             return presentationContent;
         }
+    }
+
+    /**
+     * Filter board based on scope and selection
+     * Returns a filtered board object containing only the requested content
+     */
+    private static filterBoard(board: any, options: NewExportOptions): any {
+        // Check for columnIndexes (new export dialog system)
+        if (options.columnIndexes && options.columnIndexes.length > 0) {
+            console.log(`[kanban.exportService.filterBoard] Filtering board: ${board.columns.length} total columns, selecting indexes ${options.columnIndexes.join(', ')}`);
+            const selectedColumns = options.columnIndexes
+                .filter(index => index >= 0 && index < board.columns.length)
+                .map(index => board.columns[index]);
+
+            console.log(`[kanban.exportService.filterBoard] Filtered to ${selectedColumns.length} columns`);
+            return {
+                columns: selectedColumns
+            };
+        }
+
+        // Fallback to old scope-based system
+        if (!options.scope || options.scope === 'board') {
+            return board;
+        }
+
+        if (options.scope === 'column' && options.selection?.columnIndex !== undefined) {
+            const columnIndex = options.selection.columnIndex;
+            if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                return {
+                    columns: [board.columns[columnIndex]]
+                };
+            }
+        }
+
+        if (options.scope === 'task' && options.selection?.columnIndex !== undefined && options.selection?.taskId) {
+            const columnIndex = options.selection.columnIndex;
+            const taskId = options.selection.taskId;
+
+            if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                const column = board.columns[columnIndex];
+                const task = column.tasks?.find((t: any) => t.id === taskId);
+
+                if (task) {
+                    return {
+                        columns: [{
+                            id: column.id,
+                            title: '',
+                            tasks: [task]
+                        }]
+                    };
+                }
+            }
+        }
+
+        return board;
+    }
+
+    /**
+     * Convert board object directly to presentation format
+     * No parsing needed - works directly with in-memory data
+     */
+    private static boardToPresentation(board: any): string {
+        const slides: string[] = [];
+
+        for (const column of board.columns) {
+            // Add column title as slide
+            if (column.title && column.title.trim()) {
+                slides.push(column.title.trim());
+            }
+
+            // Add each task as slide
+            if (column.tasks && column.tasks.length > 0) {
+                for (const task of column.tasks) {
+                    let slideContent = '';
+
+                    // Add task title
+                    if (task.title && task.title.trim()) {
+                        slideContent = task.title.trim();
+                    }
+
+                    // Add task description
+                    if (task.description && task.description.trim()) {
+                        if (slideContent) {
+                            slideContent += '\n\n' + task.description.trim();
+                        } else {
+                            slideContent = task.description.trim();
+                        }
+                    }
+
+                    if (slideContent) {
+                        slides.push(slideContent);
+                    }
+                }
+            }
+        }
+
+        return slides.join('\n\n---\n\n') + '\n';
     }
 
     /**
@@ -1375,461 +1454,584 @@ export class ExportService {
      * @param mergeIncludes - If true, preserve column structure without separating tasks into slides
      */
     private static convertToPresentationFormat(content: string, mergeIncludes: boolean = false): string {
-        console.log(`[kanban.exportService.convertToPresentationFormat] Converting to presentation format, mergeIncludes: ${mergeIncludes}`);
 
-        // Add temporary YAML header if missing (needed for parser)
-        let contentToParse = content;
-        const hasYaml = content.trim().startsWith('---');
-
-        if (!hasYaml) {
-            contentToParse = '---\nkanban-plugin: board\n---\n\n' + content;
-            console.log('[kanban.exportService.convertToPresentationFormat] Added temporary YAML header for parsing');
+        // Remove YAML frontmatter if present
+        let workingContent = content;
+        const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n\n?/);
+        if (yamlMatch) {
+            workingContent = content.substring(yamlMatch[0].length);
         }
 
-        // Parse the kanban content to extract tasks
-        const { board } = MarkdownKanbanParser.parseMarkdown(contentToParse);
+        const slides: string[] = [];
+        const lines = workingContent.split('\n');
+        let i = 0;
 
-        if (!board.valid) {
-            console.log('[kanban.exportService.convertToPresentationFormat] No valid kanban board found after adding YAML, returning original content');
-            return content;
-        }
+        while (i < lines.length) {
+            const line = lines[i];
 
-        if (board.columns.length === 0) {
-            console.log('[kanban.exportService.convertToPresentationFormat] No columns found');
-            return '';
-        }
-
-        if (mergeIncludes) {
-            // When merging includes, preserve column structure
-            // Don't split tasks into individual slides
-            let presentationContent = '';
-
-            for (const column of board.columns) {
-                const columnTitle = column.title.trim();
-                console.log(`[kanban.exportService.convertToPresentationFormat] Column: "${columnTitle}"`);
-
-                // Add column as a section with ## header
+            // Column header: ## Title (ONLY if not indented - starts at beginning of line)
+            if (line.startsWith('## ') && !line.startsWith(' ')) {
+                const columnTitle = line.substring(3).trim();
                 if (columnTitle) {
-                    presentationContent += `## ${columnTitle}\n\n`;
+                    slides.push(columnTitle);
                 }
+                i++;
+                continue;
+            }
 
-                // Add tasks under the column (not as separate slides)
-                if (column.tasks && column.tasks.length > 0) {
-                    for (const task of column.tasks) {
-                        // Add task with its title and description
-                        const taskTitle = task.title.replace(/^- \[ \]\s*/, '').trim();
-                        presentationContent += `${taskTitle}\n`;
+            // Task: - [ ] Title or - [x] Title (ONLY if not indented - starts at beginning of line)
+            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
+                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
 
-                        if (task.description && task.description.trim()) {
-                            presentationContent += `\n${task.description.trim()}\n`;
-                        }
-                        presentationContent += '\n';
+                // Collect description (indented lines)
+                const descriptionLines: string[] = [];
+                i++;
+
+                while (i < lines.length) {
+                    const nextLine = lines[i];
+
+                    // Stop at next NON-INDENTED column or task
+                    if (!nextLine.startsWith(' ') && (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
+                        break;
+                    }
+
+                    // Collect indented or empty lines
+                    if (nextLine.startsWith('  ')) {
+                        descriptionLines.push(nextLine.substring(2));
+                        i++;
+                    } else if (nextLine.trim() === '') {
+                        descriptionLines.push('');
+                        i++;
+                    } else {
+                        break;
                     }
                 }
 
-                // Separate columns with slide separator
-                presentationContent += '---\n\n';
-            }
-
-            console.log(`[kanban.exportService.convertToPresentationFormat] Preserved column structure for ${board.columns.length} columns (mergeIncludes mode)`);
-            return presentationContent;
-
-        } else {
-            // Build slides with column titles as section headers
-            const slides: string[] = [];
-
-            for (const column of board.columns) {
-                // Add column title as a slide
-                // The parser already removed "## " from column.title, just use it directly
-                const columnTitle = column.title.trim();
-
-                console.log(`[kanban.exportService.convertToPresentationFormat] Column title: "${columnTitle}"`);
-
-                // Add the column title as-is (parser already stripped the kanban ## structure)
-                if (columnTitle) {
-                    slides.push(columnTitle);
-                    console.log(`[kanban.exportService.convertToPresentationFormat]   Added column title as slide`);
+                // Build slide: title + description
+                let slide = taskTitle;
+                if (descriptionLines.length > 0) {
+                    const description = descriptionLines.join('\n').trim();
+                    if (description) {
+                        slide += '\n\n' + description;
+                    }
                 }
 
-                // Convert column tasks to slides
-                if (column.tasks && column.tasks.length > 0) {
-                    const columnSlides = PresentationParser.tasksToPresentation(column.tasks);
-                    // Remove the trailing newline from tasksToPresentation and split by slide separator
-                    const taskSlideArray = columnSlides.trim().split(/\n\n---\n\n/);
-                    slides.push(...taskSlideArray);
-                }
+                slides.push(slide);
+                continue;
             }
 
-            console.log(`[kanban.exportService.convertToPresentationFormat] Converted ${board.columns.length} columns with column titles as slides`);
+            i++;
+        }
 
-            // Join all slides with separator
-            const presentationContent = slides.join('\n\n---\n\n') + '\n';
+        return slides.join('\n\n---\n\n') + '\n';
+    }
 
-            return presentationContent;
+
+    /**
+     * Add Marp process PID for tracking
+     * @param markdownPath Path to the markdown file being watched
+     * @param pid Process ID of the Marp process
+     */
+    public static addMarpProcessPid(markdownPath: string, pid: number): void {
+        this.marpProcessPids.set(markdownPath, pid);
+    }
+
+    /**
+     * Stop Marp watch process for a specific file
+     * @param markdownPath Path to the markdown file being watched
+     */
+    public static stopMarpWatch(markdownPath: string): void {
+        const pid = this.marpProcessPids.get(markdownPath);
+        if (pid) {
+            try {
+                // Kill the Marp process
+                process.kill(pid, 'SIGTERM');
+            } catch (error) {
+                console.error(`[kanban.exportService.stopMarpWatch] Failed to kill process ${pid}:`, error);
+            }
+            this.marpProcessPids.delete(markdownPath);
+        }
+
+        if (this.marpWatchProcesses.has(markdownPath)) {
+            this.marpWatchProcesses.delete(markdownPath);
         }
     }
 
     /**
-     * Unified export method - handles all export scopes and formats
+     * Stop all Marp watch processes except for generated files from a specific kanban file
+     * @param kanbanFilePath Path to the kanban file whose generated files should NOT be stopped
      */
-    public static async exportUnified(
+    public static stopAllMarpWatchesExceptKanbanFile(kanbanFilePath: string): void {
+        // Get the base name of the kanban file without extension
+        const kanbanBaseName = path.basename(kanbanFilePath, '.md');
+        const kanbanDir = path.dirname(kanbanFilePath);
+
+        // Kill all tracked Marp processes except those generated from the current kanban file
+        for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
+            const markdownBaseName = path.basename(markdownPath, '.md');
+            const markdownDir = path.dirname(markdownPath);
+
+            // Check if this markdown file is a generated file from the current kanban
+            const isGeneratedFromCurrentKanban =
+                markdownDir.startsWith(kanbanDir) &&
+                (markdownBaseName.startsWith(kanbanBaseName) ||
+                 markdownBaseName.includes(kanbanBaseName));
+
+            if (!isGeneratedFromCurrentKanban) {
+                try {
+                    process.kill(pid, 'SIGTERM');
+                } catch (error) {
+                    console.error(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Failed to kill process ${pid}:`, error);
+                }
+                this.marpProcessPids.delete(markdownPath);
+                this.marpWatchProcesses.delete(markdownPath);
+            }
+        }
+    }
+
+    /**
+     * Stop all Marp watch processes except for a specific file
+     * @param excludeFilePath Path to the file whose Marp process should NOT be stopped
+     */
+    public static stopAllMarpWatchesExcept(excludeFilePath?: string): void {
+        // Kill all tracked Marp processes except the excluded one
+        for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
+            if (markdownPath !== excludeFilePath) {
+                try {
+                    process.kill(pid, 'SIGTERM');
+                } catch (error) {
+                    console.error(`[kanban.exportService.stopAllMarpWatchesExcept] Failed to kill process ${pid}:`, error);
+                }
+                this.marpProcessPids.delete(markdownPath);
+                this.marpWatchProcesses.delete(markdownPath);
+            }
+        }
+    }
+
+    /**
+     * Stop all Marp watch processes
+     */
+    public static stopAllMarpWatches(): void {
+        // Kill all tracked Marp processes
+        for (const [, pid] of this.marpProcessPids.entries()) {
+            try {
+                process.kill(pid, 'SIGTERM');
+            } catch (error) {
+                console.error(`[kanban.exportService.stopAllMarpWatches] Failed to kill process ${pid}:`, error);
+            }
+        }
+
+        this.marpProcessPids.clear();
+        this.marpWatchProcesses.clear();
+    }
+
+    /**
+     * Extract content based on scope
+     * Phase 1 of export pipeline: EXTRACTION
+     */
+    private static async extractContent(
         sourceDocument: vscode.TextDocument,
-        options: UnifiedExportOptions
-    ): Promise<{ success: boolean; message: string; content?: string; exportedPath?: string }> {
-        try {
-            // Read source content
-            const sourcePath = sourceDocument.uri.fsPath;
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source file not found: ${sourcePath}`);
+        columnIndexes?: number[]
+    ): Promise<string> {
+        // This function ONLY reads from files (kanban-markdown)
+        // For board-based exports, skip this phase entirely
+
+        const sourcePath = sourceDocument.uri.fsPath;
+        if (!fs.existsSync(sourcePath)) {
+            throw new Error(`Source file not found: ${sourcePath}`);
+        }
+
+        const fullContent = fs.readFileSync(sourcePath, 'utf8');
+
+        // If no column indexes specified, export full board
+        if (!columnIndexes || columnIndexes.length === 0) {
+            return fullContent;
+        }
+
+        // Extract selected columns and combine them
+        const extractedColumns: string[] = [];
+
+        for (const columnIndex of columnIndexes) {
+            const columnContent = this.extractColumnContent(fullContent, columnIndex);
+            if (columnContent) {
+                extractedColumns.push(columnContent);
             }
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
+        }
 
-            // Extract content based on scope
-            let content: string | null = null;
-            switch (options.scope) {
-                case 'full':
-                    content = fullContent;
-                    break;
-                case 'row':
-                    if (options.selection.rowNumber === undefined) {
-                        throw new Error('Row number required for row scope');
-                    }
-                    content = this.extractRowContent(fullContent, options.selection.rowNumber);
-                    break;
-                case 'stack':
-                    if (options.selection.rowNumber === undefined || options.selection.stackIndex === undefined) {
-                        throw new Error('Row number and stack index required for stack scope');
-                    }
-                    content = this.extractStackContent(fullContent, options.selection.rowNumber, options.selection.stackIndex);
-                    break;
-                case 'column':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for column scope');
-                    }
-                    content = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    break;
-                case 'task':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for task scope');
-                    }
-                    const columnContent = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    content = columnContent ? this.extractTaskContent(columnContent, options.selection.taskId) : null;
-                    break;
-            }
+        if (extractedColumns.length === 0) {
+            throw new Error('Failed to extract any column content');
+        }
 
-            if (!content) {
-                throw new Error(`Could not extract content for scope: ${options.scope}`);
-            }
+        // Combine columns with the kanban header
+        const headerMatch = fullContent.match(/^---\n[\s\S]*?\n---\n/);
+        const header = headerMatch ? headerMatch[0] : '';
 
-            // For copy operations (no pack), apply tag filtering and format conversion
-            if (!options.packAssets || !options.targetFolder) {
-                let processedContent = this.applyTagFiltering(content, {
-                    targetFolder: '',
-                    includeFiles: false,
-                    includeImages: false,
-                    includeVideos: false,
-                    includeOtherMedia: false,
-                    includeDocuments: false,
-                    fileSizeLimitMB: 100,
-                    tagVisibility: options.tagVisibility
-                });
+        return header + '\n' + extractedColumns.join('\n\n');
+    }
 
-                // Convert format if needed
-                if (options.format === 'presentation') {
-                    processedContent = this.convertToPresentationFormat(processedContent);
-                }
+    /**
+     * Transform content through the processing pipeline
+     * Phase 2 of export pipeline: TRANSFORMATION
+     */
+    private static async transformContent(
+        content: string,
+        sourceDocument: vscode.TextDocument,
+        options: NewExportOptions,
+        board?: any
+    ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
 
-                return {
-                    success: true,
-                    message: 'Content generated successfully',
-                    content: processedContent
-                };
-            }
+        const sourcePath = sourceDocument.uri.fsPath;
+        const sourceDir = path.dirname(sourcePath);
+        const sourceBasename = path.basename(sourcePath, '.md');
 
-            // Pack assets if requested
-            const sourceDir = path.dirname(sourcePath);
-            const sourceBasename = path.basename(sourcePath, '.md');
+        let result = content;
+        let notIncludedAssets: AssetInfo[] = [];
 
-            // Build scope suffix with indices
-            let scopeSuffix = '';
-            if (options.scope !== 'full') {
-                const parts: string[] = [];
+        // ROUTING LOGIC:
+        // - Converting format (presentation/marp) → Use in-memory board (kanban-data)
+        // - Keeping original format (kanban) → Use file (kanban-markdown) to preserve formatting
+        // - Asset packing → Use file to process includes correctly
+        const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
 
-                if (options.selection.rowNumber !== undefined) {
-                    parts.push(`row${options.selection.rowNumber}`);
-                }
-                if (options.selection.stackIndex !== undefined) {
-                    parts.push(`stack${options.selection.stackIndex}`);
-                }
-                if (options.selection.columnIndex !== undefined) {
-                    parts.push(`col${options.selection.columnIndex}`);
-                }
+        // Use board-based conversion for ANY format conversion (not just presentation)
+        if (board && options.format !== 'kanban' && !options.packAssets) {
+            // Filter board based on scope and selection
+            const filteredBoard = this.filterBoard(board, options);
+            result = this.boardToPresentation(filteredBoard);
 
-                // If no indices specified, just use scope name
-                if (parts.length === 0) {
-                    scopeSuffix = `-${options.scope}`;
-                } else {
-                    scopeSuffix = `-${parts.join('-')}`;
-                }
+            // Rewrite links if requested (same as simple path)
+            if (options.linkHandlingMode !== 'no-modify') {
+                result = this.rewriteLinksForExport(
+                    result,
+                    sourceDir,
+                    options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                    sourceBasename,
+                    true
+                );
             }
 
-            const targetBasename = `${sourceBasename}${scopeSuffix}`;
+            return { content: result, notIncludedAssets: [] };
+        }
 
-            console.log(`[kanban.exportService.exportUnified] Format: ${options.format}, Will convert to presentation: ${options.format === 'presentation'}`);
+        // Use file-based pipeline only for keeping original format or packing assets
+        if (options.packAssets || options.format !== 'kanban') {
 
-            // Ensure target folder exists
-            if (!fs.existsSync(options.targetFolder)) {
-                fs.mkdirSync(options.targetFolder, { recursive: true });
-            }
+            // Determine settings
+            const mergeIncludes = options.mergeIncludes ?? (options.columnIndexes && options.columnIndexes.length > 0);
 
-            // Clear tracking maps
-            this.fileHashMap.clear();
-            this.exportedFiles.clear();
-
-            // Process with asset packing
-            // Pass raw content - processMarkdownContent will handle tag filtering and format conversion
-            const convertToPresentation = options.format === 'presentation';
-            // For scoped exports (not full), merge includes by default unless explicitly set
-            const mergeIncludes = options.mergeIncludes ?? (options.scope !== 'full');
-            console.log(`[kanban.exportService.exportUnified] Scope: ${options.scope}, mergeIncludes: ${mergeIncludes}, convertToPresentation: ${convertToPresentation}`);
-
-            const exportOptions = {
-                targetFolder: options.targetFolder,
-                includeFiles: options.packOptions?.includeFiles ?? false,
-                includeImages: options.packOptions?.includeImages ?? false,
-                includeVideos: options.packOptions?.includeVideos ?? false,
-                includeOtherMedia: options.packOptions?.includeOtherMedia ?? false,
-                includeDocuments: options.packOptions?.includeDocuments ?? false,
-                fileSizeLimitMB: options.packOptions?.fileSizeLimitMB ?? 100,
-                tagVisibility: options.tagVisibility
-            };
-            console.log(`[kanban.exportService.exportUnified] Export options:`, exportOptions);
-
-            const result = await this.processMarkdownContent(
-                content,
+            // Use existing processMarkdownContent (it does everything)
+            const processed = await this.processMarkdownContent(
+                result,
                 sourceDir,
-                targetBasename,
-                options.targetFolder,
-                exportOptions,
+                sourceBasename,
+                options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                options,
                 new Set<string>(),
                 convertToPresentation,
                 mergeIncludes
             );
 
-            // Ensure YAML frontmatter for kanban format exports
-            let finalContent = result.exportedContent;
-            if (options.format === 'kanban' || options.format === 'keep') {
-                finalContent = this.ensureYamlFrontmatter(finalContent);
+            result = processed.exportedContent;
+            notIncludedAssets = processed.notIncludedAssets;
+
+        } else {
+            // Simple path: tag filtering and link rewriting (no asset packing)
+            result = this.applyTagFiltering(result, options.tagVisibility);
+
+            // Rewrite links if requested
+            if (options.linkHandlingMode !== 'no-modify') {
+                result = this.rewriteLinksForExport(
+                    result,
+                    sourceDir,
+                    options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                    sourceBasename,
+                    true
+                );
             }
-
-            // Write the markdown file
-            const targetMarkdownPath = path.join(options.targetFolder, `${targetBasename}.md`);
-            fs.writeFileSync(targetMarkdownPath, finalContent, 'utf8');
-
-            // Create _not_included.md if needed
-            if (result.notIncludedAssets.length > 0) {
-                await this.createNotIncludedFile(result.notIncludedAssets, options.targetFolder);
-            }
-
-            const successMessage = `Export completed! ${result.stats.includedCount} assets included, ${result.stats.excludedCount} excluded.`;
-
-            return {
-                success: true,
-                message: successMessage,
-                exportedPath: targetMarkdownPath
-            };
-
-        } catch (error) {
-            console.error('[kanban.exportService.exportUnified] Export failed:', error);
-            return {
-                success: false,
-                message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
-            };
         }
+
+        return { content: result, notIncludedAssets };
     }
 
     /**
-     * Export using ContentPipelineService (v2 implementation)
-     *
-     * This is the new unified export that uses the ContentPipelineService
-     * for all processing. It coexists with the old exportUnified() method
-     * to allow gradual migration and testing.
-     *
-     * @param sourceDocument Source document to export from
-     * @param options Export options
-     * @returns Export result
+     * Output content based on mode
+     * Phase 3 of export pipeline: OUTPUT
      */
-    public static async exportUnifiedV2(
+    private static async outputContent(
+        transformed: { content: string; notIncludedAssets: AssetInfo[] },
         sourceDocument: vscode.TextDocument,
-        options: UnifiedExportOptions
-    ): Promise<{ success: boolean; message: string; content?: string; exportedPath?: string }> {
+        options: NewExportOptions
+    ): Promise<ExportResult> {
+
+        // MODE: COPY (return content for clipboard)
+        if (options.mode === 'copy') {
+            return {
+                success: true,
+                message: 'Content generated successfully',
+                content: transformed.content
+            };
+        }
+
+        // MODE: SAVE / AUTO / PREVIEW (write to disk)
+        if (!options.targetFolder) {
+            throw new Error('Target folder required for save/auto/preview modes');
+        }
+
+        // Ensure target folder exists
+        if (!fs.existsSync(options.targetFolder)) {
+            fs.mkdirSync(options.targetFolder, { recursive: true });
+        }
+
+        // Build output filename
+        const sourcePath = sourceDocument.uri.fsPath;
+        const sourceBasename = path.basename(sourcePath, '.md');
+        let outputBasename = sourceBasename;
+
+        // Add suffix for partial exports (when specific columns selected)
+        if (options.columnIndexes && options.columnIndexes.length > 0) {
+            outputBasename = `${sourceBasename}-partial`;
+        }
+
+        // Write markdown file
+        const markdownPath = path.join(options.targetFolder, `${outputBasename}.md`);
+        fs.writeFileSync(markdownPath, transformed.content, 'utf8');
+
+        // Handle Marp conversion
+        if (options.format === 'marp') {
+            return await this.runMarpConversion(markdownPath, sourcePath, options);
+        }
+
+        // Regular save succeeded
+        return {
+            success: true,
+            message: `Exported to ${markdownPath}`,
+            exportedPath: markdownPath
+        };
+    }
+
+    /**
+     * Run Marp conversion
+     * Helper for outputContentNew
+     * @param markdownPath - Path to the exported markdown file (in _Export folder)
+     * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
+     */
+    private static async runMarpConversion(
+        markdownPath: string,
+        sourceFilePath: string,
+        options: NewExportOptions
+    ): Promise<ExportResult> {
+
+        const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
+
+        // Build output path
+        const dir = path.dirname(markdownPath);
+        const baseName = path.basename(markdownPath, '.md');
+
+        // DIAGRAM PREPROCESSING: Convert diagrams to SVG files before Marp processing
+        // This ensures diagrams work in PDF exports
+        let processedMarkdownPath = markdownPath;
+        let preprocessCleanup: (() => Promise<void>) | undefined;
+
         try {
-            const sourcePath = sourceDocument.uri.fsPath;
+            // Get the webview panel for the SOURCE document (needed for Mermaid rendering)
+            // NOTE: Use sourceFilePath, not markdownPath (which is the exported file)
+            const docUri = vscode.Uri.file(sourceFilePath).toString();
+            console.log('[ExportService] Looking for webview panel for SOURCE file:', sourceFilePath);
+            console.log('[ExportService] Source URI:', docUri);
 
-            // Read source content
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source file not found: ${sourcePath}`);
-            }
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
+            const { KanbanWebviewPanel } = await import('./kanbanWebviewPanel');
+            const webviewPanel = KanbanWebviewPanel.getPanelForDocument(docUri);
 
-            // Step 1: Extract content based on scope (reuse existing extraction methods)
-            let content: string | null = null;
-            switch (options.scope) {
-                case 'full':
-                    content = fullContent;
-                    break;
-                case 'row':
-                    if (options.selection.rowNumber === undefined) {
-                        throw new Error('Row number required for row scope');
-                    }
-                    content = this.extractRowContent(fullContent, options.selection.rowNumber);
-                    break;
-                case 'stack':
-                    if (options.selection.rowNumber === undefined || options.selection.stackIndex === undefined) {
-                        throw new Error('Row number and stack index required for stack scope');
-                    }
-                    content = this.extractStackContent(fullContent, options.selection.rowNumber, options.selection.stackIndex);
-                    break;
-                case 'column':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for column scope');
-                    }
-                    content = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    break;
-                case 'task':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for task scope');
-                    }
-                    const columnContent = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    content = columnContent ? this.extractTaskContent(columnContent, options.selection.taskId) : null;
-                    break;
+            console.log('[ExportService] Webview panel found:', webviewPanel ? 'YES' : 'NO');
+
+            if (webviewPanel) {
+                console.log('[ExportService] Setting webview panel on MermaidExportService');
+                // Set up Mermaid export service with webview
+                const mermaidService = getMermaidExportService();
+                mermaidService.setWebviewPanel(webviewPanel.getPanel());
+                console.log('[ExportService] MermaidExportService ready:', mermaidService.isReady());
+            } else {
+                console.warn('[ExportService] ⚠️ No webview panel found for document. Mermaid diagrams will not be converted.');
+                console.warn('[ExportService] Document URI:', docUri);
+                console.warn('[ExportService] Available panels:', KanbanWebviewPanel.getAllPanels().length);
             }
 
-            if (!content) {
-                throw new Error(`Could not extract content for scope: ${options.scope}`);
+            // Create diagram preprocessor
+            const preprocessor = new DiagramPreprocessor(webviewPanel ? webviewPanel.getPanel() : undefined);
+
+            // Preprocess diagrams
+            console.log('[ExportService] Preprocessing diagrams for Marp export...');
+            const preprocessResult = await preprocessor.preprocess(
+                markdownPath,
+                dir,
+                baseName
+            );
+
+            // If diagrams were processed, write to temp file
+            if (preprocessResult.diagramFiles.length > 0) {
+                console.log(`[ExportService] Processed ${preprocessResult.diagramFiles.length} diagrams`);
+
+                // Write processed markdown to temp file
+                const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
+                await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
+
+                processedMarkdownPath = tempFile;
+
+                // Setup cleanup function
+                preprocessCleanup = async () => {
+                    try {
+                        await fs.promises.unlink(tempFile);
+                        console.log('[ExportService] Cleaned up preprocessed markdown file');
+                    } catch (error) {
+                        // Ignore cleanup errors
+                    }
+                };
+            } else {
+                console.log('[ExportService] No diagrams found, using original markdown');
             }
+        } catch (error) {
+            console.error('[ExportService] Diagram preprocessing failed:', error);
+            // Continue with original file if preprocessing fails
+            vscode.window.showWarningMessage(
+                'Diagram preprocessing failed. Exporting without diagram conversion.'
+            );
+        }
+        let ext = '.html';
+        switch (marpFormat) {
+            case 'pdf': ext = '.pdf'; break;
+            case 'pptx': ext = '.pptx'; break;
+            case 'markdown': ext = '.md'; break;
+            default: ext = '.html'; break;
+        }
+        const outputPath = path.join(dir, `${baseName}${ext}`);
 
-            // Step 2: Apply tag filtering (still needed, not part of pipeline)
-            let processedContent = this.applyTagFiltering(content, {
-                targetFolder: '',
-                includeFiles: false,
-                includeImages: false,
-                includeVideos: false,
-                includeOtherMedia: false,
-                includeDocuments: false,
-                fileSizeLimitMB: 100,
-                tagVisibility: options.tagVisibility
-            });
-
-            // Step 3: For copy operations (no pack), return processed content
-            if (!options.packAssets || !options.targetFolder) {
-                // Convert format if needed using ContentPipelineService
-                const formatStrategy: FormatStrategy = options.format === 'presentation' ? 'presentation' : 'keep';
-
-                if (formatStrategy !== 'keep') {
-                    const tempOptions = new OperationOptionsBuilder()
-                        .operation('export')
-                        .source(sourcePath)
-                        .format(formatStrategy)
-                        .build();
-
-                    // Just use FormatConverter directly for in-memory conversion
-                    const { FormatConverter } = require('./services/FormatConverter');
-                    processedContent = FormatConverter.convert(processedContent, formatStrategy);
-                }
-
-                // Ensure YAML frontmatter for kanban format exports
-                if (options.format === 'kanban' || options.format === 'keep') {
-                    processedContent = this.ensureYamlFrontmatter(processedContent);
-                }
-
+        // MODE: PREVIEW (watch mode) - run Marp in watch mode
+        if (options.marpWatch) {
+            // Check if Marp is already watching this file
+            if (MarpExportService.isWatching(markdownPath)) {
+                // DON'T cleanup - Marp is still watching the preprocessed file
                 return {
                     success: true,
-                    message: 'Content generated successfully',
-                    content: processedContent
+                    message: 'Markdown updated, Marp watch active',
+                    exportedPath: outputPath
                 };
             }
 
-            // Step 4: Pack assets using ContentPipelineService
-            const sourceDir = path.dirname(sourcePath);
-            const sourceBasename = path.basename(sourcePath, '.md');
+            try {
+                await MarpExportService.export({
+                    inputFilePath: processedMarkdownPath, // Use preprocessed markdown
+                    format: marpFormat,
+                    outputPath: outputPath,
+                    watchMode: true,
+                    enginePath: options.marpEnginePath,
+                    theme: options.marpTheme
+                });
 
-            // Build scope suffix with indices
-            let scopeSuffix = '';
-            if (options.scope !== 'full') {
-                const parts: string[] = [];
+                // DON'T cleanup in watch mode - Marp needs the preprocessed file to continue watching
+                // The file will be cleaned up when watch mode is stopped
 
-                if (options.selection.rowNumber !== undefined) {
-                    parts.push(`row${options.selection.rowNumber}`);
-                }
-                if (options.selection.stackIndex !== undefined) {
-                    parts.push(`stack${options.selection.stackIndex}`);
-                }
-                if (options.selection.columnIndex !== undefined) {
-                    parts.push(`col${options.selection.columnIndex}`);
+                return {
+                    success: true,
+                    message: 'Marp preview started',
+                    exportedPath: outputPath
+                };
+            } catch (error) {
+                console.error(`[kanban.exportService.runMarpConversionNew] Realtime export failed:`, error);
+
+                // Cleanup on error since Marp didn't start
+                if (preprocessCleanup) {
+                    await preprocessCleanup();
                 }
 
-                if (parts.length === 0) {
-                    scopeSuffix = `-${options.scope}`;
-                } else {
-                    scopeSuffix = `-${parts.join('-')}`;
-                }
+                return {
+                    success: false,
+                    message: `Marp preview failed: ${error instanceof Error ? error.message : String(error)}`
+                };
             }
+        }
 
-            const targetBasename = `${sourceBasename}${scopeSuffix}`;
-            const targetFolder = options.targetFolder || this.generateDefaultExportFolder(sourcePath);
-
-            // Step 5: Build OperationOptions for ContentPipelineService
-            const formatStrategy: FormatStrategy = options.format === 'presentation' ? 'presentation' : 'keep';
-            const mergeIncludes = options.mergeIncludes ?? (options.scope !== 'full');
-
-            const pipelineOptions = new OperationOptionsBuilder()
-                .operation('export')
-                .source(sourcePath)
-                .targetDir(targetFolder)
-                .targetFilename(`${targetBasename}.md`)
-                .format(formatStrategy)
-                .scope(options.scope as any)
-                .includes({
-                    strategy: mergeIncludes ? 'merge' : 'separate',
-                    processTypes: ['include', 'columninclude', 'taskinclude'],
-                    resolveNested: true,
-                    maxDepth: 10
-                })
-                .exportOptions({
-                    includeAssets: options.packAssets && (
-                        (options.packOptions?.includeImages ?? false) ||
-                        (options.packOptions?.includeVideos ?? false) ||
-                        (options.packOptions?.includeOtherMedia ?? false) ||
-                        (options.packOptions?.includeDocuments ?? false)
-                    ),
-                    assetStrategy: options.packAssets ? 'copy' : 'ignore',
-                    preserveYaml: true
-                })
-                .build();
-
-            // Step 6: Execute pipeline with extracted content
-            const result = await ContentPipelineService.execute(processedContent, pipelineOptions);
-
-            if (!result.success) {
-                throw new Error(result.errors?.join('; ') || 'Export failed');
-            }
-
-            // Step 7: Build success message
-            const mainFile = result.filesWritten.find(f => f.type === 'main');
-            const includeCount = result.filesWritten.filter(f => f.type === 'include').length;
-            const assetCount = result.filesWritten.filter(f => f.type === 'asset').length;
-
-            const successMessage = `Export completed! ${includeCount} includes, ${assetCount} assets included. Time: ${result.executionTime}ms`;
-
+        // MODE: SAVE (single conversion)
+        try {
+            await MarpExportService.export({
+                inputFilePath: processedMarkdownPath, // Use preprocessed markdown
+                format: marpFormat,
+                outputPath: outputPath,
+                enginePath: options.marpEnginePath,
+                theme: options.marpTheme
+            });
             return {
                 success: true,
-                message: successMessage,
-                exportedPath: mainFile?.path
+                message: `Exported to ${outputPath}`,
+                exportedPath: outputPath
             };
+        } catch (error) {
+            console.error(`[kanban.exportService.runMarpConversion] Conversion failed:`, error);
+            return {
+                success: false,
+                message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        } finally {
+            // Cleanup preprocessed file
+            if (preprocessCleanup) {
+                await preprocessCleanup();
+            }
+        }
+    }
+
+    /**
+     * NEW UNIFIED EXPORT ENTRY POINT
+     * Replaces: exportWithAssets(), exportColumn(), exportUnified()
+     *
+     * This is the single entry point for ALL export operations.
+     * Handles all scopes (full, column, task), all formats (kanban, presentation, marp),
+     * and all modes (copy, save, auto, preview).
+     *
+     * @param board - Optional in-memory board object for presentation exports (avoids file parsing)
+     */
+    public static async export(
+        sourceDocument: vscode.TextDocument,
+        options: NewExportOptions,
+        board?: any
+    ): Promise<ExportResult> {
+        try {
+            // Clear tracking maps for new export
+            this.fileHashMap.clear();
+            this.exportedFiles.clear();
+
+            // PHASE 1: EXTRACTION
+            // Use in-memory board for ANY conversion (kanban or presentation)
+            // Only use file-based extraction when keeping original format or packing assets
+            const useBoardDirectly = board && options.format !== 'kanban' && !options.packAssets;
+            let extracted: string;
+
+            if (useBoardDirectly) {
+                extracted = ''; // Dummy value, won't be used
+            } else {
+                extracted = await this.extractContent(
+                    sourceDocument,
+                    options.columnIndexes
+                );
+            }
+
+            // PHASE 2: TRANSFORMATION
+            const transformed = await this.transformContent(
+                extracted,
+                sourceDocument,
+                options,
+                board
+            );
+
+            // PHASE 3: OUTPUT
+            const result = await this.outputContent(
+                transformed,
+                sourceDocument,
+                options
+            );
+
+            return result;
 
         } catch (error) {
-            console.error('[kanban.exportService.exportUnifiedV2] Export failed:', error);
+            console.error('[kanban.exportService.export] Export failed:', error);
             return {
                 success: false,
                 message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
@@ -1837,194 +2039,4 @@ export class ExportService {
         }
     }
 
-    /**
-     * Export using Marp (markdown, PDF, PPTX, or HTML)
-     * @param sourceDocument Source document to export from
-     * @param options Export options
-     * @returns Export result
-     */
-    public static async exportWithMarp(
-        sourceDocument: vscode.TextDocument,
-        options: UnifiedExportOptions & {
-            marpTheme?: string;
-            marpEnginePath?: string;
-        } & {
-            format: string; // Allow marp-prefixed formats
-        }
-    ): Promise<{ success: boolean; message: string; exportedPath?: string }> {
-        try {
-            const sourcePath = sourceDocument.uri.fsPath;
-
-            // Read source content
-            if (!fs.existsSync(sourcePath)) {
-                throw new Error(`Source file not found: ${sourcePath}`);
-            }
-            const fullContent = fs.readFileSync(sourcePath, 'utf8');
-
-            // Extract content based on scope
-            let content: string | null = null;
-            switch (options.scope) {
-                case 'full':
-                    content = fullContent;
-                    break;
-                case 'row':
-                    if (options.selection.rowNumber === undefined) {
-                        throw new Error('Row number required for row scope');
-                    }
-                    content = this.extractRowContent(fullContent, options.selection.rowNumber);
-                    break;
-                case 'stack':
-                    if (options.selection.rowNumber === undefined || options.selection.stackIndex === undefined) {
-                        throw new Error('Row number and stack index required for stack scope');
-                    }
-                    content = this.extractStackContent(fullContent, options.selection.rowNumber, options.selection.stackIndex);
-                    break;
-                case 'column':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for column scope');
-                    }
-                    content = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    break;
-                case 'task':
-                    if (options.selection.columnIndex === undefined) {
-                        throw new Error('Column index required for task scope');
-                    }
-                    const columnContent = this.extractColumnContent(fullContent, options.selection.columnIndex);
-                    content = columnContent ? this.extractTaskContent(columnContent, options.selection.taskId) : null;
-                    break;
-            }
-
-            if (!content) {
-                throw new Error(`Could not extract content for scope: ${options.scope}`);
-            }
-
-            // Apply tag filtering
-            let processedContent = this.applyTagFiltering(content, {
-                targetFolder: '',
-                includeFiles: false,
-                includeImages: false,
-                includeVideos: false,
-                includeOtherMedia: false,
-                includeDocuments: false,
-                fileSizeLimitMB: 100,
-                tagVisibility: options.tagVisibility
-            });
-
-            // FIRST: Convert kanban to presentation format (slides separated by ---)
-            // This matches the "Convert to Presentation Format" export option
-            console.log('[kanban.exportService.exportWithMarp] Converting to presentation format first');
-            processedContent = this.convertToPresentationFormat(processedContent, false);
-
-            // THEN: Add Marp directives (frontmatter) on top of the presentation content
-            const marpOptions: MarpConversionOptions = {
-                theme: options.marpTheme,
-                tagVisibility: options.tagVisibility,
-                preserveYaml: true
-            };
-
-            // Just add Marp frontmatter to the already-converted presentation content
-            const marpMarkdown = MarpConverter.addMarpDirectives(processedContent, marpOptions);
-
-            // Determine output format and path
-            let outputFormat: MarpOutputFormat;
-            let outputPath: string;
-
-            if (!options.targetFolder) {
-                throw new Error('Target folder is required for Marp export');
-            }
-
-            const sourceBasename = path.basename(sourcePath, '.md');
-
-            // Build scope suffix
-            let scopeSuffix = '';
-            if (options.scope !== 'full') {
-                const parts: string[] = [];
-                if (options.selection.rowNumber !== undefined) {
-                    parts.push(`row${options.selection.rowNumber}`);
-                }
-                if (options.selection.stackIndex !== undefined) {
-                    parts.push(`stack${options.selection.stackIndex}`);
-                }
-                if (options.selection.columnIndex !== undefined) {
-                    parts.push(`col${options.selection.columnIndex}`);
-                }
-                scopeSuffix = parts.length > 0 ? `-${parts.join('-')}` : `-${options.scope}`;
-            }
-
-            const targetBasename = `${sourceBasename}${scopeSuffix}`;
-
-            // Ensure target folder exists
-            if (!fs.existsSync(options.targetFolder)) {
-                fs.mkdirSync(options.targetFolder, { recursive: true });
-            }
-
-            // Extract Marp output format from options.format (e.g., "marp-pdf" -> "pdf")
-            let marpOutputFormat: string;
-            if (options.format.startsWith('marp-')) {
-                marpOutputFormat = options.format.substring(5); // Remove "marp-" prefix
-            } else {
-                throw new Error(`Invalid Marp export format: ${options.format}`);
-            }
-
-            // Determine output format
-            switch (marpOutputFormat) {
-                case 'pdf':
-                    outputFormat = 'pdf';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.pdf`);
-                    break;
-
-                case 'pptx':
-                    outputFormat = 'pptx';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.pptx`);
-                    break;
-
-                case 'html':
-                    outputFormat = 'html';
-                    outputPath = path.join(options.targetFolder, `${targetBasename}.html`);
-                    break;
-
-                default:
-                    throw new Error(`Unsupported Marp export format: ${marpOutputFormat}`);
-            }
-
-            // Export using Marp CLI
-            const exportOptions: any = {
-                format: outputFormat,
-                outputPath,
-                enginePath: options.marpEnginePath,
-                theme: options.marpTheme,
-                allowLocalFiles: true
-            };
-
-            // Add browser option if specified
-            const additionalArgs: string[] = [];
-            if (options.marpBrowser && options.marpBrowser !== 'auto') {
-                additionalArgs.push(`--browser`, options.marpBrowser);
-            }
-
-            // Add preview option if specified
-            if (options.marpPreview) {
-                additionalArgs.push(`--preview`);
-            }
-
-            if (additionalArgs.length > 0) {
-                exportOptions.additionalArgs = additionalArgs;
-            }
-
-            await MarpExportService.export(marpMarkdown, exportOptions);
-
-            return {
-                success: true,
-                message: `Successfully exported to ${outputFormat.toUpperCase()}: ${outputPath}`,
-                exportedPath: outputPath
-            };
-
-        } catch (error) {
-            console.error('[kanban.exportService.exportWithMarp] Export failed:', error);
-            return {
-                success: false,
-                message: `Marp export failed: ${error instanceof Error ? error.message : String(error)}`
-            };
-        }
-    }
 }

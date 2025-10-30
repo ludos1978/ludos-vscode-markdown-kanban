@@ -43,12 +43,33 @@ export class BoardOperations {
         const fromColumn = this.findColumn(board, fromColumnId);
         const toColumn = this.findColumn(board, toColumnId);
 
-        if (!fromColumn || !toColumn) {return false;}
+        if (!fromColumn || !toColumn) {
+            return false;
+        }
 
         const taskIndex = fromColumn.tasks.findIndex(task => task.id === taskId);
-        if (taskIndex === -1) {return false;}
+        if (taskIndex === -1) {
+            return false;
+        }
 
         const task = fromColumn.tasks.splice(taskIndex, 1)[0];
+
+        // Log detailed task move information
+        console.log('====== BACKEND MOVE TASK ======');
+        console.log(`Task ID: ${task.id}`);
+        console.log(`Task Title: ${task.title}`);
+        console.log(`Task Description (first 100 chars): ${task.description?.substring(0, 100) || '(empty)'}`);
+        console.log(`Task includeMode: ${task.includeMode}`);
+        console.log(`Task includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
+        console.log(`From Column: ${fromColumn.title} (ID: ${fromColumnId})`);
+        console.log(`To Column: ${toColumn.title} (ID: ${toColumnId})`);
+        console.log(`From Index: ${taskIndex}, To Index: ${newIndex}`);
+        console.log(`From Column includeMode: ${fromColumn.includeMode}`);
+        console.log(`From Column includeFiles: ${fromColumn.includeFiles?.join(', ') || '(none)'}`);
+        console.log(`To Column includeMode: ${toColumn.includeMode}`);
+        console.log(`To Column includeFiles: ${toColumn.includeFiles?.join(', ') || '(none)'}`);
+        console.log('===============================');
+
         toColumn.tasks.splice(newIndex, 0, task);
         return true;
     }
@@ -126,7 +147,12 @@ export class BoardOperations {
             title: result.task.title,
             description: result.task.description,
             includeMode: result.task.includeMode,
-            includeFiles: result.task.includeFiles ? [...result.task.includeFiles] : undefined,
+            // FIX BUG #B: Normalize paths when copying to ensure consistent registry lookups
+            // All includeFiles paths MUST be normalized (lowercase, forward slashes)
+            includeFiles: result.task.includeFiles
+                // FOUNDATION-1: Store original paths (just trim whitespace)
+                ? result.task.includeFiles.map(f => f.trim())
+                : undefined,
             originalTitle: result.task.originalTitle,
             displayTitle: result.task.displayTitle
         };
@@ -223,7 +249,28 @@ export class BoardOperations {
             tasks: []
         };
 
-        board.columns.push(newColumn);
+        // Extract row number from title to determine correct insertion position
+        const targetRow = this.getColumnRow({ title } as KanbanColumn);
+        
+        // Find the correct position to insert the column
+        let insertIndex = board.columns.length; // Default to end
+        
+        // Find the first column of the target row, or where to insert if row doesn't exist
+        for (let i = 0; i < board.columns.length; i++) {
+            const columnRow = this.getColumnRow(board.columns[i]);
+            
+            if (columnRow > targetRow) {
+                // Insert before this column (higher row number)
+                insertIndex = i;
+                break;
+            } else if (columnRow === targetRow) {
+                // Found the target row, continue to find end of this row
+                continue;
+            }
+        }
+        
+        // Insert at the calculated position
+        board.columns.splice(insertIndex, 0, newColumn);
         this._originalTaskOrder.set(newColumn.id, []);
         return true;
     }
@@ -283,14 +330,14 @@ export class BoardOperations {
         // Simply save the title as provided - all tag handling is done in frontend
         column.title = title;
 
-        // Check for column include syntax changes
-        const columnIncludeMatches = column.title.match(/!!!columninclude\(([^)]+)\)!!!/g);
+        // Check for column include syntax changes (position-based: column header uses !!!include()!!!)
+        const columnIncludeMatches = column.title.match(/!!!include\(([^)]+)\)!!!/g);
 
         if (columnIncludeMatches && columnIncludeMatches.length > 0) {
             // Extract new include files from the title
             const newIncludeFiles: string[] = [];
             columnIncludeMatches.forEach(match => {
-                const filePath = match.replace(/!!!columninclude\(([^)]+)\)!!!/, '$1').trim();
+                const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
                 newIncludeFiles.push(filePath);
             });
 

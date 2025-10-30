@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { PathResolver } from './PathResolver';
-import { FormatConverter } from './FormatConverter';
-import { IncludeMode, IncludeType } from './OperationOptions';
+import { PathResolver } from '../PathResolver';
+import { FormatConverter } from '../export/FormatConverter';
+import { IncludeMode, IncludeType } from '../OperationOptions';
 
 /**
  * Unified include file processing utility
@@ -13,14 +13,8 @@ import { IncludeMode, IncludeType } from './OperationOptions';
  * - kanbanWebviewPanel.ts: Include file handling
  */
 export class IncludeProcessor {
-    /** Include pattern: !!!include(filename)!!! */
+    /** Unified include pattern: !!!include(filename)!!! - location determines behavior */
     private static readonly INCLUDE_PATTERN = /!!!include\(([^)]+)\)!!!/gi;
-
-    /** Column include pattern: !!!columninclude(filename)!!! */
-    private static readonly COLUMN_INCLUDE_PATTERN = /!!!columninclude\(([^)]+)\)!!!/gi;
-
-    /** Task include pattern: !!!taskinclude(filename)!!! */
-    private static readonly TASK_INCLUDE_PATTERN = /!!!taskinclude\(([^)]+)\)!!!/gi;
 
     /**
      * Process all include markers in content
@@ -216,14 +210,9 @@ export class IncludeProcessor {
             taskIncludes: []
         };
 
-        // Detect regular includes
+        // Detect all includes using unified pattern
+        // Note: Location-based detection (column/task/regular) happens during parsing, not here
         this.detectIncludeType(content, basePath, this.INCLUDE_PATTERN, result.includes);
-
-        // Detect column includes
-        this.detectIncludeType(content, basePath, this.COLUMN_INCLUDE_PATTERN, result.columnIncludes);
-
-        // Detect task includes
-        this.detectIncludeType(content, basePath, this.TASK_INCLUDE_PATTERN, result.taskIncludes);
 
         return result;
     }
@@ -272,10 +261,10 @@ export class IncludeProcessor {
         }
 
         // For columninclude in presentation, special handling
-        if (includeType === 'columninclude' && targetFormat === 'presentation') {
-            // Convert kanban column to presentation slides
-            return FormatConverter.kanbanToPresentation(content, true);
-        }
+        // if (includeType === 'columninclude' && targetFormat === 'presentation') {
+        //     // Convert kanban column to presentation slides
+        //     return FormatConverter.kanbanToPresentation(content, true);
+        // }
 
         // For taskinclude, convert appropriately
         if (includeType === 'taskinclude') {
@@ -321,16 +310,10 @@ export class IncludeProcessor {
 
     /**
      * Get regex pattern for include type
+     * Note: All types now use the same unified pattern - location determines behavior
      */
     private static getPatternForType(type: IncludeType): RegExp {
-        switch (type) {
-            case 'include':
-                return this.INCLUDE_PATTERN;
-            case 'columninclude':
-                return this.COLUMN_INCLUDE_PATTERN;
-            case 'taskinclude':
-                return this.TASK_INCLUDE_PATTERN;
-        }
+        return this.INCLUDE_PATTERN;
     }
 
     /**
@@ -342,35 +325,24 @@ export class IncludeProcessor {
 
     /**
      * Create include marker for a file
+     * Note: All types now use unified syntax - location determines behavior
      */
     static createMarker(filename: string, type: IncludeType): string {
-        switch (type) {
-            case 'include':
-                return `!!!include(${filename})!!!`;
-            case 'columninclude':
-                return `!!!columninclude(${filename})!!!`;
-            case 'taskinclude':
-                return `!!!taskinclude(${filename})!!!`;
-        }
+        return `!!!include(${filename})!!!`;
     }
 
     /**
      * Check if content contains any include markers
      */
     static hasIncludes(content: string): boolean {
-        return this.INCLUDE_PATTERN.test(content) ||
-               this.COLUMN_INCLUDE_PATTERN.test(content) ||
-               this.TASK_INCLUDE_PATTERN.test(content);
+        return this.INCLUDE_PATTERN.test(content);
     }
 
     /**
      * Remove all include markers from content (replace with empty string)
      */
     static stripIncludes(content: string): string {
-        return content
-            .replace(this.INCLUDE_PATTERN, '')
-            .replace(this.COLUMN_INCLUDE_PATTERN, '')
-            .replace(this.TASK_INCLUDE_PATTERN, '');
+        return content.replace(this.INCLUDE_PATTERN, '');
     }
 }
 

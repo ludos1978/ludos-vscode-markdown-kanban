@@ -378,22 +378,27 @@ function setupGlobalDragAndDrop() {
         
     }
     
-    // Register handlers on the container (works for both single row and multi-row)
+    // PERFORMANCE-OPTIMIZED: Board container dragover with throttling
+    // Cache column positions for external file drag indicators
+    let cachedBoardColumns = null;
+    let boardCacheTimestamp = 0;
+    const BOARD_CACHE_DURATION = 1000; // Re-cache every 1 second
+
     boardContainer.addEventListener('dragover', function(e) {
         // Always prevent default to allow drops
         e.preventDefault();
-        
+
         // Skip visual indicators for internal column/task drags
-        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) && 
+        if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask) &&
             !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
             return; // Don't show external drop indicators during internal drags
         }
-        
+
         // Show drop indicators for external drags
         const now = Date.now();
         if (now - lastIndicatorUpdate >= INDICATOR_UPDATE_THROTTLE) {
             lastIndicatorUpdate = now;
-            
+
             // Check if we're over a column (works for both single and multi-row layouts)
             const column = e.target && e.target.closest ? e.target.closest('.kanban-full-height-column') : null;
             if (column) {
@@ -404,20 +409,28 @@ function setupGlobalDragAndDrop() {
                 const row = e.target && e.target.closest ? e.target.closest('.kanban-row') : null;
                 const spacer = e.target && e.target.closest ? e.target.closest('.row-drop-zone-spacer') : null;
                 if (row || spacer) {
-                    // Try to find the nearest column (include collapsed columns)
-                    const columns = boardContainer.querySelectorAll('.kanban-full-height-column');
+                    // PERFORMANCE: Cache column positions for 1 second to avoid repeated querySelectorAll
+                    if (!cachedBoardColumns || (now - boardCacheTimestamp) > BOARD_CACHE_DURATION) {
+                        const columns = boardContainer.querySelectorAll('.kanban-full-height-column');
+                        cachedBoardColumns = Array.from(columns).map(col => ({
+                            element: col,
+                            rect: col.getBoundingClientRect()
+                        }));
+                        boardCacheTimestamp = now;
+                    }
+
+                    // Find nearest column using cached positions
                     let nearestColumn = null;
                     let minDistance = Infinity;
-                    
-                    columns.forEach(col => {
-                        const rect = col.getBoundingClientRect();
-                        const distance = Math.abs(rect.left + rect.width / 2 - e.clientX);
+
+                    cachedBoardColumns.forEach(item => {
+                        const distance = Math.abs(item.rect.left + item.rect.width / 2 - e.clientX);
                         if (distance < minDistance) {
                             minDistance = distance;
-                            nearestColumn = col;
+                            nearestColumn = item.element;
                         }
                     });
-                    
+
                     if (nearestColumn) {
                         showExternalDropIndicator(nearestColumn, e.clientY);
                     } else {
@@ -711,6 +724,22 @@ function setupGlobalDragAndDrop() {
                 const taskIndex = originalColumn.tasks.findIndex(t => t.id === taskId);
                 if (taskIndex >= 0) {
                     const [task] = originalColumn.tasks.splice(taskIndex, 1);
+
+                    // Log detailed task move information BEFORE the move
+                    console.log('====== FRONTEND MOVE TASK ======');
+                    console.log(`Task ID: ${task.id}`);
+                    console.log(`Task Title: ${task.title}`);
+                    console.log(`Task Description (first 100 chars): ${task.description?.substring(0, 100) || '(empty)'}`);
+                    console.log(`Task includeMode: ${task.includeMode}`);
+                    console.log(`Task includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
+                    console.log(`From Column: ${originalColumn.title} (ID: ${originalColumnId})`);
+                    console.log(`To Column: ${finalColumn.title} (ID: ${finalColumnId})`);
+                    console.log(`From Index: ${taskIndex}, To Index: ${dropIndex}`);
+                    console.log(`From Column includeMode: ${originalColumn.includeMode}`);
+                    console.log(`From Column includeFiles: ${originalColumn.includeFiles?.join(', ') || '(none)'}`);
+                    console.log(`To Column includeMode: ${finalColumn.includeMode}`);
+                    console.log(`To Column includeFiles: ${finalColumn.includeFiles?.join(', ') || '(none)'}`);
+                    console.log('================================');
 
                     // Add task to new column at correct position
                     const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);
@@ -1970,10 +1999,7 @@ function setupTaskDragAndDrop() {
             }
         });
 
-        // Keep the existing tasks container specific handling for precise placement
-        // Throttle transition class updates using requestAnimationFrame
-        let transitionUpdatePending = false;
-
+        // PERFORMANCE-OPTIMIZED: Throttled dragover handler with cached positions
         tasksContainer.addEventListener('dragover', e => {
             e.preventDefault();
 
@@ -1999,33 +2025,62 @@ function setupTaskDragAndDrop() {
             // Remove any column-level visual feedback when over tasks
             columnElement.classList.remove('drag-over-append');
 
-            const afterElement = getDragAfterTaskElement(tasksContainer, e.clientY);
-
-            if (afterElement === null) {
-                // Insert at the end, but before the add button if it exists
-                const addButton = tasksContainer.querySelector('.add-task-btn');
-                if (addButton) {
-                    tasksContainer.insertBefore(dragState.draggedTask, addButton);
-                } else {
-                    tasksContainer.appendChild(dragState.draggedTask);
-                }
-            } else if (afterElement !== dragState.draggedTask) {
-                // Insert before the after element
-                tasksContainer.insertBefore(dragState.draggedTask, afterElement);
+            // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
+            // Skip if already scheduled
+            if (dragState.dragoverThrottleId) {
+                return;
             }
 
-            // Throttle transition class updates to max 60fps
-            if (!transitionUpdatePending) {
-                transitionUpdatePending = true;
-                requestAnimationFrame(() => {
-                    tasksContainer.querySelectorAll('.task-item').forEach(task => {
-                        if (task !== dragState.draggedTask) {
-                            task.classList.add('drag-transitioning');
+            dragState.dragoverThrottleId = requestAnimationFrame(() => {
+                // PERFORMANCE: Check if we're in the same column as when drag started
+                // If different column, cached positions are invalid - use non-cached version
+                const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
+                const afterElement = isOriginalColumn
+                    ? getDragAfterTaskElementCached(e.clientY)
+                    : getDragAfterTaskElement(tasksContainer, e.clientY);
+
+                // PERFORMANCE: Only update DOM if position actually changed
+                if (afterElement !== dragState.lastAfterElement) {
+                    dragState.lastAfterElement = afterElement;
+
+                    // Safety check: ensure draggedTask is still a valid DOM element
+                    if (!dragState.draggedTask || !dragState.draggedTask.parentNode) {
+                        console.warn('[kanban.dragDrop] draggedTask is invalid or detached, skipping DOM update');
+                        return;
+                    }
+
+                    if (afterElement === null) {
+                        // Insert at the end, but before the add button if it exists
+                        const addButton = isOriginalColumn && dragState.cachedAddButton
+                            ? dragState.cachedAddButton
+                            : tasksContainer.querySelector('.add-task-btn');
+                        if (addButton) {
+                            tasksContainer.insertBefore(dragState.draggedTask, addButton);
+                        } else {
+                            tasksContainer.appendChild(dragState.draggedTask);
                         }
-                    });
-                    transitionUpdatePending = false;
-                });
-            }
+                    } else if (afterElement !== dragState.draggedTask) {
+                        // Insert before the after element
+                        tasksContainer.insertBefore(dragState.draggedTask, afterElement);
+                    }
+
+                    // Update transition classes for smooth animation
+                    // Use cached positions for original column, query for new column
+                    if (isOriginalColumn && dragState.cachedTaskPositions) {
+                        dragState.cachedTaskPositions.forEach(item => {
+                            item.element.classList.add('drag-transitioning');
+                        });
+                    } else {
+                        tasksContainer.querySelectorAll('.task-item').forEach(task => {
+                            if (task !== dragState.draggedTask) {
+                                task.classList.add('drag-transitioning');
+                            }
+                        });
+                    }
+                }
+
+                dragState.dragoverThrottleId = null;
+            });
         });
 
         tasksContainer.addEventListener('drop', e => {
@@ -2073,6 +2128,22 @@ function setupTaskDragHandle(handle) {
             dragState.originalTaskIndex = Array.from(dragState.originalTaskParent.children).indexOf(taskItem);
             dragState.isDragging = true; // IMPORTANT: Set this BEFORE setting data
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
+
+            // PERFORMANCE: Cache task positions for all tasks in the column
+            // This eliminates repeated querySelectorAll and getBoundingClientRect during drag
+            const tasksContainer = taskItem.parentNode;
+            dragState.cachedTaskPositions = Array.from(tasksContainer.querySelectorAll('.task-item'))
+                .filter(task => task !== taskItem)
+                .map(task => ({
+                    element: task,
+                    rect: task.getBoundingClientRect()
+                }));
+            dragState.cachedAddButton = tasksContainer.querySelector('.add-task-btn');
+            dragState.cachedAddButtonRect = dragState.cachedAddButton ? dragState.cachedAddButton.getBoundingClientRect() : null;
+
+            // Track last position to prevent redundant DOM updates
+            dragState.lastAfterElement = undefined;
+            dragState.dragoverThrottleId = null;
 
             // Set multiple data formats
             e.dataTransfer.effectAllowed = 'move';
@@ -2136,6 +2207,40 @@ function getDragAfterTaskElement(container, y) {
             return closest;
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+/**
+ * PERFORMANCE-OPTIMIZED: Get the element to insert after using CACHED positions
+ * This eliminates querySelectorAll and getBoundingClientRect calls during drag
+ * Uses positions cached at dragstart in dragState.cachedTaskPositions
+ */
+function getDragAfterTaskElementCached(y) {
+    const cachedPositions = dragState.cachedTaskPositions;
+
+    // If column is empty, return null (insert at end)
+    if (!cachedPositions || cachedPositions.length === 0) {
+        return null;
+    }
+
+    // Check if dragging over add button area
+    if (dragState.cachedAddButtonRect) {
+        if (y >= dragState.cachedAddButtonRect.top - 10) {
+            return null; // Drop at end (before add button)
+        }
+    }
+
+    // Use cached positions instead of getBoundingClientRect
+    const result = cachedPositions.reduce((closest, item) => {
+        const offset = y - item.rect.top - item.rect.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: item.element };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY });
+
+    return result.element;
 }
 
 function calculateTaskDropIndex(tasksContainer, draggedTask, event) {
@@ -2217,6 +2322,22 @@ function setupDragAndDrop() {
     setupRowDragAndDrop(); // Setup rows first
     setupColumnDragAndDrop(); // Then columns
     setupTaskDragAndDrop(); // Then tasks
+    
+    // Initialize drop zones for the entire board and all rows
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        const rows = boardElement.querySelectorAll('.kanban-row');
+
+        if (rows.length > 0) {
+            // Multi-row mode: setup drop zones for each row individually
+            rows.forEach(row => {
+                cleanupAndRecreateDropZones(row);
+            });
+        } else {
+            // Single row mode: setup drop zones for the entire board
+            cleanupAndRecreateDropZones(boardElement);
+        }
+    }
 }
 
 /**
@@ -2391,6 +2512,7 @@ function updateStackBottomDropZones() {
 
 // Make it globally accessible for layout updates
 window.updateStackBottomDropZones = updateStackBottomDropZones;
+window.cleanupAndRecreateDropZones = cleanupAndRecreateDropZones;
 
 /**
  * Updates the visual column title display in the DOM after modifying the data model
@@ -2473,6 +2595,19 @@ function setupColumnDragAndDrop() {
             dragState.isDragging = true;
             dragState.lastDropTarget = null;  // Track last drop position
             dragState.styleUpdatePending = false;  // Track if style update is needed
+
+            // PERFORMANCE: Cache column positions for fast lookup during drag
+            const allColumns = document.querySelectorAll('.kanban-full-height-column');
+            dragState.cachedColumnPositions = Array.from(allColumns)
+                .filter(col => col !== columnElement)
+                .map(col => ({
+                    element: col,
+                    rect: col.getBoundingClientRect(),
+                    columnId: col.getAttribute('data-column-id')
+                }));
+
+            // Track throttling for column dragover
+            dragState.columnDragoverThrottleId = null;
 
             // Set drag data
             e.dataTransfer.effectAllowed = 'move';
@@ -2589,7 +2724,9 @@ function setupColumnDragAndDrop() {
             });
 
             // Clean up visual feedback
-            columnElement.classList.remove('dragging', 'drag-preview');
+            if (dragState.draggedColumn) {
+                dragState.draggedColumn.classList.remove('dragging', 'drag-preview');
+            }
 
             document.querySelectorAll('.kanban-full-height-column').forEach(col => {
                 col.classList.remove('drag-over', 'drag-transitioning');
@@ -2599,16 +2736,20 @@ function setupColumnDragAndDrop() {
             });
 
             // Calculate target position based on where the column is in the DOM now
+            const draggedColumn = dragState.draggedColumn;
+            if (!draggedColumn) {return;}
+
             const allColumns = Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
-            const targetDOMIndex = allColumns.indexOf(columnElement);
-            
+            const targetDOMIndex = allColumns.indexOf(draggedColumn);
+
             // Map DOM position to data model position
             // Build the new order based on current DOM state
             const newOrder = allColumns.map(col => col.getAttribute('data-column-id'));
+            const columnId = draggedColumn.getAttribute('data-column-id');
             const targetDataIndex = newOrder.indexOf(columnId);
-            
+
             // Get row number
-            const parentRow = columnElement.closest('.kanban-row');
+            const parentRow = draggedColumn.closest('.kanban-row');
             const newRow = parentRow ? parseInt(parentRow.getAttribute('data-row-number') || '1') : 1;
 
             // Update the column's row tag FIRST in the data before reordering
@@ -2770,6 +2911,7 @@ function setupColumnDragAndDrop() {
             dragState.lastDropTarget = null;
         });
 
+        // PERFORMANCE-OPTIMIZED: Throttled column dragover with position change detection
         column.addEventListener('dragover', e => {
             if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
@@ -2780,90 +2922,107 @@ function setupColumnDragAndDrop() {
 
             e.preventDefault();
 
-            const draggedStack = dragState.draggedColumn.parentNode;
-            const targetStack = column.parentNode;
-
-            if (!draggedStack || !targetStack ||
-                !draggedStack.classList.contains('kanban-column-stack') ||
-                !targetStack.classList.contains('kanban-column-stack')) {
+            // PERFORMANCE: Skip if already scheduled
+            if (dragState.columnDragoverThrottleId) {
                 return;
             }
 
-            const rect = column.getBoundingClientRect();
-            const midpoint = rect.top + rect.height / 2;
+            dragState.columnDragoverThrottleId = requestAnimationFrame(() => {
+                const draggedStack = dragState.draggedColumn.parentNode;
+                const targetStack = column.parentNode;
 
-            // Determine target position (vertical)
-            let targetElement;
-            let insertBefore = false;
+                if (!draggedStack || !targetStack ||
+                    !draggedStack.classList.contains('kanban-column-stack') ||
+                    !targetStack.classList.contains('kanban-column-stack')) {
+                    dragState.columnDragoverThrottleId = null;
+                    return;
+                }
 
-            if (e.clientY < midpoint) {
-                // Insert before this column
-                targetElement = column;
-                insertBefore = true;
-            } else {
-                // Insert after this column
-                targetElement = column.nextSibling;
-                insertBefore = false;
-            }
-
-            // Only move if it's a different position than last time
-            const targetKey = 'column-' + column.getAttribute('data-column-id') + '-' + insertBefore;
-            if (dragState.lastDropTarget !== targetKey) {
-                dragState.lastDropTarget = targetKey;
-
-                if (insertBefore) {
-                    // Only move if not already there
-                    if (dragState.draggedColumn.nextSibling !== column) {
-                        const oldStack = dragState.draggedColumn.parentNode;
-                        targetStack.insertBefore(dragState.draggedColumn, column);
-
-                        // Clean up empty stack and its drop zone
-                        cleanupEmptyStack(oldStack);
-
-                        // Schedule style update if not already pending
-                        if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                            dragState.styleUpdatePending = true;
-                            requestAnimationFrame(() => {
-                                window.applyStackedColumnStyles();
-                                dragState.styleUpdatePending = false;
-                            });
-                        }
-                    }
+                // PERFORMANCE: Use cached rect if available
+                let rect;
+                if (dragState.cachedColumnPositions) {
+                    const cached = dragState.cachedColumnPositions.find(pos => pos.element === column);
+                    rect = cached ? cached.rect : column.getBoundingClientRect();
                 } else {
-                    // Only move if not already there
-                    if (targetElement && dragState.draggedColumn.nextSibling !== targetElement) {
-                        const oldStack = dragState.draggedColumn.parentNode;
-                        targetStack.insertBefore(dragState.draggedColumn, targetElement);
+                    rect = column.getBoundingClientRect();
+                }
+                const midpoint = rect.top + rect.height / 2;
 
-                        // Clean up empty stack and its drop zone
-                        cleanupEmptyStack(oldStack);
+                // Determine target position (vertical)
+                let targetElement;
+                let insertBefore = false;
 
-                        // Schedule style update if not already pending
-                        if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                            dragState.styleUpdatePending = true;
-                            requestAnimationFrame(() => {
-                                window.applyStackedColumnStyles();
-                                dragState.styleUpdatePending = false;
-                            });
+                if (e.clientY < midpoint) {
+                    // Insert before this column
+                    targetElement = column;
+                    insertBefore = true;
+                } else {
+                    // Insert after this column
+                    targetElement = column.nextSibling;
+                    insertBefore = false;
+                }
+
+                // PERFORMANCE: Only move if it's a different position than last time
+                const targetKey = 'column-' + column.getAttribute('data-column-id') + '-' + insertBefore;
+                if (dragState.lastDropTarget !== targetKey) {
+                    dragState.lastDropTarget = targetKey;
+
+                    if (insertBefore) {
+                        // Only move if not already there
+                        if (dragState.draggedColumn.nextSibling !== column) {
+                            const oldStack = dragState.draggedColumn.parentNode;
+                            targetStack.insertBefore(dragState.draggedColumn, column);
+
+                            // Clean up empty stack and its drop zone
+                            cleanupEmptyStack(oldStack);
+
+                            // Schedule style update if not already pending
+                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
+                                dragState.styleUpdatePending = true;
+                                requestAnimationFrame(() => {
+                                    window.applyStackedColumnStyles();
+                                    dragState.styleUpdatePending = false;
+                                });
+                            }
                         }
-                    } else if (!targetElement && dragState.draggedColumn !== targetStack.lastElementChild) {
-                        const oldStack = dragState.draggedColumn.parentNode;
-                        targetStack.appendChild(dragState.draggedColumn);
+                    } else {
+                        // Only move if not already there
+                        if (targetElement && dragState.draggedColumn.nextSibling !== targetElement) {
+                            const oldStack = dragState.draggedColumn.parentNode;
+                            targetStack.insertBefore(dragState.draggedColumn, targetElement);
 
-                        // Clean up empty stack and its drop zone
-                        cleanupEmptyStack(oldStack);
+                            // Clean up empty stack and its drop zone
+                            cleanupEmptyStack(oldStack);
 
-                        // Schedule style update if not already pending
-                        if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                            dragState.styleUpdatePending = true;
-                            requestAnimationFrame(() => {
-                                window.applyStackedColumnStyles();
-                                dragState.styleUpdatePending = false;
-                            });
+                            // Schedule style update if not already pending
+                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
+                                dragState.styleUpdatePending = true;
+                                requestAnimationFrame(() => {
+                                    window.applyStackedColumnStyles();
+                                    dragState.styleUpdatePending = false;
+                                });
+                            }
+                        } else if (!targetElement && dragState.draggedColumn !== targetStack.lastElementChild) {
+                            const oldStack = dragState.draggedColumn.parentNode;
+                            targetStack.appendChild(dragState.draggedColumn);
+
+                            // Clean up empty stack and its drop zone
+                            cleanupEmptyStack(oldStack);
+
+                            // Schedule style update if not already pending
+                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
+                                dragState.styleUpdatePending = true;
+                                requestAnimationFrame(() => {
+                                    window.applyStackedColumnStyles();
+                                    dragState.styleUpdatePending = false;
+                                });
+                            }
                         }
                     }
                 }
-            }
+
+                dragState.columnDragoverThrottleId = null;
+            });
         });
     });
 

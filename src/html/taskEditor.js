@@ -573,8 +573,15 @@ class TaskEditor {
             columnId: columnId || window.getColumnIdFromElement(editElement),
             originalValue: editElement.value
         };
-        
-        
+
+        // CRITICAL: Tell backend editing has started to block board regenerations
+        if (type === 'column-title') {
+            vscode.postMessage({
+                type: 'editingStarted'
+            });
+        }
+
+
         // Reset edit context when starting a new edit session on a different field
         const newEditContext = type === 'column-title' 
             ? `column-title-${columnId}` 
@@ -778,9 +785,9 @@ class TaskEditor {
 
                         this.lastEditContext = editContext;
 
-                        // Check for column include syntax changes
-                        const oldIncludeMatches = (column.title || '').match(/!!!columninclude\(([^)]+)\)!!!/g) || [];
-                        const newIncludeMatches = newTitle.match(/!!!columninclude\(([^)]+)\)!!!/g) || [];
+                        // Check for include syntax changes in column header (location-based column include)
+                        const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
+                        const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
 
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||
@@ -790,10 +797,27 @@ class TaskEditor {
 
                         // If include syntax changed, send editColumnTitle message immediately for backend processing
                         if (hasIncludeChanges) {
+                            // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
+                            // DOM might have stale IDs if a boardUpdate just arrived
+                            let currentColumnId = columnId; // Default to what we have
+
+                            // Find column's position in DOM to match with current board
+                            const columnElement = element.closest('.kanban-full-height-column');
+                            if (columnElement) {
+                                const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
+                                const columnIndex = allColumns.indexOf(columnElement);
+
+                                if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+                                    // Match by position - use current ID from board at this position
+                                    currentColumnId = window.currentBoard.columns[columnIndex].id;
+                                    console.log(`[TaskEditor] Column position ${columnIndex}: stored ID ${columnId}, current ID ${currentColumnId}`);
+                                }
+                            }
+
                             // Send editColumnTitle message to trigger proper include handling in backend
                             vscode.postMessage({
                                 type: 'editColumnTitle',
-                                columnId: columnId,
+                                columnId: currentColumnId, // Use current ID from board
                                 title: newTitle
                             });
 
@@ -936,9 +960,9 @@ class TaskEditor {
                     const originalDescription = task.description || '';
 
                     if (type === 'task-title') {
-                        // Handle task title - check for include syntax first
-                        const newIncludeMatches = value.match(/!!!taskinclude\(([^)]+)\)!!!/g) || [];
-                        const oldIncludeMatches = (task.title || '').match(/!!!taskinclude\(([^)]+)\)!!!/g) || [];
+                        // Handle task title - check for include syntax (location-based task include)
+                        const newIncludeMatches = value.match(/!!!include\(([^)]+)\)!!!/g) || [];
+                        const oldIncludeMatches = (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
 
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||
@@ -962,16 +986,12 @@ class TaskEditor {
 
                             return; // Skip local updates, let backend handle
                         } else if (task.includeMode && oldIncludeMatches.length > 0) {
-                            // This is editing the display content of an existing include task
-                            // (the user is editing what appears to be the title but it's actually the display content)
-                            const editContext = `${type}-${taskId}-${columnId}`;
-                            this.saveUndoStateImmediately('editTaskTitle', taskId, columnId);
-                            this.lastEditContext = editContext;
-
-                            // Update displayTitle instead of title for include tasks
-                            task.displayTitle = value;
-                            // title stays the same (contains include syntax)
-                            // No backend message - this is just local editing
+                            // FIX BUG #2: Don't update displayTitle for task includes
+                            // If we reach here, the include syntax hasn't changed (caught by line 971)
+                            // displayTitle should stay as "# include in path" (UI indicator only, read-only)
+                            // Nothing to do - include syntax is unchanged
+                            console.log('[TaskEditor] Task include title unchanged, skipping');
+                            return;
                         } else {
                             // Regular task title editing
                             if (task.title !== value) {
@@ -986,25 +1006,15 @@ class TaskEditor {
                     } else if (type === 'task-description') {
                         // Handle task description
                         if (task.includeMode) {
-                            // For task includes, the description field contains the ENTIRE file content
-                            // Parse it to extract the first line (new displayTitle) and rest (new description)
-                            const lines = value.split('\n');
-                            const newDisplayTitle = lines[0] || '';
-
-                            // Remove the first line and any immediately following empty lines
-                            let remainingLines = lines.slice(1);
-                            while (remainingLines.length > 0 && remainingLines[0].trim() === '') {
-                                remainingLines.shift();
-                            }
-                            const newDescription = remainingLines.join('\n');
-
+                            // FIX BUG #1: No-parsing approach
+                            // The description field contains the COMPLETE file content - don't parse it!
+                            // displayTitle stays as "# include in path" (UI indicator only)
                             const editContext = `${type}-${taskId}-${columnId}`;
                             this.saveUndoStateImmediately('editTaskDescription', taskId, columnId);
                             this.lastEditContext = editContext;
 
-                            // Update both displayTitle and description
-                            task.displayTitle = newDisplayTitle;
-                            task.description = newDescription; // Only the content after the first line
+                            // Update description only - NO PARSING!
+                            task.description = value;  // Complete file content
                         } else {
                             // Regular task description handling
                             const currentRawValue = task.description || '';
@@ -1027,22 +1037,42 @@ class TaskEditor {
                         if (task.includeMode) {
                             // For include tasks, check if displayTitle changed
                             wasChanged = (task.displayTitle || '') !== originalDisplayTitle;
+                            console.log('[TaskEditor] Include task title edit:', {
+                                wasChanged,
+                                newDisplayTitle: task.displayTitle,
+                                originalDisplayTitle,
+                                includeMode: task.includeMode
+                            });
                         } else {
                             // For regular tasks, check if title changed
                             wasChanged = (task.title || '') !== originalTitle;
                         }
                     } else if (type === 'task-description') {
                         wasChanged = (task.description || '') !== originalDescription;
+                        console.log('[TaskEditor] Task description edit:', {
+                            wasChanged,
+                            type,
+                            includeMode: task.includeMode,
+                            newDescription: task.description ? task.description.substring(0, 50) : '',
+                            originalDescription: originalDescription ? originalDescription.substring(0, 50) : ''
+                        });
                     }
 
+                    console.log('[TaskEditor] After edit check - wasChanged:', wasChanged, 'type:', type);
+
                     if (wasChanged) {
+                        console.log('[TaskEditor] Change detected! Calling markUnsavedChanges()');
                         if (typeof markUnsavedChanges === 'function') {
                             markUnsavedChanges();
+                        } else {
+                            console.error('[TaskEditor] markUnsavedChanges function not available!');
                         }
 
                         // Note: No need to send updateTaskInBackend message here
                         // The markUnsavedChanges() call above already sends the complete
                         // updated board data via the cachedBoard parameter
+                    } else {
+                        console.log('[TaskEditor] No change detected - NOT calling markUnsavedChanges()');
                     }
                     
                     if (this.currentEditor.displayElement) {
@@ -1064,8 +1094,14 @@ class TaskEditor {
                             }
                             this.currentEditor.displayElement.innerHTML = renderedHtml;
                         } else {
-                            // Handle empty values - must be truly empty for CSS :empty selector
-                            this.currentEditor.displayElement.innerHTML = '';
+                            // Handle empty values
+                            // For task descriptions, always wrap in sections for keyboard navigation
+                            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
+                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections('');
+                            } else {
+                                // For other types, must be truly empty for CSS :empty selector
+                                this.currentEditor.displayElement.innerHTML = '';
+                            }
                         }
                         // Ensure display element is visible
                         this.currentEditor.displayElement.style.display = 'block';
@@ -1075,8 +1111,10 @@ class TaskEditor {
                             const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
                             if (taskElement) {
                                 const titleDisplayElement = taskElement.querySelector('.task-title-display');
-                                if (titleDisplayElement && task.displayTitle) {
-                                    titleDisplayElement.innerHTML = renderMarkdown(task.displayTitle);
+                                if (titleDisplayElement) {
+                                    // Use getTaskDisplayTitle to maintain link format
+                                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '');
+                                    titleDisplayElement.innerHTML = displayHtml;
                                 }
                             }
                         }

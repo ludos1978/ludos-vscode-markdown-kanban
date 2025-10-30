@@ -16,5 +16,8 @@ src/test/extension.test.js
 .*.md
 tools/reports
 code-analysis-report.json
-# bespoke.js is copied during build and should be tracked
-!bespoke.js
+tests/kanban-huge-test
+tests/kanban-graph-tools/_Export
+tests/kanban-graph-tools/Media-kanban-graphs
+tests/kanban-graph-tools/kanban-graphs-*
+logs/*.log

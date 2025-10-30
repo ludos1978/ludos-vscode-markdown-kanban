@@ -1,0 +1,15 @@
+- [ ] plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
+- [x] COMPLETED: PlantUML integration (LOCAL WASM)
+  - [x] Renders ```plantuml code blocks as SVG diagrams using LOCAL WASM (no server!)
+  - [x] Uses @sakirtemel/plantuml.js with CheerpJ for browser-based Java execution
+  - [x] Convert to SVG button saves diagram and comments out code
+  - [x] Files saved to Media-{markdown-filename}/ folder
+  - [x] Complete offline rendering - NO network calls to plantuml.com
+  - [x] SVG rendering via com.plantuml.wasm.v1.Svg Java class
+  - [x] Package size: 4.2MB jar + 17MB jar.js (one-time load, then cached)
+
+- [ ] Add mermaid rendering into the kanban and the export!
+- [ ] Could we add a feature that we could add full pdf files or individual pages from pdf files, where each page is a task? 
+  - the format would be something like ![](path/to/document.pdf p13)  for page 13 of the pdf.
+  - best if you create a markdown-it plugin for it. as it should also work in the export.
+- [ ] saving and change detection still are not reliably working. create 3 comprehensive solution suggestions that will fix the problem. choose the best and implement it if it has a very high reliably. if it's not very reliably analyze it again in 3 variants and select the best one. using this method improve the solution and find the fix!!!

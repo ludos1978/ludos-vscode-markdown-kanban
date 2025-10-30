@@ -265,10 +265,11 @@ function enhancedStrikethroughPlugin(md) {
     };
 }
 
-// HTML Comment Visibility Plugin
-// Makes HTML comments visible similar to style markers
+// HTML Comment and Content Rendering Plugin
+// Handles HTML comments and HTML content based on user settings
 function htmlCommentPlugin(md, options = {}) {
-    const showComments = options.showComments !== false; // Default to true if not specified
+    const commentMode = options.commentMode || 'hidden'; // 'hidden' or 'text'
+    const contentMode = options.contentMode || 'html'; // 'html' or 'text'
 
     // Parse HTML comments as inline tokens
     function parseHtmlComment(state, silent) {
@@ -318,21 +319,21 @@ function htmlCommentPlugin(md, options = {}) {
     // Also register as block rule to catch block-level comments
     md.block.ruler.before('html_block', 'html_comment_block', parseHtmlComment);
 
-    // Render rule
+    // Render rule for HTML comments
     md.renderer.rules.html_comment = function(tokens, idx) {
         const token = tokens[idx];
         const content = token.content;
 
-        if (!showComments) {
-            // Hide comment completely (don't return HTML comment as it's invisible anyway)
+        if (commentMode === 'hidden') {
+            // Hide comment completely
             return '';
         }
 
-        // Return visible comment marker (escaped so it shows as text, not as HTML comment)
+        // Return visible comment marker (escaped so it shows as text)
         return `<span class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(content)}--&gt;</span>`;
     };
 
-    // Override default html_block renderer to handle comments
+    // Override default html_block renderer to handle comments and content
     const originalHtmlBlock = md.renderer.rules.html_block;
     md.renderer.rules.html_block = function(tokens, idx, options, env, self) {
         const token = tokens[idx];
@@ -342,15 +343,417 @@ function htmlCommentPlugin(md, options = {}) {
         if (content.trim().startsWith('<!--') && content.trim().endsWith('-->')) {
             const commentContent = content.trim().slice(4, -3).trim();
 
-            if (!showComments) {
+            if (commentMode === 'hidden') {
                 return '';
             }
 
             return `<div class="html-comment-marker" title="HTML Comment">&lt;!--${escapeHtml(commentContent)}--&gt;</div>`;
         }
 
-        // Not a comment, use original renderer
+        // Check if this is HTML content (not a comment, not a URL)
+        // HTML content starts with < but not <http or <https
+        const trimmedContent = content.trim();
+        const isHtmlContent = trimmedContent.startsWith('<') &&
+                              !trimmedContent.match(/^<https?:\/\//i);
+
+        if (isHtmlContent && contentMode === 'text') {
+            // Render HTML tags as visible text
+            return `<pre class="html-content-text">${escapeHtml(content)}</pre>`;
+        }
+
+        // Not a comment or should render as HTML, use original renderer
         return originalHtmlBlock ? originalHtmlBlock(tokens, idx, options, env, self) : content;
+    };
+
+    // Override default html_inline renderer for inline HTML content
+    const originalHtmlInline = md.renderer.rules.html_inline;
+    md.renderer.rules.html_inline = function(tokens, idx, options, env, self) {
+        const token = tokens[idx];
+        const content = token.content;
+
+        // Check if this is inline HTML content (not a URL)
+        const trimmedContent = content.trim();
+        const isHtmlContent = trimmedContent.startsWith('<') &&
+                              !trimmedContent.match(/^<https?:\/\//i);
+
+        if (isHtmlContent && contentMode === 'text') {
+            // Render HTML tags as visible text
+            return `<code class="html-content-text">${escapeHtml(content)}</code>`;
+        }
+
+        // Should render as HTML, use original renderer
+        return originalHtmlInline ? originalHtmlInline(tokens, idx, options, env, self) : content;
+    };
+}
+
+// ============================================================================
+// PlantUML Rendering System
+// ============================================================================
+
+// PlantUML is now rendered in the extension backend (Node.js)
+// No initialization needed in webview
+window.plantumlReady = true; // Always ready - backend handles rendering
+console.log('[PlantUML] Using backend rendering (Java + node-plantuml)');
+
+// Queue for pending PlantUML diagrams
+const pendingPlantUMLQueue = [];
+let plantumlQueueProcessing = false;
+
+// Cache for rendered PlantUML diagrams (code → svg)
+const plantumlRenderCache = new Map();
+window.plantumlRenderCache = plantumlRenderCache; // Make globally accessible
+
+/**
+ * Queue a PlantUML diagram for rendering
+ * @param {string} id - Unique placeholder ID
+ * @param {string} code - PlantUML source code
+ */
+function queuePlantUMLRender(id, code) {
+    pendingPlantUMLQueue.push({ id, code, timestamp: Date.now() });
+}
+
+// Map to store pending render requests
+const plantUMLRenderRequests = new Map();
+let plantUMLRequestId = 0;
+
+/**
+ * Render PlantUML code to SVG using backend (Node.js + Java)
+ * @param {string} code - PlantUML source code (without @startuml/@enduml)
+ * @returns {Promise<string>} SVG content
+ */
+async function renderPlantUML(code) {
+    // Check cache first
+    if (plantumlRenderCache.has(code)) {
+        console.log('[PlantUML] Using cached SVG');
+        return plantumlRenderCache.get(code);
+    }
+
+    // Wrap content with required delimiters
+    const wrappedCode = `@startuml\n${code.trim()}\n@enduml`;
+
+    return new Promise((resolve, reject) => {
+        const requestId = `plantuml-${++plantUMLRequestId}`;
+
+        console.log('[PlantUML] Sending render request to backend:', requestId);
+
+        // Store promise callbacks
+        plantUMLRenderRequests.set(requestId, { resolve, reject, code });
+
+        // Send request to extension backend
+        vscode.postMessage({
+            type: 'renderPlantUML',
+            requestId: requestId,
+            code: wrappedCode
+        });
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+            if (plantUMLRenderRequests.has(requestId)) {
+                plantUMLRenderRequests.delete(requestId);
+                reject(new Error('PlantUML rendering timeout'));
+            }
+        }, 30000);
+    });
+}
+
+// Make renderPlantUML globally accessible for conversion handler
+window.renderPlantUML = renderPlantUML;
+
+// Handle PlantUML render responses from backend
+window.addEventListener('message', event => {
+    const message = event.data;
+
+    if (message.type === 'plantUMLRenderSuccess') {
+        const { requestId, svg } = message;
+        const request = plantUMLRenderRequests.get(requestId);
+
+        if (request) {
+            console.log('[PlantUML] ✅ Diagram rendered successfully (backend)');
+
+            // Cache the result
+            plantumlRenderCache.set(request.code, svg);
+
+            // Resolve promise
+            request.resolve(svg);
+            plantUMLRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'plantUMLRenderError') {
+        const { requestId, error } = message;
+        const request = plantUMLRenderRequests.get(requestId);
+
+        if (request) {
+            console.error('[PlantUML] Rendering failed:', error);
+            request.reject(new Error(error));
+            plantUMLRenderRequests.delete(requestId);
+        }
+    }
+});
+
+/**
+ * Process all pending PlantUML diagrams in the queue
+ */
+async function processPlantUMLQueue() {
+    if (plantumlQueueProcessing || pendingPlantUMLQueue.length === 0) {
+        return;
+    }
+
+    plantumlQueueProcessing = true;
+
+    console.log(`[PlantUML] Processing ${pendingPlantUMLQueue.length} diagrams...`);
+
+    while (pendingPlantUMLQueue.length > 0) {
+        const item = pendingPlantUMLQueue.shift();
+        const element = document.getElementById(item.id);
+
+        if (!element) {
+            console.warn(`[PlantUML] Placeholder not found: ${item.id}`);
+            continue;
+        }
+
+        try {
+            const svg = await renderPlantUML(item.code);
+
+            // Replace placeholder with diagram container
+            const container = document.createElement('div');
+            container.className = 'plantuml-diagram';
+            container.innerHTML = svg;
+
+            // Add convert button
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'plantuml-actions';
+            buttonContainer.innerHTML = `
+                <button class="plantuml-convert-btn"
+                        data-code="${escapeHtml(item.code)}"
+                        title="Convert to SVG file">
+                    💾 Convert to SVG
+                </button>
+            `;
+            container.appendChild(buttonContainer);
+
+            element.replaceWith(container);
+        } catch (error) {
+            console.error('[PlantUML] Rendering error:', error);
+
+            // Replace placeholder with error
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'plantuml-error';
+            errorDiv.innerHTML = `
+                <strong>PlantUML Error:</strong><br>
+                <pre>${escapeHtml(error.message)}</pre>
+            `;
+            element.replaceWith(errorDiv);
+        }
+    }
+
+    plantumlQueueProcessing = false;
+    console.log('[PlantUML] Queue processing complete');
+}
+
+// ============================================================================
+// Mermaid Rendering System
+// ============================================================================
+
+// Initialize Mermaid (browser-based, pure JavaScript)
+let mermaidReady = false;
+let mermaidInitialized = false;
+
+function initializeMermaid() {
+    if (mermaidInitialized) {
+        return;
+    }
+
+    if (typeof mermaid === 'undefined') {
+        console.warn('[Mermaid] Library not loaded yet');
+        return;
+    }
+
+    try {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'inherit'
+        });
+        mermaidReady = true;
+        mermaidInitialized = true;
+        console.log('[Mermaid] Initialized successfully');
+    } catch (error) {
+        console.error('[Mermaid] Initialization error:', error);
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeMermaid);
+} else {
+    initializeMermaid();
+}
+
+// Queue for pending Mermaid diagrams
+const pendingMermaidQueue = [];
+let mermaidQueueProcessing = false;
+
+// Cache for rendered Mermaid diagrams (code → svg)
+const mermaidRenderCache = new Map();
+window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
+
+/**
+ * Queue a Mermaid diagram for rendering
+ * @param {string} id - Unique placeholder ID
+ * @param {string} code - Mermaid source code
+ */
+function queueMermaidRender(id, code) {
+    pendingMermaidQueue.push({ id, code });
+    console.log(`[Mermaid] Queued diagram: ${id}`);
+
+    // Process queue after a short delay (allows multiple diagrams to queue)
+    setTimeout(() => processMermaidQueue(), 10);
+}
+
+/**
+ * Render Mermaid code to SVG (browser-based, pure JavaScript)
+ * @param {string} code - Mermaid source code
+ * @returns {Promise<string>} SVG content
+ */
+async function renderMermaid(code) {
+    // Check cache first
+    if (mermaidRenderCache.has(code)) {
+        console.log('[Mermaid] Using cached SVG');
+        return mermaidRenderCache.get(code);
+    }
+
+    if (!mermaidReady) {
+        throw new Error('Mermaid not initialized');
+    }
+
+    try {
+        const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // Use mermaid.render() to generate SVG
+        const { svg } = await mermaid.render(diagramId, code);
+
+        console.log('[Mermaid] ✅ Diagram rendered successfully');
+
+        // Cache the result
+        mermaidRenderCache.set(code, svg);
+
+        return svg;
+    } catch (error) {
+        console.error('[Mermaid] Rendering error:', error);
+        throw error;
+    }
+}
+
+// Make renderMermaid globally accessible for conversion handler
+window.renderMermaid = renderMermaid;
+
+/**
+ * Process all pending Mermaid diagrams in the queue
+ */
+async function processMermaidQueue() {
+    if (mermaidQueueProcessing || pendingMermaidQueue.length === 0) {
+        return;
+    }
+
+    mermaidQueueProcessing = true;
+
+    console.log(`[Mermaid] Processing ${pendingMermaidQueue.length} diagrams...`);
+
+    while (pendingMermaidQueue.length > 0) {
+        const item = pendingMermaidQueue.shift();
+
+        const element = document.getElementById(item.id);
+        if (!element) {
+            console.warn(`[Mermaid] Placeholder not found: ${item.id}`);
+            continue;
+        }
+
+        try {
+            const svg = await renderMermaid(item.code);
+
+            // Replace placeholder with diagram container
+            const container = document.createElement('div');
+            container.className = 'mermaid-diagram';
+            container.innerHTML = svg;
+
+            // Add convert button
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'mermaid-actions';
+            buttonContainer.innerHTML = `
+                <button class="mermaid-convert-btn"
+                        data-code="${escapeHtml(item.code)}"
+                        title="Convert to SVG file">
+                    💾 Convert to SVG
+                </button>
+            `;
+            container.appendChild(buttonContainer);
+
+            element.replaceWith(container);
+        } catch (error) {
+            console.error('[Mermaid] Rendering error:', error);
+
+            // Replace placeholder with error
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mermaid-error';
+            errorDiv.innerHTML = `
+                <strong>Mermaid Error:</strong><br>
+                <pre>${escapeHtml(error.message)}</pre>
+            `;
+            element.replaceWith(errorDiv);
+        }
+    }
+
+    mermaidQueueProcessing = false;
+    console.log('[Mermaid] Queue processing complete');
+}
+
+/**
+ * Add PlantUML and Mermaid fence renderer to markdown-it instance
+ */
+function addPlantUMLRenderer(md) {
+    // Store original fence renderer
+    const originalFence = md.renderer.rules.fence || function(tokens, idx, options, env, self) {
+        return self.renderToken(tokens, idx, options);
+    };
+
+    // Override fence renderer (SYNCHRONOUS)
+    md.renderer.rules.fence = function(tokens, idx, options, env, self) {
+        const token = tokens[idx];
+        const info = token.info ? token.info.trim() : '';
+        const langName = info.split(/\s+/g)[0];
+
+        // Check if this is a PlantUML block
+        if (langName.toLowerCase() === 'plantuml') {
+            const code = token.content;
+            const diagramId = `plantuml-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Queue for async processing
+            queuePlantUMLRender(diagramId, code);
+
+            // Return placeholder immediately (synchronous)
+            return `<div id="${diagramId}" class="plantuml-placeholder">
+                <div class="placeholder-spinner"></div>
+                <div class="placeholder-text">Rendering PlantUML diagram...</div>
+            </div>`;
+        }
+
+        // Check if this is a Mermaid block
+        if (langName.toLowerCase() === 'mermaid') {
+            const code = token.content;
+            const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Queue for async processing
+            queueMermaidRender(diagramId, code);
+
+            // Return placeholder immediately (synchronous)
+            return `<div id="${diagramId}" class="mermaid-placeholder">
+                <div class="placeholder-spinner"></div>
+                <div class="placeholder-text">Rendering Mermaid diagram...</div>
+            </div>`;
+        }
+
+        // Use original renderer for other languages
+        return originalFence(tokens, idx, options, env, self);
     };
 }
 
@@ -358,8 +761,9 @@ function renderMarkdown(text) {
     if (!text) {return '';}
 
     try {
-        // Get HTML comment visibility setting
-        const showHtmlComments = window.configManager?.getConfig('showHtmlComments', false) ?? false;
+        // Get HTML rendering settings
+        const htmlCommentRenderMode = window.configManager?.getConfig('htmlCommentRenderMode', 'hidden') ?? 'hidden';
+        const htmlContentRenderMode = window.configManager?.getConfig('htmlContentRenderMode', 'html') ?? 'html';
 
         // Initialize markdown-it with enhanced wiki links and tags plugins
         const md = window.markdownit({
@@ -377,8 +781,9 @@ function renderMarkdown(text) {
         .use(datePersonTagPlugin) // Add this line
         .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
         .use(htmlCommentPlugin, {
-            showComments: showHtmlComments
-        }); // HTML comment visibility
+            commentMode: htmlCommentRenderMode,
+            contentMode: htmlContentRenderMode
+        }); // HTML comment and content rendering
 
         // Add plugins that are available from CDN (CSP-compliant)
         if (typeof window.markdownitEmoji !== 'undefined') {
@@ -536,14 +941,23 @@ function renderMarkdown(text) {
             }
             return '</a>';
         };
-        
+
+        // Add PlantUML renderer
+        addPlantUMLRenderer(md);
+
         const rendered = md.render(text);
-        
+
+        // Trigger PlantUML queue processing after render completes
+        if (pendingPlantUMLQueue.length > 0) {
+            // Use microtask to ensure DOM is updated first
+            Promise.resolve().then(() => processPlantUMLQueue());
+        }
+
         // Remove paragraph wrapping for single line content
         if (!text.includes('\n') && rendered.startsWith('<p>') && rendered.endsWith('</p>\n')) {
             return rendered.slice(3, -5);
         }
-        
+
         return rendered;
     } catch (error) {
         console.error('Error rendering markdown:', error);

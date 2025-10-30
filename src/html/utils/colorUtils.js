@@ -187,15 +187,16 @@ class ColorUtils {
 
     /**
      * Determine if dark text should be used on a background color
-     * Uses WCAG contrast guidelines
+     * Uses WCAG contrast guidelines with scientifically accurate threshold
      * @param {string} backgroundColor - Background color
      * @returns {boolean} True if dark text should be used
      */
     shouldUseDarkText(backgroundColor) {
         const luminance = this.getLuminance(backgroundColor);
-        // If luminance is above 0.5, use dark text
-        // This threshold ensures good contrast
-        return luminance > 0.2;
+        // WCAG 2.0 standard: use threshold of sqrt(1.05 * 0.05) - 0.05 ≈ 0.179
+        // This ensures contrast ratio >= 4.5:1 for both black and white text
+        // Simplified: luminance > 0.179 → use black text, otherwise white text
+        return luminance > 0.179;
     }
 
     /**

@@ -182,39 +182,37 @@ class ExportTreeBuilder {
      * Only returns top-level selected items (doesn't include children of selected parents)
      */
     static getSelectedItems(tree) {
-        const selected = [];
+        const columnIndexes = new Set();
 
-        const traverse = (node, parentSelected = false) => {
-            // If parent is already selected, don't add this child node
-            // because the parent export will include it
-            if (parentSelected) {
-                return;
-            }
-
-            if (node.selected && node.scope !== 'root') {
-                selected.push({
-                    type: node.type,
-                    scope: node.scope,
-                    rowNumber: node.rowNumber,
-                    stackIndex: node.stackIndex,
-                    columnIndex: node.columnIndex,
-                    columnId: node.columnId
-                });
-                // If this node is selected, don't export its children separately
-                // Pass true to indicate children have a selected parent
-                if (node.children) {
-                    node.children.forEach(child => traverse(child, true));
-                }
-            } else {
-                // Node not selected, continue traversing children
-                if (node.children) {
-                    node.children.forEach(child => traverse(child, false));
-                }
+        const traverse = (node) => {
+            if (node.selected) {
+                // Node is selected - collect all column indexes from this node and its descendants
+                this.collectColumnIndexes(node, columnIndexes);
+            } else if (node.children) {
+                // Node not selected - check children
+                node.children.forEach(child => traverse(child));
             }
         };
 
-        traverse(tree, false);
-        return selected;
+        traverse(tree);
+        const result = Array.from(columnIndexes);
+        console.log('[kanban.exportTreeBuilder.getSelectedItems] Collected column indexes:', result);
+        return result;
+    }
+
+    /**
+     * Collect all column indexes from a node and its descendants
+     */
+    static collectColumnIndexes(node, columnIndexes) {
+        if (node.type === 'column' && node.columnIndex !== undefined) {
+            // This is a column node - add its index
+            columnIndexes.add(node.columnIndex);
+        }
+
+        // Recursively collect from children
+        if (node.children) {
+            node.children.forEach(child => this.collectColumnIndexes(child, columnIndexes));
+        }
     }
 
     /**

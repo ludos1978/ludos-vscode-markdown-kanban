@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { KanbanBoard } from './markdownParser';
-import { CacheManager } from './cacheManager';
 
 function deepCloneBoard(board: KanbanBoard): KanbanBoard {
     return JSON.parse(JSON.stringify(board));
@@ -11,16 +10,10 @@ export class UndoRedoManager {
     private _redoStack: KanbanBoard[] = [];
     private readonly _maxUndoStackSize = 100;
     private _webview: vscode.Webview;
-    private _cacheManager?: CacheManager;
     private _document?: vscode.TextDocument;
 
     constructor(webview: vscode.Webview) {
         this._webview = webview;
-    }
-
-    public setCacheManager(cacheManager: CacheManager, document: vscode.TextDocument) {
-        this._cacheManager = cacheManager;
-        this._document = document;
     }
 
     public saveStateForUndo(board: KanbanBoard) {
@@ -32,11 +25,6 @@ export class UndoRedoManager {
         }
         this._redoStack = [];
         this.sendUndoRedoStatus();
-        
-        // Save undo cache for crash recovery
-        if (this._cacheManager && this._document) {
-            this._cacheManager.createUndoCacheFile(this._document, this._undoStack, this._redoStack);
-        }
     }
 
     public undo(currentBoard: KanbanBoard | undefined): KanbanBoard | null {
@@ -51,12 +39,7 @@ export class UndoRedoManager {
         
         const restoredBoard = this._undoStack.pop()!;
         this.sendUndoRedoStatus();
-        
-        // Update undo cache after undo operation
-        if (this._cacheManager && this._document) {
-            this._cacheManager.createUndoCacheFile(this._document, this._undoStack, this._redoStack);
-        }
-        
+                
         this.disableFileListenerTemporarily();
         
         return restoredBoard;
@@ -74,11 +57,6 @@ export class UndoRedoManager {
         
         const restoredBoard = this._redoStack.pop()!;
         this.sendUndoRedoStatus();
-        
-        // Update undo cache after redo operation
-        if (this._cacheManager && this._document) {
-            this._cacheManager.createUndoCacheFile(this._document, this._undoStack, this._redoStack);
-        }
         
         this.disableFileListenerTemporarily();
         
@@ -100,13 +78,12 @@ export class UndoRedoManager {
     }
 
     private sendUndoRedoStatus() {
-        setTimeout(() => {
-            this._webview.postMessage({
-                type: 'undoRedoStatus',
-                canUndo: this.canUndo(),
-                canRedo: this.canRedo()
-            });
-        }, 10);
+        // Send immediately - no delay needed for message posting
+        this._webview.postMessage({
+            type: 'undoRedoStatus',
+            canUndo: this.canUndo(),
+            canRedo: this.canRedo()
+        });
     }
 
     private disableFileListenerTemporarily() {
@@ -116,12 +93,12 @@ export class UndoRedoManager {
                 const wasEnabled = kanbanFileListener.getStatus();
                 if (wasEnabled) {
                     kanbanFileListener.setStatus(false);
-                    
-                    setTimeout(() => {
-                        if (kanbanFileListener) {
-                            kanbanFileListener.setStatus(true);
-                        }
-                    }, 2000);
+
+                    // Re-enable immediately after undo/redo operations complete
+                    // Note: The messageHandler sets _isUndoRedoOperation flag to coordinate this.
+                    // The file listener should check that flag instead of being disabled.
+                    // This immediate re-enable is safe because undo/redo marks as unsaved but doesn't save to disk yet.
+                    kanbanFileListener.setStatus(true);
                 }
             }
         } catch (error) {

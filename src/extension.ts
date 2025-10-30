@@ -1,14 +1,10 @@
 import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
-import { ExternalFileWatcher } from './externalFileWatcher';
 import { configService } from './configurationService';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('[Kanban Extension] Activating markdown-kanban-obsidian extension...');
 	let fileListenerEnabled = true;
-
-	// Initialize the centralized file watcher
-	const fileWatcher = ExternalFileWatcher.getInstance();
 
 	// Function to get file listener status
 	const getFileListenerStatus = () => {
@@ -18,7 +14,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// Function to toggle file listener
 	const setFileListenerStatus = (enabled: boolean) => {
 		fileListenerEnabled = enabled;
-		fileWatcher.setFileListenerEnabled(enabled);
 		const status = fileListenerEnabled ? 'enabled' : 'disabled';
 		vscode.window.showInformationMessage(`Kanban auto-switching ${status}`);
 	};
@@ -29,25 +24,35 @@ export function activate(context: vscode.ExtensionContext) {
 		setStatus: setFileListenerStatus
 	};
 
-	// Listen for file change events from the centralized watcher
-	const fileChangeListener = fileWatcher.onFileChanged(async (event) => {
-		for (const panel of event.panels) {
-			if (event.fileType === 'main') {
-				// Handle main file changes
-				const document = vscode.workspace.textDocuments.find(doc =>
-					doc.uri.toString() === vscode.Uri.file(event.path).toString()
-				);
-				if (document) {
-					panel.loadMarkdownFile(document, false);
-				}
-			} else if (event.fileType === 'include') {
-				// Include file changes are now handled directly by each panel's file watcher subscription
-				// No need to call panel.handleIncludeFileChange() - this would cause duplicate dialogs
-			}
+	// Register onWillSaveTextDocument to sync board changes before save
+	const willSaveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
+		const document = event.document;
+		console.log(`[Extension.onWillSave] Document about to save: ${document.uri.fsPath}`);
+
+		// Find panel for this document
+		const panel = KanbanWebviewPanel.getPanelForDocument(document.uri.toString());
+		if (!panel) {
+			console.log('[Extension.onWillSave] No panel found for document');
+			return; // No panel for this document
+		}
+
+		const hasUnsaved = panel.hasUnsavedChanges();
+		console.log(`[Extension.onWillSave] Panel found, hasUnsavedChanges: ${hasUnsaved}`);
+
+		// If there are unsaved changes in the UI, update the document before save
+		if (hasUnsaved) {
+			console.log('[Extension.onWillSave] Updating document with board changes before save');
+
+			// Use waitUntil to ensure the document is updated before the save proceeds
+			event.waitUntil(
+				panel.saveToMarkdown(false, false) // updateVersionTracking=false, triggerSave=false (save will happen automatically)
+			);
+		} else {
+			console.log('[Extension.onWillSave] No unsaved changes, allowing save to proceed normally');
 		}
 	});
 
-	context.subscriptions.push(fileChangeListener);
+	context.subscriptions.push(willSaveListener);
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {
@@ -56,6 +61,17 @@ export function activate(context: vscode.ExtensionContext) {
 				KanbanWebviewPanel.revive(webviewPanel, context.extensionUri, context, state);
 			}
 		});
+	}
+
+	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
+	const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
+	if (isDevelopment) {
+		console.log('[Kanban Extension] Development mode - refreshing all panels to load latest code');
+		const allPanels = KanbanWebviewPanel.getAllPanels();
+		Promise.all(allPanels.map(async (panel) => {
+			console.log('[Kanban Extension] Refreshing panel:', panel.getPanelId());
+			await panel.refreshWebviewContent();
+		})).catch(err => console.error('[Kanban Extension] Error refreshing panels:', err));
 	}
 
 	// Register command to open kanban panel
@@ -241,8 +257,7 @@ export function activate(context: vscode.ExtensionContext) {
 		activePanel.triggerSnippetInsertion();
 	});
 
-	// Note: External file change detection is now handled by ExternalFileWatcher
-	// Document save events are also handled through the file watcher system
+	// Note: External file change detection is handled by MarkdownFile instances via their built-in watchers
 
 	// Listen for active editor changes
 	const activeEditorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -303,9 +318,6 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(configChangeListener);
-
-	// Clean up file watcher on disposal
-	context.subscriptions.push(fileWatcher);
 
 	// If current active editor is markdown, auto-activate kanban
 	if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId === 'markdown') {

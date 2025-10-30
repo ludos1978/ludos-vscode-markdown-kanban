@@ -6,6 +6,8 @@
   --whitespace-div2: calc(var(--whitespace) / 2);
   --whitespace-div4: calc(var(--whitespace) / 4);
   --task-height: auto;
+  --task-section-min-height: auto;
+  --task-section-max-height: auto;
   --column-width: 350px;
   --collapsed-column-width: 40px;
 
@@ -192,9 +194,30 @@ body {
   }
 }
 
-.auto-export-icon,
-.auto-export-text {
-  font-size: 12px;
+/* Export activity indicator */
+.export-activity-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--vscode-charts-green);
+  animation: activity-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 
 /* Layout Presets Menu */
@@ -835,7 +858,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   background-color: var(--vscode-list-hoverBackground);
 }
 
-/* Columninclude link styling */
+/* Column and Task include link styling */
 .columninclude-link {
   color: var(--vscode-textLink-foreground);
   text-decoration: underline;
@@ -1144,10 +1167,14 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Task section styling for content between HRs */
 .task-section {
-  display: block;
+  max-height: inherit;
+  max-width: inherit;
+  /* display: block; */
+  display: flex;
+  flex-direction: column;
   outline: none; /* Remove default focus outline */
-  border-radius: 4px;
-  transition: background-color 0.15s ease;
+  /* border-radius: 4px; */
+  /* transition: background-color 0.15s ease; */
 }
 
 /* Focus styling for task sections */
@@ -1160,6 +1187,18 @@ body.small-card-fonts .task-title-container .markdown-content img {
 body.section-height-limited .task-section {
   max-height: var(--section-max-height, auto);
   min-height: var(--section-min-height, auto);
+  max-width: -webkit-fill-available;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Apply task-section specific min/max height when task-section-height-limited class is active */
+body.task-section-height-limited .task-section {
+  min-height: var(--task-section-min-height, auto);
+  max-height: var(--task-section-max-height, auto);
+  max-width: -webkit-fill-available;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
@@ -1182,9 +1221,11 @@ body.section-height-limited .task-section figure {
 
 /* Constrain figure content */
 body.section-height-limited .task-section figure img {
-  max-height: calc(var(--section-max-height, auto) - 2em);
-  width: auto;
-  height: auto;
+  /* max-height: calc(var(--section-max-height, auto) - 2em); */
+  /* max-height: 100%;
+  max-width: 100%; */
+  width: 100%;
+  height: 100%;
 }
 
 
@@ -1204,7 +1245,8 @@ body.section-height-limited .task-section figure img {
   opacity: 0.7;
 }
 
-.task-description-display:empty::before {
+.task-description-display:empty::before,
+.task-description-display:has(> .task-section:only-child:empty)::before {
   content: "Add description...";
   color: var(--vscode-descriptionForeground);
   font-size: 13px;
@@ -1544,7 +1586,7 @@ body.vscode-high-contrast-light .task-count {
 
 .donut-menu-item,
 .file-bar-menu-item {
-  padding: 8px 12px;
+  padding: 4px 8px;
   cursor: pointer;
   font-size: 13px;
   color: var(--vscode-dropdown-foreground);
@@ -1800,7 +1842,7 @@ button.file-bar-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  /* padding: 8px 12px; */
 }
 
 .span-width-label {
@@ -1818,8 +1860,8 @@ button.file-bar-menu-item {
   background: var(--vscode-button-background);
   border: 1px solid var(--vscode-button-border, transparent);
   color: var(--vscode-button-foreground);
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1851,7 +1893,7 @@ button.file-bar-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  /* padding: 8px 12px; */
 }
 
 .stack-label {
@@ -1863,8 +1905,8 @@ button.file-bar-menu-item {
   background: var(--vscode-button-background);
   border: 1px solid var(--vscode-button-border, transparent);
   color: var(--vscode-button-foreground);
-  padding: 4px 12px;
-  height: 22px;
+  padding: 4px 8px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2663,31 +2705,27 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   font-weight: normal !important;
 }
 
-/* Pack Assets Toggle */
-.export-pack-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  cursor: pointer;
-}
-
-.export-pack-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  cursor: pointer;
-}
-
-.export-pack-options {
+/* Link Handling Options */
+.link-handling-options {
   margin-left: 24px;
-  margin-top: 8px;
+  margin-top: 12px;
   padding-left: 12px;
   border-left: 2px solid var(--vscode-panel-border);
 }
 
-.export-pack-options.disabled {
-  display: none;
+.export-field-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+#file-type-options {
+  margin-bottom: 12px;
+}
+
+#file-size-option {
+  margin-top: 8px;
 }
 
 /* Search Panel */
@@ -3162,6 +3200,9 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 /* Markdown content */
 .markdown-content {
   word-wrap: break-word;
+  max-height: inherit;
+  max-width: inherit;
+  flex-shrink: 0;
 }
 
 .markdown-content h1,
@@ -3192,16 +3233,16 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .markdown-content code {
-  background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-editor-foreground)	;
+  /* background-color: var(--vscode-textCodeBlock-background);
+  color: var(--vscode-editor-foreground)	; */
   padding: 0.1em 0.3em;
   border-radius: 3px;
   font-size: 0.9em;
 }
 
 .markdown-content pre {
-  background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-textPreformat-foreground);
+  /* background-color: var(--vscode-textCodeBlock-background);
+  color: var(--vscode-textPreformat-foreground); */
   padding: 0.5em;
   border-radius: 3px;
   overflow-x: auto;
@@ -3309,8 +3350,8 @@ blockquote {
 
 /* Images and files */
 .markdown-content img {
-  max-width: 100%;
-  height: auto;
+  /* max-width: 100%; */
+  /* height: auto; */
   border-radius: 4px;
   /* margin: 8px 0; */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -3326,12 +3367,12 @@ blockquote {
 }
 
 .task-description-container .markdown-content img {
-  max-width: 100%;
-  max-height: inherit;
-  width: 100%;
-  height: 100%;
+  max-width: -webkit-fill-available;
+  max-height: -webkit-fill-available;
+  width: auto;
+  height: auto;
   /* margin: var(--whitespace) 0; */
-  display: block;
+  /* display: block; */
   object-fit: contain;
 }
 
@@ -3387,8 +3428,10 @@ blockquote {
 
 /* HTML Comment Markers */
 .html-comment-marker {
-  color: var(--vscode-editor-foreground, #cccccc);
-  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.25));
+  /* color: var(--vscode-editor-foreground, #cccccc);
+  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.25)); */
+  color: var(--vscode-textPreformat-foreground, #666);
+  background-color: var(--vscode-textPreformat-background, transparent);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 0.85em;
@@ -3407,13 +3450,34 @@ blockquote {
 
 .html-comment-marker:hover {
   opacity: 1;
-  background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.4));
+  /* background-color: var(--vscode-input-background, rgba(60, 120, 60, 0.4)); */
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
-/* Hide HTML comments when showHtmlComments config is false */
-body:not(.show-html-comments) .html-comment-marker {
-  display: none;
+/* HTML Content rendered as text */
+.html-content-text {
+  color: var(--vscode-textPreformat-foreground);
+  background-color: var(--vscode-textPreformat-background);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'Courier New', monospace;
+  font-style: normal;
+  font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  border: 1px dashed var(--vscode-editorWarning-foreground, #cc6600);
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.html-content-text:hover {
+  opacity: 1;
+  border-color: var(--vscode-focusBorder, #007acc);
+  border-style: solid;
 }
 
 /* Tags */
@@ -4232,6 +4296,11 @@ mark {
     word-break: break-word;
 }
 
+.vscode-dark mark {
+    background-color: var(--vscode-editor-findMatchHighlightBackground, #885533);
+    color: var(--vscode-editor-foreground);
+}
+
 /* Additional markdown-it plugin styles */
 sub, sup {
     font-size: 0.75em;
@@ -4409,6 +4478,42 @@ s {
     transform: scale(1.1);
 }
 
+/* Regular include bordered container with title bar */
+.include-container {
+    display: block;
+    border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.2));
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.include-title-bar {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background-color: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+    font-size: 0.9em;
+    font-family: var(--vscode-font-family);
+}
+
+.include-filename-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.include-filename-link:hover {
+    text-decoration: underline;
+    color: var(--vscode-textLink-activeForeground);
+}
+
+.include-content-area {
+    padding: 8px 12px;
+    background-color: var(--vscode-editor-background);
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.6; }
@@ -4465,7 +4570,14 @@ s {
 /* Image figures with captions */
 figure {
   margin: 0;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+  /* max-height: inherit;
+  max-width: inherit; */
 }
 
 figcaption {
@@ -4473,5 +4585,52 @@ figcaption {
   color: var(--vscode-descriptionForeground);
   margin-top: 4px;
   text-align: center;
+}
+
+
+/* =================== LOADING INDICATORS =================== */
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--vscode-editor-background);
+    opacity: 0.9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 12px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--vscode-editor-foreground);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    opacity: 0.6;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    color: var(--vscode-editor-foreground);
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.column-loading {
+    position: relative;
+}
+
+.task-loading {
+    position: relative;
 }
 

@@ -155,9 +155,9 @@ styleManager.applyRowHeight = function(height) {
     this.setCSSVariable('row-height', actualHeight);
 };
 
-styleManager.applySectionMaxHeight = function(height) {
+styleManager.applySectionHeight = function(height) {
     // Convert value to CSS using getCSS helper
-    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionMaxHeight', height) : height;
+    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('sectionHeight', height) : height;
 
     // Set both min and max height to the same value for fixed height
     this.setCSSVariable('section-max-height', actualHeight);
@@ -167,6 +167,21 @@ styleManager.applySectionMaxHeight = function(height) {
         document.body.classList.add('section-height-limited');
     } else {
         document.body.classList.remove('section-height-limited');
+    }
+};
+
+styleManager.applyTaskSectionHeight = function(height) {
+    // Convert value to CSS using getCSS helper
+    const actualHeight = typeof window.getCSS === 'function' ? window.getCSS('taskSectionHeight', height) : height;
+
+    // Set both min and max height to the same value for fixed height
+    this.setCSSVariable('task-section-min-height', actualHeight);
+    this.setCSSVariable('task-section-max-height', actualHeight);
+
+    if (height !== 'auto') {
+        document.body.classList.add('task-section-height-limited');
+    } else {
+        document.body.classList.remove('task-section-height-limited');
     }
 };
 

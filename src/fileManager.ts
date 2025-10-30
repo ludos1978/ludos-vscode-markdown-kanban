@@ -93,12 +93,11 @@ export class FileManager {
             isLocked: this._isFileLocked
         };
 
-        setTimeout(() => {
-            this._webview.postMessage({
-                type: 'updateFileInfo',
-                fileInfo: fileInfo
-            });
-        }, 10);
+        // Send immediately - no delay needed for message posting
+        this._webview.postMessage({
+            type: 'updateFileInfo',
+            fileInfo: fileInfo
+        });
     }
 
     public async selectFile(): Promise<vscode.TextDocument | null> {
@@ -390,24 +389,30 @@ export class FileManager {
      * This does NOT modify content, just returns the display URI
      */
     public async resolveImageForDisplay(imagePath: string): Promise<string> {
-        if (imagePath.startsWith('vscode-webview://') || 
+        if (imagePath.startsWith('vscode-webview://') ||
             imagePath.startsWith('data:') ||
-            imagePath.startsWith('http://') || 
+            imagePath.startsWith('http://') ||
             imagePath.startsWith('https://')) {
             return imagePath;
         }
-        
+
         const resolution = await this.resolveFilePath(imagePath);
-        
+
         if (resolution && resolution.exists) {
             try {
                 const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.bmp', '.webp'];
                 const ext = path.extname(resolution.resolvedPath).toLowerCase();
-                
+
                 if (imageExtensions.includes(ext)) {
                     const imageUri = vscode.Uri.file(resolution.resolvedPath);
                     const webviewUri = this._webview.asWebviewUri(imageUri);
-                    return webviewUri.toString();
+                    let uriString = webviewUri.toString();
+
+                    // Fix URL encoding: ensure + is encoded as %2B, not treated as space
+                    // VSCode's asWebviewUri may not properly encode + in filenames
+                    uriString = uriString.replace(/\+/g, '%2B');
+
+                    return uriString;
                 }
             } catch (error) {
                 // Silently handle image resolution failure
@@ -417,7 +422,7 @@ export class FileManager {
             console.warn(`Image not found: ${imagePath}`);
             console.warn('Attempted paths:', resolution.attemptedPaths);
         }
-        
+
         return imagePath;
     }
 

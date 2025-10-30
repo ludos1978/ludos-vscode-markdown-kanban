@@ -30,14 +30,26 @@ const copyStaticFilesPlugin = {
 				fs.mkdirSync('dist', { recursive: true });
 			}
 
-			// Copy bespoke.js from Marp CLI if it exists
-			const bespokeSource = './node_modules/@marp-team/marp-cli/lib/bespoke.js';
-			const bespokeDistDest = './dist/bespoke.js';
-			const bespokeRootDest = './bespoke.js';
-			if (fs.existsSync(bespokeSource)) {
-				fs.copyFileSync(bespokeSource, bespokeDistDest);
-				fs.copyFileSync(bespokeSource, bespokeRootDest);
-				console.log('Copied bespoke.js to dist/ and workspace root');
+			// Copy build scripts required by Marp CLI
+			const marpRequiredFiles = ['esbuild.js', 'watch.js'];
+			marpRequiredFiles.forEach(file => {
+				const srcFile = path.join(process.cwd(), file);
+				const distFile = path.join('dist', file);
+				if (fs.existsSync(srcFile)) {
+					fs.copyFileSync(srcFile, distFile);
+					console.log(`Copied ${file} to dist/ for Marp CLI`);
+				}
+			});
+
+			// Create watch.js placeholder if it doesn't exist
+			const watchJsPath = path.join('dist', 'watch.js');
+			if (!fs.existsSync(watchJsPath)) {
+				const watchJsContent = `#!/usr/bin/env node
+// Watch script placeholder for Marp CLI
+console.log('Marp watch script placeholder');
+`;
+				fs.writeFileSync(watchJsPath, watchJsContent);
+				console.log('Created watch.js placeholder for Marp CLI');
 			}
 
 			const srcHtmlDir = 'src/html';

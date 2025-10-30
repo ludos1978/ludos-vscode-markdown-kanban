@@ -6,11 +6,14 @@
     <title>Enhanced Markdown Kanban</title>
     <link href="webview.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
-    
+
     <!-- Only load essential plugins that are available on cdnjs.cloudflare.com for CSP compliance -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-emoji/3.0.0/markdown-it-emoji.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it-footnote/4.0.0/markdown-it-footnote.min.js"></script>
-    
+
+    <!-- Mermaid for diagram rendering (completely offline after loading) -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
     <!-- Note: Most markdown-it plugins are not available on cdnjs.cloudflare.com due to CSP restrictions -->
     <!-- Advanced plugin functionality will be provided via npm packages and bundling -->
     
@@ -32,6 +35,260 @@
     <!-- markdown-it-strikethrough-alt, markdown-it-underline, markdown-it-footnote-here, -->
     <!-- markdown-it-image-figures, markdown-it-anchor, markdown-it-toc-done-right, markdown-it-checkboxes -->
     <style>
+        /* ============================================================================
+           PlantUML Diagram Styles
+           ============================================================================ */
+
+        /* Placeholder (shown while rendering) */
+        .plantuml-placeholder {
+            margin: 1em 0;
+            padding: 2em 1em;
+            background: var(--vscode-editor-background);
+            border: 2px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Spinner animation */
+        .placeholder-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--vscode-panel-border);
+            border-top-color: var(--vscode-button-background);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1em;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .placeholder-text {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        /* Rendered diagram container */
+        .plantuml-diagram {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            position: relative;
+        }
+
+        .plantuml-diagram svg {
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            display: inline-block;
+            object-fit: contain;
+        }
+
+        /* Ensure aspect ratio is preserved in task descriptions */
+        .task-description-container .plantuml-diagram svg {
+            max-width: 100% !important;
+            max-height: none !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* Action buttons */
+        .plantuml-actions {
+            margin-top: 0.5em;
+            padding-top: 0.5em;
+            border-top: 1px solid var(--vscode-panel-border);
+            text-align: right;
+        }
+
+        .plantuml-convert-btn {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 0.4em 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .plantuml-convert-btn:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        .plantuml-convert-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Error display */
+        .plantuml-error {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-inputValidation-errorBackground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            border-radius: 6px;
+            color: var(--vscode-errorForeground);
+        }
+
+        .plantuml-error strong {
+            display: block;
+            margin-bottom: 0.5em;
+            font-size: 1.1em;
+        }
+
+        .plantuml-error pre {
+            margin: 0.5em 0 0 0;
+            padding: 0.5em;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Converted PlantUML SVG images (embedded as markdown images) */
+        .markdown-content img[src*="plantuml"] {
+            max-width: 100% !important;
+            height: auto !important;
+            width: auto !important;
+            display: block !important;
+            margin: 1em auto !important;
+        }
+
+        .task-description-container .markdown-content img[src*="plantuml"] {
+            max-width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+            width: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* ============================================================================
+           Mermaid Diagram Styles
+           ============================================================================ */
+
+        /* Placeholder (shown while rendering) */
+        .mermaid-placeholder {
+            margin: 1em 0;
+            padding: 2em 1em;
+            background: var(--vscode-editor-background);
+            border: 2px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 1em;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Rendered diagram container */
+        .mermaid-diagram {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            text-align: center;
+            position: relative;
+        }
+
+        .mermaid-diagram svg {
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            display: inline-block;
+            object-fit: contain;
+        }
+
+        /* Ensure aspect ratio is preserved in task descriptions */
+        .task-description-container .mermaid-diagram svg {
+            max-width: 100% !important;
+            max-height: none !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* Action buttons */
+        .mermaid-actions {
+            margin-top: 0.5em;
+            padding-top: 0.5em;
+            border-top: 1px solid var(--vscode-panel-border);
+            text-align: right;
+        }
+
+        .mermaid-convert-btn {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 0.4em 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .mermaid-convert-btn:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+
+        .mermaid-convert-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Error display */
+        .mermaid-error {
+            margin: 1em 0;
+            padding: 1em;
+            background: var(--vscode-inputValidation-errorBackground);
+            border: 1px solid var(--vscode-inputValidation-errorBorder);
+            border-radius: 6px;
+            color: var(--vscode-errorForeground);
+        }
+
+        .mermaid-error strong {
+            display: block;
+            margin-bottom: 0.5em;
+            font-size: 1.1em;
+        }
+
+        .mermaid-error pre {
+            margin: 0.5em 0 0 0;
+            padding: 0.5em;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Converted Mermaid SVG images (embedded as markdown images) */
+        .markdown-content img[src*="mermaid"] {
+            max-width: 100% !important;
+            height: auto !important;
+            width: auto !important;
+            display: block !important;
+            margin: 1em auto !important;
+        }
+
+        .task-description-container .markdown-content img[src*="mermaid"] {
+            max-width: 100% !important;
+            max-height: none !important;
+            height: auto !important;
+            width: auto !important;
+            object-fit: contain !important;
+        }
     </style>
 </head>
 <body>
@@ -69,9 +326,12 @@
                     <span class="sort-text">Sort</span>
                 </button>
 
+                <span id="export-activity-indicator" class="export-activity-indicator" style="display: none;" title="Export or Marp process active">
+                    <span class="activity-dot"></span>
+                </span>
+
                 <button id="auto-export-btn" class="auto-export-btn" style="display: none;" onmousedown="event.preventDefault();" onclick="toggleAutoExport()" title="Start/stop auto-export">
                     <span id="auto-export-icon" class="auto-export-icon">▶</span>
-                    <span id="auto-export-text" class="auto-export-text">Auto Export</span>
                 </button>
 
                 <button id="refresh-btn" class="refresh-btn" onmousedown="event.preventDefault();" onclick="manualRefresh()" onmouseenter="if(window.scheduleDebugOverlayShow) window.scheduleDebugOverlayShow()" onmouseleave="if(window.cancelDebugOverlayShow) window.cancelDebugOverlayShow(); if(window.hideDebugOverlayDelayed) window.hideDebugOverlayDelayed()" title="Refresh from source markdown&#13;&#10;Hover to see debug info">
@@ -122,8 +382,14 @@
                             </div>
                         </div>
                         <div class="file-bar-menu-item has-submenu">
-                            <span class="menu-icon">⊟</span> Section Max Height
-                            <div class="file-bar-menu-submenu" data-menu="sectionMaxHeight">
+                            <span class="menu-icon">⊟</span> Section Height
+                            <div class="file-bar-menu-submenu" data-menu="sectionHeight">
+                                <!-- Dynamic content populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="file-bar-menu-item has-submenu">
+                            <span class="menu-icon">▭</span> Task Section Height
+                            <div class="file-bar-menu-submenu" data-menu="taskSectionHeight">
                                 <!-- Dynamic content populated by JavaScript -->
                             </div>
                         </div>
@@ -172,8 +438,14 @@
                             </div>
                         </div>
                         <div class="file-bar-menu-item has-submenu">
-                            <span class="menu-icon">💬</span> HTML Comments
-                            <div class="file-bar-menu-submenu" data-menu="showHtmlComments">
+                            <span class="menu-icon">💬</span> HTML Comment Rendering
+                            <div class="file-bar-menu-submenu" data-menu="htmlCommentRenderMode">
+                                <!-- Dynamic content populated by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="file-bar-menu-item has-submenu">
+                            <span class="menu-icon">🔖</span> HTML Content Rendering
+                            <div class="file-bar-menu-submenu" data-menu="htmlContentRenderMode">
                                 <!-- Dynamic content populated by JavaScript -->
                             </div>
                         </div>
@@ -267,6 +539,18 @@
             </div>
             <div class="modal-body">
 
+                <!-- Export Presets -->
+                <div class="export-field">
+                    <label for="export-preset">Export Preset:</label>
+                    <select id="export-preset" class="form-input" onchange="applyExportPreset()">
+                        <option value="">Custom Settings</option>
+                        <option value="marp-presentation">Marp Presentation</option>
+                        <option value="marp-pdf">Marp PDF</option>
+                        <option value="share-content">Share Content</option>
+                    </select>
+                    <small class="form-help">Select a preset to quickly configure export options. You can customize settings after applying a preset.</small>
+                </div>
+
 								<div class="export-field-row">
 										<div class="export-field-half">
 												<label for="export-format">Export Format:</label>
@@ -288,15 +572,22 @@
 										</div>
 								</div>
 
-								<!-- Auto-export option (moved here) -->
+<!-- Auto-export option (moved here) -->
 								<div class="export-field">
-										<label class="export-checkbox">
-												<input type="checkbox" id="auto-export-on-save">
-												<span>Auto-export on save</span>
-										</label>
+									<label class="export-checkbox">
+										<input type="checkbox" id="auto-export-on-save">
+										<span>Auto-export on save</span>
+									</label>
 								</div>
 
-						<!-- Use Marp option (always visible but disabled when not presentation format) -->
+								<!-- Merge Includes option -->
+								<div class="export-field">
+									<label class="export-checkbox">
+										<input type="checkbox" id="merge-includes">
+										<span>Merge Includes into Main File</span>
+									</label>
+									<div class="help-text">When unchecked, include files are exported separately and referenced via !!!include()!!! markers. When checked, all include content is merged into the main export file.</div>
+								</div>						<!-- Use Marp option (always visible but disabled when not presentation format) -->
 						<div id="use-marp-container" class="export-field">
 							<label class="export-checkbox">
 								<input type="checkbox" id="use-marp" onchange="handleUseMarpChange()" disabled>
@@ -365,44 +656,45 @@
                 </div>
 
                 <div class="export-field">
-                    <label class="export-pack-toggle">
-                        <input type="checkbox" id="pack-assets" checked>
-                        <span>Pack Assets into Export Folder</span>
-                    </label>
-                    <div id="export-pack-options" class="export-pack-options">
-                        <div class="export-checkboxes">
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="include-files" checked>
-                                <span>Included Files</span>
-                            </label>
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="include-images" checked>
-                                <span>Images</span>
-                            </label>
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="include-videos" checked>
-                                <span>Videos</span>
-                            </label>
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="include-other-media" checked>
-                                <span>Other Media</span>
-                            </label>
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="include-documents" checked>
-                                <span>Documents</span>
-                            </label>
-                        </div>
-                        <div class="export-field-compact">
-                            <label for="file-size-limit">File Size Limit (MB):</label>
-                            <input type="number" id="file-size-limit" class="form-input" value="100" min="1" max="1000" />
-                        </div>
-                        <div class="export-field">
-                            <label class="export-checkbox">
-                                <input type="checkbox" id="merge-includes">
-                                <span>Merge Includes into Main File</span>
-                            </label>
-                            <div class="help-text">When unchecked, include files are exported separately and referenced via !!!include()!!! markers. When checked, all include content is merged into the main export file.</div>
-                        </div>
+                    <label for="link-handling-mode">Link & Asset Handling:</label>
+                    <select id="link-handling-mode" class="form-input">
+                        <option value="rewrite-only" selected>Rewrite Relative Links</option>
+                        <option value="pack-linked">Pack Linked Files</option>
+                        <option value="pack-all">Pack All Files (by type)</option>
+                        <option value="no-modify">Don't Modify Links</option>
+                    </select>
+                </div>
+
+                <div id="link-handling-options" class="link-handling-options" style="display: none;">
+                    <!-- File type checkboxes - shown only for pack-all mode -->
+                    <div id="file-type-options" class="export-checkboxes" style="display: none;">
+                        <div class="export-field-label">Select file types to pack:</div>
+                        <label class="export-checkbox">
+                            <input type="checkbox" id="include-files" checked>
+                            <span>Included Files</span>
+                        </label>
+                        <label class="export-checkbox">
+                            <input type="checkbox" id="include-images" checked>
+                            <span>Images</span>
+                        </label>
+                        <label class="export-checkbox">
+                            <input type="checkbox" id="include-videos" checked>
+                            <span>Videos</span>
+                        </label>
+                        <label class="export-checkbox">
+                            <input type="checkbox" id="include-other-media" checked>
+                            <span>Other Media</span>
+                        </label>
+                        <label class="export-checkbox">
+                            <input type="checkbox" id="include-documents" checked>
+                            <span>Documents</span>
+                        </label>
+                    </div>
+
+                    <!-- File size limit - shown for pack-linked and pack-all modes -->
+                    <div id="file-size-option" class="export-field-compact" style="display: none;">
+                        <label for="file-size-limit">File Size Limit (MB):</label>
+                        <input type="number" id="file-size-limit" class="form-input" value="100" min="1" max="1000" />
                     </div>
                 </div>
             </div>

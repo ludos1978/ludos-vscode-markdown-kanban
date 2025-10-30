@@ -102,21 +102,29 @@ export class PresentationParser {
       return '';
     }
 
-    const slides = tasks.map(task => {
+    // Filter out task includes - they shouldn't be written to presentation format
+    // Task includes have includeMode=true or includeFiles set
+    const regularTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+
+    if (regularTasks.length === 0) {
+      return '';
+    }
+
+    const slides = regularTasks.map(task => {
       let slideContent = '';
 
       // Add title with preserved heading depth if it exists
-      if (task.title && task.title.trim()) {
+      if (task.title) {
         // Plain text title: place on first line, followed by empty line
         slideContent += `${task.title}\n\n`;
       }
 
       // Add description content
-      if (task.description && task.description.trim()) {
+      if (task.description) {
         slideContent += task.description;
       }
 
-      return slideContent.trim();
+      return slideContent;
     });
 
     // Join slides with slide separators

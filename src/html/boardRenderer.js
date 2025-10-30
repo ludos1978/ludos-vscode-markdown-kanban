@@ -78,8 +78,10 @@ function interpolateColor(color1, color2, factor) {
  * @returns {string} HTML with sections wrapped
  */
 function wrapTaskSections(html) {
+    // Always create at least one section, even for empty content
+    // This ensures tasks are focusable with keyboard navigation
     if (!html || !html.trim()) {
-        return html;
+        return `<div class="task-section" tabindex="0"></div>`;
     }
 
     // Create a temporary container to parse the HTML
@@ -1495,7 +1497,8 @@ function renderBoard() {
     // - Calls getBoundingClientRect() forcing layout recalculations
     // - With 50 columns = 500 forced layouts per second during scroll
     // - Feature is currently disabled anyway (see setupCompactViewHandler)
-    // TODO: Replace with IntersectionObserver for proper implementation
+    // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
+    // Recommendation: Remove entirely OR wait for user request before reimplementing
     // setupCompactViewHandler();
 }
 
@@ -1742,14 +1745,14 @@ function createColumnElement(column, columnIndex) {
 								<div class="donut-menu">
 										<button class="donut-menu-btn" onmousedown="event.preventDefault();" onclick="toggleDonutMenu(event, this)">⋯</button>
 										<div class="donut-menu-dropdown">
-												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert list before</button>
-												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert list after</button>
+												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert column before</button>
+												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert column after</button>
 												<div class="donut-menu-divider"></div>
 												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
 												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
 												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move list left</button>
-												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move list right</button>
+												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move column left</button>
+												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move column right</button>
 												<div class="donut-menu-divider"></div>
 												<div class="donut-menu-item span-width-control">
 													<span class="span-width-label">Width:</span>
@@ -1788,13 +1791,14 @@ function createColumnElement(column, columnIndex) {
 												<div class="donut-menu-divider"></div>
 												${generateTagMenuItems(column.id, 'column', null)}
 												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete list</button>
+												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 										</div>
 								</div>
 						</div>
 				</div>
-        <div class="column-inner">
+        <div class="column-inner${column.isLoadingContent ? ' column-loading' : ''}">
             <div class="column-content">
+                ${column.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading include content...</div></div>' : ''}
                 <div class="tasks-container" id="tasks-${column.id}">
                     ${column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')}
                     ${column.tasks.length === 0 ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
@@ -1817,14 +1821,10 @@ function createColumnElement(column, columnIndex) {
  * For regular tasks, this is just the description
  */
 function getTaskEditContent(task) {
-    if (task.includeMode && task.displayTitle) {
-        // For task includes, combine displayTitle and description to reconstruct complete file content
-        let fullContent = task.displayTitle;
-        if (task.description && task.description.trim()) {
-            fullContent += '\n\n' + task.description;
-        }
-        return fullContent;
-    }
+    // FIX BUG #3: No-parsing approach
+    // For task includes, task.description ALREADY contains the complete file content
+    // displayTitle is just "# include in path" (UI indicator only, not part of file)
+    // Don't reconstruct - just return description directly!
     return task.description || '';
 }
 
@@ -1844,16 +1844,19 @@ function createTaskElement(task, columnId, taskIndex) {
 
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description) : '';
 
-    // Wrap description in task sections for keyboard navigation
-    if (renderedDescription) {
-        renderedDescription = wrapTaskSections(renderedDescription);
-    }
+    // Always wrap description in task sections for keyboard navigation
+    // Even empty tasks need at least one section to be focusable
+    renderedDescription = wrapTaskSections(renderedDescription);
 
     // Use same pattern as column includes:
     // - displayTitle for display (content from file or filtered title)
     // - task.title for editing (includes the !!!taskinclude(...)!!! syntax)
-    const displayTitle = task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '');
-    const renderedTitle = (displayTitle && typeof displayTitle === 'string' && displayTitle.trim()) ? renderMarkdown(displayTitle) : '';
+    // Use getTaskDisplayTitle to handle taskinclude filepaths as clickable links
+    const renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
+        ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
+         typeof (task.displayTitle || task.title) === 'string' &&
+         (task.displayTitle || task.title).trim()) ?
+        renderMarkdown(task.displayTitle || task.title) : '';
 
     // For editing, always use the full title including include syntax
     const editTitle = task.title || '';
@@ -1897,11 +1900,15 @@ function createTaskElement(task, columnId, taskIndex) {
     const headerBarsHtml = headerBarsData.html || '';
     const footerBarsHtml = footerBarsData.html || '';
     
+    const loadingClass = task.isLoadingContent ? ' task-loading' : '';
+    const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
+
     return `
-        <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}"
+        <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
              data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
+            ${loadingOverlay}
             ${headerBarsHtml}
             ${cornerBadgesHtml}
             <div class="task-header">
@@ -1960,6 +1967,8 @@ function createTaskElement(task, columnId, taskIndex) {
 
 // Update tag styles when theme changes
 function updateTagStylesForTheme() {
+    // Clear cached editor background to re-read from new theme
+    cachedEditorBg = null;
     applyTagStyles();
 }
 
@@ -2314,19 +2323,19 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // At least one column is expanded or horizontally folded - display vertically
             stack.classList.remove('all-vertical-folded');
 
-            // First pass: reset all padding/margins to get accurate natural heights
-            columns.forEach(col => {
-                col.style.paddingTop = '';
-                const columnOffset = col.querySelector('.column-offset');
-                if (columnOffset) {
-                    columnOffset.style.marginTop = '';
-                }
+            // OPTIMIZATION: Measure heights WITHOUT clearing styles first to prevent visual flicker
+            // Instead of reset → reflow → measure → apply (causes flash)
+            // We now: measure → calculate → apply in one batch (smooth)
+
+            // Read current padding values to account for them in measurements
+            const currentPaddings = new Map();
+            columns.forEach((col, idx) => {
+                const computedStyle = window.getComputedStyle(col);
+                const currentPaddingTop = parseFloat(computedStyle.paddingTop) || 0;
+                currentPaddings.set(idx, currentPaddingTop);
             });
 
-            // Force a reflow to ensure padding reset takes effect
-            void stack.offsetHeight;
-
-            // Second pass: measure actual content heights
+            // Measure actual content heights (with current padding included)
             const columnData = [];
             columns.forEach((col, idx) => {
                 const isVerticallyFolded = col.classList.contains('collapsed-vertical');
@@ -2459,8 +2468,11 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                 cumulativePadding += pos.totalHeight + pos.marginHeight;
             });
 
-            // Apply all calculated positions
-            positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
+            // OPTIMIZATION: Batch all DOM writes in requestAnimationFrame to prevent visual flicker
+            // This ensures all style changes happen in a single rendering frame
+            requestAnimationFrame(() => {
+                // Apply all calculated positions
+                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
                 col.dataset.columnHeaderTop = columnHeaderTop;
                 col.dataset.headerTop = headerTop;
                 col.dataset.footerTop = footerTop;
@@ -2542,15 +2554,16 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                         columnMargin.style.zIndex = '';
                     }
                 }
-            });
+                });
 
-            // Update scroll handler data with all columns (including horizontally folded)
-            window.stackedColumnsData = positions.map(pos => ({
-                col: pos.col,
-                headerHeight: pos.headerHeight,
-                footerHeight: pos.footerHeight,
-                totalHeight: pos.totalHeight
-            }));
+                // Update scroll handler data with all columns (including horizontally folded)
+                window.stackedColumnsData = positions.map(pos => ({
+                    col: pos.col,
+                    headerHeight: pos.headerHeight,
+                    footerHeight: pos.footerHeight,
+                    totalHeight: pos.totalHeight
+                }));
+            }); // End requestAnimationFrame
         }
     });
 }
@@ -3086,11 +3099,9 @@ function generateTagStyles() {
 
                 const columnBg = interpolateColor(editorBg, bgDark, 0.15);
 
-                // Calculate automatic text color from the opaque background (not interpolated)
-                // Strip alpha channel like we do for tags
-                const opaqueDefaultBg = columnColors.background.length === 9 ? columnColors.background.substring(0, 7) : columnColors.background;
-                const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueDefaultBg) : '#000000';
-                const defaultColumnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultColumnTextColor, opaqueDefaultBg) : '';
+                // Calculate text color from the ACTUAL interpolated background
+                const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
+                const defaultColumnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultColumnTextColor, columnBg) : '';
 
                 // Default column header background
                 styles += `.kanban-full-height-column:not([data-column-tag]) .column-header {
@@ -3124,9 +3135,9 @@ function generateTagStyles() {
 
                 const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
 
-                // Use the same text color as default columns for collapsed state
-                const defaultCollapsedTextColor = defaultColumnTextColor;
-                const defaultCollapsedTextShadow = defaultColumnTextShadow;
+                // Calculate text color from the ACTUAL collapsed background
+                const defaultCollapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                const defaultCollapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultCollapsedTextColor, columnCollapsedBg) : '';
 
                 // Default collapsed column header background
                 styles += `.kanban-full-height-column.collapsed:not([data-column-tag]) .column-header {
@@ -3236,10 +3247,9 @@ function generateTagStyles() {
                     // Interpolate 15% towards the darker color
                     const columnBg = interpolateColor(editorBg, bgDark, 0.15);
 
-                    // Use the same text color as tags for all headers/footers
-                    // This ensures consistency across tags, headers, and footers
-                    const columnTextColor = tagTextColor;
-                    const columnTextShadow = tagTextShadow;
+                    // Calculate text color from the ACTUAL interpolated background, not the original color
+                    const columnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
+                    const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
                     styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-header {
@@ -3274,10 +3284,9 @@ function generateTagStyles() {
                     // Column collapsed state - interpolate 20% towards the darker color
                     const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
 
-                    // Use the same text color as tags for collapsed state
-                    // This ensures consistency across all states
-                    const collapsedTextColor = tagTextColor;
-                    const collapsedTextShadow = tagTextShadow;
+                    // Calculate text color from the ACTUAL collapsed background
+                    const collapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                    const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
                     styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-header {
@@ -3886,10 +3895,6 @@ window.updateColumnDisplay = updateColumnDisplay;
 
 // Expose rendering functions for include file updates
 window.renderSingleColumn = renderSingleColumn;
-
-// TODO: These functions are not defined - commenting out to prevent errors
-// window.getAllHeaderBarsHtml = getAllHeaderBarsHtml;
-// window.getAllFooterBarsHtml = getAllFooterBarsHtml;
 window.injectStackableBars = injectStackableBars;
 window.isDarkTheme = isDarkTheme;
 
@@ -3997,7 +4002,7 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
  * @param {number} insertIndex - Position to insert at (-1 for end)
  * @returns {HTMLElement} - The created column element
  */
-function addSingleColumnToDOM(column, insertIndex = -1) {
+function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null) {
     const boardElement = getBoardElement();
     if (!boardElement) {
         return null;
@@ -4049,20 +4054,92 @@ function addSingleColumnToDOM(column, insertIndex = -1) {
             rowContainer.appendChild(dropZoneSpacer);
         }
 
-        // Wrap the column in a stack container
-        const stackContainer = document.createElement('div');
-        stackContainer.className = 'kanban-column-stack';
-        stackContainer.appendChild(columnElement);
+        // Find the correct position to insert within this row based on data model order
+        // Get all columns in the data model that should be in this row, in order
+        const columnsInThisRow = window.cachedBoard.columns.filter(col => {
+            return getColumnRow(col.title) === columnRow;
+        });
 
-        // Find the "Add Column" button in this row (it should be at the end)
-        const addColumnBtn = rowContainer.querySelector('.add-column-btn');
+        // Find where the new column should be positioned within this row
+        const positionInRow = columnsInThisRow.findIndex(col => col.id === column.id);
 
-        if (addColumnBtn) {
-            // Insert the stack before the "Add Column" button
-            rowContainer.insertBefore(stackContainer, addColumnBtn);
+        // Find the stack by looking ONLY at the reference column
+        let targetStack = null;
+        let insertBeforeColumn = null;
+        let insertAfterColumn = null;
+
+        const allStacks = rowContainer.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+
+        // If we have a reference column ID, find it in the DOM
+        if (referenceColumnId) {
+            for (const stack of allStacks) {
+                const refColumnElement = stack.querySelector(`[data-column-id="${referenceColumnId}"]`);
+                if (refColumnElement) {
+                    targetStack = stack;
+
+                    // Determine if we're inserting before or after based on position
+                    const refColumnIndex = columnsInThisRow.findIndex(c => c.id === referenceColumnId);
+                    if (positionInRow < refColumnIndex) {
+                        // Inserting before the reference column
+                        insertBeforeColumn = refColumnElement;
+                    } else {
+                        // Inserting after the reference column
+                        insertAfterColumn = refColumnElement;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (targetStack) {
+            // Add to existing stack
+            if (insertBeforeColumn) {
+                targetStack.insertBefore(columnElement, insertBeforeColumn);
+            } else if (insertAfterColumn) {
+                // Insert after the reference column
+                if (insertAfterColumn.nextSibling) {
+                    targetStack.insertBefore(columnElement, insertAfterColumn.nextSibling);
+                } else {
+                    targetStack.appendChild(columnElement);
+                }
+            } else {
+                targetStack.appendChild(columnElement);
+            }
         } else {
-            // Fallback: append to the end of row
-            rowContainer.appendChild(stackContainer);
+            // No adjacent columns found - create a new stack
+            const stackContainer = document.createElement('div');
+            stackContainer.className = 'kanban-column-stack';
+            stackContainer.appendChild(columnElement);
+
+            // Find the correct position to insert the new stack
+            let insertBeforeStack = null;
+            if (positionInRow >= 0 && positionInRow < columnsInThisRow.length - 1) {
+                // Get the column that should come after the new column in the data model
+                const nextColumnId = columnsInThisRow[positionInRow + 1].id;
+
+                // Find the DOM stack containing that column
+                for (const stack of allStacks) {
+                    const stackColumn = stack.querySelector(`[data-column-id="${nextColumnId}"]`);
+                    if (stackColumn) {
+                        insertBeforeStack = stack;
+                        break;
+                    }
+                }
+            }
+
+            if (insertBeforeStack) {
+                // Insert before the found stack
+                rowContainer.insertBefore(stackContainer, insertBeforeStack);
+            } else {
+                // Insert before the "Add Column" button (at the end of row)
+                const addColumnBtn = rowContainer.querySelector('.add-column-btn');
+                if (addColumnBtn) {
+                    rowContainer.insertBefore(stackContainer, addColumnBtn);
+                } else {
+                    // Fallback: append to the end of row
+                    rowContainer.appendChild(stackContainer);
+                }
+            }
         }
     } else {
         // Legacy single-row mode: insert directly into boardElement
@@ -4102,6 +4179,15 @@ function addSingleColumnToDOM(column, insertIndex = -1) {
     // Setup drag & drop for the new column
     if (typeof setupColumnDragAndDrop === 'function') {
         setupColumnDragAndDrop();
+    }
+
+    // Recreate drop zones for the row that was modified
+    if (isMultiRow) {
+        const columnRow = getColumnRow(column.title);
+        const rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
+        if (rowContainer && typeof window.cleanupAndRecreateDropZones === 'function') {
+            window.cleanupAndRecreateDropZones(rowContainer);
+        }
     }
 
     return columnElement;

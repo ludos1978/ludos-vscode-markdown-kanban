@@ -36,7 +36,161 @@ let currentWhitespace = '8px';
 let currentTaskMinHeight = 'auto';
 let currentLayoutRows = 1;
 
-// Centralized configuration for all menu options
+// ============================================================================
+// PlantUML Initialization
+// ============================================================================
+
+// NOTE: PlantUML is now initialized in markdownRenderer.js (before markdown processing)
+
+// ============================================================================
+// PlantUML SVG Conversion
+// ============================================================================
+
+/**
+ * Handle click on "Convert to SVG" button
+ */
+async function handlePlantUMLConvert(button) {
+    console.log('[PlantUML] handlePlantUMLConvert called');
+    const code = button.getAttribute('data-code');
+    console.log('[PlantUML] Code length:', code ? code.length : 'null');
+
+    if (!code) {
+        console.error('[PlantUML] No code found for conversion');
+        return;
+    }
+
+    // Disable button during processing
+    button.disabled = true;
+    button.textContent = '⏳ Converting...';
+    console.log('[PlantUML] Button updated to "Converting..."');
+
+    try {
+        // Get SVG from cache or render it
+        let svg;
+        if (plantumlRenderCache && plantumlRenderCache.has(code)) {
+            svg = plantumlRenderCache.get(code);
+            console.log('[PlantUML] Got SVG from cache');
+        } else {
+            // This shouldn't happen (already rendered), but handle it
+            console.log('[PlantUML] Rendering SVG (not in cache)');
+            svg = await renderPlantUML(code);
+        }
+        console.log('[PlantUML] SVG length:', svg ? svg.length : 'null');
+
+        // Get current board file path
+        const currentFilePath = window.currentKanbanFilePath;
+        console.log('[PlantUML] Current file path:', currentFilePath);
+
+        if (!currentFilePath) {
+            throw new Error('No kanban file currently open');
+        }
+
+        // Send message to backend to save SVG and update markdown
+        console.log('[PlantUML] Sending convertPlantUMLToSVG message to backend');
+        vscode.postMessage({
+            type: 'convertPlantUMLToSVG',
+            filePath: currentFilePath,
+            plantUMLCode: code,
+            svgContent: svg
+        });
+
+        // Button will be updated when file reloads
+        button.textContent = '✓ Converting...';
+        console.log('[PlantUML] Message sent, waiting for backend response');
+    } catch (error) {
+        console.error('[PlantUML] Conversion error:', error);
+        button.disabled = false;
+        button.textContent = '❌ Convert Failed';
+
+        setTimeout(() => {
+            button.textContent = '💾 Convert to SVG';
+        }, 3000);
+    }
+}
+
+// Event delegation for convert buttons
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('plantuml-convert-btn')) {
+        console.log('[PlantUML] Convert button clicked');
+        handlePlantUMLConvert(e.target);
+    }
+
+    if (e.target.classList.contains('mermaid-convert-btn')) {
+        console.log('[Mermaid] Convert button clicked');
+        handleMermaidConvert(e.target);
+    }
+});
+
+// ============================================================================
+// Mermaid Diagram Conversion
+// ============================================================================
+
+/**
+ * Handle "Convert to SVG" button click for Mermaid diagrams
+ * @param {HTMLElement} button - The clicked button element
+ */
+async function handleMermaidConvert(button) {
+    console.log('[Mermaid] Convert button clicked');
+    const code = button.getAttribute('data-code');
+    console.log('[Mermaid] Code:', code);
+
+    if (!code) {
+        console.error('[Mermaid] No code found in button data-code attribute');
+        return;
+    }
+
+    // Disable button during processing
+    button.disabled = true;
+    button.textContent = '⏳ Converting...';
+    console.log('[Mermaid] Button updated to "Converting..."');
+
+    try {
+        // Get SVG from cache or render it
+        let svg;
+        if (mermaidRenderCache && mermaidRenderCache.has(code)) {
+            svg = mermaidRenderCache.get(code);
+            console.log('[Mermaid] Got SVG from cache');
+        } else {
+            // This shouldn't happen (already rendered), but handle it
+            console.log('[Mermaid] Rendering SVG (not in cache)');
+            svg = await renderMermaid(code);
+        }
+        console.log('[Mermaid] SVG length:', svg ? svg.length : 'null');
+
+        // Get current board file path
+        const currentFilePath = window.currentKanbanFilePath;
+        console.log('[Mermaid] Current file path:', currentFilePath);
+
+        if (!currentFilePath) {
+            throw new Error('No kanban file currently open');
+        }
+
+        // Send message to backend to save SVG and update markdown
+        console.log('[Mermaid] Sending convertMermaidToSVG message to backend');
+        vscode.postMessage({
+            type: 'convertMermaidToSVG',
+            filePath: currentFilePath,
+            mermaidCode: code,
+            svgContent: svg
+        });
+
+        // Button will be updated when file reloads
+        button.textContent = '✓ Converting...';
+        console.log('[Mermaid] Message sent, waiting for backend response');
+    } catch (error) {
+        console.error('[Mermaid] Conversion error:', error);
+        button.disabled = false;
+        button.textContent = '❌ Convert Failed';
+
+        setTimeout(() => {
+            button.textContent = '💾 Convert to SVG';
+        }, 3000);
+    }
+}
+
+// ============================================================================
+// Menu Configuration
+// ============================================================================
 // Font size configuration
 const fontSizeMultipliers = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
 
@@ -97,6 +251,7 @@ const baseOptions = {
         { label: "2/3 Screen", value: "66percent", css: "63vw"},
         { label: "Full Width", value: "100percent", css: "95vw" }
     ],
+
     // Card height options
     cardHeight: [
         { label: "Auto", value: "auto", css: "auto" },
@@ -106,10 +261,10 @@ const baseOptions = {
         { label: "1/3 Screen", value: "33percent", css: "26.5vh", separator: true },
         { label: "1/2 Screen", value: "50percent", css: "43.5vh" },
         { label: "2/3 Screen", value: "66percent", css: "59vh" },
-        { label: "Full Screen", value: "100percent", css: "89vh" }
+        { label: "Full Screen", value: "100percent", css: "92vh" }
     ],
-    // Section max height options
-    sectionMaxHeight: [
+    // Section height options
+    sectionHeight: [
         { label: "Auto", value: "auto", css: "auto" },
         { label: "Small", value: "200px", css: "200px", separator: true },
         { label: "Medium", value: "400px", css: "400px" },
@@ -117,8 +272,21 @@ const baseOptions = {
         { label: "1/3 Screen", value: "33percent", css: "17vh", separator: true },
         { label: "1/2 Screen", value: "50percent", css: "33vh" },
         { label: "2/3 Screen", value: "66percent", css: "48vh" },
-        { label: "Full Screen", value: "100percent", css: "78vh" }
+        { label: "Full Screen", value: "100percent", css: "80vh" }
     ],
+
+    // Task section height options
+    taskSectionHeight: [
+        { label: "Auto", value: "auto", css: "auto" },
+        { label: "Small", value: "150px", css: "150px", separator: true },
+        { label: "Medium", value: "300px", css: "300px" },
+        { label: "Large", value: "500px", css: "500px" },
+        { label: "1/3 Screen", value: "33percent", css: "17vh", separator: true },
+        { label: "1/2 Screen", value: "50percent", css: "33vh" },
+        { label: "2/3 Screen", value: "66percent", css: "48vh" },
+        { label: "Full Screen", value: "100percent", css: "80vh" }
+    ],
+
     // Row height options
     rowHeight: [
         { label: "Auto", value: "auto", css: "auto" },
@@ -172,10 +340,15 @@ const baseOptions = {
         { label: "@ Tags Only", value: "mentionsonly", description: "Show only @ tags" },
         { label: "No Tags", value: "none", description: "Hide all tags" }
     ],
-    // HTML Comments visibility options
-    showHtmlComments: [
-        { label: "Show", value: true, description: "Show HTML comments as visible markers" },
-        { label: "Hide", value: false, description: "Hide HTML comments (default HTML behavior)" }
+    // HTML Comments render mode options
+    htmlCommentRenderMode: [
+        { label: "Hidden", value: "hidden", description: "Hide HTML comments (default markdown behavior)" },
+        { label: "As Text", value: "text", description: "Render HTML comments as visible text" }
+    ],
+    // HTML Content render mode options
+    htmlContentRenderMode: [
+        { label: "As HTML", value: "html", description: "Render HTML tags as HTML (default)" },
+        { label: "As Text", value: "text", description: "Render HTML tags as visible text" }
     ],
     // Arrow key focus scroll options
     arrowKeyFocusScroll: [
@@ -206,7 +379,8 @@ function getValue(optionType, css) {
 const menuConfig = {
     columnWidth: null, // Generated
     cardHeight: null, // Generated
-    sectionMaxHeight: null, // Generated
+    sectionHeight: null, // Generated
+    taskSectionHeight: null, // Generated
     rowHeight: null, // Generated
     whitespace: null, // Generated
     fontSize: null, // Generated
@@ -234,7 +408,7 @@ const menuConfig = {
 
 // Generate menu configurations from base options
 // Simple generator for most menu types
-['columnWidth', 'cardHeight', 'sectionMaxHeight', 'rowHeight', 'whitespace', 'fontSize', 'layoutRows', 'stickyStackMode', 'tagVisibility', 'showHtmlComments', 'arrowKeyFocusScroll'].forEach(key => {
+['columnWidth', 'cardHeight', 'sectionHeight', 'taskSectionHeight', 'rowHeight', 'whitespace', 'fontSize', 'layoutRows', 'stickyStackMode', 'tagVisibility', 'htmlCommentRenderMode', 'htmlContentRenderMode', 'arrowKeyFocusScroll'].forEach(key => {
     if (baseOptions[key]) {
         menuConfig[key] = baseOptions[key].map(option => {
             const result = {
@@ -274,8 +448,10 @@ function getCurrentSettingValue(configKey) {
             return window.currentColumnWidth || '350px';
         case 'cardHeight':
             return window.currentTaskMinHeight || 'auto';
-        case 'sectionMaxHeight':
-            return window.currentSectionMaxHeight || 'auto';
+        case 'sectionHeight':
+            return window.currentSectionHeight || 'auto';
+        case 'taskSectionHeight':
+            return window.currentTaskSectionHeight || 'auto';
         case 'whitespace':
             return window.currentWhitespace || '8px';
         case 'fontSize':
@@ -290,8 +466,10 @@ function getCurrentSettingValue(configKey) {
             return window.currentStickyStackMode || 'titleonly';
         case 'tagVisibility':
             return window.currentTagVisibility || 'allexcludinglayout';
-        case 'showHtmlComments':
-            return window.currentShowHtmlComments !== undefined ? window.currentShowHtmlComments : false;
+        case 'htmlCommentRenderMode':
+            return window.currentHtmlCommentRenderMode || 'hidden';
+        case 'htmlContentRenderMode':
+            return window.currentHtmlContentRenderMode || 'html';
         case 'arrowKeyFocusScroll':
             return window.currentArrowKeyFocusScroll || 'center';
         default:
@@ -304,7 +482,8 @@ function updateAllMenuIndicators() {
     const menuMappings = [
         { selector: '[data-menu="columnWidth"]', config: 'columnWidth', function: 'setColumnWidth' },
         { selector: '[data-menu="cardHeight"]', config: 'cardHeight', function: 'setTaskMinHeight' },
-        { selector: '[data-menu="sectionMaxHeight"]', config: 'sectionMaxHeight', function: 'setSectionMaxHeight' },
+        { selector: '[data-menu="sectionHeight"]', config: 'sectionHeight', function: 'setSectionHeight' },
+        { selector: '[data-menu="taskSectionHeight"]', config: 'taskSectionHeight', function: 'setTaskSectionHeight' },
         { selector: '[data-menu="whitespace"]', config: 'whitespace', function: 'setWhitespace' },
         { selector: '[data-menu="fontSize"]', config: 'fontSize', function: 'setFontSize' },
         { selector: '[data-menu="fontFamily"]', config: 'fontFamily', function: 'setFontFamily' },
@@ -312,7 +491,8 @@ function updateAllMenuIndicators() {
         { selector: '[data-menu="rowHeight"]', config: 'rowHeight', function: 'setRowHeight' },
         { selector: '[data-menu="stickyStackMode"]', config: 'stickyStackMode', function: 'setStickyStackMode' },
         { selector: '[data-menu="tagVisibility"]', config: 'tagVisibility', function: 'setTagVisibility' },
-        { selector: '[data-menu="showHtmlComments"]', config: 'showHtmlComments', function: 'setShowHtmlComments' }
+        { selector: '[data-menu="htmlCommentRenderMode"]', config: 'htmlCommentRenderMode', function: 'setHtmlCommentRenderMode' },
+        { selector: '[data-menu="htmlContentRenderMode"]', config: 'htmlContentRenderMode', function: 'setHtmlContentRenderMode' }
     ];
 
     menuMappings.forEach(mapping => {
@@ -1296,22 +1476,6 @@ function applyRowHeightSetting(height) {
 
 function setRowHeight(height) {
     applyAndSaveSetting('rowHeight', height, applyRowHeightSetting);
-
-    // Show user-friendly message
-    // let message = 'Row height set to ';
-    // switch(height) {
-    //     case '100vh': message += '100% of screen'; break;
-    //     case '63vh': message += '2/3 of screen'; break;
-    //     case '44vh': message += '1/2 of screen'; break;
-    //     case '30vh': message += '1/3 of screen'; break;
-    //     case '44em': message += '700px (~44em)'; break;
-    //     case '31em': message += '500px (~31em)'; break;
-    //     case '19em': message += '300px (~19em)'; break;
-    //     case 'auto': message += 'auto height'; break;
-    //     default: message += height; break;
-    // }
-    
-    // vscode.postMessage({ type: 'showMessage', text: message });
 }
 
 // Sticky stack elements functionality
@@ -1387,21 +1551,13 @@ function setTagVisibility(setting) {
 }
 
 // HTML Comments visibility
-function applyShowHtmlComments(show) {
-    // Store current setting (convert to boolean)
-    const showBool = show === true || show === 'true';
-    window.currentShowHtmlComments = showBool;
-
-    // Update body class for CSS visibility control
-    if (showBool) {
-        document.body.classList.add('show-html-comments');
-    } else {
-        document.body.classList.remove('show-html-comments');
-    }
+function applyHtmlCommentRenderMode(mode) {
+    // Store current setting
+    window.currentHtmlCommentRenderMode = mode;
 
     // Update config manager cache if available
     if (window.configManager) {
-        window.configManager.cache.set('showHtmlComments', showBool);
+        window.configManager.cache.set('htmlCommentRenderMode', mode);
     }
 
     // Trigger re-render to apply changes
@@ -1417,8 +1573,34 @@ function applyShowHtmlComments(show) {
     }
 }
 
-function setShowHtmlComments(show) {
-    applyAndSaveSetting('showHtmlComments', show, applyShowHtmlComments);
+function setHtmlCommentRenderMode(mode) {
+    applyAndSaveSetting('htmlCommentRenderMode', mode, applyHtmlCommentRenderMode);
+}
+
+function applyHtmlContentRenderMode(mode) {
+    // Store current setting
+    window.currentHtmlContentRenderMode = mode;
+
+    // Update config manager cache if available
+    if (window.configManager) {
+        window.configManager.cache.set('htmlContentRenderMode', mode);
+    }
+
+    // Trigger re-render to apply changes
+    if (window.cachedBoard) {
+        renderBoard(window.cachedBoard, { skipRender: false });
+
+        // Preserve column width after re-render
+        setTimeout(() => {
+            if (window.currentColumnWidth && window.applyColumnWidth) {
+                window.applyColumnWidth(window.currentColumnWidth, true);
+            }
+        }, 50);
+    }
+}
+
+function setHtmlContentRenderMode(mode) {
+    applyAndSaveSetting('htmlContentRenderMode', mode, applyHtmlContentRenderMode);
 }
 
 // Helper function to filter tags from text based on export tag visibility setting
@@ -1495,16 +1677,28 @@ function setTaskMinHeight(height) {
     applyAndSaveSetting('taskMinHeight', height, applyTaskMinHeight);
 }
 
-// Section max height functions
-function applySectionMaxHeight(height) {
-    window.currentSectionMaxHeight = height;
+// Section height functions
+function applySectionHeight(height) {
+    window.currentSectionHeight = height;
 
-    // Use styleManager to apply section max height
-    styleManager.applySectionMaxHeight(height);
+    // Use styleManager to apply section height
+    styleManager.applySectionHeight(height);
 }
 
-function setSectionMaxHeight(height) {
-    applyAndSaveSetting('sectionMaxHeight', height, applySectionMaxHeight);
+function setSectionHeight(height) {
+    applyAndSaveSetting('sectionHeight', height, applySectionHeight);
+}
+
+// Task section height functions
+function applyTaskSectionHeight(height) {
+    window.currentTaskSectionHeight = height;
+
+    // Use styleManager to apply task section height
+    styleManager.applyTaskSectionHeight(height);
+}
+
+function setTaskSectionHeight(height) {
+    applyAndSaveSetting('taskSectionHeight', height, applyTaskSectionHeight);
 }
 
 // Function to detect row tags from board
@@ -1587,7 +1781,7 @@ function updateColumnRowTag(columnId, newRow) {
     }
     
     // Update the visual element immediately
-    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`)?.closest('.kanban-full-height-column');
     if (columnElement) {
         columnElement.setAttribute('data-row', newRow);
         
@@ -1605,10 +1799,27 @@ function updateColumnRowTag(columnId, newRow) {
         }
     }
     
+    // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
+    // DOM might have stale IDs if a boardUpdate just arrived
+    let currentColumnId = columnId; // Default to what we have
+
+    // Find column's position in DOM to match with current board
+    if (columnElement) {
+        const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
+        const columnIndex = allColumns.indexOf(columnElement);
+
+        if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+            // Match by position - use current ID from board at this position
+            currentColumnId = window.currentBoard.columns[columnIndex].id;
+            console.log(`[Frontend] Column position ${columnIndex}: DOM ID ${columnId}, currentBoard ID ${currentColumnId}`);
+        }
+    }
+
     // Send update to backend with the full title including row tag
+    console.log(`[Frontend] Sending editColumnTitle - columnId: ${currentColumnId}, title: ${column.title}`);
     vscode.postMessage({
         type: 'editColumnTitle',
-        columnId: columnId,
+        columnId: currentColumnId,
         title: column.title
     });
 }
@@ -1976,9 +2187,6 @@ function isCurrentlyEditing() {
            window.taskEditor.currentEditor.element.style.display !== 'none';
 }
 
-// REMOVED: Focus handler that was causing board refresh and losing folding state
-// The panel reuse mechanism now handles board updates properly
-
 // Callback for when board rendering is complete
 window.onBoardRenderingComplete = function() {
     if (window.pendingFocusTargets && window.pendingFocusTargets.length > 0) {
@@ -2108,7 +2316,7 @@ window.addEventListener('message', event => {
     const message = event.data;
     
     switch (message.type) {
-        case 'updateBoard':
+        case 'boardUpdate':
             const previousBoard = window.cachedBoard;
             
             // Clear card focus when board is updated
@@ -2201,11 +2409,18 @@ window.addEventListener('message', event => {
                     applyTaskMinHeight('auto'); // Default fallback
                 }
 
-                // Update section max height with the value from configuration
-                if (message.sectionMaxHeight) {
-                    applySectionMaxHeight(message.sectionMaxHeight);
+                // Update section height with the value from configuration
+                if (message.sectionHeight) {
+                    applySectionHeight(message.sectionHeight);
                 } else {
-                    applySectionMaxHeight('auto'); // Default fallback
+                    applySectionHeight('auto'); // Default fallback
+                }
+
+                // Update task section height with the value from configuration
+                if (message.taskSectionHeight) {
+                    applyTaskSectionHeight(message.taskSectionHeight);
+                } else {
+                    applyTaskSectionHeight('auto'); // Default fallback
                 }
 
                 // Update font size with the value from configuration
@@ -2325,11 +2540,17 @@ window.addEventListener('message', event => {
                     applyTagVisibility('allexcludinglayout'); // Default fallback
                 }
 
-                // Update HTML comments visibility with the value from configuration
-                if (message.showHtmlComments !== undefined) {
-                    applyShowHtmlComments(message.showHtmlComments);
+                // Update HTML rendering modes with values from configuration
+                if (message.htmlCommentRenderMode !== undefined) {
+                    applyHtmlCommentRenderMode(message.htmlCommentRenderMode);
                 } else {
-                    applyShowHtmlComments(false); // Default fallback
+                    applyHtmlCommentRenderMode('hidden'); // Default fallback
+                }
+
+                if (message.htmlContentRenderMode !== undefined) {
+                    applyHtmlContentRenderMode(message.htmlContentRenderMode);
+                } else {
+                    applyHtmlContentRenderMode('html'); // Default fallback
                 }
 
                 // Update arrow key focus scroll with the value from configuration
@@ -2399,6 +2620,12 @@ window.addEventListener('message', event => {
             const previousDocumentPath = currentFileInfo?.documentPath;
             currentFileInfo = message.fileInfo;
             
+            // Set current file path for export functions
+            if (currentFileInfo && currentFileInfo.documentPath) {
+                window.currentFilePath = currentFileInfo.documentPath;
+                window.currentKanbanFilePath = currentFileInfo.documentPath; // For PlantUML conversion
+            }
+            
             // Only update document URI if it actually changed
             if (currentFileInfo && currentFileInfo.documentPath && 
                 currentFileInfo.documentPath !== previousDocumentPath) {
@@ -2409,6 +2636,13 @@ window.addEventListener('message', event => {
             break;
         case 'resetClosePromptFlag':
             closePromptActive = false;
+            break;
+        case 'saveCompleted':
+            // Backend has confirmed save is complete, update frontend UI
+            console.log('[FRONTEND] Received saveCompleted from backend');
+            if (typeof markSavedChanges === 'function') {
+                markSavedChanges();
+            }
             break;
         case 'undoRedoStatus':
             canUndo = message.canUndo;
@@ -2459,6 +2693,15 @@ window.addEventListener('message', event => {
             if (typeof unfoldColumnIfCollapsed === 'function') {
                 message.columnIds.forEach(columnId => {
                     unfoldColumnIfCollapsed(columnId);
+                });
+            }
+
+            // Send confirmation back to backend
+            if (message.requestId) {
+                console.log('[Frontend] Confirming columns unfolded:', message.requestId);
+                vscode.postMessage({
+                    type: 'columnsUnfolded',
+                    requestId: message.requestId
                 });
             }
             break;
@@ -2532,46 +2775,95 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating include file
+            console.log('[FRONTEND proceedUpdateIncludeFile] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND proceedUpdateIncludeFile] columnId:', message.columnId);
+            console.log('[FRONTEND proceedUpdateIncludeFile] newFileName:', message.newFileName);
+            console.log('[FRONTEND proceedUpdateIncludeFile] currentFile:', message.currentFile);
             if (typeof updateColumnIncludeFile === 'function') {
+                console.log('[FRONTEND proceedUpdateIncludeFile] Calling updateColumnIncludeFile...');
                 updateColumnIncludeFile(message.columnId, message.newFileName, message.currentFile);
+            } else {
+                console.error('[FRONTEND proceedUpdateIncludeFile] updateColumnIncludeFile function not found!');
+            }
+            break;
+        case 'proceedUpdateTaskIncludeFile':
+            // User provided new file name in VS Code dialog - proceed with updating task include file
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] taskId:', message.taskId);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] columnId:', message.columnId);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] newFileName:', message.newFileName);
+            console.log('[FRONTEND proceedUpdateTaskIncludeFile] currentFile:', message.currentFile);
+            if (typeof updateTaskIncludeFile === 'function') {
+                console.log('[FRONTEND proceedUpdateTaskIncludeFile] Calling updateTaskIncludeFile...');
+                updateTaskIncludeFile(message.taskId, message.columnId, message.newFileName, message.currentFile);
+            } else {
+                console.error('[FRONTEND proceedUpdateTaskIncludeFile] updateTaskIncludeFile function not found!');
             }
             break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
-
-            // Update the column in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
-
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
                     column.title = message.columnTitle || column.title;
                     column.displayTitle = message.displayTitle || column.displayTitle;
-                    column.includeMode = message.includeMode;
-                    column.includeFiles = message.includeFiles;
 
+                    // Only update includeMode if explicitly provided (preserve existing value otherwise)
+                    if (message.includeMode !== undefined) {
+                        column.includeMode = message.includeMode;
+                    }
+                    if (message.includeFiles !== undefined) {
+                        column.includeFiles = message.includeFiles;
+                    }
+                    // Update loading state for includes
+                    if (message.isLoadingContent !== undefined) {
+                        column.isLoadingContent = message.isLoadingContent;
+                    }
 
-                    // Re-render just this column
-                    if (typeof renderSingleColumn === 'function') {
-                        renderSingleColumn(message.columnId, column);
-                    } else {
-                        if (typeof window.renderBoard === 'function') {
-                            window.renderBoard();
+                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+
+                    if (!isEditing) {
+                        // Re-render just this column
+                        if (typeof window.renderSingleColumn === 'function') {
+                            window.renderSingleColumn(message.columnId, column);
+                        } else {
+                            if (typeof window.renderBoard === 'function') {
+                                window.renderBoard();
+                            }
                         }
-                    }
 
-                    // Inject header/footer bars after rendering
-                    if (typeof window.injectStackableBars === 'function') {
-                        requestAnimationFrame(() => {
-                            window.injectStackableBars();
+                        // Inject header/footer bars after rendering
+                        if (typeof window.injectStackableBars === 'function') {
+                            requestAnimationFrame(() => {
+                                window.injectStackableBars();
+                            });
+                        }
+
+                        // Recalculate stacked column heights after include content update
+                        if (typeof window.applyStackedColumnStyles === 'function') {
+                            requestAnimationFrame(() => {
+                                window.applyStackedColumnStyles();
+                            });
+                        }
+
+                        // OPTIMIZATION 3: Confirm successful render
+                        vscode.postMessage({
+                            type: 'renderCompleted',
+                            itemType: 'column',
+                            itemId: message.columnId
                         });
-                    }
+                    } else {
+                        console.log('[Frontend updateColumnContent] Skipping render - user is editing');
 
-                    // Recalculate stacked column heights after include content update
-                    if (typeof window.applyStackedColumnStyles === 'function') {
-                        requestAnimationFrame(() => {
-                            window.applyStackedColumnStyles();
+                        // OPTIMIZATION 1: Tell backend this render was skipped
+                        vscode.postMessage({
+                            type: 'renderSkipped',
+                            reason: 'editing',
+                            itemType: 'column',
+                            itemId: message.columnId
                         });
                     }
                 }
@@ -2581,6 +2873,11 @@ window.addEventListener('message', event => {
             break;
         case 'updateTaskContent':
             // Handle targeted task content update for include file changes
+            console.log('[FRONTEND updateTaskContent] ===== RECEIVED FROM BACKEND =====');
+            console.log('[FRONTEND updateTaskContent] taskId:', message.taskId);
+            console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
+            console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
+            console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2598,38 +2895,163 @@ window.addEventListener('message', event => {
                 }
 
                 if (foundTask && foundColumn) {
+                    console.log('[FRONTEND updateTaskContent] Found task in cachedBoard, updating...');
+                    console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+
                     // Update task metadata
                     foundTask.description = message.description || '';
                     foundTask.title = message.taskTitle || foundTask.title;
                     foundTask.displayTitle = message.displayTitle || foundTask.displayTitle;
-                    foundTask.includeMode = message.includeMode;
-                    foundTask.includeFiles = message.includeFiles;
                     foundTask.originalTitle = message.originalTitle || foundTask.originalTitle;
 
+                    // Only update includeMode if explicitly provided (preserve existing value otherwise)
+                    if (message.includeMode !== undefined) {
+                        foundTask.includeMode = message.includeMode;
+                    }
+                    if (message.includeFiles !== undefined) {
+                        foundTask.includeFiles = message.includeFiles;
+                    }
+                    // Update loading state for includes
+                    if (message.isLoadingContent !== undefined) {
+                        foundTask.isLoadingContent = message.isLoadingContent;
+                    }
 
-                    // Re-render just this column to reflect the task update
-                    if (typeof renderSingleColumn === 'function') {
-                        renderSingleColumn(foundColumn.id, foundColumn);
-                    } else {
-                        if (typeof window.renderBoard === 'function') {
-                            window.renderBoard();
+                    console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+                    console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
+
+                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+
+                    // CRITICAL: If user is editing THIS task, update the editor value with new content
+                    if (isEditing && window.taskEditor.currentEditor.taskId === message.taskId) {
+                        if (window.taskEditor.currentEditor.type === 'task-title') {
+                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task title:', message.taskTitle);
+                            window.taskEditor.currentEditor.element.value = message.taskTitle;
+                            window.taskEditor.currentEditor.originalValue = message.taskTitle;
+                            // Auto-resize the textarea if needed
+                            if (typeof window.taskEditor.autoResize === 'function') {
+                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
+                            }
+                        } else if (window.taskEditor.currentEditor.type === 'task-description') {
+                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task description (length:', message.description ? message.description.length : 0, ')');
+                            window.taskEditor.currentEditor.element.value = message.description || '';
+                            window.taskEditor.currentEditor.originalValue = message.description || '';
+                            // Auto-resize the textarea if needed
+                            if (typeof window.taskEditor.autoResize === 'function') {
+                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
+                            }
                         }
                     }
 
-                    // Inject header/footer bars after rendering
-                    if (typeof window.injectStackableBars === 'function') {
-                        requestAnimationFrame(() => {
-                            window.injectStackableBars();
-                        });
-                    }
+                    if (!isEditing) {
+                        // Re-render just this column to reflect the task update
+                        if (typeof renderSingleColumn === 'function') {
+                            renderSingleColumn(foundColumn.id, foundColumn);
+                        } else {
+                            if (typeof window.renderBoard === 'function') {
+                                window.renderBoard();
+                            }
+                        }
 
-                    // Recalculate stacked column heights after task include content update
-                    if (typeof window.applyStackedColumnStyles === 'function') {
-                        requestAnimationFrame(() => {
-                            window.applyStackedColumnStyles();
+                        // Inject header/footer bars after rendering
+                        if (typeof window.injectStackableBars === 'function') {
+                            requestAnimationFrame(() => {
+                                window.injectStackableBars();
+                            });
+                        }
+
+                        // Recalculate stacked column heights after task include content update
+                        if (typeof window.applyStackedColumnStyles === 'function') {
+                            requestAnimationFrame(() => {
+                                window.applyStackedColumnStyles();
+                            });
+                        }
+
+                        // OPTIMIZATION 3: Confirm successful render
+                        vscode.postMessage({
+                            type: 'renderCompleted',
+                            itemType: 'task',
+                            itemId: message.taskId
+                        });
+                    } else {
+                        console.log('[Frontend updateTaskContent] Skipping render - user is editing');
+
+                        // OPTIMIZATION 1: Tell backend this render was skipped
+                        vscode.postMessage({
+                            type: 'renderSkipped',
+                            reason: 'editing',
+                            itemType: 'task',
+                            itemId: message.taskId
                         });
                     }
                 }
+            }
+            break;
+        case 'syncDirtyItems':
+            // OPTIMIZATION 2: Batch update multiple items with unrendered changes
+            if (window.cachedBoard) {
+                console.log(`[Frontend syncDirtyItems] Syncing ${message.columns.length} columns, ${message.tasks.length} tasks`);
+
+                // Update columns
+                for (const colData of message.columns) {
+                    const column = window.cachedBoard.columns.find(c => c.id === colData.columnId);
+                    if (column) {
+                        // Update cache
+                        column.title = colData.title;
+                        column.displayTitle = colData.displayTitle;
+                        column.includeMode = colData.includeMode;
+                        column.includeFiles = colData.includeFiles;
+
+                        // Update DOM directly (minimal update, no full re-render)
+                        const headerEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-header`);
+                        if (headerEl && typeof window.getColumnDisplayTitle === 'function') {
+                            headerEl.innerHTML = window.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        }
+                    }
+                }
+
+                // Update tasks
+                for (const taskData of message.tasks) {
+                    const column = window.cachedBoard.columns.find(c => c.id === taskData.columnId);
+                    if (column) {
+                        const task = column.tasks.find(t => t.id === taskData.taskId);
+                        if (task) {
+                            // Update cache
+                            task.displayTitle = taskData.displayTitle;
+                            task.description = taskData.description;
+
+                            // Update DOM directly (minimal update)
+                            const taskEl = document.querySelector(`[data-task-id="${taskData.taskId}"]`);
+                            if (taskEl) {
+                                // Re-render just this task element
+                                if (typeof window.renderSingleTask === 'function') {
+                                    window.renderSingleTask(taskData.columnId, taskData.taskId, task);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        case 'stopEditing':
+            // Backend requests to stop editing (e.g., due to external file conflict)
+            if (window.taskEditor && window.taskEditor.currentEditor) {
+                console.log('[Frontend] Stopping editing due to backend request');
+                // Save current field before stopping
+                if (typeof window.taskEditor.saveCurrentField === 'function') {
+                    window.taskEditor.saveCurrentField();
+                }
+                // Clear editor state
+                window.taskEditor.currentEditor = null;
+            }
+
+            // Send confirmation back to backend
+            if (message.requestId) {
+                console.log('[Frontend] Confirming editing stopped:', message.requestId);
+                vscode.postMessage({
+                    type: 'editingStopped',
+                    requestId: message.requestId
+                });
             }
             break;
         case 'exportDefaultFolder':
@@ -2733,6 +3155,84 @@ window.addEventListener('message', event => {
                 console.error(`[Debug] Failed to reload ${reloadedFileName}: ${message.error}`);
             }
             break;
+
+        case 'autoExportStopped':
+            // Hide the auto-export button and indicator when auto-export is stopped
+            console.log('[kanban.webview] Received autoExportStopped message - hiding button and indicator');
+            const autoExportBtn = document.getElementById('auto-export-btn');
+            const activityIndicator = document.getElementById('export-activity-indicator');
+            console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
+            if (autoExportBtn) {
+                autoExportBtn.style.display = 'none';
+                autoExportBtn.classList.remove('active');
+                console.log('[kanban.webview] Auto-export button hidden and deactivated');
+            }
+            if (activityIndicator) {
+                activityIndicator.style.display = 'none';
+            }
+            // Reset auto-export state - both local and window variables
+            autoExportActive = false;
+            autoExportBrowserMode = false;
+            lastExportSettings = null;
+            window.autoExportActive = false;
+            window.lastExportSettings = null;
+            // Reset button text and icon to default state
+            const icon = document.getElementById('auto-export-icon');
+            if (icon) {
+                icon.textContent = '▶';
+            }
+            // FORCE HIDE AGAIN after a short delay to ensure it's hidden
+            setTimeout(() => {
+                const btn = document.getElementById('auto-export-btn');
+                const indicator = document.getElementById('export-activity-indicator');
+                if (btn) {
+                    btn.style.display = 'none';
+                    btn.classList.remove('active');
+                    console.log('[kanban.webview] Auto-export button force-hidden after timeout');
+                }
+                if (indicator) {
+                    indicator.style.display = 'none';
+                }
+            }, 100);
+            break;
+
+        case 'plantUMLConvertSuccess':
+            console.log('[PlantUML] Conversion successful:', message.svgPath);
+            // File will reload automatically, which will show the updated content
+            break;
+
+        case 'plantUMLConvertError':
+            console.error('[PlantUML] Conversion error:', message.error);
+            alert(`PlantUML conversion failed: ${message.error}`);
+            break;
+
+        // Mermaid export rendering (for PDF/Marp export)
+        case 'renderMermaidForExport':
+            console.log('[Webview] Received Mermaid export render request:', message.requestId);
+
+            // Use existing renderMermaid function to render the diagram
+            renderMermaid(message.code)
+                .then(svg => {
+                    console.log('[Webview] Mermaid rendered successfully for export:', message.requestId);
+
+                    // Send success response back to backend
+                    vscode.postMessage({
+                        type: 'mermaidExportSuccess',
+                        requestId: message.requestId,
+                        svg: svg
+                    });
+                })
+                .catch(error => {
+                    console.error('[Webview] Mermaid render failed for export:', message.requestId, error);
+
+                    // Send error response back to backend
+                    vscode.postMessage({
+                        type: 'mermaidExportError',
+                        requestId: message.requestId,
+                        error: error.message || String(error)
+                    });
+                });
+            break;
     }
 });
 
@@ -2790,17 +3290,15 @@ if (typeof MutationObserver !== 'undefined') {
     }
 }
 
-// REMOVED: Duplicate focus handler that was causing board refresh and losing folding state
-// The panel reuse mechanism now handles board updates properly
-
 // Card navigation functions
 function updateCardList() {
     // Use more flexible selector to handle class name variations
     const allTaskItems = document.querySelectorAll('[class*="task-item"]');
-    
+
     allCards = Array.from(allTaskItems).filter(card => {
         const column = card.closest('.kanban-full-height-column');
-        return column && !column.classList.contains('collapsed');
+        // Filter out cards in collapsed columns and collapsed tasks
+        return column && !window.isColumnCollapsed(column) && !card.classList.contains('collapsed');
     });
 }
 
@@ -2877,16 +3375,22 @@ function focusSection(section) {
     section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+// Helper function to get visible (non-collapsed) task cards from a column
+function getVisibleTaskCards(column) {
+    const allTaskItems = Array.from(column.querySelectorAll('[class*="task-item"]'));
+    return allTaskItems.filter(task => !task.classList.contains('collapsed'));
+}
+
 function getCurrentCardPosition() {
     if (!currentFocusedCard) {return null;}
-    
+
     const column = currentFocusedCard.closest('.kanban-full-height-column');
     if (!column) {return null;}
-    
-    const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+
+    const columnCards = getVisibleTaskCards(column);
     const cardIndex = columnCards.indexOf(currentFocusedCard);
     const columnIndex = Array.from(document.querySelectorAll('.kanban-full-height-column')).indexOf(column);
-    
+
     return { columnIndex, cardIndex, columnCards };
 }
 
@@ -2980,23 +3484,29 @@ function navigateToCard(direction) {
             break;
             
         case 'left':
-            if (columnIndex > 0) {
-                const prevColumn = columns[columnIndex - 1];
-                const prevColumnCards = Array.from(prevColumn.querySelectorAll('[class*="task-item"]'));
-                if (prevColumnCards.length > 0) {
-                    // Always go to first task in the column
-                    focusCard(prevColumnCards[0]);
+            // Find the first non-collapsed column to the left with visible tasks
+            for (let i = columnIndex - 1; i >= 0; i--) {
+                const prevColumn = columns[i];
+                if (!window.isColumnCollapsed(prevColumn)) {
+                    const prevColumnCards = getVisibleTaskCards(prevColumn);
+                    if (prevColumnCards.length > 0) {
+                        focusCard(prevColumnCards[0]);
+                        break;
+                    }
                 }
             }
             break;
 
         case 'right':
-            if (columnIndex < columns.length - 1) {
-                const nextColumn = columns[columnIndex + 1];
-                const nextColumnCards = Array.from(nextColumn.querySelectorAll('[class*="task-item"]'));
-                if (nextColumnCards.length > 0) {
-                    // Always go to first task in the column
-                    focusCard(nextColumnCards[0]);
+            // Find the first non-collapsed column to the right with visible tasks
+            for (let i = columnIndex + 1; i < columns.length; i++) {
+                const nextColumn = columns[i];
+                if (!window.isColumnCollapsed(nextColumn)) {
+                    const nextColumnCards = getVisibleTaskCards(nextColumn);
+                    if (nextColumnCards.length > 0) {
+                        focusCard(nextColumnCards[0]);
+                        break;
+                    }
                 }
             }
             break;
@@ -3037,7 +3547,7 @@ function handleSectionNavigation(key, currentSection) {
         } else {
             // At last section, go to first section of next task
             const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+            const columnCards = getVisibleTaskCards(column);
             const taskIndex = columnCards.indexOf(taskItem);
 
             if (taskIndex < columnCards.length - 1) {
@@ -3052,16 +3562,20 @@ function handleSectionNavigation(key, currentSection) {
                 const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                 const columnIndex = columns.indexOf(column);
 
-                if (columnIndex < columns.length - 1) {
-                    const nextColumn = columns[columnIndex + 1];
-                    const nextColumnCards = Array.from(nextColumn.querySelectorAll('[class*="task-item"]'));
+                // Find the first non-collapsed column to the right with visible tasks
+                for (let i = columnIndex + 1; i < columns.length; i++) {
+                    const nextColumn = columns[i];
+                    if (!window.isColumnCollapsed(nextColumn)) {
+                        const nextColumnCards = getVisibleTaskCards(nextColumn);
 
-                    if (nextColumnCards.length > 0) {
-                        const firstTask = nextColumnCards[0];
-                        const firstTaskSections = firstTask.querySelectorAll('.task-section');
+                        if (nextColumnCards.length > 0) {
+                            const firstTask = nextColumnCards[0];
+                            const firstTaskSections = firstTask.querySelectorAll('.task-section');
 
-                        if (firstTaskSections.length > 0) {
-                            focusSection(firstTaskSections[0]);
+                            if (firstTaskSections.length > 0) {
+                                focusSection(firstTaskSections[0]);
+                                break;
+                            }
                         }
                     }
                 }
@@ -3074,7 +3588,7 @@ function handleSectionNavigation(key, currentSection) {
         } else {
             // At first section, go to last section of previous task
             const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = Array.from(column.querySelectorAll('[class*="task-item"]'));
+            const columnCards = getVisibleTaskCards(column);
             const taskIndex = columnCards.indexOf(taskItem);
 
             if (taskIndex > 0) {
@@ -3089,16 +3603,20 @@ function handleSectionNavigation(key, currentSection) {
                 const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                 const columnIndex = columns.indexOf(column);
 
-                if (columnIndex > 0) {
-                    const prevColumn = columns[columnIndex - 1];
-                    const prevColumnCards = Array.from(prevColumn.querySelectorAll('[class*="task-item"]'));
+                // Find the first non-collapsed column to the left with visible tasks
+                for (let i = columnIndex - 1; i >= 0; i--) {
+                    const prevColumn = columns[i];
+                    if (!window.isColumnCollapsed(prevColumn)) {
+                        const prevColumnCards = getVisibleTaskCards(prevColumn);
 
-                    if (prevColumnCards.length > 0) {
-                        const lastTask = prevColumnCards[prevColumnCards.length - 1];
-                        const lastTaskSections = lastTask.querySelectorAll('.task-section');
+                        if (prevColumnCards.length > 0) {
+                            const lastTask = prevColumnCards[prevColumnCards.length - 1];
+                            const lastTaskSections = lastTask.querySelectorAll('.task-section');
 
-                        if (lastTaskSections.length > 0) {
-                            focusSection(lastTaskSections[lastTaskSections.length - 1]);
+                            if (lastTaskSections.length > 0) {
+                                focusSection(lastTaskSections[lastTaskSections.length - 1]);
+                                break;
+                            }
                         }
                     }
                 }
@@ -3110,19 +3628,25 @@ function handleSectionNavigation(key, currentSection) {
         const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
         const columnIndex = columns.indexOf(column);
 
-        const targetColumnIndex = key === 'ArrowLeft' ? columnIndex - 1 : columnIndex + 1;
+        // Find the first non-collapsed column in the target direction
+        const start = key === 'ArrowLeft' ? columnIndex - 1 : columnIndex + 1;
+        const end = key === 'ArrowLeft' ? -1 : columns.length;
+        const step = key === 'ArrowLeft' ? -1 : 1;
 
-        if (targetColumnIndex >= 0 && targetColumnIndex < columns.length) {
-            const targetColumn = columns[targetColumnIndex];
-            const targetColumnCards = Array.from(targetColumn.querySelectorAll('[class*="task-item"]'));
+        for (let i = start; key === 'ArrowLeft' ? i > end : i < end; i += step) {
+            const targetColumn = columns[i];
+            if (!window.isColumnCollapsed(targetColumn)) {
+                const targetColumnCards = getVisibleTaskCards(targetColumn);
 
-            if (targetColumnCards.length > 0) {
-                // Always go to first task's first section in the column
-                const targetTask = targetColumnCards[0];
-                const targetSections = targetTask.querySelectorAll('.task-section');
+                if (targetColumnCards.length > 0) {
+                    // Always go to first task's first section in the column
+                    const targetTask = targetColumnCards[0];
+                    const targetSections = targetTask.querySelectorAll('.task-section');
 
-                if (targetSections.length > 0) {
-                    focusSection(targetSections[0]);
+                    if (targetSections.length > 0) {
+                        focusSection(targetSections[0]);
+                        break;
+                    }
                 }
             }
         }
@@ -3540,18 +4064,16 @@ function updateWhitespace(value) {
 function updateBorderStyles() {
     // Borders should be set via window.borderConfig from extension
     if (!window.borderConfig) {
-        console.error('[Border] Border configuration not received from extension');
+        // Configuration will be received shortly after webview loads
         return;
     }
 
     const { columnBorder, taskBorder } = window.borderConfig;
-    console.log('[Border-Debug] updateBorderStyles - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
+    console.log('[Border-Debug] Received from extension - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
     // Apply CSS variables
     document.documentElement.style.setProperty('--column-border', columnBorder);
     document.documentElement.style.setProperty('--task-border', taskBorder);
-
-    console.log('[Border-Debug] Applied to CSS - --column-border:', document.documentElement.style.getPropertyValue('--column-border'), '--task-border:', document.documentElement.style.getPropertyValue('--task-border'));
 }
 
 function calculateTaskDescriptionHeight() {
@@ -4008,6 +4530,12 @@ function applyLayoutPreset(presetKey) {
             case 'cardHeight':
                 setTaskMinHeight(value);
                 break;
+            case 'sectionHeight':
+                setSectionHeight(value);
+                break;
+            case 'taskSectionHeight':
+                setTaskSectionHeight(value);
+                break;
             case 'fontSize':
                 setFontSize(value);
                 break;
@@ -4026,8 +4554,11 @@ function applyLayoutPreset(presetKey) {
             case 'tagVisibility':
                 setTagVisibility(value);
                 break;
-            case 'showHtmlComments':
-                setShowHtmlComments(value);
+            case 'htmlCommentRenderMode':
+                setHtmlCommentRenderMode(value);
+                break;
+            case 'htmlContentRenderMode':
+                setHtmlContentRenderMode(value);
                 break;
             case 'whitespace':
                 setWhitespace(value);
@@ -4123,6 +4654,9 @@ function showExportDialogWithSelection(scope, index, id) {
     // Check Marp status when opening dialog
     checkMarpStatus();
 
+    // Add event listeners to detect manual setting changes
+    addExportSettingChangeListeners();
+
     modal.style.display = 'block';
 }
 
@@ -4165,6 +4699,8 @@ function setSelectedExportFolder(folderPath) {
     const folderInput = document.getElementById('export-folder');
     if (folderInput) {
         folderInput.value = folderPath;
+        // Reset preset to custom since user manually changed folder
+        resetPresetToCustom();
     }
 }
 
@@ -4239,25 +4775,63 @@ function initializeExportTree(preSelectNodeId = null) {
         exportTreeUI.selectAll();
     }
 
-    // Set up pack assets toggle
-    const packCheckbox = document.getElementById('pack-assets');
-    const packOptions = document.getElementById('export-pack-options');
+    // Set up link handling mode dropdown
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+    const linkHandlingOptions = document.getElementById('link-handling-options');
+    const fileTypeOptions = document.getElementById('file-type-options');
+    const fileSizeOption = document.getElementById('file-size-option');
 
-    if (packCheckbox && packOptions) {
-        packCheckbox.addEventListener('change', () => {
-            if (packCheckbox.checked) {
-                packOptions.classList.remove('disabled');
-            } else {
-                packOptions.classList.add('disabled');
-            }
+    if (linkModeDropdown && linkHandlingOptions && fileTypeOptions && fileSizeOption) {
+        linkModeDropdown.addEventListener('change', () => {
+            updateLinkHandlingOptionsVisibility();
         });
 
         // Initialize state
-        if (packCheckbox.checked) {
-            packOptions.classList.remove('disabled');
-        } else {
-            packOptions.classList.add('disabled');
-        }
+        updateLinkHandlingOptionsVisibility();
+    }
+}
+
+/**
+ * Update visibility of link handling options based on selected mode
+ */
+function updateLinkHandlingOptionsVisibility() {
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+    const linkHandlingOptions = document.getElementById('link-handling-options');
+    const fileTypeOptions = document.getElementById('file-type-options');
+    const fileSizeOption = document.getElementById('file-size-option');
+
+    if (!linkModeDropdown || !linkHandlingOptions || !fileTypeOptions || !fileSizeOption) {
+        return;
+    }
+
+    const mode = linkModeDropdown.value;
+
+    switch (mode) {
+        case 'rewrite-only':
+        case 'no-modify':
+            // No options needed for these modes
+            linkHandlingOptions.style.display = 'none';
+            fileTypeOptions.style.display = 'none';
+            fileSizeOption.style.display = 'none';
+            break;
+
+        case 'pack-linked':
+            // Show only file size limit
+            linkHandlingOptions.style.display = 'block';
+            fileTypeOptions.style.display = 'none';
+            fileSizeOption.style.display = 'block';
+            break;
+
+        case 'pack-all':
+            // Show both file type options and file size limit
+            linkHandlingOptions.style.display = 'block';
+            fileTypeOptions.style.display = 'block';
+            fileSizeOption.style.display = 'block';
+            break;
+
+        default:
+            linkHandlingOptions.style.display = 'none';
+            break;
     }
 }
 
@@ -4265,6 +4839,31 @@ function initializeExportTree(preSelectNodeId = null) {
  * Execute unified export
  */
 function executeUnifiedExport() {
+    // Stop existing auto-export and Marp processes before starting new export
+    if (autoExportActive || lastExportSettings) {
+        console.log('[kanban.webview.executeUnifiedExport] Stopping existing processes before new export');
+
+        // Stop auto-export
+        if (autoExportActive) {
+            vscode.postMessage({
+                type: 'stopAutoExport'
+            });
+        }
+
+        // Hide indicator
+        const indicator = document.getElementById('export-activity-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+
+        // Reset state
+        autoExportActive = false;
+        window.autoExportActive = false;
+        autoExportBrowserMode = false;
+        lastExportSettings = null;
+        window.lastExportSettings = null;
+    }
+
     const folderInput = document.getElementById('export-folder');
     if (!folderInput || !folderInput.value.trim()) {
         vscode.postMessage({
@@ -4290,18 +4889,28 @@ function executeUnifiedExport() {
     // Get tag visibility
     const tagVisibility = document.getElementById('export-tag-visibility')?.value || 'allexcludinglayout';
 
-    // Get pack assets option
-    const packAssets = document.getElementById('pack-assets')?.checked || false;
+    // Get link handling mode
+    const linkHandlingMode = document.getElementById('link-handling-mode')?.value || 'rewrite-only';
 
-    // Get pack options if packing is enabled
-    const packOptions = packAssets ? {
-        includeFiles: document.getElementById('include-files')?.checked || false,
-        includeImages: document.getElementById('include-images')?.checked || false,
-        includeVideos: document.getElementById('include-videos')?.checked || false,
-        includeOtherMedia: document.getElementById('include-other-media')?.checked || false,
-        includeDocuments: document.getElementById('include-documents')?.checked || false,
-        fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
-    } : undefined;
+    // Determine pack settings based on link handling mode
+    let packAssets = false;
+    let packOptions = undefined;
+
+    if (linkHandlingMode === 'pack-linked' || linkHandlingMode === 'pack-all') {
+        packAssets = true;
+        packOptions = {
+            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
+        };
+
+        // For pack-all mode, include type filters
+        if (linkHandlingMode === 'pack-all') {
+            packOptions.includeFiles = document.getElementById('include-files')?.checked || false;
+            packOptions.includeImages = document.getElementById('include-images')?.checked || false;
+            packOptions.includeVideos = document.getElementById('include-videos')?.checked || false;
+            packOptions.includeOtherMedia = document.getElementById('include-other-media')?.checked || false;
+            packOptions.includeDocuments = document.getElementById('include-documents')?.checked || false;
+        }
+    }
 
     // Get merge includes option
     const mergeIncludes = document.getElementById('merge-includes')?.checked || false;
@@ -4325,87 +4934,68 @@ function executeUnifiedExport() {
     // Close modal
     closeExportModal();
 
-    // Check if this is a Marp export
-    if (useMarp && format === 'presentation') {
-        // Export each selected item with Marp
-        selectedItems.forEach(item => {
-            const options = {
-                targetFolder: folderInput.value.trim(),
-                scope: item.scope,
-                format: `marp-${marpOutputFormat}`,
-                tagVisibility: tagVisibility,
-                packAssets: packAssets,
-                packOptions: packOptions,
-                mergeIncludes: mergeIncludes,
-                marpTheme: marpTheme,
-                marpBrowser: marpBrowser,
-                marpPreview: marpPreview,
-                autoExportOnSave: autoExportOnSave,
-                selection: {
-                    rowNumber: item.rowNumber,
-                    stackIndex: item.stackIndex,
-                    columnIndex: item.columnIndex,
-                    columnId: item.columnId
-                }
-            };
+    // selectedItems is now an array of column indexes
+    const options = {
+        // SELECTION: Column indexes to export
+        columnIndexes: selectedItems,
 
-            // Save last export settings for quick re-export
-            lastExportSettings = options;
+        // MODE
+        mode: 'save',
 
-            vscode.postMessage({
-                type: 'exportWithMarp',
-                options: options
-            });
-        });
-    } else {
-        // Export each selected item with standard export
-        selectedItems.forEach(item => {
-            const options = {
-                targetFolder: folderInput.value.trim(),
-                scope: item.scope,
-                format: format,
-                tagVisibility: tagVisibility,
-                packAssets: packAssets,
-                packOptions: packOptions,
-                mergeIncludes: mergeIncludes,
-                autoExportOnSave: autoExportOnSave,
-                selection: {
-                    rowNumber: item.rowNumber,
-                    stackIndex: item.stackIndex,
-                    columnIndex: item.columnIndex,
-                    columnId: item.columnId
-                }
-            };
+        // FORMAT
+        format: useMarp && format === 'presentation' ? 'marp' : format,
+        marpFormat: useMarp && format === 'presentation' ? marpOutputFormat : undefined,
 
-            // Save last export settings for quick re-export
-            lastExportSettings = options;
+        // TRANSFORMATIONS
+        tagVisibility: tagVisibility,
+        mergeIncludes: mergeIncludes,
 
-            // Send unified export request
-            vscode.postMessage({
-                type: 'unifiedExport',
-                options: options
-            });
-        });
-    }
+        // PACKING & LINK HANDLING
+        linkHandlingMode: linkHandlingMode,
+        packAssets: packAssets,
+        packOptions: packOptions,
+
+        // OUTPUT
+        targetFolder: folderInput.value.trim(),
+        openAfterExport: false,
+
+        // MARP SPECIFIC
+        marpTheme: useMarp ? marpTheme : undefined,
+        marpBrowser: useMarp ? marpBrowser : undefined,
+        marpWatch: useMarp && marpPreview ? true : undefined
+    };
+
+    // Save last export settings for quick re-export
+    lastExportSettings = options;
+    window.lastExportSettings = options;
+
+    vscode.postMessage({
+        type: 'export',
+        options: options
+    });
 
     // Update auto-export mode tracking (for Marp preview)
     autoExportBrowserMode = useMarp && marpPreview;
 
-    // Show the auto-export button after first export
+    // Show the auto-export button if auto-export-on-save OR (marp + live preview) is enabled
+    const shouldShowButton = autoExportOnSave || (useMarp && marpPreview);
     const autoExportBtn = document.getElementById('auto-export-btn');
-    if (autoExportBtn && lastExportSettings) {
+    if (autoExportBtn && lastExportSettings && shouldShowButton) {
         autoExportBtn.style.display = '';
+        autoExportActive = true;
+        window.autoExportActive = true;
         updateAutoExportButton();
     }
 
     // If auto-export checkbox was enabled in dialog, start auto-export immediately
     if (autoExportOnSave && lastExportSettings) {
-        autoExportActive = true;
-        updateAutoExportButton();
-
+        const autoOptions = {
+            ...lastExportSettings,
+            mode: 'auto'
+        };
         vscode.postMessage({
-            type: 'startAutoExport',
-            settings: lastExportSettings
+            type: 'export',
+            options: autoOptions
         });
     }
 }
@@ -4433,6 +5023,23 @@ function handleExportResult(result) {
             message: result.message
         });
     }
+}
+
+/**
+ * Get workspace path from current file
+ */
+function getWorkspacePath() {
+    if (window.currentFilePath) {
+        // Extract directory from current file path
+        const pathParts = window.currentFilePath.split('/');
+        // Remove the filename to get the directory
+        const directoryPath = '/' + pathParts.slice(0, -1).join('/');
+        
+        // Try to find workspace root by looking for common workspace indicators
+        // For now, return the directory path - this should work for most cases
+        return directoryPath;
+    }
+    return '_Export'; // Fallback
 }
 
 /**
@@ -4498,6 +5105,273 @@ function handleUseMarpChange() {
             marpOptions.classList.add('disabled-section');
         }
     }
+}
+
+/**
+ * Store last export settings for quick re-export
+ */
+let lastExportSettings = null;
+
+/**
+ * Apply export preset configuration
+ */
+function applyExportPreset() {
+    const presetSelect = document.getElementById('export-preset');
+    if (!presetSelect) {
+        return;
+    }
+
+    const preset = presetSelect.value;
+    if (!preset) {
+        return; // Custom settings selected
+    }
+
+    console.log('[kanban.webview] Applying export preset:', preset);
+
+    // Get current filename for folder generation
+    const currentFilename = window.currentKanbanFile ? 
+        window.currentKanbanFile.split('/').pop().replace('.md', '') : 'kanban';
+    
+    // Get absolute workspace path for export folder generation
+    // const getWorkspacePath = () => {
+    //     if (window.currentKanbanFile) {
+    //         // Extract workspace path from current file path
+    //         const filePathParts = window.currentKanbanFile.split('/');
+    //         // Find the workspace root (assuming the file is in a workspace folder)
+    //         // For now, use the directory containing the current file as base
+    //         return window.currentKanbanFile.replace(/\/[^\/]*\.md$/, '');
+    //     }
+    //     return '_Export'; // Fallback
+    // };
+
+    switch (preset) {
+        case 'marp-presentation':
+            applyPresetMarpPresentation(currentFilename);
+            break;
+        case 'marp-pdf':
+            applyPresetMarpPdf(currentFilename);
+            break;
+        case 'share-content':
+            applyPresetShareContent(currentFilename);
+            break;
+    }
+
+    // Trigger format change to update Marp options state
+    handleFormatChange();
+}
+
+/**
+ * Apply Marp Presentation preset
+ */
+function applyPresetMarpPresentation(currentFilename) {
+    // Export format: Convert to Presentation format
+    document.getElementById('export-format').value = 'presentation';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: No Tags
+    document.getElementById('export-tag-visibility').value = 'none';
+    
+    // Auto-export on save: On
+    document.getElementById('auto-export-on-save').checked = true;
+    
+    // Use Marp: On
+    document.getElementById('use-marp').checked = true;
+    
+    // Output Format: HTML
+    document.getElementById('marp-output-format').value = 'html';
+    
+    // Browser: Chrome
+    document.getElementById('marp-browser').value = 'chrome';
+    
+    // Live Preview: On
+    document.getElementById('marp-preview').checked = true;
+    
+    // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_Export`;
+    document.getElementById('export-folder').value = exportFolder;
+
+    // Link & Asset Handling: Rewrite relative links (no packing)
+    document.getElementById('link-handling-mode').value = 'rewrite-only';
+    updateLinkHandlingOptionsVisibility();
+}
+
+/**
+ * Apply Marp PDF preset
+ */
+function applyPresetMarpPdf(currentFilename) {
+    // Export format: Convert to Presentation format
+    document.getElementById('export-format').value = 'presentation';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: No Tags
+    document.getElementById('export-tag-visibility').value = 'none';
+    
+    // Auto-export on save: On
+    document.getElementById('auto-export-on-save').checked = true;
+    
+    // Use Marp: On
+    document.getElementById('use-marp').checked = true;
+    
+    // Output Format: PDF
+    document.getElementById('marp-output-format').value = 'pdf';
+    
+    // Browser: Chrome
+    document.getElementById('marp-browser').value = 'chrome';
+    
+    // Live Preview: Off
+    document.getElementById('marp-preview').checked = false;
+    
+    // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_Export`;
+    document.getElementById('export-folder').value = exportFolder;
+
+    // Link & Asset Handling: Rewrite relative links (no packing)
+    document.getElementById('link-handling-mode').value = 'rewrite-only';
+    updateLinkHandlingOptionsVisibility();
+}
+
+/**
+ * Apply Share Content preset
+ */
+function applyPresetShareContent(currentFilename) {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Export format: Keep original format
+    document.getElementById('export-format').value = 'keep';
+    
+    // Merge Includes into Main File: Off
+    document.getElementById('merge-includes').checked = false;
+    
+    // Tag Visibility: All Tags
+    document.getElementById('export-tag-visibility').value = 'all';
+    
+    // Auto-export on save: Off (not specified, so default to off)
+    document.getElementById('auto-export-on-save').checked = false;
+    
+    // Use Marp: Off
+    document.getElementById('use-marp').checked = false;
+    
+    // Export folder: Absolute path to _{filename}_{date}
+    const workspacePath = getWorkspacePath();
+    const exportFolder = `${workspacePath}/_${currentFilename}_${dateStr}`;
+    document.getElementById('export-folder').value = exportFolder;
+
+    // Link & Asset Handling: Pack all files (by type)
+    document.getElementById('link-handling-mode').value = 'pack-all';
+    updateLinkHandlingOptionsVisibility();
+
+    // Pack options - all file types enabled
+    document.getElementById('include-files').checked = true;
+    document.getElementById('include-images').checked = true;
+    document.getElementById('include-videos').checked = true;
+    document.getElementById('include-other-media').checked = true;
+    document.getElementById('include-documents').checked = true;
+
+    // File size limit: 100mb
+    document.getElementById('file-size-limit').value = 100;
+}
+
+/**
+ * Save current export settings as last used
+ */
+function saveLastExportSettings() {
+    const folderInput = document.getElementById('export-folder');
+    const formatSelect = document.getElementById('export-format');
+    const tagVisibilitySelect = document.getElementById('export-tag-visibility');
+    const mergeIncludesCheckbox = document.getElementById('merge-includes');
+    const autoExportCheckbox = document.getElementById('auto-export-on-save');
+    const useMarpCheckbox = document.getElementById('use-marp');
+    const linkModeDropdown = document.getElementById('link-handling-mode');
+
+    if (!folderInput || !formatSelect || !tagVisibilitySelect) {
+        return;
+    }
+
+    // Get link handling mode
+    const linkHandlingMode = linkModeDropdown?.value || 'rewrite-only';
+
+    // Determine pack settings based on link handling mode
+    let packAssets = false;
+    let packOptions = undefined;
+
+    if (linkHandlingMode === 'pack-linked' || linkHandlingMode === 'pack-all') {
+        packAssets = true;
+        packOptions = {
+            fileSizeLimitMB: parseInt(document.getElementById('file-size-limit')?.value) || 100
+        };
+
+        // For pack-all mode, include type filters
+        if (linkHandlingMode === 'pack-all') {
+            packOptions.includeFiles = document.getElementById('include-files')?.checked || false;
+            packOptions.includeImages = document.getElementById('include-images')?.checked || false;
+            packOptions.includeVideos = document.getElementById('include-videos')?.checked || false;
+            packOptions.includeOtherMedia = document.getElementById('include-other-media')?.checked || false;
+            packOptions.includeDocuments = document.getElementById('include-documents')?.checked || false;
+        }
+    }
+
+    lastExportSettings = {
+        targetFolder: folderInput.value.trim(),
+        format: formatSelect.value,
+        tagVisibility: tagVisibilitySelect.value,
+        mergeIncludes: mergeIncludesCheckbox?.checked || false,
+        autoExportOnSave: autoExportCheckbox?.checked || false,
+        useMarp: useMarpCheckbox?.checked || false,
+        linkHandlingMode: linkHandlingMode,
+        packAssets: packAssets,
+        packOptions: packOptions,
+        // Marp settings
+        marpOutputFormat: document.getElementById('marp-output-format')?.value || 'html',
+        marpTheme: document.getElementById('marp-theme')?.value || 'default',
+        marpBrowser: document.getElementById('marp-browser')?.value || 'chrome',
+        marpPreview: document.getElementById('marp-preview')?.checked || false
+    };
+
+    window.lastExportSettings = lastExportSettings;
+    console.log('[kanban.webview] Saved last export settings:', lastExportSettings);
+}
+
+/**
+ * Reset preset to Custom Settings when user manually changes options
+ */
+function resetPresetToCustom() {
+    const presetSelect = document.getElementById('export-preset');
+    if (presetSelect && presetSelect.value !== '') {
+        presetSelect.value = '';
+        console.log('[kanban.webview] Reset preset to Custom Settings due to manual change');
+    }
+}
+
+/**
+ * Add event listeners to detect manual changes and reset preset
+ */
+function addExportSettingChangeListeners() {
+    const elements = [
+        'export-format', 'export-tag-visibility', 'merge-includes',
+        'auto-export-on-save', 'use-marp', 'link-handling-mode',
+        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview',
+        'include-files', 'include-images', 'include-videos',
+        'include-other-media', 'include-documents', 'file-size-limit'
+    ];
+
+    elements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.addEventListener('change', resetPresetToCustom);
+            } else {
+                element.addEventListener('input', resetPresetToCustom);
+                element.addEventListener('change', resetPresetToCustom);
+            }
+        }
+    });
 }
 
 /**
@@ -4613,11 +5487,6 @@ function loadMarpThemes() {
 }
 
 /**
- * Store last export settings for quick re-export
- */
-let lastExportSettings = null;
-
-/**
  * Auto-export state
  */
 let autoExportActive = false;
@@ -4637,13 +5506,20 @@ function toggleAutoExport() {
     }
 
     autoExportActive = !autoExportActive;
+    // Keep window variables in sync
+    window.autoExportActive = autoExportActive;
+    
     updateAutoExportButton();
 
     if (autoExportActive) {
         // Start auto-export
+        const autoOptions = {
+            ...lastExportSettings,
+            mode: 'auto'
+        };
         vscode.postMessage({
-            type: 'startAutoExport',
-            settings: lastExportSettings
+            type: 'export',
+            options: autoOptions
         });
 
         vscode.postMessage({
@@ -4651,14 +5527,39 @@ function toggleAutoExport() {
             message: 'Auto-export started. File will export automatically on save.'
         });
     } else {
-        // Stop auto-export
+        // IMMEDIATELY hide the button and indicator when user clicks stop
+        const autoExportBtn = document.getElementById('auto-export-btn');
+        const indicator = document.getElementById('export-activity-indicator');
+        if (autoExportBtn) {
+            autoExportBtn.style.display = 'none';
+            autoExportBtn.classList.remove('active');
+            console.log('[kanban.webview] Auto-export button immediately hidden on user stop');
+        }
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+
+        // Reset state immediately
+        autoExportActive = false;
+        window.autoExportActive = false;
+        autoExportBrowserMode = false;
+        lastExportSettings = null;
+        window.lastExportSettings = null;
+
+        // Reset button text and icon
+        const icon = document.getElementById('auto-export-icon');
+        if (icon) {
+            icon.textContent = '▶';
+        }
+
+        // Stop both auto-export and Marp processes
         vscode.postMessage({
             type: 'stopAutoExport'
         });
 
         vscode.postMessage({
             type: 'showInfo',
-            message: 'Auto-export stopped.'
+            message: 'Auto-export and Marp processes stopped.'
         });
     }
 }
@@ -4669,22 +5570,39 @@ function toggleAutoExport() {
 function updateAutoExportButton() {
     const btn = document.getElementById('auto-export-btn');
     const icon = document.getElementById('auto-export-icon');
-    const text = document.getElementById('auto-export-text');
+    const indicator = document.getElementById('export-activity-indicator');
 
-    if (!btn || !icon || !text) {
+    if (!btn || !icon || !indicator) {
+        console.warn('[kanban.webview] updateAutoExportButton: Button elements not found');
         return;
     }
+
+    // Hide button and indicator if there are no export settings
+    if (!lastExportSettings) {
+        btn.style.display = 'none';
+        btn.classList.remove('active');
+        icon.textContent = '▶';
+        btn.title = 'Start auto-export with last settings';
+        if (indicator) indicator.style.display = 'none';
+        console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
+        return;
+    }
+
+    // Show button if there are export settings
+    btn.style.display = '';
 
     if (autoExportActive) {
         btn.classList.add('active');
         icon.textContent = '■'; // Stop icon
-        text.textContent = autoExportBrowserMode ? 'Stop Live' : 'Stop Auto';
+        if (indicator) indicator.style.display = 'inline-flex';
         btn.title = 'Stop auto-export';
+        console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
         btn.classList.remove('active');
         icon.textContent = '▶'; // Play icon
-        text.textContent = autoExportBrowserMode ? 'Start Live' : 'Auto Export';
         btn.title = 'Start auto-export with last settings';
+        if (indicator) indicator.style.display = 'none';
+        console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');
     }
 }
 
@@ -4702,25 +5620,11 @@ function executeQuickExport() {
     }
 
     // Re-export with last settings
-    const format = lastExportSettings.format;
-
-    // For Marp HTML with preview, don't re-export during auto-export since Marp handles file changes
-    if (autoExportActive && format === 'marp-html' && lastExportSettings.marpPreview) {
-        console.log('[kanban.webview.executeQuickExport] Skipping Marp HTML re-export during auto-export - Marp handles file changes automatically');
-        return;
-    }
-
-    if (format && format.startsWith('marp')) {
-        vscode.postMessage({
-            type: 'exportWithMarp',
-            options: lastExportSettings
-        });
-    } else {
-        vscode.postMessage({
-            type: 'unifiedExport',
-            options: lastExportSettings
-        });
-    }
+    // Just re-use the last export settings
+    vscode.postMessage({
+        type: 'export',
+        options: lastExportSettings
+    });
 
     // Show activity indicator only if not auto-exporting
     if (!autoExportActive) {
@@ -4775,6 +5679,41 @@ function handleColumnIncludeClick(event, filePath) {
         });
     }
     // Normal clicks do nothing (don't interfere with column title editing)
+}
+
+function handleTaskIncludeClick(event, filePath) {
+    // Only open file on Alt+click
+    if (event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Send message to backend to open the file
+        vscode.postMessage({
+            type: 'openIncludeFile',
+            filePath: filePath
+        });
+    }
+    // Normal clicks do nothing (don't interfere with task title editing)
+}
+
+/**
+ * Handle clicks on regular include filename links
+ * @param {Event} event - The click event
+ * @param {string} filePath - The path to the include file
+ */
+function handleRegularIncludeClick(event, filePath) {
+    // Only open file on Alt+click
+    if (event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Send message to backend to open the file
+        vscode.postMessage({
+            type: 'openIncludeFile',
+            filePath: filePath
+        });
+    }
+    // Normal clicks do nothing
 }
 
 function handleColumnExportResult(result) {

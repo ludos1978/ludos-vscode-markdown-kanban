@@ -7,40 +7,16 @@ if (typeof window !== 'undefined') {
     window.handleTaskTagClick = null;
 }
 
-// Smart logger for menuOperations
-const menuLogger = window.createSmartLogger ? window.createSmartLogger('[MenuOps]') : {
-    log: () => {},
-    once: () => {},
-    always: console.log.bind(console, '[MenuOps]')
-};
-
 // Global state
 let activeTagMenu = null;
 
 /**
- * Scrolls an element into view only if it's outside the viewport and highlights it
+ * Scrolls an element into view only if it's outside the viewport
  * @param {HTMLElement} element - Element to check and potentially scroll
  * @param {string} type - 'task' or 'column' for logging purposes
- * @param {boolean} highlight - Whether to highlight the element after scrolling (default: true)
  */
-function scrollToElementIfNeeded(element, type = 'element', highlight = true) {
-    menuLogger.always('scrollToElementIfNeeded Called', {
-        hasElement: !!element,
-        type,
-        highlight,
-        elementId: element?.dataset?.columnId || element?.dataset?.taskId,
-        isConnected: element?.isConnected
-    });
-
-    if (!element) {
-        menuLogger.always('scrollToElementIfNeeded ABORTED - no element');
-        return;
-    }
-
-    if (!element.isConnected) {
-        menuLogger.always('scrollToElementIfNeeded ABORTED - element not in DOM');
-        return;
-    }
+function scrollToElementIfNeeded(element, type = 'element') {
+    if (!element) return;
 
     const rect = element.getBoundingClientRect();
 
@@ -53,63 +29,15 @@ function scrollToElementIfNeeded(element, type = 'element', highlight = true) {
         isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
     }
 
-    menuLogger.log('scrollToElementIfNeeded-visibility', {
+    console.log(`[scrollToElementIfNeeded] ${type} visibility check:`, {
         isVisible,
-        rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
-        viewport: { width: window.innerWidth, height: window.innerHeight }
-    }, 'Visibility check');
+        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        willScroll: !isVisible
+    });
 
     if (!isVisible) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        menuLogger.always('scrollToElementIfNeeded Scrolled into view');
-    }
-
-    // Highlight the element to draw attention
-    if (highlight) {
-        if (type === 'column') {
-            // For columns, highlight all parts: header, title, inner, and footer
-            const parts = [
-                element.querySelector('.column-header'),
-                element.querySelector('.column-title'),
-                element.querySelector('.column-inner'),
-                element.querySelector('.column-footer')
-            ].filter(Boolean);
-
-            menuLogger.always('scrollToElementIfNeeded Applying highlight to column parts', {
-                partsCount: parts.length
-            });
-
-            // Apply animation to all parts
-            parts.forEach(part => {
-                part.style.animation = 'none';
-                void part.offsetWidth; // Force reflow
-                part.style.animation = 'highlightFlash 0.6s ease-in-out 2';
-            });
-
-            menuLogger.always('scrollToElementIfNeeded Highlight applied to all column parts');
-
-            // Clean up after animation completes
-            setTimeout(() => {
-                parts.forEach(part => {
-                    part.style.animation = '';
-                });
-                menuLogger.log('scrollToElementIfNeeded-cleanup', {}, 'Highlight cleaned up');
-            }, 1200);
-        } else {
-            // For tasks, highlight the task element directly
-            menuLogger.always('scrollToElementIfNeeded Applying highlight to task');
-
-            element.style.animation = 'none';
-            void element.offsetWidth;
-            element.style.animation = 'highlightFlash 0.6s ease-in-out 2';
-
-            menuLogger.always('scrollToElementIfNeeded Highlight applied');
-
-            setTimeout(() => {
-                element.style.animation = '';
-                menuLogger.log('scrollToElementIfNeeded-cleanup', {}, 'Highlight cleaned up');
-            }, 1200);
-        }
     }
 }
 
@@ -843,10 +771,11 @@ function insertColumnBefore(columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Extract tags from reference column and send to backend
-    const referenceColumn = window.cachedBoard?.columns.find(col => col.id === columnId);
+    // Get reference column and its row
+    const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
+    const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag and stack tag from reference column
+    // Extract row tag from reference column (e.g., #row2)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -854,37 +783,38 @@ function insertColumnBefore(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // Insert BEFORE rules:
-        // - If reference has #stack: new column gets #stack
-        // - If reference doesn't have #stack: new column gets NO #stack, but reference GETS #stack
-        const hasStackTag = /#stack\b/i.test(referenceColumn.title);
-        if (hasStackTag) {
-            tags += ' #stack';
-        }
-
-        // Ensure reference column gets #stack tag (if it doesn't have it already)
-        if (!hasStackTag) {
-            // Add #stack to reference column
+        // NEW column gets #stack tag (to be part of the stack)
+        // Reference column also gets #stack tag if it doesn't have it
+        if (!/#stack\b/i.test(referenceColumn.title)) {
             const trimmedTitle = referenceColumn.title.trim();
-            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : '#stack';
-
-            // Mark as unsaved since we modified the reference column
-            markUnsavedChanges();
+            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
         }
+
+        // New column gets #stack tag
+        tags += ' #stack';
     }
 
-    // Use unified operation that communicates with backend
-    insertColumnBefore_unified(columnId, tags.trim());
+    // Cache-first: Create new column and insert before reference column
+    const newColumn = {
+        id: `temp-column-before-${Date.now()}`,
+        title: tags.trim(), // Row tag AND #stack tag
+        tasks: []
+    };
+
+    updateCacheForNewColumn(newColumn, referenceIndex, columnId);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function insertColumnAfter(columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Extract tags from reference column and send to backend
-    const referenceColumn = window.cachedBoard?.columns.find(col => col.id === columnId);
+    // Get reference column and its row
+    const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
+    const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column
+    // Extract row tag from reference column (e.g., #row2)
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -892,13 +822,21 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // Insert AFTER rules:
-        // - ALWAYS add #stack to new column
+        // For insertColumnAfter: Only the NEW column gets #stack tag
+        // The reference column is NOT modified
         tags += ' #stack';
     }
 
-    // Use unified operation that communicates with backend
-    insertColumnAfter_unified(columnId, tags.trim());
+    // Cache-first: Create new column and insert after reference column
+    const newColumn = {
+        id: `temp-column-after-${Date.now()}`,
+        title: tags.trim(), // Row tag and #stack tag
+        tasks: []
+    };
+
+    updateCacheForNewColumn(newColumn, referenceIndex + 1, columnId);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function moveColumnLeft(columnId) {
@@ -1168,14 +1106,17 @@ function sortColumn(columnId, sortType) {
 
 // Copy operations - using unified export system
 async function copyColumnAsMarkdown(columnId) {
+    closeAllMenus();
+
     if (!currentBoard?.columns) {return;}
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
-    // Use unified export system with presentation format
+    // Use NEW unified export system with presentation format
     vscode.postMessage({
-        type: 'generateCopyContent',
+        type: 'export',
         options: {
+            mode: 'copy',
             scope: 'column',
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
@@ -1185,19 +1126,20 @@ async function copyColumnAsMarkdown(columnId) {
             }
         }
     });
-
-    document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 }
 
 async function copyTaskAsMarkdown(taskId, columnId) {
+    closeAllMenus();
+
     if (!currentBoard?.columns) {return;}
     const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
-    // Use unified export system with presentation format
+    // Use NEW unified export system with presentation format
     vscode.postMessage({
-        type: 'generateCopyContent',
+        type: 'export',
         options: {
+            mode: 'copy',
             scope: 'task',
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
@@ -1208,8 +1150,6 @@ async function copyTaskAsMarkdown(taskId, columnId) {
             }
         }
     });
-
-    document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 }
 
 function copyToClipboard(text) {
@@ -1268,9 +1208,9 @@ function enableColumnIncludeMode(columnId, fileName) {
         return;
     }
 
-		// Update column title to include the syntax
+		// Update column title to include the syntax (location-based column include)
 		const currentTitle = column.title || '';
-		const newTitle = `${currentTitle} !!!columninclude(${fileName.trim()})!!!`.trim();
+		const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
 		// Update the cached board
 		column.originalTitle = currentTitle;
@@ -1287,7 +1227,7 @@ function enableColumnIncludeMode(columnId, fileName) {
 
 		// Send update to backend
 		vscode.postMessage({
-				type: 'updateBoard',
+				type: 'boardUpdate',
 				board: window.cachedBoard
 		});
 
@@ -1322,25 +1262,28 @@ function editColumnIncludeFile(columnId) {
     // Get current include file path
     const currentFile = column.includeFiles[0]; // For now, handle single file includes
 
+    console.log('[editColumnIncludeFile] Sending requestEditIncludeFileName message:', { columnId, currentFile });
+
     // Request new file path via VS Code dialog
     vscode.postMessage({
         type: 'requestEditIncludeFileName',
         columnId: columnId,
         currentFile: currentFile
     });
+    console.log('[editColumnIncludeFile] Message sent');
     return; // Exit here, the backend will handle the input and response
 }
 
 // Function called from backend after user provides edited include file name
 function updateColumnIncludeFile(columnId, newFileName, currentFile) {
     if (!window.cachedBoard) {
-        console.error('No cached board available');
+        console.error('[updateColumnIncludeFile] No cached board available');
         return;
     }
 
     const column = window.cachedBoard.columns.find(col => col.id === columnId);
     if (!column) {
-        console.error('Column not found:', columnId);
+        console.error('[updateColumnIncludeFile] Column not found:', columnId);
         return;
     }
 
@@ -1348,40 +1291,22 @@ function updateColumnIncludeFile(columnId, newFileName, currentFile) {
         // Extract the clean title (without include syntax)
         let cleanTitle = column.title || '';
 
-        // Remove all existing columninclude patterns
-        cleanTitle = cleanTitle.replace(/!!!columninclude\([^)]+\)!!!/g, '').trim();
+        // Remove all existing include patterns (location-based column include)
+        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
         // Create new title with updated include syntax
-        const newTitle = `${cleanTitle} !!!columninclude(${newFileName.trim()})!!!`.trim();
+        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-        // Update the cached board
-        column.title = newTitle;
-        column.includeFiles = [newFileName.trim()];
-        column.originalTitle = newTitle;
-
-        // Also update currentBoard for compatibility
-        if (window.cachedBoard !== window.cachedBoard) {
-            const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-            if (currentColumn) {
-                currentColumn.title = newTitle;
-                currentColumn.includeFiles = [newFileName.trim()];
-                currentColumn.originalTitle = newTitle;
-            }
-        }
-
-        // Send update to backend
+        // SWITCH-4: Use editColumnTitle message (unified path)
+        // Backend's updateColumnIncludeFile() handles: undo, unsaved prompts, cleanup, loading, updates
         vscode.postMessage({
-            type: 'updateBoard',
-            board: window.cachedBoard
+            type: 'editColumnTitle',
+            columnId: columnId,
+            title: newTitle
         });
 
-        // Update button state to show unsaved changes
+        // Update button state to show unsaved changes (path changed but not saved to main file yet)
         updateRefreshButtonState('unsaved', 1);
-
-        vscode.postMessage({
-            type: 'showMessage',
-            text: `Column include file updated to: ${newFileName.trim()}`
-        });
     }
 }
 
@@ -1400,7 +1325,7 @@ function disableColumnIncludeMode(columnId) {
 
     // Extract the clean title (without include syntax)
     let cleanTitle = column.title || '';
-    cleanTitle = cleanTitle.replace(/!!!columninclude\([^)]+\)!!!/g, '').trim();
+    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
     // If no clean title remains, use the filename
     if (!cleanTitle && column.includeFiles && column.includeFiles.length > 0) {
@@ -1427,7 +1352,7 @@ function disableColumnIncludeMode(columnId) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
@@ -1459,9 +1384,9 @@ function enableTaskIncludeMode(taskId, columnId, fileName) {
         return;
     }
 
-    // Update task title to include the syntax
+    // Update task title to include the syntax (location-based task include)
     const currentTitle = task.title || '';
-    const newTitle = `${currentTitle} !!!taskinclude(${fileName.trim()})!!!`.trim();
+    const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
     // Update the cached board
     task.originalTitle = currentTitle;
@@ -1481,7 +1406,7 @@ function enableTaskIncludeMode(taskId, columnId, fileName) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
@@ -1522,68 +1447,60 @@ function editTaskIncludeFile(taskId, columnId) {
     // Get current include file path
     const currentFile = task.includeFiles[0]; // For now, handle single file includes
 
-    // Request new filename from backend
+    // Request new file path via VS Code dialog (with unsaved changes check in backend)
     vscode.postMessage({
-        type: 'requestInput',
-        prompt: 'Enter the new include file name:',
-        value: currentFile,
-        callback: 'updateTaskIncludeFile',
-        params: { taskId: taskId, columnId: columnId }
+        type: 'requestEditTaskIncludeFileName',
+        taskId: taskId,
+        columnId: columnId,
+        currentFile: currentFile
     });
+    return; // Exit here, the backend will handle the input and response
 }
 
 // Function called from backend after user provides new include file name
-function updateTaskIncludeFile(taskId, columnId, newFileName) {
+function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
     if (!window.cachedBoard) {
-        console.error('No cached board available');
+        console.error('[updateTaskIncludeFile] No cached board available');
         return;
     }
 
     const column = window.cachedBoard.columns.find(col => col.id === columnId);
     if (!column) {
-        console.error('Column not found:', columnId);
+        console.error('[updateTaskIncludeFile] Column not found:', columnId);
         return;
     }
 
     const task = column.tasks.find(t => t.id === taskId);
     if (!task) {
-        console.error('Task not found:', taskId);
+        console.error('[updateTaskIncludeFile] Task not found:', taskId);
         return;
     }
 
-    // Update task title with new include file
-    let cleanTitle = task.title || '';
+    if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
+        // Update task title with new include file
+        let cleanTitle = task.title || '';
 
-    // Remove all existing taskinclude patterns
-    cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
+        // Remove all existing include patterns (location-based task include)
+        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
-    // Add new include pattern
-    const newTitle = `${cleanTitle} !!!taskinclude(${newFileName.trim()})!!!`.trim();
+        // Add new include pattern
+        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-    // Update cached board
-    task.title = newTitle;
-    task.originalTitle = cleanTitle;
+        // Send request to backend to switch the include file
+        // Backend will: save old file if needed, load new file, update task content
+        // WITHOUT saving the main kanban file
+        vscode.postMessage({
+            type: 'switchTaskIncludeFile',
+            taskId: taskId,
+            columnId: columnId,
+            newFilePath: newFileName.trim(),
+            oldFilePath: currentFile,
+            newTitle: newTitle
+        });
 
-    // Also update currentBoard for compatibility
-    if (window.cachedBoard !== window.cachedBoard) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-            if (currentTask) {
-                currentTask.title = newTitle;
-                currentTask.originalTitle = cleanTitle;
-            }
-        }
+        // Update button state to show unsaved changes (path changed but not saved to main file yet)
+        updateRefreshButtonState('unsaved', 1);
     }
-
-    // Send update to backend
-    vscode.postMessage({
-        type: 'updateBoard',
-        board: window.cachedBoard
-    });
-
-    // Update button state to show unsaved changes
-    updateRefreshButtonState('unsaved', 1);
 }
 
 // Disable task include mode
@@ -1610,7 +1527,7 @@ function disableTaskIncludeMode(taskId, columnId) {
 
     // Clean title to remove include syntax
     let cleanTitle = task.title || '';
-    cleanTitle = cleanTitle.replace(/!!!taskinclude\([^)]+\)!!!/g, '').trim();
+    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
     // Update cached board
     task.title = cleanTitle;
@@ -1636,7 +1553,7 @@ function disableTaskIncludeMode(taskId, columnId) {
 
     // Send update to backend
     vscode.postMessage({
-        type: 'updateBoard',
+        type: 'boardUpdate',
         board: window.cachedBoard
     });
 
@@ -1738,16 +1655,50 @@ function insertTaskBefore(taskId, columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    insertTaskBefore_unified(taskId, columnId);
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-before-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function insertTaskAfter(taskId, columnId) {
     // Close all menus properly
     closeAllMenus();
 
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    insertTaskAfter_unified(taskId, columnId);
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-after-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex + 1);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 function moveTaskToTop(taskId, columnId) {
@@ -2085,7 +2036,7 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
 
         // Use incremental DOM update instead of full redraw
         if (typeof window.addSingleColumnToDOM === 'function') {
-            const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex);
+            const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex, referenceColumnId);
 
             // Focus the newly created column and start editing its title
             if (columnElement) {
@@ -2110,9 +2061,17 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
 function addTask(columnId) {
     // Close all menus properly
     closeAllMenus();
-
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    addTask_unified(columnId, { title: '', description: '' });
+    
+    // Cache-first: Only update cached board, no automatic save
+    const newTask = {
+        id: `temp-menu-${Date.now()}`,
+        title: '',
+        description: ''
+    };
+    
+    updateCacheForNewTask(columnId, newTask);
+    
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 // Helper function to unfold a column if it's collapsed
@@ -2134,12 +2093,45 @@ function addTaskAndUnfold(columnId) {
 }
 
 function addColumn(rowNumber) {
-    // UNIFIED APPROACH: Send to backend instead of manipulating cache directly
-    // Always use empty title so column appears in row 1 as standalone column
-    const title = '';
+    // Cache-first: Create new column and add to end of the specified row
+    const title = (rowNumber && rowNumber > 1) ? `#row${rowNumber}` : '';
+    const newColumn = {
+        id: `temp-column-${Date.now()}`,
+        title: title,
+        tasks: []
+    };
 
-    // Use unified operation that communicates with backend
-    addColumn_unified(title);
+    // Find the last column in this row to determine insert position
+    let insertIndex = -1;
+    if (window.cachedBoard?.columns) {
+        // Find the index after the last column in this row
+        for (let i = window.cachedBoard.columns.length - 1; i >= 0; i--) {
+            const col = window.cachedBoard.columns[i];
+            const colRow = getColumnRow(col.title);
+            if (colRow === rowNumber) {
+                // Found the last column in this row, insert after it
+                insertIndex = i + 1;
+                break;
+            }
+        }
+
+        // If no columns found in this row, find where this row should start
+        if (insertIndex === -1) {
+            // Find the first column that belongs to a higher row number
+            for (let i = 0; i < window.cachedBoard.columns.length; i++) {
+                const col = window.cachedBoard.columns[i];
+                const colRow = getColumnRow(col.title);
+                if (colRow > rowNumber) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    updateCacheForNewColumn(newColumn, insertIndex);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
 // Tag operations - IMPORTANT: Always use unique IDs, never titles!
@@ -2667,11 +2659,36 @@ function updateTagChipStyle(button, tagName, isActive) {
 function markUnsavedChanges() {
     window.hasUnsavedChanges = true;
     updateRefreshButtonState('unsaved', 1);
-    
+
     // Always notify backend about unsaved changes state AND send the current cached board data
     if (typeof vscode !== 'undefined') {
         const boardToSend = window.cachedBoard || window.cachedBoard;
-        
+
+        console.log('[FRONTEND markUnsavedChanges] ===== SENDING TO BACKEND =====');
+        console.log('[FRONTEND markUnsavedChanges] boardToSend exists:', !!boardToSend);
+        if (boardToSend && boardToSend.columns) {
+            console.log('[FRONTEND markUnsavedChanges] columns:', boardToSend.columns.length);
+            // Log all include tasks
+            let includeTaskCount = 0;
+            boardToSend.columns.forEach((col, colIdx) => {
+                if (col.tasks) {
+                    col.tasks.forEach((task, taskIdx) => {
+                        if (task.includeMode) {
+                            includeTaskCount++;
+                            console.log(`[FRONTEND markUnsavedChanges] Column ${colIdx} Task ${taskIdx} (include):`, {
+                                title: task.title,
+                                displayTitle: task.displayTitle,
+                                descriptionLength: task.description ? task.description.length : 0,
+                                descriptionFirst50: task.description ? task.description.substring(0, 50) : '',
+                                includeFiles: task.includeFiles
+                            });
+                        }
+                    });
+                }
+            });
+            console.log('[FRONTEND markUnsavedChanges] Total include tasks:', includeTaskCount);
+        }
+
         vscode.postMessage({
             type: 'markUnsavedChanges',
             hasUnsavedChanges: true,
@@ -2681,22 +2698,15 @@ function markUnsavedChanges() {
 }
 
 /**
- * Marks changes as saved and notifies backend
- * Purpose: Track when changes have been saved successfully
- * Used by: Save operations and discard operations
+ * Marks changes as saved in frontend only
+ * Purpose: Update UI state when backend confirms save completed
+ * Used by: Backend messages after save completion
  * Side effects: Clears unsaved flag and updates UI state
+ * NOTE: Frontend cannot clear backend unsaved state - only backend can do that after save completes
  */
 function markSavedChanges() {
     window.hasUnsavedChanges = false;
     updateRefreshButtonState('default');
-    
-    // Always notify backend about saved state immediately
-    if (typeof vscode !== 'undefined') {
-        vscode.postMessage({
-            type: 'markUnsavedChanges',
-            hasUnsavedChanges: false
-        });
-    }
 }
 
 /**
@@ -2823,6 +2833,17 @@ function saveCachedBoard() {
         return;
     }
 
+    console.log('[FRONTEND saveCurrentBoard] ========================================');
+    console.log('[FRONTEND saveCurrentBoard] Preparing to save board');
+    console.log(`[FRONTEND saveCurrentBoard] cachedBoard has ${window.cachedBoard.columns?.length || 0} columns`);
+
+    // Log each column's includeMode status
+    if (window.cachedBoard.columns) {
+        for (const col of window.cachedBoard.columns) {
+            console.log(`[FRONTEND saveCurrentBoard] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
+        }
+    }
+
     // Capture any in-progress edits and include them in the save
     let boardToSave = window.cachedBoard;
     let hadInProgressEdits = false;
@@ -2833,6 +2854,9 @@ function saveCachedBoard() {
             hadInProgressEdits = true;
         }
     }
+
+    console.log('[FRONTEND saveCurrentBoard] Sending board to backend');
+    console.log('[FRONTEND saveCurrentBoard] ========================================');
 
     // Send the complete board state to VS Code using a simple message
     // This avoids complex sequential processing that might cause issues
