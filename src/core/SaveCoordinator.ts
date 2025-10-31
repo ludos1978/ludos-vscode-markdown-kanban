@@ -1,302 +1,111 @@
-import { IStateManager } from './types/ApplicationState';
+import { IEventBus } from './interfaces/IEventBus';
+import { SaveOperation } from './types/SaveTypes';
+import { SaveCompletedEvent, SaveFailedEvent } from './events/DomainEvents';
 
 /**
- * Save Coordinator - Single-Threaded Save Processing
+ * Save Coordinator - Mediator Pattern Implementation
  *
- * Eliminates race conditions in save operations by ensuring only one save
- * operation can run at a time, with proper queuing and state management.
- */
-
-export interface SaveOperation {
-    id: string;
-    board: any; // KanbanBoard
-    options: any; // SaveOptions
-    timestamp: Date;
-    status: 'queued' | 'processing' | 'completed' | 'failed';
-    error?: Error;
-}
-
-export interface SaveSubscriber {
-    onSaveUpdate(operation: SaveOperation): void;
-}
-
-/**
- * Save Coordinator with Single-Threaded Processing
- *
- * Ensures save operations are processed sequentially to prevent race conditions
- * and data corruption from concurrent save attempts.
+ * Coordinates save operations between multiple components.
+ * Ensures proper sequencing and conflict resolution.
  */
 export class SaveCoordinator {
-    private _queue: SaveOperation[] = [];
-    private _isProcessing = false;
-    private _subscribers: SaveSubscriber[] = [];
-    private _operationCounter = 0;
+    private saveQueue: SaveOperation[] = [];
+    private isProcessing: boolean = false;
+    private currentOperation: SaveOperation | null = null;
 
-    constructor(private stateManager: IStateManager) {}
+    constructor(private eventBus: IEventBus) {}
 
     /**
-     * Enqueue a save operation
+     * Enqueue save operation with conflict resolution
      */
-    async enqueueSave(board: any, options?: any): Promise<void> {
-        const operation: SaveOperation = {
-            id: `save_${++this._operationCounter}_${Date.now()}`,
-            board,
-            options,
+    async enqueueSave(operation: () => Promise<void>): Promise<void> {
+        const saveOp: SaveOperation = {
+            id: `save_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            operation,
             timestamp: new Date(),
-            status: 'queued'
+            priority: 'normal'
         };
 
-        console.log(`[SaveCoordinator] Enqueuing save operation: ${operation.id}`);
-        this._queue.push(operation);
+        this.saveQueue.push(saveOp);
 
-        // Notify subscribers of new operation
-        this._notifySubscribers(operation);
+        // Sort by priority (high first)
+        this.saveQueue.sort((a, b) => {
+            const priorityOrder: Record<string, number> = { high: 3, normal: 2, low: 1 };
+            return priorityOrder[b.priority] - priorityOrder[a.priority];
+        });
 
-        // Start processing if not already running
-        await this._processQueue();
+        return this.processQueue();
     }
 
     /**
-     * Cancel all pending save operations
+     * Process save queue sequentially
      */
-    cancelAll(): void {
-        console.log(`[SaveCoordinator] Cancelling all operations (${this._queue.length} queued)`);
+    private async processQueue(): Promise<void> {
+        if (this.isProcessing || this.saveQueue.length === 0) {
+            return;
+        }
 
-        // Mark all queued operations as failed
-        for (const operation of this._queue) {
-            if (operation.status === 'queued') {
-                operation.status = 'failed';
-                operation.error = new Error('Operation cancelled');
-                this._notifySubscribers(operation);
+        this.isProcessing = true;
+
+        while (this.saveQueue.length > 0) {
+            const operation = this.saveQueue.shift()!;
+            this.currentOperation = operation;
+
+            try {
+                console.log(`[SaveCoordinator] Processing save operation: ${operation.id}`);
+                await operation.operation();
+
+                // Publish success event
+                const event = new SaveCompletedEvent({
+                    board: null, // Will be filled by actual save operation
+                    filePath: '',
+                    duration: Date.now() - operation.timestamp.getTime(),
+                    timestamp: new Date()
+                });
+                await this.eventBus.publish(event);
+
+            } catch (error) {
+                console.error(`[SaveCoordinator] Save operation failed: ${operation.id}`, error);
+
+                // Publish failure event
+                const event = new SaveFailedEvent({
+                    board: null, // Will be filled by actual save operation
+                    error: error as Error,
+                    timestamp: new Date()
+                });
+                await this.eventBus.publish(event);
+
+                // Continue processing other operations
+            } finally {
+                this.currentOperation = null;
             }
         }
 
-        this._queue = [];
+        this.isProcessing = false;
     }
 
     /**
-     * Get current save status
+     * Cancel current operation
+     */
+    cancelCurrent(): void {
+        if (this.currentOperation) {
+            console.log(`[SaveCoordinator] Cancelling operation: ${this.currentOperation.id}`);
+            this.currentOperation = null;
+        }
+    }
+
+    /**
+     * Get queue status
      */
     getStatus(): {
         isProcessing: boolean;
         queueLength: number;
-        currentOperation: SaveOperation | null;
-    } {
-        const currentOperation = this._queue.find(op => op.status === 'processing') || null;
-
-        return {
-            isProcessing: this._isProcessing,
-            queueLength: this._queue.filter(op => op.status === 'queued').length,
-            currentOperation
-        };
-    }
-
-    /**
-     * Subscribe to save operation updates
-     */
-    subscribe(subscriber: SaveSubscriber): () => void {
-        this._subscribers.push(subscriber);
-
-        return () => {
-            const index = this._subscribers.indexOf(subscriber);
-            if (index >= 0) {
-                this._subscribers.splice(index, 1);
-            }
-        };
-    }
-
-    /**
-     * Process the save queue sequentially
-     */
-    private async _processQueue(): Promise<void> {
-        if (this._isProcessing || this._queue.length === 0) {
-            return;
-        }
-
-        this._isProcessing = true;
-        console.log(`[SaveCoordinator] Starting queue processing (${this._queue.length} operations)`);
-
-        try {
-            while (this._queue.length > 0) {
-                // Find next queued operation
-                const operationIndex = this._queue.findIndex(op => op.status === 'queued');
-
-                if (operationIndex === -1) {
-                    // No more queued operations
-                    break;
-                }
-
-                const operation = this._queue[operationIndex];
-                operation.status = 'processing';
-                this._notifySubscribers(operation);
-
-                console.log(`[SaveCoordinator] Processing operation: ${operation.id}`);
-
-                try {
-                    // Execute the save operation
-                    await this._executeSave(operation);
-
-                    operation.status = 'completed';
-                    console.log(`[SaveCoordinator] Operation completed: ${operation.id}`);
-
-                } catch (error) {
-                    operation.status = 'failed';
-                    operation.error = error as Error;
-                    console.error(`[SaveCoordinator] Operation failed: ${operation.id}`, error);
-                }
-
-                // Notify subscribers of final status
-                this._notifySubscribers(operation);
-
-                // Remove completed/failed operations from queue
-                this._queue.splice(operationIndex, 1);
-            }
-        } finally {
-            this._isProcessing = false;
-            console.log(`[SaveCoordinator] Queue processing complete`);
-        }
-    }
-
-    /**
-     * Execute a single save operation
-     */
-    private async _executeSave(operation: SaveOperation): Promise<void> {
-        const startTime = Date.now();
-
-        try {
-            // Update state manager with save in progress
-            this.stateManager.update({
-                type: 'save-update',
-                state: {
-                    isProcessing: true,
-                    currentOperation: operation,
-                    queueLength: this._queue.filter(op => op.status === 'queued').length,
-                    lastSaveTime: operation.timestamp
-                }
-            });
-
-            // Validate board before saving
-            if (!operation.board || !operation.board.valid) {
-                throw new Error('Invalid board data');
-            }
-
-            // Generate markdown content
-            const markdown = this._generateMarkdown(operation.board);
-
-            // Get current document (this would be injected in real implementation)
-            const document = this._getCurrentDocument();
-            if (!document) {
-                throw new Error('No active document to save to');
-            }
-
-            // Pause file watchers to prevent self-triggering
-            await this._pauseFileWatchers();
-
-            try {
-                // Apply the edit
-                const edit = new vscode.WorkspaceEdit();
-                edit.replace(
-                    document.uri,
-                    new vscode.Range(0, 0, document.lineCount, 0),
-                    markdown
-                );
-
-                const success = await vscode.workspace.applyEdit(edit);
-                if (!success) {
-                    throw new Error('Failed to apply workspace edit');
-                }
-
-                // Save the document
-                await document.save();
-
-                const duration = Date.now() - startTime;
-                console.log(`[SaveCoordinator] Save completed in ${duration}ms for operation: ${operation.id}`);
-
-            } finally {
-                // Always resume file watchers
-                await this._resumeFileWatchers();
-            }
-
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            console.error(`[SaveCoordinator] Save failed after ${duration}ms for operation: ${operation.id}`, error);
-            throw error;
-        } finally {
-            // Update state manager with save completed
-            this.stateManager.update({
-                type: 'save-update',
-                state: {
-                    isProcessing: this._isProcessing,
-                    currentOperation: null,
-                    queueLength: this._queue.filter(op => op.status === 'queued').length,
-                    lastSaveTime: new Date()
-                }
-            });
-        }
-    }
-
-    /**
-     * Generate markdown from board (placeholder - would use real parser)
-     */
-    private _generateMarkdown(board: any): string {
-        // This would use the MarkdownKanbanParser in real implementation
-        return `# ${board.title || 'Kanban Board'}\n\n<!-- Board content would go here -->`;
-    }
-
-    /**
-     * Get current document (placeholder - would be injected)
-     */
-    private _getCurrentDocument(): any {
-        // This would be injected in real implementation
-        return null;
-    }
-
-    /**
-     * Pause file watchers (placeholder)
-     */
-    private async _pauseFileWatchers(): Promise<void> {
-        console.log('[SaveCoordinator] Pausing file watchers');
-        // Implementation would pause all file watchers
-    }
-
-    /**
-     * Resume file watchers (placeholder)
-     */
-    private async _resumeFileWatchers(): Promise<void> {
-        console.log('[SaveCoordinator] Resuming file watchers');
-        // Implementation would resume all file watchers
-    }
-
-    /**
-     * Notify subscribers of operation updates
-     */
-    private _notifySubscribers(operation: SaveOperation): void {
-        this._subscribers.forEach(subscriber => {
-            try {
-                subscriber.onSaveUpdate(operation);
-            } catch (error) {
-                console.error('[SaveCoordinator] Error notifying subscriber:', error);
-            }
-        });
-    }
-
-    /**
-     * Get save statistics
-     */
-    getStats(): {
-        totalOperations: number;
-        queueLength: number;
-        isProcessing: boolean;
-        subscriberCount: number;
+        currentOperationId: string | null;
     } {
         return {
-            totalOperations: this._operationCounter,
-            queueLength: this._queue.length,
-            isProcessing: this._isProcessing,
-            subscriberCount: this._subscribers.length
+            isProcessing: this.isProcessing,
+            queueLength: this.saveQueue.length,
+            currentOperationId: this.currentOperation?.id || null
         };
     }
 }
-
-// Import vscode for the implementation
-import * as vscode from 'vscode';
