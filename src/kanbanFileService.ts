@@ -454,45 +454,13 @@ export class KanbanFileService {
      * @param updateVersionTracking - Track document version changes
      * @param triggerSave - Whether to call document.save() (false when called from onWillSave)
      */
-    private _saveQueue: Array<{resolve: () => void, reject: (error: any) => void, operation: () => Promise<void>}> = [];
-    private _isProcessingSave: boolean = false;
-
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
         console.log(`[KanbanFileService.saveToMarkdown] ENTRY - updateVersionTracking: ${updateVersionTracking}, triggerSave: ${triggerSave}`);
 
-        return new Promise((resolve, reject) => {
-            // Queue the save operation to prevent race conditions
-            this._saveQueue.push({
-                resolve,
-                reject,
-                operation: async () => {
-                    await this._executeSaveToMarkdown(updateVersionTracking, triggerSave);
-                }
-            });
-
-            // Process the queue
-            this._processSaveQueue();
+        // Use SaveCoordinator for queuing and sequential processing
+        return this._saveCoordinator.enqueueSave(async () => {
+            await this._executeSaveToMarkdown(updateVersionTracking, triggerSave);
         });
-    }
-
-    private async _processSaveQueue(): Promise<void> {
-        if (this._isProcessingSave || this._saveQueue.length === 0) {
-            return;
-        }
-
-        this._isProcessingSave = true;
-
-        while (this._saveQueue.length > 0) {
-            const item = this._saveQueue.shift()!;
-            try {
-                await item.operation();
-                item.resolve();
-            } catch (error) {
-                item.reject(error);
-            }
-        }
-
-        this._isProcessingSave = false;
     }
 
     private async _executeSaveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
@@ -575,6 +543,18 @@ export class KanbanFileService {
                 if (mainFile) {
                     // Always discard to reset unsaved state
                     // discardChanges() internally checks if content changed before emitting events
+                    mainFile.discardChanges();
+                }
+                return;
+            }
+
+            // CRITICAL FIX: If only include files have changes, we still need to save them
+            // Even if main file content is unchanged, proceed if include files need saving
+            const hasAnyChanges = (currentContent !== markdown) || (unsavedIncludeFiles.length > 0);
+            if (!hasAnyChanges) {
+                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: No changes detected, skipping save');
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
                     mainFile.discardChanges();
                 }
                 return;

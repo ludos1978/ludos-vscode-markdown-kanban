@@ -60,6 +60,10 @@ export class ConflictResolver {
     private activeDialogs = new Set<string>();
     private pendingResolutions = new Map<string, Promise<ConflictResolution>>();
 
+    // Merged from ConflictService: Dialog throttling to prevent spam
+    private _lastDialogTimestamp: number = 0;
+    private readonly _MIN_DIALOG_INTERVAL = 2000; // 2 seconds minimum between dialogs
+
     protected constructor() {}
 
     public static getInstance(): ConflictResolver {

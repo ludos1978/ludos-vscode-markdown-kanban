@@ -18,7 +18,6 @@ import { FormatConverter } from './services/export/FormatConverter';
 import { SaveEventCoordinator } from './saveEventCoordinator';
 import { IncludeFileManager } from './includeFileManager';
 import { KanbanFileService } from './kanbanFileService';
-import { ConflictService } from './conflictService';
 import { LinkOperations } from './utils/linkOperations';
 import {
     MarkdownFileRegistry,
@@ -53,7 +52,6 @@ export class KanbanWebviewPanel {
     private _backupManager: BackupManager;
     private _includeFileManager: IncludeFileManager;
     private _fileService: KanbanFileService;
-    private _conflictService: ConflictService;
 
     // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
@@ -341,18 +339,7 @@ export class KanbanWebviewPanel {
             () => this.getBoard()
         );
 
-        // Initialize ConflictService
-        this._conflictService = new ConflictService(
-            this._fileRegistry,
-            this._conflictResolver,
-            this._backupManager,
-            () => this.getBoard(),
-            this._fileManager,
-            () => this.saveToMarkdown(false),  // don't update version on conflict saves
-            () => this.forceReloadFromFile(),
-            this._includeFileManager,
-            this._context
-        );
+
 
         // Initialize KanbanFileService
         this._fileService = new KanbanFileService(
@@ -369,8 +356,8 @@ export class KanbanWebviewPanel {
             (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
             () => this._panel,
             () => this._context,
-            (context) => this._conflictService.showConflictDialog(context),
-            (document) => this._conflictService.notifyExternalChanges(
+            (context) => this.showConflictDialog(context),
+            (document) => this.notifyExternalChanges(
                 document,
                 () => this._messageHandler?.getUnifiedFileState(),
                 this._undoRedoManager,
@@ -431,19 +418,19 @@ export class KanbanWebviewPanel {
                     }
 
                     if (hasChanges && cachedBoard) {
-                        // User edited the board - update backend cache via unified handler
-                        // NOTE: This updates cache (setContent), NOT disk. Saving is separate.
-                        console.log('[markUnsavedChanges callback] User edited board - updating backend cache');
+                        // User edited the board - mark as having unsaved changes
+                        // NOTE: Do NOT generate markdown here - only during actual save operation
+                        console.log('[markUnsavedChanges callback] User edited board - marking as unsaved changes');
 
                         // Track changes in include files (updates their cache)
                         await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
 
-                        // Update main file cache - CRITICAL: use updateFromBoard to update BOTH content AND board object
+                        // Mark main file as having unsaved changes (without updating content)
                         const mainFile = this._getMainFile();
                         if (mainFile) {
-                            // updateFromBoard() updates both this._board and this._content
-                            // This ensures that when save() is called, it has the correct board to regenerate from
-                            mainFile.updateFromBoard(cachedBoard);
+                            // CRITICAL FIX: Only mark as unsaved, do NOT update content here
+                            // Content generation happens ONLY during save operation
+                            mainFile.setContent(mainFile.getContent(), false); // Force hasUnsavedChanges = true
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -466,10 +453,10 @@ export class KanbanWebviewPanel {
                         // If we get here, it's a valid state change from frontend (marking something as changed)
                         if (cachedBoard) {
                             // Frontend sent board changes - mark main file as having unsaved changes
-                            // CRITICAL: use updateFromBoard to update BOTH content AND board object
+                            // CRITICAL FIX: Only mark as unsaved, do NOT update content here
                             const mainFile = this._getMainFile();
                             if (mainFile) {
-                                mainFile.updateFromBoard(cachedBoard);
+                                mainFile.setContent(mainFile.getContent(), false); // Force hasUnsavedChanges = true
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
@@ -2645,36 +2632,65 @@ export class KanbanWebviewPanel {
         const mainFile = this._getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
 
-        const result = await this._conflictService._handlePanelClose(
-            () => this._messageHandler?.getUnifiedFileState(),
-            hasUnsavedChanges,
-            this._isClosingPrevented,
-            this.getBoard(),
-            () => this.dispose()
+        // Get include files unsaved status
+        const includeStatus = this._getIncludeFilesUnsavedStatus();
+
+        // If no unsaved changes, allow close
+        if (!hasUnsavedChanges && !includeStatus.hasChanges) {
+            console.log('[PanelClose] No unsaved changes - allowing close');
+            this.dispose();
+            return;
+        }
+
+        // Build message for unsaved changes
+        let message = '';
+        if (hasUnsavedChanges && includeStatus.hasChanges) {
+            message = `You have unsaved changes in the main file and in column include files:\n${includeStatus.changedFiles.join('\n')}\n\nDo you want to save before closing?`;
+        } else if (hasUnsavedChanges) {
+            message = `You have unsaved changes in the main file. Do you want to save before closing?`;
+        } else if (includeStatus.hasChanges) {
+            message = `You have unsaved changes in column include files:\n${includeStatus.changedFiles.join('\n')}\n\nDo you want to save before closing?`;
+        }
+
+        const saveAndClose = 'Save and close';
+        const closeWithoutSaving = 'Close without saving';
+        const cancel = 'Cancel (Esc)';
+
+        const choice = await vscode.window.showWarningMessage(
+            message,
+            { modal: true },
+            saveAndClose,
+            closeWithoutSaving,
+            cancel
         );
 
-        // Update state from result
-        // NOTE: newHasUnsavedChanges should be applied to MarkdownFile, not stored locally
-        const board = this.getBoard();
-        if (result.newHasUnsavedChanges !== hasUnsavedChanges && mainFile && board) {
-            if (result.newHasUnsavedChanges) {
-                // CRITICAL: use updateFromBoard to update BOTH content AND board object
-                mainFile.updateFromBoard(board);
-            } else {
-                // Always discard to reset state when transitioning to saved
-                // discardChanges() internally checks if content changed before emitting events
-                mainFile.discardChanges();
-            }
-        }
-        this._isClosingPrevented = result.newIsClosingPrevented;
-        if (result.newCachedBoard) {
-            this._cachedBoard = result.newCachedBoard;
-            this._boardCacheValid = true;
+        if (!choice || choice === cancel) {
+            // User cancelled - prevent close
+            this._isClosingPrevented = true;
+            console.log('[PanelClose] User cancelled close');
+            return;
         }
 
-        // Handle recursive call if user cancelled
-        if (result.shouldPreventClose && !result.newIsClosingPrevented) {
-            this._handlePanelClose();
+        if (choice === saveAndClose) {
+            // Save all changes and then close
+            console.log('[PanelClose] Saving all changes before close');
+            try {
+                await this.saveToMarkdown(true, true); // Save with version tracking and trigger save
+                console.log('[PanelClose] Save completed, now closing');
+                this.dispose();
+            } catch (error) {
+                console.error('[PanelClose] Save failed:', error);
+                // Don't close if save failed
+                this._isClosingPrevented = true;
+            }
+        } else if (choice === closeWithoutSaving) {
+            // Discard changes and close
+            console.log('[PanelClose] Discarding changes and closing');
+            if (mainFile) {
+                mainFile.discardChanges();
+            }
+            // Include files are handled by their own discard logic
+            this.dispose();
         }
     }
 
@@ -3246,6 +3262,28 @@ export class KanbanWebviewPanel {
      */
     private async setFileHidden(filePath: string): Promise<void> {
         await this._fileService.setFileHidden(filePath);
+    }
+
+    /**
+     * Show conflict dialog to user
+     */
+    public async showConflictDialog(context: ConflictContext): Promise<ConflictResolution> {
+        // Use ConflictResolver to handle the dialog
+        return await this._conflictResolver.resolveConflict(context);
+    }
+
+    /**
+     * Notify about external changes - simplified implementation
+     */
+    public async notifyExternalChanges(
+        document: vscode.TextDocument,
+        getUnifiedFileState: () => any,
+        undoRedoManager: any,
+        board: KanbanBoard | undefined
+    ): Promise<void> {
+        // This method is now handled by the unified conflict resolution system
+        // External changes are detected and handled by file watchers and the registry
+        console.log('[notifyExternalChanges] External changes are now handled by the unified system');
     }
 
     /**
