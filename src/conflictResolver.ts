@@ -15,6 +15,8 @@ export interface ConflictContext {
     changedIncludeFiles: string[];
     isClosing?: boolean;
     isInEditMode?: boolean;  // User is actively editing (cursor in editor)
+    lastExternalSaveTime?: Date;  // When external file was last legitimately saved
+    externalChangeTime?: Date;    // When current external change was detected
 }
 
 export interface ConflictResolution {
@@ -208,8 +210,9 @@ export class ConflictResolver {
     /**
      * External main file change dialog
      *
-     * SPEC REQUIREMENT: Should auto-reload if no unsaved changes AND not in edit mode (without showing dialog)
-     * NOTE: Edit mode tracking not yet implemented, so we still show dialog for now
+     * SOLUTION 1.1: Timestamp-Based Conflict Resolution
+     * - Detect legitimate external saves that should take precedence
+     * - Auto-reload for external saves, show dialog only for concurrent editing
      */
     private async showExternalMainFileDialog(context: ConflictContext): Promise<ConflictResolution> {
         const hasAnyUnsavedChanges = context.hasMainUnsavedChanges || context.hasIncludeUnsavedChanges;
@@ -220,8 +223,27 @@ export class ConflictResolver {
             hasMainUnsaved: context.hasMainUnsavedChanges,
             hasIncludeUnsaved: context.hasIncludeUnsavedChanges,
             hasAnyUnsavedChanges,
-            isInEditMode
+            isInEditMode,
+            lastExternalSaveTime: context.lastExternalSaveTime,
+            externalChangeTime: context.externalChangeTime
         });
+
+        // SOLUTION 1.1: Check if external change was a legitimate save operation
+        const isLegitimateExternalSave = this.isLegitimateExternalSave(context);
+
+        // If external change was a legitimate save AND we have unsaved changes,
+        // treat external save as authoritative and auto-reload (don't show dialog)
+        if (isLegitimateExternalSave && hasAnyUnsavedChanges && !isInEditMode) {
+            console.log('[ConflictResolver.showExternalMainFileDialog] AUTO-RELOAD: Legitimate external save detected, discarding local changes');
+            return {
+                action: 'discard_local',
+                shouldProceed: true,
+                shouldCreateBackup: false,
+                shouldSave: false,
+                shouldReload: true,
+                shouldIgnore: false
+            };
+        }
 
         // SPEC: Auto-reload if no unsaved changes AND not in edit mode (no dialog)
         if (!hasAnyUnsavedChanges && !isInEditMode) {
@@ -237,7 +259,7 @@ export class ConflictResolver {
             };
         }
 
-        console.log('[ConflictResolver.showExternalMainFileDialog] SHOW-DIALOG: Has unsaved changes or is in edit mode');
+        console.log('[ConflictResolver.showExternalMainFileDialog] SHOW-DIALOG: Concurrent editing or rapid changes detected');
 
         // Has unsaved changes OR in edit mode - show full 4-option dialog
         // Build include files list if present
@@ -481,6 +503,38 @@ export class ConflictResolver {
                 shouldIgnore: false
             };
         }
+    }
+
+    /**
+     * SOLUTION 1.1: Check if external change was a legitimate save operation
+     * that should take precedence over internal unsaved changes
+     */
+    private isLegitimateExternalSave(context: ConflictContext): boolean {
+        // If no timestamp information available, assume concurrent editing
+        if (!context.lastExternalSaveTime || !context.externalChangeTime) {
+            console.log('[ConflictResolver.isLegitimateExternalSave] No timestamp info - assuming concurrent editing');
+            return false;
+        }
+
+        // Calculate time difference between last known external save and current change detection
+        const timeDiff = context.externalChangeTime.getTime() - context.lastExternalSaveTime.getTime();
+        const timeDiffSeconds = timeDiff / 1000;
+
+        console.log('[ConflictResolver.isLegitimateExternalSave] Time analysis:', {
+            lastExternalSave: context.lastExternalSaveTime.toISOString(),
+            externalChangeDetected: context.externalChangeTime.toISOString(),
+            timeDiffSeconds,
+            thresholdSeconds: 30
+        });
+
+        // If external change happened more than 30 seconds after last known external save,
+        // it's likely a new legitimate save operation that should take precedence
+        const LEGITIMATE_SAVE_THRESHOLD_SECONDS = 30;
+        const isLegitimate = timeDiffSeconds > LEGITIMATE_SAVE_THRESHOLD_SECONDS;
+
+        console.log(`[ConflictResolver.isLegitimateExternalSave] Result: ${isLegitimate ? 'LEGITIMATE SAVE' : 'CONCURRENT EDITING'}`);
+
+        return isLegitimate;
     }
 
     /**

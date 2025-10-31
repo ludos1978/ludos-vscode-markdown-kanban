@@ -91,6 +91,7 @@ export class ConflictService {
 
     /**
      * Notify user about external changes without forcing reload
+     * SOLUTION 1.1: Track external save timestamps for intelligent conflict resolution
      */
     public async notifyExternalChanges(document: vscode.TextDocument, getUnifiedFileState: () => any, _undoRedoManager: any, cachedBoardFromWebview: any): Promise<void> {
         const fileName = path.basename(document.fileName);
@@ -108,6 +109,10 @@ export class ConflictService {
         const mainFile = this.fileRegistry.getMainFile();
         const isInEditMode = mainFile?.isInEditMode() || false;
 
+        // SOLUTION 1.1: Get timestamp information for intelligent conflict resolution
+        const lastExternalSaveTime = await this.getLastExternalSaveTime(document.uri.fsPath);
+        const externalChangeTime = new Date();
+
         // Use the unified conflict resolver with consistent data
         const context: ConflictContext = {
             type: 'external_main',
@@ -117,7 +122,9 @@ export class ConflictService {
             hasMainUnsavedChanges: fileState?.hasInternalChanges || false,
             hasIncludeUnsavedChanges: hasIncludeUnsavedChanges,
             changedIncludeFiles: changedIncludeFiles,
-            isInEditMode: isInEditMode
+            isInEditMode: isInEditMode,
+            lastExternalSaveTime: lastExternalSaveTime,
+            externalChangeTime: externalChangeTime
         };
 
         try {
@@ -419,6 +426,35 @@ export class ConflictService {
         } catch (error) {
             console.error('[openFileWithReuseCheck] Error opening file:', error);
             vscode.window.showErrorMessage(`Failed to open file: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * SOLUTION 1.1: Get the last time this file was legitimately saved externally
+     * Used to distinguish between external saves and concurrent editing conflicts
+     */
+    private async getLastExternalSaveTime(filePath: string): Promise<Date | undefined> {
+        try {
+            // Get file stats to determine last modification time
+            const stats = await fs.promises.stat(filePath);
+            const lastModified = new Date(stats.mtime);
+
+            // Store this in extension context for future comparisons
+            const contextKey = `lastExternalSave_${Buffer.from(filePath).toString('base64')}`;
+            const storedTime = this.context.globalState.get(contextKey) as Date | undefined;
+
+            // If this is the first time we're checking, or if the file was modified
+            // more recently than our stored time, update the stored time
+            if (!storedTime || lastModified.getTime() > storedTime.getTime()) {
+                await this.context.globalState.update(contextKey, lastModified);
+                return lastModified;
+            }
+
+            return storedTime;
+        } catch (error) {
+            // If we can't get file stats, return undefined (assume concurrent editing)
+            console.debug(`[getLastExternalSaveTime] Could not get stats for ${filePath}:`, error);
+            return undefined;
         }
     }
 

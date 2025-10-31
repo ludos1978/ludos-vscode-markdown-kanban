@@ -108,7 +108,18 @@ export class CacheManager implements ICacheManager {
             taskCount: number;
         };
     } {
-        const stats = {
+        const stats: {
+            hasBoard: boolean;
+            version: number;
+            lastSync: Date | null;
+            subscriberCount: number;
+            boardInfo?: {
+                id: string;
+                title: string;
+                columnCount: number;
+                taskCount: number;
+            };
+        } = {
             hasBoard: this.board !== null,
             version: this.version,
             lastSync: this.lastSync,

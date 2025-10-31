@@ -8,6 +8,9 @@ import { BackupManager } from './backupManager';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
 import { BoardOperations } from './boardOperations';
+import { SaveCoordinator } from './core/SaveCoordinator';
+import { ConflictEngine } from './core/ConflictEngine';
+import { StateManager } from './core/StateManager';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -48,6 +51,11 @@ export class KanbanFileService {
     private _panelId: string;
     private _trackedDocumentUri: string | undefined;
 
+    // NEW ARCHITECTURE COMPONENTS
+    private _stateManager: StateManager;
+    private _conflictEngine: ConflictEngine;
+    private _saveCoordinator: SaveCoordinator;
+
     constructor(
         private fileManager: FileManager,
         private fileRegistry: MarkdownFileRegistry,
@@ -68,6 +76,11 @@ export class KanbanFileService {
         private getPanelInstance: () => any  // Returns KanbanWebviewPanel instance
     ) {
         this._panelId = Math.random().toString(36).substr(2, 9);
+
+        // Initialize new architecture components
+        this._stateManager = new StateManager();
+        this._conflictEngine = new ConflictEngine(this._stateManager);
+        this._saveCoordinator = new SaveCoordinator(this._stateManager);
     }
 
     /**
@@ -441,8 +454,49 @@ export class KanbanFileService {
      * @param updateVersionTracking - Track document version changes
      * @param triggerSave - Whether to call document.save() (false when called from onWillSave)
      */
+    private _saveQueue: Array<{resolve: () => void, reject: (error: any) => void, operation: () => Promise<void>}> = [];
+    private _isProcessingSave: boolean = false;
+
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
         console.log(`[KanbanFileService.saveToMarkdown] ENTRY - updateVersionTracking: ${updateVersionTracking}, triggerSave: ${triggerSave}`);
+
+        return new Promise((resolve, reject) => {
+            // Queue the save operation to prevent race conditions
+            this._saveQueue.push({
+                resolve,
+                reject,
+                operation: async () => {
+                    await this._executeSaveToMarkdown(updateVersionTracking, triggerSave);
+                }
+            });
+
+            // Process the queue
+            this._processSaveQueue();
+        });
+    }
+
+    private async _processSaveQueue(): Promise<void> {
+        if (this._isProcessingSave || this._saveQueue.length === 0) {
+            return;
+        }
+
+        this._isProcessingSave = true;
+
+        while (this._saveQueue.length > 0) {
+            const item = this._saveQueue.shift()!;
+            try {
+                await item.operation();
+                item.resolve();
+            } catch (error) {
+                item.reject(error);
+            }
+        }
+
+        this._isProcessingSave = false;
+    }
+
+    private async _executeSaveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
+        console.log(`[KanbanFileService.saveToMarkdown] Executing save operation`);
 
         let document = this.fileManager.getDocument();
         if (!document || !this.board() || !this.board()!.valid) {
@@ -450,10 +504,9 @@ export class KanbanFileService {
             return;
         }
 
-        // STATE MACHINE: Check if already saving
+        // STATE MACHINE: Check if already saving (additional safety check)
         if (this._saveState !== SaveState.IDLE) {
-            console.warn(`[SaveStateMachine] Save already in progress (state=${SaveState[this._saveState]}), operation will be queued by RACE-4 lock`);
-            // Note: RACE-4 operation lock in KanbanWebviewPanel will queue this
+            console.warn(`[SaveStateMachine] Save already in progress (state=${SaveState[this._saveState]}), this should not happen with queue`);
             return;
         }
 
@@ -976,87 +1029,87 @@ export class KanbanFileService {
 
     /**
      * Check for external unsaved changes when about to save
+     * NOW USES NEW CONFLICT ENGINE FOR CONSISTENT DETECTION
      */
     private async checkForExternalUnsavedChanges(): Promise<boolean> {
-        // First check main file for external changes
         const document = this.fileManager.getDocument();
         if (!document) {
             return true; // No document, nothing to check
         }
 
-        // Check main file external changes using MainKanbanFile state
         const mainFile = this.fileRegistry.getMainFile();
-        if (mainFile && mainFile.hasExternalChanges()) {
-            // Real external changes detected in main file
-            const fileName = path.basename(document.fileName);
+        const includeFiles = this.fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
+        const changedIncludeFiles = includeFiles
+            .filter(f => f.hasUnsavedChanges())
+            .map(f => f.getRelativePath());
 
-            // Get include file unsaved status
-            const includeFiles = this.fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
-            const changedIncludeFiles = includeFiles
-                .filter(f => f.hasUnsavedChanges())
-                .map(f => f.getRelativePath());
+        // Create conflict context for main file
+        const mainContext: ConflictContext = {
+            type: 'presave_check',
+            fileType: 'main',
+            filePath: document.uri.fsPath,
+            fileName: path.basename(document.fileName),
+            hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false,
+            hasIncludeUnsavedChanges: changedIncludeFiles.length > 0,
+            hasExternalChanges: mainFile?.hasExternalChanges() || false,
+            changedIncludeFiles: changedIncludeFiles,
+            isInEditMode: false // We're in save operation, not editing
+        };
 
-            const context: ConflictContext = {
-                type: 'presave_check',
-                fileType: 'main',
-                filePath: document.uri.fsPath,
-                fileName: fileName,
-                hasMainUnsavedChanges: mainFile.hasUnsavedChanges(), // We're in the process of saving
-                hasIncludeUnsavedChanges: changedIncludeFiles.length > 0,
-                changedIncludeFiles: changedIncludeFiles
-            };
+        // Use ConflictEngine to detect conflicts
+        const conflicts = this._conflictEngine.detectConflicts(mainContext);
 
-            try {
-                const resolution = await this.showConflictDialog(context);
-                if (!resolution || !resolution.shouldProceed) {
-                    console.log('[checkForExternalUnsavedChanges] User chose not to proceed (cancel save)');
-                    return false; // User chose not to proceed
+        if (conflicts.length > 0) {
+            console.log(`[checkForExternalUnsavedChanges] Detected ${conflicts.length} conflict(s) using ConflictEngine`);
+
+            // For each conflict, get resolution (may auto-resolve or show dialog)
+            for (const conflict of conflicts) {
+                const resolution = this._conflictEngine.resolveConflict(conflict);
+
+                if (!resolution.shouldProceed) {
+                    console.log(`[checkForExternalUnsavedChanges] Conflict resolution cancelled save: ${conflict.description}`);
+                    return false;
                 }
-                console.log('[checkForExternalUnsavedChanges] User chose to overwrite external changes');
-            } catch (error) {
-                console.error('[checkForExternalUnsavedChanges] Error in main file conflict resolution:', error);
-                return false;
+
+                console.log(`[checkForExternalUnsavedChanges] Conflict resolved: ${resolution.action} - ${resolution.description}`);
             }
         }
 
-        // Now check include files for external changes
+        // Check include files for conflicts
         const filesThatNeedReload = this.fileRegistry.getFilesThatNeedReload();
         if (filesThatNeedReload.length > 0) {
-            console.log(`[checkForExternalUnsavedChanges] ${filesThatNeedReload.length} include file(s) have external changes, showing conflict dialog`);
+            console.log(`[checkForExternalUnsavedChanges] ${filesThatNeedReload.length} include file(s) have external changes`);
 
-            // Check if any of these files also have unsaved changes (conflict situation)
-            const filesWithConflicts = filesThatNeedReload.filter(f => f.hasUnsavedChanges());
-
-            if (filesWithConflicts.length > 0) {
-                // We have include files with both external changes AND unsaved changes - show conflict dialog
-                const changedIncludeFiles = filesWithConflicts.map(f => f.getRelativePath());
-                const fileName = document ? path.basename(document.fileName) : 'Unknown';
-
-                const mainFile = this.fileRegistry.getMainFile();
-                const context: ConflictContext = {
+            // Check each include file for conflicts
+            for (const includeFile of filesThatNeedReload) {
+                const includeContext: ConflictContext = {
                     type: 'presave_check',
                     fileType: 'include',
-                    filePath: document?.uri.fsPath || '',
-                    fileName: fileName,
-                    hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false, // We're about to save main file
-                    hasIncludeUnsavedChanges: true,
-                    changedIncludeFiles: changedIncludeFiles
+                    filePath: includeFile.getPath(),
+                    fileName: includeFile.getRelativePath(),
+                    hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false,
+                    hasIncludeUnsavedChanges: includeFile.hasUnsavedChanges(),
+                    hasExternalChanges: true, // File needs reload = has external changes
+                    changedIncludeFiles: [includeFile.getRelativePath()],
+                    isInEditMode: false
                 };
 
-                try {
-                    const resolution = await this.showConflictDialog(context);
-                    if (!resolution || !resolution.shouldProceed) {
-                        console.log('[checkForExternalUnsavedChanges] User chose not to proceed with include file conflicts');
-                        return false; // User chose not to proceed
+                const includeConflicts = this._conflictEngine.detectConflicts(includeContext);
+
+                if (includeConflicts.length > 0) {
+                    console.log(`[checkForExternalUnsavedChanges] Include file conflict detected: ${includeFile.getRelativePath()}`);
+
+                    for (const conflict of includeConflicts) {
+                        const resolution = this._conflictEngine.resolveConflict(conflict);
+
+                        if (!resolution.shouldProceed) {
+                            console.log(`[checkForExternalUnsavedChanges] Include file conflict cancelled save: ${conflict.description}`);
+                            return false;
+                        }
+
+                        console.log(`[checkForExternalUnsavedChanges] Include file conflict resolved: ${resolution.action} - ${resolution.description}`);
                     }
-                    console.log('[checkForExternalUnsavedChanges] User chose to proceed despite include file conflicts');
-                } catch (error) {
-                    console.error('[checkForExternalUnsavedChanges] Error in include file conflict resolution:', error);
-                    return false;
                 }
-            } else {
-                // Files need reload but no unsaved changes - safe to auto-reload
-                console.log('[checkForExternalUnsavedChanges] Include files have external changes but no unsaved changes, will auto-reload');
             }
         }
 
