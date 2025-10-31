@@ -190,14 +190,7 @@ export class MainKanbanFile extends MarkdownFile {
      * Handle external file change (file changed on disk)
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        console.log(`[MainKanbanFile.handleExternalChange] TRIGGERED:`, {
-            changeType,
-            file: this._relativePath,
-            hasUnsaved: this._hasUnsavedChanges,
-            hasFileSystemChanges: this._hasFileSystemChanges,
-            isInEditMode: this._isInEditMode
-        });
-
+        // Deleted file - special case
         if (changeType === 'deleted') {
             this._exists = false;
             console.warn(`[MainKanbanFile.handleExternalChange] FILE-DELETED: ${this._path}`);
@@ -208,26 +201,29 @@ export class MainKanbanFile extends MarkdownFile {
             this._exists = true;
         }
 
-        // Check for conflict FIRST - only clear content if auto-reloading
-        const hasConflict = this.hasConflict();
-        const needsReload = this.needsReload();
+        // SIMPLIFIED 3-VARIANT APPROACH
+        // We already know external changes occurred (watcher triggered)
+        // Just check: Are there ANY unsaved changes?
 
-        console.log(`[MainKanbanFile.handleExternalChange] DECISION-FACTORS:`, {
-            hasConflict,
-            needsReload,
-            hasUnsaved: this._hasUnsavedChanges,
-            isInEditMode: this._isInEditMode
-        });
+        const hasAnyUnsavedChanges = this.hasAnyUnsavedChanges();
 
-        if (hasConflict) {
-            console.log(`[MainKanbanFile.handleExternalChange] CONFLICT-DIALOG: Showing dialog to user (keeping current content for potential save)`);
+        console.log(`[MainKanbanFile.handleExternalChange] DECISION:`, JSON.stringify({
+            changeType,
+            file: this._relativePath,
+            hasAnyUnsavedChanges: hasAnyUnsavedChanges,
+            reasons: this._getUnsavedChangesReasons()
+        }, null, 2));
+
+        // VARIANT 1: ANY unsaved changes → SHOW DIALOG
+        if (hasAnyUnsavedChanges) {
+            console.log(`[VARIANT 1] Unsaved changes detected → Showing conflict dialog`);
             await this.showConflictDialog();
-        } else if (needsReload) {
-            console.log(`[MainKanbanFile.handleExternalChange] AUTO-RELOAD: Reloading from disk (no conflict detected)`);
-            await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
-        } else {
-            console.log(`[MainKanbanFile.handleExternalChange] NO-ACTION: External change detected but neither conflict nor reload needed`);
+            return;
         }
+
+        // VARIANT 2: NO unsaved changes → Safe to auto-reload
+        console.log(`[VARIANT 2] No unsaved changes → Auto-reloading`);
+        await this.reload();
     }
 
     // ============= VALIDATION =============
@@ -295,6 +291,56 @@ export class MainKanbanFile extends MarkdownFile {
             changedIncludeFiles: [],
             isClosing: false,
             isInEditMode: this._isInEditMode
+        };
+    }
+
+    // ============= SIMPLIFIED CONFLICT DETECTION =============
+
+    /**
+     * Check if there are ANY unsaved changes (simplified 3-variant approach)
+     * Returns true if ANY of these conditions are met:
+     * - Internal state flag is true (kanban UI edits)
+     * - User is in edit mode
+     * - VSCode document is dirty (text editor edits)
+     * - Document is open but we can't access it (safe default)
+     */
+    public hasAnyUnsavedChanges(): boolean {
+        // Check 1: Internal state flag (from kanban UI)
+        if (this._hasUnsavedChanges) return true;
+
+        // Check 2: Edit mode (user is actively editing)
+        if (this._isInEditMode) return true;
+
+        // Check 3: VSCode document dirty status (text editor edits)
+        const document = this._fileManager.getDocument();
+        if (document && document.uri.fsPath === this._path && document.isDirty) {
+            return true;
+        }
+
+        // Check 4: If document is open but we can't find it, be safe
+        const allDocs = vscode.workspace.textDocuments;
+        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
+        if (docOpen && !document) {
+            // Document is open but we can't access it - assume it might have changes
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get detailed reasons for unsaved changes (for logging)
+     */
+    private _getUnsavedChangesReasons(): { [key: string]: boolean } {
+        const document = this._fileManager.getDocument();
+        const allDocs = vscode.workspace.textDocuments;
+        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
+
+        return {
+            hasUnsavedChanges_flag: this._hasUnsavedChanges,
+            isInEditMode_flag: this._isInEditMode,
+            documentIsDirty: !!(document && document.uri.fsPath === this._path && document.isDirty),
+            documentOpenButInaccessible: docOpen && !document
         };
     }
 

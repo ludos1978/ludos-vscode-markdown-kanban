@@ -69,7 +69,8 @@
       "Bash(/opt/homebrew/bin/node /opt/homebrew/bin/npx tsc)",
       "Read(//opt/homebrew/bin/**)",
       "Bash(/usr/bin/find:*)",
-      "Bash(brew list:*)"
+      "Bash(brew list:*)",
+      "Bash(vsce package:*)"
     ],
     "deny": [],
     "ask": []
