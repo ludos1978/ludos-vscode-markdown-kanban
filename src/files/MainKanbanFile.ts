@@ -7,8 +7,6 @@ import { KanbanBoard, MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { FileManager } from '../fileManager';
-import { ConflictEngine } from '../core/ConflictEngine';
-import { StateManager } from '../core/StateManager';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 import { SaveCoordinator } from '../core/SaveCoordinator';
 
@@ -34,17 +32,13 @@ export class MainKanbanFile extends MarkdownFile {
     private _fileManager: FileManager;
     private _fileRegistry: MarkdownFileRegistry;
     private _parser: typeof MarkdownKanbanParser;
-    private _conflictEngine: ConflictEngine;
-    private _stateManager: StateManager;
 
     constructor(
         filePath: string,
         fileManager: FileManager,
         conflictResolver: ConflictResolver,
         backupManager: BackupManager,
-        fileRegistry: MarkdownFileRegistry,
-        conflictEngine?: ConflictEngine,
-        stateManager?: StateManager
+        fileRegistry: MarkdownFileRegistry
     ) {
         // FOUNDATION-1: For main file, use basename as relative path
         // Main file doesn't have a "parent", so relative path = filename
@@ -55,10 +49,6 @@ export class MainKanbanFile extends MarkdownFile {
         this._fileManager = fileManager;
         this._fileRegistry = fileRegistry;
         this._parser = MarkdownKanbanParser;
-
-        // Initialize new architecture components (with fallbacks)
-        this._stateManager = stateManager || new StateManager();
-        this._conflictEngine = conflictEngine || new ConflictEngine(this._stateManager);
     }
 
     // ============= FILE TYPE =============

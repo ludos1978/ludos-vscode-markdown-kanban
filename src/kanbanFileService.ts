@@ -9,8 +9,6 @@ import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
 import { BoardOperations } from './boardOperations';
 import { SaveCoordinator } from './core/SaveCoordinator';
-import { ConflictEngine } from './core/ConflictEngine';
-import { StateManager } from './core/StateManager';
 import { IEventBus } from './core/interfaces/IEventBus';
 
 /**
@@ -53,8 +51,6 @@ export class KanbanFileService {
     private _trackedDocumentUri: string | undefined;
 
     // NEW ARCHITECTURE COMPONENTS
-    private _stateManager: StateManager;
-    private _conflictEngine: ConflictEngine;
     private _saveCoordinator: SaveCoordinator;
 
     constructor(
@@ -79,8 +75,6 @@ export class KanbanFileService {
         this._panelId = Math.random().toString(36).substr(2, 9);
 
         // Initialize new architecture components
-        this._stateManager = new StateManager();
-        this._conflictEngine = new ConflictEngine(this._stateManager);
         this._saveCoordinator = SaveCoordinator.getInstance();
     }
 
