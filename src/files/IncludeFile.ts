@@ -5,6 +5,7 @@ import { MarkdownFile } from './MarkdownFile';
 import { ConflictResolver, ConflictContext } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { MainKanbanFile } from './MainKanbanFile';
+import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 
 /**
  * Abstract base class for all include files (column, task, regular includes).
@@ -131,44 +132,12 @@ export abstract class IncludeFile extends MarkdownFile {
     // ============= EXTERNAL CHANGE HANDLING =============
 
     /**
-     * Handle external file change
+     * Handle external file change using unified change handler
+     * This replaces the complex conflict detection logic with a single, consistent system
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        // Deleted file - special case
-        if (changeType === 'deleted') {
-            this._exists = false;
-            console.warn(`[${this.getFileType()}.handleExternalChange] FILE-DELETED: ${this._relativePath}`);
-            await this.notifyParentOfChange();
-            return;
-        }
-
-        if (changeType === 'created') {
-            this._exists = true;
-        }
-
-        // SIMPLIFIED 3-VARIANT APPROACH
-        // We already know external changes occurred (watcher triggered)
-        // Just check: Are there ANY unsaved changes?
-
-        const hasAnyUnsavedChanges = this.hasAnyUnsavedChanges();
-
-        console.log(`[${this.getFileType()}.handleExternalChange] DECISION:`, JSON.stringify({
-            changeType,
-            file: this._relativePath,
-            hasAnyUnsavedChanges: hasAnyUnsavedChanges,
-            reasons: this._getUnsavedChangesReasons()
-        }, null, 2));
-
-        // VARIANT 1: ANY unsaved changes → SHOW DIALOG
-        if (hasAnyUnsavedChanges) {
-            console.log(`[VARIANT 1] Unsaved changes detected → Showing conflict dialog`);
-            await this.showConflictDialog();
-            return;
-        }
-
-        // VARIANT 2: NO unsaved changes → Safe to auto-reload
-        console.log(`[VARIANT 2] No unsaved changes → Auto-reloading`);
-        await this.reload();
+        const changeHandler = UnifiedChangeHandler.getInstance();
+        await changeHandler.handleExternalChange(this, changeType);
     }
 
     // ============= PARENT NOTIFICATION =============

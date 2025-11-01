@@ -294,7 +294,10 @@ export class ConflictResolver {
             ignoreExternal
         );
 
+        console.log(`[ConflictResolver.showExternalMainFileDialog] User selected: "${choice}"`);
+
         if (!choice || choice === ignoreExternal) {
+            console.log(`[ConflictResolver.showExternalMainFileDialog] → Returning: ignore (no action)`);
             return {
                 action: 'ignore',
                 shouldProceed: true,
@@ -307,6 +310,7 @@ export class ConflictResolver {
 
         switch (choice) {
             case discardMyChanges:
+                console.log(`[ConflictResolver.showExternalMainFileDialog] → Returning: discard_local (reload)`);
                 return {
                     action: 'discard_local',
                     shouldProceed: true,
@@ -316,6 +320,7 @@ export class ConflictResolver {
                     shouldIgnore: false
                 };
             case saveAsBackup:
+                console.log(`[ConflictResolver.showExternalMainFileDialog] → Returning: backup_and_reload`);
                 return {
                     action: 'backup_and_reload',
                     shouldProceed: true,
@@ -325,6 +330,7 @@ export class ConflictResolver {
                     shouldIgnore: false
                 };
             case saveAndIgnoreExternal:
+                console.log(`[ConflictResolver.showExternalMainFileDialog] → Returning: discard_external (save local)`);
                 return {
                     action: 'discard_external',
                     shouldProceed: true,
@@ -334,6 +340,7 @@ export class ConflictResolver {
                     shouldIgnore: false
                 };
             default:
+                console.log(`[ConflictResolver.showExternalMainFileDialog] → Returning: ignore (default/unknown choice)`);
                 return {
                     action: 'ignore',
                     shouldProceed: true,

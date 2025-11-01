@@ -7,6 +7,8 @@ import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { FileManager } from '../fileManager';
 import { ConflictResolver } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
+import { ConflictEngine } from '../core/ConflictEngine';
+import { StateManager } from '../core/StateManager';
 
 /**
  * Factory for creating MarkdownFile instances with proper dependency injection.
@@ -24,7 +26,9 @@ export class FileFactory {
         private fileManager: FileManager,
         private conflictResolver: ConflictResolver,
         private backupManager: BackupManager,
-        private fileRegistry: MarkdownFileRegistry
+        private fileRegistry: MarkdownFileRegistry,
+        private conflictEngine?: ConflictEngine,
+        private stateManager?: StateManager
     ) {}
 
     // ============= MAIN FILE =============
@@ -38,7 +42,9 @@ export class FileFactory {
             this.fileManager,
             this.conflictResolver,
             this.backupManager,
-            this.fileRegistry
+            this.fileRegistry,
+            this.conflictEngine,
+            this.stateManager
         );
     }
 

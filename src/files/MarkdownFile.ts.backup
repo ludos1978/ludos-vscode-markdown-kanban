@@ -4,7 +4,6 @@ import * as path from 'path';
 import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
-import { SaveCoordinator } from '../core/SaveCoordinator';
 
 /**
  * File change event emitted when file state changes
@@ -769,38 +768,18 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async showConflictDialog(): Promise<ConflictResolution | null> {
         const context = this.getConflictContext();
-        console.log(`[${this.getFileType()}] showConflictDialog - Awaiting user choice...`);
         const resolution = await this._conflictResolver.resolveConflict(context);
-        console.log(`[${this.getFileType()}] showConflictDialog - Resolution received:`, {
-            action: resolution?.action,
-            shouldProceed: resolution?.shouldProceed,
-            shouldCreateBackup: resolution?.shouldCreateBackup,
-            shouldSave: resolution?.shouldSave,
-            shouldReload: resolution?.shouldReload,
-            shouldIgnore: resolution?.shouldIgnore
-        });
 
         if (resolution && resolution.shouldProceed) {
             // Check shouldCreateBackup FIRST because backup-and-reload sets both flags
             if (resolution.shouldCreateBackup) {
-                console.log(`[${this.getFileType()}] → Executing: backup-and-reload`);
                 // resolveConflict('backup') creates backup AND reloads
                 await this.resolveConflict('backup');
             } else if (resolution.shouldSave) {
-                console.log(`[${this.getFileType()}] → Executing: save`);
-                // CRITICAL: Mark save as legitimate BEFORE saving so file watcher doesn't trigger reload
-                SaveCoordinator.getInstance().markSaveAsLegitimate(this.getPath());
                 await this.save();
             } else if (resolution.shouldReload) {
-                console.log(`[${this.getFileType()}] → Executing: reload`);
                 await this.reload();
-            } else if (resolution.shouldIgnore) {
-                console.log(`[${this.getFileType()}] → Executing: ignore (no action)`);
-            } else {
-                console.log(`[${this.getFileType()}] → No action flags set`);
             }
-        } else {
-            console.log(`[${this.getFileType()}] → Resolution cancelled or shouldProceed=false`);
         }
 
         return resolution;

@@ -1,111 +1,154 @@
-import { IEventBus } from './interfaces/IEventBus';
-import { SaveOperation } from './types/SaveTypes';
-import { SaveCompletedEvent, SaveFailedEvent } from './events/DomainEvents';
+import * as vscode from 'vscode';
+import { SaveEventCoordinator } from '../saveEventCoordinator';
+import { MarkdownFile } from '../files/MarkdownFile';
 
 /**
- * Save Coordinator - Mediator Pattern Implementation
+ * Unified Save Coordinator - Single source for all save operations
  *
- * Coordinates save operations between multiple components.
- * Ensures proper sequencing and conflict resolution.
+ * Consolidates multiple conflicting save implementations into one system.
+ * Ensures consistent state tracking and proper save operation detection.
  */
 export class SaveCoordinator {
-    private saveQueue: SaveOperation[] = [];
-    private isProcessing: boolean = false;
-    private currentOperation: SaveOperation | null = null;
+    private static instance: SaveCoordinator | undefined;
+    private saveCoordinator: SaveEventCoordinator;
+    private activeSaves = new Map<string, Promise<void>>();
+    private legitimateSaves = new Map<string, { timestamp: number; timeout: NodeJS.Timeout }>();
 
-    constructor(private eventBus: IEventBus) {}
+    public constructor() {
+        this.saveCoordinator = SaveEventCoordinator.getInstance();
+    }
 
-    /**
-     * Enqueue save operation with conflict resolution
-     */
-    async enqueueSave(operation: () => Promise<void>): Promise<void> {
-        const saveOp: SaveOperation = {
-            id: `save_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            operation,
-            timestamp: new Date(),
-            priority: 'normal'
-        };
-
-        this.saveQueue.push(saveOp);
-
-        // Sort by priority (high first)
-        this.saveQueue.sort((a, b) => {
-            const priorityOrder: Record<string, number> = { high: 3, normal: 2, low: 1 };
-            return priorityOrder[b.priority] - priorityOrder[a.priority];
-        });
-
-        return this.processQueue();
+    public static getInstance(): SaveCoordinator {
+        if (!SaveCoordinator.instance) {
+            SaveCoordinator.instance = new SaveCoordinator();
+        }
+        return SaveCoordinator.instance;
     }
 
     /**
-     * Process save queue sequentially
+     * Unified save method for all file types
+     * Replaces multiple conflicting save implementations
      */
-    private async processQueue(): Promise<void> {
-        if (this.isProcessing || this.saveQueue.length === 0) {
+    public async saveFile(file: MarkdownFile, content?: string): Promise<void> {
+        const filePath = file.getPath();
+        const saveKey = `${file.getFileType()}:${filePath}`;
+
+        // Prevent concurrent saves on the same file
+        if (this.activeSaves.has(saveKey)) {
+            console.log(`[SaveCoordinator] Waiting for existing save: ${saveKey}`);
+            await this.activeSaves.get(saveKey);
             return;
         }
 
-        this.isProcessing = true;
+        const savePromise = this.performSave(file, content);
+        this.activeSaves.set(saveKey, savePromise);
 
-        while (this.saveQueue.length > 0) {
-            const operation = this.saveQueue.shift()!;
-            this.currentOperation = operation;
+        try {
+            await savePromise;
+        } finally {
+            this.activeSaves.delete(saveKey);
+        }
+    }
 
-            try {
-                console.log(`[SaveCoordinator] Processing save operation: ${operation.id}`);
-                await operation.operation();
+    /**
+     * Perform the actual save operation
+     */
+    private async performSave(file: MarkdownFile, content?: string): Promise<void> {
+        const filePath = file.getPath();
+        const fileType = file.getFileType();
 
-                // Publish success event
-                const event = new SaveCompletedEvent({
-                    board: null, // Will be filled by actual save operation
-                    filePath: '',
-                    duration: Date.now() - operation.timestamp.getTime(),
-                    timestamp: new Date()
-                });
-                await this.eventBus.publish(event);
+        console.log(`[SaveCoordinator] Starting save: ${fileType} - ${filePath}`);
 
-            } catch (error) {
-                console.error(`[SaveCoordinator] Save operation failed: ${operation.id}`, error);
+        // Mark this save as legitimate for conflict detection
+        this.markSaveAsLegitimate(filePath);
 
-                // Publish failure event
-                const event = new SaveFailedEvent({
-                    board: null, // Will be filled by actual save operation
-                    error: error as Error,
-                    timestamp: new Date()
-                });
-                await this.eventBus.publish(event);
+        try {
+            // Use the file's content or provided content
+            const contentToSave = content ?? file.getContent();
 
-                // Continue processing other operations
-            } finally {
-                this.currentOperation = null;
+            if (!contentToSave) {
+                throw new Error('No content to save');
             }
-        }
 
-        this.isProcessing = false;
-    }
+            // Perform the save using the file's save method (which handles state updates)
+            await file.save();
 
-    /**
-     * Cancel current operation
-     */
-    cancelCurrent(): void {
-        if (this.currentOperation) {
-            console.log(`[SaveCoordinator] Cancelling operation: ${this.currentOperation.id}`);
-            this.currentOperation = null;
+            console.log(`[SaveCoordinator] Save completed: ${fileType} - ${filePath}`);
+
+        } catch (error) {
+            console.error(`[SaveCoordinator] Save failed: ${fileType} - ${filePath}`, error);
+            throw error;
         }
     }
 
     /**
-     * Get queue status
+     * Mark a save operation as legitimate for conflict detection
+     * Public method for external callers (like SaveEventCoordinator handlers)
      */
-    getStatus(): {
-        isProcessing: boolean;
-        queueLength: number;
-        currentOperationId: string | null;
-    } {
+    public markSaveAsLegitimate(filePath: string): void {
+        const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+
+        // Clear any existing timeout for this file
+        const existing = this.legitimateSaves.get(normalizedPath);
+        if (existing) {
+            clearTimeout(existing.timeout);
+        }
+
+        // Set a timeout to automatically clear the legitimate save flag
+        // This gives a 2-second window for the file watcher to detect the change
+        const timeout = setTimeout(() => {
+            this.legitimateSaves.delete(normalizedPath);
+            console.log(`[SaveCoordinator] Cleared legitimate save flag for: ${normalizedPath}`);
+        }, 2000);
+
+        this.legitimateSaves.set(normalizedPath, {
+            timestamp: Date.now(),
+            timeout
+        });
+
+        console.log(`[SaveCoordinator] Marked legitimate save for: ${filePath} (normalized: ${normalizedPath})`);
+    }
+
+    /**
+     * Check if a file change was caused by a legitimate save operation
+     * This replaces all time-based heuristics
+     */
+    public isLegitimateSave(filePath: string): boolean {
+        const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+        const legitimateSave = this.legitimateSaves.get(normalizedPath);
+
+        console.log(`[SaveCoordinator] Checking legitimate save for: ${filePath} (normalized: ${normalizedPath})`);
+        console.log(`[SaveCoordinator]   Found legitimate save entry: ${!!legitimateSave}`);
+
+        if (!legitimateSave) {
+            console.log(`[SaveCoordinator]   → NOT legitimate (no entry found)`);
+            return false;
+        }
+
+        // Check if the save is still within the legitimate window (2 seconds)
+        const age = Date.now() - legitimateSave.timestamp;
+        const isStillLegitimate = age < 2000;
+
+        console.log(`[SaveCoordinator]   Save timestamp: ${legitimateSave.timestamp}`);
+        console.log(`[SaveCoordinator]   Current time: ${Date.now()}`);
+        console.log(`[SaveCoordinator]   Age: ${age}ms`);
+        console.log(`[SaveCoordinator]   Still legitimate: ${isStillLegitimate}`);
+
+        if (isStillLegitimate) {
+            console.log(`[SaveCoordinator]   → LEGITIMATE SAVE (${age}ms ago)`);
+        } else {
+            console.log(`[SaveCoordinator]   → NOT legitimate (${age}ms ago - expired)`);
+        }
+
+        return isStillLegitimate;
+    }
+
+    /**
+     * Get save statistics for debugging
+     */
+    public getStats(): { activeSaves: number } {
         return {
-            isProcessing: this.isProcessing,
-            queueLength: this.saveQueue.length,
-            currentOperationId: this.currentOperation?.id || null
+            activeSaves: this.activeSaves.size
         };
     }
 }

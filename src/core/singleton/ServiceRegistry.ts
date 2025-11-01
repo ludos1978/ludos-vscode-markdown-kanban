@@ -90,7 +90,7 @@ export class ServiceRegistry {
         this.register('fileRegistry', new MarkdownFileRegistry());
 
         // Coordination services
-        this.register('saveCoordinator', new SaveCoordinator(this.get('eventBus')));
+        this.register('saveCoordinator', new SaveCoordinator());
         this.register('conflictManager', new ConflictDetectionChainManager());
 
         // Caching services
@@ -109,9 +109,14 @@ export class ServiceRegistry {
             publish: async (event: any) => {
                 console.log(`[MockEventBus] Published event:`, event);
             },
-            subscribe: (eventType: string, handler: any) => {
+            subscribe: (eventType: string, handler: any): Subscription => {
                 console.log(`[MockEventBus] Subscribed to: ${eventType}`);
-                return () => {}; // Return unsubscribe function
+                return {
+                    unsubscribe: () => {
+                        console.log(`[MockEventBus] Unsubscribed from: ${eventType}`);
+                    },
+                    isActive: () => true
+                };
             },
             unsubscribe: (eventType: string, handler: any) => {
                 console.log(`[MockEventBus] Unsubscribed from: ${eventType}`);

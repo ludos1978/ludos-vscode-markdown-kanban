@@ -1,0 +1,403 @@
+import { MarkdownFile } from '../files/MarkdownFile';
+import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
+import { SaveCoordinator } from './SaveCoordinator';
+import * as vscode from 'vscode';
+
+/**
+ * Change types that can occur
+ */
+export type ChangeType = 
+    | 'external_file_modified'
+    | 'external_file_deleted'
+    | 'external_file_created'
+    | 'internal_main_content'
+    | 'internal_include_content'
+    | 'include_file_switch'
+    | 'column_title_edit'
+    | 'task_title_edit'
+    | 'task_description_edit';
+
+/**
+ * Change context - all information needed to process a change
+ */
+export interface IChangeContext {
+    type: ChangeType;
+    file?: MarkdownFile;
+    
+    // For include switching
+    oldIncludeFiles?: string[];
+    newIncludeFiles?: string[];
+    
+    // For content changes
+    modifiedContent?: {
+        columnId?: string;
+        taskId?: string;
+        field?: 'title' | 'description';
+        value?: string;
+    };
+    
+    // Flags
+    skipSave?: boolean;
+    userInitiated?: boolean;
+}
+
+/**
+ * Change classification result
+ */
+interface IChangeClassification {
+    type: ChangeType;
+    filesBeingUnloaded: string[];
+    filesBeingLoaded: string[];
+    modifiedFiles: string[];
+    requiresUnsavedCheck: boolean;
+    requiresCacheClear: boolean;
+    requiresFrontendUpdate: boolean;
+}
+
+/**
+ * Unified Change Coordinator - SINGLE ENTRY POINT for ALL changes
+ * 
+ * Handles:
+ * - External file changes (from file system)
+ * - Internal kanban changes (column/task edits)
+ * - Include file switching (menu operations)
+ * - Content changes in include files
+ * 
+ * Enforces ordered execution:
+ * 1. Classify change type
+ * 2. Check for unsaved changes in files being unloaded
+ * 3. Unload old files and clear cache
+ * 4. Load new files and update cache
+ * 5. Update frontend only for modified content
+ * 
+ * CRITICAL: Never auto-saves! Only saves when user explicitly requests it.
+ */
+export class UnifiedChangeCoordinator {
+    private static instance: UnifiedChangeCoordinator | undefined;
+    
+    // Lock to ensure sequential processing
+    private _processing: boolean = false;
+    private _changeQueue: IChangeContext[] = [];
+    
+    // Dependencies
+    private saveCoordinator: SaveCoordinator;
+    private fileRegistry: MarkdownFileRegistry | undefined;
+    
+    // Cache management
+    private _contentCache: Map<string, string> = new Map();
+    
+    // Callback for frontend updates
+    private _frontendUpdateCallback?: (updates: any) => void;
+
+    private constructor() {
+        this.saveCoordinator = SaveCoordinator.getInstance();
+    }
+
+    public static getInstance(): UnifiedChangeCoordinator {
+        if (!UnifiedChangeCoordinator.instance) {
+            UnifiedChangeCoordinator.instance = new UnifiedChangeCoordinator();
+        }
+        return UnifiedChangeCoordinator.instance;
+    }
+
+    /**
+     * Initialize with dependencies
+     */
+    public initialize(fileRegistry: MarkdownFileRegistry, frontendUpdateCallback: (updates: any) => void): void {
+        this.fileRegistry = fileRegistry;
+        this._frontendUpdateCallback = frontendUpdateCallback;
+    }
+
+    /**
+     * SINGLE ENTRY POINT - All changes go through this method
+     */
+    public async processChange(context: IChangeContext): Promise<void> {
+        console.log(`\n${'='.repeat(80)}`);
+        console.log(`[UnifiedChangeCoordinator] 🎯 CHANGE RECEIVED: ${context.type}`);
+        console.log(`${'='.repeat(80)}`);
+        
+        // Queue if already processing
+        if (this._processing) {
+            console.log(`[UnifiedChangeCoordinator] ⏸️  Currently processing, queueing change`);
+            this._changeQueue.push(context);
+            return;
+        }
+        
+        this._processing = true;
+        
+        try {
+            await this._processChangeInternal(context);
+            
+            // Process queued changes
+            while (this._changeQueue.length > 0) {
+                const nextChange = this._changeQueue.shift()!;
+                console.log(`[UnifiedChangeCoordinator] 📋 Processing queued change: ${nextChange.type}`);
+                await this._processChangeInternal(nextChange);
+            }
+        } finally {
+            this._processing = false;
+            console.log(`[UnifiedChangeCoordinator] ✅ Processing complete\n`);
+        }
+    }
+
+    /**
+     * Internal processing with ordered execution
+     */
+    private async _processChangeInternal(context: IChangeContext): Promise<void> {
+        // STEP 1: Classify the change
+        console.log(`[UnifiedChangeCoordinator] 1️⃣  STEP 1: Classify change`);
+        const classification = this._classifyChange(context);
+        console.log(`[UnifiedChangeCoordinator]   → Type: ${classification.type}`);
+        console.log(`[UnifiedChangeCoordinator]   → Files being unloaded: ${classification.filesBeingUnloaded.length}`);
+        console.log(`[UnifiedChangeCoordinator]   → Files being loaded: ${classification.filesBeingLoaded.length}`);
+        console.log(`[UnifiedChangeCoordinator]   → Modified files: ${classification.modifiedFiles.length}`);
+        
+        // STEP 2: Check for unsaved changes (if switching files)
+        if (classification.requiresUnsavedCheck && classification.filesBeingUnloaded.length > 0) {
+            console.log(`[UnifiedChangeCoordinator] 2️⃣  STEP 2: Check unsaved changes`);
+            const proceed = await this._handleUnsavedChanges(classification.filesBeingUnloaded);
+            if (!proceed) {
+                console.log(`[UnifiedChangeCoordinator]   → User cancelled - aborting change`);
+                return;
+            }
+        } else {
+            console.log(`[UnifiedChangeCoordinator] 2️⃣  STEP 2: Skip (no files being unloaded)`);
+        }
+        
+        // STEP 3: Unload files and clear cache
+        if (classification.requiresCacheClear && classification.filesBeingUnloaded.length > 0) {
+            console.log(`[UnifiedChangeCoordinator] 3️⃣  STEP 3: Unload files and clear cache`);
+            await this._unloadFilesAndClearCache(classification.filesBeingUnloaded);
+        } else {
+            console.log(`[UnifiedChangeCoordinator] 3️⃣  STEP 3: Skip (no cache clear needed)`);
+        }
+        
+        // STEP 4: Load new files and update cache
+        if (classification.filesBeingLoaded.length > 0) {
+            console.log(`[UnifiedChangeCoordinator] 4️⃣  STEP 4: Load new files and update cache`);
+            await this._loadFilesAndUpdateCache(classification.filesBeingLoaded);
+        } else {
+            console.log(`[UnifiedChangeCoordinator] 4️⃣  STEP 4: Skip (no files to load)`);
+        }
+        
+        // STEP 5: Update frontend (only modified content)
+        if (classification.requiresFrontendUpdate) {
+            console.log(`[UnifiedChangeCoordinator] 5️⃣  STEP 5: Update frontend`);
+            await this._updateFrontend(classification);
+        } else {
+            console.log(`[UnifiedChangeCoordinator] 5️⃣  STEP 5: Skip (no frontend update needed)`);
+        }
+        
+        console.log(`[UnifiedChangeCoordinator] ✅ Change processing complete`);
+    }
+
+    /**
+     * STEP 1: Classify the change to determine what actions are needed
+     */
+    private _classifyChange(context: IChangeContext): IChangeClassification {
+        const classification: IChangeClassification = {
+            type: context.type,
+            filesBeingUnloaded: [],
+            filesBeingLoaded: [],
+            modifiedFiles: [],
+            requiresUnsavedCheck: false,
+            requiresCacheClear: false,
+            requiresFrontendUpdate: true
+        };
+        
+        switch (context.type) {
+            case 'include_file_switch':
+                // Switching include files - need full workflow
+                classification.filesBeingUnloaded = context.oldIncludeFiles || [];
+                classification.filesBeingLoaded = context.newIncludeFiles || [];
+                classification.requiresUnsavedCheck = true;
+                classification.requiresCacheClear = true;
+                break;
+                
+            case 'internal_include_content':
+                // Content changed in include file - update cache and frontend
+                classification.modifiedFiles = context.file ? [context.file.getRelativePath()] : [];
+                classification.requiresCacheClear = false; // Don't clear, just update
+                break;
+                
+            case 'internal_main_content':
+            case 'column_title_edit':
+            case 'task_title_edit':
+            case 'task_description_edit':
+                // Internal edits - frontend update only (no save, no cache clear)
+                classification.modifiedFiles = context.file ? [context.file.getRelativePath()] : [];
+                classification.requiresCacheClear = false;
+                break;
+                
+            case 'external_file_modified':
+            case 'external_file_created':
+                // External change - reload and update
+                classification.filesBeingLoaded = context.file ? [context.file.getRelativePath()] : [];
+                classification.requiresCacheClear = true;
+                break;
+                
+            case 'external_file_deleted':
+                // External deletion - unload
+                classification.filesBeingUnloaded = context.file ? [context.file.getRelativePath()] : [];
+                classification.requiresCacheClear = true;
+                break;
+        }
+        
+        return classification;
+    }
+
+    /**
+     * STEP 2: Check for unsaved changes and ask user
+     */
+    private async _handleUnsavedChanges(filePaths: string[]): Promise<boolean> {
+        if (!this.fileRegistry) return true;
+        
+        const unsavedFiles: MarkdownFile[] = [];
+        
+        for (const relativePath of filePaths) {
+            const file = this.fileRegistry.getByRelativePath(relativePath);
+            if (file && file.hasUnsavedChanges()) {
+                unsavedFiles.push(file);
+            }
+        }
+        
+        if (unsavedFiles.length === 0) {
+            console.log(`[UnifiedChangeCoordinator]   → No unsaved changes`);
+            return true;
+        }
+        
+        console.log(`[UnifiedChangeCoordinator]   → Found ${unsavedFiles.length} files with unsaved changes`);
+        
+        // Show dialog to user
+        const fileNames = unsavedFiles.map(f => f.getRelativePath()).join(', ');
+        const response = await vscode.window.showWarningMessage(
+            `${unsavedFiles.length} include file(s) have unsaved changes: ${fileNames}`,
+            { modal: true },
+            'Save Changes',
+            'Discard Changes',
+            'Cancel'
+        );
+        
+        if (response === 'Cancel' || !response) {
+            console.log(`[UnifiedChangeCoordinator]   → User cancelled`);
+            return false;
+        }
+        
+        if (response === 'Save Changes') {
+            console.log(`[UnifiedChangeCoordinator]   → User chose to save`);
+            for (const file of unsavedFiles) {
+                await file.save();
+            }
+        } else {
+            console.log(`[UnifiedChangeCoordinator]   → User chose to discard`);
+        }
+        
+        return true;
+    }
+
+    /**
+     * STEP 3: Unload files and clear cache
+     */
+    private async _unloadFilesAndClearCache(filePaths: string[]): Promise<void> {
+        if (!this.fileRegistry) return;
+        
+        for (const relativePath of filePaths) {
+            console.log(`[UnifiedChangeCoordinator]   → Unloading: ${relativePath}`);
+            
+            // Unregister from registry
+            const file = this.fileRegistry.getByRelativePath(relativePath);
+            if (file) {
+                file.stopWatching();
+                this.fileRegistry.unregister(relativePath);
+            }
+            
+            // Clear from cache
+            this._contentCache.delete(relativePath);
+        }
+        
+        console.log(`[UnifiedChangeCoordinator]   ✓ Unloaded ${filePaths.length} files`);
+    }
+
+    /**
+     * STEP 4: Load new files and update cache
+     */
+    private async _loadFilesAndUpdateCache(filePaths: string[]): Promise<void> {
+        if (!this.fileRegistry) return;
+        
+        for (const relativePath of filePaths) {
+            console.log(`[UnifiedChangeCoordinator]   → Loading: ${relativePath}`);
+            
+            const file = this.fileRegistry.getByRelativePath(relativePath);
+            if (file) {
+                // Reload content
+                await file.reload();
+                
+                // Update cache
+                this._contentCache.set(relativePath, file.getContent());
+            } else {
+                console.warn(`[UnifiedChangeCoordinator]   ⚠️  File not found in registry: ${relativePath}`);
+            }
+        }
+        
+        console.log(`[UnifiedChangeCoordinator]   ✓ Loaded ${filePaths.length} files`);
+    }
+
+    /**
+     * STEP 5: Update frontend (only modified content)
+     */
+    private async _updateFrontend(classification: IChangeClassification): Promise<void> {
+        if (!this._frontendUpdateCallback) {
+            console.log(`[UnifiedChangeCoordinator]   ⚠️  No frontend update callback registered`);
+            return;
+        }
+        
+        const updates: any = {
+            type: classification.type,
+            modifiedFiles: classification.modifiedFiles,
+            cache: {}
+        };
+        
+        // Include cached content for modified files
+        for (const relativePath of classification.modifiedFiles) {
+            const content = this._contentCache.get(relativePath);
+            if (content !== undefined) {
+                updates.cache[relativePath] = content;
+            }
+        }
+        
+        // Include newly loaded files
+        for (const relativePath of classification.filesBeingLoaded) {
+            const content = this._contentCache.get(relativePath);
+            if (content !== undefined) {
+                updates.cache[relativePath] = content;
+            }
+        }
+        
+        console.log(`[UnifiedChangeCoordinator]   → Sending update to frontend`);
+        console.log(`[UnifiedChangeCoordinator]     Modified files: ${updates.modifiedFiles.length}`);
+        console.log(`[UnifiedChangeCoordinator]     Cache entries: ${Object.keys(updates.cache).length}`);
+        
+        this._frontendUpdateCallback(updates);
+    }
+
+    /**
+     * Get cached content for a file
+     */
+    public getCachedContent(relativePath: string): string | undefined {
+        return this._contentCache.get(relativePath);
+    }
+
+    /**
+     * Update cache for a file (without triggering reload)
+     */
+    public updateCache(relativePath: string, content: string): void {
+        this._contentCache.set(relativePath, content);
+    }
+
+    /**
+     * Clear all cache
+     */
+    public clearAllCache(): void {
+        this._contentCache.clear();
+    }
+}

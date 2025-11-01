@@ -16,7 +16,6 @@ import { PathResolver } from './services/PathResolver';
 import { FileWriter } from './services/FileWriter';
 import { FormatConverter } from './services/export/FormatConverter';
 import { SaveEventCoordinator } from './saveEventCoordinator';
-import { SaveCoordinator } from './core/SaveCoordinator';
 import { IncludeFileManager } from './includeFileManager';
 import { KanbanFileService } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
@@ -1613,22 +1612,13 @@ export class KanbanWebviewPanel {
 
         // Use coordinator if available, otherwise fall back to direct execution
         if (!this._changeCoordinator) {
-            console.warn('[UNIFIED] No coordinator available - using legacy _withLock');
-            return this._withLock('handleContentChange', async () => {
-                await this._executeContentChangeLogic(params, hasMainChange, hasIncludeChanges, hasSwitches);
-            });
+            console.warn('[UNIFIED] No coordinator available - executing directly');
+            return this._executeContentChangeDirectly(params, hasMainChange, hasIncludeChanges, hasSwitches);
         }
-
-        // Map source to coordinator format
-        const coordinatorSource: 'save' | 'external' | 'file_watcher' | 'ui' =
-            params.source === 'external_reload' ? 'external' :
-            params.source === 'board_update' ? 'ui' :
-            params.source === 'user_edit' ? 'ui' :
-            params.source; // file_watcher stays as is
 
         // Execute through coordinator with state machine tracking
         return this._changeCoordinator.handleChange({
-            source: coordinatorSource,
+            source: params.source,
             hasMainChange,
             hasIncludeChanges,
             hasSwitchedIncludes: hasSwitches,
@@ -1666,35 +1656,6 @@ export class KanbanWebviewPanel {
             },
 
             // COORDINATING_INCLUDES phase: Handle include switches and unsaved changes
-            onCoordinateIncludes: async (analysis: ChangeAnalysis) => {
-                await this._executeContentChangeLogic(params, hasMainChange, hasIncludeChanges, hasSwitches);
-            },
-
-            // UPDATING_UI phase: Invalidate cache
-            onUpdateUI: async () => {
-                // Board state has been modified (switches, reloads, external changes)
-                this.invalidateBoardCache();
-                console.log('[UNIFIED] Content change complete');
-            }
-        });
-    }
-
-    /**
-     * Core content change logic (extracted for reuse)
-     * Handles the actual file operations and UI updates
-     */
-    private async _executeContentChangeLogic(
-        params: {
-            source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
-            mainFileChanged?: boolean;
-            changedIncludes?: string[];
-            switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[]; newTitle?: string }[];
-        },
-        hasMainChange: boolean,
-        hasIncludeChanges: boolean,
-        hasSwitches: boolean
-    ): Promise<void> {
-        // Step 1: Check for unsaved includes being unloaded/switched
         if (hasSwitches) {
             for (const switchInfo of params.switchedIncludes!) {
                 const unloadingFiles = switchInfo.oldFiles.filter(old => !switchInfo.newFiles.includes(old));
@@ -1723,7 +1684,7 @@ export class KanbanWebviewPanel {
                             }
                         } else if (choice === 'Cancel') {
                             console.log('[UNIFIED] User cancelled - aborting content change');
-                            throw new Error('USER_CANCELLED');
+                            throw new Error('USER_CANCELLED'); // Throw instead of return so caller knows operation was cancelled
                         }
                         // If 'Discard', continue
                     }
@@ -1731,7 +1692,7 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Step 2: Unset old includes, clear cache, set new includes, load new content
+        // Step 3: Unset old includes, clear cache, set new includes, load new content
         if (hasSwitches) {
             const board = this.getBoard();
 
@@ -1807,7 +1768,7 @@ export class KanbanWebviewPanel {
                                 taskId: task.id,
                                 description: task.description,
                                 displayTitle: task.displayTitle,
-                                taskTitle: switchInfo.newTitle || task.title,
+                                taskTitle: switchInfo.newTitle || task.title,  // CRITICAL: Use new title if provided
                                 originalTitle: task.originalTitle,
                                 includeMode: task.includeMode,
                                 includeFiles: task.includeFiles
@@ -1818,17 +1779,18 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Step 3: External include changes are handled autonomously by file instances
+        // Step 4: External include changes are handled autonomously by file instances
+        // (prevents duplicate dialogs, maintains single responsibility)
         if (hasIncludeChanges) {
             console.log('[UNIFIED] External include changes detected - files will handle autonomously');
         }
 
-        // Step 4: Update frontend & backend cache for main file
+        // Step 5: Update frontend & backend cache for main file
         if (hasMainChange) {
             // CRITICAL: Block board regeneration if user is editing
             if (this._isEditingInProgress) {
                 console.log(`[handleContentChange] BLOCKING board regeneration - editing in progress! Source: ${params.source}`);
-                return;
+                return; // Don't regenerate board while user is editing
             }
 
             console.log(`[CRITICAL] Main file changed - this will regenerate ALL column/task IDs!`);
@@ -1869,6 +1831,13 @@ export class KanbanWebviewPanel {
                 }
             }
         }
+
+            // RACE-4: Invalidate cache after content changes
+            // Board state has been modified (switches, reloads, external changes)
+            this.invalidateBoardCache();
+
+            console.log('[UNIFIED] Content change complete');
+        });
     }
 
     /**
@@ -2241,36 +2210,34 @@ export class KanbanWebviewPanel {
             return;
         }
 
-        // UNIFIED APPROACH: All files (main + includes) handle external changes autonomously
-        // 'external' events → File's handleExternalChange() handles it → emits 'reloaded'
-        // 'reloaded' events → Update frontend
-
-        if (event.changeType === 'external') {
-            // All files handle external changes independently via handleExternalChange()
-            // They will show dialogs, reload, and emit 'reloaded' event
-            // We just wait for the 'reloaded' event to update frontend
-            console.log(`[KanbanWebviewPanel] External change detected - file will handle autonomously: ${file.getRelativePath()}`);
-            return;
-        }
-
-        // Handle 'reloaded' events for all file types
+        // Route external/reload events to unified content change handler
         if (fileType === 'main') {
-            if (event.changeType === 'reloaded') {
+            if (event.changeType === 'external' || event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
-                if (this._isInitialBoardLoad) {
+                // This is just loading the main file for the first time, not an actual change
+                if (event.changeType === 'reloaded' && this._isInitialBoardLoad) {
                     console.log(`[KanbanWebviewPanel] Skipping main file reloaded event during initial board load`);
                     return;
                 }
 
-                // Main file reloaded from disk, regenerate board and update frontend
-                console.log(`[KanbanWebviewPanel] Main file reloaded - regenerating board`);
-                this.invalidateBoardCache();
-                const board = this.getBoard();
-                if (board) {
-                    this._sendBoardUpdate(board);
-                }
+                // Main file changed externally
+                await this._handleContentChange({
+                    source: 'file_watcher',
+                    mainFileChanged: true
+                });
             }
         } else if (fileType === 'include-column' || fileType === 'include-task' || fileType === 'include-regular') {
+            // OPTION A: Files handle external changes autonomously
+            // 'external' events → File's handleExternalChange() handles it → emits 'reloaded'
+            // 'reloaded' events → Send frontend update
+
+            if (event.changeType === 'external') {
+                // Files handle external changes independently via handleExternalChange()
+                // They will show dialogs, reload, and emit 'reloaded' event
+                // We just wait for the 'reloaded' event to update frontend
+                console.log(`[KanbanWebviewPanel] External change detected - file will handle autonomously: ${file.getRelativePath()}`);
+                return;
+            }
 
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load

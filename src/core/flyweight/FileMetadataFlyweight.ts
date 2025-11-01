@@ -324,7 +324,9 @@ export class FileMetadataCache {
         // Implement LRU-style cache eviction
         if (this.cache.size >= this.maxCacheSize) {
             const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
+            if (firstKey) {
+                this.cache.delete(firstKey);
+            }
         }
 
         this.cache.set(filePath, metadata);

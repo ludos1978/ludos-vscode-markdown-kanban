@@ -11,6 +11,7 @@ import { BoardOperations } from './boardOperations';
 import { SaveCoordinator } from './core/SaveCoordinator';
 import { ConflictEngine } from './core/ConflictEngine';
 import { StateManager } from './core/StateManager';
+import { IEventBus } from './core/interfaces/IEventBus';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -68,19 +69,41 @@ export class KanbanFileService {
         private panel: () => vscode.WebviewPanel | undefined,
         private context: () => vscode.ExtensionContext,
         private showConflictDialog: (context: ConflictContext) => Promise<ConflictResolution | null>,
-        private notifyExternalChanges: (document: vscode.TextDocument) => Promise<void>,
         private updateWebviewPermissions: () => void,
         private undoRedoManagerClear: () => void,
         private panelStates: Map<string, any>,
         private panels: Map<string, any>,
-        private getPanelInstance: () => any  // Returns KanbanWebviewPanel instance
+        private getPanelInstance: () => any,  // Returns KanbanWebviewPanel instance
+        private eventBus?: IEventBus
     ) {
         this._panelId = Math.random().toString(36).substr(2, 9);
 
         // Initialize new architecture components
         this._stateManager = new StateManager();
         this._conflictEngine = new ConflictEngine(this._stateManager);
-        this._saveCoordinator = new SaveCoordinator(this._stateManager);
+        this._saveCoordinator = SaveCoordinator.getInstance();
+    }
+
+    private createMockEventBus(): IEventBus {
+        return {
+            publish: async (event: any) => {
+                console.log(`[MockEventBus] Published event:`, event);
+            },
+            subscribe: (eventType: string, handler: any) => {
+                console.log(`[MockEventBus] Subscribed to: ${eventType}`);
+                return {
+                    unsubscribe: () => {},
+                    isActive: () => true
+                };
+            },
+            unsubscribe: (eventType: string, handler: any) => {
+                console.log(`[MockEventBus] Unsubscribed from: ${eventType}`);
+            },
+            getSubscriberCount: (eventType: string) => 0,
+            clear: () => {
+                console.log(`[MockEventBus] Cleared all subscribers`);
+            }
+        };
     }
 
     /**
@@ -104,6 +127,12 @@ export class KanbanFileService {
         this._trackedDocumentUri = trackedDocumentUri;
         if (panelId) {
             this._panelId = panelId;
+        }
+
+        // Sync cached board with MainKanbanFile for conflict detection
+        const mainFile = this.fileRegistry.getMainFile();
+        if (mainFile) {
+            mainFile.setCachedBoardFromWebview(cachedBoardFromWebview);
         }
     }
 
@@ -285,9 +314,9 @@ export class KanbanFileService {
                                      this._saveState === SaveState.IDLE &&
                                      !isFromEditorFocus; // Don't show dialog on editor focus
 
-            if (hasExternalChanges) {
-                await this.notifyExternalChanges(document);
-            } else {
+            // External changes are now handled by the unified file watcher system
+            // The UnifiedChangeHandler and individual file watchers detect and resolve conflicts
+            if (!hasExternalChanges) {
                 // Only update version if no external changes were detected (to avoid blocking future detections)
                 this._lastDocumentVersion = document.version;
             }
@@ -321,6 +350,9 @@ export class KanbanFileService {
         }
 
         this.fileManager.setDocument(document);
+
+        // Register save handler now that document is available
+        this.registerSaveHandler();
 
         if (documentChanged) {
             this.updateWebviewPermissions();
@@ -447,306 +479,57 @@ export class KanbanFileService {
     }
 
     /**
-     * Save board to markdown file
-     */
-    /**
-     * Update document content with board state, optionally save to disk
-     * @param updateVersionTracking - Track document version changes
-     * @param triggerSave - Whether to call document.save() (false when called from onWillSave)
+     * Save board to markdown file using unified SaveCoordinator
      */
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
-        console.log(`[KanbanFileService.saveToMarkdown] ENTRY - updateVersionTracking: ${updateVersionTracking}, triggerSave: ${triggerSave}`);
+        console.log(`[KanbanFileService.saveToMarkdown] Using unified SaveCoordinator`);
 
-        // Use SaveCoordinator for queuing and sequential processing
-        return this._saveCoordinator.enqueueSave(async () => {
-            await this._executeSaveToMarkdown(updateVersionTracking, triggerSave);
-        });
-    }
-
-    private async _executeSaveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
-        console.log(`[KanbanFileService.saveToMarkdown] Executing save operation`);
-
-        let document = this.fileManager.getDocument();
+        const document = this.fileManager.getDocument();
         if (!document || !this.board() || !this.board()!.valid) {
             console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - document: ${!!document}, board: ${!!this.board()}, valid: ${this.board()?.valid}`);
             return;
         }
 
-        // STATE MACHINE: Check if already saving (additional safety check)
-        if (this._saveState !== SaveState.IDLE) {
-            console.warn(`[SaveStateMachine] Save already in progress (state=${SaveState[this._saveState]}), this should not happen with queue`);
-            return;
+        // Generate markdown content
+        const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
+
+        // Use SaveCoordinator for unified save handling
+        await this._saveCoordinator.saveFile(this.fileRegistry.getMainFile()!, markdown);
+
+        // Save include files that have unsaved changes
+        const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
+        if (unsavedIncludes.length > 0) {
+            console.log(`[KanbanFileService.saveToMarkdown] Saving ${unsavedIncludes.length} include files...`);
+            await Promise.all(unsavedIncludes.map(f => this._saveCoordinator.saveFile(f)));
+            console.log('[KanbanFileService.saveToMarkdown] All include files saved');
         }
 
-        console.log(`[KanbanFileService.saveToMarkdown] Proceeding with save`);
-
-        // STATE MACHINE: Transition to SAVING state and record version
-        this._saveState = SaveState.SAVING;
-        this._saveStartVersion = document.version;
-        this._saveOperationTimestamp = new Date();
-        console.log(`[SaveStateMachine] IDLE → SAVING (startVersion=${this._saveStartVersion})`);
-
-        try{
-            // Check if document is still valid/open
-            const isDocumentOpen = vscode.workspace.textDocuments.some(doc =>
-                doc.uri.toString() === document!.uri.toString()
-            );
-
-            if (!isDocumentOpen) {
-                // Reopen the document in the background
-                try {
-                    const reopenedDoc = await vscode.workspace.openTextDocument(document.uri);
-                    // Update the file manager with the reopened document
-                    this.fileManager.setDocument(reopenedDoc);
-                    document = reopenedDoc;
-                } catch (reopenError) {
-                    console.error('Failed to reopen document:', reopenError);
-                    vscode.window.showErrorMessage(
-                        `Cannot save changes: Failed to reopen "${path.basename(document.fileName)}". The file may have been deleted or moved.`
-                    );
-                    return;
-                }
-            }
-
-            // NOTE: Include file caches are updated by trackIncludeFileUnsavedChanges()
-            // They will be saved to disk after the main file save completes
-
-            console.log('[KanbanFileService.saveToMarkdown] About to generate markdown for main file');
-            console.log(`[KanbanFileService.saveToMarkdown] Board has ${this.board()!.columns.length} columns`);
-            for (const col of this.board()!.columns) {
-                console.log(`[KanbanFileService.saveToMarkdown] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
-            }
-
-            const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
-            console.log(`[KanbanFileService.saveToMarkdown] Generated markdown (${markdown.length} chars)`);
-            console.log(`[KanbanFileService.saveToMarkdown] Generated markdown:\n${markdown}`);
-
-            // Check for external unsaved changes before proceeding
-            const canProceed = await this.checkForExternalUnsavedChanges();
-            if (!canProceed) {
-                console.warn('[KanbanFileService.saveToMarkdown] EARLY RETURN: checkForExternalUnsavedChanges returned false');
-                return;
-            }
-
-            // Check if content has actually changed before applying edit
-            const currentContent = document.getText();
-            console.log(`[KanbanFileService.saveToMarkdown] Current content (${currentContent.length} chars), Generated (${markdown.length} chars)`);
-
-            // Check if include files have unsaved changes
-            const unsavedIncludeFiles = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
-            console.log(`[KanbanFileService.saveToMarkdown] Unsaved include files: ${unsavedIncludeFiles.length}`);
-
-            if (currentContent === markdown && unsavedIncludeFiles.length === 0) {
-                // No changes needed, skip the edit to avoid unnecessary re-renders
-                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: Content unchanged and no unsaved includes, skipping save');
-                const mainFile = this.fileRegistry.getMainFile();
-                if (mainFile) {
-                    // Always discard to reset unsaved state
-                    // discardChanges() internally checks if content changed before emitting events
-                    mainFile.discardChanges();
-                }
-                return;
-            }
-
-            // CRITICAL FIX: If only include files have changes, we still need to save them
-            // Even if main file content is unchanged, proceed if include files need saving
-            const hasAnyChanges = (currentContent !== markdown) || (unsavedIncludeFiles.length > 0);
-            if (!hasAnyChanges) {
-                console.log('[KanbanFileService.saveToMarkdown] EARLY RETURN: No changes detected, skipping save');
-                const mainFile = this.fileRegistry.getMainFile();
-                if (mainFile) {
-                    mainFile.discardChanges();
-                }
-                return;
-            }
-
-            if (currentContent === markdown) {
-                console.log('[KanbanFileService.saveToMarkdown] Main file unchanged but include files have changes - proceeding to save includes only');
-            } else {
-                console.log('[KanbanFileService.saveToMarkdown] Main file content has changed, proceeding with full save');
-            }
-
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(
-                document.uri,
-                new vscode.Range(0, 0, document.lineCount, 0),
-                markdown
-            );
-
-            console.log(`[KanbanFileService.saveToMarkdown] Applying edit to document...`);
-            const success = await vscode.workspace.applyEdit(edit);
-            console.log(`[KanbanFileService.saveToMarkdown] applyEdit result: ${success}`);
-
-            if (!success) {
-                // VS Code's applyEdit can return false even when successful
-                // Check if the document actually contains our changes before failing
-                console.warn('⚠️ workspace.applyEdit returned false, checking if changes were applied...');
-
-                // Check if the document content matches what we tried to write
-                // Note: VS Code's document.getText() should be synchronous and return current state
-                const currentContent = document.getText();
-                const expectedContent = markdown;
-
-                if (currentContent === expectedContent) {
-                } else {
-                    console.error('❌ Changes were not applied - this is a real failure');
-
-                    // Find the first difference
-                    for (let i = 0; i < Math.max(expectedContent.length, currentContent.length); i++) {
-                        if (expectedContent[i] !== currentContent[i]) {
-                            break;
-                        }
-                    }
-
-                    throw new Error('Failed to apply workspace edit: Content mismatch detected');
-                }
-            }
-
-            // STATE MACHINE: Record end version after edit applied
-            this._saveEndVersion = document.version;
-            console.log(`[SaveStateMachine] Edit applied (saveEndVersion=${this._saveEndVersion})`);
-
-            // Update document version after successful edit (only if tracking is enabled)
-            if (updateVersionTracking) {
-                this._lastDocumentVersion = document.version + 1;
-            }
-
-            // Save the document to disk (if requested)
-            if (triggerSave) {
-                console.log(`[KanbanFileService.saveToMarkdown] Calling document.save()...`);
-
-                // Pause file watcher before saving to prevent our own save from triggering "external" change
-                const mainFile = this.fileRegistry.getMainFile();
-                if (mainFile) {
-                    mainFile.stopWatching();
-                }
-
-                try {
-                    await document.save();
-                    console.log(`[KanbanFileService.saveToMarkdown] document.save() completed successfully`);
-                } catch (saveError) {
-                    // If save fails, it might be because the document was closed
-                    console.warn('[KanbanFileService.saveToMarkdown] Failed to save document:', saveError);
-
-                    // Check if the document is still open
-                    const stillOpen = vscode.workspace.textDocuments.some(doc =>
-                        doc.uri.toString() === document!.uri.toString()
-                    );
-
-                    if (!stillOpen) {
-                        vscode.window.showWarningMessage(
-                            `Changes applied but could not save: "${path.basename(document.fileName)}" was closed during the save operation.`
-                        );
-                    } else {
-                        throw saveError; // Re-throw if it's a different error
-                    }
-                } finally {
-                    // Resume file watcher after save completes
-                    // Note: Include files pause/resume their own watchers in MarkdownFile.save()
-                    if (mainFile) {
-                        mainFile.startWatching();
-                    }
-                }
-            } else {
-                console.log(`[KanbanFileService.saveToMarkdown] triggerSave=false, skipping document.save() (will be saved by VS Code)`);
-            }
-
-            // After successful save, create a backup (respects minimum interval)
-            await this.backupManager.createBackup(document);
-
-            // CRITICAL: Save all include files that have unsaved changes
-            console.log('[KanbanFileService.saveToMarkdown] Checking for unsaved include files...');
-            const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
-            if (unsavedIncludes.length > 0) {
-                console.log(`[KanbanFileService.saveToMarkdown] Saving ${unsavedIncludes.length} include files...`);
-                await Promise.all(unsavedIncludes.map(f => f.save()));
-                console.log('[KanbanFileService.saveToMarkdown] All include files saved');
-            } else {
-                console.log('[KanbanFileService.saveToMarkdown] No unsaved include files');
-            }
-
-            // Clear unsaved changes flag after successful save
-            const mainFile = this.fileRegistry.getMainFile();
-            if (mainFile) {
-                // CRITICAL: Update board AND content to ensure they stay in sync
-                // If we only update content, next save() will regenerate from stale board
-                const currentBoard = this.board();
-                if (currentBoard) {
-                    mainFile.updateFromBoard(currentBoard);
-                    // updateFromBoard sets updateBaseline=false, so we need to mark as saved manually
-                    mainFile.setContent(markdown, true); // true = already saved, update baseline
-                }
-            }
-            console.log('[KanbanFileService.saveToMarkdown] Save completed successfully, clearing unsaved changes');
-
-            // Notify frontend that save is complete so it can update UI
-            const panelInstance = this.panel();
-            if (panelInstance) {
-                panelInstance.webview.postMessage({
-                    type: 'saveCompleted',
-                    success: true
-                });
-                console.log('[KanbanFileService.saveToMarkdown] Sent saveCompleted message to frontend');
-            }
-
-            // Update our baseline after successful save
-            this.updateKnownFileContent(markdown);
-        } catch (error) {
-            console.error('Error saving to markdown:', error);
-
-            // Provide more specific error messages based on the error type
-            let errorMessage = 'Failed to save kanban changes';
-            if (error instanceof Error) {
-                if (error.message.includes('Content mismatch detected')) {
-                    errorMessage = 'Failed to save kanban changes: The document content could not be updated properly';
-                } else if (error.message.includes('Failed to apply workspace edit')) {
-                    errorMessage = 'Failed to save kanban changes: Unable to apply changes to the document';
-                } else if (error.message.includes('Failed to reopen document')) {
-                    errorMessage = 'Failed to save kanban changes: The document could not be accessed for writing';
-                } else {
-                    errorMessage = `Failed to save kanban changes: ${error.message}`;
-                }
-            } else {
-                errorMessage = `Failed to save kanban changes: ${String(error)}`;
-            }
-
-            vscode.window.showErrorMessage(errorMessage);
-
-            // Also send error to webview for frontend error handling
-            const currentPanel = this.panel();
-            if (currentPanel) {
-                currentPanel.webview.postMessage({
-                    type: 'saveError',
-                    error: error instanceof Error ? error.message : String(error)
-                });
-            }
-
-            // STATE MACHINE: Transition to RECOVERING state for error handling
-            console.log(`[SaveStateMachine] SAVING → RECOVERING (error occurred)`);
-            this._saveState = SaveState.RECOVERING;
-
-            // Error recovery: Reset state after brief delay to allow any pending events to settle
-            setTimeout(() => {
-                if (this._saveState === SaveState.RECOVERING) {
-                    this._saveState = SaveState.IDLE;
-                    this._saveStartVersion = null;
-                    this._saveEndVersion = null;
-                    console.log(`[SaveStateMachine] RECOVERING → IDLE (error recovery complete)`);
-                }
-            }, 500);
-        } finally {
-            // STATE MACHINE: Transition back to IDLE if save completed successfully
-            if (this._saveState === SaveState.SAVING) {
-                this._saveState = SaveState.IDLE;
-                // Keep version tracking for a short time as backup
-                setTimeout(() => {
-                    this._saveStartVersion = null;
-                    this._saveEndVersion = null;
-                }, 1000);
-                console.log(`[SaveStateMachine] SAVING → IDLE (save complete)`);
+        // Update state after successful save
+        const mainFile = this.fileRegistry.getMainFile();
+        if (mainFile) {
+            const currentBoard = this.board();
+            if (currentBoard) {
+                mainFile.updateFromBoard(currentBoard);
+                mainFile.setContent(markdown, true); // true = update baseline
             }
         }
+
+        // Update known file content
+        this.updateKnownFileContent(markdown);
+
+        // Notify frontend that save is complete
+        const panelInstance = this.panel();
+        if (panelInstance) {
+            panelInstance.webview.postMessage({
+                type: 'saveCompleted',
+                success: true
+            });
+        }
+
+        console.log('[KanbanFileService.saveToMarkdown] Save completed successfully');
     }
+
+
 
     /**
      * Save main kanban changes
@@ -843,12 +626,14 @@ export class KanbanFileService {
                 // Uses defense-in-depth: both state check AND version tracking
                 const isOurChange = this.isOurChange(event.document.version);
 
-                // Document was modified externally (not by our kanban save operation)
+                // NOTE: We do NOT track unsaved external changes
+                // Only SAVED external changes are tracked via file watcher
+                // This prevents noise from user typing in text editor
                 if (!isOurChange) {
-                    this._hasExternalUnsavedChanges = true;
-                    console.log(`[SaveStateMachine] External change detected (v=${event.document.version})`);
+                    // Don't set _hasExternalUnsavedChanges - only track SAVED changes
+                    // console.log(`[SaveStateMachine] External change detected (v=${event.document.version})`);
                 } else {
-                    console.log(`[SaveStateMachine] Our change detected, ignoring (v=${event.document.version})`);
+                    // console.log(`[SaveStateMachine] Our change detected, ignoring (v=${event.document.version})`);
                 }
 
                 // Notify debug overlay of document state change so it can update editor state
@@ -878,8 +663,8 @@ export class KanbanFileService {
         });
         disposables.push(changeDisposable);
 
-        // Register with SaveEventCoordinator for document save tracking
-        this.registerSaveHandler();
+        // NOTE: SaveEventCoordinator registration moved to loadMarkdownFile()
+        // because document is not available yet when this method is called in constructor
     }
 
     /**
@@ -894,7 +679,7 @@ export class KanbanFileService {
 
         const handler: SaveEventHandler = {
             id: handlerId,
-            handleSave: (savedDocument: vscode.TextDocument) => {
+            handleSave: async (savedDocument: vscode.TextDocument) => {
                 const currentDocument = this.fileManager.getDocument();
 
                 if (currentDocument && savedDocument === currentDocument) {
@@ -903,6 +688,47 @@ export class KanbanFileService {
                     // Document was saved, update our version tracking to match (legacy compatibility)
                     this._lastDocumentVersion = savedDocument.version;
                     this._hasExternalUnsavedChanges = false;
+
+                    // CRITICAL: Check if we have unsaved Kanban changes before clearing external changes
+                    // Add a small delay to allow any pending markUnsavedChanges callbacks to complete
+                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    const mainFile = this.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        const hasUnsavedKanbanChanges = mainFile.hasUnsavedChanges();
+                        const hasIncludeFileChanges = this.fileRegistry.getIncludeFiles().some(f => f.hasUnsavedChanges());
+                        const cachedBoard = mainFile.getCachedBoardFromWebview();
+
+                        // If there's a cached board from webview, it means user has edited in UI
+                        const hasCachedBoardChanges = !!cachedBoard;
+
+                        console.log(`[SaveHandler] Save detected:`);
+                        console.log(`[SaveHandler]   hasUnsavedKanbanChanges: ${hasUnsavedKanbanChanges}`);
+                        console.log(`[SaveHandler]   hasIncludeFileChanges: ${hasIncludeFileChanges}`);
+                        console.log(`[SaveHandler]   hasCachedBoardChanges (UI edited): ${hasCachedBoardChanges}`);
+                        console.log(`[SaveHandler]   cachedBoard columns: ${cachedBoard?.columns?.length || 0}`);
+
+                        // Debug: Check each include file individually
+                        const includeFiles = this.fileRegistry.getIncludeFiles();
+                        console.log(`[SaveHandler]   Total include files: ${includeFiles.length}`);
+                        includeFiles.forEach((f, i) => {
+                            console.log(`[SaveHandler]   Include file ${i}: ${f.getRelativePath()} - hasUnsavedChanges: ${f.hasUnsavedChanges()}`);
+                        });
+
+                        // Check if there are unsaved Kanban changes (main file, include files, or UI edited board)
+                        if (hasUnsavedKanbanChanges || hasIncludeFileChanges || hasCachedBoardChanges) {
+                            // DON'T mark as legitimate save - we have unsaved Kanban changes
+                            // DON'T clear external changes flag - this will trigger a conflict scenario
+                            // The external save saved old content, but we have newer Kanban changes
+                            console.log(`[SaveHandler] ⚠️  External save with unsaved Kanban changes - CONFLICT will be triggered`);
+                            console.log(`[SaveHandler] ⚠️  NOT marking as legitimate save`);
+                        } else {
+                            // No unsaved Kanban changes - safe to mark as legitimate and clear external changes flag
+                            console.log(`[SaveHandler] ✅ No unsaved Kanban changes - marking as legitimate save`);
+                            this._saveCoordinator.markSaveAsLegitimate(savedDocument.uri.fsPath);
+                            mainFile['_hasFileSystemChanges'] = false;
+                        }
+                    }
                 }
 
                 // Check if this is an included file
@@ -911,7 +737,8 @@ export class KanbanFileService {
                         // Registry tracks save state automatically
                         console.log(`[SaveHandler] Include file saved externally: ${file.getRelativePath()}`);
 
-
+                        // CRITICAL: Mark include file saves as legitimate too
+                        this._saveCoordinator.markSaveAsLegitimate(savedDocument.uri.fsPath);
 
                         // Notify debug overlay to update
                         const currentPanel = this.panel();
@@ -1008,91 +835,43 @@ export class KanbanFileService {
     }
 
     /**
-     * Check for external unsaved changes when about to save
-     * NOW USES NEW CONFLICT ENGINE FOR CONSISTENT DETECTION
+     * Compare two board objects to determine if they are different
+     * Used for detecting unsaved Kanban changes during external saves
      */
-    private async checkForExternalUnsavedChanges(): Promise<boolean> {
-        const document = this.fileManager.getDocument();
-        if (!document) {
-            return true; // No document, nothing to check
-        }
+    private _boardsAreDifferent(board1: KanbanBoard, board2: KanbanBoard): boolean {
+        // Normalize both boards for comparison (remove volatile fields)
+        const normalized1 = this._normalizeBoardForComparison(board1);
+        const normalized2 = this._normalizeBoardForComparison(board2);
 
-        const mainFile = this.fileRegistry.getMainFile();
-        const includeFiles = this.fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
-        const changedIncludeFiles = includeFiles
-            .filter(f => f.hasUnsavedChanges())
-            .map(f => f.getRelativePath());
+        // Compare the normalized boards
+        return JSON.stringify(normalized1) !== JSON.stringify(normalized2);
+    }
 
-        // Create conflict context for main file
-        const mainContext: ConflictContext = {
-            type: 'presave_check',
-            fileType: 'main',
-            filePath: document.uri.fsPath,
-            fileName: path.basename(document.fileName),
-            hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false,
-            hasIncludeUnsavedChanges: changedIncludeFiles.length > 0,
-            hasExternalChanges: mainFile?.hasExternalChanges() || false,
-            changedIncludeFiles: changedIncludeFiles,
-            isInEditMode: false // We're in save operation, not editing
-        };
+    /**
+     * Normalize a board for comparison by removing volatile fields
+     */
+    private _normalizeBoardForComparison(board: KanbanBoard): any {
+        // Deep clone to avoid modifying original
+        const normalized = JSON.parse(JSON.stringify(board));
 
-        // Use ConflictEngine to detect conflicts
-        const conflicts = this._conflictEngine.detectConflicts(mainContext);
+        // Remove volatile fields that don't affect content
+        if (normalized.columns) {
+            for (const column of normalized.columns) {
+                // Remove any volatile column properties
+                delete column.isLoadingContent;
 
-        if (conflicts.length > 0) {
-            console.log(`[checkForExternalUnsavedChanges] Detected ${conflicts.length} conflict(s) using ConflictEngine`);
-
-            // For each conflict, get resolution (may auto-resolve or show dialog)
-            for (const conflict of conflicts) {
-                const resolution = this._conflictEngine.resolveConflict(conflict);
-
-                if (!resolution.shouldProceed) {
-                    console.log(`[checkForExternalUnsavedChanges] Conflict resolution cancelled save: ${conflict.description}`);
-                    return false;
-                }
-
-                console.log(`[checkForExternalUnsavedChanges] Conflict resolved: ${resolution.action} - ${resolution.description}`);
-            }
-        }
-
-        // Check include files for conflicts
-        const filesThatNeedReload = this.fileRegistry.getFilesThatNeedReload();
-        if (filesThatNeedReload.length > 0) {
-            console.log(`[checkForExternalUnsavedChanges] ${filesThatNeedReload.length} include file(s) have external changes`);
-
-            // Check each include file for conflicts
-            for (const includeFile of filesThatNeedReload) {
-                const includeContext: ConflictContext = {
-                    type: 'presave_check',
-                    fileType: 'include',
-                    filePath: includeFile.getPath(),
-                    fileName: includeFile.getRelativePath(),
-                    hasMainUnsavedChanges: mainFile?.hasUnsavedChanges() || false,
-                    hasIncludeUnsavedChanges: includeFile.hasUnsavedChanges(),
-                    hasExternalChanges: true, // File needs reload = has external changes
-                    changedIncludeFiles: [includeFile.getRelativePath()],
-                    isInEditMode: false
-                };
-
-                const includeConflicts = this._conflictEngine.detectConflicts(includeContext);
-
-                if (includeConflicts.length > 0) {
-                    console.log(`[checkForExternalUnsavedChanges] Include file conflict detected: ${includeFile.getRelativePath()}`);
-
-                    for (const conflict of includeConflicts) {
-                        const resolution = this._conflictEngine.resolveConflict(conflict);
-
-                        if (!resolution.shouldProceed) {
-                            console.log(`[checkForExternalUnsavedChanges] Include file conflict cancelled save: ${conflict.description}`);
-                            return false;
-                        }
-
-                        console.log(`[checkForExternalUnsavedChanges] Include file conflict resolved: ${resolution.action} - ${resolution.description}`);
+                if (column.tasks) {
+                    for (const task of column.tasks) {
+                        // Remove volatile task properties
+                        delete task.isLoadingContent;
+                        // Keep essential content: title, description, includeFiles, etc.
                     }
                 }
             }
         }
 
-        return true; // All checks passed - save can proceed
+        return normalized;
     }
+
+
 }

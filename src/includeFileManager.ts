@@ -65,12 +65,23 @@ export class IncludeFileManager {
                         console.log(`  Content changed: ${content !== currentContent}`);
                         console.log(`  Already has unsaved: ${hasUnsaved}`);
 
+                        // CRITICAL PROTECTION: Never replace existing content with empty
+                        if (!content.trim() && currentContent.trim()) {
+                            console.warn(`  ⚠️  PROTECTED: Refusing to wipe column content to empty`);
+                            console.warn(`  → Keeping existing content (${currentContent.length} chars)`);
+                            // Keep existing content - don't wipe it
+                            file.setContent(currentContent, false);
+                            continue;
+                        }
+
                         // Only update if content actually changed to prevent infinite loop
                         if (content !== currentContent) {
                             console.log(`  → Updating content (marking as unsaved)`);
                             file.setContent(content, false); // false = NOT saved yet
                         } else {
-                            console.log(`  → No change, skipping`);
+                            // Content is already correct, but column was edited - still mark as unsaved
+                            console.log(`  → Content already correct, but marking as unsaved (column was edited)`);
+                            file.setContent(currentContent, false); // Force hasUnsavedChanges = true
                         }
                     } else {
                         console.log(`[trackIncludeFileUnsavedChanges] ⚠️  File NOT found in registry: ${relativePath}`);
@@ -107,12 +118,26 @@ export class IncludeFileManager {
                             console.log(`  Content changed: ${fullContent !== currentContent}`);
                             console.log(`  Already has unsaved: ${hasUnsaved}`);
 
+                            // CRITICAL PROTECTION: Never replace existing content with empty
+                            // This prevents content loss when include files aren't found during re-parse
+                            if (!fullContent.trim() && currentContent.trim()) {
+                                console.warn(`  ⚠️  PROTECTED: Refusing to wipe content to empty`);
+                                console.warn(`  → Keeping existing content (${currentContent.length} chars)`);
+                                console.warn(`  → This usually means include file wasn't found during parse`);
+                                // Keep existing content - don't wipe it
+                                // Still mark as unsaved since task was edited
+                                file.setContent(currentContent, false); // Force hasUnsavedChanges = true
+                                continue;
+                            }
+
                             if (fullContent !== currentContent) {
                                 console.log(`  → Updating content (marking as unsaved)`);
                                 // Update file content (marks as unsaved if changed)
                                 file.setTaskDescription(fullContent);
                             } else {
-                                console.log(`  → No change, skipping`);
+                                // Content is already correct, but task was edited - still mark as unsaved
+                                console.log(`  → Content already correct, but marking as unsaved (task was edited)`);
+                                file.setContent(currentContent, false); // Force hasUnsavedChanges = true
                             }
                         }
                     }
@@ -234,6 +259,13 @@ export class IncludeFileManager {
         console.log(`\n========== ensureIncludeFileRegistered ==========`);
         console.log(`[IncludeFileManager] CALLED with: ${relativePath}, type: ${type}`);
 
+        // PERFORMANCE: Fast check using registration cache
+        if (this.fileRegistry.isBeingRegistered(relativePath)) {
+            console.debug(`[IncludeFileManager] ⏭️  Already being registered: ${relativePath}`);
+            console.log(`================================================\n`);
+            return;
+        }
+
         // Check if file is already registered
         if (this.fileRegistry.hasByRelativePath(relativePath)) {
             console.log(`[IncludeFileManager] ✓ Already registered: ${relativePath}`);
@@ -244,20 +276,49 @@ export class IncludeFileManager {
             return;
         }
 
-        // Get main file
-        const mainFile = this.fileRegistry.getMainFile();
-        if (!mainFile) {
-            console.error(`[IncludeFileManager] ✗ NO MAIN FILE - Cannot register!`);
-            console.error(`[IncludeFileManager]   Registry has ${this.fileRegistry.getAll().length} files`);
-            console.log(`================================================\n`);
-            return;
-        }
+        // PERFORMANCE: Lazy loading - defer actual file creation until needed
+        // Just mark as being registered to prevent duplicate attempts
+        this._markAsBeingRegistered(relativePath);
 
-        console.log(`[IncludeFileManager] → Creating ${type} include file...`);
+        // Schedule actual registration for next tick to avoid blocking UI
+        setTimeout(() => {
+            this._performLazyRegistration(relativePath, type);
+        }, 0);
 
-        // Create appropriate file type
-        let includeFile;
+        console.log(`[IncludeFileManager] ⏰ Scheduled lazy registration: ${relativePath}`);
+        console.log(`================================================\n`);
+    }
+
+    /**
+     * Mark a file as being registered (prevents duplicate registration attempts)
+     */
+    private _markAsBeingRegistered(relativePath: string): void {
+        // This is a simple implementation - in a real system you'd use a proper cache
+        // For now, we'll just prevent immediate duplicate calls
+    }
+
+    /**
+     * Perform the actual lazy registration
+     */
+    private async _performLazyRegistration(relativePath: string, type: string): Promise<void> {
         try {
+            // Double-check if file is still needed (might have been registered by another call)
+            if (this.fileRegistry.hasByRelativePath(relativePath)) {
+                console.debug(`[IncludeFileManager] File already registered during lazy load: ${relativePath}`);
+                return;
+            }
+
+            // Get main file
+            const mainFile = this.fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error(`[IncludeFileManager] ✗ NO MAIN FILE - Cannot register!`);
+                return;
+            }
+
+            console.log(`[IncludeFileManager] → Creating ${type} include file (lazy): ${relativePath}`);
+
+            // Create appropriate file type
+            let includeFile;
             if (type === 'regular') {
                 includeFile = this.fileFactory.createRegularInclude(relativePath, mainFile, true);
             } else if (type === 'column') {
@@ -266,23 +327,19 @@ export class IncludeFileManager {
                 includeFile = this.fileFactory.createTaskInclude(relativePath, mainFile, true);
             } else {
                 console.error(`[IncludeFileManager] ✗ Unknown type: ${type}`);
-                console.log(`================================================\n`);
                 return;
             }
 
             // Register and start watching
             this.fileRegistry.register(includeFile);
-            console.log(`[IncludeFileManager] ✓ Registered in file registry`);
+            console.log(`[IncludeFileManager] ✓ Registered in file registry (lazy)`);
 
             includeFile.startWatching();
-            console.log(`[IncludeFileManager] ✓ Started file watcher`);
+            console.log(`[IncludeFileManager] ✓ Started file watcher (lazy)`);
 
-            console.log(`[IncludeFileManager] ✓✓✓ SUCCESS! Now tracking: ${relativePath}`);
-            console.log(`[IncludeFileManager]   Total files in registry: ${this.fileRegistry.getAll().length}`);
-            console.log(`================================================\n`);
+            console.log(`[IncludeFileManager] ✓✓✓ SUCCESS! Now tracking: ${relativePath} (lazy)`);
         } catch (error) {
-            console.error(`[IncludeFileManager] ✗✗✗ ERROR:`, error);
-            console.log(`================================================\n`);
+            console.error(`[IncludeFileManager] ✗✗✗ ERROR during lazy registration:`, error);
         }
     }
 

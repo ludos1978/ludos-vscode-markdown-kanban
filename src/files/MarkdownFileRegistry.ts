@@ -20,6 +20,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     private _files: Map<string, MarkdownFile> = new Map();        // Path -> File
     private _filesByRelativePath: Map<string, MarkdownFile> = new Map(); // Relative path -> File
 
+    // ============= PERFORMANCE OPTIMIZATIONS =============
+    private _registrationCache = new Set<string>(); // Prevent duplicate registrations
+
     // ============= CHANGE EVENTS =============
     private _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
     public readonly onDidChange = this._onDidChange.event;
@@ -34,6 +37,14 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     // ============= REGISTRATION =============
 
     /**
+     * Check if file is already being registered (fast lookup to prevent duplicates)
+     */
+    public isBeingRegistered(relativePath: string): boolean {
+        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        return this._registrationCache.has(normalized);
+    }
+
+    /**
      * Register a file in the registry
      *
      * FOUNDATION-1: Uses normalized relative path as key for case-insensitive lookups
@@ -42,6 +53,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         const path = file.getPath();
         const relativePath = file.getRelativePath();
         const normalizedRelativePath = file.getNormalizedRelativePath();
+
+        // PERFORMANCE: Check registration cache first
+        if (this._registrationCache.has(normalizedRelativePath)) {
+            console.debug(`[MarkdownFileRegistry] Skipping duplicate registration: ${relativePath}`);
+            return;
+        }
 
         // FOUNDATION-1: Check for duplicates BEFORE registering (collision detection)
         const existingFile = this._filesByRelativePath.get(normalizedRelativePath);
@@ -57,6 +74,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
 
         console.log(`[MarkdownFileRegistry] Registering: "${relativePath}" → "${normalizedRelativePath}" (${file.getFileType()})`);
+
+        // PERFORMANCE: Add to registration cache
+        this._registrationCache.add(normalizedRelativePath);
 
         // Store by absolute path (unchanged) and NORMALIZED relative path
         this._files.set(path, file);
