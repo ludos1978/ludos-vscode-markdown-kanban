@@ -566,8 +566,8 @@ export class MainKanbanFile extends MarkdownFile {
         await super.save();
 
         // CRITICAL: Clear cached board AFTER save completes
-        // We don't need to clear before because vscode.workspace.fs.writeFile doesn't fire onDidSaveTextDocument
-        // We already mark the save as legitimate in showConflictDialog() before calling save()
+        // Note: save() method automatically sets instance-level skipNextReloadDetection flag
+        // This prevents the file watcher from triggering unnecessary reloads
         console.log(`[MainKanbanFile] Clearing cached board after save`);
         this._cachedBoardFromWebview = undefined;
     }
@@ -585,12 +585,15 @@ export class MainKanbanFile extends MarkdownFile {
         console.log(`[MainKanbanFile] showConflictDialog - Resolution received:`, {
             action: resolution?.action,
             shouldProceed: resolution?.shouldProceed,
+            shouldCreateBackup: resolution?.shouldCreateBackup,
+            shouldSave: resolution?.shouldSave,
             shouldReload: resolution?.shouldReload,
-            shouldSave: resolution?.shouldSave
+            shouldIgnore: resolution?.shouldIgnore
         });
 
         if (resolution && resolution.shouldProceed) {
             // CRITICAL: Check shouldCreateBackup FIRST because backup-and-reload sets both shouldCreateBackup AND shouldReload
+            console.log(`[MainKanbanFile] Checking shouldCreateBackup: ${resolution.shouldCreateBackup}`);
             if (resolution.shouldCreateBackup) {
                 console.log(`[MainKanbanFile] → Executing: backup-and-reload`);
                 await this.resolveConflict('backup');
@@ -598,8 +601,7 @@ export class MainKanbanFile extends MarkdownFile {
                 this._hasFileSystemChanges = false;
             } else if (resolution.shouldSave) {
                 console.log(`[MainKanbanFile] → Executing: save`);
-                // CRITICAL: Mark save as legitimate BEFORE saving so file watcher doesn't trigger reload
-                SaveCoordinator.getInstance().markSaveAsLegitimate(this.getPath());
+                // save() method marks itself as legitimate automatically
                 await this.save();  // save() already clears cached board
             } else if (resolution.shouldReload && hadCachedBoard) {
                 // SPECIAL CASE: If reloading with cached board, force reload from disk
@@ -634,9 +636,11 @@ export class MainKanbanFile extends MarkdownFile {
                 await this.reload();
             } else if (resolution.shouldIgnore) {
                 console.log(`[MainKanbanFile] → Executing: ignore`);
-                // Clear cached board and flags
-                this._cachedBoardFromWebview = undefined;
+                // CRITICAL: Keep cached board (user wants to keep their UI edits!)
+                // Only clear the external change flag for this specific external change
                 this._hasFileSystemChanges = false;
+                // DO NOT clear cached board - user chose to ignore external, keep UI edits
+                console.log(`[MainKanbanFile] → Kept cached board (user's UI edits preserved)`);
             }
         }
 

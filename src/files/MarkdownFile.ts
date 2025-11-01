@@ -5,6 +5,7 @@ import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { SaveCoordinator } from '../core/SaveCoordinator';
+import { SaveOptions } from './SaveOptions';
 
 /**
  * File change event emitted when file state changes
@@ -46,6 +47,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // ============= FRONTEND STATE (Kanban UI) =============
     protected _hasUnsavedChanges: boolean = false;     // Kanban UI has modifications
     protected _isInEditMode: boolean = false;          // User actively editing in task/column editor
+
+    // ============= SAVE STATE (Instance-level, no global registry!) =============
+    private _skipNextReloadDetection: boolean = false; // Skip reload for our own save
 
     // ============= CHANGE DETECTION =============
     protected _fileWatcher?: vscode.FileSystemWatcher;
@@ -654,9 +658,13 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
     /**
      * Save current content to disk and update baseline
+     * @param options - Save options (skipReloadDetection, source, etc.)
      */
-    public async save(): Promise<void> {
-        console.log(`[${this.getFileType()}] Saving to disk: ${this._relativePath}`);
+    public async save(options: SaveOptions = {}): Promise<void> {
+        const skipReloadDetection = options.skipReloadDetection ?? true; // Default: skip (our own save)
+        const source = options.source ?? 'unknown';
+
+        console.log(`[${this.getFileType()}] Saving to disk: ${this._relativePath} (source: ${source})`);
 
         // PERFORMANCE: Use watcher coordinator to prevent conflicts
         await MarkdownFile._watcherCoordinator.startOperation(this._relativePath, 'save');
@@ -686,6 +694,13 @@ export abstract class MarkdownFile implements vscode.Disposable {
             }
 
             await this.writeToDisk(this._content);
+
+            // CRITICAL: Set flag AFTER successful write (not before!)
+            // This prevents flag from lingering if write fails
+            if (skipReloadDetection) {
+                this._skipNextReloadDetection = true;
+                console.log(`[${this.getFileType()}] ✓ Will skip reload detection for this save`);
+            }
 
             // Update state after successful write
             this._baseline = this._content;
@@ -788,8 +803,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 await this.resolveConflict('backup');
             } else if (resolution.shouldSave) {
                 console.log(`[${this.getFileType()}] → Executing: save`);
-                // CRITICAL: Mark save as legitimate BEFORE saving so file watcher doesn't trigger reload
-                SaveCoordinator.getInstance().markSaveAsLegitimate(this.getPath());
+                // save() method marks itself as legitimate automatically
                 await this.save();
             } else if (resolution.shouldReload) {
                 console.log(`[${this.getFileType()}] → Executing: reload`);
@@ -814,10 +828,31 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async createBackup(label: string = 'manual'): Promise<void> {
         console.log(`[${this.getFileType()}] Creating backup with label '${label}': ${this._relativePath}`);
-        // DEFERRED: Implement backup logic (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #2)
-        // Decision needed: Is backup functionality required, or can this be removed?
-        // For now, this is a placeholder that subclasses can override
-        // to integrate with BackupManager which requires a TextDocument
+
+        try {
+            // Get the VS Code TextDocument for this file
+            const document = await vscode.workspace.openTextDocument(this._path);
+
+            if (!document) {
+                console.error(`[${this.getFileType()}] Cannot create backup - failed to open document: ${this._relativePath}`);
+                return;
+            }
+
+            // Use BackupManager to create the backup
+            const backupManager = new BackupManager();
+            const success = await backupManager.createBackup(document, {
+                label: label,
+                forceCreate: true  // Always create backup for conflict resolution
+            });
+
+            if (success) {
+                console.log(`[${this.getFileType()}] ✅ Backup created successfully: ${this._relativePath}`);
+            } else {
+                console.warn(`[${this.getFileType()}] ⚠️  Backup creation returned false: ${this._relativePath}`);
+            }
+        } catch (error) {
+            console.error(`[${this.getFileType()}] ❌ Failed to create backup:`, error);
+        }
     }
 
     // ============= FILE WATCHING & CHANGE DETECTION =============
@@ -908,6 +943,23 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     protected async _onFileSystemChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
         console.log(`[${this.getFileType()}] File system change detected: ${changeType} - ${this._relativePath}`);
+
+        // CRITICAL: Always reset flag when watcher fires (prevents lingering flag)
+        const hadSkipFlag = this._skipNextReloadDetection;
+        if (hadSkipFlag) {
+            this._skipNextReloadDetection = false; // Reset flag immediately
+
+            // Only skip reload for 'modified' events (our own save)
+            if (changeType === 'modified') {
+                console.log(`[${this.getFileType()}] ✓ Skipping reload detection - this is our own save`);
+                this._hasFileSystemChanges = false; // No need to mark as external
+                return; // Skip external change handling
+            }
+
+            // For 'deleted' or 'created', flag was set but file state changed unexpectedly
+            // Continue to handle as external change (don't skip)
+            console.log(`[${this.getFileType()}] ⚠️ Flag was set but file was ${changeType} - handling as external change`);
+        }
 
         // Mark as having external changes
         this._hasFileSystemChanges = true;
