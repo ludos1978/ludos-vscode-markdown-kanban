@@ -432,10 +432,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * 3. For each task with includeFiles, load description from TaskIncludeFiles
      * 4. Return complete board
      *
+     * @param existingBoard Optional existing board to preserve column/task IDs during regeneration
      * @returns KanbanBoard with all include content loaded, or undefined if main file not ready
      */
-    public generateBoard(): KanbanBoard | undefined {
+    public generateBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
         console.log('[MarkdownFileRegistry] generateBoard() - Generating board from registry');
+
+        if (existingBoard) {
+            console.log(`[MarkdownFileRegistry] generateBoard() - Preserving IDs from existing board with ${existingBoard.columns.length} columns`);
+        }
 
         // Step 1: Get main file
         const mainFile = this.getMainFile();
@@ -444,8 +449,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             return undefined;
         }
 
-        // Step 2: Get parsed board from main file
-        const board = mainFile.getBoard();
+        // Step 2: Get parsed board from main file (parser will preserve IDs if existingBoard passed)
+        const board = mainFile.getBoard(existingBoard);
         if (!board) {
             console.warn('[MarkdownFileRegistry] generateBoard() - Main file has no board');
             return undefined;

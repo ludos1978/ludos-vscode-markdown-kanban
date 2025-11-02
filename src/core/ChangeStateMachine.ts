@@ -248,6 +248,13 @@ export class ChangeStateMachine {
 
         } catch (error: any) {
             console.error('[ChangeStateMachine] ❌ Fatal error:', error);
+
+            // CRITICAL: Clear flag on fatal error to prevent cache lock
+            if (this._webviewPanel) {
+                (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+                console.log('[ChangeStateMachine] ⚠️ Cleared include switch flag due to fatal error');
+            }
+
             return {
                 success: false,
                 error: error,
@@ -787,6 +794,13 @@ export class ChangeStateMachine {
     private async _handleLoadingNew(context: ChangeContext): Promise<ChangeState> {
         console.log(`[State:LOADING_NEW] Loading new include file content`);
 
+        // CRITICAL FIX: Set flag to block cache invalidation during include switch
+        // This prevents column/task IDs from regenerating while we're updating the board
+        if (context.impact.includesSwitched && this._webviewPanel) {
+            (this._webviewPanel as any).setIncludeSwitchInProgress?.(true);
+            console.log(`[State:LOADING_NEW] ✓ Cache protection enabled`);
+        }
+
         // Only load new files if includes are being switched
         if (!context.impact.includesSwitched) {
             console.log(`[State:LOADING_NEW] No switches, skipping load`);
@@ -997,6 +1011,7 @@ export class ChangeStateMachine {
         // Invalidate board cache if needed
         // CRITICAL: Don't invalidate for include switches - board is already updated in-memory
         // Cache MUST stay in sync with UI. Disk will be out of sync until user saves (that's OK).
+        // DEFENSE IN DEPTH: Event type check prevents the call, _includeSwitchInProgress flag blocks if called
         if (context.event.type !== 'include_switch' && this._webviewPanel && this._webviewPanel.invalidateBoardCache) {
             console.log(`[State:UPDATING_BACKEND] Invalidating board cache`);
             this._webviewPanel.invalidateBoardCache();
@@ -1171,12 +1186,24 @@ export class ChangeStateMachine {
         console.log(`[State:COMPLETE] State history: ${context.stateHistory.join(' → ')}`);
         console.log(`[State:COMPLETE] Duration: ${Date.now() - context.startTime}ms`);
 
+        // CRITICAL FIX: Clear cache protection flag after include switch completes
+        // This allows cache invalidation to work normally again
+        if (context.impact.includesSwitched && this._webviewPanel) {
+            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+            console.log(`[State:COMPLETE] ✓ Cache protection disabled`);
+        }
+
         context.result.success = true;
         return ChangeState.IDLE;
     }
 
     private async _handleCancelled(context: ChangeContext): Promise<ChangeState> {
         console.log(`[State:CANCELLED] ⚠️ User cancelled operation`);
+
+        // Clear cache protection flag in case it was set
+        if (this._webviewPanel) {
+            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+        }
 
         context.result.success = false;
         context.result.error = new Error('USER_CANCELLED');
@@ -1277,6 +1304,11 @@ export class ChangeStateMachine {
 
         console.error(`[State:ERROR] Error recovery not yet implemented`);
         console.error(`[State:ERROR] System may be in inconsistent state`);
+
+        // Clear cache protection flag in case it was set
+        if (this._webviewPanel) {
+            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+        }
 
         // Mark result as failed
         context.result.success = false;

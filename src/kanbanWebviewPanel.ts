@@ -69,6 +69,7 @@ export class KanbanWebviewPanel {
     // STATE-2: Board caching infrastructure (single source of truth)
     private _cachedBoard: KanbanBoard | null = null;  // Cached generated board
     private _boardCacheValid: boolean = false;        // Cache validity flag
+    private _includeSwitchInProgress: boolean = false; // Protects cache during include switches
 
     // RACE-3: Track last processed timestamp per file to prevent stale updates
     private _lastProcessedTimestamps: Map<string, Date> = new Map();
@@ -1939,6 +1940,7 @@ export class KanbanWebviewPanel {
 
                 // DON'T invalidate cache for include files - state machine already updated it
                 // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
+                // NOTE: Even if this were called, the _includeSwitchInProgress flag would block it
                 // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-task') {
@@ -1984,6 +1986,7 @@ export class KanbanWebviewPanel {
 
                 // DON'T invalidate cache for include files - state machine already updated it
                 // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
+                // NOTE: Even if this were called, the _includeSwitchInProgress flag would block it
                 // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-regular') {
@@ -2198,8 +2201,10 @@ export class KanbanWebviewPanel {
         }
 
         // Generate fresh board from registry
+        // CRITICAL FIX: Pass existing cached board to preserve column/task IDs
+        // This prevents "Column not found" errors when cache is invalidated
         console.log('[STATE-2] getBoard() - Cache invalid, generating fresh board');
-        const board = this._fileRegistry.generateBoard();
+        const board = this._fileRegistry.generateBoard(this._cachedBoard || undefined);
 
         // Cache the result
         if (board) {
@@ -2215,12 +2220,34 @@ export class KanbanWebviewPanel {
      *
      * Call this whenever registry files change to force fresh board generation on next access.
      * Examples: file reload, content change, include switch, etc.
+     *
+     * CRITICAL: Blocked during include switches to prevent ID regeneration
      */
     public invalidateBoardCache(): void {
+        // CRITICAL FIX: Block invalidation during include switches
+        // This prevents column/task IDs from regenerating mid-switch
+        if (this._includeSwitchInProgress) {
+            const stack = new Error().stack;
+            console.log('[Cache] ⚠️ Blocked invalidation - include switch in progress');
+            console.log('[Cache] Attempted from:', stack?.split('\n').slice(1, 4).join('\n'));
+            return;
+        }
+
         const stack = new Error().stack;
         console.log('[STATE-2] invalidateBoardCache() - Cache invalidated');
         console.log('[STATE-2] Called from:', stack?.split('\n').slice(1, 4).join('\n'));
         this._boardCacheValid = false;
+    }
+
+    /**
+     * Set include switch in-progress flag
+     *
+     * When true, blocks cache invalidation to prevent ID regeneration during include switches.
+     * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
+     */
+    public setIncludeSwitchInProgress(inProgress: boolean): void {
+        console.log(`[Cache] Include switch in-progress: ${inProgress}`);
+        this._includeSwitchInProgress = inProgress;
     }
 
     /**

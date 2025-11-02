@@ -61,18 +61,31 @@ export class MainKanbanFile extends MarkdownFile {
 
     /**
      * Get the parsed board (cached)
+     *
+     * @param existingBoard Optional existing board to preserve IDs during re-parsing.
+     *                      When provided, triggers re-parse with ID preservation.
      */
-    public getBoard(): KanbanBoard | undefined {
+    public getBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
+        // If existingBoard provided, re-parse to preserve IDs
+        if (existingBoard) {
+            console.log(`[MainKanbanFile] Re-parsing with ID preservation from existing board`);
+            return this.parseToBoard(existingBoard);
+        }
         return this._board;
     }
 
     /**
      * Parse current content into board structure
+     *
+     * @param existingBoard Optional existing board to preserve task/column IDs during re-parse
      */
-    public parseToBoard(): KanbanBoard {
+    public parseToBoard(existingBoard?: KanbanBoard): KanbanBoard {
         console.log(`[MainKanbanFile] Parsing content to board: ${this._relativePath}`);
+
         // Pass existing board to preserve task/column IDs during re-parse
-        const parseResult = this._parser.parseMarkdown(this._content, undefined, this._board);
+        // Priority: provided existingBoard > cached _board
+        const boardForIdPreservation = existingBoard || this._board;
+        const parseResult = this._parser.parseMarkdown(this._content, undefined, boardForIdPreservation);
         this._board = parseResult.board;
         this._includedFiles = parseResult.includedFiles || [];
 

@@ -303,10 +303,8 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
-            // Switch task include file (load new file without saving main file)
-            case 'switchTaskIncludeFile':
-                await this.handleSwitchTaskIncludeFile(message);
-                break;
+            // REMOVED: Legacy switchTaskIncludeFile - now routes through editTaskTitle -> state machine
+            // See menuOperations.js updateTaskIncludeFile() which now sends editTaskTitle instead
 
             // Enhanced file and link handling
             case 'openFileLink':
@@ -2496,140 +2494,8 @@ export class MessageHandler {
         }
     }
 
-    // SWITCH-3: All include switches now route through ChangeStateMachine via handleIncludeSwitch()
-
-    /**
-     * Switch task include file without saving the main file
-     * - Saves old include file if it has unsaved changes
-     * - Creates and loads new include file
-     * - Updates task with new content
-     * - Does NOT save the main kanban file
-     */
-    private async handleSwitchTaskIncludeFile(message: any): Promise<void> {
-        try {
-            const panel = this._getWebviewPanel();
-            if (!panel) {
-                console.error('[switchTaskIncludeFile] No panel found');
-                return;
-            }
-
-            const { taskId, columnId, newFilePath, oldFilePath, newTitle } = message;
-            console.log(`[switchTaskIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for task ${taskId}`);
-
-            // 1. Check if old include file has unsaved changes and prompt user
-            const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
-            if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log('[switchTaskIncludeFile] Old file has unsaved changes, prompting user');
-
-                const choice = await vscode.window.showWarningMessage(
-                    `The include file "${oldFilePath}" has unsaved changes. What would you like to do?`,
-                    { modal: true },
-                    'Save and Switch',
-                    'Discard and Switch',
-                    'Cancel'
-                );
-
-                if (choice === 'Save and Switch') {
-                    console.log('[switchTaskIncludeFile] User chose to save and switch');
-                    await oldFile.save();
-                } else if (choice === 'Discard and Switch') {
-                    console.log('[switchTaskIncludeFile] User chose to discard changes and switch');
-                    oldFile.discardChanges();
-                } else {
-                    // Cancel or closed dialog
-                    console.log('[switchTaskIncludeFile] User cancelled switch');
-                    return;
-                }
-            }
-
-            // 2. Update board with new include path
-            const board = this._getCurrentBoard();
-            if (board) {
-                const column = board.columns.find((c: any) => c.id === columnId);
-                if (column) {
-                    const task = column.tasks.find((t: any) => t.id === taskId);
-                    if (task) {
-                        task.title = newTitle;
-                        // FIX: Normalize path before storing
-                        // FOUNDATION-1: Store ORIGINAL path (no normalization)
-                        task.includeFiles = [newFilePath];
-                    }
-                }
-            }
-
-            // FIX #2b: Cleanup old include file that is being replaced
-            if (oldFilePath && oldFilePath !== newFilePath) {
-                // FOUNDATION-1: Registry handles normalization internally
-                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(oldFilePath);
-                if (oldFileToCleanup) {
-                    console.log(`[switchTaskIncludeFile] Cleaning up old include file: ${oldFilePath}`);
-                    oldFileToCleanup.stopWatching();
-                    // FIX: Don't call dispose() - unregister() does it internally
-                    panel.fileRegistry.unregister(oldFileToCleanup.getPath());
-                    console.log(`[switchTaskIncludeFile] ✓ Old file unregistered and disposed`);
-                }
-            }
-
-            // 3. Create new include file in registry if it doesn't exist
-            if (!panel.fileRegistry?.hasByRelativePath(newFilePath)) {
-                const mainFile = panel.fileRegistry.getMainFile();
-                if (mainFile) {
-                    console.log('[switchTaskIncludeFile] Creating new TaskIncludeFile');
-                    const taskInclude = panel._fileFactory.createTaskInclude(
-                        newFilePath,
-                        mainFile,
-                        false
-                    );
-                    panel.fileRegistry.register(taskInclude);
-                    taskInclude.startWatching();
-                }
-            }
-
-            // 4. Load content from file
-            const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
-            if (newFile && newFile.getTaskDescription) {
-                // ALWAYS reload from disk when switching includes to ensure fresh content
-                const content = await newFile.readFromDisk();
-                if (content !== null) {
-                    newFile.setContent(content, true); // true = update baseline too
-                } else {
-                    console.warn(`[switchTaskIncludeFile] Could not load content from file: ${newFilePath}`);
-                }
-
-                const fullFileContent = newFile.getTaskDescription();
-                console.log(`[switchTaskIncludeFile] Loaded content from new file (${fullFileContent.length} chars)`);
-
-                // FIX BUG #5: No-parsing approach
-                // Load COMPLETE file content without parsing into title/description
-                // displayTitle is just a UI indicator showing which file is included
-                const displayTitle = `# include in ${newFilePath}`;
-                const taskDescription = fullFileContent;  // Complete content, no parsing!
-
-                // 6. Get updated task metadata from board
-                const task = board?.columns.find((c: any) => c.id === columnId)?.tasks.find((t: any) => t.id === taskId);
-
-                // 7. Send updated content to frontend with all required fields
-                panel._panel?.webview.postMessage({
-                    type: 'updateTaskContent',
-                    taskId: taskId,
-                    columnId: columnId,
-                    displayTitle: displayTitle,
-                    description: taskDescription,
-                    taskTitle: task?.title || newTitle,
-                    includeMode: true,
-                    includeFiles: [newFilePath],
-                    originalTitle: task?.originalTitle
-                });
-
-                // Success - no notification needed, user can see the change in the board
-                console.log(`[switchTaskIncludeFile] Successfully switched to: ${newFilePath}`);
-            }
-
-        } catch (error) {
-            console.error('[switchTaskIncludeFile] Error:', error);
-            vscode.window.showErrorMessage(`Failed to switch task include file: ${error}`);
-        }
-    }
+    // REMOVED: Legacy handleSwitchTaskIncludeFile method - replaced by state machine
+    // All include switches now route through ChangeStateMachine via editTaskTitle message
 
     /**
      * Handle request for task include filename (enabling include mode)

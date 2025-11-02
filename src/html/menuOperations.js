@@ -1486,16 +1486,13 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-        // Send request to backend to switch the include file
-        // Backend will: save old file if needed, load new file, update task content
-        // WITHOUT saving the main kanban file
+        // MIGRATION: Route through unified state machine via editTaskTitle
+        // This replaces the old switchTaskIncludeFile legacy code path
+        // The backend will detect the include syntax change and route through ChangeStateMachine
         vscode.postMessage({
-            type: 'switchTaskIncludeFile',
+            type: 'editTaskTitle',
             taskId: taskId,
-            columnId: columnId,
-            newFilePath: newFileName.trim(),
-            oldFilePath: currentFile,
-            newTitle: newTitle
+            title: newTitle
         });
 
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
