@@ -8,8 +8,9 @@ kanban-plugin: board
 
 - [ ] Include files and cache handling:
 
-On any external change or any internal kanban change such as finish editing a column title, task title or task description, editing includes with the menu. make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
-- check if it's a change of content in main file, change of content of included files and/or a switch of included files. Then do this in the defined order:
+If any change is saved to the kanban file, and included file in the kanban or the kanban-markdown file (the source) or any of the included files. Also when an column-title, task-title or task description is modified that contains an include (eigher trough text or using the menu).
+- make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
+- if it's an external change, and the user is currently editing the kanban. end the edit, keeping the change. use this state as baseline.
 - verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
 - unset the includefiles for the switched files and clear the cache in front and backend.
 - set the includefiles, load and update the cache in backend (and frontend?).
@@ -17,14 +18,11 @@ On any external change or any internal kanban change such as finish editing a co
 - if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
 - only update the contents that have been modified in the frontend.
 
-DO NOT SAVE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES.
+DO NOT SAVE TO THE FILE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES. BUT STORE TO THE BASELINE AUTOMATICALLY IF THE MAIN FILE OR ANY INCLUDED FILES ARE MODIFYED.
 
 The Taskinclude, columninclude and regular include (include in task/column header or in task content):
-- shows the shortened !!!include(path/to/file.md)!!! as inlcude(path/to/file.md) with all the tags and other content.
+- shows the shortened !!!include(path/to/file.md)!!! as include(path/to/file.md) with all the tags and other content as a alt+clickable link.
 
-It currently shows a conflict and a save dialogue. Also it doesnt allwys properly and consistently load the data from the newly imported file.
-
-find 5 possible solutions to the problem and check the probability it solves the problem properly.
 
 
 

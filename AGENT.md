@@ -1,6 +1,14 @@
 ## Most important RULEs
-- For every task make 3 suggestions how to solve or approach the issue, each with an expected quality. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
+- For every task make 3 suggestions how to solve or approach the issue, each with an expected quality/probability that it properly solves the problem. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
+- for any new function you want to create, explain why you need to add a new one and why you cannot modify the most similar ones to be reused.
 - if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
+
+## Architecture Overview (READ BEFORE ANY CHANGES)
+- **Core Architecture**: Consult [ARCHITECTURE.md](ARCHITECTURE.md) before making any structural changes to understand the state machine pattern
+- **State Machine**: All file changes MUST go through `ChangeStateMachine.processChange()` - see [STATE_MACHINE_DESIGN.md](STATE_MACHINE_DESIGN.md) for complete specification
+- **Single Entry Point**: NEVER create new direct handlers for file changes, user edits, saves, or include switches. Route everything through the state machine.
+- **Migration**: When modifying change handling logic, follow [STATE_MACHINE_MIGRATION_GUIDE.md](STATE_MACHINE_MIGRATION_GUIDE.md)
+- **Testing**: All new state handlers must have unit tests. All new event types must have integration tests.
 
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.
@@ -43,6 +51,7 @@
 	- agent/DATAINSTANCES.md for the instances of data.
 
 - Never keep any obsolete code! Rewrite code to make it use new data styles completely or remove it completely. Do not create any compatiblity layers or conversions from old data styles!
+- Keep reports short and concise or leave them out if it's already mentioned in the answer.
 - Do not use delays or delayed calls anywhere, except for visual effects that have no functional background. Never use delays to create an order of execution. it's fine to use delays (timers) if it's just a visual information to the user.
 
 

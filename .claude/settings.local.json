@@ -70,7 +70,10 @@
       "Read(//opt/homebrew/bin/**)",
       "Bash(/usr/bin/find:*)",
       "Bash(brew list:*)",
-      "Bash(vsce package:*)"
+      "Bash(vsce package:*)",
+      "Bash(src/kanbanWebviewPanel.ts.tmp)",
+      "Bash(tee:*)",
+      "Bash(timeout 30 npx tsc:*)"
     ],
     "deny": [],
     "ask": []
