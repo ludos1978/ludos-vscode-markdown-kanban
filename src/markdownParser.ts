@@ -68,7 +68,13 @@ export class MarkdownKanbanParser {
         return undefined;
       }
 
-      // For columns without tasks or include columns, match by title
+      // For include columns, match by position only (title changes when switching files)
+      const isIncludeColumn = title.includes('!!!include(') || candidateColumn.includeMode;
+      if (isIncludeColumn) {
+        return candidateColumn; // Same position = same column, even if title/content changed
+      }
+
+      // For regular columns without tasks, match by title
       if (candidateColumn.title === title) {
         return candidateColumn;
       }

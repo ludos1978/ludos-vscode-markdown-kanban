@@ -12,10 +12,20 @@ import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { PlantUMLService } from './plantUMLService';
 import { getMermaidExportService } from './services/export/MermaidExportService';
+import { getOutputChannel } from './extension';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+
+// Helper function to log to both console and output channel
+function log(...args: any[]) {
+    const message = args.map(arg =>
+        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+    ).join(' ');
+    console.log(message);
+    getOutputChannel()?.appendLine(message);
+}
 
 interface FocusTarget {
     type: 'task' | 'column';
@@ -680,17 +690,18 @@ export class MessageHandler {
             case 'editColumnTitle':
                 // SWITCH-2: Route through unified column include switch function
                 const currentBoard = this._getCurrentBoard();
-                console.log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
-                console.log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
+                log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
+                log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
+                log(`[SWITCH-2] New title: ${message.title}`);
 
                 if (!currentBoard) {
-                    console.error(`[SWITCH-2] No board loaded`);
+                    log(`[SWITCH-2] No board loaded`);
                     break;
                 }
 
                 const column = currentBoard.columns.find(col => col.id === message.columnId);
                 if (!column) {
-                    console.error(`[SWITCH-2] Column ${message.columnId} not found`);
+                    log(`[SWITCH-2] Column ${message.columnId} not found`);
                     break;
                 }
 
@@ -699,7 +710,7 @@ export class MessageHandler {
 
                 if (hasColumnIncludeMatches) {
                     // Column include switch - route through state machine
-                    console.log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
+                    log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
 
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
@@ -710,9 +721,24 @@ export class MessageHandler {
 
                     // Get old include files for cleanup
                     const oldIncludeFiles = column.includeFiles || [];
+                    log(`[SWITCH-2] Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
+                    log(`[SWITCH-2] New include files from title:`, newIncludeFiles);
+                    log(`[SWITCH-2] Column title in board:`, column.title);
 
                     // Route through unified state machine via handleIncludeSwitch
                     const panel = this._getWebviewPanel();
+
+                    // Clear dirty flag BEFORE stopping editing
+                    // This prevents RACE-2 handler from sending stale updateColumnContent
+                    if (panel.clearColumnDirty) {
+                        panel.clearColumnDirty(message.columnId);
+                        log(`[SWITCH-2] Cleared dirty flag for column ${message.columnId} before switch`);
+                    }
+
+                    // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
+                    // This ensures user can't edit while content is loading
+                    await this.requestStopEditing();
+
                     try {
                         // Call new state machine-based handler
                         await panel.handleIncludeSwitch({
@@ -722,22 +748,22 @@ export class MessageHandler {
                             newTitle: message.title
                         });
 
-                        console.log(`[SWITCH-2] Column include switch completed successfully`);
+                        log(`[SWITCH-2] Column include switch completed successfully`);
 
                         // State machine already updated all column properties (title, includeFiles, tasks)
                         // No need to update board here - would cause stale data issues
 
                         // Clear editing flag after completion
-                        console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
+                        log(`[SWITCH-2] Edit completed - allowing board regenerations`);
                         this._getWebviewPanel().setEditingInProgress(false);
                     } catch (error: any) {
                         // RACE-1: On error, still clear editing flag
                         this._getWebviewPanel().setEditingInProgress(false);
 
                         if (error.message === 'USER_CANCELLED') {
-                            console.log(`[SWITCH-2] User cancelled switch, no changes made`);
+                            log(`[SWITCH-2] User cancelled switch, no changes made`);
                         } else {
-                            console.error(`[SWITCH-2] Error during column include switch:`, error);
+                            log(`[SWITCH-2] Error during column include switch:`, error);
                             vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
                         }
                     }
@@ -778,6 +804,13 @@ export class MessageHandler {
                         console.log('[editTaskTitle] Routing task include switch through unified handler...');
                         const panel = this._getWebviewPanel();
                         const oldTaskIncludeFiles = task.includeFiles || [];
+
+                        // Clear dirty flag BEFORE stopping editing
+                        // Otherwise RACE-2 handler will send stale updateTaskContent from dirty items
+                        if (panel.clearTaskDirty) {
+                            panel.clearTaskDirty(message.taskId);
+                            console.log(`[editTaskTitle] Cleared dirty flag for task ${message.taskId} before stopping edit`);
+                        }
 
                         // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
                         // This ensures user can't edit description while content is loading

@@ -2943,25 +2943,12 @@ window.addEventListener('message', event => {
                     // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
 
-                    // CRITICAL: If user is editing THIS task, update the editor value with new content
+                    // DON'T update editor value while user is editing!
+                    // The editor will be stopped by the backend via stopEditing message,
+                    // and the new content will be rendered after editing stops.
+                    // Updating the editor value here would overwrite user's in-progress edits.
                     if (isEditing && window.taskEditor.currentEditor.taskId === message.taskId) {
-                        if (window.taskEditor.currentEditor.type === 'task-title') {
-                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task title:', message.taskTitle);
-                            window.taskEditor.currentEditor.element.value = message.taskTitle;
-                            window.taskEditor.currentEditor.originalValue = message.taskTitle;
-                            // Auto-resize the textarea if needed
-                            if (typeof window.taskEditor.autoResize === 'function') {
-                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
-                            }
-                        } else if (window.taskEditor.currentEditor.type === 'task-description') {
-                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task description (length:', message.description ? message.description.length : 0, ')');
-                            window.taskEditor.currentEditor.element.value = message.description || '';
-                            window.taskEditor.currentEditor.originalValue = message.description || '';
-                            // Auto-resize the textarea if needed
-                            if (typeof window.taskEditor.autoResize === 'function') {
-                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
-                            }
-                        }
+                        console.log('[FRONTEND updateTaskContent] User is editing this task - NOT updating editor value to preserve user input');
                     }
 
                     if (!isEditing) {

@@ -795,6 +795,12 @@ class TaskEditor {
                             oldIncludeMatches.length !== newIncludeMatches.length ||
                             oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
 
+                        console.log('[TaskEditor COLUMN] Old title:', column.title);
+                        console.log('[TaskEditor COLUMN] New title:', newTitle);
+                        console.log('[TaskEditor COLUMN] Old includes:', oldIncludeMatches);
+                        console.log('[TaskEditor COLUMN] New includes:', newIncludeMatches);
+                        console.log('[TaskEditor COLUMN] hasIncludeChanges:', hasIncludeChanges);
+
                         column.title = newTitle;
 
                         // If include syntax changed, send editColumnTitle message immediately for backend processing

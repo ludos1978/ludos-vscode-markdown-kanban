@@ -1937,9 +1937,9 @@ export class KanbanWebviewPanel {
 
                 console.log(`[_sendIncludeFileUpdateToFrontend] Sent column update with ${tasks.length} tasks`);
 
-                // RACE-4: Invalidate cache after modifying board
-                // The cached board now contains updated data, but next operation should regenerate from files
-                this.invalidateBoardCache();
+                // DON'T invalidate cache for include files - state machine already updated it
+                // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
+                // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-task') {
             // Find task that uses this include file
@@ -1982,8 +1982,9 @@ export class KanbanWebviewPanel {
 
                 console.log(`[_sendIncludeFileUpdateToFrontend] Sent task update with ${fullContent.length} chars`);
 
-                // RACE-4: Invalidate cache after modifying board
-                this.invalidateBoardCache();
+                // DON'T invalidate cache for include files - state machine already updated it
+                // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
+                // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-regular') {
             // Regular include - regenerate board from registry
@@ -2216,7 +2217,9 @@ export class KanbanWebviewPanel {
      * Examples: file reload, content change, include switch, etc.
      */
     public invalidateBoardCache(): void {
+        const stack = new Error().stack;
         console.log('[STATE-2] invalidateBoardCache() - Cache invalidated');
+        console.log('[STATE-2] Called from:', stack?.split('\n').slice(1, 4).join('\n'));
         this._boardCacheValid = false;
     }
 
