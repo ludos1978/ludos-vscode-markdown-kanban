@@ -189,6 +189,26 @@ export abstract class IncludeFile extends MarkdownFile {
         }
     }
 
+    // ============= BASELINE CAPTURE FOR INCLUDE FILES =============
+
+    /**
+     * Apply a captured edit to the baseline for include files
+     * CRITICAL: Include files need to apply edits directly to content baseline
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        console.log(`[${this.getFileType()}] Applying captured edit to include file baseline:`, capturedEdit);
+
+        // For include files (column/task), the edit is a description edit
+        // Apply the new value directly to the baseline content
+        if (capturedEdit && capturedEdit.value !== undefined) {
+            // Update baseline with the edited content
+            this._baseline = capturedEdit.value;
+            console.log(`[${this.getFileType()}] ✓ Baseline updated with captured edit (${capturedEdit.value.length} chars)`);
+        } else {
+            console.warn(`[${this.getFileType()}] No edit value to apply to baseline`);
+        }
+    }
+
     // ============= SIMPLIFIED CONFLICT DETECTION =============
 
     /**

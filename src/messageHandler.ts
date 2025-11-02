@@ -564,13 +564,51 @@ export class MessageHandler {
                 // User started editing - block board regenerations
                 console.log(`[MessageHandler] Editing started - blocking board regenerations`);
                 this._getWebviewPanel().setEditingInProgress(true);
-                // CRITICAL: Set edit mode flag on the file for conflict detection
+                // CRITICAL: Set edit mode flag on ALL relevant files for conflict detection
                 {
                     const panel = this._getWebviewPanel();
                     const mainFile = panel.fileRegistry.getMainFile();
                     if (mainFile) {
                         mainFile.setEditMode(true);
-                        console.log(`[MessageHandler] Edit mode flag set to true`);
+                        console.log(`[MessageHandler] Edit mode flag set to true on main file`);
+                    }
+
+                    // CRITICAL FIX: Also set edit mode on include files if editing within an include
+                    // This prevents external changes to include files from being missed during editing
+                    const board = panel.getBoard();
+                    if (board && (message.taskId || message.columnId)) {
+                        // Find the column being edited
+                        const column = board.columns.find((col: any) =>
+                            col.id === message.columnId ||
+                            col.tasks.some((t: any) => t.id === message.taskId)
+                        );
+
+                        if (column) {
+                            // Check if editing within a column include
+                            if (column.includeFiles && column.includeFiles.length > 0) {
+                                for (const relativePath of column.includeFiles) {
+                                    const includeFile = panel.fileRegistry.getByRelativePath(relativePath);
+                                    if (includeFile) {
+                                        includeFile.setEditMode(true);
+                                        console.log(`[MessageHandler] Edit mode flag set to true on column include: ${relativePath}`);
+                                    }
+                                }
+                            }
+
+                            // Check if editing a task include
+                            if (message.taskId) {
+                                const task = column.tasks.find((t: any) => t.id === message.taskId);
+                                if (task && task.includeFiles && task.includeFiles.length > 0) {
+                                    for (const relativePath of task.includeFiles) {
+                                        const includeFile = panel.fileRegistry.getByRelativePath(relativePath);
+                                        if (includeFile) {
+                                            includeFile.setEditMode(true);
+                                            console.log(`[MessageHandler] Edit mode flag set to true on task include: ${relativePath}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 break;
@@ -586,13 +624,23 @@ export class MessageHandler {
                 // User finished editing normally (not via backend request)
                 console.log(`[MessageHandler] Editing stopped normally - clearing edit mode flag`);
                 this._getWebviewPanel().setEditingInProgress(false);
-                // Clear edit mode flag on the file
+                // Clear edit mode flag on ALL files (main + includes)
                 {
                     const panel = this._getWebviewPanel();
                     const mainFile = panel.fileRegistry.getMainFile();
                     if (mainFile) {
                         mainFile.setEditMode(false);
+                        console.log(`[MessageHandler] Edit mode flag cleared on main file`);
                     }
+
+                    // CRITICAL FIX: Also clear edit mode on all include files
+                    const allFiles = panel.fileRegistry.getAllFiles();
+                    for (const file of allFiles) {
+                        if (file.getFileType() !== 'main') {
+                            file.setEditMode(false);
+                        }
+                    }
+                    console.log(`[MessageHandler] Edit mode flag cleared on all include files`);
                 }
                 break;
 

@@ -1581,7 +1581,57 @@ export class KanbanWebviewPanel {
         }
 
         console.log(`[KanbanWebviewPanel] Created ${createdCount} include file instances`);
+
+        // CRITICAL FIX: Also UPDATE content of existing include files with board changes
+        this._updateIncludeFilesContent(board);
     }
+
+    /**
+     * CRITICAL: Update content of existing include files with board changes
+     * This ensures that when you edit tasks/columns in the Kanban, the include files are updated
+     */
+    private _updateIncludeFilesContent(board: KanbanBoard): void {
+        console.log('[_updateIncludeFilesContent] Updating include file content from board');
+
+        // Update column include files
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    const file = this._fileRegistry.getByRelativePath(relativePath);
+                    if (file && file.getFileType() === 'include-column') {
+                        // CRITICAL: Use the ColumnIncludeFile's updateTasks() method
+                        // which generates the correct PRESENTATION format (slides with --- separators)
+                        // NOT task list markdown!
+                        const columnIncludeFile = file as ColumnIncludeFile;
+                        columnIncludeFile.updateTasks(column.tasks);
+
+                        console.log(`[_updateIncludeFilesContent] Updated column include: ${relativePath} (${column.tasks.length} tasks)`);
+                    }
+                }
+            }
+        }
+
+        // Update task include files
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this._fileRegistry.getByRelativePath(relativePath);
+                        if (file && file.getFileType() === 'include-task') {
+                            // For task includes, the description IS the file content
+                            const taskContent = task.description || '';
+
+                            // Update file content (marks as having unsaved changes)
+                            file.setContent(taskContent, false);  // false = don't update baseline, mark as unsaved
+
+                            console.log(`[_updateIncludeFilesContent] Updated task include: ${relativePath} (${taskContent.length} chars)`);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
     /**
      * UNIFIED CONTENT CHANGE HANDLER (State Machine Integrated)
