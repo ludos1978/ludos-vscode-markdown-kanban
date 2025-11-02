@@ -32,6 +32,7 @@ import {
     RegularIncludeFile
 } from './files';
 import { MainFileCoordinator, ChangeAnalysis, ChangeType } from './core/state-machine';
+import { ChangeStateMachine } from './core/ChangeStateMachine';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -43,7 +44,7 @@ export class KanbanWebviewPanel {
     private readonly _extensionUri: vscode.Uri;
     private _context: vscode.ExtensionContext;
     private _disposables: vscode.Disposable[] = [];
-    
+
     // Main components
     private _fileManager: FileManager;
     private _undoRedoManager: UndoRedoManager;
@@ -61,6 +62,9 @@ export class KanbanWebviewPanel {
 
     // State machine coordinator for unified change handling
     private _changeCoordinator: MainFileCoordinator | null = null;
+
+    // NEW: Unified change state machine (Phase 6)
+    private _stateMachine: ChangeStateMachine;
 
     // STATE-2: Board caching infrastructure (single source of truth)
     private _cachedBoard: KanbanBoard | null = null;  // Cached generated board
@@ -328,6 +332,11 @@ export class KanbanWebviewPanel {
             this._backupManager,
             this._fileRegistry
         );
+
+        // Initialize unified change state machine (Phase 6)
+        this._stateMachine = ChangeStateMachine.getInstance();
+        this._stateMachine.initialize(this._fileRegistry, this);
+        console.log('[KanbanWebviewPanel] State machine initialized');
 
         // Subscribe to registry change events
         this._disposables.push(
@@ -1649,283 +1658,6 @@ export class KanbanWebviewPanel {
      *
      * NOTE: This does NOT save files - saving is separate, user-triggered
      */
-    private async _handleContentChange(params: {
-        source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
-        mainFileChanged?: boolean;
-        changedIncludes?: string[];
-        switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[]; newTitle?: string }[];
-    }): Promise<void> {
-        console.log(`[UNIFIED] handleContentChange from ${params.source}`);
-
-        // Detect what changed
-        const hasMainChange = params.mainFileChanged || false;
-        const hasIncludeChanges = (params.changedIncludes?.length || 0) > 0;
-        const hasSwitches = (params.switchedIncludes?.length || 0) > 0;
-
-        console.log(`[UNIFIED] Changes: main=${hasMainChange}, includes=${hasIncludeChanges}, switches=${hasSwitches}`);
-
-        // Use coordinator if available, otherwise fall back to direct execution
-        if (!this._changeCoordinator) {
-            console.warn('[UNIFIED] No coordinator available - using legacy _withLock');
-            return this._withLock('handleContentChange', async () => {
-                await this._executeContentChangeLogic(params, hasMainChange, hasIncludeChanges, hasSwitches);
-            });
-        }
-
-        // Map source to coordinator format
-        const coordinatorSource: 'save' | 'external' | 'file_watcher' | 'ui' =
-            params.source === 'external_reload' ? 'external' :
-            params.source === 'board_update' ? 'ui' :
-            params.source === 'user_edit' ? 'ui' :
-            params.source; // file_watcher stays as is
-
-        // Execute through coordinator with state machine tracking
-        return this._changeCoordinator.handleChange({
-            source: coordinatorSource,
-            hasMainChange,
-            hasIncludeChanges,
-            hasSwitchedIncludes: hasSwitches,
-
-            // ANALYZING phase: Create change analysis
-            onAnalyze: async (): Promise<ChangeAnalysis> => {
-                const mainFile = this._fileRegistry.getMainFile();
-                const saveCoordinator = SaveCoordinator.getInstance();
-
-                return {
-                    hasMainContentChange: hasMainChange,
-                    hasMainStructureChange: hasMainChange,
-                    hasIncludeContentChange: hasIncludeChanges,
-                    hasSwitchedIncludes: hasSwitches,
-                    switchedFiles: (params.switchedIncludes || []).flatMap(sw => {
-                        const unloadingFiles = sw.oldFiles.filter(old => !sw.newFiles.includes(old));
-                        const loadingFiles = sw.newFiles.filter(nf => !sw.oldFiles.includes(nf));
-
-                        const switches = [];
-                        for (const oldFile of unloadingFiles) {
-                            const newFile = loadingFiles[unloadingFiles.indexOf(oldFile)] || loadingFiles[0];
-                            if (newFile) {
-                                switches.push({
-                                    oldPath: oldFile,
-                                    newPath: newFile,
-                                    includeType: (sw.columnId ? 'column' : 'task') as 'column' | 'task' | 'regular'
-                                });
-                            }
-                        }
-                        return switches;
-                    }),
-                    changedIncludeFiles: params.changedIncludes || [],
-                    // NOTE: Legitimate saves are filtered out by watcher (_skipNextReloadDetection)
-                    // By the time we reach state machine, all changes are external
-                    isLegitimateSave: false
-                };
-            },
-
-            // COORDINATING_INCLUDES phase: Handle include switches and unsaved changes
-            onCoordinateIncludes: async (analysis: ChangeAnalysis) => {
-                await this._executeContentChangeLogic(params, hasMainChange, hasIncludeChanges, hasSwitches);
-            },
-
-            // UPDATING_UI phase: Invalidate cache
-            onUpdateUI: async () => {
-                // Board state has been modified (switches, reloads, external changes)
-                this.invalidateBoardCache();
-                console.log('[UNIFIED] Content change complete');
-            }
-        });
-    }
-
-    /**
-     * Core content change logic (extracted for reuse)
-     * Handles the actual file operations and UI updates
-     */
-    private async _executeContentChangeLogic(
-        params: {
-            source: 'external_reload' | 'file_watcher' | 'board_update' | 'user_edit';
-            mainFileChanged?: boolean;
-            changedIncludes?: string[];
-            switchedIncludes?: { columnId?: string; taskId?: string; columnIdForTask?: string; oldFiles: string[]; newFiles: string[]; newTitle?: string }[];
-        },
-        hasMainChange: boolean,
-        hasIncludeChanges: boolean,
-        hasSwitches: boolean
-    ): Promise<void> {
-        // Step 1: Check for unsaved includes being unloaded/switched
-        if (hasSwitches) {
-            for (const switchInfo of params.switchedIncludes!) {
-                const unloadingFiles = switchInfo.oldFiles.filter(old => !switchInfo.newFiles.includes(old));
-
-                if (unloadingFiles.length > 0) {
-                    const unsavedFiles = unloadingFiles.filter(path => {
-                        const file = this._fileRegistry.getByRelativePath(path);
-                        return file && file.hasUnsavedChanges();
-                    });
-
-                    if (unsavedFiles.length > 0) {
-                        const choice = await vscode.window.showWarningMessage(
-                            `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before unloading?`,
-                            { modal: true },
-                            'Save',
-                            'Discard',
-                            'Cancel'
-                        );
-
-                        if (choice === 'Save') {
-                            for (const filePath of unsavedFiles) {
-                                const file = this._fileRegistry.getByRelativePath(filePath);
-                                if (file) {
-                                    await file.save();
-                                }
-                            }
-                        } else if (choice === 'Cancel') {
-                            console.log('[UNIFIED] User cancelled - aborting content change');
-                            throw new Error('USER_CANCELLED');
-                        }
-                        // If 'Discard', continue
-                    }
-                }
-            }
-        }
-
-        // Step 2: Unset old includes, clear cache, set new includes, load new content
-        if (hasSwitches) {
-            const board = this.getBoard();
-
-            // Helper: Clear backend cache for files being unloaded
-            const clearFileCache = (files: string[], label: string) => {
-                for (const file of files) {
-                    const instance = this._fileRegistry.getByRelativePath(file);
-                    if (instance) {
-                        console.log(`[UNIFIED] ${label}: Clearing cache for ${file}`);
-                        instance.discardChanges(); // Revert to baseline (disk content)
-                    }
-                }
-            };
-
-            for (const switchInfo of params.switchedIncludes!) {
-                if (switchInfo.columnId) {
-                    // Column include switch
-                    const column = board?.columns.find(c => c.id === switchInfo.columnId);
-                    if (column) {
-                        console.log(`[UNIFIED] Column switch: unsetting old includes, clearing cache`);
-                        clearFileCache(switchInfo.oldFiles, 'Column switch');
-
-                        // Unset old includeFiles and clear frontend cache
-                        column.includeFiles = [];
-                        column.tasks = [];
-                        column.includeMode = false;
-
-                        // Set new includeFiles and load content
-                        column.includeFiles = switchInfo.newFiles;
-                        column.includeMode = switchInfo.newFiles.length > 0;
-
-                        console.log(`[UNIFIED] Column switch: loading new includes`);
-                        await this.updateIncludeContentUnified(column, switchInfo.newFiles, params.source as any);
-                    }
-                } else if (switchInfo.taskId && switchInfo.columnIdForTask) {
-                    // Task include switch
-                    const column = board?.columns.find(c => c.id === switchInfo.columnIdForTask);
-                    const task = column?.tasks.find(t => t.id === switchInfo.taskId);
-
-                    if (task) {
-                        console.log(`[UNIFIED] Task switch: unsetting old includes, clearing cache`);
-                        console.log(`[UNIFIED]   Old: includeFiles=${task.includeFiles}, displayTitle="${task.displayTitle}", description length=${task.description?.length || 0}`);
-                        clearFileCache(switchInfo.oldFiles, 'Task switch');
-
-                        // Unset old includeFiles and clear frontend cache
-                        task.includeFiles = [];
-                        task.displayTitle = '';
-                        task.description = '';
-                        task.includeMode = false;
-
-                        // Set new includeFiles
-                        task.includeFiles = switchInfo.newFiles;
-                        task.includeMode = switchInfo.newFiles.length > 0;
-
-                        // CRITICAL: Update title if provided (task include switch)
-                        if (switchInfo.newTitle) {
-                            task.title = switchInfo.newTitle;
-                            console.log(`[UNIFIED] Updated task title to: ${switchInfo.newTitle}`);
-                        }
-
-                        // Load new content from file
-                        if (switchInfo.newFiles.length > 0) {
-                            console.log(`[UNIFIED] Task switch: loading new content from ${switchInfo.newFiles[0]}`);
-                            await this.loadNewTaskIncludeContent(task, switchInfo.newFiles);
-                            console.log(`[UNIFIED]   New: displayTitle="${task.displayTitle}", description length=${task.description?.length || 0}`);
-                        }
-
-                        // Update frontend
-                        if (this._panel && column) {
-                            this._panel.webview.postMessage({
-                                type: 'updateTaskContent',
-                                columnId: column.id,
-                                taskId: task.id,
-                                description: task.description,
-                                displayTitle: task.displayTitle,
-                                taskTitle: switchInfo.newTitle || task.title,
-                                originalTitle: task.originalTitle,
-                                includeMode: task.includeMode,
-                                includeFiles: task.includeFiles
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        // Step 3: External include changes are handled autonomously by file instances
-        if (hasIncludeChanges) {
-            console.log('[UNIFIED] External include changes detected - files will handle autonomously');
-        }
-
-        // Step 4: Update frontend & backend cache for main file
-        if (hasMainChange) {
-            // CRITICAL: Block board regeneration if user is editing
-            if (this._isEditingInProgress) {
-                console.log(`[handleContentChange] BLOCKING board regeneration - editing in progress! Source: ${params.source}`);
-                return;
-            }
-
-            console.log(`[CRITICAL] Main file changed - this will regenerate ALL column/task IDs!`);
-            console.log(`[CRITICAL] Source: ${params.source}`);
-            console.log(`[CRITICAL] Stack trace:`, new Error().stack);
-
-            const mainFile = this._fileRegistry.getMainFile();
-            if (mainFile) {
-                // Re-parse board from updated content
-                const board = mainFile.getBoard();
-
-                if (board && board.valid) {
-                    console.log(`[CRITICAL] About to regenerate board with ${board.columns.length} columns - IDs will change!`);
-                    console.log(`[CRITICAL] New column IDs will be:`, board.columns.map(c => c.id));
-
-                    // Sync include files with registry
-                    this._syncIncludeFilesWithRegistry(board);
-
-                    // Load content for all column includes
-                    for (const column of board.columns) {
-                        if (column.includeFiles && column.includeFiles.length > 0) {
-                            for (const relativePath of column.includeFiles) {
-                                const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
-                                if (file) {
-                                    const tasks = file.parseToTasks(column.tasks);
-                                    column.tasks = tasks;
-                                }
-                            }
-                        }
-                    }
-
-                    // Update cached board
-                    this._cachedBoard = board;
-                    this._boardCacheValid = true;
-
-                    // Send full board to frontend
-                    this._sendBoardUpdate(board);
-                }
-            }
-        }
-    }
-
     /**
      * Set editing in progress flag to block board regenerations
      */
@@ -2028,7 +1760,7 @@ export class KanbanWebviewPanel {
 
     /**
      * PUBLIC API: Handle include file switch triggered by user edit (column/task title)
-     * Routes through the unified content change handler to ensure proper flow
+     * Routes through the unified change state machine (Phase 6)
      * Changes always apply - use undo to revert if needed
      *
      * @param params Switch parameters (columnId or taskId with old/new files)
@@ -2038,33 +1770,31 @@ export class KanbanWebviewPanel {
         taskId?: string;
         oldFiles: string[];
         newFiles: string[];
+        newTitle?: string;
     }): Promise<void> {
-        console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through unified handler`);
+        console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through STATE MACHINE`);
 
-        if (params.columnId) {
-            // Column include switch
-            await this._handleContentChange({
-                source: 'user_edit',
-                switchedIncludes: [{
-                    columnId: params.columnId,
-                    oldFiles: params.oldFiles,
-                    newFiles: params.newFiles
-                }]
-            });
-        } else if (params.taskId) {
-            // Task include switch - for now, just load the new content
-            // DEFERRED: Integrate task include switches into unified handler (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #1)
-            // Will be addressed in Phase 6 (Major Refactors) to create updateTaskIncludeFile() similar to updateColumnIncludeFile()
-            const board = this.getBoard();
-            const column = board?.columns.find(col =>
-                col.tasks.some(t => t.id === params.taskId)
-            );
-            const task = column?.tasks.find(t => t.id === params.taskId);
+        // Route through unified change state machine
+        const board = this.getBoard();
+        const column = params.columnId ? board?.columns.find((c: any) => c.id === params.columnId) :
+                       board?.columns.find((c: any) => c.tasks.some((t: any) => t.id === params.taskId));
 
-            if (task && params.newFiles.length > 0) {
-                await this.loadNewTaskIncludeContent(task, params.newFiles);
-            }
+        const result = await this._stateMachine.processChange({
+            type: 'include_switch',
+            target: params.columnId ? 'column' : 'task',
+            targetId: params.columnId || params.taskId!,
+            columnIdForTask: params.columnId ? undefined : column?.id,
+            oldFiles: params.oldFiles,
+            newFiles: params.newFiles,
+            newTitle: params.newTitle
+        });
+
+        if (!result.success) {
+            console.error('[handleIncludeSwitch] State machine failed:', result.error);
+            throw result.error || new Error('Include switch failed');
         }
+
+        console.log('[handleIncludeSwitch] ✅ Include switch completed via state machine');
     }
 
     /**
@@ -2091,192 +1821,6 @@ export class KanbanWebviewPanel {
      * @param onComplete Optional callback when all async operations complete (RACE-1 fix)
      * @throws Error if column not found or user cancels
      */
-    public async updateColumnIncludeFile(
-        columnId: string,
-        oldFiles: string[],
-        newFiles: string[],
-        newTitle: string,
-        onComplete?: () => void
-    ): Promise<void> {
-        // RACE-4: Wrap entire operation with lock to prevent concurrent include switches
-        return this._withLock('updateColumnIncludeFile', async () => {
-            console.log(`[SWITCH-1] updateColumnIncludeFile START`);
-        console.log(`[SWITCH-1]   columnId: ${columnId}`);
-        console.log(`[SWITCH-1]   oldFiles: [${oldFiles.join(', ')}]`);
-        console.log(`[SWITCH-1]   newFiles: [${newFiles.join(', ')}]`);
-        console.log(`[SWITCH-1]   newTitle: "${newTitle}"`);
-
-        // STEP 0: Verify column exists
-        const board = this.getBoard();
-        if (!board) {
-            throw new Error('[SWITCH-1] No board loaded');
-        }
-
-        const column = board.columns.find(c => c.id === columnId);
-        if (!column) {
-            throw new Error(`[SWITCH-1] Column ${columnId} not found in board`);
-        }
-
-        console.log(`[SWITCH-1] Column found: "${column.title}"`);
-
-        // STEP 1: Save undo state FIRST (before ANY changes)
-        // This captures the current state so undo can restore it
-        console.log(`[SWITCH-1] STEP 1: Saving undo state`);
-        this._undoRedoManager.saveStateForUndo(board);
-
-        // STEP 2: Prompt for unsaved changes in old files
-        console.log(`[SWITCH-1] STEP 2: Checking for unsaved changes in old files`);
-        const filesToUnload = oldFiles.filter(old => !newFiles.includes(old));
-
-        if (filesToUnload.length > 0) {
-            const unsavedFiles = filesToUnload.filter(relativePath => {
-                const file = this._fileRegistry.getByRelativePath(relativePath);
-                return file && file.hasUnsavedChanges();
-            });
-
-            if (unsavedFiles.length > 0) {
-                console.log(`[SWITCH-1] Found ${unsavedFiles.length} unsaved files: [${unsavedFiles.join(', ')}]`);
-
-                const choice = await vscode.window.showWarningMessage(
-                    `The following include files have unsaved changes:\n${unsavedFiles.join('\n')}\n\nDo you want to save them before switching?`,
-                    { modal: true },
-                    'Save',
-                    'Discard',
-                    'Cancel'
-                );
-
-                if (choice === 'Save') {
-                    console.log(`[SWITCH-1] User chose to save unsaved files`);
-                    for (const relativePath of unsavedFiles) {
-                        const file = this._fileRegistry.getByRelativePath(relativePath);
-                        if (file) {
-                            await file.save();
-                        }
-                    }
-                } else if (choice === 'Cancel') {
-                    console.log(`[SWITCH-1] User cancelled switch`);
-                    throw new Error('USER_CANCELLED');
-                }
-                // If 'Discard', continue
-                console.log(`[SWITCH-1] User chose to discard changes, continuing`);
-            }
-        }
-
-        // STEP 3: Cleanup old files (stopWatching + unregister)
-        console.log(`[SWITCH-1] STEP 3: Cleaning up old files`);
-        for (const relativePath of filesToUnload) {
-            const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file) {
-                console.log(`[SWITCH-1]   Cleaning up: ${relativePath}`);
-                file.stopWatching();
-                this._fileRegistry.unregister(file.getPath());
-                // Note: unregister() calls dispose() internally
-            }
-        }
-
-        // STEP 4: Update board state (title + includeFiles + includeMode)
-        console.log(`[SWITCH-1] STEP 4: Updating board state`);
-        column.title = newTitle;
-        column.originalTitle = newTitle;
-        column.includeFiles = [...newFiles]; // Store ORIGINAL paths (no normalization)
-        column.includeMode = newFiles.length > 0;
-
-        // Clear tasks until new content loads
-        column.tasks = [];
-
-        // Parse display title (remove !!!include()!!! syntax for UI)
-        column.displayTitle = newTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-        if (!column.displayTitle) {
-            column.displayTitle = 'Untitled Column';
-        }
-
-        console.log(`[SWITCH-1]   Updated column.title: "${column.title}"`);
-        console.log(`[SWITCH-1]   Updated column.displayTitle: "${column.displayTitle}"`);
-        console.log(`[SWITCH-1]   Updated column.includeFiles: [${column.includeFiles.join(', ')}]`);
-        console.log(`[SWITCH-1]   Updated column.includeMode: ${column.includeMode}`);
-
-        // STEP 5: Register new file instances (if not already registered)
-        console.log(`[SWITCH-1] STEP 5: Registering new file instances`);
-        const mainFile = this._fileRegistry.getMainFile();
-        if (!mainFile) {
-            throw new Error('[SWITCH-1] Main file not found in registry');
-        }
-
-        for (const relativePath of newFiles) {
-            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-                console.log(`[SWITCH-1]   Creating new ColumnIncludeFile: ${relativePath}`);
-                const columnIncludeFile = this._fileFactory.createColumnInclude(
-                    relativePath,
-                    mainFile,
-                    false // autoLoad=false, we'll load manually next
-                );
-                this._fileRegistry.register(columnIncludeFile);
-                columnIncludeFile.startWatching();
-            } else {
-                console.log(`[SWITCH-1]   File already registered: ${relativePath}`);
-            }
-        }
-
-        // STEP 6: Load new content (with FOUNDATION-2 cancellation protection)
-        console.log(`[SWITCH-1] STEP 6: Loading new content`);
-        const tasks: KanbanTask[] = [];
-
-        for (const relativePath of newFiles) {
-            const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
-            if (!file) {
-                console.warn(`[SWITCH-1] File not found after registration: ${relativePath}`);
-                continue;
-            }
-
-            // Ensure file has content loaded (reload() has cancellation protection from FOUNDATION-2)
-            if (!file.getContent() || file.getContent().length === 0) {
-                console.log(`[SWITCH-1]   Loading content from disk: ${relativePath}`);
-                await file.reload();
-            }
-
-            // Parse tasks from file content
-            if (file.parseToTasks) {
-                const fileTasks = file.parseToTasks(column.tasks); // Preserve existing task IDs if any
-                console.log(`[SWITCH-1]   Parsed ${fileTasks.length} tasks from ${relativePath}`);
-                tasks.push(...fileTasks);
-            }
-        }
-
-        // Update column with loaded tasks
-        column.tasks = tasks;
-        console.log(`[SWITCH-1]   Total tasks loaded: ${tasks.length}`);
-
-        // STEP 7: Send updateColumnContent to frontend
-        console.log(`[SWITCH-1] STEP 7: Sending updateColumnContent to frontend`);
-        this._panel?.webview.postMessage({
-            type: 'updateColumnContent',
-            columnId: column.id,
-            tasks: column.tasks,
-            columnTitle: column.title,
-            displayTitle: column.displayTitle,
-            includeMode: column.includeMode,
-            includeFiles: column.includeFiles
-        });
-
-        // STEP 8: REMOVED - sendBoardUpdate() causes full board redraw
-        // updateColumnContent (Step 7) is sufficient - only updates the switched column
-            // Avoids unnecessary visual flickering and performance issues
-
-            console.log(`[SWITCH-1] updateColumnIncludeFile COMPLETE ✓`);
-
-            // RACE-4: Invalidate cache after include switch
-            // Board structure has changed (includeFiles, tasks), next getBoard() should regenerate
-            this.invalidateBoardCache();
-
-            // RACE-1: Call completion callback (if provided)
-            // This allows caller to unblock board regenerations safely
-            if (onComplete) {
-                console.log(`[SWITCH-1] Calling completion callback`);
-                onComplete();
-            }
-        });
-    }
-
     /**
      * Handle file registry change events - ROUTES TO UNIFIED HANDLER
      */
@@ -2592,7 +2136,7 @@ export class KanbanWebviewPanel {
         return false;
     }
 
-    // OLD HANDLERS REMOVED - Now using unified _handleContentChange() handler
+    // OLD HANDLERS REMOVED - All include switches now route through ChangeStateMachine via handleIncludeSwitch()
 
     // ============= FILE REGISTRY HELPER METHODS =============
 
@@ -3154,171 +2698,6 @@ export class KanbanWebviewPanel {
                 includeFiles: normalizedNewFiles
             });
             console.log(`[updateIncludeContentUnified] Sent updateColumnContent with ${allTasks.length} tasks to frontend`);
-        }
-    }
-
-    public async loadNewTaskIncludeContent(task: KanbanTask, newIncludeFiles: string[]): Promise<void> {
-
-        try {
-            const currentDocument = this._fileManager.getDocument();
-            if (!currentDocument) {
-                return;
-            }
-
-            // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
-            const basePath = path.dirname(currentDocument.uri.fsPath);
-
-            // For now, handle single file includes
-            const fileState = newIncludeFiles[0];
-            const absolutePath = PathResolver.resolve(basePath, fileState);
-
-            // FIX: Must normalize path - registry does NOT normalize internally!
-            const normalizedIncludeFile = this._includeFileManager.normalizeIncludePath(fileState);
-
-            // SOLUTION 3: NUCLEAR OPTION - Always create fresh file instances, never reuse
-            const oldIncludeFiles = task.includeFiles || [];
-            const normalizedNewFiles = [normalizedIncludeFile];
-            const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
-
-            const filesToRemove = normalizedOldFiles.filter(old => !normalizedNewFiles.includes(old));
-
-            // STEP 1: Cleanup old files
-            for (const oldFilePath of filesToRemove) {
-                const oldFile = this.fileRegistry?.getByRelativePath(oldFilePath);
-                if (oldFile) {
-                    console.log(`[loadNewTaskIncludeContent] Cleaning up old include file: ${oldFilePath}`);
-                    oldFile.stopWatching();
-                    this.fileRegistry.unregister(oldFile.getPath());
-                    console.log(`[loadNewTaskIncludeContent] ✓ Old file unregistered and disposed`);
-                }
-            }
-
-            // STEP 2: ALWAYS unregister existing file (even if switching back)
-            // This ensures fresh state and prevents stale baseline issues
-            const existingFile = this.fileRegistry?.getByRelativePath(normalizedIncludeFile);
-            if (existingFile) {
-                console.log(`[loadNewTaskIncludeContent] Unregistering existing file for fresh start: ${normalizedIncludeFile}`);
-                existingFile.stopWatching();
-                this.fileRegistry.unregister(existingFile.getPath());
-            }
-
-            // STEP 3: ALWAYS create fresh instance (Solution 3)
-            const mainFile = this.fileRegistry.getMainFile();
-            if (!mainFile) {
-                console.error('[loadNewTaskIncludeContent] ❌ No main file found!');
-                return;
-            }
-
-            console.log('[loadNewTaskIncludeContent] Creating fresh TaskIncludeFile instance:', normalizedIncludeFile);
-            const taskInclude = this._fileFactory.createTaskInclude(
-                normalizedIncludeFile,
-                mainFile,
-                false
-            );
-            taskInclude.setTaskId(task.id);
-            this.fileRegistry.register(taskInclude);
-            taskInclude.startWatching();
-            console.log('[loadNewTaskIncludeContent] ✓ Created and registered TaskIncludeFile:', normalizedIncludeFile);
-
-            // STRATEGY 1: Load full content without parsing
-            // Reload the file content from disk first
-            await this._includeFileManager.readAndUpdateIncludeContent(normalizedIncludeFile, () => this._fileManager.getDocument());
-
-            // Get file instance from registry
-            const includeFile = this.fileRegistry.getByRelativePath(normalizedIncludeFile);
-            if (!includeFile) {
-                console.error('[loadNewTaskIncludeContent] File not found in registry:', normalizedIncludeFile);
-                return;
-            }
-
-            // Get COMPLETE content from file (NO PARSING!)
-            let fullFileContent = includeFile.getContent();
-            console.log(`[loadNewTaskIncludeContent] Loaded ${fullFileContent.length} chars from registry`);
-
-            // FIX: Handle case where reload() failed silently and content is empty
-            if (!fullFileContent || fullFileContent.length === 0) {
-                console.warn(`[loadNewTaskIncludeContent] ⚠ Content is empty! Attempting manual reload...`);
-                await includeFile.reload();
-                fullFileContent = includeFile.getContent();
-
-                if (!fullFileContent || fullFileContent.length === 0) {
-                    console.error(`[loadNewTaskIncludeContent] ❌ Reload failed - file has no content: ${normalizedIncludeFile}`);
-                    return; // Abort - don't update task with empty content
-                }
-
-                console.log(`[loadNewTaskIncludeContent] ✓ Manual reload succeeded: ${fullFileContent.length} chars`);
-            }
-
-            if (fullFileContent !== null && fullFileContent !== undefined) {
-                // Generate displayTitle for UI (visual indicator only, not part of file content)
-                const displayTitle = `# include in ${normalizedIncludeFile}`;
-
-                // Update task with COMPLETE file content (NO PARSING, NO TRUNCATION)
-                task.includeMode = true;
-
-                // FIX: MUST normalize paths before storing - this is CRITICAL for consistent registry lookups!
-                // Store normalized paths so all future lookups will work (registry does NOT normalize internally)
-                task.includeFiles = newIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
-
-                task.originalTitle = task.title; // Preserve the include syntax
-                task.displayTitle = displayTitle; // UI header only
-                task.description = fullFileContent; // COMPLETE file content, no parsing!
-
-                // CRITICAL: Update file baseline to match task content
-                // This prevents false "unsaved" detection in trackIncludeFileUnsavedChanges
-                // setContent with updateBaseline=true syncs both content and baseline
-                includeFile.setContent(fullFileContent, true);
-                console.log(`[loadNewTaskIncludeContent] ✓ File baseline synced with task content`);
-
-                console.log(`[loadNewTaskIncludeContent] ======== TASK UPDATED AFTER RELOAD ========`);
-                console.log(`[loadNewTaskIncludeContent] File: ${normalizedIncludeFile}`);
-                console.log(`[loadNewTaskIncludeContent] displayTitle: "${task.displayTitle}"`);
-                console.log(`[loadNewTaskIncludeContent] description (first 100): "${task.description.substring(0, 100)}"`);
-                console.log(`[loadNewTaskIncludeContent] description length: ${task.description.length}`);
-
-                // Send targeted update message to frontend instead of full refresh
-                if (this._panel) {
-                    this._panel.webview.postMessage({
-                        type: 'updateTaskContent',
-                        taskId: task.id,
-                        description: task.description,
-                        fileState: normalizedIncludeFile,
-                        taskTitle: task.title,
-                        displayTitle: task.displayTitle,
-                        originalTitle: task.originalTitle,
-                        includeMode: task.includeMode,
-                        includeFiles: task.includeFiles
-                    });
-                } else {
-                    console.warn('[loadNewTaskIncludeContent] Cannot send message - panel is null');
-                }
-
-                // File instance tracks its own state, no manual marking needed
-
-            } else {
-                console.warn(`[LoadNewTaskInclude] Include file not found: ${absolutePath}`);
-                // Clear description if file doesn't exist
-                task.description = '';
-
-                // Send targeted update with empty description
-                if (this._panel) {
-                    this._panel.webview.postMessage({
-                        type: 'updateTaskContent',
-                        taskId: task.id,
-                        description: '',
-                        fileState: fileState,
-                        taskTitle: task.title,
-                        displayTitle: task.displayTitle,
-                        originalTitle: task.originalTitle,
-                        includeMode: task.includeMode,
-                        includeFiles: task.includeFiles
-                    });
-                } else {
-                    console.warn('[loadNewTaskIncludeContent] Cannot send empty task message - panel is null');
-                }
-            }
-        } catch (error) {
-            console.error(`[LoadNewTaskInclude] Error loading new task include content:`, error);
         }
     }
 

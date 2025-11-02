@@ -698,8 +698,8 @@ export class MessageHandler {
                 const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
 
                 if (hasColumnIncludeMatches) {
-                    // Column include switch - use UNIFIED function
-                    console.log(`[SWITCH-2] Detected column include syntax, routing to updateColumnIncludeFile`);
+                    // Column include switch - route through state machine
+                    console.log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
 
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
@@ -711,23 +711,28 @@ export class MessageHandler {
                     // Get old include files for cleanup
                     const oldIncludeFiles = column.includeFiles || [];
 
-                    // Call unified switch function
-                    // It handles: undo state, unsaved prompts, cleanup, loading, updates
+                    // Route through unified state machine via handleIncludeSwitch
                     const panel = this._getWebviewPanel();
                     try {
-                        // RACE-1: Pass completion callback to clear editing flag when truly done
-                        await panel.updateColumnIncludeFile(
-                            message.columnId,
-                            oldIncludeFiles,
-                            newIncludeFiles,
-                            message.title,
-                            () => {
-                                // Clear editing flag only after all async operations complete
-                                console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
-                                this._getWebviewPanel().setEditingInProgress(false);
-                            }
-                        );
+                        // Call new state machine-based handler
+                        await panel.handleIncludeSwitch({
+                            columnId: message.columnId,
+                            oldFiles: oldIncludeFiles,
+                            newFiles: newIncludeFiles,
+                            newTitle: message.title
+                        });
+
                         console.log(`[SWITCH-2] Column include switch completed successfully`);
+
+                        // Update board title after successful switch
+                        await this.performBoardAction(() =>
+                            this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title),
+                            { sendUpdate: false }
+                        );
+
+                        // Clear editing flag after completion
+                        console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
+                        this._getWebviewPanel().setEditingInProgress(false);
                     } catch (error: any) {
                         // RACE-1: On error, still clear editing flag
                         this._getWebviewPanel().setEditingInProgress(false);
@@ -782,16 +787,12 @@ export class MessageHandler {
                         await this.requestStopEditing();
 
                         try {
-                            // Route through unified handler - it checks unsaved changes once
-                            await (panel as any)._handleContentChange({
-                                source: 'user_edit',
-                                switchedIncludes: [{
-                                    taskId: message.taskId,
-                                    columnIdForTask: message.columnId,
-                                    oldFiles: oldTaskIncludeFiles,
-                                    newFiles: newIncludeFiles,
-                                    newTitle: message.title
-                                }]
+                            // Route through unified state machine via handleIncludeSwitch
+                            await panel.handleIncludeSwitch({
+                                taskId: message.taskId,
+                                oldFiles: oldTaskIncludeFiles,
+                                newFiles: newIncludeFiles,
+                                newTitle: message.title
                             });
                             console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
 
@@ -2463,7 +2464,7 @@ export class MessageHandler {
         }
     }
 
-    // SWITCH-3: Deleted handleSwitchColumnIncludeFile() - replaced by updateColumnIncludeFile() in KanbanWebviewPanel
+    // SWITCH-3: All include switches now route through ChangeStateMachine via handleIncludeSwitch()
 
     /**
      * Switch task include file without saving the main file
