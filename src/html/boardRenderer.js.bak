@@ -1533,6 +1533,108 @@ function renderBoard(options = null) {
     // setupCompactViewHandler();
 }
 
+/**
+ * Re-render a single column element (for selective updates)
+ * @param {string} columnId - ID of column to re-render
+ */
+function renderSingleColumn(columnId) {
+    if (!window.cachedBoard || !window.cachedBoard.columns) {
+        console.warn('[renderSingleColumn] No cached board available');
+        return;
+    }
+
+    const column = window.cachedBoard.columns.find(c => c.id === columnId);
+    if (!column) {
+        console.warn(`[renderSingleColumn] Column ${columnId} not found in cached board`);
+        return;
+    }
+
+    const columnIndex = window.cachedBoard.columns.indexOf(column);
+    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    if (!columnElement) {
+        console.warn(`[renderSingleColumn] Column ${columnId} not found in DOM`);
+        return;
+    }
+
+    // Save scroll position
+    const tasksContainer = columnElement.querySelector('.tasks-container');
+    const scrollTop = tasksContainer ? tasksContainer.scrollTop : 0;
+
+    // Create new column element
+    const newColumnElement = createColumnElement(column, columnIndex);
+
+    // Replace the old element with the new one
+    columnElement.replaceWith(newColumnElement);
+
+    // Restore scroll position
+    const newTasksContainer = newColumnElement.querySelector('.tasks-container');
+    if (newTasksContainer) {
+        newTasksContainer.scrollTop = scrollTop;
+    }
+
+    // Re-apply visual updates
+    if (window.updateAllVisualTagElements) {
+        const allTags = newColumnElement.getAttribute('data-all-tags');
+        if (allTags) {
+            window.updateAllVisualTagElements(newColumnElement, allTags.split(' ').filter(tag => tag.trim()), 'column');
+        }
+    }
+
+    console.log(`[renderSingleColumn] Re-rendered column ${columnId}`);
+}
+
+/**
+ * Re-render a single task element (for selective updates)
+ * @param {string} columnId - ID of column containing the task
+ * @param {string} taskId - ID of task to re-render
+ */
+function renderSingleTask(columnId, taskId) {
+    if (!window.cachedBoard || !window.cachedBoard.columns) {
+        console.warn('[renderSingleTask] No cached board available');
+        return;
+    }
+
+    const column = window.cachedBoard.columns.find(c => c.id === columnId);
+    if (!column) {
+        console.warn(`[renderSingleTask] Column ${columnId} not found in cached board`);
+        return;
+    }
+
+    const task = column.tasks.find(t => t.id === taskId);
+    if (!task) {
+        console.warn(`[renderSingleTask] Task ${taskId} not found in column ${columnId}`);
+        return;
+    }
+
+    const taskIndex = column.tasks.indexOf(task);
+    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskElement) {
+        console.warn(`[renderSingleTask] Task ${taskId} not found in DOM`);
+        return;
+    }
+
+    // Create new task element HTML
+    const newTaskHtml = createTaskElement(task, columnId, taskIndex);
+
+    // Create a temporary container to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = newTaskHtml;
+    const newTaskElement = tempDiv.firstChild;
+
+    // Replace the old element with the new one
+    taskElement.replaceWith(newTaskElement);
+
+    // Re-apply visual updates
+    if (window.updateAllVisualTagElements) {
+        const allTags = newTaskElement.getAttribute('data-all-tags');
+        if (allTags) {
+            window.updateAllVisualTagElements(newTaskElement, allTags.split(' ').filter(tag => tag.trim()), 'task');
+        }
+    }
+
+    console.log(`[renderSingleTask] Re-rendered task ${taskId} in column ${columnId}`);
+}
+
 function getFoldAllButtonState(columnId) {
     if (!window.cachedBoard || !window.cachedBoard.columns) {return 'fold-mixed';}
     

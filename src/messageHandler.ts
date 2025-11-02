@@ -634,7 +634,7 @@ export class MessageHandler {
                     }
 
                     // CRITICAL FIX: Also clear edit mode on all include files
-                    const allFiles = panel.fileRegistry.getAllFiles();
+                    const allFiles = panel.fileRegistry.getAll();
                     for (const file of allFiles) {
                         if (file.getFileType() !== 'main') {
                             file.setEditMode(false);
@@ -724,11 +724,8 @@ export class MessageHandler {
 
                         console.log(`[SWITCH-2] Column include switch completed successfully`);
 
-                        // Update board title after successful switch
-                        await this.performBoardAction(() =>
-                            this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title),
-                            { sendUpdate: false }
-                        );
+                        // State machine already updated all column properties (title, includeFiles, tasks)
+                        // No need to update board here - would cause stale data issues
 
                         // Clear editing flag after completion
                         console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
@@ -788,20 +785,22 @@ export class MessageHandler {
 
                         try {
                             // Route through unified state machine via handleIncludeSwitch
+                            // The state machine will:
+                            // 1. Load new file content from disk
+                            // 2. Update task.description and task.displayTitle
+                            // 3. Invalidate board cache
+                            // 4. Send updateTaskContent to frontend
+                            // 5. Mark changes as unsaved
                             await panel.handleIncludeSwitch({
                                 taskId: message.taskId,
                                 oldFiles: oldTaskIncludeFiles,
                                 newFiles: newIncludeFiles,
                                 newTitle: message.title
                             });
-                            console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
+                            console.log(`[editTaskTitle] Switch complete via state machine`);
 
-                            // Update the task title (this will trigger markUnsavedChanges with CORRECT content)
-                            // STATE-3: Frontend already has include content, don't echo back
-                            await this.performBoardAction(() =>
-                                this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
-                                { sendUpdate: false }
-                            );
+                            // State machine already updated all task properties (title, includeFiles, description)
+                            // No need to update board here - would cause stale data issues
 
                             // RACE-1: Clear editing flag after task include switch completes
                             console.log('[editTaskTitle] Task include switch completed - allowing board regenerations');
@@ -2556,14 +2555,12 @@ export class MessageHandler {
             // 4. Load content from file
             const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
             if (newFile && newFile.getTaskDescription) {
-                // Ensure file has content loaded (may be empty if file was just created or content was cleared)
-                if (!newFile.getContent() || newFile.getContent().length === 0) {
-                    const content = await newFile.readFromDisk();
-                    if (content !== null) {
-                        newFile.setContent(content, true); // true = update baseline too
-                    } else {
-                        console.warn(`[switchTaskIncludeFile] Could not load content from file: ${newFilePath}`);
-                    }
+                // ALWAYS reload from disk when switching includes to ensure fresh content
+                const content = await newFile.readFromDisk();
+                if (content !== null) {
+                    newFile.setContent(content, true); // true = update baseline too
+                } else {
+                    console.warn(`[switchTaskIncludeFile] Could not load content from file: ${newFilePath}`);
                 }
 
                 const fullFileContent = newFile.getTaskDescription();

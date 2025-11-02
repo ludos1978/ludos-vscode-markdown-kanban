@@ -128,6 +128,24 @@ export interface ChangeContext {
         frontendMessages: any[];
     };
 
+    // Modified board reference (to avoid re-fetching stale data)
+    modifiedBoard?: any;
+
+    // Rollback data for error recovery
+    rollback?: {
+        columnId?: string;
+        taskId?: string;
+        taskColumnId?: string;
+        oldState: {
+            title?: string;
+            tasks?: any[];
+            includeFiles?: string[];
+            includeMode?: boolean;
+            description?: string;
+            displayTitle?: string;
+        };
+    };
+
     // Metadata
     startTime: number;
     currentState: ChangeState;
@@ -433,6 +451,95 @@ export class ChangeStateMachine {
 
         console.log(`[State:ANALYZING_IMPACT] Impact: main=${context.impact.mainFileChanged}, includes=${context.impact.includeFilesChanged}, switches=${context.impact.includesSwitched}`);
 
+        // TEMPORARY: Disable duplicate validation to diagnose include switch issues
+        /*
+        // Validate duplicate includes early, before any state changes
+        if (context.impact.includesSwitched && context.switches.loadingFiles.length > 0) {
+            const board = this._webviewPanel?.getBoard();
+            if (board) {
+                // Determine target column/task for exclusion from search
+                let targetColumnId: string | undefined;
+                let targetTaskId: string | undefined;
+                let targetColumn: any = null;
+                let targetTask: any = null;
+
+                if (event.type === 'include_switch') {
+                    if (event.target === 'column') {
+                        targetColumnId = event.targetId;
+                        targetColumn = board.columns.find((c: any) => c.id === targetColumnId);
+                    } else if (event.target === 'task') {
+                        targetTaskId = event.targetId;
+                        const column = board.columns.find((c: any) => c.id === event.columnIdForTask);
+                        targetTask = column?.tasks.find((t: any) => t.id === targetTaskId);
+                    }
+                } else if (event.type === 'user_edit' && event.params.includeSwitch) {
+                    if (event.editType === 'column_title') {
+                        targetColumnId = event.params.columnId;
+                        targetColumn = board.columns.find((c: any) => c.id === targetColumnId);
+                    } else if (event.editType === 'task_title') {
+                        targetTaskId = event.params.taskId;
+                        const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === targetTaskId));
+                        targetTask = column?.tasks.find((t: any) => t.id === targetTaskId);
+                    }
+                }
+
+                // Capture current state for rollback (before any modifications)
+                if (targetColumn) {
+                    // For column include switches, reconstruct the old title from old files
+                    let oldTitle = targetColumn.title;
+                    if (context.switches.oldFiles && context.switches.oldFiles.length > 0) {
+                        // Old title was an include syntax
+                        oldTitle = `!!!include(${context.switches.oldFiles[0]})!!!`;
+                    }
+
+                    context.rollback = {
+                        columnId: targetColumn.id,
+                        oldState: {
+                            title: oldTitle,
+                            tasks: [...(targetColumn.tasks || [])],
+                            includeFiles: [...(targetColumn.includeFiles || [])],
+                            includeMode: targetColumn.includeMode
+                        }
+                    };
+                } else if (targetTask) {
+                    // For task include switches, reconstruct the old title from old files
+                    let oldTitle = targetTask.title;
+                    if (context.switches.oldFiles && context.switches.oldFiles.length > 0) {
+                        // Old title was an include syntax
+                        oldTitle = `!!!include(${context.switches.oldFiles[0]})!!!`;
+                    }
+
+                    const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === targetTaskId));
+                    context.rollback = {
+                        taskId: targetTask.id,
+                        taskColumnId: column?.id,
+                        oldState: {
+                            title: oldTitle,
+                            description: targetTask.description,
+                            displayTitle: targetTask.displayTitle,
+                            includeFiles: [...(targetTask.includeFiles || [])],
+                            includeMode: targetTask.includeMode
+                        }
+                    };
+                }
+
+                // Check each loading file for duplicates
+                for (const relativePath of context.switches.loadingFiles) {
+                    const existingLocation = this._findFileIncludeLocation(board, relativePath, targetColumnId, targetTaskId);
+                    if (existingLocation) {
+                        const errorMsg = existingLocation.type === 'column'
+                            ? `File "${relativePath}" is already included in column "${existingLocation.columnTitle}"`
+                            : `File "${relativePath}" is already included in task "${existingLocation.taskTitle}" in column "${existingLocation.columnTitle}"`;
+
+                        console.error(`[State:ANALYZING_IMPACT] Duplicate include detected: ${errorMsg}`);
+                        context.result.error = new Error(errorMsg);
+                        return ChangeState.ERROR;
+                    }
+                }
+            }
+        }
+        */
+
         return ChangeState.CHECKING_EDIT_STATE;
     }
 
@@ -694,7 +801,11 @@ export class ChangeStateMachine {
         }
 
         const event = context.event;
+
+        // Get board and store in context so we use the SAME instance throughout
+        // This prevents SYNCING_FRONTEND from fetching a stale board after cache invalidation
         const board = this._webviewPanel?.getBoard();
+        context.modifiedBoard = board;
 
         if (!board) {
             console.log(`[State:LOADING_NEW] No board available, skipping load`);
@@ -746,6 +857,12 @@ export class ChangeStateMachine {
             targetColumn.includeFiles = loadingFiles;
             targetColumn.includeMode = loadingFiles.length > 0;
 
+            // Update title if provided in event
+            if (event.type === 'include_switch' && event.newTitle) {
+                targetColumn.title = event.newTitle;
+                targetColumn.originalTitle = event.newTitle;
+            }
+
             // Create/register file instances and load content
             const tasks: any[] = [];
 
@@ -763,11 +880,9 @@ export class ChangeStateMachine {
                 // Load content
                 const file = this._fileRegistry.getByRelativePath(relativePath);
                 if (file) {
-                    // Ensure content is loaded
-                    if (!file.getContent() || file.getContent().length === 0) {
-                        console.log(`[State:LOADING_NEW] Loading content from disk: ${relativePath}`);
-                        await file.reload();
-                    }
+                    // ALWAYS reload from disk when switching includes to ensure fresh content
+                    console.log(`[State:LOADING_NEW] Loading content from disk: ${relativePath}`);
+                    await file.reload();
 
                     // Parse tasks from file content
                     if (file.parseToTasks) {
@@ -803,11 +918,9 @@ export class ChangeStateMachine {
             // Load content
             const file = this._fileRegistry.getByRelativePath(relativePath);
             if (file) {
-                // Ensure content is loaded
-                if (!file.getContent() || file.getContent().length === 0) {
-                    console.log(`[State:LOADING_NEW] Loading content from disk: ${relativePath}`);
-                    await file.reload();
-                }
+                // ALWAYS reload from disk when switching includes to ensure fresh content
+                console.log(`[State:LOADING_NEW] Loading content from disk: ${relativePath}`);
+                await file.reload();
 
                 const fullFileContent = file.getContent();
 
@@ -866,10 +979,29 @@ export class ChangeStateMachine {
             }
         }
 
+        // CRITICAL FIX: Mark main file as modified for include switches
+        // When an include file is switched, the task/column title in the main file
+        // changes (e.g., !!!include(old.md)!!! -> !!!include(new.md)!!!), so the
+        // main file needs to be marked as having unsaved changes
+        if (context.impact.includesSwitched) {
+            const mainFile = this._fileRegistry.getMainFile();
+            if (mainFile && this._webviewPanel) {
+                console.log(`[State:UPDATING_BACKEND] Main file modified by include switch`);
+                // Mark as unsaved so user is prompted to save before closing
+                if (this._webviewPanel.markUnsavedChanges) {
+                    this._webviewPanel.markUnsavedChanges();
+                }
+            }
+        }
+
         // Invalidate board cache if needed
-        if (this._webviewPanel && this._webviewPanel.invalidateBoardCache) {
+        // CRITICAL: Don't invalidate for include switches - board is already updated in-memory
+        // Cache MUST stay in sync with UI. Disk will be out of sync until user saves (that's OK).
+        if (context.event.type !== 'include_switch' && this._webviewPanel && this._webviewPanel.invalidateBoardCache) {
             console.log(`[State:UPDATING_BACKEND] Invalidating board cache`);
             this._webviewPanel.invalidateBoardCache();
+        } else if (context.event.type === 'include_switch') {
+            console.log(`[State:UPDATING_BACKEND] Skipping cache invalidation for include switch - keeping in-memory updates`);
         }
 
         // TODO: Additional backend updates
@@ -895,7 +1027,11 @@ export class ChangeStateMachine {
 
         const panel = (this._webviewPanel as any)._panel;
         const event = context.event;
-        const board = this._webviewPanel.getBoard();
+
+        // CRITICAL FIX: Use the modified board from context instead of calling getBoard()
+        // After cache invalidation, getBoard() would regenerate from disk with stale data
+        // The modifiedBoard contains our in-memory changes with fresh include content
+        const board = context.modifiedBoard || this._webviewPanel.getBoard();
 
         if (!board) {
             console.log(`[State:SYNCING_FRONTEND] No board available, skipping frontend sync`);
@@ -920,6 +1056,11 @@ export class ChangeStateMachine {
                             includeFiles: column.includeFiles
                         });
                         context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
+
+                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
+                        if (this._webviewPanel.clearColumnDirty) {
+                            this._webviewPanel.clearColumnDirty(column.id);
+                        }
                     }
                 } else if (event.target === 'task') {
                     // Task include switch
@@ -939,6 +1080,11 @@ export class ChangeStateMachine {
                             includeFiles: task.includeFiles
                         });
                         context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
+
+                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
+                        if (this._webviewPanel.clearTaskDirty) {
+                            this._webviewPanel.clearTaskDirty(task.id);
+                        }
                     }
                 }
             } else if (event.type === 'user_edit' && event.params.includeSwitch) {
@@ -955,6 +1101,11 @@ export class ChangeStateMachine {
                             includeFiles: column.includeFiles
                         });
                         context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
+
+                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
+                        if (this._webviewPanel.clearColumnDirty) {
+                            this._webviewPanel.clearColumnDirty(column.id);
+                        }
                     }
                 } else if (event.editType === 'task_title') {
                     const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
@@ -973,6 +1124,11 @@ export class ChangeStateMachine {
                             includeFiles: task.includeFiles
                         });
                         context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
+
+                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
+                        if (this._webviewPanel.clearTaskDirty) {
+                            this._webviewPanel.clearTaskDirty(task.id);
+                        }
                     }
                 }
             }
@@ -1032,13 +1188,76 @@ export class ChangeStateMachine {
         console.error(`[State:ERROR] State history: ${context.stateHistory.join(' → ')}`);
         console.error(`[State:ERROR] Event type: ${context.event.type}`);
 
-        // Show error dialog to user
+        // Perform rollback if we have saved state
+        if (context.rollback && this._webviewPanel && (this._webviewPanel as any)._panel) {
+            const panel = (this._webviewPanel as any)._panel;
+            const board = this._webviewPanel.getBoard();
+
+            if (board) {
+                if (context.rollback.columnId) {
+                    // Rollback column state
+                    const column = board.columns.find((c: any) => c.id === context.rollback!.columnId);
+                    if (column) {
+                        console.log(`[State:ERROR] Rolling back column ${context.rollback.columnId} to previous state`);
+
+                        // Restore backend board state
+                        column.title = context.rollback.oldState.title || column.title;
+                        column.tasks = context.rollback.oldState.tasks || [];
+                        column.includeFiles = context.rollback.oldState.includeFiles || [];
+                        column.includeMode = context.rollback.oldState.includeMode || false;
+
+                        // Send update to frontend to revert display
+                        panel.webview.postMessage({
+                            type: 'updateColumnContent',
+                            columnId: column.id,
+                            columnTitle: column.title,
+                            tasks: column.tasks,
+                            includeFiles: column.includeFiles,
+                            includeMode: column.includeMode
+                        });
+
+                        console.log(`[State:ERROR] ✓ Column rolled back to: ${column.title}`);
+                    }
+                } else if (context.rollback.taskId && context.rollback.taskColumnId) {
+                    // Rollback task state
+                    const column = board.columns.find((c: any) => c.id === context.rollback!.taskColumnId);
+                    const task = column?.tasks.find((t: any) => t.id === context.rollback!.taskId);
+
+                    if (task && column) {
+                        console.log(`[State:ERROR] Rolling back task ${context.rollback.taskId} to previous state`);
+
+                        // Restore backend board state
+                        task.title = context.rollback.oldState.title || task.title;
+                        task.description = context.rollback.oldState.description || '';
+                        task.displayTitle = context.rollback.oldState.displayTitle || '';
+                        task.includeFiles = context.rollback.oldState.includeFiles || [];
+                        task.includeMode = context.rollback.oldState.includeMode || false;
+
+                        // Send update to frontend to revert display
+                        panel.webview.postMessage({
+                            type: 'updateTaskContent',
+                            columnId: column.id,
+                            taskId: task.id,
+                            taskTitle: task.title,
+                            description: task.description,
+                            displayTitle: task.displayTitle,
+                            includeFiles: task.includeFiles,
+                            includeMode: task.includeMode
+                        });
+
+                        console.log(`[State:ERROR] ✓ Task rolled back to: ${task.title}`);
+                    }
+                }
+            }
+        }
+
+        // Show error dialog to user with warning about rollback
         const vscode = require('vscode');
         const errorMessage = context.result.error?.message || 'Unknown error';
-        const stateHistory = context.stateHistory.join(' → ');
+        const rollbackMsg = context.rollback ? ' The operation has been undone.' : '';
 
-        await vscode.window.showErrorMessage(
-            `State Machine Error: ${errorMessage}\n\nState flow: ${stateHistory}`,
+        await vscode.window.showWarningMessage(
+            `${errorMessage}${rollbackMsg}`,
             { modal: false },
             'OK'
         );
@@ -1063,6 +1282,58 @@ export class ChangeStateMachine {
         context.result.success = false;
 
         return ChangeState.IDLE;
+    }
+
+    // ============= HELPER METHODS =============
+
+    /**
+     * Find where a file is currently included in the board
+     * @param board The kanban board
+     * @param relativePath Path of the file to search for
+     * @param excludeColumnId Exclude this column from search (current target)
+     * @param excludeTaskId Exclude this task from search (current target)
+     * @returns Location info if found, undefined otherwise
+     */
+    private _findFileIncludeLocation(
+        board: any,
+        relativePath: string,
+        excludeColumnId?: string,
+        excludeTaskId?: string
+    ): { type: 'column' | 'task'; columnTitle: string; taskTitle?: string } | undefined {
+        // Check all columns for this include file
+        for (const column of board.columns) {
+            // Skip the target column if specified
+            if (excludeColumnId && column.id === excludeColumnId) {
+                continue;
+            }
+
+            // Check if column includes this file
+            if (column.includeFiles && column.includeFiles.includes(relativePath)) {
+                return {
+                    type: 'column',
+                    columnTitle: column.title
+                };
+            }
+
+            // Check all tasks in this column
+            for (const task of column.tasks) {
+                // Skip the target task if specified
+                if (excludeTaskId && task.id === excludeTaskId) {
+                    continue;
+                }
+
+                // Check if task includes this file
+                if (task.includeFiles && task.includeFiles.includes(relativePath)) {
+                    return {
+                        type: 'task',
+                        columnTitle: column.title,
+                        taskTitle: task.title
+                    };
+                }
+            }
+        }
+
+        return undefined;
     }
 
     // ============= CONTEXT MANAGEMENT =============

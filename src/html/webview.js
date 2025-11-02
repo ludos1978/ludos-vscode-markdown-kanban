@@ -3040,16 +3040,33 @@ window.addEventListener('message', event => {
                             // Update cache
                             task.displayTitle = taskData.displayTitle;
                             task.description = taskData.description;
-
-                            // Update DOM directly (minimal update)
-                            const taskEl = document.querySelector(`[data-task-id="${taskData.taskId}"]`);
-                            if (taskEl) {
-                                // Re-render just this task element
-                                if (typeof window.renderSingleTask === 'function') {
-                                    window.renderSingleTask(taskData.columnId, taskData.taskId, task);
-                                }
-                            }
                         }
+                    }
+                }
+
+                // Re-render all dirty columns (after cache is updated)
+                const renderedColumnIds = new Set();
+                if (message.columns.length > 0) {
+                    const columnIds = message.columns.map(col => col.columnId).filter(id => id);
+                    if (columnIds.length > 0) {
+                        window.renderBoard({ columns: columnIds });
+                        // Track which columns were rendered (they include all their tasks)
+                        columnIds.forEach(id => renderedColumnIds.add(id));
+                    }
+                }
+
+                // Re-render dirty tasks that are NOT in columns we just rendered
+                // (to avoid double-rendering the same column)
+                if (message.tasks.length > 0) {
+                    const taskUpdates = message.tasks
+                        .filter(taskData => !renderedColumnIds.has(taskData.columnId))
+                        .map(taskData => ({
+                            columnId: taskData.columnId,
+                            taskId: taskData.taskId
+                        }))
+                        .filter(t => t.columnId && t.taskId);
+                    if (taskUpdates.length > 0) {
+                        window.renderBoard({ tasks: taskUpdates });
                     }
                 }
             }
