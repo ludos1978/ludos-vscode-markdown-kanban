@@ -27,11 +27,34 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     private _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
     public readonly onDidChange = this._onDidChange.event;
 
+    // ============= PANEL REFERENCE (for stopping edit mode during conflicts) =============
+    private _messageHandler?: any; // MessageHandler reference for requestStopEditing()
+
     // ============= LIFECYCLE =============
     private _disposables: vscode.Disposable[] = [];
 
     constructor() {
         this._disposables.push(this._onDidChange);
+    }
+
+    // ============= MESSAGE HANDLER ACCESS =============
+
+    /**
+     * Set the message handler reference (used for stopping edit mode during conflicts)
+     */
+    public setMessageHandler(messageHandler: any): void {
+        this._messageHandler = messageHandler;
+    }
+
+    /**
+     * Request frontend to stop editing and return the captured edit value
+     * Used during conflict resolution to preserve user's edit in baseline
+     */
+    public async requestStopEditing(): Promise<any> {
+        if (this._messageHandler && typeof this._messageHandler.requestStopEditing === 'function') {
+            return await this._messageHandler.requestStopEditing();
+        }
+        return null;
     }
 
     // ============= REGISTRATION =============

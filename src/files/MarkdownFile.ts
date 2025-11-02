@@ -961,12 +961,54 @@ export abstract class MarkdownFile implements vscode.Disposable {
             console.log(`[${this.getFileType()}] ⚠️ Flag was set but file was ${changeType} - handling as external change`);
         }
 
+        // CRITICAL: If user is in edit mode, stop editing IMMEDIATELY before any processing
+        // This prevents board corruption when external changes occur during editing
+        if (this._isInEditMode) {
+            console.log(`[${this.getFileType()}] 🛑 STOPPING EDIT MODE - External change detected while editing`);
+            await this.requestStopEditing();
+            // Keep the edit mode flag true for conflict detection (will be cleared after resolution)
+            console.log(`[${this.getFileType()}] ✓ Edit mode stopped, edit flag kept for conflict detection`);
+        }
+
         // Mark as having external changes
         this._hasFileSystemChanges = true;
         this._emitChange('external');
 
         // Delegate to subclass for specific handling
         await this.handleExternalChange(changeType);
+    }
+
+    /**
+     * Request the frontend to stop editing and capture the edited value
+     * The captured value is applied to the baseline (not saved to disk)
+     * This preserves the user's edit as "local state" for conflict resolution
+     */
+    protected async requestStopEditing(): Promise<void> {
+        // Access the file registry to request stop editing and capture value
+        const mainFile = this.getFileType() === 'main' ? this as any : (this as any)._parentFile;
+        if (mainFile && mainFile._fileRegistry) {
+            const capturedEdit = await mainFile._fileRegistry.requestStopEditing();
+
+            // If we got an edit value, apply it to the baseline (not save to disk)
+            if (capturedEdit && capturedEdit.value !== undefined) {
+                console.log(`[${this.getFileType()}] Applying captured edit to baseline:`, capturedEdit);
+
+                // Apply the edit to baseline - this becomes the "local state" for conflict
+                await this.applyEditToBaseline(capturedEdit);
+
+                console.log(`[${this.getFileType()}] ✓ Edit applied to baseline (not saved to disk)`);
+            }
+        }
+    }
+
+    /**
+     * Apply a captured edit to the baseline (in-memory, not saved to disk)
+     * This updates the "local state" to include the user's edit
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        // Subclasses override this to handle their specific edit types
+        // Default: do nothing (main file handles via board, includes override)
+        console.log(`[${this.getFileType()}] Default applyEditToBaseline - no action`);
     }
 
     /**

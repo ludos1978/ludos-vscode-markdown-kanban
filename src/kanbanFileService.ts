@@ -711,17 +711,14 @@ export class KanbanFileService {
 
                         // Check if there are unsaved Kanban changes (main file, include files, or UI edited board)
                         if (hasUnsavedKanbanChanges || hasIncludeFileChanges || hasCachedBoardChanges) {
-                            // DON'T mark as legitimate save - we have unsaved Kanban changes
-                            // DON'T clear external changes flag - this will trigger a conflict scenario
-                            // The external save saved old content, but we have newer Kanban changes
-                            console.log(`[SaveHandler] ⚠️  External save with unsaved Kanban changes - CONFLICT will be triggered`);
-                            console.log(`[SaveHandler] ⚠️  NOT marking as legitimate save`);
+                            // User saved externally (Ctrl+S) while having unsaved Kanban changes
+                            // File watcher will trigger conflict detection automatically
+                            console.log(`[SaveHandler] ⚠️  External save with unsaved Kanban changes - watcher will detect conflict`);
                         } else {
-                            // No unsaved Kanban changes - safe to mark as legitimate and clear external changes flag
-                            console.log(`[SaveHandler] ✅ No unsaved Kanban changes - marking as legitimate save`);
-                            this._saveCoordinator.markSaveAsLegitimate(savedDocument.uri.fsPath);
-                            mainFile['_hasFileSystemChanges'] = false;
+                            // No unsaved Kanban changes - safe save, watcher will auto-reload
+                            console.log(`[SaveHandler] ✅ No unsaved Kanban changes - watcher will auto-reload`);
                         }
+                        // NOTE: No need to call markSaveAsLegitimate - watcher handles everything via SaveOptions
                     }
                 }
 
@@ -731,8 +728,7 @@ export class KanbanFileService {
                         // Registry tracks save state automatically
                         console.log(`[SaveHandler] Include file saved externally: ${file.getRelativePath()}`);
 
-                        // CRITICAL: Mark include file saves as legitimate too
-                        this._saveCoordinator.markSaveAsLegitimate(savedDocument.uri.fsPath);
+                        // NOTE: Watcher handles everything via SaveOptions - no manual marking needed
 
                         // Notify debug overlay to update
                         const currentPanel = this.panel();

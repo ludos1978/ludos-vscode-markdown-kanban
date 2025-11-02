@@ -107,6 +107,75 @@ export class MainKanbanFile extends MarkdownFile {
     }
 
     /**
+     * Apply a captured edit to the baseline (in-memory, not saved to disk)
+     * This updates the "local state" to include the user's edit for conflict resolution
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        console.log(`[MainKanbanFile] Applying captured edit to baseline:`, capturedEdit);
+
+        // Get the current board (from webview cache or parse from content)
+        let board = this._cachedBoardFromWebview;
+        if (!board) {
+            console.log(`[MainKanbanFile] No cached board, parsing from content`);
+            board = this.parseToBoard();
+        }
+
+        // Apply the edit to the board based on type
+        if (capturedEdit.type === 'task-title') {
+            const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
+            if (task) {
+                console.log(`[MainKanbanFile] Updating task title: "${task.title}" → "${capturedEdit.value}"`);
+                task.title = capturedEdit.value;
+            }
+        } else if (capturedEdit.type === 'task-description') {
+            const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
+            if (task) {
+                console.log(`[MainKanbanFile] Updating task description`);
+                task.description = capturedEdit.value;
+            }
+        } else if (capturedEdit.type === 'column-title') {
+            const column = board.columns.find(c => c.id === capturedEdit.columnId);
+            if (column) {
+                console.log(`[MainKanbanFile] Updating column title: "${column.title}" → "${capturedEdit.value}"`);
+                column.title = capturedEdit.value;
+            }
+        }
+
+        // Regenerate markdown from the modified board
+        const newContent = this._generateMarkdownFromBoard(board);
+
+        // Update BOTH content and baseline with the edit
+        // This makes the edit part of the "local state" for conflict detection
+        this._content = newContent;
+        this._baseline = newContent;
+        this._hasUnsavedChanges = true;  // Mark as unsaved (edit in memory, not on disk)
+
+        console.log(`[MainKanbanFile] ✓ Edit applied to baseline (${newContent.length} chars)`);
+    }
+
+    /**
+     * Find a task in the board by ID
+     */
+    private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): any {
+        // If columnId provided, search only that column first
+        if (columnId) {
+            const column = board.columns.find(c => c.id === columnId);
+            if (column) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) return task;
+            }
+        }
+
+        // Search all columns
+        for (const column of board.columns) {
+            const task = column.tasks.find(t => t.id === taskId);
+            if (task) return task;
+        }
+
+        return null;
+    }
+
+    /**
      * Get YAML frontmatter
      */
     public getYamlHeader(): string | null {

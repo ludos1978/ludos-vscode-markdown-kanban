@@ -481,6 +481,9 @@ export class KanbanWebviewPanel {
             }
         );
 
+        // Connect message handler to file registry (for stopping edit mode during conflicts)
+        this._fileRegistry.setMessageHandler(this._messageHandler);
+
         // Initialize state in KanbanFileService
         this._fileService.initializeState(
             this._isUpdatingFromPanel,
@@ -1661,7 +1664,9 @@ export class KanbanWebviewPanel {
                         return switches;
                     }),
                     changedIncludeFiles: params.changedIncludes || [],
-                    isLegitimateSave: mainFile ? saveCoordinator.isLegitimateSave(mainFile.getPath()) : false
+                    // NOTE: Legitimate saves are filtered out by watcher (_skipNextReloadDetection)
+                    // By the time we reach state machine, all changes are external
+                    isLegitimateSave: false
                 };
             },
 

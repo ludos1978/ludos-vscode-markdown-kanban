@@ -1,5 +1,4 @@
 import { MarkdownFile } from '../files/MarkdownFile';
-import { SaveCoordinator } from './SaveCoordinator';
 
 /**
  * Unified External Change Handler - Single logic for all file types
@@ -9,13 +8,16 @@ import { SaveCoordinator } from './SaveCoordinator';
  * - IncludeFile.handleExternalChange()
  *
  * Provides consistent conflict resolution for all file types.
+ *
+ * NOTE: Legitimate saves (our own writes) are filtered out by _onFileSystemChange()
+ * using the _skipNextReloadDetection flag (set via SaveOptions). This handler only
+ * receives TRUE external changes.
  */
 export class UnifiedChangeHandler {
     private static instance: UnifiedChangeHandler | undefined;
-    private saveCoordinator: SaveCoordinator;
 
     private constructor() {
-        this.saveCoordinator = SaveCoordinator.getInstance();
+        // No dependencies needed - conflict detection is handled by files themselves
     }
 
     public static getInstance(): UnifiedChangeHandler {
@@ -92,7 +94,6 @@ export class UnifiedChangeHandler {
         const hasUnsavedChanges = file.hasUnsavedChanges();
         const isInEditMode = file.isInEditMode();
         const hasConflict = file.hasConflict(); // Use the file's conflict detection logic
-        const isLegitimateSave = this.saveCoordinator.isLegitimateSave(file.getPath());
         const hasFileSystemChanges = file['_hasFileSystemChanges'];
 
         // For main file changes, also check if any include files have unsaved changes
@@ -106,7 +107,6 @@ export class UnifiedChangeHandler {
         console.log(`[UnifiedChangeHandler]   isInEditMode: ${isInEditMode}`);
         console.log(`[UnifiedChangeHandler]   hasFileSystemChanges: ${hasFileSystemChanges}`);
         console.log(`[UnifiedChangeHandler]   hasConflict (computed): ${hasConflict}`);
-        console.log(`[UnifiedChangeHandler]   isLegitimateSave: ${isLegitimateSave}`);
 
         // Additional debugging for MainKanbanFile
         if (file.getFileType() === 'main') {
@@ -120,39 +120,20 @@ export class UnifiedChangeHandler {
             console.log(`[UnifiedChangeHandler]     content === baseline: ${mainFile._content === mainFile._baseline}`);
         }
 
-        // CASE 1: Legitimate save operation (no conflict)
-        if (isLegitimateSave) {
-            console.log(`[UnifiedChangeHandler] ✅ CASE 1: LEGITIMATE SAVE - No conflict, accepting changes`);
-            // The save was legitimate, so external changes are expected
-            // Clear the external change flag and continue
-            file['_hasFileSystemChanges'] = false;
-            return;
-        }
+        // NOTE: Legitimate saves are already filtered out by _onFileSystemChange()
+        // If _skipNextReloadDetection flag was set, the watcher returns early
+        // So we only reach this point for TRUE external changes
 
-        // CASE 2: Check for race condition - external save with unsaved Kanban changes
+        // CASE 1: Check for race condition - external save with unsaved Kanban changes
         // This happens when user saves externally (Ctrl+S) while having Kanban UI changes
         if (file.getFileType() === 'main' && hasAnyUnsavedChanges && hasFileSystemChanges) {
-            console.log(`[UnifiedChangeHandler] ⚠️  CASE 2A: RACE CONDITION DETECTED - External save with Kanban changes`);
+            console.log(`[UnifiedChangeHandler] ⚠️  CASE 1: CONFLICT DETECTED - External save with Kanban changes`);
             console.log(`[UnifiedChangeHandler]   User has unsaved Kanban changes (including include files) AND external file changes`);
             console.log(`[UnifiedChangeHandler]   This indicates external save (Ctrl+S) while Kanban UI had changes`);
-            console.log(`[UnifiedChangeHandler]   → TREATING AS CONFLICT: External save overwrote Kanban changes`);
+            console.log(`[UnifiedChangeHandler]   → TREATING AS CONFLICT: Showing dialog`);
 
-            // Wait a brief moment for SaveEventCoordinator to process the save event
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Check again if it became legitimate after waiting
-            const isNowLegitimate = this.saveCoordinator.isLegitimateSave(file.getPath());
-            console.log(`[UnifiedChangeHandler]   After waiting: isNowLegitimate=${isNowLegitimate}`);
-
-            if (isNowLegitimate) {
-                console.log(`[UnifiedChangeHandler]   → Became legitimate after waiting, clearing changes`);
-                file['_hasFileSystemChanges'] = false;
-                return;
-            } else {
-                console.log(`[UnifiedChangeHandler]   → Still not legitimate, showing conflict dialog`);
-                await this.showConflictDialog(file);
-                return;
-            }
+            await this.showConflictDialog(file);
+            return;
         }
 
         // CASE 3: No conflict detected by file's logic (safe auto-reload)
@@ -178,6 +159,13 @@ export class UnifiedChangeHandler {
      */
     private async showConflictDialog(file: MarkdownFile): Promise<void> {
         try {
+            // NOTE: Editing is already stopped in MarkdownFile._onFileSystemChange()
+            // Just clear the flag here before showing dialog
+            if (file.isInEditMode()) {
+                console.log(`[UnifiedChangeHandler] Clearing edit mode flag before showing conflict dialog`);
+                file.setEditMode(false);
+            }
+
             const resolution = await file.showConflictDialog();
 
             if (resolution) {

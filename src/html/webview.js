@@ -1991,6 +1991,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Function to auto-save pending changes
     function autoSavePendingChanges() {
+        // CRITICAL FIX: Do NOT auto-save if user is actively editing
+        // This prevents auto-save from setting skip flag when user switches to external editor,
+        // which would cause external saves to be incorrectly treated as "our own save"
+        if (window.taskEditor && window.taskEditor.currentEditor !== null) {
+            console.log('[webview] ⏸️ Skipping auto-save - user is actively editing');
+            return;
+        }
+
         const pendingColumnCount = window.pendingColumnChanges?.size || 0;
         const pendingTaskCount = window.pendingTaskChanges?.size || 0;
         const totalPending = pendingColumnCount + pendingTaskCount;
@@ -2314,8 +2322,21 @@ document.addEventListener('click', (e) => {
 // Listen for messages from the extension
 window.addEventListener('message', event => {
     const message = event.data;
-    
+
     switch (message.type) {
+        case 'batch':
+            // CRITICAL FIX: Handle batched messages from backend
+            // Backend uses queueMessage() which batches multiple messages into one
+            if (message.messages && Array.isArray(message.messages)) {
+                for (const batchedMessage of message.messages) {
+                    // Re-dispatch each batched message through this same handler
+                    window.dispatchEvent(new MessageEvent('message', {
+                        data: batchedMessage,
+                        origin: event.origin
+                    }));
+                }
+            }
+            break;
         case 'boardUpdate':
             const previousBoard = window.cachedBoard;
             
@@ -3035,22 +3056,41 @@ window.addEventListener('message', event => {
             break;
         case 'stopEditing':
             // Backend requests to stop editing (e.g., due to external file conflict)
+            let capturedEdit = null;
+
             if (window.taskEditor && window.taskEditor.currentEditor) {
                 console.log('[Frontend] Stopping editing due to backend request');
-                // Save current field before stopping
-                if (typeof window.taskEditor.saveCurrentField === 'function') {
-                    window.taskEditor.saveCurrentField();
+
+                if (message.captureValue) {
+                    // CAPTURE mode: Extract edit value WITHOUT modifying board
+                    console.log('[Frontend] Capturing edit value without saving to board');
+                    const editor = window.taskEditor.currentEditor;
+                    capturedEdit = {
+                        type: editor.type,
+                        taskId: editor.taskId,
+                        columnId: editor.columnId,
+                        value: editor.element.value,
+                        originalValue: editor.originalValue
+                    };
+                    console.log('[Frontend] Captured edit:', capturedEdit);
+                } else {
+                    // SAVE mode: Normal save (for backwards compatibility)
+                    if (typeof window.taskEditor.saveCurrentField === 'function') {
+                        window.taskEditor.saveCurrentField();
+                    }
                 }
+
                 // Clear editor state
                 window.taskEditor.currentEditor = null;
             }
 
-            // Send confirmation back to backend
+            // Send confirmation back to backend with captured value
             if (message.requestId) {
                 console.log('[Frontend] Confirming editing stopped:', message.requestId);
                 vscode.postMessage({
                     type: 'editingStopped',
-                    requestId: message.requestId
+                    requestId: message.requestId,
+                    capturedEdit: capturedEdit  // Include captured edit (null if not capturing)
                 });
             }
             break;

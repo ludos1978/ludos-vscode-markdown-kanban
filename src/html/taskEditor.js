@@ -575,11 +575,13 @@ class TaskEditor {
         };
 
         // CRITICAL: Tell backend editing has started to block board regenerations
-        if (type === 'column-title') {
-            vscode.postMessage({
-                type: 'editingStarted'
-            });
-        }
+        // MUST send for ALL edit types (column-title, task-title, task-description)
+        vscode.postMessage({
+            type: 'editingStarted',
+            editType: type,
+            taskId: taskId,
+            columnId: columnId
+        });
 
 
         // Reset edit context when starting a new edit session on a different field
@@ -1251,7 +1253,14 @@ class TaskEditor {
                     value: false
                 });
             }
+        }
 
+        // CRITICAL: Notify backend that editing has stopped (for ALL edit types)
+        // This allows backend to clear _isInEditMode flag
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'editingStoppedNormal'  // Different from 'editingStopped' (backend request response)
+            });
         }
 
         this.currentEditor = null;

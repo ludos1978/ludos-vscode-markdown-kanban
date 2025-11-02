@@ -84,49 +84,51 @@ export class MessageHandler {
     }
 
     /**
-     * Request frontend to stop editing and wait for response
-     * Returns a Promise that resolves when frontend confirms editing has stopped
+     * Request frontend to stop editing and wait for response with captured edit
+     * Returns a Promise that resolves with the captured edit value from frontend
+     * PUBLIC: Can be called from external code (e.g., conflict resolution)
      */
-    private async _requestStopEditing(): Promise<void> {
+    public async requestStopEditing(): Promise<any> {
         const requestId = `stop-edit-${++this._stopEditingRequestCounter}`;
         const panel = this._getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.warn('[_requestStopEditing] No panel or webview available');
-            return;
+            console.warn('[requestStopEditing] No panel or webview available');
+            return null;
         }
 
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<any>((resolve, reject) => {
             // Set timeout in case frontend doesn't respond
             const timeout = setTimeout(() => {
                 this._pendingStopEditingRequests.delete(requestId);
-                console.warn('[_requestStopEditing] Timeout waiting for frontend response');
-                resolve(); // Don't reject, just continue
+                console.warn('[requestStopEditing] Timeout waiting for frontend response');
+                resolve(null); // Resolve with null if timeout
             }, 2000);
 
             // Store promise resolver
             this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });
 
-            // Send request to frontend
-            console.log(`[_requestStopEditing] Sending stopEditing request: ${requestId}`);
+            // Send request to frontend to capture edit value
+            console.log(`[requestStopEditing] Sending stopEditing request: ${requestId}`);
             panel.webview.postMessage({
                 type: 'stopEditing',
-                requestId
+                requestId,
+                captureValue: true  // Tell frontend to capture the edit value
             });
         });
     }
 
     /**
-     * Handle response from frontend that editing has stopped
+     * Handle response from frontend that editing has stopped (with captured value)
      */
-    private _handleEditingStopped(requestId: string): void {
-        console.log(`[_handleEditingStopped] Received response for: ${requestId}`);
+    private _handleEditingStopped(requestId: string, capturedEdit: any): void {
+        console.log(`[_handleEditingStopped] Received response for: ${requestId}`, capturedEdit);
         const pending = this._pendingStopEditingRequests.get(requestId);
 
         if (pending) {
             clearTimeout(pending.timeout);
             this._pendingStopEditingRequests.delete(requestId);
-            pending.resolve();
+            pending.resolve(capturedEdit);  // Resolve with captured edit value
 
             // RACE-2: Sync dirty items after editing stops
             // When user was editing, frontend skipped rendering updateColumnContent.
@@ -562,12 +564,35 @@ export class MessageHandler {
                 // User started editing - block board regenerations
                 console.log(`[MessageHandler] Editing started - blocking board regenerations`);
                 this._getWebviewPanel().setEditingInProgress(true);
+                // CRITICAL: Set edit mode flag on the file for conflict detection
+                {
+                    const panel = this._getWebviewPanel();
+                    const mainFile = panel.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        mainFile.setEditMode(true);
+                        console.log(`[MessageHandler] Edit mode flag set to true`);
+                    }
+                }
                 break;
 
             case 'editingStopped':
                 // Frontend confirms editing has stopped (response to stopEditing request)
                 if (message.requestId) {
-                    this._handleEditingStopped(message.requestId);
+                    this._handleEditingStopped(message.requestId, message.capturedEdit);
+                }
+                break;
+
+            case 'editingStoppedNormal':
+                // User finished editing normally (not via backend request)
+                console.log(`[MessageHandler] Editing stopped normally - clearing edit mode flag`);
+                this._getWebviewPanel().setEditingInProgress(false);
+                // Clear edit mode flag on the file
+                {
+                    const panel = this._getWebviewPanel();
+                    const mainFile = panel.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        mainFile.setEditMode(false);
+                    }
                 }
                 break;
 
@@ -706,7 +731,7 @@ export class MessageHandler {
 
                         // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
                         // This ensures user can't edit description while content is loading
-                        await this._requestStopEditing();
+                        await this.requestStopEditing();
 
                         try {
                             // Route through unified handler - it checks unsaved changes once

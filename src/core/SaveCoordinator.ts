@@ -1,18 +1,25 @@
 import * as vscode from 'vscode';
 import { SaveEventCoordinator } from '../saveEventCoordinator';
 import { MarkdownFile } from '../files/MarkdownFile';
+import { SaveOptions } from '../files/SaveOptions';
 
 /**
  * Unified Save Coordinator - Single source for all save operations
  *
- * Consolidates multiple conflicting save implementations into one system.
- * Ensures consistent state tracking and proper save operation detection.
+ * Uses SaveOptions interface for consistent, parameter-based save handling.
+ * NO timing-based heuristics - uses instance-level flags instead (SaveOptions.skipReloadDetection).
+ *
+ * ARCHITECTURE:
+ * - All saves go through SaveCoordinator.saveFile()
+ * - SaveCoordinator calls file.save(SaveOptions)
+ * - SaveOptions.skipReloadDetection (default: true) sets instance flag _skipNextReloadDetection
+ * - File watcher checks instance flag and skips reload if true
+ * - No global state, no timing windows, just clean parameter-based design
  */
 export class SaveCoordinator {
     private static instance: SaveCoordinator | undefined;
     private saveCoordinator: SaveEventCoordinator;
     private activeSaves = new Map<string, Promise<void>>();
-    private legitimateSaves = new Map<string, { timestamp: number; timeout: NodeJS.Timeout }>();
 
     public constructor() {
         this.saveCoordinator = SaveEventCoordinator.getInstance();
@@ -27,9 +34,9 @@ export class SaveCoordinator {
 
     /**
      * Unified save method for all file types
-     * Replaces multiple conflicting save implementations
+     * Uses SaveOptions for consistent, parameter-based save handling
      */
-    public async saveFile(file: MarkdownFile, content?: string): Promise<void> {
+    public async saveFile(file: MarkdownFile, content?: string, options?: SaveOptions): Promise<void> {
         const filePath = file.getPath();
         const saveKey = `${file.getFileType()}:${filePath}`;
 
@@ -40,7 +47,7 @@ export class SaveCoordinator {
             return;
         }
 
-        const savePromise = this.performSave(file, content);
+        const savePromise = this.performSave(file, content, options);
         this.activeSaves.set(saveKey, savePromise);
 
         try {
@@ -51,27 +58,35 @@ export class SaveCoordinator {
     }
 
     /**
-     * Perform the actual save operation
+     * Perform the actual save operation using SaveOptions
      */
-    private async performSave(file: MarkdownFile, content?: string): Promise<void> {
+    private async performSave(file: MarkdownFile, content?: string, options?: SaveOptions): Promise<void> {
         const filePath = file.getPath();
         const fileType = file.getFileType();
 
         console.log(`[SaveCoordinator] Starting save: ${fileType} - ${filePath}`);
 
-        // Mark this save as legitimate for conflict detection
-        this.markSaveAsLegitimate(filePath);
-
         try {
-            // Use the file's content or provided content
-            const contentToSave = content ?? file.getContent();
-
-            if (!contentToSave) {
-                throw new Error('No content to save');
+            // If content is provided, update file content first
+            // Use updateBaseline=true to prevent emitting 'content' event and triggering save loop
+            // This is safe because we're about to save immediately anyway
+            if (content !== undefined) {
+                file.setContent(content, true);
             }
 
-            // Perform the save using the file's save method (which handles state updates)
-            await file.save();
+            // Use SaveOptions with defaults:
+            // - skipReloadDetection: true (our own save, don't reload)
+            // - source: 'auto-save' (unless specified otherwise)
+            const saveOptions: SaveOptions = {
+                skipReloadDetection: options?.skipReloadDetection ?? true,
+                source: options?.source ?? 'auto-save',
+                skipValidation: options?.skipValidation ?? false
+            };
+
+            console.log(`[SaveCoordinator] Calling file.save() with options:`, saveOptions);
+
+            // Perform the save using the file's save method with SaveOptions
+            await file.save(saveOptions);
 
             console.log(`[SaveCoordinator] Save completed: ${fileType} - ${filePath}`);
 
@@ -79,68 +94,6 @@ export class SaveCoordinator {
             console.error(`[SaveCoordinator] Save failed: ${fileType} - ${filePath}`, error);
             throw error;
         }
-    }
-
-    /**
-     * Mark a save operation as legitimate for conflict detection
-     * Public method for external callers (like SaveEventCoordinator handlers)
-     */
-    public markSaveAsLegitimate(filePath: string): void {
-        const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-
-        // Clear any existing timeout for this file
-        const existing = this.legitimateSaves.get(normalizedPath);
-        if (existing) {
-            clearTimeout(existing.timeout);
-        }
-
-        // Set a timeout to automatically clear the legitimate save flag
-        // This gives a 2-second window for the file watcher to detect the change
-        const timeout = setTimeout(() => {
-            this.legitimateSaves.delete(normalizedPath);
-            console.log(`[SaveCoordinator] Cleared legitimate save flag for: ${normalizedPath}`);
-        }, 2000);
-
-        this.legitimateSaves.set(normalizedPath, {
-            timestamp: Date.now(),
-            timeout
-        });
-
-        console.log(`[SaveCoordinator] Marked legitimate save for: ${filePath} (normalized: ${normalizedPath})`);
-    }
-
-    /**
-     * Check if a file change was caused by a legitimate save operation
-     * This replaces all time-based heuristics
-     */
-    public isLegitimateSave(filePath: string): boolean {
-        const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-        const legitimateSave = this.legitimateSaves.get(normalizedPath);
-
-        console.log(`[SaveCoordinator] Checking legitimate save for: ${filePath} (normalized: ${normalizedPath})`);
-        console.log(`[SaveCoordinator]   Found legitimate save entry: ${!!legitimateSave}`);
-
-        if (!legitimateSave) {
-            console.log(`[SaveCoordinator]   → NOT legitimate (no entry found)`);
-            return false;
-        }
-
-        // Check if the save is still within the legitimate window (2 seconds)
-        const age = Date.now() - legitimateSave.timestamp;
-        const isStillLegitimate = age < 2000;
-
-        console.log(`[SaveCoordinator]   Save timestamp: ${legitimateSave.timestamp}`);
-        console.log(`[SaveCoordinator]   Current time: ${Date.now()}`);
-        console.log(`[SaveCoordinator]   Age: ${age}ms`);
-        console.log(`[SaveCoordinator]   Still legitimate: ${isStillLegitimate}`);
-
-        if (isStillLegitimate) {
-            console.log(`[SaveCoordinator]   → LEGITIMATE SAVE (${age}ms ago)`);
-        } else {
-            console.log(`[SaveCoordinator]   → NOT legitimate (${age}ms ago - expired)`);
-        }
-
-        return isStillLegitimate;
     }
 
     /**
