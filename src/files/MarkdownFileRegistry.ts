@@ -467,7 +467,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                     const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file && file.getFileType() === 'include-column') {
                         // Parse tasks from include file, preserving existing task IDs
-                        const tasks = file.parseToTasks(column.tasks);
+                        const tasks = file.parseToTasks(column.tasks, column.id);
                         column.tasks = tasks;
                         console.log(`[MarkdownFileRegistry] generateBoard() - Loaded ${tasks.length} tasks from ${relativePath}`);
                     } else {

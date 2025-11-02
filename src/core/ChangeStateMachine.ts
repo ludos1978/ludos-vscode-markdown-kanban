@@ -771,7 +771,7 @@ export class ChangeStateMachine {
 
                     // Parse tasks from file content
                     if (file.parseToTasks) {
-                        const fileTasks = file.parseToTasks(targetColumn.tasks);
+                        const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id);
                         console.log(`[State:LOADING_NEW] Parsed ${fileTasks.length} tasks from ${relativePath}`);
                         tasks.push(...fileTasks);
                     }

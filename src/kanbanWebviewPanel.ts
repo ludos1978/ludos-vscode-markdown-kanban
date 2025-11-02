@@ -1379,7 +1379,7 @@ export class KanbanWebviewPanel {
                         try {
                             // Reload from disk and parse to tasks
                             await file.reload();
-                            const tasks = file.parseToTasks(column.tasks);
+                            const tasks = file.parseToTasks(column.tasks, column.id);
                             column.tasks = tasks;
                             column.isLoadingContent = false; // Clear loading flag
 
@@ -1921,7 +1921,7 @@ export class KanbanWebviewPanel {
             if (column) {
                 // Parse tasks from updated file
                 const columnFile = file as any; // ColumnIncludeFile
-                const tasks = columnFile.parseToTasks(column.tasks);
+                const tasks = columnFile.parseToTasks(column.tasks, column.id);
                 column.tasks = tasks;
 
                 // Send update to frontend
@@ -2678,7 +2678,7 @@ export class KanbanWebviewPanel {
             await columnInclude.reload();
 
             // Pass existing tasks to preserve IDs during re-parse
-            const tasks = columnInclude.parseToTasks(existingTasks);
+            const tasks = columnInclude.parseToTasks(existingTasks, column.id);
             console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
             allTasks.push(...tasks);
         }

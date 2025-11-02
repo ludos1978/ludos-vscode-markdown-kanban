@@ -82,13 +82,17 @@ export class ColumnIncludeFile extends IncludeFile {
     /**
      * Parse presentation format into tasks, preserving IDs for existing tasks
      * @param existingTasks Optional array of existing tasks to preserve IDs from
+     * @param columnId Optional columnId to use for task ID generation (supports file reuse across columns)
      */
-    public parseToTasks(existingTasks?: KanbanTask[]): KanbanTask[] {
+    public parseToTasks(existingTasks?: KanbanTask[], columnId?: string): KanbanTask[] {
         console.log(`[ColumnIncludeFile] Parsing presentation to tasks: ${this._relativePath}`);
 
         // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
         const tasks = PresentationParser.slidesToTasks(slides);
+
+        // Use provided columnId if available, otherwise fall back to stored _columnId
+        const effectiveColumnId = columnId || this._columnId;
 
         // Update task IDs, preserving existing IDs when task titles match
         return tasks.map((task, index) => {
@@ -97,7 +101,7 @@ export class ColumnIncludeFile extends IncludeFile {
 
             return {
                 ...task,
-                id: existingTask?.id || `task-${this._columnId}-${index}`,
+                id: existingTask?.id || `task-${effectiveColumnId}-${index}`,
                 includeMode: false, // Tasks from column includes are NOT individual includes
                 includeFiles: undefined // Column has the includeFiles, not individual tasks
             };
