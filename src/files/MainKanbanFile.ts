@@ -85,7 +85,10 @@ export class MainKanbanFile extends MarkdownFile {
         // Pass existing board to preserve task/column IDs during re-parse
         // Priority: provided existingBoard > cached _board
         const boardForIdPreservation = existingBoard || this._board;
-        const parseResult = this._parser.parseMarkdown(this._content, undefined, boardForIdPreservation);
+
+        // CRITICAL FIX: Pass basePath for resolving relative include paths
+        const basePath = path.dirname(this._path);
+        const parseResult = this._parser.parseMarkdown(this._content, basePath, boardForIdPreservation);
         this._board = parseResult.board;
         this._includedFiles = parseResult.includedFiles || [];
 
@@ -411,7 +414,9 @@ export class MainKanbanFile extends MarkdownFile {
      */
     public validate(content: string): { valid: boolean; errors?: string[] } {
         try {
-            const parseResult = this._parser.parseMarkdown(content);
+            // CRITICAL FIX: Pass basePath for resolving relative include paths
+            const basePath = path.dirname(this._path);
+            const parseResult = this._parser.parseMarkdown(content, basePath);
             const board = parseResult.board;
 
             if (!board.valid) {

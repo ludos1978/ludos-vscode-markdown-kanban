@@ -984,19 +984,15 @@ class TaskEditor {
 
                             task.title = value;
 
-                            // WORKAROUND: Use editTask message type (same as columns) since editTaskTitle is silent
-                            console.log('🟠🟠🟠 [FRONTEND taskEditor] Sending editTask with title change');
-                            console.log('🟠🟠🟠 [FRONTEND] taskId:', taskId, 'columnId:', columnId);
-                            console.log('🟠🟠🟠 [FRONTEND] title:', value);
+                            // Use editTask message type for title changes
+                            console.log('[FRONTEND taskEditor] Sending editTask with title change');
 
                             vscode.postMessage({
-                                type: 'editTask',  // Use editTask instead of editTaskTitle
+                                type: 'editTask',
                                 taskId: taskId,
                                 columnId: columnId,
-                                taskData: { title: value }  // Pass as taskData like other edit operations
+                                taskData: { title: value }
                             });
-
-                            console.log('🟠🟠🟠 [FRONTEND taskEditor] editTask message sent!');
 
                             return; // Skip local updates, let backend handle
                         } else if (task.includeMode && oldIncludeMatches.length > 0) {

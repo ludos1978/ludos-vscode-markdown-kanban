@@ -10,15 +10,14 @@ export function getOutputChannel(): vscode.OutputChannel | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	// ULTRA EARLY LOG - Verify new code is running
-	console.log('🔴🔴🔴 [EXTENSION] ACTIVATION STARTED - NEW CODE LOADED 🔴🔴🔴');
+	console.log('[Extension] Activation started');
 
 	// Create output channel for debugging
 	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
 	context.subscriptions.push(outputChannel);
 
-	console.log('[Kanban Extension] Activating markdown-kanban-obsidian extension...');
-	outputChannel.appendLine('[Kanban Extension] Activating markdown-kanban-obsidian extension...');
+	console.log('[Extension] Activating markdown-kanban-obsidian extension');
+	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
 
 	let fileListenerEnabled = true;
 
