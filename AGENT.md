@@ -2,6 +2,7 @@
 - For every task make 3 suggestions how to solve or approach the issue, each with an expected quality/probability that it properly solves the problem. If the best quality is still below 100%, analyze the problems and suggest 3 improvements to make on it. only then continue working on the task.
 - for any new function you want to create, explain why you need to add a new one and why you cannot modify the most similar ones to be reused.
 - if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
+- You may not add any functions, except if have not checked all the existing functions before for similar functionality or ones that might easily be extended to cover the feature. There must absoletely be no multiple functions that handle similar functions. Check the full code before you add any a new function.
 
 ## Architecture Overview (READ BEFORE ANY CHANGES)
 - **Core Architecture**: Consult [ARCHITECTURE.md](ARCHITECTURE.md) before making any structural changes to understand the state machine pattern

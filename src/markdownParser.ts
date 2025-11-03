@@ -350,17 +350,17 @@ export class MarkdownKanbanParser {
             }
           });
 
-          // STRATEGY 1: Load full content without parsing
-          // Read complete file content without parsing into title/description
+          // STRATEGY: Load full content into description, displayTitle is just metadata
+          // The displayTitle shows file info in the UI, description contains the actual file content
           let fullFileContent = '';
 
           for (const filePath of includeFiles) {
             const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
             try {
               if (fs.existsSync(resolvedPath)) {
-                // Read COMPLETE file content (NO PARSING!)
+                // Read COMPLETE file content
                 fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
-                console.log(`[Parser] Loaded ${fullFileContent.length} chars from ${filePath} (no parsing)`);
+                console.log(`[Parser] Loaded ${fullFileContent.length} chars from ${filePath}`);
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);
               }
@@ -369,10 +369,8 @@ export class MarkdownKanbanParser {
             }
           }
 
-          // Generate displayTitle for UI (visual indicator only, not part of file content)
-          const displayTitle = includeFiles.length > 0
-            ? `# include in ${includeFiles[0]}`
-            : '# include';
+          // displayTitle is metadata (file path indicator), not part of file content
+          const displayTitle = includeFiles.length > 0 ? `# include in ${includeFiles[0]}` : '# include';
 
           // Update task properties for include mode
           task.includeMode = true;
@@ -381,8 +379,8 @@ export class MarkdownKanbanParser {
           // DO NOT normalize here - files need original paths for display
           task.includeFiles = includeFiles.map(f => f.trim()); // Just trim whitespace, keep original casing
           task.originalTitle = task.title; // Keep original title with include syntax
-          task.displayTitle = displayTitle; // UI header only
-          task.description = fullFileContent; // COMPLETE file content, no parsing!
+          task.displayTitle = displayTitle; // UI metadata (not file content)
+          task.description = fullFileContent; // COMPLETE file content
         }
       }
     }

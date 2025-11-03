@@ -447,13 +447,14 @@ export class MessageHandler {
 
                     if (task) {
                         // CRITICAL FIX: Skip include detection for column-generated tasks
-                        // Column-generated tasks (task-col-xxx) are slides from column includes
-                        // Their titles contain slide content, not include directives
-                        const isColumnGeneratedTask = message.taskId.startsWith('task-col-');
+                        // Column-generated tasks are slides from column includes (presentation files)
+                        // Their titles contain slide content, NOT include directives
+                        // IMPORTANT: Task IDs are regular (task-xxx), NOT task-col-xxx!
+                        // The ONLY way to identify them: check if parent column has includeMode=true
                         const columnHasInclude = column?.includeMode === true;
 
-                        if (isColumnGeneratedTask || columnHasInclude) {
-                            console.log(`[editTask] Skipping include detection - column-generated task or column has include`);
+                        if (columnHasInclude) {
+                            console.log(`[editTask] Skipping include detection - column has includeMode (tasks are generated slides)`);
                             // Fall through to regular edit handling
                         } else {
                             try {
@@ -527,10 +528,11 @@ export class MessageHandler {
                     const task = column?.tasks.find((t: any) => t.id === message.taskId);
 
                     // CRITICAL FIX: Skip for column-generated tasks (slides from column includes)
-                    const isColumnGeneratedTask = message.taskId.startsWith('task-col-');
+                    // Column-generated tasks have regular IDs (task-xxx), NOT task-col-xxx
+                    // The ONLY way to identify them: parent column has includeMode=true
                     const columnHasInclude = column?.includeMode === true;
 
-                    if (task && task.includeMode && task.includeFiles && !isColumnGeneratedTask && !columnHasInclude) {
+                    if (task && task.includeMode && task.includeFiles && !columnHasInclude) {
                         console.log(`[editTask] Task include detected - updating file instance`);
                         const panel = this._getWebviewPanel();
 
@@ -540,10 +542,14 @@ export class MessageHandler {
                             const file = panel.fileRegistry?.getByRelativePath(normalizedPath);
 
                             if (file) {
+                                // Task include: description contains the FULL file content
+                                // No need to reconstruct - just save the description as-is
+                                const fullFileContent = message.taskData.description || '';
+
                                 // Update file content immediately (marks as unsaved)
                                 // This ensures "text modification" path calls the SAME function as "edit include file" path
-                                file.setContent(message.taskData.description, false);
-                                console.log(`[editTask] Updated file content for: ${relativePath}`);
+                                file.setContent(fullFileContent, false);
+                                console.log(`[editTask] Updated file content for: ${relativePath} (${fullFileContent.length} chars)`);
                             } else {
                                 console.warn(`[editTask] File not found in registry: ${relativePath}`);
                                 // File will be created when markUnsavedChanges → trackIncludeFileUnsavedChanges is called
@@ -693,9 +699,12 @@ export class MessageHandler {
                             }
 
                             // Check if editing a task include
+                            // CRITICAL FIX: Skip for column-generated tasks
                             if (message.taskId) {
                                 const task = column.tasks.find((t: any) => t.id === message.taskId);
-                                if (task && task.includeFiles && task.includeFiles.length > 0) {
+                                const columnHasInclude = column.includeMode === true;
+
+                                if (task && task.includeFiles && task.includeFiles.length > 0 && !columnHasInclude) {
                                     for (const relativePath of task.includeFiles) {
                                         const includeFile = panel.fileRegistry.getByRelativePath(relativePath);
                                         if (includeFile) {
@@ -703,6 +712,8 @@ export class MessageHandler {
                                             console.log(`[MessageHandler] Edit mode flag set to true on task include: ${relativePath}`);
                                         }
                                     }
+                                } else if (columnHasInclude) {
+                                    console.log(`[MessageHandler] Skipping task include edit mode - column has includeMode (task is generated slide)`);
                                 }
                             }
                         }
@@ -887,16 +898,26 @@ export class MessageHandler {
                     console.log(`[editTaskTitle] Old task title: "${task.title}"`);
                 }
 
-                // Check if the new title contains include syntax (location-based: task include)
-                const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
-                console.log(`[editTaskTitle] hasTaskIncludeMatches: ${!!hasTaskIncludeMatches}`, hasTaskIncludeMatches);
+                // CRITICAL FIX: Skip include detection for column-generated tasks
+                // Column-generated tasks are slides from column includes (presentation files)
+                // Their titles may contain text that LOOKS like include syntax
+                // The ONLY way to identify them: check if parent column has includeMode=true
+                const columnHasTaskInclude = targetColumn?.includeMode === true;
 
-                // BUGFIX: Also check if old title had includes that are being removed
-                const oldTaskIncludeMatches = task ? (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) : null;
-                console.log(`[editTaskTitle] oldTaskIncludeMatches: ${!!oldTaskIncludeMatches}`, oldTaskIncludeMatches);
+                if (columnHasTaskInclude) {
+                    console.log(`[editTaskTitle] Skipping include detection - column has includeMode (tasks are generated slides)`);
+                    // Fall through to regular title edit below
+                } else {
+                    // Check if the new title contains include syntax (location-based: task include)
+                    const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
+                    console.log(`[editTaskTitle] hasTaskIncludeMatches: ${!!hasTaskIncludeMatches}`, hasTaskIncludeMatches);
 
-                const hasTaskIncludeChanges = hasTaskIncludeMatches || oldTaskIncludeMatches;
-                console.log(`[editTaskTitle] hasTaskIncludeChanges: ${!!hasTaskIncludeChanges}`);
+                    // BUGFIX: Also check if old title had includes that are being removed
+                    const oldTaskIncludeMatches = task ? (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) : null;
+                    console.log(`[editTaskTitle] oldTaskIncludeMatches: ${!!oldTaskIncludeMatches}`, oldTaskIncludeMatches);
+
+                    const hasTaskIncludeChanges = hasTaskIncludeMatches || oldTaskIncludeMatches;
+                    console.log(`[editTaskTitle] hasTaskIncludeChanges: ${!!hasTaskIncludeChanges}`);
 
                 if (hasTaskIncludeChanges) {
                     // Extract the include files from the new title
@@ -962,18 +983,20 @@ export class MessageHandler {
                             }
                         }
                     }
-                } else {
-                    // Regular title edit without include syntax
-                    // STATE-3: Frontend already updated title, don't echo back
-                    await this.performBoardAction(() =>
-                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
-                        { sendUpdate: false }
-                    );
-
-                    // RACE-1: Clear editing flag after regular title edit
-                    console.log('[editTaskTitle] Regular edit completed - allowing board regenerations');
-                    this._getWebviewPanel().setEditingInProgress(false);
+                    break; // Exit after include handling
                 }
+                } // End of columnHasTaskInclude check
+
+                // Regular title edit without include syntax (or column-generated task edit)
+                // STATE-3: Frontend already updated title, don't echo back
+                await this.performBoardAction(() =>
+                    this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
+                    { sendUpdate: false }
+                );
+
+                // RACE-1: Clear editing flag after regular title edit
+                console.log('[editTaskTitle] Regular edit completed - allowing board regenerations');
+                this._getWebviewPanel().setEditingInProgress(false);
                 break;
             case 'moveColumnWithRowUpdate':
                 await this.performBoardAction(() => 

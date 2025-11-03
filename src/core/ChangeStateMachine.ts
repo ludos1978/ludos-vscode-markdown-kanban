@@ -863,26 +863,91 @@ export class ChangeStateMachine {
             }
         }
 
-        // If no new files to load, we're done (this handles the "remove all includes" case)
+        // CRITICAL FIX: Distinguish between "includes removed" vs "includes already loaded"
+        // loadingFiles = newFiles that aren't in oldFiles
+        // If loadingFiles is empty, check if newFiles is also empty (truly removed) or not (already loaded)
         if (loadingFiles.length === 0) {
-            console.log(`[State:LOADING_NEW] No new files to load (includes removed)`);
+            const newFiles = context.switches.newFiles;
 
-            // CRITICAL FIX: Clear include properties when removing all includes
-            // Without this, the task/column retains includeMode=true and includeFiles=[...],
-            // causing the include to be re-loaded in a flapping loop
-            if (isColumnSwitch && targetColumn) {
-                console.log(`[State:LOADING_NEW] Clearing column include properties for: ${targetColumn.id}`);
-                targetColumn.includeFiles = [];
-                targetColumn.includeMode = false;
-                targetColumn.displayTitle = targetColumn.title;
-                // Don't clear description for columns - they don't have loaded content
-            } else if (targetTask) {
-                console.log(`[State:LOADING_NEW] Clearing task include properties for: ${targetTask.id}`);
-                targetTask.includeFiles = [];
-                targetTask.includeMode = false;
-                targetTask.displayTitle = targetTask.title;  // Should be empty string now
-                targetTask.originalTitle = targetTask.title;  // CRITICAL FIX: Also clear originalTitle!
-                targetTask.description = '';  // Clear loaded include content
+            if (newFiles.length === 0) {
+                // TRUE REMOVAL: newFiles is empty - user removed all includes
+                console.log(`[State:LOADING_NEW] No files specified - includes removed`);
+
+                // Clear include properties when removing all includes
+                if (isColumnSwitch && targetColumn) {
+                    console.log(`[State:LOADING_NEW] Clearing column include properties for: ${targetColumn.id}`);
+                    targetColumn.includeFiles = [];
+                    targetColumn.includeMode = false;
+                    targetColumn.displayTitle = targetColumn.title;
+                } else if (targetTask) {
+                    console.log(`[State:LOADING_NEW] Clearing task include properties for: ${targetTask.id}`);
+                    targetTask.includeFiles = [];
+                    targetTask.includeMode = false;
+                    targetTask.displayTitle = targetTask.title;
+                    targetTask.originalTitle = targetTask.title;
+                    targetTask.description = '';
+                }
+            } else {
+                // FILES ALREADY LOADED: newFiles has content but all are already in oldFiles
+                console.log(`[State:LOADING_NEW] No new files to load - files already loaded (${newFiles.length} files)`);
+
+                // CRITICAL FIX: CLEARING_CACHE cleared all properties, we must RESTORE them from loaded files!
+                // Otherwise the task/column will have includeMode=false and empty content
+
+                if (targetTask) {
+                    // Restore task include properties from already-loaded file
+                    const relativePath = newFiles[0];
+                    const file = this._fileRegistry.getByRelativePath(relativePath);
+
+                    if (file) {
+                        const fullFileContent = file.getContent();
+
+                        if (fullFileContent && fullFileContent.length > 0) {
+                            // Restore all properties
+                            targetTask.includeMode = true;
+                            targetTask.includeFiles = newFiles;
+                            targetTask.displayTitle = `# include in ${relativePath}`;
+                            targetTask.description = fullFileContent;
+
+                            // Update title if provided in event
+                            if (event.type === 'include_switch' && event.newTitle !== undefined) {
+                                targetTask.title = event.newTitle;
+                                targetTask.originalTitle = event.newTitle;
+                            }
+
+                            console.log(`[State:LOADING_NEW] ✓ Restored task properties from already-loaded file (${fullFileContent.length} chars)`);
+                        } else {
+                            console.error(`[State:LOADING_NEW] File has no content: ${relativePath}`);
+                        }
+                    } else {
+                        console.error(`[State:LOADING_NEW] File not found in registry: ${relativePath}`);
+                    }
+                } else if (isColumnSwitch && targetColumn) {
+                    // Restore column include properties from already-loaded files
+                    console.log(`[State:LOADING_NEW] Restoring column properties from ${newFiles.length} already-loaded files`);
+
+                    targetColumn.includeFiles = newFiles;
+                    targetColumn.includeMode = true;
+
+                    // Update title if provided
+                    if (event.type === 'include_switch' && event.newTitle !== undefined) {
+                        targetColumn.title = event.newTitle;
+                        targetColumn.originalTitle = event.newTitle;
+                    }
+
+                    // Re-load tasks from already-loaded files
+                    const tasks: any[] = [];
+                    for (const relativePath of newFiles) {
+                        const file = this._fileRegistry.getByRelativePath(relativePath);
+                        if (file) {
+                            const fileTasks = file.parseToTasks([], targetColumn.id);
+                            tasks.push(...fileTasks);
+                        }
+                    }
+                    targetColumn.tasks = tasks;
+
+                    console.log(`[State:LOADING_NEW] ✓ Restored column with ${tasks.length} tasks`);
+                }
             }
 
             return ChangeState.UPDATING_BACKEND;
@@ -974,11 +1039,14 @@ export class ChangeStateMachine {
                 const fullFileContent = file.getContent();
 
                 if (fullFileContent && fullFileContent.length > 0) {
+                    // displayTitle is metadata (file path indicator), description contains full file content
+                    const displayTitle = `# include in ${relativePath}`;
+
                     // Update task properties
                     targetTask.includeMode = true;
                     targetTask.includeFiles = loadingFiles;
-                    targetTask.displayTitle = `# include in ${relativePath}`;
-                    targetTask.description = fullFileContent;
+                    targetTask.displayTitle = displayTitle; // UI metadata (not file content)
+                    targetTask.description = fullFileContent; // COMPLETE file content
 
                     // Update title if provided in event
                     // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
