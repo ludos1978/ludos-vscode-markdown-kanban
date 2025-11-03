@@ -808,12 +808,6 @@ export class ChangeStateMachine {
         }
 
         const loadingFiles = context.switches.loadingFiles;
-
-        if (loadingFiles.length === 0) {
-            console.log(`[State:LOADING_NEW] No new files to load`);
-            return ChangeState.UPDATING_BACKEND;
-        }
-
         const event = context.event;
 
         // Get board and store in context so we use the SAME instance throughout
@@ -854,6 +848,46 @@ export class ChangeStateMachine {
             return ChangeState.UPDATING_BACKEND;
         }
 
+        // BUGFIX: Update title even when removing all includes (loadingFiles.length === 0)
+        // This ensures the column/task title is updated to reflect the removal
+        // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
+        if (event.type === 'include_switch' && event.newTitle !== undefined) {
+            if (isColumnSwitch && targetColumn) {
+                targetColumn.title = event.newTitle;
+                targetColumn.originalTitle = event.newTitle;
+                console.log(`[State:LOADING_NEW] Updated column title to: "${event.newTitle}"`);
+            } else if (targetTask) {
+                targetTask.title = event.newTitle;
+                targetTask.originalTitle = event.newTitle;
+                console.log(`[State:LOADING_NEW] Updated task title to: "${event.newTitle}"`);
+            }
+        }
+
+        // If no new files to load, we're done (this handles the "remove all includes" case)
+        if (loadingFiles.length === 0) {
+            console.log(`[State:LOADING_NEW] No new files to load (includes removed)`);
+
+            // CRITICAL FIX: Clear include properties when removing all includes
+            // Without this, the task/column retains includeMode=true and includeFiles=[...],
+            // causing the include to be re-loaded in a flapping loop
+            if (isColumnSwitch && targetColumn) {
+                console.log(`[State:LOADING_NEW] Clearing column include properties for: ${targetColumn.id}`);
+                targetColumn.includeFiles = [];
+                targetColumn.includeMode = false;
+                targetColumn.displayTitle = targetColumn.title;
+                // Don't clear description for columns - they don't have loaded content
+            } else if (targetTask) {
+                console.log(`[State:LOADING_NEW] Clearing task include properties for: ${targetTask.id}`);
+                targetTask.includeFiles = [];
+                targetTask.includeMode = false;
+                targetTask.displayTitle = targetTask.title;  // Should be empty string now
+                targetTask.originalTitle = targetTask.title;  // CRITICAL FIX: Also clear originalTitle!
+                targetTask.description = '';  // Clear loaded include content
+            }
+
+            return ChangeState.UPDATING_BACKEND;
+        }
+
         // Get file factory and main file
         const fileFactory = (this._webviewPanel as any)._fileFactory;
         const mainFile = this._fileRegistry.getMainFile();
@@ -872,7 +906,8 @@ export class ChangeStateMachine {
             targetColumn.includeMode = loadingFiles.length > 0;
 
             // Update title if provided in event
-            if (event.type === 'include_switch' && event.newTitle) {
+            // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
+            if (event.type === 'include_switch' && event.newTitle !== undefined) {
                 targetColumn.title = event.newTitle;
                 targetColumn.originalTitle = event.newTitle;
             }
@@ -946,7 +981,8 @@ export class ChangeStateMachine {
                     targetTask.description = fullFileContent;
 
                     // Update title if provided in event
-                    if (event.type === 'include_switch' && event.newTitle) {
+                    // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
+                    if (event.type === 'include_switch' && event.newTitle !== undefined) {
                         targetTask.title = event.newTitle;
                         targetTask.originalTitle = event.newTitle;
                     }
@@ -980,6 +1016,19 @@ export class ChangeStateMachine {
                 }
             } catch (error) {
                 console.error(`[State:UPDATING_BACKEND] Error syncing file registry:`, error);
+            }
+        }
+
+        // CRITICAL FIX: Update MainKanbanFile content when includes are modified
+        // This ensures that removing a column include updates the file's markdown content
+        if (context.impact.includesSwitched || context.impact.mainFileChanged) {
+            const mainFile = this._fileRegistry.getMainFile();
+            const board = context.modifiedBoard || this._webviewPanel?.getBoard();
+            
+            if (mainFile && board) {
+                console.log(`[State:UPDATING_BACKEND] Updating MainKanbanFile content to reflect include changes`);
+                mainFile.updateFromBoard(board);
+                console.log(`[State:UPDATING_BACKEND] ✓ MainKanbanFile content updated (marked as unsaved)`);
             }
         }
 
@@ -1266,6 +1315,7 @@ export class ChangeStateMachine {
                             columnId: column.id,
                             taskId: task.id,
                             taskTitle: task.title,
+                            originalTitle: task.originalTitle,
                             description: task.description,
                             displayTitle: task.displayTitle,
                             includeFiles: task.includeFiles,

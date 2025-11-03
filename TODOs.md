@@ -4,8 +4,6 @@ kanban-plugin: board
 
 # Markdown Kanban - Development Roadmap
 
-it isnt working when switching include files. the old content stays displayed. @logs/vscode-app-1762099023074.log
-
 
 **Analysis**: See [COLUMNIMPORT_ANALYSIS.md](COLUMNIMPORT_ANALYSIS.md) for detailed issue analysis
 **Cleanup Plan**: See [tmp/10-cleanup-areas.md](tmp/10-cleanup-areas.md) for simplification strategy

@@ -10,6 +10,9 @@ export function getOutputChannel(): vscode.OutputChannel | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	// ULTRA EARLY LOG - Verify new code is running
+	console.log('🔴🔴🔴 [EXTENSION] ACTIVATION STARTED - NEW CODE LOADED 🔴🔴🔴');
+
 	// Create output channel for debugging
 	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
 	context.subscriptions.push(outputChannel);

@@ -1486,13 +1486,13 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-        // MIGRATION: Route through unified state machine via editTaskTitle
-        // This replaces the old switchTaskIncludeFile legacy code path
-        // The backend will detect the include syntax change and route through ChangeStateMachine
+        // SOLUTION 2: Use editTask message type (same as taskEditor fix)
+        // editTaskTitle appears to be broken, use editTask instead
         vscode.postMessage({
-            type: 'editTaskTitle',
+            type: 'editTask',  // Changed from editTaskTitle
             taskId: taskId,
-            title: newTitle
+            columnId: columnId,
+            taskData: { title: newTitle }  // Pass as taskData object
         });
 
         // Update button state to show unsaved changes (path changed but not saved to main file yet)

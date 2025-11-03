@@ -245,6 +245,22 @@ export class MessageHandler {
     }
 
     public async handleMessage(message: any): Promise<void> {
+        // CRITICAL: Log IMMEDIATELY with zero overhead
+        console.log(`🟢 [handleMessage] Received: ${message.type}`);
+
+        if (message.type?.includes?.('task') || message.type?.includes?.('Task') || message.type === 'editTask') {
+            const detailMsg = `🟢 [handleMessage] TASK MESSAGE: ${JSON.stringify({
+                type: message.type,
+                taskId: message.taskId,
+                columnId: message.columnId,
+                title: message.title,
+                taskDataKeys: Object.keys(message.taskData || {})
+            })}`;
+            console.log(detailMsg);
+        }
+
+        const switchMsg = `🟢 [handleMessage] ENTERING SWITCH for type: "${message.type}"`;
+        console.log(switchMsg);
 
         switch (message.type) {
             // Undo/Redo operations
@@ -416,6 +432,117 @@ export class MessageHandler {
         
             // Task operations
             case 'editTask':
+                // ULTRA VISIBLE LOG
+                const msg1 = '🟢🟢🟢 [editTask] HANDLER CALLED 🟢🟢🟢';
+                console.log(msg1);
+
+                const msg2 = `[editTask] taskId: ${message.taskId}, columnId: ${message.columnId}, taskData: ${JSON.stringify(message.taskData)}`;
+                console.log(msg2);
+
+                // SOLUTION 1 & 3: Check if this is a title change with include syntax (add/remove/change)
+                const conditionMsg = `[editTask] Checking title condition: taskData=${!!message.taskData}, title=${message.taskData?.title}, titleType=${typeof message.taskData?.title}`;
+                console.log(conditionMsg);
+
+                if (message.taskData?.title !== undefined) {
+                    const enterMsg = '[editTask] ✅ ENTERED title condition block';
+                    console.log(enterMsg);
+
+                    const newTitle = message.taskData.title;
+                    const hasNewInclude = /!!!include\([^)]+\)!!!/.test(newTitle);
+
+                    const titleMsg = `[editTask] Title change detected: "${newTitle}"`;
+                    const includeMsg = `[editTask] Has include syntax: ${hasNewInclude}`;
+                    console.log(titleMsg);
+                    console.log(includeMsg);
+
+                    const board = this._getCurrentBoard();
+                    const boardMsg = `[editTask] Board lookup: found=${!!board}, columns=${board?.columns?.length || 0}`;
+                    console.log(boardMsg);
+
+                    const column = board?.columns.find((c: any) => c.id === message.columnId);
+                    const colMsg = `[editTask] Column lookup: found=${!!column}, looking for=${message.columnId}, tasks=${column?.tasks?.length || 0}`;
+                    console.log(colMsg);
+
+                    const task = column?.tasks.find((t: any) => t.id === message.taskId);
+                    const taskMsg = `[editTask] Task lookup: found=${!!task}, looking for=${message.taskId}, hasIncludes=${!!(task?.includeFiles?.length)}`;
+                    console.log(taskMsg);
+
+                    if (task) {
+                        // CRITICAL: Use ONLY console.log - NO getOutputChannel to avoid async boundary
+                        console.log('[editTask] ✅ Task found, checking includes...');
+
+                        try {
+                            console.log('[editTask] 🔵 INSIDE TRY BLOCK');
+                            console.log('[editTask] 🔵 About to access task.includeFiles...');
+
+                            let oldIncludeFiles: string[];
+                            try {
+                                oldIncludeFiles = task.includeFiles || [];
+                                console.log('[editTask] 🔵 Got includeFiles array:', oldIncludeFiles);
+                            } catch (accessError) {
+                                console.error('[editTask] 🔴 FAILED to access task.includeFiles:', accessError);
+                                throw accessError;
+                            }
+
+                            const hadOldInclude = oldIncludeFiles.length > 0;
+
+                            // CRITICAL: Use ONLY console.log to avoid async boundary
+                            console.log('[editTask] 🔵 Calculated hadOldInclude:', hadOldInclude);
+                            console.log('[editTask] 🔵 About to log old includes...');
+
+                            console.log(`[editTask] Old includes: ${JSON.stringify(oldIncludeFiles)}`);
+                            console.log(`[editTask] Include change: ${hadOldInclude} → ${hasNewInclude}`);
+
+                        // SOLUTION 3: Also handle include REMOVAL (not just addition)
+                        if (hasNewInclude || hadOldInclude) {
+                            console.log('[editTask] INCLUDE CHANGE DETECTED - routing to handleIncludeSwitch');
+
+                            const panel = this._getWebviewPanel();
+
+                            // Extract new include files from title
+                            const newIncludeFiles: string[] = [];
+                            const matches = newTitle.match(/!!!include\(([^)]+)\)!!!/g);
+                            if (matches) {
+                                matches.forEach((match: string) => {
+                                    const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                                    newIncludeFiles.push(filePath);
+                                });
+                            }
+
+                            console.log(`[editTask] New includes: ${JSON.stringify(newIncludeFiles)}`);
+
+                            // Clear dirty flag before stopping edit
+                            if (panel.clearTaskDirty) {
+                                panel.clearTaskDirty(message.taskId);
+                                console.log(`[editTask] Cleared dirty flag for task ${message.taskId}`);
+                            }
+
+                            // Stop editing before switch
+                            await this.requestStopEditing();
+
+                            await panel.handleIncludeSwitch({
+                                taskId: message.taskId,
+                                oldFiles: oldIncludeFiles,
+                                newFiles: newIncludeFiles,
+                                newTitle: newTitle
+                            });
+
+                            panel.setEditingInProgress(false);
+                            console.log('[editTask] Include switch completed');
+                            break;
+                        }
+                        } catch (error) {
+                            const errMsg = `[editTask] 🔴🔴🔴 EXCEPTION in include handling: ${error}`;
+                            console.error(errMsg);
+                            console.error('[editTask] Error type:', typeof error);
+                            console.error('[editTask] Error object:', error);
+                        }
+                    } else {
+                        const failMsg = '[editTask] ❌ Task NOT found - cannot process include change';
+                        console.log(failMsg);
+                    }
+                }
+
                 // CRITICAL FIX: Unified execution path for task include content updates
                 // Both "edit include file" and "text modification" must call the same functions
 
@@ -705,17 +832,23 @@ export class MessageHandler {
 
                 // Check if the new title contains include syntax (location-based: column include)
                 const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
+                
+                // BUGFIX: Also check if old title had includes that are being removed
+                const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g);
+                const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
 
-                if (hasColumnIncludeMatches) {
+                if (hasIncludeChanges) {
                     // Column include switch - route through state machine
                     log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
 
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
-                    hasColumnIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                        newIncludeFiles.push(filePath);
-                    });
+                    if (hasColumnIncludeMatches) {
+                        hasColumnIncludeMatches.forEach((match: string) => {
+                            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                            newIncludeFiles.push(filePath);
+                        });
+                    }
 
                     // Get old include files for cleanup
                     const oldIncludeFiles = column.includeFiles || [];
@@ -780,25 +913,44 @@ export class MessageHandler {
                 }
                 break;
             case 'editTaskTitle':
+                console.log('🔵🔵🔵 [editTaskTitle] HANDLER CALLED 🔵🔵🔵');
+                console.log(`[editTaskTitle] taskId: ${message.taskId}, columnId: ${message.columnId}`);
+                console.log(`[editTaskTitle] New title: "${message.title}"`);
+
                 // Check if this might be a task include file change
                 const currentBoardForTask = this._getCurrentBoard();
                 const targetColumn = currentBoardForTask?.columns.find(col => col.id === message.columnId);
                 const task = targetColumn?.tasks.find(t => t.id === message.taskId);
 
+                console.log(`[editTaskTitle] Found column: ${!!targetColumn}, Found task: ${!!task}`);
+                if (task) {
+                    console.log(`[editTaskTitle] Old task title: "${task.title}"`);
+                }
+
                 // Check if the new title contains include syntax (location-based: task include)
                 const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
+                console.log(`[editTaskTitle] hasTaskIncludeMatches: ${!!hasTaskIncludeMatches}`, hasTaskIncludeMatches);
 
-                if (hasTaskIncludeMatches) {
+                // BUGFIX: Also check if old title had includes that are being removed
+                const oldTaskIncludeMatches = task ? (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) : null;
+                console.log(`[editTaskTitle] oldTaskIncludeMatches: ${!!oldTaskIncludeMatches}`, oldTaskIncludeMatches);
+
+                const hasTaskIncludeChanges = hasTaskIncludeMatches || oldTaskIncludeMatches;
+                console.log(`[editTaskTitle] hasTaskIncludeChanges: ${!!hasTaskIncludeChanges}`);
+
+                if (hasTaskIncludeChanges) {
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
-                    hasTaskIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                        newIncludeFiles.push(filePath);
-                    });
+                    if (hasTaskIncludeMatches) {
+                        hasTaskIncludeMatches.forEach((match: string) => {
+                            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                            newIncludeFiles.push(filePath);
+                        });
+                    }
 
-                    // STRATEGY A: Route through unified handler - it will check unsaved changes ONCE
-                    // All duplicate checks have been removed (lines 612-660 deleted)
-                    if (newIncludeFiles.length > 0 && task) {
+                    // BUGFIX: Route through state machine for ANY include changes (add, remove, or switch)
+                    // This matches the column logic and ensures removal is handled
+                    if (task) {
                         console.log('[editTaskTitle] Routing task include switch through unified handler...');
                         const panel = this._getWebviewPanel();
                         const oldTaskIncludeFiles = task.includeFiles || [];
@@ -822,8 +974,11 @@ export class MessageHandler {
                             // 3. Invalidate board cache
                             // 4. Send updateTaskContent to frontend
                             // 5. Mark changes as unsaved
+                            // CRITICAL: Only pass taskId for task includes (NOT columnId)
+                            // If columnId is present, handleIncludeSwitch treats it as a column switch!
                             await panel.handleIncludeSwitch({
                                 taskId: message.taskId,
+                                // DO NOT pass columnId - state machine finds column from taskId
                                 oldFiles: oldTaskIncludeFiles,
                                 newFiles: newIncludeFiles,
                                 newTitle: message.title

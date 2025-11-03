@@ -2899,6 +2899,8 @@ window.addEventListener('message', event => {
             console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
             console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
             console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
+            console.log('[FRONTEND updateTaskContent] taskTitle:', message.taskTitle);
+            console.log('[FRONTEND updateTaskContent] originalTitle:', message.originalTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2920,10 +2922,12 @@ window.addEventListener('message', event => {
                     console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
 
                     // Update task metadata
-                    foundTask.description = message.description || '';
-                    foundTask.title = message.taskTitle || foundTask.title;
-                    foundTask.displayTitle = message.displayTitle || foundTask.displayTitle;
-                    foundTask.originalTitle = message.originalTitle || foundTask.originalTitle;
+                    // CRITICAL FIX: Use !== undefined checks instead of || operator
+                    // Empty string "" is falsy and would fall back to old value with ||
+                    foundTask.description = message.description !== undefined ? message.description : '';
+                    foundTask.title = message.taskTitle !== undefined ? message.taskTitle : foundTask.title;
+                    foundTask.displayTitle = message.displayTitle !== undefined ? message.displayTitle : foundTask.displayTitle;
+                    foundTask.originalTitle = message.originalTitle !== undefined ? message.originalTitle : foundTask.originalTitle;
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
                     if (message.includeMode !== undefined) {
@@ -2938,17 +2942,25 @@ window.addEventListener('message', event => {
                     }
 
                     console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+                    console.log('[FRONTEND updateTaskContent] NEW title:', foundTask.title);
+                    console.log('[FRONTEND updateTaskContent] NEW displayTitle:', foundTask.displayTitle);
+                    console.log('[FRONTEND updateTaskContent] NEW originalTitle:', foundTask.originalTitle);
                     console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
-                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    // Check if user is currently editing - if so, handle carefully
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+                    const isEditingThisTask = isEditing && window.taskEditor.currentEditor.taskId === message.taskId;
 
-                    // DON'T update editor value while user is editing!
-                    // The editor will be stopped by the backend via stopEditing message,
-                    // and the new content will be rendered after editing stops.
-                    // Updating the editor value here would overwrite user's in-progress edits.
-                    if (isEditing && window.taskEditor.currentEditor.taskId === message.taskId) {
-                        console.log('[FRONTEND updateTaskContent] User is editing this task - NOT updating editor value to preserve user input');
+                    // CRITICAL FIX: For include changes, update the editor field value even if editing
+                    // The backend has processed the include removal/addition and stopped editing
+                    // We need to update the textarea to reflect the new title
+                    if (isEditingThisTask && message.taskTitle !== undefined) {
+                        const editor = window.taskEditor.currentEditor;
+                        if (editor.type === 'task-title') {
+                            // Update the editor field value to match the backend's processed title
+                            editor.element.value = message.taskTitle || '';
+                            console.log('[FRONTEND updateTaskContent] Updated editor value for include change:', message.taskTitle);
+                        }
                     }
 
                     if (!isEditing) {

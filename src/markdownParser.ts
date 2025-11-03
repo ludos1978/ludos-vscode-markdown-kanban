@@ -480,6 +480,7 @@ export class MarkdownKanbanParser {
         for (const task of column.tasks) {
           // For taskinclude tasks, use the original title with include syntax
           const titleToSave = task.includeMode && task.originalTitle ? task.originalTitle : task.title;
+          console.log(`[generateMarkdown] Task ${task.id}: includeMode=${task.includeMode}, title="${task.title}", originalTitle="${task.originalTitle}", titleToSave="${titleToSave}"`);
           markdown += `- [ ] ${titleToSave}\n`;
 
           // For taskinclude tasks, don't save the description (it comes from the file)

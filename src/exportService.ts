@@ -104,10 +104,12 @@ export class ExportService {
     private static readonly DOCUMENT_EXTENSIONS = ['.pdf', '.epub', '.doc', '.docx', '.txt'];
 
     // Include patterns for different include types
+    // UNIFIED SYNTAX: All includes use !!!include()!!! - position determines behavior
     private static readonly INCLUDE_PATTERN = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-    // For taskinclude, match the entire task line including the checkbox prefix
+    // For task includes, match the entire task line including the checkbox prefix
     // This prevents checkbox duplication when replacing with converted content
-    private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!taskinclude\s*\(([^)]+)\)\s*!!!/gm;
+    // USES UNIFIED SYNTAX: !!!include()!!! in task title (position-based)
+    private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!include\s*\(([^)]+)\)\s*!!!/gm;
     // For column includes (position-based: !!!include()!!! in column header), match the entire column header line
     // Captures: prefix title, file path, and suffix (tags/other content)
     private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
@@ -254,7 +256,8 @@ export class ExportService {
             },
             {
                 pattern: this.TASK_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] !!!taskinclude(${filename})!!!`,
+                // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] !!!include(${filename})!!!`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },

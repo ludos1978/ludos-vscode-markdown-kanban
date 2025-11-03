@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
+import { getOutputChannel } from './extension';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { FileManager, ImagePathMapping } from './fileManager';
@@ -875,16 +876,37 @@ export class KanbanWebviewPanel {
 
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
+                // ULTRA AGGRESSIVE DIAGNOSTIC - Log to BOTH console AND outputChannel
+                const logMsg = `🔴 [PANEL] Message received: ${message.type}`;
+                console.log(logMsg);
+                getOutputChannel()?.appendLine(logMsg);
+
+                if (message.type?.includes?.('Task') || message.type?.includes?.('task') || message.type === 'editTask') {
+                    const detailMsg = `🔴 [PANEL] TASK/EDIT MESSAGE: type=${message.type}, taskId=${message.taskId}, columnId=${message.columnId}, title=${message.title || message.taskData?.title}`;
+                    console.log(detailMsg);
+                    getOutputChannel()?.appendLine(detailMsg);
+                }
 
                 if (message.type === 'undo' || message.type === 'redo') {
                 }
 
                 try {
+                    const beforeMsg = `🔴 [PANEL] Calling messageHandler.handleMessage for ${message.type}`;
+                    console.log(beforeMsg);
+                    getOutputChannel()?.appendLine(beforeMsg);
+
                     await this._messageHandler.handleMessage(message);
+
+                    const afterMsg = `🔴 [PANEL] messageHandler.handleMessage completed for ${message.type}`;
+                    console.log(afterMsg);
+                    getOutputChannel()?.appendLine(afterMsg);
                 } catch (error) {
-                    console.error('[WEBVIEW PANEL ERROR] Error handling message:', error);
+                    const errMsg = `[WEBVIEW PANEL ERROR] Error handling message: ${error}`;
+                    console.error(errMsg);
+                    getOutputChannel()?.appendLine(errMsg);
                     if (error instanceof Error) {
                         console.error('[WEBVIEW PANEL ERROR] Stack trace:', error.stack);
+                        getOutputChannel()?.appendLine(`Stack: ${error.stack}`);
                     }
                 }
             },
@@ -1386,6 +1408,13 @@ export class KanbanWebviewPanel {
 
                             console.log(`[_loadIncludeContentAsync] Loaded ${tasks.length} tasks from ${relativePath}`);
 
+                            // CRITICAL FIX: Don't send updates during include switch
+                            // The state machine handles all updates during switches
+                            if (this._includeSwitchInProgress) {
+                                console.log(`[_loadIncludeContentAsync] ⚠️ Skipped sending update - include switch in progress`);
+                                continue;
+                            }
+
                             // Send update to frontend
                             if (this._panel) {
                                 this.queueMessage({
@@ -1449,6 +1478,13 @@ export class KanbanWebviewPanel {
                                 file.setContent(fullFileContent, true);
 
                                 console.log(`[_loadIncludeContentAsync] Loaded task include ${relativePath}`);
+
+                                // CRITICAL FIX: Don't send updates during include switch
+                                // The state machine handles all updates during switches
+                                if (this._includeSwitchInProgress) {
+                                    console.log(`[_loadIncludeContentAsync] ⚠️ Skipped sending update - include switch in progress`);
+                                    continue;
+                                }
 
                                 // Send update to frontend
                                 if (this._panel) {
@@ -1706,6 +1742,14 @@ export class KanbanWebviewPanel {
      * Also called after editing stops to ensure skipped updates are applied.
      */
     public syncDirtyItems(): void {
+        // CRITICAL FIX: Don't sync during include switches - state machine sends correct updates
+        // During include switch, board might be regenerated with empty descriptions (before async load completes)
+        // This would send stale/empty data and cause content flapping
+        if (this._includeSwitchInProgress) {
+            console.log(`[syncDirtyItems] ⚠️ Skipped - include switch in progress (state machine handles updates)`);
+            return;
+        }
+
         const board = this.getBoard();
         if (!board || !this._panel) return;
 
