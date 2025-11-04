@@ -898,6 +898,13 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-all-tags');
                         }
 
+                        // Update current week attribute
+                        if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+                            columnElement2.setAttribute('data-current-week', 'true');
+                        } else {
+                            columnElement2.removeAttribute('data-current-week');
+                        }
+
                         // Force style recalculation and update header/footer bars
                         if (allTags.length > 0) {
                             // Gentle style refresh: toggle a temporary class to force re-evaluation

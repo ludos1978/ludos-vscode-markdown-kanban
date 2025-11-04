@@ -138,7 +138,8 @@ class TagUtils {
     extractNumericTag(text) {
         if (!text) return null;
 
-        const match = text.match(this.patterns.numericTag);
+        // Use a non-global version of the pattern to get capture groups
+        const match = text.match(/#(\d+(?:\.\d+)?)\b/);
         if (match && match[1]) {
             return parseFloat(match[1]);
         }

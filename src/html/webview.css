@@ -17,7 +17,7 @@
   --section-focus-color: gray;
 
   /* Week tag highlighting - configurable */
-  --current-week-highlight-color: #4CAF50;
+  --current-week-highlight-color: #ff0000;
   --current-week-highlight-style: border; /* Options: border, background, glow */
   --current-week-border-width: 3px;
   --current-week-border-style: solid;
@@ -3637,8 +3637,8 @@ h6 .kanban-tag {
 /* Numeric badges for index tags (#1, #1.1, etc.) */
 .numeric-badge {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: -12px;
+  left: -12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3658,37 +3658,30 @@ h6 .kanban-tag {
 
 /* Numeric badge in tasks */
 .task-item .numeric-badge {
-  top: 6px;
-  left: 6px;
+  top: -12px;
+  left: -12px;
 }
 
 /* Numeric badge in columns */
 .kanban-full-height-column .numeric-badge {
-  top: 6px;
-  left: 6px;
+  top: -12px;
+  left: -12px;
 }
 
 /* Current week highlighting for columns and tasks */
 /* Border style (default) - apply to column elements, not container */
-.kanban-full-height-column[data-current-week="true"] .column-header {
-  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-.kanban-full-height-column[data-current-week="true"] .column-title {
-  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
-.kanban-full-height-column[data-current-week="true"] .column-footer {
-  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
-}
-
+.kanban-full-height-column[data-current-week="true"] .column-header,
+.kanban-full-height-column[data-current-week="true"] .column-title,
+.kanban-full-height-column[data-current-week="true"] .column-inner,
+.kanban-full-height-column[data-current-week="true"] .column-footer,
 .task-item[data-current-week="true"] {
-  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
 /* Background style - add class 'week-highlight-background' to body to enable */
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-header,
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-inner,
 body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-footer {
   background-color: var(--current-week-highlight-color) !important;
   opacity: 0.2;
@@ -3702,6 +3695,7 @@ body.week-highlight-background .task-item[data-current-week="true"] {
 /* Glow style - add class 'week-highlight-glow' to body to enable */
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-header,
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-inner,
 body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-footer {
   box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }
