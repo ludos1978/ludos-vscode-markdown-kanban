@@ -2709,6 +2709,11 @@ window.addEventListener('message', event => {
                 });
             }
             break;
+        case 'updateShortcuts':
+            // Cache shortcuts for taskEditor to use
+            window.cachedShortcuts = message.shortcuts || {};
+            console.log('[webview] Updated shortcuts cache:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
+            break;
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
             if (typeof unfoldColumnIfCollapsed === 'function') {

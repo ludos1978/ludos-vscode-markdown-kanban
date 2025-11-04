@@ -847,13 +847,16 @@ export class KanbanWebviewPanel {
 
         // View state change handler
         this._panel.onDidChangeViewState(
-            e => {
+            async e => {
                 if (e.webviewPanel.visible) {
                     // Panel became visible - send file info
                     this._fileManager.sendFileInfo();
 
                     // Sync any pending DOM updates (items with unrendered changes)
                     this.syncDirtyItems();
+
+                    // Send updated shortcuts to webview
+                    await this._sendShortcutsToWebview();
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
@@ -2035,6 +2038,20 @@ export class KanbanWebviewPanel {
      * Send full board update to frontend with all configuration
      * Helper to consolidate board update message logic
      */
+    private async _sendShortcutsToWebview(): Promise<void> {
+        if (!this._panel) return;
+
+        try {
+            const shortcuts = await this._messageHandler.getAllShortcuts();
+            this._panel.webview.postMessage({
+                type: 'updateShortcuts',
+                shortcuts: shortcuts
+            });
+        } catch (error) {
+            console.error('[KanbanWebviewPanel] Failed to send shortcuts to webview:', error);
+        }
+    }
+
     private _sendBoardUpdate(board: KanbanBoard, options: {
         imageMappings?: Record<string, string>;
         isFullRefresh?: boolean;

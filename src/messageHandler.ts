@@ -1675,36 +1675,75 @@ export class MessageHandler {
         }
     }
 
-    private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
-        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
+    /**
+     * Get all available shortcuts as a map (shortcut -> command)
+     * This is called when the webview gains focus to refresh shortcuts
+     */
+    async getAllShortcuts(): Promise<Record<string, string>> {
+        const shortcutMap: Record<string, string> = {};
 
+        try {
+            // Load keybindings from VS Code
+            const keybindings = await this.loadVSCodeKeybindings();
+
+            // Build shortcut map from user keybindings
+            for (const binding of keybindings) {
+                if (binding.key && binding.command && !binding.command.startsWith('-')) {
+                    // Normalize the key format
+                    const normalizedKey = binding.key
+                        .toLowerCase()
+                        .replace(/cmd/g, 'meta')
+                        .replace(/\s+/g, '');
+                    shortcutMap[normalizedKey] = binding.command;
+                }
+            }
+
+            // Add extension shortcuts
+            const extensionShortcuts = await this.getExtensionShortcuts();
+            Object.assign(shortcutMap, extensionShortcuts);
+
+            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} shortcuts for webview`);
+
+        } catch (error) {
+            console.error('[MessageHandler] Failed to load shortcuts:', error);
+        }
+
+        return shortcutMap;
+    }
+
+    private async getExtensionShortcuts(): Promise<Record<string, string>> {
         // Map of common extension shortcuts to their commands
-        // This allows extensions to work in the kanban editor without requiring user keybindings
         const extensionShortcuts: Record<string, string> = {
             'alt+t': 'deepl.translate',
             'shift+alt+t': 'deepl.translateTo',
             // Add more common extension shortcuts here as needed
         };
 
-        const command = extensionShortcuts[shortcut];
-        console.log(`[MessageHandler] Mapped shortcut to command: ${command}`);
+        // Verify commands actually exist
+        const allCommands = await vscode.commands.getCommands();
+        const validShortcuts: Record<string, string> = {};
 
-        if (command) {
-            // Verify the command actually exists
-            const allCommands = await vscode.commands.getCommands();
-            const commandExists = allCommands.includes(command);
-            console.log(`[MessageHandler] Command ${command} exists: ${commandExists}`);
-
-            if (commandExists) {
-                console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
-                return command;
-            } else {
-                console.log(`[MessageHandler] Command ${command} not found in available commands`);
+        for (const [shortcut, command] of Object.entries(extensionShortcuts)) {
+            if (allCommands.includes(command)) {
+                validShortcuts[shortcut] = command;
             }
-        } else {
-            console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
         }
 
+        return validShortcuts;
+    }
+
+    private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
+        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
+
+        const extensionShortcuts = await this.getExtensionShortcuts();
+        const command = extensionShortcuts[shortcut];
+
+        if (command) {
+            console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
+            return command;
+        }
+
+        console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
         return null;
     }
 

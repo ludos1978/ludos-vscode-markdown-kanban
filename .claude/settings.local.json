@@ -74,7 +74,8 @@
       "Bash(src/kanbanWebviewPanel.ts.tmp)",
       "Bash(tee:*)",
       "Bash(timeout 30 npx tsc:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(/tmp/filtered-log.log)"
     ],
     "deny": [],
     "ask": []

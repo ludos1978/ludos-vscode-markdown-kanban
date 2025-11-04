@@ -4047,6 +4047,17 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .markdown-content h5::before { content: "H5"; }
 .markdown-content h6::before { content: "H6"; }
 
+.column-title-text .markdown-content h1,
+.column-title-text .markdown-content h2,
+.column-title-text .markdown-content h3,
+.column-title-text .markdown-content h4,
+.column-title-text .markdown-content h5,
+.column-title-text .markdown-content h6,
+.column-title-text .markdown-content p {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
 /* Paragraph - only before (DISABLED - too common) */
 /*
 .markdown-content p::before {

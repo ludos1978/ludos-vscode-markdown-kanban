@@ -299,10 +299,9 @@ class TaskEditor {
                 (e.code && e.code.match(/^Digit[0-9]$/))
             );
 
-            // Forward to VS Code backend - it will try to execute the bound command
+            // Check if this is a known VS Code shortcut
+            // Only handle shortcuts that have commands bound - let all others pass through normally
             if (isVSCodeShortcut) {
-                e.preventDefault(); // Prevent default browser behavior
-
                 // Build modifier string
                 const modifiers = [];
                 if (e.ctrlKey) modifiers.push('ctrl');
@@ -320,42 +319,43 @@ class TaskEditor {
 
                 const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
 
-                console.log(`[TaskEditor] Detected shortcut: ${shortcut} (key: ${e.key}, code: ${e.code}, alt: ${e.altKey}, ctrl: ${e.ctrlKey}, meta: ${e.metaKey}, shift: ${e.shiftKey})`);
+                // Check if this shortcut has a command bound
+                const cachedShortcuts = window.cachedShortcuts || {};
+                const hasCommand = !!cachedShortcuts[shortcut];
 
-                // Get current cursor position and text for context
-                const cursorPos = element.selectionStart;
-                const selectionStart = element.selectionStart;
-                const selectionEnd = element.selectionEnd;
-                const selectedText = element.value.substring(selectionStart, selectionEnd);
+                // Only process if we know this shortcut has a command
+                if (hasCommand) {
+                    console.log(`[TaskEditor] Executing known shortcut: ${shortcut}`);
+                    e.preventDefault();
 
-                // Send to VS Code to handle the shortcut
-                if (typeof vscode !== 'undefined') {
-                    vscode.postMessage({
-                        type: 'handleEditorShortcut',
-                        shortcut: shortcut,
-                        key: e.key,
-                        ctrlKey: e.ctrlKey,
-                        metaKey: e.metaKey,
-                        altKey: e.altKey,
-                        shiftKey: e.shiftKey,
-                        cursorPosition: cursorPos,
-                        selectionStart: selectionStart,
-                        selectionEnd: selectionEnd,
-                        selectedText: selectedText,
-                        fullText: element.value,
-                        fieldType: this.currentEditor.type,
-                        taskId: this.currentEditor.taskId,
-                        columnId: this.currentEditor.columnId
-                    });
+                    // Get current cursor position and text for context
+                    const cursorPos = element.selectionStart;
+                    const selectionStart = element.selectionStart;
+                    const selectionEnd = element.selectionEnd;
+                    const selectedText = element.value.substring(selectionStart, selectionEnd);
+
+                    // Send to VS Code to execute the command
+                    if (typeof vscode !== 'undefined') {
+                        vscode.postMessage({
+                            type: 'handleEditorShortcut',
+                            shortcut: shortcut,
+                            key: e.key,
+                            ctrlKey: e.ctrlKey,
+                            metaKey: e.metaKey,
+                            altKey: e.altKey,
+                            shiftKey: e.shiftKey,
+                            cursorPosition: cursorPos,
+                            selectionStart: selectionStart,
+                            selectionEnd: selectionEnd,
+                            selectedText: selectedText,
+                            fullText: element.value,
+                            fieldType: this.currentEditor.type,
+                            taskId: this.currentEditor.taskId,
+                            columnId: this.currentEditor.columnId
+                        });
+                    }
                 }
-
-                // Keep focus and prevent auto-save during command execution
-                this.isTransitioning = true;
-                setTimeout(() => {
-                    this.isTransitioning = false;
-                    element.focus();
-                }, 100);
-                return;
+                // If no command is bound, do nothing - let the key behave normally
             }
 
             // Check for other system shortcuts that might cause focus loss
