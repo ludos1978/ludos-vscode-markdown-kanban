@@ -106,12 +106,12 @@ class TagUtils {
     extractFirstTag(text, excludeLayout = true) {
         if (!text) return null;
 
-        // Use boardRenderer.js compatible regex with exclusions
-        const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_-]+(?:[=|><][a-zA-Z0-9_-]+)*)/g;
+        // Use boardRenderer.js compatible regex with exclusions (includes dots for numeric tags like #1.5)
+        const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_.-]+(?:[=|><][a-zA-Z0-9_.-]+)*)/g;
         let m;
         while ((m = re.exec(text)) !== null) {
             const raw = m[1];
-            const baseMatch = raw.match(/^([a-zA-Z0-9_-]+)/);
+            const baseMatch = raw.match(/^([a-zA-Z0-9_.-]+)/);
             const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
             if (base.startsWith('gather_')) continue; // do not use gather tags for styling
             return base;
@@ -126,7 +126,7 @@ class TagUtils {
      */
     extractFirstTagSimple(text) {
         if (!text) return null;
-        const tagMatch = text.match(/#([a-zA-Z0-9_-]+)/);
+        const tagMatch = text.match(/#([a-zA-Z0-9_.-]+)/);
         return tagMatch ? tagMatch[1].toLowerCase() : null;
     }
 

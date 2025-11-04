@@ -3391,14 +3391,14 @@ function generateTagStyles() {
                     // Card background styles - only for primary tag
                     // Interpolate 25% towards the darker color
                     const cardBg = interpolateColor(editorBg, bgDark, 0.25);
-                    styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                    styles += `.task-item[data-task-tag="${lowerTagName}"] {
                         background-color: ${cardBg} !important;
                         position: relative;
                     }\n`;
                     
                     // Card hover state - interpolate 35% towards the darker color
                     const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-                    styles += `.task-item[data-task-tag="${escapedTagName}"]:hover {
+                    styles += `.task-item[data-task-tag="${lowerTagName}"]:hover {
                         background-color: ${cardHoverBg} !important;
                     }\n`;
                 }
@@ -3423,7 +3423,7 @@ function generateTagStyles() {
                             styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                            styles += `.task-item[data-task-tag="${lowerTagName}"] {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         } else {
@@ -3447,7 +3447,7 @@ function generateTagStyles() {
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                            styles += `.task-item[data-task-tag="${lowerTagName}"] {
                                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         }

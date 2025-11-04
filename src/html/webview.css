@@ -3669,8 +3669,16 @@ h6 .kanban-tag {
 }
 
 /* Current week highlighting for columns and tasks */
-/* Border style (default) */
-.kanban-full-height-column[data-current-week="true"] {
+/* Border style (default) - apply to column elements, not container */
+.kanban-full-height-column[data-current-week="true"] .column-header {
+  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+.kanban-full-height-column[data-current-week="true"] .column-title {
+  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+.kanban-full-height-column[data-current-week="true"] .column-footer {
   border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
@@ -3679,7 +3687,9 @@ h6 .kanban-tag {
 }
 
 /* Background style - add class 'week-highlight-background' to body to enable */
-body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title {
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-header,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-footer {
   background-color: var(--current-week-highlight-color) !important;
   opacity: 0.2;
 }
@@ -3690,7 +3700,9 @@ body.week-highlight-background .task-item[data-current-week="true"] {
 }
 
 /* Glow style - add class 'week-highlight-glow' to body to enable */
-body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] {
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-header,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-footer {
   box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }
 
@@ -3923,6 +3935,31 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .kanban-date-tag:hover,
 .kanban-person-tag:hover {
     opacity: 0.8;
+}
+
+/* Week tag styling (same as date tag but no icon) */
+.kanban-week-tag {
+    color: var(--vscode-charts-blue);
+    background-color: rgba(0, 122, 204, 0.1);
+    padding: 0px 4px;
+    display: inline;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+    user-select: none;
+    border: 1px solid var(--vscode-charts-blue);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.kanban-week-tag:hover {
+    opacity: 0.8;
+}
+
+/* Ensure week tags stay inline in folded columns */
+.collapsed .kanban-week-tag {
+    display: inline !important;
 }
 
 /* Sort button */

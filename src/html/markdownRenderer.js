@@ -189,15 +189,24 @@ function datePersonTagPlugin(md, options = {}) {
         let tagContent = '';
         let tagType = '';
         
-        // Check if it's a date pattern (YYYY-MM-DD or DD-MM-YYYY)
+        // Check if it's a week date pattern (@YYYY-WNN, @YYYYWNN, @WNN)
         const remaining = state.src.slice(pos);
-        const dateMatch = remaining.match(/^(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/);
-        
-        if (dateMatch) {
-            tagContent = dateMatch[1];
-            tagType = 'date';
+        const weekMatch = remaining.match(/^(\d{4}-?W\d{1,2}|W\d{1,2})/i);
+
+        if (weekMatch) {
+            tagContent = weekMatch[1];
+            tagType = 'week';
             pos += tagContent.length;
-        } else {
+        }
+        // Check if it's a date pattern (YYYY-MM-DD or DD-MM-YYYY)
+        else {
+            const dateMatch = remaining.match(/^(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/);
+
+            if (dateMatch) {
+                tagContent = dateMatch[1];
+                tagType = 'date';
+                pos += tagContent.length;
+            } else {
             // Parse as person name (letters, numbers, underscore, hyphen)
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
@@ -212,10 +221,11 @@ function datePersonTagPlugin(md, options = {}) {
                 }
             }
             
-            if (pos === tagStart) {return false;} // No content
-            
-            tagContent = state.src.slice(tagStart, pos);
-            tagType = 'person';
+                if (pos === tagStart) {return false;} // No content
+
+                tagContent = state.src.slice(tagStart, pos);
+                tagType = 'person';
+            }
         }
         
         if (silent) {return true;}
@@ -237,10 +247,15 @@ function datePersonTagPlugin(md, options = {}) {
         const tagContent = token.content;
         const tagType = token.meta.type;
         const fullTag = '@' + token.content;
-        
+
+        // Week tags get their own class (no icon)
+        if (tagType === 'week') {
+            return `<span class="kanban-week-tag" data-week="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
+        }
+
         const className = tagType === 'date' ? 'kanban-date-tag' : 'kanban-person-tag';
         const dataAttr = tagType === 'date' ? 'data-date' : 'data-person';
-        
+
         return `<span class="${className}" ${dataAttr}="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
     };
 }
