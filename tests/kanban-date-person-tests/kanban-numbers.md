@@ -21,7 +21,12 @@ kanban-plugin: board
 - [ ] #1.21
 - [ ] #1.3
 
-## #2
+## #4 #green
+
+## #blue #2 #stack
+- [ ] a
+
+## #blue #2
 
 ## #3
 

@@ -402,35 +402,10 @@ function ensureTagStyleExists(tagName) {
         styleElement.textContent += newStyles;
     }
 }
-
-/**
- * Extract the first tag from text (boardRenderer.js internal use)
- * @param {string} text - Text to extract tag from
- * @returns {string|null} First tag or null
- */
-function extractFirstTag(text) {
-    if (!text) {
-        return null;
-    }
-
-    // Use boardRenderer.js compatible regex with exclusions for layout tags
-    const re = /#(?!row\d+\b)(?!span\d+\b)(?!stack\b)([a-zA-Z0-9_-]+(?:[=|><][a-zA-Z0-9_-]+)*)/g;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-        const raw = m[1];
-        const baseMatch = raw.match(/^([a-zA-Z0-9_-]+)/);
-        const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
-        if (base.startsWith('gather_')) {
-            continue; // do not use gather tags for styling
-        }
-        return base;
-    }
-    return null;
-}
+// Note: extractFirstTag is now provided by utils/tagUtils.js via window.tagUtils.extractFirstTag()
 
 // Make functions globally available
 window.ensureTagStyleExists = ensureTagStyleExists;
-window.extractFirstTag = extractFirstTag;
 
 
 
@@ -1706,9 +1681,9 @@ function createColumnElement(column, columnIndex) {
 
     // Extract ALL tags from column title for stacking features
     const allTags = getActiveTagsInTitle(column.title);
-    
+
     // Use first tag for background color (never stack backgrounds)
-    const columnTag = extractFirstTag(column.title);
+    const columnTag = window.tagUtils ? window.tagUtils.extractFirstTag(column.title) : null;
     
     const columnDiv = document.createElement('div');
     const isCollapsed = window.collapsedColumns.has(column.id);

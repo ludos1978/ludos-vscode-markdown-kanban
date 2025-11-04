@@ -843,8 +843,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 /* Column title text */
-.column-title-text,
-.column-title-text * {
+.column-title-text {
   color: var(--vscode-foreground);
   cursor: pointer;
   border-radius: 3px;
@@ -859,6 +858,11 @@ body.small-card-fonts .task-title-container .markdown-content img {
   white-space: normal;
   overflow-wrap: break-word;
   max-height: none;
+}
+
+/* Don't apply block/width styles to tag children - they should be inline */
+.column-title-text *:not(.kanban-tag) {
+  color: inherit;
 }
 
 .column-title-text:hover {
@@ -2074,7 +2078,6 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 .kanban-full-height-column.collapsed-horizontal .column-title-text {
   display: flex;
   align-items: center;
-  justify-content: center;
   flex: 1;
   width: 100%;
   padding: 0 5px;
@@ -3538,8 +3541,8 @@ blockquote {
 
 .column-title-text .kanban-tag,
 .task-title-display .kanban-tag {
-  vertical-align: middle;
-  display: unset;
+  vertical-align: left;
+  display: inline-table;
 }
 
 /* Ensure tags in task descriptions are strictly inline without any card-level styling */
