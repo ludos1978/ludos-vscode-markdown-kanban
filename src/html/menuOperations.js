@@ -788,6 +788,11 @@ function insertColumnBefore(columnId) {
         if (!/#stack\b/i.test(referenceColumn.title)) {
             const trimmedTitle = referenceColumn.title.trim();
             referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
+
+            // Update the reference column title in the DOM
+            if (typeof updateColumnTitleDisplay === 'function') {
+                updateColumnTitleDisplay(columnId);
+            }
         }
 
         // New column gets #stack tag

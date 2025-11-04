@@ -1,5 +1,6 @@
 import { KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { IdGenerator } from './utils/idGenerator';
+import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 
 export class BoardOperations {
     private _originalTaskOrder: Map<string, string[]> = new Map();
@@ -331,13 +332,13 @@ export class BoardOperations {
         column.title = title;
 
         // Check for column include syntax changes (position-based: column header uses !!!include()!!!)
-        const columnIncludeMatches = column.title.match(/!!!include\(([^)]+)\)!!!/g);
+        const columnIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX);
 
         if (columnIncludeMatches && columnIncludeMatches.length > 0) {
             // Extract new include files from the title
             const newIncludeFiles: string[] = [];
             columnIncludeMatches.forEach(match => {
-                const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
                 newIncludeFiles.push(filePath);
             });
 
