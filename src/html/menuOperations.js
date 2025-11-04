@@ -1005,8 +1005,9 @@ function changeColumnSpan(columnId, delta) {
 function toggleColumnStack(columnId) {
     if (!currentBoard?.columns) {return;}
 
-    const column = currentBoard.columns.find(c => c.id === columnId);
-    if (!column) {return;}
+    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    const column = currentBoard.columns[columnIndex];
+    if (!column || columnIndex === -1) {return;}
 
     // Flush pending tag changes first
     if ((window.pendingTaskChanges && window.pendingTaskChanges.size > 0) ||
@@ -1017,23 +1018,65 @@ function toggleColumnStack(columnId) {
     // Check current stack state
     const hasStack = /#stack\b/i.test(column.title);
     let newTitle = column.title;
+    let needsRepositioning = false;
+    let newPosition = columnIndex;
 
     if (hasStack) {
-        // Remove stack tag
+        // REMOVING stack tag - column separates from its current stack
+        // Any following columns with #stack will naturally stay with this column (forming a new stack)
+        // The rendering logic handles this automatically - no repositioning needed
         newTitle = newTitle.replace(/#stack\b\s*/gi, '').replace(/\s+/g, ' ').trim();
+        needsRepositioning = false;
+
     } else {
-        // Add stack tag
+        // ADDING stack tag - move column to stack with previous column
         newTitle += ' #stack';
+
+        // Find the previous column in the same row
+        let prevColumnIndex = -1;
+        for (let i = columnIndex - 1; i >= 0; i--) {
+            if (getColumnRow(currentBoard.columns[i].title) === getColumnRow(column.title)) {
+                prevColumnIndex = i;
+                break;
+            }
+        }
+
+        // If there's a previous column in the same row, move this column right after it
+        if (prevColumnIndex !== -1) {
+            // Find the last column in the previous column's stack
+            let targetPosition = prevColumnIndex;
+            for (let i = prevColumnIndex + 1; i < columnIndex; i++) {
+                const nextCol = currentBoard.columns[i];
+                if (getColumnRow(nextCol.title) !== getColumnRow(column.title) ||
+                    !/#stack\b/i.test(nextCol.title)) {
+                    break;
+                }
+                targetPosition = i;
+            }
+
+            // Move to right after the target position (last in that stack)
+            newPosition = targetPosition + 1;
+            if (newPosition !== columnIndex) {
+                needsRepositioning = true;
+            }
+        }
     }
 
-    // Update the column in currentBoard and cachedBoard
+    // Update the column title
     column.title = newTitle;
 
+    // Reposition if needed
+    if (needsRepositioning && newPosition !== columnIndex) {
+        // Remove from current position
+        const [movedColumn] = currentBoard.columns.splice(columnIndex, 1);
+        // Insert at new position (adjust if we removed from before the target)
+        const adjustedPosition = newPosition > columnIndex ? newPosition - 1 : newPosition;
+        currentBoard.columns.splice(adjustedPosition, 0, movedColumn);
+    }
+
+    // Sync with cachedBoard
     if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
-        const cachedColumn = cachedBoard.columns.find(c => c.id === columnId);
-        if (cachedColumn) {
-            cachedColumn.title = newTitle;
-        }
+        cachedBoard.columns = [...currentBoard.columns];
     }
 
     // Update the column element immediately
@@ -2525,7 +2568,41 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         const isCollapsed = columnElement.classList.contains('collapsed');
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
-    
+
+    // Update numeric badge immediately
+    const numericBadgeContainer = columnElement.querySelector('.numeric-badge');
+    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+        const numericTag = window.tagUtils.extractNumericTag(newTitle);
+        if (numericTag !== null) {
+            // Format the badge display
+            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+            if (numericBadgeContainer) {
+                // Update existing badge
+                numericBadgeContainer.textContent = displayValue;
+                numericBadgeContainer.title = `Index: ${displayValue}`;
+            } else {
+                // Create new badge if it doesn't exist
+                const columnTitleElement = columnElement.querySelector('.column-title');
+                if (columnTitleElement) {
+                    const newBadge = document.createElement('div');
+                    newBadge.className = 'numeric-badge';
+                    newBadge.textContent = displayValue;
+                    newBadge.title = `Index: ${displayValue}`;
+                    // Insert before the corner badges or at the beginning
+                    const cornerBadges = columnTitleElement.querySelector('.corner-badges');
+                    if (cornerBadges) {
+                        columnTitleElement.insertBefore(newBadge, cornerBadges);
+                    } else {
+                        columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
+                    }
+                }
+            }
+        } else if (numericBadgeContainer) {
+            // Remove badge if no numeric tag
+            numericBadgeContainer.remove();
+        }
+    }
+
     // Update corner badges immediately
     updateCornerBadgesImmediate(columnId, 'column', newTitle);
     
@@ -2599,7 +2676,41 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         const isCollapsed = taskElement.classList.contains('collapsed');
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
-    
+
+    // Update numeric badge immediately
+    const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
+    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+        const numericTag = window.tagUtils.extractNumericTag(newTitle);
+        if (numericTag !== null) {
+            // Format the badge display
+            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+            if (numericBadgeContainer) {
+                // Update existing badge
+                numericBadgeContainer.textContent = displayValue;
+                numericBadgeContainer.title = `Index: ${displayValue}`;
+            } else {
+                // Create new badge if it doesn't exist
+                const taskHeaderElement = taskElement.querySelector('.task-header');
+                if (taskHeaderElement) {
+                    const newBadge = document.createElement('div');
+                    newBadge.className = 'numeric-badge';
+                    newBadge.textContent = displayValue;
+                    newBadge.title = `Index: ${displayValue}`;
+                    // Insert before the corner badges or at the beginning
+                    const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
+                    if (cornerBadges) {
+                        taskHeaderElement.insertBefore(newBadge, cornerBadges);
+                    } else {
+                        taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
+                    }
+                }
+            }
+        } else if (numericBadgeContainer) {
+            // Remove badge if no numeric tag
+            numericBadgeContainer.remove();
+        }
+    }
+
     // Update corner badges immediately
     updateCornerBadgesImmediate(taskId, 'task', newTitle);
     

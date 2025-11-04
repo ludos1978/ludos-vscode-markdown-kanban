@@ -113,7 +113,17 @@ class TagUtils {
             const raw = m[1];
             const baseMatch = raw.match(/^([a-zA-Z0-9_.-]+)/);
             const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
-            if (base.startsWith('gather_')) continue; // do not use gather tags for styling
+
+            // Skip gather tags for styling
+            if (base.startsWith('gather_')) continue;
+
+            // Skip numeric tags for styling (they're for indexing, not styling)
+            // Check if the tag is purely numeric (with optional decimal point)
+            if (/^\d+(?:\.\d+)?$/.test(base)) continue;
+
+            // Skip stack tag for styling
+            if (base === 'stack') continue;
+
             return base;
         }
         return null;
