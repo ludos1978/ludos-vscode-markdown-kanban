@@ -16,6 +16,13 @@
   --task-hover-color: var(--vscode-focusBorder);
   --section-focus-color: gray;
 
+  /* Week tag highlighting - configurable */
+  --current-week-highlight-color: #4CAF50;
+  --current-week-highlight-style: border; /* Options: border, background, glow */
+  --current-week-border-width: 3px;
+  --current-week-border-style: solid;
+  --current-week-glow-size: 0 0 10px;
+
   /* Compact view - smaller fonts and padding when content outside viewport */
   --compact-font-size: 0.85em;
   --compact-visibility-threshold: 0.3; /* Apply when < 30% visible */
@@ -3659,6 +3666,36 @@ h6 .kanban-tag {
 .kanban-full-height-column .numeric-badge {
   top: 6px;
   left: 6px;
+}
+
+/* Current week highlighting for columns and tasks */
+/* Border style (default) */
+.kanban-full-height-column[data-current-week="true"] {
+  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+.task-item[data-current-week="true"] {
+  border-left: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Background style - add class 'week-highlight-background' to body to enable */
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title {
+  background-color: var(--current-week-highlight-color) !important;
+  opacity: 0.2;
+}
+
+body.week-highlight-background .task-item[data-current-week="true"] {
+  background-color: var(--current-week-highlight-color) !important;
+  opacity: 0.9;
+}
+
+/* Glow style - add class 'week-highlight-glow' to body to enable */
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] {
+  box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
+}
+
+body.week-highlight-glow .task-item[data-current-week="true"] {
+  box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }
 
 /* Header and footer bars */

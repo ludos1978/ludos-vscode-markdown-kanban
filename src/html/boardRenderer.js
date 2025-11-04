@@ -1756,6 +1756,11 @@ function createColumnElement(column, columnIndex) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
 
+    // Check if column has current week tag
+    if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+        columnDiv.setAttribute('data-current-week', 'true');
+    }
+
     // Corner badges handled by immediate update system
     const cornerBadgesHtml = '';
 
@@ -1952,14 +1957,17 @@ function createTaskElement(task, columnId, taskIndex) {
     
     const headerBarsHtml = headerBarsData.html || '';
     const footerBarsHtml = footerBarsData.html || '';
-    
+
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
+
+    // Check if task has current week tag
+    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isCurrentWeek(task.title)) ? ' data-current-week="true"' : '';
 
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
-             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}
+             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}${currentWeekAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
             ${loadingOverlay}
             ${headerBarsHtml}

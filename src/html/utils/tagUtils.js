@@ -26,6 +26,9 @@ class TagUtils {
             // Date patterns
             dateTags: /@(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})(?:\s|$)/,
 
+            // Week date patterns (@2001-W1, @2001W1, @W1, @W01)
+            weekTags: /(?:@(\d{4})-?W(\d{1,2})|@W(\d{1,2}))\b/gi,
+
             // Priority/state tags
             priorityTag: /#(high|medium|low|urgent)\b/i,
             stateTag: /#(todo|doing|done|blocked|waiting)\b/i,
@@ -140,6 +143,92 @@ class TagUtils {
             return parseFloat(match[1]);
         }
         return null;
+    }
+
+    /**
+     * Extract week date tag from text
+     * @param {string} text - Text to extract week tag from
+     * @returns {Object|null} Object with {year, week} or null if not found
+     */
+    extractWeekTag(text) {
+        if (!text) return null;
+
+        // Reset regex lastIndex to ensure consistent matching
+        this.patterns.weekTags.lastIndex = 0;
+        const match = this.patterns.weekTags.exec(text);
+
+        if (!match) return null;
+
+        // Format: @2001-W1 or @2001W1 (groups 1 and 2)
+        if (match[1] && match[2]) {
+            return {
+                year: parseInt(match[1], 10),
+                week: parseInt(match[2], 10)
+            };
+        }
+
+        // Format: @W1 (group 3) - use current year
+        if (match[3]) {
+            const currentYear = new Date().getFullYear();
+            return {
+                year: currentYear,
+                week: parseInt(match[3], 10)
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Get current week number and year (ISO 8601 week date)
+     * @returns {Object} Object with {year, week}
+     */
+    getCurrentWeek() {
+        const now = new Date();
+
+        // ISO 8601 week date calculation
+        const target = new Date(now.valueOf());
+        const dayNumber = (now.getDay() + 6) % 7; // Monday = 0
+        target.setDate(target.getDate() - dayNumber + 3); // Thursday of this week
+        const firstThursday = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) {
+            target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        }
+        const weekNumber = 1 + Math.ceil((firstThursday - target) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000
+
+        // Get the year for the week (might differ from calendar year for first/last week)
+        const jan4 = new Date(now.getFullYear(), 0, 4);
+        const weekYear = target.getFullYear();
+
+        return {
+            year: weekYear,
+            week: weekNumber
+        };
+    }
+
+    /**
+     * Check if a week tag matches the current week
+     * @param {string} text - Text containing week tag
+     * @returns {boolean} True if text contains current week tag
+     */
+    isCurrentWeek(text) {
+        const weekTag = this.extractWeekTag(text);
+        if (!weekTag) return false;
+
+        const currentWeek = this.getCurrentWeek();
+        return weekTag.year === currentWeek.year && weekTag.week === currentWeek.week;
+    }
+
+    /**
+     * Check if text contains a week tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains week tag
+     */
+    hasWeekTag(text) {
+        if (!text) return false;
+        this.patterns.weekTags.lastIndex = 0;
+        return this.patterns.weekTags.test(text);
     }
 
     /**
