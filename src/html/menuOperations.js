@@ -277,6 +277,7 @@ class SimpleMenuManager {
                 return `
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'unsorted')">Unsorted</button>
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>
+                    <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'numericTag')">Sort by index (#)</button>
                 `;
             default:
                 return '';

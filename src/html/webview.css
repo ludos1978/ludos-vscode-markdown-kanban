@@ -3627,6 +3627,40 @@ h6 .kanban-tag {
   z-index: 102;
 }
 
+/* Numeric badges for index tags (#1, #1.1, etc.) */
+.numeric-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 12px;
+  z-index: 150;
+  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+}
+
+/* Numeric badge in tasks */
+.task-item .numeric-badge {
+  top: 6px;
+  left: 6px;
+}
+
+/* Numeric badge in columns */
+.kanban-full-height-column .numeric-badge {
+  top: 6px;
+  left: 6px;
+}
+
 /* Header and footer bars */
 .header-bar,
 .footer-bar {
@@ -3807,6 +3841,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
     color: var(--vscode-charts-blue);
     background-color: rgba(0, 122, 204, 0.1);
     padding: 0px 4px;
+    display: inline;
     border-radius: 4px;
     font-size: 0.85em;
     font-weight: 500;
@@ -3829,6 +3864,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
     color: var(--vscode-charts-purple);
     background-color: rgba(138, 43, 226, 0.1);
     padding: 0px 4px;
+    display: inline;
     border-radius: 4px;
     font-size: 0.85em;
     font-weight: 500;

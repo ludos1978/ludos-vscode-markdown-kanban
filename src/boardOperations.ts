@@ -372,7 +372,16 @@ export class BoardOperations {
         return true;
     }
 
-    public sortColumn(board: KanbanBoard, columnId: string, sortType: 'unsorted' | 'title'): boolean {
+    private extractNumericTag(title: string): number | null {
+        if (!title) return null;
+        const match = title.match(/#(\d+(?:\.\d+)?)\b/);
+        if (match && match[1]) {
+            return parseFloat(match[1]);
+        }
+        return null;
+    }
+
+    public sortColumn(board: KanbanBoard, columnId: string, sortType: 'unsorted' | 'title' | 'numericTag'): boolean {
         const column = this.findColumn(board, columnId);
         if (!column) {return false;}
 
@@ -382,12 +391,24 @@ export class BoardOperations {
                 const titleB = b.title || '';
                 return titleA.localeCompare(titleB);
             });
+        } else if (sortType === 'numericTag') {
+            column.tasks.sort((a, b) => {
+                const numA = this.extractNumericTag(a.title);
+                const numB = this.extractNumericTag(b.title);
+
+                // Tasks without numeric tags go to the end
+                if (numA === null && numB === null) return 0;
+                if (numA === null) return 1;
+                if (numB === null) return -1;
+
+                return numA - numB;
+            });
         } else if (sortType === 'unsorted') {
             const originalOrder = this._originalTaskOrder.get(columnId);
             if (originalOrder) {
                 const taskMap = new Map(column.tasks.map(t => [t.id, t]));
                 column.tasks = [];
-                
+
                 originalOrder.forEach(taskId => {
                     const task = taskMap.get(taskId);
                     if (task) {
@@ -395,7 +416,7 @@ export class BoardOperations {
                         taskMap.delete(taskId);
                     }
                 });
-                
+
                 taskMap.forEach(task => {
                     column.tasks.push(task);
                 });

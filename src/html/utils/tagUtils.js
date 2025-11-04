@@ -11,6 +11,9 @@ class TagUtils {
             basicTags: /#([a-zA-Z0-9_-]+)/g,
             atTags: /@([a-zA-Z0-9_&-]+)/g,
 
+            // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01)
+            numericTag: /#(\d+(?:\.\d+)?)\b/g,
+
             // Layout-specific tags
             rowTag: /#row(\d+)\b/gi,
             spanTag: /#span(\d+)\b/gi,
@@ -122,6 +125,32 @@ class TagUtils {
         if (!text) return null;
         const tagMatch = text.match(/#([a-zA-Z0-9_-]+)/);
         return tagMatch ? tagMatch[1].toLowerCase() : null;
+    }
+
+    /**
+     * Extract numeric index tag from text
+     * @param {string} text - Text to extract numeric tag from
+     * @returns {number|null} Numeric value or null if not found
+     */
+    extractNumericTag(text) {
+        if (!text) return null;
+
+        const match = text.match(this.patterns.numericTag);
+        if (match && match[1]) {
+            return parseFloat(match[1]);
+        }
+        return null;
+    }
+
+    /**
+     * Check if a tag is a numeric index tag
+     * @param {string} tag - Tag to check (with or without # symbol)
+     * @returns {boolean} True if numeric tag
+     */
+    isNumericTag(tag) {
+        if (!tag) return false;
+        const withHash = tag.startsWith('#') ? tag : `#${tag}`;
+        return this.patterns.numericTag.test(withHash);
     }
 
     /**
@@ -380,6 +409,48 @@ class TagUtils {
         cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
 
         return cleanedText;
+    }
+
+    /**
+     * Sort columns by numeric index tag
+     * @param {Array} columns - Array of columns with title property
+     * @returns {Array} Sorted columns
+     */
+    sortColumnsByNumericTag(columns) {
+        if (!Array.isArray(columns)) return [];
+
+        return [...columns].sort((a, b) => {
+            const numA = this.extractNumericTag(a.title);
+            const numB = this.extractNumericTag(b.title);
+
+            // Columns without numeric tags go to the end
+            if (numA === null && numB === null) return 0;
+            if (numA === null) return 1;
+            if (numB === null) return -1;
+
+            return numA - numB;
+        });
+    }
+
+    /**
+     * Sort tasks by numeric index tag
+     * @param {Array} tasks - Array of tasks with title property
+     * @returns {Array} Sorted tasks
+     */
+    sortTasksByNumericTag(tasks) {
+        if (!Array.isArray(tasks)) return [];
+
+        return [...tasks].sort((a, b) => {
+            const numA = this.extractNumericTag(a.title);
+            const numB = this.extractNumericTag(b.title);
+
+            // Tasks without numeric tags go to the end
+            if (numA === null && numB === null) return 0;
+            if (numA === null) return 1;
+            if (numB === null) return -1;
+
+            return numA - numB;
+        });
     }
 
     /**

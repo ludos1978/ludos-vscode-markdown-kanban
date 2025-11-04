@@ -863,6 +863,23 @@ function getUserAddedTags() {
 
 // Helper function to generate tag menu items from configuration and user-added tags
 /**
+ * Generate numeric badge HTML for columns and tasks
+ * @param {string} title - Column or task title
+ * @returns {string} HTML string for numeric badge or empty string
+ */
+function generateNumericBadge(title) {
+    if (!title || !window.tagUtils) return '';
+
+    const numericTag = window.tagUtils.extractNumericTag(title);
+    if (numericTag === null) return '';
+
+    // Format the badge display - show the numeric value
+    const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+
+    return `<div class="numeric-badge" title="Index: ${displayValue}">${displayValue}</div>`;
+}
+
+/**
  * Generates complete HTML for tag selection menu
  * Purpose: Creates interactive tag toggle menu for columns/tasks
  * Used by: Column and task burger menus
@@ -1742,6 +1759,9 @@ function createColumnElement(column, columnIndex) {
     // Corner badges handled by immediate update system
     const cornerBadgesHtml = '';
 
+    // Generate numeric badge if present
+    const numericBadgeHtml = generateNumericBadge(column.title);
+
     // Get display title using shared utility function
     const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
 
@@ -1758,6 +1778,7 @@ function createColumnElement(column, columnIndex) {
 				</div>
 				<div class="column-title">
 						${cornerBadgesHtml}
+						${numericBadgeHtml}
 						<div class="column-title-section">
 								<span class="drag-handle column-drag-handle" draggable="true">⋮⋮</span>
 								<span class="collapse-toggle ${isCollapsed ? 'rotated' : ''}" data-column-id="${column.id}">▶</span>
@@ -1908,6 +1929,7 @@ function createTaskElement(task, columnId, taskIndex) {
     
     // Corner badges and header/footer bars handled by immediate update system
     const cornerBadgesHtml = '';
+    const numericBadgeHtml = generateNumericBadge(task.title);
     const headerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     const footerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     
@@ -1942,6 +1964,7 @@ function createTaskElement(task, columnId, taskIndex) {
             ${loadingOverlay}
             ${headerBarsHtml}
             ${cornerBadgesHtml}
+            ${numericBadgeHtml}
             <div class="task-header">
                 <div class="task-drag-handle" title="Drag to move task">⋮⋮</div>
                 <span class="task-collapse-toggle ${isCollapsed ? 'rotated' : ''}" onclick="toggleTaskCollapse('${task.id}'); updateFoldAllButton('${columnId}')">▶</span>
