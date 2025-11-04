@@ -1113,6 +1113,7 @@ function deleteColumn(columnId) {
 }
 
 function sortColumn(columnId, sortType) {
+    closeAllMenus();
     vscode.postMessage({ type: 'sortColumn', columnId, sortType });
 }
 

@@ -124,12 +124,13 @@ function tagPlugin(md, options = {}) {
             // For regular tags, use existing logic
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
-                // Allow alphanumeric, underscore, hyphen
+                // Allow alphanumeric, underscore, hyphen, dot
                 if ((char >= 0x30 && char <= 0x39) || // 0-9
                     (char >= 0x41 && char <= 0x5A) || // A-Z
                     (char >= 0x61 && char <= 0x7A) || // a-z
                     char === 0x5F || // _
-                    char === 0x2D) { // -
+                    char === 0x2D || // -
+                    char === 0x2E) { // .
                     pos++;
                 } else {
                     break;
@@ -163,7 +164,7 @@ function tagPlugin(md, options = {}) {
         if (tagContent.startsWith('gather_')) {
             baseTagName = 'gather'; // Use 'gather' as base for all gather tags
         } else {
-            const baseMatch = tagContent.match(/^([a-zA-Z0-9_-]+)/);
+            const baseMatch = tagContent.match(/^([a-zA-Z0-9_.-]+)/);
             baseTagName = baseMatch ? baseMatch[1].toLowerCase() : tagContent.toLowerCase();
         }
         
