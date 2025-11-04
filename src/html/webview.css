@@ -874,6 +874,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   color: var(--vscode-textLink-foreground);
   text-decoration: underline;
   cursor: pointer;
+  word-break: break-all;
   font-weight: 500;
 }
 

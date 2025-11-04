@@ -1414,8 +1414,14 @@ export class ExportService {
 
         for (const column of board.columns) {
             // Add column title as slide
-            if (column.title && column.title.trim()) {
-                slides.push(column.title.trim());
+            // Use displayTitle if available (has !!!include()!!! stripped), otherwise clean the title
+            let columnTitle = column.displayTitle || column.title;
+            if (columnTitle && columnTitle.trim()) {
+                // Strip !!!include()!!! syntax if still present
+                columnTitle = columnTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                if (columnTitle) {
+                    slides.push(columnTitle);
+                }
             }
 
             // Add each task as slide
@@ -1424,8 +1430,14 @@ export class ExportService {
                     let slideContent = '';
 
                     // Add task title
-                    if (task.title && task.title.trim()) {
-                        slideContent = task.title.trim();
+                    // Use displayTitle if available (has !!!include()!!! stripped), otherwise clean the title
+                    let taskTitle = task.displayTitle || task.title;
+                    if (taskTitle && taskTitle.trim()) {
+                        // Strip !!!include()!!! syntax if still present
+                        taskTitle = taskTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                        if (taskTitle) {
+                            slideContent = taskTitle;
+                        }
                     }
 
                     // Add task description

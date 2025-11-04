@@ -225,10 +225,20 @@ export class MarkdownKanbanParser {
               }
             }
 
-            // Clean title from include syntax for display
+            // Replace !!!include()!!! with placeholder for frontend badge rendering
+            // This preserves the position of the include in the title
             let displayTitle = columnTitle;
-            columnIncludeMatches.forEach(match => {
-              displayTitle = displayTitle.replace(match, '').trim();
+            columnIncludeMatches.forEach((match, index) => {
+              // Extract the file path from the match: !!!include(path)!!!
+              const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
+              if (pathMatch && includeFiles[index]) {
+                // Use the resolved file path as a unique identifier
+                const filePath = includeFiles[index];
+                const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+                displayTitle = displayTitle.replace(match, placeholder);
+              } else {
+                displayTitle = displayTitle.replace(match, '').trim();
+              }
             });
 
             // Use filename as title if no display title provided
@@ -369,8 +379,22 @@ export class MarkdownKanbanParser {
             }
           }
 
-          // displayTitle is metadata (file path indicator), not part of file content
-          const displayTitle = includeFiles.length > 0 ? `# include in ${includeFiles[0]}` : '# include';
+          // Create placeholder for frontend badge rendering
+          // Extract any text before the !!!include()!!! and use that as displayTitle with placeholder
+          let displayTitle = task.title;
+          const taskIncludeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+          let match;
+          let index = 0;
+          while ((match = taskIncludeRegex.exec(task.title)) !== null) {
+            if (includeFiles[index]) {
+              const filePath = includeFiles[index];
+              const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+              displayTitle = displayTitle.replace(match[0], placeholder);
+              index++;
+            }
+          }
+          // Remove checkbox prefix from displayTitle for cleaner display
+          displayTitle = displayTitle.replace(/^- \[ \]\s*/, '').trim();
 
           // Update task properties for include mode
           task.includeMode = true;
@@ -379,7 +403,7 @@ export class MarkdownKanbanParser {
           // DO NOT normalize here - files need original paths for display
           task.includeFiles = includeFiles.map(f => f.trim()); // Just trim whitespace, keep original casing
           task.originalTitle = task.title; // Keep original title with include syntax
-          task.displayTitle = displayTitle; // UI metadata (not file content)
+          task.displayTitle = displayTitle; // UI metadata with placeholder for badge
           task.description = fullFileContent; // COMPLETE file content
         }
       }

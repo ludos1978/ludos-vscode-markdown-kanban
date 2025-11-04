@@ -762,13 +762,23 @@ class TagUtils {
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
 
             if (additionalTitle) {
-                // Strip !!!include()!!! syntax before rendering markdown
-                // This allows markdown-it to render other markdown syntax (bold, italic, links, etc.)
-                // while preventing markdown-it-include plugin from processing include directives
-                const cleanedTitle = additionalTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                // Backend has already inserted %INCLUDE_BADGE:filepath% placeholder in displayTitle
+                // We just need to replace it with the badge HTML
+                console.log('[tagUtils.getColumnDisplayTitle] additionalTitle:', additionalTitle);
+                console.log('[tagUtils.getColumnDisplayTitle] fileName:', fileName);
+
+                // Render markdown first (with the placeholder still in place)
                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                const renderedTitle = renderFn ? renderFn(cleanedTitle) : cleanedTitle;
-                return `${renderedTitle} ${linkHtml}`;
+                const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
+                console.log('[tagUtils.getColumnDisplayTitle] renderedTitle:', renderedTitle);
+
+                // Replace the backend-inserted placeholder with our badge HTML
+                // The placeholder format is: %INCLUDE_BADGE:filepath%
+                const placeholder = `%INCLUDE_BADGE:${fileName}%`;
+                console.log('[tagUtils.getColumnDisplayTitle] looking for placeholder:', placeholder);
+                const result = renderedTitle.replace(placeholder, linkHtml);
+                console.log('[tagUtils.getColumnDisplayTitle] result:', result);
+                return result;
             } else {
                 return linkHtml;
             }
@@ -827,14 +837,48 @@ class TagUtils {
             // Just return the include link - displayTitle is not shown because it's the file content, not metadata
             return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
         } else {
-            // Normal task - render displayTitle as-is, but strip !!!include()!!! first
+            // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
             const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
-            // Strip !!!include()!!! syntax before rendering markdown
-            // This allows markdown-it to render other markdown syntax (bold, italic, links, etc.)
-            // while preventing markdown-it-include plugin from processing include directives
-            const cleanedTitle = displayTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+
+            // Render markdown first (placeholder will be preserved in the output)
             const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-            return renderFn ? renderFn(cleanedTitle) : cleanedTitle;
+            let rendered = renderFn ? renderFn(displayTitle) : displayTitle;
+
+            // Replace any %INCLUDE_BADGE:filepath% placeholders with badge HTML
+            // This handles cases where tasks have includes with additional text
+            const placeholderRegex = /%INCLUDE_BADGE:([^%]+)%/g;
+            rendered = rendered.replace(placeholderRegex, (match, filePath) => {
+                // Generate badge for this file path
+                const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
+                const baseFileName = parts[parts.length - 1];
+
+                let displayFileName = baseFileName;
+                if (baseFileName.length > 12) {
+                    const lastDotIndex = baseFileName.lastIndexOf('.');
+                    const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                    const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+                    const first12 = nameWithoutExt.substring(0, 12);
+                    const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                    displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+                }
+
+                let pathPart = '';
+                if (parts.length > 1) {
+                    const fullPath = parts.slice(0, -1).join('/');
+                    if (fullPath.length > 4) {
+                        pathPart = '...' + fullPath.slice(-4);
+                    } else {
+                        pathPart = fullPath;
+                    }
+                }
+
+                const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
+                const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+                return `<span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>`;
+            });
+
+            return rendered;
         }
     }
 }
