@@ -284,18 +284,23 @@ class TaskEditor {
 
             const element = this.currentEditor.element;
 
-            // Check if this is a potential VS Code extension shortcut
-            // Allow Alt, Ctrl, Cmd (Meta) combinations to pass through to VS Code
+            // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
+            if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
+                console.log(`[TaskEditor] Keypress: key="${e.key}" code="${e.code}" keyCode=${e.keyCode} alt=${e.altKey} ctrl=${e.ctrlKey} meta=${e.metaKey} shift=${e.shiftKey}`);
+            }
+
+            // Check if this is a potential VS Code shortcut (any modifier + key)
+            // Forward ALL modifier combinations to VS Code so extensions can handle them
             const hasModifier = e.altKey || e.metaKey || e.ctrlKey;
-            const isExtensionShortcut = hasModifier && (
-                // Letter keys with modifiers (DeepL, other extensions)
-                (e.key.length === 1 && e.key.match(/[a-zA-Z]/)) ||
-                // Number keys with Cmd/Ctrl (snippets)
-                ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9')
+            const isVSCodeShortcut = hasModifier && (
+                // Letter keys with modifiers
+                (e.code && e.code.match(/^Key[A-Z]$/)) ||
+                // Number keys with modifiers
+                (e.code && e.code.match(/^Digit[0-9]$/))
             );
 
-            // If it's a potential extension shortcut, forward to VS Code
-            if (isExtensionShortcut) {
+            // Forward to VS Code backend - it will try to execute the bound command
+            if (isVSCodeShortcut) {
                 e.preventDefault(); // Prevent default browser behavior
 
                 // Build modifier string
@@ -304,7 +309,18 @@ class TaskEditor {
                 if (e.metaKey) modifiers.push('meta');
                 if (e.altKey) modifiers.push('alt');
                 if (e.shiftKey) modifiers.push('shift');
-                const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${e.key}` : e.key;
+
+                // Extract the actual key letter from e.code (e.g., "KeyT" -> "t")
+                let keyChar = e.key;
+                if (e.code && e.code.match(/^Key[A-Z]$/)) {
+                    keyChar = e.code.replace('Key', '').toLowerCase();
+                } else if (e.code && e.code.match(/^Digit[0-9]$/)) {
+                    keyChar = e.code.replace('Digit', '');
+                }
+
+                const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
+
+                console.log(`[TaskEditor] Detected shortcut: ${shortcut} (key: ${e.key}, code: ${e.code}, alt: ${e.altKey}, ctrl: ${e.ctrlKey}, meta: ${e.metaKey}, shift: ${e.shiftKey})`);
 
                 // Get current cursor position and text for context
                 const cursorPos = element.selectionStart;
@@ -1521,11 +1537,41 @@ class TaskEditor {
 
         return getLayoutTags(oldTitle) !== getLayoutTags(newTitle);
     }
+
+    /**
+     * Replace the currently selected text with new text
+     * Used by extension commands like translation
+     */
+    replaceSelection(newText) {
+        if (!this.currentEditor) {
+            console.log('[TaskEditor] No active editor for replaceSelection');
+            return;
+        }
+
+        const element = this.currentEditor.element;
+        const start = element.selectionStart;
+        const end = element.selectionEnd;
+
+        // Replace the selection
+        const before = element.value.substring(0, start);
+        const after = element.value.substring(end);
+        element.value = before + newText + after;
+
+        // Set cursor position after the replaced text
+        const newCursorPos = start + newText.length;
+        element.setSelectionRange(newCursorPos, newCursorPos);
+
+        // Focus the element
+        element.focus();
+
+        console.log('[TaskEditor] Replaced selection with new text');
+    }
 }
 
 // Initialize the editor system
 const taskEditor = new TaskEditor();
 window.taskEditor = taskEditor;
+window.taskEditorManager = taskEditor; // Alias for compatibility
 
 /**
  * Triggers title editing for a task

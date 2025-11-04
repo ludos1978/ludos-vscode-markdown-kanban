@@ -1579,24 +1579,132 @@ export class MessageHandler {
 
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
-            // Find the command bound to this keyboard shortcut
-            const command = await this.getCommandForShortcut(message.shortcut);
+            console.log(`[MessageHandler] Handling shortcut: ${message.shortcut}, selected text: "${message.selectedText}"`);
 
-            if (command) {
-                console.log(`[MessageHandler] Executing command '${command}' for shortcut ${message.shortcut}`);
+            // First, check user keybindings
+            let userCommand = await this.getCommandForShortcut(message.shortcut);
 
-                // Execute the command - VS Code will handle it (e.g., DeepL translation, etc.)
-                // Most commands will work on the active editor, but webviews need special handling
-                // For now, we'll execute and let the extension handle it
-                await vscode.commands.executeCommand(command);
-            } else {
-                // No specific command found - might be a built-in shortcut
-                console.log(`[MessageHandler] No custom command found for shortcut ${message.shortcut}`);
+            // If not in user keybindings, check for common extension commands
+            if (!userCommand) {
+                userCommand = await this.getExtensionCommandForShortcut(message.shortcut);
             }
+
+            if (userCommand) {
+                console.log(`[MessageHandler] Found command: ${userCommand}`);
+
+                try {
+                    // For commands that work on text selection (like translators):
+                    // Create a temporary document, execute the command, get the result
+                    if (message.selectedText && message.selectedText.length > 0) {
+                        const tempDoc = await vscode.workspace.openTextDocument({
+                            content: message.selectedText,
+                            language: 'markdown'
+                        });
+
+                        // Store the original active editor to return to it
+                        const originalEditor = vscode.window.activeTextEditor;
+
+                        const tempEditor = await vscode.window.showTextDocument(tempDoc, {
+                            preview: true,
+                            preserveFocus: true,  // Don't steal focus
+                            viewColumn: vscode.ViewColumn.Beside  // Open beside, not replacing current
+                        });
+
+                        // Select all text
+                        tempEditor.selection = new vscode.Selection(
+                            tempDoc.lineAt(0).range.start,
+                            tempDoc.lineAt(tempDoc.lineCount - 1).range.end
+                        );
+
+                        // Execute the command
+                        await vscode.commands.executeCommand(userCommand);
+
+                        // Wait for command to complete and modify the document
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Get the result
+                        const resultText = tempDoc.getText();
+
+                        // Close the temp document directly (without saving)
+                        // DON'T use 'workbench.action.closeActiveEditor' as it might close the kanban!
+                        try {
+                            await vscode.workspace.fs.delete(tempDoc.uri, { useTrash: false });
+                        } catch {
+                            // Document might not be deleteable, that's fine - it's in-memory
+                        }
+
+                        // Close all editors showing this temp document
+                        const tabs = vscode.window.tabGroups.all.flatMap(g => g.tabs);
+                        for (const tab of tabs) {
+                            if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === tempDoc.uri.toString()) {
+                                await vscode.window.tabGroups.close(tab, true); // true = don't prompt to save
+                            }
+                        }
+
+                        // Return focus to kanban panel and send result back
+                        const panel = this._getWebviewPanel();
+                        if (panel) {
+                            panel._panel.reveal(vscode.ViewColumn.One, true);
+                            panel._panel.webview.postMessage({
+                                type: 'replaceSelection',
+                                text: resultText,
+                                fieldType: message.fieldType,
+                                taskId: message.taskId,
+                                columnId: message.columnId
+                            });
+                        }
+
+                        console.log(`[MessageHandler] Command executed, sent result back`);
+                    } else {
+                        // No selection - execute normally
+                        await vscode.commands.executeCommand(userCommand);
+                        console.log(`[MessageHandler] Command executed (no selection)`);
+                    }
+
+                    return;
+                } catch (err) {
+                    console.error(`[MessageHandler] Failed to execute command:`, err);
+                }
+            }
+
+            console.log(`[MessageHandler] Shortcut not found. Add to keybindings.json to use in kanban editor.`);
 
         } catch (error) {
             console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
         }
+    }
+
+    private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
+        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
+
+        // Map of common extension shortcuts to their commands
+        // This allows extensions to work in the kanban editor without requiring user keybindings
+        const extensionShortcuts: Record<string, string> = {
+            'alt+t': 'deepl.translate',
+            'shift+alt+t': 'deepl.translateTo',
+            // Add more common extension shortcuts here as needed
+        };
+
+        const command = extensionShortcuts[shortcut];
+        console.log(`[MessageHandler] Mapped shortcut to command: ${command}`);
+
+        if (command) {
+            // Verify the command actually exists
+            const allCommands = await vscode.commands.getCommands();
+            const commandExists = allCommands.includes(command);
+            console.log(`[MessageHandler] Command ${command} exists: ${commandExists}`);
+
+            if (commandExists) {
+                console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
+                return command;
+            } else {
+                console.log(`[MessageHandler] Command ${command} not found in available commands`);
+            }
+        } else {
+            console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
+        }
+
+        return null;
     }
 
     private async getCommandForShortcut(shortcut: string): Promise<string | null> {
@@ -1604,16 +1712,31 @@ export class MessageHandler {
             // Read VS Code's keybindings configuration
             const keybindings = await this.loadVSCodeKeybindings();
 
+            console.log(`[MessageHandler] Looking for command for shortcut: ${shortcut}`);
+            console.log(`[MessageHandler] Loaded ${keybindings.length} keybindings`);
+
+            // Debug: Show all keybindings that contain 'alt' or match the letter
+            const shortcutLetter = shortcut.split('+').pop();
+            const relevantBindings = keybindings.filter(b =>
+                b.key && (b.key.includes('alt') || b.key.includes(shortcutLetter || ''))
+            );
+            console.log(`[MessageHandler] Relevant bindings:`, relevantBindings.slice(0, 10));
+
             // Find keybinding that matches our shortcut
             for (const binding of keybindings) {
                 if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
                     // Skip negative bindings (commands starting with -)
-                    if (binding.command.startsWith('-')) continue;
+                    if (binding.command.startsWith('-')) {
+                        console.log(`[MessageHandler] Skipping negative binding: ${binding.command}`);
+                        continue;
+                    }
 
+                    console.log(`[MessageHandler] Found matching command: ${binding.command}`);
                     return binding.command;
                 }
             }
 
+            console.log(`[MessageHandler] No command found for shortcut ${shortcut}`);
             return null;
 
         } catch (error) {

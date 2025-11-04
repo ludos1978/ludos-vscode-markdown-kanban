@@ -2782,6 +2782,12 @@ window.addEventListener('message', event => {
             // Insert VS Code snippet content into the active editor
             insertVSCodeSnippetContent(message.content, message.fieldType, message.taskId);
             break;
+        case 'replaceSelection':
+            // Replace selected text with result from command (e.g., translation)
+            if (window.taskEditorManager) {
+                window.taskEditorManager.replaceSelection(message.text);
+            }
+            break;
         case 'proceedDisableIncludeMode':
             // User confirmed disable include mode in VS Code dialog - proceed with the action
             if (typeof disableColumnIncludeMode === 'function') {
