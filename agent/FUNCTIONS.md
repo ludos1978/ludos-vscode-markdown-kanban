@@ -2,7 +2,7 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-11-02
+**Last Updated:** 2025-11-04
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
@@ -627,19 +627,33 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/services/MarpExportService-MarpExportService_getMarpVersion - Get Marp CLI version
 - src/services/MarpExportService-MarpExportService_getAvailableThemes - Get available Marp themes
 
+## src/constants/IncludeConstants.ts
+
+**Centralized Constants** (Added 2025-11-04)
+- **INCLUDE_SYNTAX** - Include directive constants (PREFIX, SUFFIX, REGEX, REGEX_SINGLE)
+  - PREFIX: '!!!include('
+  - SUFFIX: ')!!!'
+  - REGEX: Global regex pattern for matching include directives
+  - REGEX_SINGLE: Non-global regex for single match
+- **FILE_TYPES** - File type constants (MAIN, INCLUDE_COLUMN, INCLUDE_TASK, INCLUDE_REGULAR)
+- **Purpose**: Eliminates 783+ duplicate string instances across the codebase
+- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts, IncludeProcessor.ts
+
+**Note**: All include syntax pattern matching should use INCLUDE_SYNTAX constants instead of hardcoded strings.
+
 ## src/services/IncludeProcessor.ts - IncludeProcessor
 
-- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content
+- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content (uses INCLUDE_SYNTAX constants)
 - src/services/IncludeProcessor-IncludeProcessor_processIncludeType - Process specific type of include
 - src/services/IncludeProcessor-IncludeProcessor_processIncludeContent - Process include content recursively
-- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing
+- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing (uses INCLUDE_SYNTAX.REGEX)
 - src/services/IncludeProcessor-IncludeProcessor_detectIncludeType - Detect includes of specific type
 - src/services/IncludeProcessor-IncludeProcessor_convertIncludeContent - Convert include content based on format
-- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type
+- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type (uses INCLUDE_SYNTAX constants)
 - src/services/IncludeProcessor-IncludeProcessor_detectIncludeFormat - Detect format of include file
-- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file
-- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers
-- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers
+- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file (uses INCLUDE_SYNTAX.PREFIX and SUFFIX)
+- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers (uses INCLUDE_SYNTAX.REGEX)
+- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers (uses INCLUDE_SYNTAX.REGEX)
 
 ## src/services/FormatConverter.ts - FormatConverter
 

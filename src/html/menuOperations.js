@@ -775,7 +775,7 @@ function insertColumnBefore(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column (e.g., #row2)
+    // Extract row tag from reference column
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -783,9 +783,16 @@ function insertColumnBefore(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // NEW column gets #stack tag (to be part of the stack)
-        // Reference column also gets #stack tag if it doesn't have it
-        if (!/#stack\b/i.test(referenceColumn.title)) {
+        // CRITICAL: Check if reference has #stack BEFORE modifying it
+        const hasStack = /#stack\b/i.test(referenceColumn.title);
+
+        // New column gets #stack only if reference already had it
+        if (hasStack) {
+            tags += ' #stack';
+        }
+
+        // Reference column gets #stack tag if it doesn't have it
+        if (!hasStack) {
             const trimmedTitle = referenceColumn.title.trim();
             referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
 
@@ -794,15 +801,12 @@ function insertColumnBefore(columnId) {
                 updateColumnTitleDisplay(columnId);
             }
         }
-
-        // New column gets #stack tag
-        tags += ' #stack';
     }
 
     // Cache-first: Create new column and insert before reference column
     const newColumn = {
         id: `temp-column-before-${Date.now()}`,
-        title: tags.trim(), // Row tag AND #stack tag
+        title: tags.trim(), // Row tag only (NO #stack tag)
         tasks: []
     };
 
@@ -819,7 +823,7 @@ function insertColumnAfter(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column (e.g., #row2)
+    // Extract row tag and stack tag from reference column
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -827,9 +831,11 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // For insertColumnAfter: Only the NEW column gets #stack tag
-        // The reference column is NOT modified
-        tags += ' #stack';
+        // Only add #stack if reference column already has it (joining existing stack)
+        const hasStack = /#stack\b/i.test(referenceColumn.title);
+        if (hasStack) {
+            tags += ' #stack';
+        }
     }
 
     // Cache-first: Create new column and insert after reference column

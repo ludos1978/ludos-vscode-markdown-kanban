@@ -73,7 +73,8 @@
       "Bash(vsce package:*)",
       "Bash(src/kanbanWebviewPanel.ts.tmp)",
       "Bash(tee:*)",
-      "Bash(timeout 30 npx tsc:*)"
+      "Bash(timeout 30 npx tsc:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

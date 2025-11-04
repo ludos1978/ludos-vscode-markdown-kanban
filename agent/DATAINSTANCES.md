@@ -2,11 +2,30 @@
 
 This document catalogs ALL singleton instances, global state, and data instances (actual runtime instances, not just type definitions) in the Markdown Kanban Obsidian extension.
 
-**Last Updated:** 2025-10-29
+**Last Updated:** 2025-11-04
 
 ---
 
-## Recent Architecture Changes (Phase 1-5)
+## Recent Architecture Changes (Phase 1-6)
+
+### Phase 6: Constants Centralization & Logging Cleanup (2025-11-04)
+
+**CONSTANTS-1: Include Constants Centralization**
+- **New File**: `/src/constants/IncludeConstants.ts` - Centralized constants for include syntax
+- **Constants Added**:
+  - `INCLUDE_SYNTAX`: PREFIX, SUFFIX, REGEX, REGEX_SINGLE
+  - `FILE_TYPES`: MAIN, INCLUDE_COLUMN, INCLUDE_TASK, INCLUDE_REGULAR
+- **Impact**: Eliminates 783+ duplicate string instances across the codebase
+- **Files Updated**: markdownParser.ts, messageHandler.ts, boardOperations.ts, IncludeProcessor.ts
+- **Result**: Single source of truth for include syntax patterns, easier maintenance
+
+**LOGGING-1: Verbose Log Cleanup**
+- **Removed verbose console.log statements** (keeping only console.error and console.warn):
+  - ChangeStateMachine.ts: Removed 97 logs
+  - messageHandler.ts: Removed 156 logs
+  - markdownParser.ts: Removed 4 logs
+- **Total**: 257 logs removed
+- **Impact**: Cleaner console output, easier debugging, better performance
 
 ### Phase 5: Critical Cleanup & Services Reorganization (2025-10-29)
 
@@ -503,7 +522,43 @@ const fileWatcher = ExternalFileWatcher.getInstance();
 
 ## 5. STATIC CONSTANTS & DATA
 
-### 5.1 ExportService Static Data
+### 5.1 IncludeConstants (Added 2025-11-04)
+**File:** `/src/constants/IncludeConstants.ts`
+**Lines:** 1-28
+
+**Instance Name:** INCLUDE_SYNTAX, FILE_TYPES
+**Type:** Exported constant objects
+**Scope:** Module-level (exported constants)
+
+**Purpose:**
+- Centralize all include syntax patterns and file type strings
+- Eliminate 783+ duplicate string instances across the codebase
+- Provide single source of truth for include directive parsing
+
+**Data Held:**
+```typescript
+export const INCLUDE_SYNTAX = {
+    PREFIX: '!!!include(',
+    SUFFIX: ')!!!',
+    REGEX: /!!!include\(([^)]+)\)!!!/g,
+    REGEX_SINGLE: /!!!include\(([^)]+)\)!!!/,
+} as const;
+
+export const FILE_TYPES = {
+    MAIN: 'main',
+    INCLUDE_COLUMN: 'include-column',
+    INCLUDE_TASK: 'include-task',
+    INCLUDE_REGULAR: 'include-regular',
+} as const;
+```
+
+**Used By:**
+- markdownParser.ts: Parsing include directives
+- messageHandler.ts: Handling include file switches
+- boardOperations.ts: Board operations with includes
+- IncludeProcessor.ts: Processing include content
+
+### 5.2 ExportService Static Data
 **File:** `/src/exportService.ts`
 **Lines:** 98-100
 
@@ -547,7 +602,11 @@ private static readonly VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.wmv', '.fl
 **Module-Level State:** 1
 - Extension activation state (fileListenerEnabled, globalThis.kanbanFileListener)
 
-**Total Data Instances Documented:** 14 major categories
+**Static Constants & Data:** 2
+- IncludeConstants (INCLUDE_SYNTAX, FILE_TYPES)
+- ExportService (IMAGE_EXTENSIONS, VIDEO_EXTENSIONS)
+
+**Total Data Instances Documented:** 15 major categories
 
 ---
 
