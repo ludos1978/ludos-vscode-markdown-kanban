@@ -721,25 +721,39 @@ class TagUtils {
      */
     getColumnDisplayTitle(column, filterFn) {
         if (column.includeMode && column.includeFiles && column.includeFiles.length > 0) {
-            // For columninclude, show as "include(...path/filename.md)" format
+            // For columninclude, show as inline badge "!(...path/filename.ext)!" format
             const fileName = column.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Get path (everything except filename), limit to 10 characters
+            // Truncate filename if longer than 12 characters
+            let displayFileName = baseFileName;
+            if (baseFileName.length > 12) {
+                // Extract extension
+                const lastDotIndex = baseFileName.lastIndexOf('.');
+                const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+
+                // Create truncated version: first 12 chars...last 4 chars before extension
+                const first12 = nameWithoutExt.substring(0, 12);
+                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+            }
+
+            // Get path (everything except filename), limit to 4 characters
             let pathPart = '';
             if (parts.length > 1) {
                 const fullPath = parts.slice(0, -1).join('/');
-                if (fullPath.length > 10) {
-                    // Show last 10 characters with ... prefix
-                    pathPart = '...' + fullPath.slice(-10);
+                if (fullPath.length > 4) {
+                    // Show last 4 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-4);
                 } else {
                     pathPart = fullPath;
                 }
             }
 
-            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
-            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+            // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
+            const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
             const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
             const linkHtml = `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleColumnIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
@@ -748,8 +762,10 @@ class TagUtils {
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
 
             if (additionalTitle) {
-                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                return `${linkHtml} ${renderFn ? renderFn(additionalTitle) : additionalTitle}`;
+                // Don't use renderMarkdown for columninclude titles - it causes markdown-it-include to process the title
+                // The additionalTitle has already been cleaned by the backend parser
+                const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+                return `${escapeHtml(additionalTitle)} ${linkHtml}`;
             } else {
                 return linkHtml;
             }
@@ -763,31 +779,45 @@ class TagUtils {
 
     /**
      * Get display title for a task, handling taskinclude specially to make filepaths clickable
-     * Uses same format as column includes: "include(path/filename.md)"
+     * Uses same format as column includes: "!(...path/filename.ext)!"
      * @param {Object} task - Task object with displayTitle, includeMode, includeFiles
      * @returns {string} HTML string for display
      */
     getTaskDisplayTitle(task) {
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-            // For taskinclude, show as "include(...path/filename.md)" format - same as column includes
+            // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Get path (everything except filename), limit to 10 characters
+            // Truncate filename if longer than 12 characters
+            let displayFileName = baseFileName;
+            if (baseFileName.length > 12) {
+                // Extract extension
+                const lastDotIndex = baseFileName.lastIndexOf('.');
+                const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+
+                // Create truncated version: first 12 chars...last 4 chars before extension
+                const first12 = nameWithoutExt.substring(0, 12);
+                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+            }
+
+            // Get path (everything except filename), limit to 4 characters
             let pathPart = '';
             if (parts.length > 1) {
                 const fullPath = parts.slice(0, -1).join('/');
-                if (fullPath.length > 10) {
-                    // Show last 10 characters with ... prefix
-                    pathPart = '...' + fullPath.slice(-10);
+                if (fullPath.length > 4) {
+                    // Show last 4 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-4);
                 } else {
                     pathPart = fullPath;
                 }
             }
 
-            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
-            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+            // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
+            const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
             const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 

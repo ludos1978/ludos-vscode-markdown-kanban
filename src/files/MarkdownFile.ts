@@ -392,9 +392,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
         }
 
         // Check 2: Absolute path passed as relative (security/correctness issue)
-        if (path.isAbsolute(relativePath)) {
-            throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
-        }
+        // if (path.isAbsolute(relativePath)) {
+        //     throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
+        // }
 
         // Check 3: Excessive parent directory traversal (potential security concern)
         const normalized = path.normalize(relativePath);

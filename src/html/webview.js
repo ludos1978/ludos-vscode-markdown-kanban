@@ -3023,9 +3023,9 @@ window.addEventListener('message', event => {
                         column.includeFiles = colData.includeFiles;
 
                         // Update DOM directly (minimal update, no full re-render)
-                        const headerEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-header`);
-                        if (headerEl && typeof window.getColumnDisplayTitle === 'function') {
-                            headerEl.innerHTML = window.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        const titleEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-title-text`);
+                        if (titleEl && window.tagUtils) {
+                            titleEl.innerHTML = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
                         }
                     }
                 }

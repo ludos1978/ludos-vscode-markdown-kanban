@@ -806,11 +806,13 @@ export class ChangeStateMachine {
                 if (isColumnSwitch && targetColumn) {
                     targetColumn.includeFiles = [];
                     targetColumn.includeMode = false;
-                    targetColumn.displayTitle = targetColumn.title;
+                    // Clean displayTitle by removing any !!!include()!!! syntax
+                    targetColumn.displayTitle = targetColumn.title.replace(/!!!include\([^)]+\)!!!/g, '').trim();
                 } else if (targetTask) {
                     targetTask.includeFiles = [];
                     targetTask.includeMode = false;
-                    targetTask.displayTitle = targetTask.title;
+                    // Clean displayTitle by removing any !!!include()!!! syntax
+                    targetTask.displayTitle = targetTask.title.replace(/!!!include\([^)]+\)!!!/g, '').trim();
                     targetTask.originalTitle = targetTask.title;
                     targetTask.description = '';
                 }

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { BackupManager } from './backupManager';
@@ -258,6 +259,19 @@ export class IncludeFileManager {
     public ensureIncludeFileRegistered(relativePath: string, type: string, documentGetter: any): void {
         console.log(`\n========== ensureIncludeFileRegistered ==========`);
         console.log(`[IncludeFileManager] CALLED with: ${relativePath}, type: ${type}`);
+
+        // BUGFIX: If an absolute path is passed, convert it to relative
+        // This can happen during include switches when resolved paths are passed
+        if (path.isAbsolute(relativePath)) {
+            const mainFile = this.fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error(`[IncludeFileManager] ✗ Cannot convert absolute to relative - no main file`);
+                return;
+            }
+            const baseDir = path.dirname(mainFile.getPath());
+            relativePath = path.relative(baseDir, relativePath);
+            console.log(`[IncludeFileManager] 🔄 Converted absolute to relative: ${relativePath}`);
+        }
 
         // PERFORMANCE: Fast check using registration cache
         if (this.fileRegistry.isBeingRegistered(relativePath)) {
