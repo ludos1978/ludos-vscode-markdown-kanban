@@ -284,50 +284,56 @@ class TaskEditor {
 
             const element = this.currentEditor.element;
 
-            // Check for DeepL translator shortcut (Alt+T)
-            const isDeepLShortcut = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey &&
-                (e.key === 't' || e.key === 'T');
-
-            // If it's DeepL shortcut, prevent default and let VS Code handle it
-            if (isDeepLShortcut) {
-                e.preventDefault(); // Prevent inserting special character
-                // Don't call e.stopPropagation() - let it bubble to VS Code
-                return;
-            }
-
-            // Check for VS Code snippet shortcuts (Cmd/Ctrl + number keys)
-            const isSnippetShortcut = (e.metaKey || e.ctrlKey) && (
-                e.key >= '1' && e.key <= '9' // These might be snippet shortcuts
+            // Check if this is a potential VS Code extension shortcut
+            // Allow Alt, Ctrl, Cmd (Meta) combinations to pass through to VS Code
+            const hasModifier = e.altKey || e.metaKey || e.ctrlKey;
+            const isExtensionShortcut = hasModifier && (
+                // Letter keys with modifiers (DeepL, other extensions)
+                (e.key.length === 1 && e.key.match(/[a-zA-Z]/)) ||
+                // Number keys with Cmd/Ctrl (snippets)
+                ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9')
             );
 
-            // If it's a potential snippet shortcut, send to VS Code to handle
-            if (isSnippetShortcut) {
-                e.preventDefault(); // Prevent default behavior
-                e.stopPropagation(); // Stop the event from bubbling up
+            // If it's a potential extension shortcut, forward to VS Code
+            if (isExtensionShortcut) {
+                e.preventDefault(); // Prevent default browser behavior
 
-                // Get current cursor position and text
+                // Build modifier string
+                const modifiers = [];
+                if (e.ctrlKey) modifiers.push('ctrl');
+                if (e.metaKey) modifiers.push('meta');
+                if (e.altKey) modifiers.push('alt');
+                if (e.shiftKey) modifiers.push('shift');
+                const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${e.key}` : e.key;
+
+                // Get current cursor position and text for context
                 const cursorPos = element.selectionStart;
-                const textBefore = element.value.substring(0, cursorPos);
-                const textAfter = element.value.substring(element.selectionEnd);
+                const selectionStart = element.selectionStart;
+                const selectionEnd = element.selectionEnd;
+                const selectedText = element.value.substring(selectionStart, selectionEnd);
 
-                // Build the shortcut string
-                const modifierKey = e.metaKey ? 'meta' : 'ctrl';
-                const shortcut = `${modifierKey}+${e.key}`;
-
-                // Send message to VS Code to trigger the snippet by shortcut
+                // Send to VS Code to handle the shortcut
                 if (typeof vscode !== 'undefined') {
                     vscode.postMessage({
-                        type: 'triggerVSCodeSnippet',
-                        shortcut: shortcut, // Send the shortcut instead of snippet name
+                        type: 'handleEditorShortcut',
+                        shortcut: shortcut,
+                        key: e.key,
+                        ctrlKey: e.ctrlKey,
+                        metaKey: e.metaKey,
+                        altKey: e.altKey,
+                        shiftKey: e.shiftKey,
                         cursorPosition: cursorPos,
-                        textBefore: textBefore,
-                        textAfter: textAfter,
+                        selectionStart: selectionStart,
+                        selectionEnd: selectionEnd,
+                        selectedText: selectedText,
+                        fullText: element.value,
                         fieldType: this.currentEditor.type,
-                        taskId: this.currentEditor.taskId
+                        taskId: this.currentEditor.taskId,
+                        columnId: this.currentEditor.columnId
                     });
                 }
 
-                // Keep focus and prevent auto-save
+                // Keep focus and prevent auto-save during command execution
                 this.isTransitioning = true;
                 setTimeout(() => {
                     this.isTransitioning = false;

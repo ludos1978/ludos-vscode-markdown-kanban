@@ -403,6 +403,9 @@ export class MessageHandler {
             case 'triggerVSCodeSnippet':
                 await this.handleVSCodeSnippet(message);
                 break;
+            case 'handleEditorShortcut':
+                await this.handleEditorShortcut(message);
+                break;
             case 'resolveAndCopyPath':
                 const resolution = await this._fileManager.resolveFilePath(message.path);
                 if (resolution && resolution.exists) {
@@ -1571,6 +1574,51 @@ export class MessageHandler {
             vscode.window.showInformationMessage(
                 `Use Ctrl+Space in the kanban editor for snippet picker.`
             );
+        }
+    }
+
+    private async handleEditorShortcut(message: any): Promise<void> {
+        try {
+            // Find the command bound to this keyboard shortcut
+            const command = await this.getCommandForShortcut(message.shortcut);
+
+            if (command) {
+                console.log(`[MessageHandler] Executing command '${command}' for shortcut ${message.shortcut}`);
+
+                // Execute the command - VS Code will handle it (e.g., DeepL translation, etc.)
+                // Most commands will work on the active editor, but webviews need special handling
+                // For now, we'll execute and let the extension handle it
+                await vscode.commands.executeCommand(command);
+            } else {
+                // No specific command found - might be a built-in shortcut
+                console.log(`[MessageHandler] No custom command found for shortcut ${message.shortcut}`);
+            }
+
+        } catch (error) {
+            console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
+        }
+    }
+
+    private async getCommandForShortcut(shortcut: string): Promise<string | null> {
+        try {
+            // Read VS Code's keybindings configuration
+            const keybindings = await this.loadVSCodeKeybindings();
+
+            // Find keybinding that matches our shortcut
+            for (const binding of keybindings) {
+                if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
+                    // Skip negative bindings (commands starting with -)
+                    if (binding.command.startsWith('-')) continue;
+
+                    return binding.command;
+                }
+            }
+
+            return null;
+
+        } catch (error) {
+            console.error('Failed to find command for shortcut:', error);
+            return null;
         }
     }
 
