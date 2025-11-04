@@ -958,6 +958,9 @@ export class KanbanWebviewPanel {
         const packageJson = require('../package.json');
         const version = packageJson.version || 'Unknown';
 
+        // Send shortcuts to webview (especially important on initial load)
+        await this._sendShortcutsToWebview();
+
         // Send boardUpdate immediately - no delay needed
         this._sendBoardUpdate(board, {
             imageMappings,
