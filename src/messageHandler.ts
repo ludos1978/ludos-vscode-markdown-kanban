@@ -1594,67 +1594,68 @@ export class MessageHandler {
 
                 try {
                     // For commands that work on text selection (like translators):
-                    // Create a temporary document, execute the command, get the result
+                    // Create a temp document, execute the command, capture result, close document
                     if (message.selectedText && message.selectedText.length > 0) {
+                        console.log(`[MessageHandler] Creating temp document for command execution`);
+
+                        // Create temp document with selected text
                         const tempDoc = await vscode.workspace.openTextDocument({
                             content: message.selectedText,
                             language: 'markdown'
                         });
 
-                        // Store the original active editor to return to it
-                        const originalEditor = vscode.window.activeTextEditor;
-
+                        // Show the temp document in a split view
                         const tempEditor = await vscode.window.showTextDocument(tempDoc, {
                             preview: true,
-                            preserveFocus: true,  // Don't steal focus
-                            viewColumn: vscode.ViewColumn.Beside  // Open beside, not replacing current
+                            preserveFocus: false, // Give focus to temp doc so command works
+                            viewColumn: vscode.ViewColumn.Beside
                         });
 
-                        // Select all text
+                        // Select all text in the temp document
+                        const lastLine = tempDoc.lineAt(tempDoc.lineCount - 1);
                         tempEditor.selection = new vscode.Selection(
-                            tempDoc.lineAt(0).range.start,
-                            tempDoc.lineAt(tempDoc.lineCount - 1).range.end
+                            new vscode.Position(0, 0),
+                            new vscode.Position(tempDoc.lineCount - 1, lastLine.text.length)
                         );
 
-                        // Execute the command
+                        console.log(`[MessageHandler] Executing command: ${userCommand}`);
+                        // Execute the command (e.g., DeepL translate)
                         await vscode.commands.executeCommand(userCommand);
 
-                        // Wait for command to complete and modify the document
+                        // Wait a bit for the command to complete and modify the document
                         await new Promise(resolve => setTimeout(resolve, 1000));
 
                         // Get the result
                         const resultText = tempDoc.getText();
+                        console.log(`[MessageHandler] Command executed, result length: ${resultText.length}`);
 
-                        // Close the temp document directly (without saving)
-                        // DON'T use 'workbench.action.closeActiveEditor' as it might close the kanban!
-                        try {
-                            await vscode.workspace.fs.delete(tempDoc.uri, { useTrash: false });
-                        } catch {
-                            // Document might not be deleteable, that's fine - it's in-memory
-                        }
-
-                        // Close all editors showing this temp document
-                        const tabs = vscode.window.tabGroups.all.flatMap(g => g.tabs);
-                        for (const tab of tabs) {
-                            if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === tempDoc.uri.toString()) {
-                                await vscode.window.tabGroups.close(tab, true); // true = don't prompt to save
-                            }
-                        }
-
-                        // Return focus to kanban panel and send result back
+                        // Send the result back to the webview first
                         const panel = this._getWebviewPanel();
                         if (panel) {
-                            panel._panel.reveal(vscode.ViewColumn.One, true);
                             panel._panel.webview.postMessage({
                                 type: 'replaceSelection',
                                 text: resultText,
-                                fieldType: message.fieldType,
-                                taskId: message.taskId,
-                                columnId: message.columnId
+                                cursorLine: message.cursorLine,
+                                cursorColumn: message.cursorColumn,
+                                selectionStart: message.selectionStart,
+                                selectionEnd: message.selectionEnd
                             });
                         }
 
-                        console.log(`[MessageHandler] Command executed, sent result back`);
+                        // Close the temp document by focusing it first, then closing without saving
+                        await vscode.window.showTextDocument(tempDoc, {
+                            preview: false,
+                            preserveFocus: false,
+                            viewColumn: vscode.ViewColumn.Beside
+                        });
+
+                        // Close this editor without saving
+                        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+
+                        // Return focus to kanban
+                        if (panel) {
+                            panel._panel.reveal(vscode.ViewColumn.One, false);
+                        }
                     } else {
                         // No selection - execute normally
                         await vscode.commands.executeCommand(userCommand);
