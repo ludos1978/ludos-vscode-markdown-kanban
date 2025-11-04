@@ -2083,7 +2083,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   padding: 0 5px;
   margin: 0;
   gap: 4px;
-  white-space: nowrap;
+  /* white-space: nowrap; */
 }
 
 /* .kanban-full-height-column.collapsed-horizontal .column-title-text {
