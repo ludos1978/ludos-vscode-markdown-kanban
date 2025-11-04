@@ -284,6 +284,16 @@ class TaskEditor {
 
             const element = this.currentEditor.element;
 
+            // Check for DeepL translator shortcut (Alt+T)
+            const isDeepLShortcut = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey &&
+                (e.key === 't' || e.key === 'T');
+
+            // If it's DeepL shortcut, prevent default and let VS Code handle it
+            if (isDeepLShortcut) {
+                e.preventDefault(); // Prevent inserting special character
+                // Don't call e.stopPropagation() - let it bubble to VS Code
+                return;
+            }
 
             // Check for VS Code snippet shortcuts (Cmd/Ctrl + number keys)
             const isSnippetShortcut = (e.metaKey || e.ctrlKey) && (

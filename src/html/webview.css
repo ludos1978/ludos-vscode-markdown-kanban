@@ -3367,6 +3367,7 @@ blockquote {
   /* margin: 8px 0; */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   border: 1px solid var(--vscode-panel-border);
+  background-color: white;
 }
 
 .task-title-container .markdown-content img {
