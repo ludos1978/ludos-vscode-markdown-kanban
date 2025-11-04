@@ -6,6 +6,18 @@ A VS Code extension that allows editing Markdown files as an interactive Kanban 
 
 The project is in active use by me. But i have encountered rare data storage and loading problems. But it might habe been just one intermediate version that modified some cards (the last card or the indention of content). So dont handle very important data with it yet. State in 2025-Sept-03.
 
+## For Developers
+
+This extension uses a **state machine architecture** for handling all file changes. Before contributing:
+
+- **Architecture Overview**: Read [ARCHITECTURE.md](ARCHITECTURE.md) for system design and patterns
+- **State Machine Design**: See [STATE_MACHINE_DESIGN.md](STATE_MACHINE_DESIGN.md) for complete state flow specification
+- **Migration Guide**: Follow [STATE_MACHINE_MIGRATION_GUIDE.md](STATE_MACHINE_MIGRATION_GUIDE.md) when modifying change handling
+- **Development Rules**: Consult [AGENT.md](AGENT.md) for coding guidelines and best practices
+- **Function Catalog**: Check [agent/FUNCTIONS.md](agent/FUNCTIONS.md) before adding new functions
+
+**Key Principle**: All file changes must go through `ChangeStateMachine.processChange()` - never create direct handlers.
+
 ## Features
 
 ### Basic Features

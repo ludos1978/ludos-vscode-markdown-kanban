@@ -284,40 +284,72 @@ class TaskEditor {
 
             const element = this.currentEditor.element;
 
+            // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
+            if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
+                console.log(`[TaskEditor] Keypress: key="${e.key}" code="${e.code}" keyCode=${e.keyCode} alt=${e.altKey} ctrl=${e.ctrlKey} meta=${e.metaKey} shift=${e.shiftKey}`);
+            }
 
-            // Check for VS Code snippet shortcuts (Cmd/Ctrl + number keys)
-            const isSnippetShortcut = (e.metaKey || e.ctrlKey) && (
-                e.key >= '1' && e.key <= '9' // These might be snippet shortcuts
+            // Check if this is a potential VS Code shortcut (any modifier + key)
+            // Forward ALL modifier combinations to VS Code so extensions can handle them
+            const hasModifier = e.altKey || e.metaKey || e.ctrlKey;
+            const isVSCodeShortcut = hasModifier && (
+                // Letter keys with modifiers
+                (e.code && e.code.match(/^Key[A-Z]$/)) ||
+                // Number keys with modifiers
+                (e.code && e.code.match(/^Digit[0-9]$/))
             );
 
-            // If it's a potential snippet shortcut, send to VS Code to handle
-            if (isSnippetShortcut) {
-                e.preventDefault(); // Prevent default behavior
-                e.stopPropagation(); // Stop the event from bubbling up
+            // Forward to VS Code backend - it will try to execute the bound command
+            if (isVSCodeShortcut) {
+                e.preventDefault(); // Prevent default browser behavior
 
-                // Get current cursor position and text
+                // Build modifier string
+                const modifiers = [];
+                if (e.ctrlKey) modifiers.push('ctrl');
+                if (e.metaKey) modifiers.push('meta');
+                if (e.altKey) modifiers.push('alt');
+                if (e.shiftKey) modifiers.push('shift');
+
+                // Extract the actual key letter from e.code (e.g., "KeyT" -> "t")
+                let keyChar = e.key;
+                if (e.code && e.code.match(/^Key[A-Z]$/)) {
+                    keyChar = e.code.replace('Key', '').toLowerCase();
+                } else if (e.code && e.code.match(/^Digit[0-9]$/)) {
+                    keyChar = e.code.replace('Digit', '');
+                }
+
+                const shortcut = modifiers.length > 0 ? `${modifiers.join('+')}+${keyChar}` : keyChar;
+
+                console.log(`[TaskEditor] Detected shortcut: ${shortcut} (key: ${e.key}, code: ${e.code}, alt: ${e.altKey}, ctrl: ${e.ctrlKey}, meta: ${e.metaKey}, shift: ${e.shiftKey})`);
+
+                // Get current cursor position and text for context
                 const cursorPos = element.selectionStart;
-                const textBefore = element.value.substring(0, cursorPos);
-                const textAfter = element.value.substring(element.selectionEnd);
+                const selectionStart = element.selectionStart;
+                const selectionEnd = element.selectionEnd;
+                const selectedText = element.value.substring(selectionStart, selectionEnd);
 
-                // Build the shortcut string
-                const modifierKey = e.metaKey ? 'meta' : 'ctrl';
-                const shortcut = `${modifierKey}+${e.key}`;
-
-                // Send message to VS Code to trigger the snippet by shortcut
+                // Send to VS Code to handle the shortcut
                 if (typeof vscode !== 'undefined') {
                     vscode.postMessage({
-                        type: 'triggerVSCodeSnippet',
-                        shortcut: shortcut, // Send the shortcut instead of snippet name
+                        type: 'handleEditorShortcut',
+                        shortcut: shortcut,
+                        key: e.key,
+                        ctrlKey: e.ctrlKey,
+                        metaKey: e.metaKey,
+                        altKey: e.altKey,
+                        shiftKey: e.shiftKey,
                         cursorPosition: cursorPos,
-                        textBefore: textBefore,
-                        textAfter: textAfter,
+                        selectionStart: selectionStart,
+                        selectionEnd: selectionEnd,
+                        selectedText: selectedText,
+                        fullText: element.value,
                         fieldType: this.currentEditor.type,
-                        taskId: this.currentEditor.taskId
+                        taskId: this.currentEditor.taskId,
+                        columnId: this.currentEditor.columnId
                     });
                 }
 
-                // Keep focus and prevent auto-save
+                // Keep focus and prevent auto-save during command execution
                 this.isTransitioning = true;
                 setTimeout(() => {
                     this.isTransitioning = false;
@@ -575,11 +607,13 @@ class TaskEditor {
         };
 
         // CRITICAL: Tell backend editing has started to block board regenerations
-        if (type === 'column-title') {
-            vscode.postMessage({
-                type: 'editingStarted'
-            });
-        }
+        // MUST send for ALL edit types (column-title, task-title, task-description)
+        vscode.postMessage({
+            type: 'editingStarted',
+            editType: type,
+            taskId: taskId,
+            columnId: columnId
+        });
 
 
         // Reset edit context when starting a new edit session on a different field
@@ -711,9 +745,9 @@ class TaskEditor {
         // Hide title editor
         this.currentEditor.element.style.display = 'none';
         if (this.currentEditor.displayElement) {
-            this.currentEditor.displayElement.style.display = 'block';
+            this.currentEditor.displayElement.style.removeProperty('display');
         }
-        
+
         // Clear current editor
         this.currentEditor = null;
         
@@ -792,6 +826,12 @@ class TaskEditor {
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||
                             oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
+
+                        console.log('[TaskEditor COLUMN] Old title:', column.title);
+                        console.log('[TaskEditor COLUMN] New title:', newTitle);
+                        console.log('[TaskEditor COLUMN] Old includes:', oldIncludeMatches);
+                        console.log('[TaskEditor COLUMN] New includes:', newIncludeMatches);
+                        console.log('[TaskEditor COLUMN] hasIncludeChanges:', hasIncludeChanges);
 
                         column.title = newTitle;
 
@@ -890,6 +930,13 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-all-tags');
                         }
 
+                        // Update current week attribute
+                        if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+                            columnElement2.setAttribute('data-current-week', 'true');
+                        } else {
+                            columnElement2.removeAttribute('data-current-week');
+                        }
+
                         // Force style recalculation and update header/footer bars
                         if (allTags.length > 0) {
                             // Gentle style refresh: toggle a temporary class to force re-evaluation
@@ -906,6 +953,40 @@ class TaskEditor {
                             // If no tags, still update header/footer bars to remove any existing ones
                             if (window.injectStackableBars) {
                                 window.injectStackableBars(columnElement2);
+                            }
+                        }
+
+                        // Update numeric badge immediately
+                        const numericBadgeContainer = columnElement2.querySelector('.numeric-badge');
+                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+                            const numericTag = window.tagUtils.extractNumericTag(column.title);
+                            if (numericTag !== null) {
+                                // Format the badge display
+                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+                                if (numericBadgeContainer) {
+                                    // Update existing badge
+                                    numericBadgeContainer.textContent = displayValue;
+                                    numericBadgeContainer.title = `Index: ${displayValue}`;
+                                } else {
+                                    // Create new badge if it doesn't exist
+                                    const columnTitleElement = columnElement2.querySelector('.column-title');
+                                    if (columnTitleElement) {
+                                        const newBadge = document.createElement('div');
+                                        newBadge.className = 'numeric-badge';
+                                        newBadge.textContent = displayValue;
+                                        newBadge.title = `Index: ${displayValue}`;
+                                        // Insert before the corner badges or at the beginning
+                                        const cornerBadges = columnTitleElement.querySelector('.corner-badges');
+                                        if (cornerBadges) {
+                                            columnTitleElement.insertBefore(newBadge, cornerBadges);
+                                        } else {
+                                            columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
+                                        }
+                                    }
+                                }
+                            } else if (numericBadgeContainer) {
+                                // Remove badge if no numeric tag
+                                numericBadgeContainer.remove();
                             }
                         }
 
@@ -976,12 +1057,14 @@ class TaskEditor {
 
                             task.title = value;
 
-                            // Send to backend for include processing
+                            // Use editTask message type for title changes
+                            console.log('[FRONTEND taskEditor] Sending editTask with title change');
+
                             vscode.postMessage({
-                                type: 'editTaskTitle',
+                                type: 'editTask',
                                 taskId: taskId,
                                 columnId: columnId,
-                                title: value
+                                taskData: { title: value }
                             });
 
                             return; // Skip local updates, let backend handle
@@ -1104,7 +1187,7 @@ class TaskEditor {
                             }
                         }
                         // Ensure display element is visible
-                        this.currentEditor.displayElement.style.display = 'block';
+                        this.currentEditor.displayElement.style.removeProperty('display');
 
                         // For task includes, also update the title display when description is edited
                         if (type === 'task-description' && task.includeMode) {
@@ -1162,6 +1245,40 @@ class TaskEditor {
                             }
                         }
 
+                        // Update numeric badge immediately
+                        const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
+                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+                            const numericTag = window.tagUtils.extractNumericTag(task.title);
+                            if (numericTag !== null) {
+                                // Format the badge display
+                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+                                if (numericBadgeContainer) {
+                                    // Update existing badge
+                                    numericBadgeContainer.textContent = displayValue;
+                                    numericBadgeContainer.title = `Index: ${displayValue}`;
+                                } else {
+                                    // Create new badge if it doesn't exist
+                                    const taskHeaderElement = taskElement.querySelector('.task-header');
+                                    if (taskHeaderElement) {
+                                        const newBadge = document.createElement('div');
+                                        newBadge.className = 'numeric-badge';
+                                        newBadge.textContent = displayValue;
+                                        newBadge.title = `Index: ${displayValue}`;
+                                        // Insert before the corner badges or at the beginning
+                                        const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
+                                        if (cornerBadges) {
+                                            taskHeaderElement.insertBefore(newBadge, cornerBadges);
+                                        } else {
+                                            taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
+                                        }
+                                    }
+                                }
+                            } else if (numericBadgeContainer) {
+                                // Remove badge if no numeric tag
+                                numericBadgeContainer.remove();
+                            }
+                        }
+
                         // Update corner badges without re-render (uses title+description combined)
                         if (window.updateCornerBadgesImmediate) {
                             // For tasks, we need to pass a combined text that includes both title and description tags
@@ -1211,7 +1328,7 @@ class TaskEditor {
 
         // Show display element
         if (displayElement) {
-            displayElement.style.display = 'block';
+            displayElement.style.removeProperty('display');
         }
 
         // For editing in stacked columns, recalculate positions after closing
@@ -1251,7 +1368,14 @@ class TaskEditor {
                     value: false
                 });
             }
+        }
 
+        // CRITICAL: Notify backend that editing has stopped (for ALL edit types)
+        // This allows backend to clear _isInEditMode flag
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'editingStoppedNormal'  // Different from 'editingStopped' (backend request response)
+            });
         }
 
         this.currentEditor = null;
@@ -1413,11 +1537,41 @@ class TaskEditor {
 
         return getLayoutTags(oldTitle) !== getLayoutTags(newTitle);
     }
+
+    /**
+     * Replace the currently selected text with new text
+     * Used by extension commands like translation
+     */
+    replaceSelection(newText) {
+        if (!this.currentEditor) {
+            console.log('[TaskEditor] No active editor for replaceSelection');
+            return;
+        }
+
+        const element = this.currentEditor.element;
+        const start = element.selectionStart;
+        const end = element.selectionEnd;
+
+        // Replace the selection
+        const before = element.value.substring(0, start);
+        const after = element.value.substring(end);
+        element.value = before + newText + after;
+
+        // Set cursor position after the replaced text
+        const newCursorPos = start + newText.length;
+        element.setSelectionRange(newCursorPos, newCursorPos);
+
+        // Focus the element
+        element.focus();
+
+        console.log('[TaskEditor] Replaced selection with new text');
+    }
 }
 
 // Initialize the editor system
 const taskEditor = new TaskEditor();
 window.taskEditor = taskEditor;
+window.taskEditorManager = taskEditor; // Alias for compatibility
 
 /**
  * Triggers title editing for a task

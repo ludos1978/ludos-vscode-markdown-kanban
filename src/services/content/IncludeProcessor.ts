@@ -3,6 +3,7 @@ import * as path from 'path';
 import { PathResolver } from '../PathResolver';
 import { FormatConverter } from '../export/FormatConverter';
 import { IncludeMode, IncludeType } from '../OperationOptions';
+import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
 /**
  * Unified include file processing utility
@@ -14,7 +15,7 @@ import { IncludeMode, IncludeType } from '../OperationOptions';
  */
 export class IncludeProcessor {
     /** Unified include pattern: !!!include(filename)!!! - location determines behavior */
-    private static readonly INCLUDE_PATTERN = /!!!include\(([^)]+)\)!!!/gi;
+    private static readonly INCLUDE_PATTERN = new RegExp(INCLUDE_SYNTAX.REGEX.source, 'gi');
 
     /**
      * Process all include markers in content

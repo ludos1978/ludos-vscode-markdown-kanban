@@ -11,6 +11,9 @@ class TagUtils {
             basicTags: /#([a-zA-Z0-9_-]+)/g,
             atTags: /@([a-zA-Z0-9_&-]+)/g,
 
+            // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01)
+            numericTag: /#(\d+(?:\.\d+)?)\b/g,
+
             // Layout-specific tags
             rowTag: /#row(\d+)\b/gi,
             spanTag: /#span(\d+)\b/gi,
@@ -22,6 +25,9 @@ class TagUtils {
 
             // Date patterns
             dateTags: /@(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})(?:\s|$)/,
+
+            // Week date patterns (@2001-W1, @2001W1, @W1, @W01)
+            weekTags: /(?:@(\d{4})-?W(\d{1,2})|@W(\d{1,2}))\b/gi,
 
             // Priority/state tags
             priorityTag: /#(high|medium|low|urgent)\b/i,
@@ -100,14 +106,24 @@ class TagUtils {
     extractFirstTag(text, excludeLayout = true) {
         if (!text) return null;
 
-        // Use boardRenderer.js compatible regex with exclusions
-        const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_-]+(?:[=|><][a-zA-Z0-9_-]+)*)/g;
+        // Use boardRenderer.js compatible regex with exclusions (includes dots for numeric tags like #1.5)
+        const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_.-]+(?:[=|><][a-zA-Z0-9_.-]+)*)/g;
         let m;
         while ((m = re.exec(text)) !== null) {
             const raw = m[1];
-            const baseMatch = raw.match(/^([a-zA-Z0-9_-]+)/);
+            const baseMatch = raw.match(/^([a-zA-Z0-9_.-]+)/);
             const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
-            if (base.startsWith('gather_')) continue; // do not use gather tags for styling
+
+            // Skip gather tags for styling
+            if (base.startsWith('gather_')) continue;
+
+            // Skip numeric tags for styling (they're for indexing, not styling)
+            // Check if the tag is purely numeric (with optional decimal point)
+            if (/^\d+(?:\.\d+)?$/.test(base)) continue;
+
+            // Skip stack tag for styling
+            if (base === 'stack') continue;
+
             return base;
         }
         return null;
@@ -120,8 +136,121 @@ class TagUtils {
      */
     extractFirstTagSimple(text) {
         if (!text) return null;
-        const tagMatch = text.match(/#([a-zA-Z0-9_-]+)/);
+        const tagMatch = text.match(/#([a-zA-Z0-9_.-]+)/);
         return tagMatch ? tagMatch[1].toLowerCase() : null;
+    }
+
+    /**
+     * Extract numeric index tag from text
+     * @param {string} text - Text to extract numeric tag from
+     * @returns {number|null} Numeric value or null if not found
+     */
+    extractNumericTag(text) {
+        if (!text) return null;
+
+        // Use a non-global version of the pattern to get capture groups
+        const match = text.match(/#(\d+(?:\.\d+)?)\b/);
+        if (match && match[1]) {
+            return parseFloat(match[1]);
+        }
+        return null;
+    }
+
+    /**
+     * Extract week date tag from text
+     * @param {string} text - Text to extract week tag from
+     * @returns {Object|null} Object with {year, week} or null if not found
+     */
+    extractWeekTag(text) {
+        if (!text) return null;
+
+        // Reset regex lastIndex to ensure consistent matching
+        this.patterns.weekTags.lastIndex = 0;
+        const match = this.patterns.weekTags.exec(text);
+
+        if (!match) return null;
+
+        // Format: @2001-W1 or @2001W1 (groups 1 and 2)
+        if (match[1] && match[2]) {
+            return {
+                year: parseInt(match[1], 10),
+                week: parseInt(match[2], 10)
+            };
+        }
+
+        // Format: @W1 (group 3) - use current year
+        if (match[3]) {
+            const currentYear = new Date().getFullYear();
+            return {
+                year: currentYear,
+                week: parseInt(match[3], 10)
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Get current week number and year (ISO 8601 week date)
+     * @returns {Object} Object with {year, week}
+     */
+    getCurrentWeek() {
+        const now = new Date();
+
+        // ISO 8601 week date calculation
+        const target = new Date(now.valueOf());
+        const dayNumber = (now.getDay() + 6) % 7; // Monday = 0
+        target.setDate(target.getDate() - dayNumber + 3); // Thursday of this week
+        const firstThursday = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) {
+            target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        }
+        const weekNumber = 1 + Math.ceil((firstThursday - target) / 604800000); // 604800000 = 7 * 24 * 3600 * 1000
+
+        // Get the year for the week (might differ from calendar year for first/last week)
+        const jan4 = new Date(now.getFullYear(), 0, 4);
+        const weekYear = target.getFullYear();
+
+        return {
+            year: weekYear,
+            week: weekNumber
+        };
+    }
+
+    /**
+     * Check if a week tag matches the current week
+     * @param {string} text - Text containing week tag
+     * @returns {boolean} True if text contains current week tag
+     */
+    isCurrentWeek(text) {
+        const weekTag = this.extractWeekTag(text);
+        if (!weekTag) return false;
+
+        const currentWeek = this.getCurrentWeek();
+        return weekTag.year === currentWeek.year && weekTag.week === currentWeek.week;
+    }
+
+    /**
+     * Check if text contains a week tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains week tag
+     */
+    hasWeekTag(text) {
+        if (!text) return false;
+        this.patterns.weekTags.lastIndex = 0;
+        return this.patterns.weekTags.test(text);
+    }
+
+    /**
+     * Check if a tag is a numeric index tag
+     * @param {string} tag - Tag to check (with or without # symbol)
+     * @returns {boolean} True if numeric tag
+     */
+    isNumericTag(tag) {
+        if (!tag) return false;
+        const withHash = tag.startsWith('#') ? tag : `#${tag}`;
+        return this.patterns.numericTag.test(withHash);
     }
 
     /**
@@ -383,6 +512,48 @@ class TagUtils {
     }
 
     /**
+     * Sort columns by numeric index tag
+     * @param {Array} columns - Array of columns with title property
+     * @returns {Array} Sorted columns
+     */
+    sortColumnsByNumericTag(columns) {
+        if (!Array.isArray(columns)) return [];
+
+        return [...columns].sort((a, b) => {
+            const numA = this.extractNumericTag(a.title);
+            const numB = this.extractNumericTag(b.title);
+
+            // Columns without numeric tags go to the end
+            if (numA === null && numB === null) return 0;
+            if (numA === null) return 1;
+            if (numB === null) return -1;
+
+            return numA - numB;
+        });
+    }
+
+    /**
+     * Sort tasks by numeric index tag
+     * @param {Array} tasks - Array of tasks with title property
+     * @returns {Array} Sorted tasks
+     */
+    sortTasksByNumericTag(tasks) {
+        if (!Array.isArray(tasks)) return [];
+
+        return [...tasks].sort((a, b) => {
+            const numA = this.extractNumericTag(a.title);
+            const numB = this.extractNumericTag(b.title);
+
+            // Tasks without numeric tags go to the end
+            if (numA === null && numB === null) return 0;
+            if (numA === null) return 1;
+            if (numB === null) return -1;
+
+            return numA - numB;
+        });
+    }
+
+    /**
      * Sort tags by priority/importance
      * @param {Array} tags - Tags to sort
      * @returns {Array} Sorted tags
@@ -550,25 +721,39 @@ class TagUtils {
      */
     getColumnDisplayTitle(column, filterFn) {
         if (column.includeMode && column.includeFiles && column.includeFiles.length > 0) {
-            // For columninclude, show as "include(...path/filename.md)" format
+            // For columninclude, show as inline badge "!(...path/filename.ext)!" format
             const fileName = column.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Get path (everything except filename), limit to 10 characters
+            // Truncate filename if longer than 12 characters
+            let displayFileName = baseFileName;
+            if (baseFileName.length > 12) {
+                // Extract extension
+                const lastDotIndex = baseFileName.lastIndexOf('.');
+                const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+
+                // Create truncated version: first 12 chars...last 4 chars before extension
+                const first12 = nameWithoutExt.substring(0, 12);
+                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+            }
+
+            // Get path (everything except filename), limit to 4 characters
             let pathPart = '';
             if (parts.length > 1) {
                 const fullPath = parts.slice(0, -1).join('/');
-                if (fullPath.length > 10) {
-                    // Show last 10 characters with ... prefix
-                    pathPart = '...' + fullPath.slice(-10);
+                if (fullPath.length > 4) {
+                    // Show last 4 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-4);
                 } else {
                     pathPart = fullPath;
                 }
             }
 
-            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
-            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+            // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
+            const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
             const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
             const linkHtml = `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleColumnIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
@@ -577,8 +762,23 @@ class TagUtils {
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
 
             if (additionalTitle) {
+                // Backend has already inserted %INCLUDE_BADGE:filepath% placeholder in displayTitle
+                // We just need to replace it with the badge HTML
+                console.log('[tagUtils.getColumnDisplayTitle] additionalTitle:', additionalTitle);
+                console.log('[tagUtils.getColumnDisplayTitle] fileName:', fileName);
+
+                // Render markdown first (with the placeholder still in place)
                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                return `${linkHtml} ${renderFn ? renderFn(additionalTitle) : additionalTitle}`;
+                const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
+                console.log('[tagUtils.getColumnDisplayTitle] renderedTitle:', renderedTitle);
+
+                // Replace the backend-inserted placeholder with our badge HTML
+                // The placeholder format is: %INCLUDE_BADGE:filepath%
+                const placeholder = `%INCLUDE_BADGE:${fileName}%`;
+                console.log('[tagUtils.getColumnDisplayTitle] looking for placeholder:', placeholder);
+                const result = renderedTitle.replace(placeholder, linkHtml);
+                console.log('[tagUtils.getColumnDisplayTitle] result:', result);
+                return result;
             } else {
                 return linkHtml;
             }
@@ -592,41 +792,93 @@ class TagUtils {
 
     /**
      * Get display title for a task, handling taskinclude specially to make filepaths clickable
-     * Uses same format as column includes: "include(path/filename.md)"
+     * Uses same format as column includes: "!(...path/filename.ext)!"
      * @param {Object} task - Task object with displayTitle, includeMode, includeFiles
      * @returns {string} HTML string for display
      */
     getTaskDisplayTitle(task) {
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-            // For taskinclude, show as "include(...path/filename.md)" format - same as column includes
+            // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Get path (everything except filename), limit to 10 characters
+            // Truncate filename if longer than 12 characters
+            let displayFileName = baseFileName;
+            if (baseFileName.length > 12) {
+                // Extract extension
+                const lastDotIndex = baseFileName.lastIndexOf('.');
+                const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+
+                // Create truncated version: first 12 chars...last 4 chars before extension
+                const first12 = nameWithoutExt.substring(0, 12);
+                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+            }
+
+            // Get path (everything except filename), limit to 4 characters
             let pathPart = '';
             if (parts.length > 1) {
                 const fullPath = parts.slice(0, -1).join('/');
-                if (fullPath.length > 10) {
-                    // Show last 10 characters with ... prefix
-                    pathPart = '...' + fullPath.slice(-10);
+                if (fullPath.length > 4) {
+                    // Show last 4 characters with ... prefix
+                    pathPart = '...' + fullPath.slice(-4);
                 } else {
                     pathPart = fullPath;
                 }
             }
 
-            // Format: "include(path/filename.md)" or "include(filename.md)" if no path
-            const displayText = pathPart ? `include(${pathPart}/${baseFileName})` : `include(${baseFileName})`;
+            // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
+            const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
             const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
             // Just return the include link - displayTitle is not shown because it's the file content, not metadata
             return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
         } else {
-            // Normal task - render displayTitle as-is
+            // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
             const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
+
+            // Render markdown first (placeholder will be preserved in the output)
             const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-            return renderFn ? renderFn(displayTitle) : displayTitle;
+            let rendered = renderFn ? renderFn(displayTitle) : displayTitle;
+
+            // Replace any %INCLUDE_BADGE:filepath% placeholders with badge HTML
+            // This handles cases where tasks have includes with additional text
+            const placeholderRegex = /%INCLUDE_BADGE:([^%]+)%/g;
+            rendered = rendered.replace(placeholderRegex, (match, filePath) => {
+                // Generate badge for this file path
+                const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
+                const baseFileName = parts[parts.length - 1];
+
+                let displayFileName = baseFileName;
+                if (baseFileName.length > 12) {
+                    const lastDotIndex = baseFileName.lastIndexOf('.');
+                    const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                    const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+                    const first12 = nameWithoutExt.substring(0, 12);
+                    const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                    displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+                }
+
+                let pathPart = '';
+                if (parts.length > 1) {
+                    const fullPath = parts.slice(0, -1).join('/');
+                    if (fullPath.length > 4) {
+                        pathPart = '...' + fullPath.slice(-4);
+                    } else {
+                        pathPart = fullPath;
+                    }
+                }
+
+                const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
+                const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+                return `<span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>`;
+            });
+
+            return rendered;
         }
     }
 }

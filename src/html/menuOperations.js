@@ -277,6 +277,7 @@ class SimpleMenuManager {
                 return `
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'unsorted')">Unsorted</button>
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>
+                    <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'numericTag')">Sort by index (#)</button>
                 `;
             default:
                 return '';
@@ -775,7 +776,7 @@ function insertColumnBefore(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column (e.g., #row2)
+    // Extract row tag from reference column
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -783,21 +784,30 @@ function insertColumnBefore(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // NEW column gets #stack tag (to be part of the stack)
-        // Reference column also gets #stack tag if it doesn't have it
-        if (!/#stack\b/i.test(referenceColumn.title)) {
-            const trimmedTitle = referenceColumn.title.trim();
-            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
+        // CRITICAL: Check if reference has #stack BEFORE modifying it
+        const hasStack = /#stack\b/i.test(referenceColumn.title);
+
+        // New column gets #stack only if reference already had it
+        if (hasStack) {
+            tags += ' #stack';
         }
 
-        // New column gets #stack tag
-        tags += ' #stack';
+        // Reference column gets #stack tag if it doesn't have it
+        if (!hasStack) {
+            const trimmedTitle = referenceColumn.title.trim();
+            referenceColumn.title = trimmedTitle ? `${trimmedTitle} #stack` : ' #stack';
+
+            // Update the reference column title in the DOM
+            if (typeof updateColumnTitleDisplay === 'function') {
+                updateColumnTitleDisplay(columnId);
+            }
+        }
     }
 
     // Cache-first: Create new column and insert before reference column
     const newColumn = {
         id: `temp-column-before-${Date.now()}`,
-        title: tags.trim(), // Row tag AND #stack tag
+        title: tags.trim(), // Row tag only (NO #stack tag)
         tasks: []
     };
 
@@ -814,7 +824,7 @@ function insertColumnAfter(columnId) {
     const referenceIndex = window.cachedBoard?.columns.findIndex(col => col.id === columnId) || 0;
     const referenceColumn = window.cachedBoard?.columns[referenceIndex];
 
-    // Extract row tag from reference column (e.g., #row2)
+    // Extract row tag and stack tag from reference column
     let tags = '';
     if (referenceColumn && referenceColumn.title) {
         const rowMatch = referenceColumn.title.match(/#row(\d+)\b/i);
@@ -822,9 +832,11 @@ function insertColumnAfter(columnId) {
             tags = ` ${rowMatch[0]}`;
         }
 
-        // For insertColumnAfter: Only the NEW column gets #stack tag
-        // The reference column is NOT modified
-        tags += ' #stack';
+        // Only add #stack if reference column already has it (joining existing stack)
+        const hasStack = /#stack\b/i.test(referenceColumn.title);
+        if (hasStack) {
+            tags += ' #stack';
+        }
     }
 
     // Cache-first: Create new column and insert after reference column
@@ -993,8 +1005,9 @@ function changeColumnSpan(columnId, delta) {
 function toggleColumnStack(columnId) {
     if (!currentBoard?.columns) {return;}
 
-    const column = currentBoard.columns.find(c => c.id === columnId);
-    if (!column) {return;}
+    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    const column = currentBoard.columns[columnIndex];
+    if (!column || columnIndex === -1) {return;}
 
     // Flush pending tag changes first
     if ((window.pendingTaskChanges && window.pendingTaskChanges.size > 0) ||
@@ -1005,23 +1018,65 @@ function toggleColumnStack(columnId) {
     // Check current stack state
     const hasStack = /#stack\b/i.test(column.title);
     let newTitle = column.title;
+    let needsRepositioning = false;
+    let newPosition = columnIndex;
 
     if (hasStack) {
-        // Remove stack tag
+        // REMOVING stack tag - column separates from its current stack
+        // Any following columns with #stack will naturally stay with this column (forming a new stack)
+        // The rendering logic handles this automatically - no repositioning needed
         newTitle = newTitle.replace(/#stack\b\s*/gi, '').replace(/\s+/g, ' ').trim();
+        needsRepositioning = false;
+
     } else {
-        // Add stack tag
+        // ADDING stack tag - move column to stack with previous column
         newTitle += ' #stack';
+
+        // Find the previous column in the same row
+        let prevColumnIndex = -1;
+        for (let i = columnIndex - 1; i >= 0; i--) {
+            if (getColumnRow(currentBoard.columns[i].title) === getColumnRow(column.title)) {
+                prevColumnIndex = i;
+                break;
+            }
+        }
+
+        // If there's a previous column in the same row, move this column right after it
+        if (prevColumnIndex !== -1) {
+            // Find the last column in the previous column's stack
+            let targetPosition = prevColumnIndex;
+            for (let i = prevColumnIndex + 1; i < columnIndex; i++) {
+                const nextCol = currentBoard.columns[i];
+                if (getColumnRow(nextCol.title) !== getColumnRow(column.title) ||
+                    !/#stack\b/i.test(nextCol.title)) {
+                    break;
+                }
+                targetPosition = i;
+            }
+
+            // Move to right after the target position (last in that stack)
+            newPosition = targetPosition + 1;
+            if (newPosition !== columnIndex) {
+                needsRepositioning = true;
+            }
+        }
     }
 
-    // Update the column in currentBoard and cachedBoard
+    // Update the column title
     column.title = newTitle;
 
+    // Reposition if needed
+    if (needsRepositioning && newPosition !== columnIndex) {
+        // Remove from current position
+        const [movedColumn] = currentBoard.columns.splice(columnIndex, 1);
+        // Insert at new position (adjust if we removed from before the target)
+        const adjustedPosition = newPosition > columnIndex ? newPosition - 1 : newPosition;
+        currentBoard.columns.splice(adjustedPosition, 0, movedColumn);
+    }
+
+    // Sync with cachedBoard
     if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
-        const cachedColumn = cachedBoard.columns.find(c => c.id === columnId);
-        if (cachedColumn) {
-            cachedColumn.title = newTitle;
-        }
+        cachedBoard.columns = [...currentBoard.columns];
     }
 
     // Update the column element immediately
@@ -1101,6 +1156,7 @@ function deleteColumn(columnId) {
 }
 
 function sortColumn(columnId, sortType) {
+    closeAllMenus();
     vscode.postMessage({ type: 'sortColumn', columnId, sortType });
 }
 
@@ -1486,16 +1542,13 @@ function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
         // Add new include pattern
         const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
 
-        // Send request to backend to switch the include file
-        // Backend will: save old file if needed, load new file, update task content
-        // WITHOUT saving the main kanban file
+        // SOLUTION 2: Use editTask message type (same as taskEditor fix)
+        // editTaskTitle appears to be broken, use editTask instead
         vscode.postMessage({
-            type: 'switchTaskIncludeFile',
+            type: 'editTask',  // Changed from editTaskTitle
             taskId: taskId,
             columnId: columnId,
-            newFilePath: newFileName.trim(),
-            oldFilePath: currentFile,
-            newTitle: newTitle
+            taskData: { title: newTitle }  // Pass as taskData object
         });
 
         // Update button state to show unsaved changes (path changed but not saved to main file yet)
@@ -2515,7 +2568,41 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         const isCollapsed = columnElement.classList.contains('collapsed');
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
-    
+
+    // Update numeric badge immediately
+    const numericBadgeContainer = columnElement.querySelector('.numeric-badge');
+    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+        const numericTag = window.tagUtils.extractNumericTag(newTitle);
+        if (numericTag !== null) {
+            // Format the badge display
+            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+            if (numericBadgeContainer) {
+                // Update existing badge
+                numericBadgeContainer.textContent = displayValue;
+                numericBadgeContainer.title = `Index: ${displayValue}`;
+            } else {
+                // Create new badge if it doesn't exist
+                const columnTitleElement = columnElement.querySelector('.column-title');
+                if (columnTitleElement) {
+                    const newBadge = document.createElement('div');
+                    newBadge.className = 'numeric-badge';
+                    newBadge.textContent = displayValue;
+                    newBadge.title = `Index: ${displayValue}`;
+                    // Insert before the corner badges or at the beginning
+                    const cornerBadges = columnTitleElement.querySelector('.corner-badges');
+                    if (cornerBadges) {
+                        columnTitleElement.insertBefore(newBadge, cornerBadges);
+                    } else {
+                        columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
+                    }
+                }
+            }
+        } else if (numericBadgeContainer) {
+            // Remove badge if no numeric tag
+            numericBadgeContainer.remove();
+        }
+    }
+
     // Update corner badges immediately
     updateCornerBadgesImmediate(columnId, 'column', newTitle);
     
@@ -2589,7 +2676,41 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         const isCollapsed = taskElement.classList.contains('collapsed');
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
-    
+
+    // Update numeric badge immediately
+    const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
+    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
+        const numericTag = window.tagUtils.extractNumericTag(newTitle);
+        if (numericTag !== null) {
+            // Format the badge display
+            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+            if (numericBadgeContainer) {
+                // Update existing badge
+                numericBadgeContainer.textContent = displayValue;
+                numericBadgeContainer.title = `Index: ${displayValue}`;
+            } else {
+                // Create new badge if it doesn't exist
+                const taskHeaderElement = taskElement.querySelector('.task-header');
+                if (taskHeaderElement) {
+                    const newBadge = document.createElement('div');
+                    newBadge.className = 'numeric-badge';
+                    newBadge.textContent = displayValue;
+                    newBadge.title = `Index: ${displayValue}`;
+                    // Insert before the corner badges or at the beginning
+                    const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
+                    if (cornerBadges) {
+                        taskHeaderElement.insertBefore(newBadge, cornerBadges);
+                    } else {
+                        taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
+                    }
+                }
+            }
+        } else if (numericBadgeContainer) {
+            // Remove badge if no numeric tag
+            numericBadgeContainer.remove();
+        }
+    }
+
     // Update corner badges immediately
     updateCornerBadgesImmediate(taskId, 'task', newTitle);
     

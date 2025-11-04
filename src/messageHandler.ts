@@ -12,10 +12,20 @@ import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { PlantUMLService } from './plantUMLService';
 import { getMermaidExportService } from './services/export/MermaidExportService';
+import { getOutputChannel } from './extension';
+import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+
+// Helper function to log to both console and output channel
+function log(...args: any[]) {
+    const message = args.map(arg =>
+        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+    ).join(' ');
+    getOutputChannel()?.appendLine(message);
+}
 
 interface FocusTarget {
     type: 'task' | 'column';
@@ -84,54 +94,53 @@ export class MessageHandler {
     }
 
     /**
-     * Request frontend to stop editing and wait for response
-     * Returns a Promise that resolves when frontend confirms editing has stopped
+     * Request frontend to stop editing and wait for response with captured edit
+     * Returns a Promise that resolves with the captured edit value from frontend
+     * PUBLIC: Can be called from external code (e.g., conflict resolution)
      */
-    private async _requestStopEditing(): Promise<void> {
+    public async requestStopEditing(): Promise<any> {
         const requestId = `stop-edit-${++this._stopEditingRequestCounter}`;
         const panel = this._getWebviewPanel();
 
         if (!panel || !panel.webview) {
-            console.warn('[_requestStopEditing] No panel or webview available');
-            return;
+            console.warn('[requestStopEditing] No panel or webview available');
+            return null;
         }
 
-        return new Promise<void>((resolve, reject) => {
+        return new Promise<any>((resolve, reject) => {
             // Set timeout in case frontend doesn't respond
             const timeout = setTimeout(() => {
                 this._pendingStopEditingRequests.delete(requestId);
-                console.warn('[_requestStopEditing] Timeout waiting for frontend response');
-                resolve(); // Don't reject, just continue
+                console.warn('[requestStopEditing] Timeout waiting for frontend response');
+                resolve(null); // Resolve with null if timeout
             }, 2000);
 
             // Store promise resolver
             this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });
 
-            // Send request to frontend
-            console.log(`[_requestStopEditing] Sending stopEditing request: ${requestId}`);
+            // Send request to frontend to capture edit value
             panel.webview.postMessage({
                 type: 'stopEditing',
-                requestId
+                requestId,
+                captureValue: true  // Tell frontend to capture the edit value
             });
         });
     }
 
     /**
-     * Handle response from frontend that editing has stopped
+     * Handle response from frontend that editing has stopped (with captured value)
      */
-    private _handleEditingStopped(requestId: string): void {
-        console.log(`[_handleEditingStopped] Received response for: ${requestId}`);
+    private _handleEditingStopped(requestId: string, capturedEdit: any): void {
         const pending = this._pendingStopEditingRequests.get(requestId);
 
         if (pending) {
             clearTimeout(pending.timeout);
             this._pendingStopEditingRequests.delete(requestId);
-            pending.resolve();
+            pending.resolve(capturedEdit);  // Resolve with captured edit value
 
             // RACE-2: Sync dirty items after editing stops
             // When user was editing, frontend skipped rendering updateColumnContent.
             // Backend marked those items as dirty. Now apply all skipped updates.
-            console.log(`[RACE-2] Editing stopped - syncing dirty items`);
             const panel = this._getWebviewPanel();
             panel.syncDirtyItems();
         } else {
@@ -164,7 +173,6 @@ export class MessageHandler {
             this._pendingUnfoldRequests.set(requestId, { resolve, reject, timeout });
 
             // Send request to frontend
-            console.log(`[_requestUnfoldColumns] Sending unfold request: ${requestId}, columns: ${columnIds.join(', ')}`);
             panel.webview.postMessage({
                 type: 'unfoldColumnsBeforeUpdate',
                 requestId,
@@ -177,7 +185,6 @@ export class MessageHandler {
      * Handle response from frontend that columns have been unfolded
      */
     private _handleColumnsUnfolded(requestId: string): void {
-        console.log(`[_handleColumnsUnfolded] Received response for: ${requestId}`);
         const pending = this._pendingUnfoldRequests.get(requestId);
 
         if (pending) {
@@ -233,6 +240,19 @@ export class MessageHandler {
     }
 
     public async handleMessage(message: any): Promise<void> {
+        // CRITICAL: Log IMMEDIATELY with zero overhead
+
+        if (message.type?.includes?.('task') || message.type?.includes?.('Task') || message.type === 'editTask') {
+            const detailMsg = `🟢 [handleMessage] TASK MESSAGE: ${JSON.stringify({
+                type: message.type,
+                taskId: message.taskId,
+                columnId: message.columnId,
+                title: message.title,
+                taskDataKeys: Object.keys(message.taskData || {})
+            })}`;
+        }
+
+        const switchMsg = `🟢 [handleMessage] ENTERING SWITCH for type: "${message.type}"`;
 
         switch (message.type) {
             // Undo/Redo operations
@@ -291,10 +311,8 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
-            // Switch task include file (load new file without saving main file)
-            case 'switchTaskIncludeFile':
-                await this.handleSwitchTaskIncludeFile(message);
-                break;
+            // REMOVED: Legacy switchTaskIncludeFile - now routes through editTaskTitle -> state machine
+            // See menuOperations.js updateTaskIncludeFile() which now sends editTaskTitle instead
 
             // Enhanced file and link handling
             case 'openFileLink':
@@ -340,25 +358,16 @@ export class MessageHandler {
                 break;
             case 'markUnsavedChanges':
                 // Track unsaved changes at panel level and update cached board if provided
-                console.log('[MessageHandler.markUnsavedChanges] ENTRY - hasChanges:', message.hasUnsavedChanges, 'hasCachedBoard:', !!message.cachedBoard);
                 if (message.cachedBoard) {
-                    console.log('[MessageHandler.markUnsavedChanges] cachedBoard columns:', message.cachedBoard.columns?.length);
                     // Check if any tasks have includeMode
                     let includeTaskCount = 0;
                     message.cachedBoard.columns?.forEach((col: any) => {
                         col.tasks?.forEach((task: any) => {
                             if (task.includeMode) {
                                 includeTaskCount++;
-                                console.log('[MessageHandler.markUnsavedChanges] Include task found:', {
-                                    title: task.title,
-                                    displayTitle: task.displayTitle,
-                                    descriptionLength: task.description?.length || 0,
-                                    includeFiles: task.includeFiles
-                                });
                             }
                         });
                     });
-                    console.log('[MessageHandler.markUnsavedChanges] Total include tasks:', includeTaskCount);
                 }
                 this._markUnsavedChanges(message.hasUnsavedChanges, message.cachedBoard);
                 break;
@@ -394,6 +403,9 @@ export class MessageHandler {
             case 'triggerVSCodeSnippet':
                 await this.handleVSCodeSnippet(message);
                 break;
+            case 'handleEditorShortcut':
+                await this.handleEditorShortcut(message);
+                break;
             case 'resolveAndCopyPath':
                 const resolution = await this._fileManager.resolveFilePath(message.path);
                 if (resolution && resolution.exists) {
@@ -406,6 +418,75 @@ export class MessageHandler {
         
             // Task operations
             case 'editTask':
+
+                // Check if this is a title change with include syntax (add/remove/change)
+                if (message.taskData?.title !== undefined) {
+                    const newTitle = message.taskData.title;
+                    const hasNewInclude = INCLUDE_SYNTAX.REGEX_SINGLE.test(newTitle);
+
+
+                    const board = this._getCurrentBoard();
+                    const column = board?.columns.find((c: any) => c.id === message.columnId);
+                    const task = column?.tasks.find((t: any) => t.id === message.taskId);
+
+                    if (task) {
+                        // CRITICAL FIX: Skip include detection for column-generated tasks
+                        // Column-generated tasks are slides from column includes (presentation files)
+                        // Their titles contain slide content, NOT include directives
+                        // IMPORTANT: Task IDs are regular (task-xxx), NOT task-col-xxx!
+                        // The ONLY way to identify them: check if parent column has includeMode=true
+                        const columnHasInclude = column?.includeMode === true;
+
+                        if (columnHasInclude) {
+                            // Fall through to regular edit handling
+                        } else {
+                            try {
+                                const oldIncludeFiles = task.includeFiles || [];
+                                const hadOldInclude = oldIncludeFiles.length > 0;
+
+
+                            // SOLUTION 3: Also handle include REMOVAL (not just addition)
+                            if (hasNewInclude || hadOldInclude) {
+
+                            const panel = this._getWebviewPanel();
+
+                            // Extract new include files from title
+                            const newIncludeFiles: string[] = [];
+                            const matches = newTitle.match(INCLUDE_SYNTAX.REGEX);
+                            if (matches) {
+                                matches.forEach((match: string) => {
+                                    const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+                                    newIncludeFiles.push(filePath);
+                                });
+                            }
+
+
+                            // Clear dirty flag before stopping edit
+                            if (panel.clearTaskDirty) {
+                                panel.clearTaskDirty(message.taskId);
+                            }
+
+                            // Stop editing before switch
+                            await this.requestStopEditing();
+
+                            await panel.handleIncludeSwitch({
+                                taskId: message.taskId,
+                                oldFiles: oldIncludeFiles,
+                                newFiles: newIncludeFiles,
+                                newTitle: newTitle
+                            });
+
+                            panel.setEditingInProgress(false);
+                            break;
+                        }
+                            } catch (error) {
+                                console.error(`[editTask] Exception in include handling:`, error);
+                            }
+                        }
+                    } else {
+                    }
+                }
+
                 // CRITICAL FIX: Unified execution path for task include content updates
                 // Both "edit include file" and "text modification" must call the same functions
 
@@ -423,8 +504,12 @@ export class MessageHandler {
                     const column = board?.columns.find((c: any) => c.id === message.columnId);
                     const task = column?.tasks.find((t: any) => t.id === message.taskId);
 
-                    if (task && task.includeMode && task.includeFiles) {
-                        console.log(`[editTask] Task include detected - updating file instance for: ${task.includeFiles.join(', ')}`);
+                    // CRITICAL FIX: Skip for column-generated tasks (slides from column includes)
+                    // Column-generated tasks have regular IDs (task-xxx), NOT task-col-xxx
+                    // The ONLY way to identify them: parent column has includeMode=true
+                    const columnHasInclude = column?.includeMode === true;
+
+                    if (task && task.includeMode && task.includeFiles && !columnHasInclude) {
                         const panel = this._getWebviewPanel();
 
                         for (const relativePath of task.includeFiles) {
@@ -433,20 +518,15 @@ export class MessageHandler {
                             const file = panel.fileRegistry?.getByRelativePath(normalizedPath);
 
                             if (file) {
+                                // Task include: description contains the FULL file content
+                                // No need to reconstruct - just save the description as-is
+                                const fullFileContent = message.taskData.description || '';
+
                                 // Update file content immediately (marks as unsaved)
                                 // This ensures "text modification" path calls the SAME function as "edit include file" path
-                                console.log(`[editTask] Updating file content for: ${relativePath}`);
-                                console.log(`[editTask]   Old content length: ${file.getContent().length}`);
-                                console.log(`[editTask]   New content length: ${message.taskData.description.length}`);
-
-                                // Update the file content (marks as unsaved, does NOT sync baseline)
-                                // Baseline will be synced when file is saved
-                                file.setContent(message.taskData.description, false);
-
-                                console.log(`[editTask]   File marked as unsaved: ${file.hasUnsavedChanges()}`);
+                                file.setContent(fullFileContent, false);
                             } else {
                                 console.warn(`[editTask] File not found in registry: ${relativePath}`);
-                                console.warn(`[editTask]   This might indicate the file was never loaded`);
                                 // File will be created when markUnsavedChanges → trackIncludeFileUnsavedChanges is called
                             }
                         }
@@ -536,10 +616,8 @@ export class MessageHandler {
                 break;
             case 'deleteColumn':
                 // REVERT: Using performBoardAction to investigate why changes are being reverted
-                console.log('[kanban.messageHandler.deleteColumn] Before delete, board has', this._getCurrentBoard()?.columns.length, 'columns');
                 await this.performBoardAction(() => {
                     const result = this._boardOperations.deleteColumn(this._getCurrentBoard()!, message.columnId);
-                    console.log('[kanban.messageHandler.deleteColumn] After delete, board has', this._getCurrentBoard()?.columns.length, 'columns');
                     return result;
                 });
                 break;
@@ -560,20 +638,87 @@ export class MessageHandler {
                 break;
             case 'editingStarted':
                 // User started editing - block board regenerations
-                console.log(`[MessageHandler] Editing started - blocking board regenerations`);
                 this._getWebviewPanel().setEditingInProgress(true);
+                // CRITICAL: Set edit mode flag on ALL relevant files for conflict detection
+                {
+                    const panel = this._getWebviewPanel();
+                    const mainFile = panel.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        mainFile.setEditMode(true);
+                    }
+
+                    // CRITICAL FIX: Also set edit mode on include files if editing within an include
+                    // This prevents external changes to include files from being missed during editing
+                    const board = panel.getBoard();
+                    if (board && (message.taskId || message.columnId)) {
+                        // Find the column being edited
+                        const column = board.columns.find((col: any) =>
+                            col.id === message.columnId ||
+                            col.tasks.some((t: any) => t.id === message.taskId)
+                        );
+
+                        if (column) {
+                            // Check if editing within a column include
+                            if (column.includeFiles && column.includeFiles.length > 0) {
+                                for (const relativePath of column.includeFiles) {
+                                    const includeFile = panel.fileRegistry.getByRelativePath(relativePath);
+                                    if (includeFile) {
+                                        includeFile.setEditMode(true);
+                                    }
+                                }
+                            }
+
+                            // Check if editing a task include
+                            // CRITICAL FIX: Skip for column-generated tasks
+                            if (message.taskId) {
+                                const task = column.tasks.find((t: any) => t.id === message.taskId);
+                                const columnHasInclude = column.includeMode === true;
+
+                                if (task && task.includeFiles && task.includeFiles.length > 0 && !columnHasInclude) {
+                                    for (const relativePath of task.includeFiles) {
+                                        const includeFile = panel.fileRegistry.getByRelativePath(relativePath);
+                                        if (includeFile) {
+                                            includeFile.setEditMode(true);
+                                        }
+                                    }
+                                } else if (columnHasInclude) {
+                                }
+                            }
+                        }
+                    }
+                }
                 break;
 
             case 'editingStopped':
                 // Frontend confirms editing has stopped (response to stopEditing request)
                 if (message.requestId) {
-                    this._handleEditingStopped(message.requestId);
+                    this._handleEditingStopped(message.requestId, message.capturedEdit);
+                }
+                break;
+
+            case 'editingStoppedNormal':
+                // User finished editing normally (not via backend request)
+                this._getWebviewPanel().setEditingInProgress(false);
+                // Clear edit mode flag on ALL files (main + includes)
+                {
+                    const panel = this._getWebviewPanel();
+                    const mainFile = panel.fileRegistry.getMainFile();
+                    if (mainFile) {
+                        mainFile.setEditMode(false);
+                    }
+
+                    // CRITICAL FIX: Also clear edit mode on all include files
+                    const allFiles = panel.fileRegistry.getAll();
+                    for (const file of allFiles) {
+                        if (file.getFileType() !== 'main') {
+                            file.setEditMode(false);
+                        }
+                    }
                 }
                 break;
 
             case 'renderSkipped':
                 // OPTIMIZATION 1: Frontend reports it skipped a render - mark as dirty
-                console.log(`[MessageHandler] Frontend skipped render for ${message.itemType} ${message.itemId} (reason: ${message.reason})`);
                 {
                     const panel = this._getWebviewPanel();
                     if (message.itemType === 'column') {
@@ -586,7 +731,6 @@ export class MessageHandler {
 
             case 'renderCompleted':
                 // OPTIMIZATION 3: Frontend successfully rendered - clear dirty flag
-                console.log(`[MessageHandler] Frontend confirmed render for ${message.itemType} ${message.itemId}`);
                 {
                     const panel = this._getWebviewPanel();
                     if (message.itemType === 'column') {
@@ -607,68 +751,91 @@ export class MessageHandler {
             case 'editColumnTitle':
                 // SWITCH-2: Route through unified column include switch function
                 const currentBoard = this._getCurrentBoard();
-                console.log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
-                console.log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
+                log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
+                log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
+                log(`[SWITCH-2] New title: ${message.title}`);
 
                 if (!currentBoard) {
-                    console.error(`[SWITCH-2] No board loaded`);
+                    log(`[SWITCH-2] No board loaded`);
                     break;
                 }
 
                 const column = currentBoard.columns.find(col => col.id === message.columnId);
                 if (!column) {
-                    console.error(`[SWITCH-2] Column ${message.columnId} not found`);
+                    log(`[SWITCH-2] Column ${message.columnId} not found`);
                     break;
                 }
 
                 // Check if the new title contains include syntax (location-based: column include)
-                const hasColumnIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
+                const hasColumnIncludeMatches = message.title.match(INCLUDE_SYNTAX.REGEX);
+                
+                // BUGFIX: Also check if old title had includes that are being removed
+                const oldIncludeMatches = (column.title || '').match(INCLUDE_SYNTAX.REGEX);
+                const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
 
-                if (hasColumnIncludeMatches) {
-                    // Column include switch - use UNIFIED function
-                    console.log(`[SWITCH-2] Detected column include syntax, routing to updateColumnIncludeFile`);
+                if (hasIncludeChanges) {
+                    // Column include switch - route through state machine
+                    log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
 
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
-                    hasColumnIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                        newIncludeFiles.push(filePath);
-                    });
+                    if (hasColumnIncludeMatches) {
+                        hasColumnIncludeMatches.forEach((match: string) => {
+                            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                            newIncludeFiles.push(filePath);
+                        });
+                    }
 
                     // Get old include files for cleanup
                     const oldIncludeFiles = column.includeFiles || [];
+                    log(`[SWITCH-2] Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
+                    log(`[SWITCH-2] New include files from title:`, newIncludeFiles);
+                    log(`[SWITCH-2] Column title in board:`, column.title);
 
-                    // Call unified switch function
-                    // It handles: undo state, unsaved prompts, cleanup, loading, updates
+                    // Route through unified state machine via handleIncludeSwitch
                     const panel = this._getWebviewPanel();
+
+                    // Clear dirty flag BEFORE stopping editing
+                    // This prevents RACE-2 handler from sending stale updateColumnContent
+                    if (panel.clearColumnDirty) {
+                        panel.clearColumnDirty(message.columnId);
+                        log(`[SWITCH-2] Cleared dirty flag for column ${message.columnId} before switch`);
+                    }
+
+                    // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
+                    // This ensures user can't edit while content is loading
+                    await this.requestStopEditing();
+
                     try {
-                        // RACE-1: Pass completion callback to clear editing flag when truly done
-                        await panel.updateColumnIncludeFile(
-                            message.columnId,
-                            oldIncludeFiles,
-                            newIncludeFiles,
-                            message.title,
-                            () => {
-                                // Clear editing flag only after all async operations complete
-                                console.log(`[SWITCH-2] Edit completed - allowing board regenerations`);
-                                this._getWebviewPanel().setEditingInProgress(false);
-                            }
-                        );
-                        console.log(`[SWITCH-2] Column include switch completed successfully`);
+                        // Call new state machine-based handler
+                        await panel.handleIncludeSwitch({
+                            columnId: message.columnId,
+                            oldFiles: oldIncludeFiles,
+                            newFiles: newIncludeFiles,
+                            newTitle: message.title
+                        });
+
+                        log(`[SWITCH-2] Column include switch completed successfully`);
+
+                        // State machine already updated all column properties (title, includeFiles, tasks)
+                        // No need to update board here - would cause stale data issues
+
+                        // Clear editing flag after completion
+                        log(`[SWITCH-2] Edit completed - allowing board regenerations`);
+                        this._getWebviewPanel().setEditingInProgress(false);
                     } catch (error: any) {
                         // RACE-1: On error, still clear editing flag
                         this._getWebviewPanel().setEditingInProgress(false);
 
                         if (error.message === 'USER_CANCELLED') {
-                            console.log(`[SWITCH-2] User cancelled switch, no changes made`);
+                            log(`[SWITCH-2] User cancelled switch, no changes made`);
                         } else {
-                            console.error(`[SWITCH-2] Error during column include switch:`, error);
+                            log(`[SWITCH-2] Error during column include switch:`, error);
                             vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
                         }
                     }
                 } else {
                     // Regular title edit without include syntax
-                    console.log(`[SWITCH-2] Regular column title edit (no include syntax)`);
                     // STATE-3: Frontend already updated title, don't echo back
                     await this.performBoardAction(() =>
                         this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title),
@@ -676,85 +843,108 @@ export class MessageHandler {
                     );
 
                     // RACE-1: Clear editing flag after regular title edit
-                    console.log(`[SWITCH-2] Regular edit completed - allowing board regenerations`);
                     this._getWebviewPanel().setEditingInProgress(false);
                 }
                 break;
             case 'editTaskTitle':
+
                 // Check if this might be a task include file change
                 const currentBoardForTask = this._getCurrentBoard();
                 const targetColumn = currentBoardForTask?.columns.find(col => col.id === message.columnId);
                 const task = targetColumn?.tasks.find(t => t.id === message.taskId);
 
-                // Check if the new title contains include syntax (location-based: task include)
-                const hasTaskIncludeMatches = message.title.match(/!!!include\(([^)]+)\)!!!/g);
+                if (task) {
+                }
 
-                if (hasTaskIncludeMatches) {
+                // CRITICAL FIX: Skip include detection for column-generated tasks
+                // Column-generated tasks are slides from column includes (presentation files)
+                // Their titles may contain text that LOOKS like include syntax
+                // The ONLY way to identify them: check if parent column has includeMode=true
+                const columnHasTaskInclude = targetColumn?.includeMode === true;
+
+                if (columnHasTaskInclude) {
+                    // Fall through to regular title edit below
+                } else {
+                    // Check if the new title contains include syntax (location-based: task include)
+                    const hasTaskIncludeMatches = message.title.match(INCLUDE_SYNTAX.REGEX);
+
+                    // BUGFIX: Also check if old title had includes that are being removed
+                    const oldTaskIncludeMatches = task ? (task.title || '').match(INCLUDE_SYNTAX.REGEX) : null;
+
+                    const hasTaskIncludeChanges = hasTaskIncludeMatches || oldTaskIncludeMatches;
+
+                if (hasTaskIncludeChanges) {
                     // Extract the include files from the new title
                     const newIncludeFiles: string[] = [];
-                    hasTaskIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                        newIncludeFiles.push(filePath);
-                    });
+                    if (hasTaskIncludeMatches) {
+                        hasTaskIncludeMatches.forEach((match: string) => {
+                            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                            newIncludeFiles.push(filePath);
+                        });
+                    }
 
-                    // STRATEGY A: Route through unified handler - it will check unsaved changes ONCE
-                    // All duplicate checks have been removed (lines 612-660 deleted)
-                    if (newIncludeFiles.length > 0 && task) {
-                        console.log('[editTaskTitle] Routing task include switch through unified handler...');
+                    // BUGFIX: Route through state machine for ANY include changes (add, remove, or switch)
+                    // This matches the column logic and ensures removal is handled
+                    if (task) {
                         const panel = this._getWebviewPanel();
                         const oldTaskIncludeFiles = task.includeFiles || [];
 
+                        // Clear dirty flag BEFORE stopping editing
+                        // Otherwise RACE-2 handler will send stale updateTaskContent from dirty items
+                        if (panel.clearTaskDirty) {
+                            panel.clearTaskDirty(message.taskId);
+                        }
+
                         // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
                         // This ensures user can't edit description while content is loading
-                        await this._requestStopEditing();
+                        await this.requestStopEditing();
 
                         try {
-                            // Route through unified handler - it checks unsaved changes once
-                            await (panel as any)._handleContentChange({
-                                source: 'user_edit',
-                                switchedIncludes: [{
-                                    taskId: message.taskId,
-                                    columnIdForTask: message.columnId,
-                                    oldFiles: oldTaskIncludeFiles,
-                                    newFiles: newIncludeFiles,
-                                    newTitle: message.title
-                                }]
+                            // Route through unified state machine via handleIncludeSwitch
+                            // The state machine will:
+                            // 1. Load new file content from disk
+                            // 2. Update task.description and task.displayTitle
+                            // 3. Invalidate board cache
+                            // 4. Send updateTaskContent to frontend
+                            // 5. Mark changes as unsaved
+                            // CRITICAL: Only pass taskId for task includes (NOT columnId)
+                            // If columnId is present, handleIncludeSwitch treats it as a column switch!
+                            await panel.handleIncludeSwitch({
+                                taskId: message.taskId,
+                                // DO NOT pass columnId - state machine finds column from taskId
+                                oldFiles: oldTaskIncludeFiles,
+                                newFiles: newIncludeFiles,
+                                newTitle: message.title
                             });
-                            console.log(`[editTaskTitle] Switch complete - displayTitle: "${task.displayTitle}"`);
 
-                            // Update the task title (this will trigger markUnsavedChanges with CORRECT content)
-                            // STATE-3: Frontend already has include content, don't echo back
-                            await this.performBoardAction(() =>
-                                this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
-                                { sendUpdate: false }
-                            );
+                            // State machine already updated all task properties (title, includeFiles, description)
+                            // No need to update board here - would cause stale data issues
 
                             // RACE-1: Clear editing flag after task include switch completes
-                            console.log('[editTaskTitle] Task include switch completed - allowing board regenerations');
                             panel.setEditingInProgress(false);
                         } catch (error: any) {
                             // RACE-1: On error, still clear editing flag
                             panel.setEditingInProgress(false);
 
                             if (error.message === 'USER_CANCELLED') {
-                                console.log('[editTaskTitle] Switch cancelled by user - keeping original title and content');
                             } else {
                                 throw error; // Re-throw other errors
                             }
                         }
                     }
-                } else {
-                    // Regular title edit without include syntax
-                    // STATE-3: Frontend already updated title, don't echo back
-                    await this.performBoardAction(() =>
-                        this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
-                        { sendUpdate: false }
-                    );
-
-                    // RACE-1: Clear editing flag after regular title edit
-                    console.log('[editTaskTitle] Regular edit completed - allowing board regenerations');
-                    this._getWebviewPanel().setEditingInProgress(false);
+                    break; // Exit after include handling
                 }
+                } // End of columnHasTaskInclude check
+
+                // Regular title edit without include syntax (or column-generated task edit)
+                // STATE-3: Frontend already updated title, don't echo back
+                await this.performBoardAction(() =>
+                    this._boardOperations.editTask(currentBoardForTask!, message.taskId, message.columnId, { title: message.title }),
+                    { sendUpdate: false }
+                );
+
+                // RACE-1: Clear editing flag after regular title edit
+                this._getWebviewPanel().setEditingInProgress(false);
                 break;
             case 'moveColumnWithRowUpdate':
                 await this.performBoardAction(() => 
@@ -1102,7 +1292,6 @@ export class MessageHandler {
         const filePath = message.filePath;
         const fileType = message.fileType;
 
-        console.log(`[MessageHandler.handleEditModeStart] filePath: ${filePath}, fileType: ${fileType}`);
 
         // Resolve to absolute path
         const currentDocument = this._fileManager.getDocument();
@@ -1137,7 +1326,6 @@ export class MessageHandler {
         const filePath = message.filePath;
         const fileType = message.fileType;
 
-        console.log(`[MessageHandler.handleEditModeEnd] filePath: ${filePath}, fileType: ${fileType}`);
 
         // Resolve to absolute path
         const currentDocument = this._fileManager.getDocument();
@@ -1238,17 +1426,12 @@ export class MessageHandler {
             return;
         }
 
-        console.log('[handleSaveBoardState] ========================================');
-        console.log('[handleSaveBoardState] Received board from frontend for saving');
-        console.log(`[handleSaveBoardState] Board has ${board.columns?.length || 0} columns`);
 
         // Log each column's includeMode status
         if (board.columns) {
             for (const col of board.columns) {
-                console.log(`[handleSaveBoardState] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
             }
         }
-        console.log('[handleSaveBoardState] ========================================');
 
         // NOTE: Do not save undo state here - individual operations already saved their undo states
         // before making changes. Saving here would create duplicate/grouped undo states.
@@ -1391,6 +1574,175 @@ export class MessageHandler {
             vscode.window.showInformationMessage(
                 `Use Ctrl+Space in the kanban editor for snippet picker.`
             );
+        }
+    }
+
+    private async handleEditorShortcut(message: any): Promise<void> {
+        try {
+            console.log(`[MessageHandler] Handling shortcut: ${message.shortcut}, selected text: "${message.selectedText}"`);
+
+            // First, check user keybindings
+            let userCommand = await this.getCommandForShortcut(message.shortcut);
+
+            // If not in user keybindings, check for common extension commands
+            if (!userCommand) {
+                userCommand = await this.getExtensionCommandForShortcut(message.shortcut);
+            }
+
+            if (userCommand) {
+                console.log(`[MessageHandler] Found command: ${userCommand}`);
+
+                try {
+                    // For commands that work on text selection (like translators):
+                    // Create a temp document, execute the command, capture result, close document
+                    if (message.selectedText && message.selectedText.length > 0) {
+                        console.log(`[MessageHandler] Creating temp document for command execution`);
+
+                        // Create temp document with selected text
+                        const tempDoc = await vscode.workspace.openTextDocument({
+                            content: message.selectedText,
+                            language: 'markdown'
+                        });
+
+                        // Show the temp document in a split view
+                        const tempEditor = await vscode.window.showTextDocument(tempDoc, {
+                            preview: true,
+                            preserveFocus: false, // Give focus to temp doc so command works
+                            viewColumn: vscode.ViewColumn.Beside
+                        });
+
+                        // Select all text in the temp document
+                        const lastLine = tempDoc.lineAt(tempDoc.lineCount - 1);
+                        tempEditor.selection = new vscode.Selection(
+                            new vscode.Position(0, 0),
+                            new vscode.Position(tempDoc.lineCount - 1, lastLine.text.length)
+                        );
+
+                        console.log(`[MessageHandler] Executing command: ${userCommand}`);
+                        // Execute the command (e.g., DeepL translate)
+                        await vscode.commands.executeCommand(userCommand);
+
+                        // Wait a bit for the command to complete and modify the document
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Get the result
+                        const resultText = tempDoc.getText();
+                        console.log(`[MessageHandler] Command executed, result length: ${resultText.length}`);
+
+                        // Send the result back to the webview first
+                        const panel = this._getWebviewPanel();
+                        if (panel) {
+                            panel._panel.webview.postMessage({
+                                type: 'replaceSelection',
+                                text: resultText,
+                                cursorLine: message.cursorLine,
+                                cursorColumn: message.cursorColumn,
+                                selectionStart: message.selectionStart,
+                                selectionEnd: message.selectionEnd
+                            });
+                        }
+
+                        // Close the temp document by focusing it first, then closing without saving
+                        await vscode.window.showTextDocument(tempDoc, {
+                            preview: false,
+                            preserveFocus: false,
+                            viewColumn: vscode.ViewColumn.Beside
+                        });
+
+                        // Close this editor without saving
+                        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+
+                        // Return focus to kanban
+                        if (panel) {
+                            panel._panel.reveal(vscode.ViewColumn.One, false);
+                        }
+                    } else {
+                        // No selection - execute normally
+                        await vscode.commands.executeCommand(userCommand);
+                        console.log(`[MessageHandler] Command executed (no selection)`);
+                    }
+
+                    return;
+                } catch (err) {
+                    console.error(`[MessageHandler] Failed to execute command:`, err);
+                }
+            }
+
+            console.log(`[MessageHandler] Shortcut not found. Add to keybindings.json to use in kanban editor.`);
+
+        } catch (error) {
+            console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
+        }
+    }
+
+    private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
+        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
+
+        // Map of common extension shortcuts to their commands
+        // This allows extensions to work in the kanban editor without requiring user keybindings
+        const extensionShortcuts: Record<string, string> = {
+            'alt+t': 'deepl.translate',
+            'shift+alt+t': 'deepl.translateTo',
+            // Add more common extension shortcuts here as needed
+        };
+
+        const command = extensionShortcuts[shortcut];
+        console.log(`[MessageHandler] Mapped shortcut to command: ${command}`);
+
+        if (command) {
+            // Verify the command actually exists
+            const allCommands = await vscode.commands.getCommands();
+            const commandExists = allCommands.includes(command);
+            console.log(`[MessageHandler] Command ${command} exists: ${commandExists}`);
+
+            if (commandExists) {
+                console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
+                return command;
+            } else {
+                console.log(`[MessageHandler] Command ${command} not found in available commands`);
+            }
+        } else {
+            console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
+        }
+
+        return null;
+    }
+
+    private async getCommandForShortcut(shortcut: string): Promise<string | null> {
+        try {
+            // Read VS Code's keybindings configuration
+            const keybindings = await this.loadVSCodeKeybindings();
+
+            console.log(`[MessageHandler] Looking for command for shortcut: ${shortcut}`);
+            console.log(`[MessageHandler] Loaded ${keybindings.length} keybindings`);
+
+            // Debug: Show all keybindings that contain 'alt' or match the letter
+            const shortcutLetter = shortcut.split('+').pop();
+            const relevantBindings = keybindings.filter(b =>
+                b.key && (b.key.includes('alt') || b.key.includes(shortcutLetter || ''))
+            );
+            console.log(`[MessageHandler] Relevant bindings:`, relevantBindings.slice(0, 10));
+
+            // Find keybinding that matches our shortcut
+            for (const binding of keybindings) {
+                if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
+                    // Skip negative bindings (commands starting with -)
+                    if (binding.command.startsWith('-')) {
+                        console.log(`[MessageHandler] Skipping negative binding: ${binding.command}`);
+                        continue;
+                    }
+
+                    console.log(`[MessageHandler] Found matching command: ${binding.command}`);
+                    return binding.command;
+                }
+            }
+
+            console.log(`[MessageHandler] No command found for shortcut ${shortcut}`);
+            return null;
+
+        } catch (error) {
+            console.error('Failed to find command for shortcut:', error);
+            return null;
         }
     }
 
@@ -1899,38 +2251,21 @@ export class MessageHandler {
             }
 
             // Log the board received from frontend with ALL task details
-            console.log('====== BACKEND RECEIVED BOARD FROM FRONTEND ======');
-            console.log(`Board has ${board.columns?.length || 0} columns`);
             if (board.columns) {
                 board.columns.forEach((col: any, colIdx: number) => {
-                    console.log(`\nColumn ${colIdx}: "${col.title}" (ID: ${col.id})`);
-                    console.log(`  includeMode: ${col.includeMode}`);
-                    console.log(`  includeFiles: ${col.includeFiles?.join(', ') || '(none)'}`);
-                    console.log(`  Tasks: ${col.tasks?.length || 0}`);
                     if (col.tasks) {
                         col.tasks.forEach((task: any, taskIdx: number) => {
-                            console.log(`    Task ${taskIdx}:`);
-                            console.log(`      ID: ${task.id}`);
-                            console.log(`      Title: ${task.title}`);
-                            console.log(`      Description (first 100): ${task.description?.substring(0, 100) || '(empty)'}`);
-                            console.log(`      includeMode: ${task.includeMode}`);
-                            console.log(`      includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
                         });
                     }
                 });
             }
-            console.log('==================================================');
 
             // CRITICAL: Check for unsaved changes in include files BEFORE updating the board
             const panel = this._getWebviewPanel();
             const oldBoard = this._getCurrentBoard();
 
-            console.log('[handleBoardUpdate] ========== UNSAVED CHANGES CHECK ==========');
-            console.log('[handleBoardUpdate] oldBoard exists:', !!oldBoard);
-            console.log('[handleBoardUpdate] panel exists:', !!panel);
 
             if (oldBoard && panel) {
-                console.log('[handleBoardUpdate] Checking columns for include file changes...');
 
                 // Check column includes
                 for (let i = 0; i < board.columns.length && i < oldBoard.columns.length; i++) {
@@ -1939,27 +2274,18 @@ export class MessageHandler {
 
                     const oldIncludeFiles = oldCol.includeFiles || [];
                     const newIncludeFiles = newCol.includeFiles || [];
-                    console.log(`[handleBoardUpdate] Column ${i} "${newCol.title}":`);
-                    console.log(`[handleBoardUpdate]   Old includeFiles:`, oldIncludeFiles);
-                    console.log(`[handleBoardUpdate]   New includeFiles:`, newIncludeFiles);
 
                     // FOUNDATION-1: Use normalized comparison
                     const removedFiles = oldIncludeFiles.filter((oldPath: string) =>
                         !newIncludeFiles.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
                     );
-                    console.log(`[handleBoardUpdate]   Removed files:`, removedFiles);
 
                     for (const removedPath of removedFiles) {
                         const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
-                        console.log(`[handleBoardUpdate]   Checking file "${removedPath}"`);
-                        console.log(`[handleBoardUpdate]     File exists in registry:`, !!oldFile);
                         if (oldFile) {
-                            console.log(`[handleBoardUpdate]     File type:`, oldFile.getFileType());
-                            console.log(`[handleBoardUpdate]     Has unsaved changes:`, oldFile.hasUnsavedChanges());
                         }
 
                         if (oldFile && oldFile.hasUnsavedChanges()) {
-                            console.log(`[handleBoardUpdate] ⚠️  Column include file being removed has unsaved changes: ${removedPath}`);
 
                             const choice = await vscode.window.showWarningMessage(
                                 `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
@@ -1974,7 +2300,6 @@ export class MessageHandler {
                             } else if (choice === 'Discard and Continue') {
                                 oldFile.discardChanges();
                             } else {
-                                console.log('[handleBoardUpdate] User cancelled - aborting board update');
                                 return; // Cancel the entire update
                             }
                         }
@@ -1994,7 +2319,6 @@ export class MessageHandler {
                             for (const removedPath of removedTaskFiles) {
                                 const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
                                 if (oldFile && oldFile.hasUnsavedChanges()) {
-                                    console.log(`[handleBoardUpdate] Task include file being removed has unsaved changes: ${removedPath}`);
 
                                     const choice = await vscode.window.showWarningMessage(
                                         `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
@@ -2009,7 +2333,6 @@ export class MessageHandler {
                                     } else if (choice === 'Discard and Continue') {
                                         oldFile.discardChanges();
                                     } else {
-                                        console.log('[handleBoardUpdate] User cancelled - aborting board update');
                                         return; // Cancel the entire update
                                     }
                                 }
@@ -2212,12 +2535,10 @@ export class MessageHandler {
     private async handleRequestEditIncludeFileName(message: any): Promise<void> {
         try {
             const currentFile = message.currentFile || '';
-            console.log('[requestEditIncludeFileName] currentFile:', currentFile, 'columnId:', message.columnId);
 
             // CRITICAL: Check if current include file has unsaved changes before switching
             const panel = this._getWebviewPanel();
             const file = panel?.fileRegistry?.getByRelativePath(currentFile);
-            console.log('[requestEditIncludeFileName] file found:', !!file, 'hasUnsaved:', file?.hasUnsavedChanges());
 
             if (file && file.hasUnsavedChanges()) {
                 // Current include file has unsaved changes - ask user what to do
@@ -2242,7 +2563,6 @@ export class MessageHandler {
             }
 
             // Now show the file picker dialog
-            console.log('[requestEditIncludeFileName] Showing file picker with current file:', currentFile);
 
             const currentDocument = this._fileManager.getDocument();
             if (!currentDocument) {
@@ -2272,7 +2592,6 @@ export class MessageHandler {
                 title: 'Select new include file for column'
             });
 
-            console.log('[requestEditIncludeFileName] User selected file:', fileUris?.[0]?.fsPath);
             if (fileUris && fileUris.length > 0) {
                 // Convert absolute path to relative path
                 const absolutePath = fileUris[0].fsPath;
@@ -2280,7 +2599,6 @@ export class MessageHandler {
 
                 // User selected a file - send message back to webview to proceed
                 const panel = this._getWebviewPanel();
-                console.log('[requestEditIncludeFileName] Sending proceedUpdateIncludeFile message');
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'proceedUpdateIncludeFile',
@@ -2288,12 +2606,10 @@ export class MessageHandler {
                         newFileName: relativePath,
                         currentFile: currentFile
                     });
-                    console.log('[requestEditIncludeFileName] Message sent successfully');
                 } else {
                     console.error('[requestEditIncludeFileName] No panel or panel._panel available!');
                 }
             } else {
-                console.log('[requestEditIncludeFileName] User cancelled file selection');
             }
             // If cancelled, do nothing
 
@@ -2390,142 +2706,8 @@ export class MessageHandler {
         }
     }
 
-    // SWITCH-3: Deleted handleSwitchColumnIncludeFile() - replaced by updateColumnIncludeFile() in KanbanWebviewPanel
-
-    /**
-     * Switch task include file without saving the main file
-     * - Saves old include file if it has unsaved changes
-     * - Creates and loads new include file
-     * - Updates task with new content
-     * - Does NOT save the main kanban file
-     */
-    private async handleSwitchTaskIncludeFile(message: any): Promise<void> {
-        try {
-            const panel = this._getWebviewPanel();
-            if (!panel) {
-                console.error('[switchTaskIncludeFile] No panel found');
-                return;
-            }
-
-            const { taskId, columnId, newFilePath, oldFilePath, newTitle } = message;
-            console.log(`[switchTaskIncludeFile] Switching from ${oldFilePath} to ${newFilePath} for task ${taskId}`);
-
-            // 1. Check if old include file has unsaved changes and prompt user
-            const oldFile = panel.fileRegistry?.getByRelativePath(oldFilePath);
-            if (oldFile && oldFile.hasUnsavedChanges()) {
-                console.log('[switchTaskIncludeFile] Old file has unsaved changes, prompting user');
-
-                const choice = await vscode.window.showWarningMessage(
-                    `The include file "${oldFilePath}" has unsaved changes. What would you like to do?`,
-                    { modal: true },
-                    'Save and Switch',
-                    'Discard and Switch',
-                    'Cancel'
-                );
-
-                if (choice === 'Save and Switch') {
-                    console.log('[switchTaskIncludeFile] User chose to save and switch');
-                    await oldFile.save();
-                } else if (choice === 'Discard and Switch') {
-                    console.log('[switchTaskIncludeFile] User chose to discard changes and switch');
-                    oldFile.discardChanges();
-                } else {
-                    // Cancel or closed dialog
-                    console.log('[switchTaskIncludeFile] User cancelled switch');
-                    return;
-                }
-            }
-
-            // 2. Update board with new include path
-            const board = this._getCurrentBoard();
-            if (board) {
-                const column = board.columns.find((c: any) => c.id === columnId);
-                if (column) {
-                    const task = column.tasks.find((t: any) => t.id === taskId);
-                    if (task) {
-                        task.title = newTitle;
-                        // FIX: Normalize path before storing
-                        // FOUNDATION-1: Store ORIGINAL path (no normalization)
-                        task.includeFiles = [newFilePath];
-                    }
-                }
-            }
-
-            // FIX #2b: Cleanup old include file that is being replaced
-            if (oldFilePath && oldFilePath !== newFilePath) {
-                // FOUNDATION-1: Registry handles normalization internally
-                const oldFileToCleanup = panel.fileRegistry?.getByRelativePath(oldFilePath);
-                if (oldFileToCleanup) {
-                    console.log(`[switchTaskIncludeFile] Cleaning up old include file: ${oldFilePath}`);
-                    oldFileToCleanup.stopWatching();
-                    // FIX: Don't call dispose() - unregister() does it internally
-                    panel.fileRegistry.unregister(oldFileToCleanup.getPath());
-                    console.log(`[switchTaskIncludeFile] ✓ Old file unregistered and disposed`);
-                }
-            }
-
-            // 3. Create new include file in registry if it doesn't exist
-            if (!panel.fileRegistry?.hasByRelativePath(newFilePath)) {
-                const mainFile = panel.fileRegistry.getMainFile();
-                if (mainFile) {
-                    console.log('[switchTaskIncludeFile] Creating new TaskIncludeFile');
-                    const taskInclude = panel._fileFactory.createTaskInclude(
-                        newFilePath,
-                        mainFile,
-                        false
-                    );
-                    panel.fileRegistry.register(taskInclude);
-                    taskInclude.startWatching();
-                }
-            }
-
-            // 4. Load content from file
-            const newFile = panel.fileRegistry?.getByRelativePath(newFilePath) as any;
-            if (newFile && newFile.getTaskDescription) {
-                // Ensure file has content loaded (may be empty if file was just created or content was cleared)
-                if (!newFile.getContent() || newFile.getContent().length === 0) {
-                    const content = await newFile.readFromDisk();
-                    if (content !== null) {
-                        newFile.setContent(content, true); // true = update baseline too
-                    } else {
-                        console.warn(`[switchTaskIncludeFile] Could not load content from file: ${newFilePath}`);
-                    }
-                }
-
-                const fullFileContent = newFile.getTaskDescription();
-                console.log(`[switchTaskIncludeFile] Loaded content from new file (${fullFileContent.length} chars)`);
-
-                // FIX BUG #5: No-parsing approach
-                // Load COMPLETE file content without parsing into title/description
-                // displayTitle is just a UI indicator showing which file is included
-                const displayTitle = `# include in ${newFilePath}`;
-                const taskDescription = fullFileContent;  // Complete content, no parsing!
-
-                // 6. Get updated task metadata from board
-                const task = board?.columns.find((c: any) => c.id === columnId)?.tasks.find((t: any) => t.id === taskId);
-
-                // 7. Send updated content to frontend with all required fields
-                panel._panel?.webview.postMessage({
-                    type: 'updateTaskContent',
-                    taskId: taskId,
-                    columnId: columnId,
-                    displayTitle: displayTitle,
-                    description: taskDescription,
-                    taskTitle: task?.title || newTitle,
-                    includeMode: true,
-                    includeFiles: [newFilePath],
-                    originalTitle: task?.originalTitle
-                });
-
-                // Success - no notification needed, user can see the change in the board
-                console.log(`[switchTaskIncludeFile] Successfully switched to: ${newFilePath}`);
-            }
-
-        } catch (error) {
-            console.error('[switchTaskIncludeFile] Error:', error);
-            vscode.window.showErrorMessage(`Failed to switch task include file: ${error}`);
-        }
-    }
+    // REMOVED: Legacy handleSwitchTaskIncludeFile method - replaced by state machine
+    // All include switches now route through ChangeStateMachine via editTaskTitle message
 
     /**
      * Handle request for task include filename (enabling include mode)
@@ -2578,18 +2760,15 @@ export class MessageHandler {
     private async handleGetExportDefaultFolder(): Promise<void> {
         try {
             let document = this._fileManager.getDocument();
-            console.log('[kanban.messageHandler.getExportDefaultFolder] FileManager document:', document ? document.uri.fsPath : 'null');
 
             // If document not available from FileManager, try to get the file path and open it
             if (!document) {
                 const filePath = this._fileManager.getFilePath();
-                console.log('[kanban.messageHandler.getExportDefaultFolder] FileManager filePath:', filePath || 'null');
 
                 if (filePath) {
                     // Open the document using the file path
                     try {
                         document = await vscode.workspace.openTextDocument(filePath);
-                        console.log('[kanban.messageHandler.getExportDefaultFolder] Opened document from file path');
                     } catch (error) {
                         console.error('[kanban.messageHandler.getExportDefaultFolder] Failed to open document from file path:', error);
                     }
@@ -2598,10 +2777,8 @@ export class MessageHandler {
                 // If still no document, try active editor as last resort
                 if (!document) {
                     const activeEditor = vscode.window.activeTextEditor;
-                    console.log('[kanban.messageHandler.getExportDefaultFolder] Active editor:', activeEditor ? activeEditor.document.fileName : 'null');
                     if (activeEditor && activeEditor.document.fileName.endsWith('.md')) {
                         document = activeEditor.document;
-                        console.log('[kanban.messageHandler.getExportDefaultFolder] Using active editor document as fallback');
                     }
                 }
             }
@@ -2612,7 +2789,6 @@ export class MessageHandler {
             }
 
             const defaultFolder = ExportService.generateDefaultExportFolder(document.uri.fsPath);
-            console.log('[kanban.messageHandler.getExportDefaultFolder] Generated default folder:', defaultFolder);
             const panel = this._getWebviewPanel();
             if (panel && panel._panel) {
                 panel._panel.webview.postMessage({
@@ -3180,20 +3356,16 @@ export class MessageHandler {
      * Handle get Marp themes request
      */
     private async handleGetMarpThemes(): Promise<void> {
-        console.log('[kanban.messageHandler.handleGetMarpThemes] Starting to get Marp themes...');
         try {
             const themes = await MarpExportService.getAvailableThemes();
-            console.log('[kanban.messageHandler.handleGetMarpThemes] Got themes:', themes);
             
             const panel = this._getWebviewPanel();
-            console.log('[kanban.messageHandler.handleGetMarpThemes] Panel result:', panel);
             
             if (panel && panel._panel && panel._panel.webview) {
                 const message = {
                     type: 'marpThemesAvailable',
                     themes: themes
                 };
-                console.log('[kanban.messageHandler.handleGetMarpThemes] Sending message:', message);
                 
                 panel._panel.webview.postMessage(message);
             } else {
@@ -3212,7 +3384,6 @@ export class MessageHandler {
                     themes: ['default'], // Fallback
                     error: error instanceof Error ? error.message : String(error)
                 };
-                console.log('[kanban.messageHandler.handleGetMarpThemes] Sending error message:', message);
                 panel._panel.webview.postMessage(message);
             }
         }
@@ -3222,12 +3393,10 @@ export class MessageHandler {
      * Handle poll for Marp themes (fallback mechanism)
      */
     private async handlePollMarpThemes(): Promise<void> {
-        console.log('[kanban.messageHandler.handlePollMarpThemes] Polling for Marp themes...');
         try {
             // Check if we have cached themes from the previous attempt
             const cachedThemes = (globalThis as any).pendingMarpThemes;
             if (cachedThemes) {
-                console.log('[kanban.messageHandler.handlePollMarpThemes] Found cached themes:', cachedThemes);
                 
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel && panel._panel.webview) {
@@ -3243,7 +3412,6 @@ export class MessageHandler {
             
             // If no cached themes, try to get them again
             const themes = await MarpExportService.getAvailableThemes();
-            console.log('[kanban.messageHandler.handlePollMarpThemes] Got fresh themes:', themes);
             
             const panel = this._getWebviewPanel();
             if (panel && panel._panel && panel._panel.webview) {
@@ -3309,7 +3477,6 @@ export class MessageHandler {
      */
     private async handleStopAutoExport(): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleStopAutoExport] Stopping auto-export');
 
             // Unregister from SaveEventCoordinator
             const doc = this._fileManager.getDocument();
@@ -3319,17 +3486,14 @@ export class MessageHandler {
             }
 
             // Stop all Marp watch processes
-            console.log('[kanban.messageHandler.handleStopAutoExport] Terminating Marp processes');
             MarpExportService.stopAllMarpWatches();
 
             this._autoExportSettings = null;
 
-            console.log('[kanban.messageHandler.handleStopAutoExport] Auto-export stopped');
 
             // Notify frontend to hide the auto-export button
             const panel = this._getWebviewPanel();
             if (panel && panel.webview) {
-                console.log('[kanban.messageHandler.handleStopAutoExport] Sending autoExportStopped message to frontend');
                 panel.webview.postMessage({
                     type: 'autoExportStopped'
                 });
@@ -3347,9 +3511,7 @@ export class MessageHandler {
      */
     private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, protectExportedPath?: string): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Stopping auto-export for other kanban files, protecting current:', currentKanbanFilePath);
             if (protectExportedPath) {
-                console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Also protecting exported file:', protectExportedPath);
             }
 
             // Unregister from SaveEventCoordinator
@@ -3360,14 +3522,12 @@ export class MessageHandler {
             }
 
             // Stop Marp watch processes for OTHER files (not the current export)
-            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Terminating Marp processes (except current export)');
             if (protectExportedPath) {
                 ExportService.stopAllMarpWatchesExcept(protectExportedPath);
             } else {
                 MarpExportService.stopAllMarpWatches();
             }
 
-            console.log('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Auto-export stopped for other kanban files');
         } catch (error) {
             console.error('[kanban.messageHandler.handleStopAutoExportForOtherKanbanFiles] Error:', error);
             throw error;
@@ -3379,7 +3539,6 @@ export class MessageHandler {
      */
     private async handleStopAutoExportForFile(excludeFilePath?: string): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Stopping auto-export, excluding:', excludeFilePath);
 
             // Unregister from SaveEventCoordinator
             const doc = this._fileManager.getDocument();
@@ -3389,12 +3548,10 @@ export class MessageHandler {
             }
 
             // Stop all Marp watch processes
-            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Terminating Marp processes');
             MarpExportService.stopAllMarpWatches();
 
             this._autoExportSettings = null;
 
-            console.log('[kanban.messageHandler.handleStopAutoExportForFile] Auto-export stopped for other files');
         } catch (error) {
             console.error('[kanban.messageHandler.handleStopAutoExportForFile] Error:', error);
             throw error;
@@ -3413,7 +3570,6 @@ export class MessageHandler {
      */
     private async handleExport(options: any, operationId?: string): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleExport] Starting export with options:', JSON.stringify(options, null, 2));
 
             // Get document (with fallback to file path if document is closed)
             let document = this._fileManager.getDocument();
@@ -3422,7 +3578,6 @@ export class MessageHandler {
                 if (filePath) {
                     try {
                         document = await vscode.workspace.openTextDocument(filePath);
-                        console.log('[kanban.messageHandler.handleExport] Opened document from file path:', filePath);
                     } catch (error) {
                         console.error('[kanban.messageHandler.handleExport] Failed to open document from file path:', error);
                     }
@@ -3443,7 +3598,6 @@ export class MessageHandler {
 
             // Handle COPY mode (no progress bar)
             if (options.mode === 'copy') {
-                console.log('[kanban.messageHandler.handleExport] Copy mode - no progress bar');
                 const result = await ExportService.export(document, options, board);
 
                 const panel = this._getWebviewPanel();
@@ -3490,7 +3644,6 @@ export class MessageHandler {
 
                 // Open in browser if requested
                 if (result.success && options.openAfterExport && result.exportedPath) {
-                    console.log('[kanban.messageHandler.handleExport] Opening exported file:', result.exportedPath);
                     const uri = vscode.Uri.file(result.exportedPath);
 
                     if (result.exportedPath.endsWith('.html')) {
@@ -3523,7 +3676,6 @@ export class MessageHandler {
      * Part of unified export handler
      */
     private async handleAutoExportMode(document: vscode.TextDocument, options: any): Promise<void> {
-        console.log('[kanban.messageHandler.handleAutoExportMode] Starting auto-export');
 
         // Store settings
         this._autoExportSettings = options;
@@ -3532,9 +3684,7 @@ export class MessageHandler {
         const board = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
 
         // Do initial export FIRST (to start Marp if needed)
-        console.log('[kanban.messageHandler.handleAutoExportMode] Running initial export...');
         const initialResult = await ExportService.export(document, options, board);
-        console.log('[kanban.messageHandler.handleAutoExportMode] Initial export completed, path:', initialResult.exportedPath);
 
         // NOW stop existing handlers/processes for other files
         // If Marp was started, protect the exported markdown file
@@ -3548,25 +3698,21 @@ export class MessageHandler {
             id: `auto-export-${docUri.fsPath}`,
             handleSave: async (savedDoc: vscode.TextDocument) => {
                 if (savedDoc.uri.toString() === docUri.toString()) {
-                    console.log('[kanban.messageHandler.autoExport] File saved');
 
                     // For Marp watch mode, update markdown only - Marp's watch will handle the rest
                     if (options.marpWatch) {
-                        console.log('[kanban.messageHandler.autoExport] Marp watch active - updating markdown only, NOT restarting Marp');
 
                         try {
                             // Get fresh board for conversion
                             const boardForUpdate = (options.format !== 'kanban' && !options.packAssets) ? this._getCurrentBoard() : undefined;
                             // Export with marpWatch flag set - skips Marp conversion
                             await ExportService.export(savedDoc, options, boardForUpdate);
-                            console.log('[kanban.messageHandler.autoExport] Markdown updated, Marp watch will auto-detect changes');
                         } catch (error) {
                             console.error('[kanban.messageHandler.autoExport] Markdown update failed:', error);
                         }
                         return;
                     }
 
-                    console.log('[kanban.messageHandler.autoExport] Triggering full export...');
 
                     try {
                         // Get fresh board for conversion
@@ -3579,7 +3725,6 @@ export class MessageHandler {
                             await vscode.env.openExternal(uri);
                         }
 
-                        console.log('[kanban.messageHandler.autoExport] Auto-export completed');
                     } catch (error) {
                         console.error('[kanban.messageHandler.autoExport] Auto-export failed:', error);
                         vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -3589,7 +3734,6 @@ export class MessageHandler {
         };
 
         coordinator.registerHandler(handler);
-        console.log('[kanban.messageHandler.handleAutoExportMode] Handler registered');
     }
 
     /**
@@ -3606,12 +3750,10 @@ export class MessageHandler {
         }
 
         try {
-            console.log('[PlantUML Backend] Rendering diagram...');
 
             // Render using backend service (Java + PlantUML JAR)
             const svg = await this._plantUMLService.renderSVG(code);
 
-            console.log('[PlantUML Backend] ✅ Diagram rendered successfully');
 
             // Send success response to webview
             panel.webview.postMessage({
@@ -3680,7 +3822,6 @@ export class MessageHandler {
                 });
             }
 
-            console.log(`[PlantUML] Converted to SVG: ${svgFilePath}`);
         } catch (error) {
             console.error('[PlantUML] Conversion failed:', error);
             const panel = this._getWebviewPanel();
@@ -3701,10 +3842,6 @@ export class MessageHandler {
         plantUMLCode: string,
         svgRelativePath: string
     ): string {
-        console.log('[PlantUML] replacePlantUMLWithSVG called');
-        console.log('[PlantUML] PlantUML code length:', plantUMLCode.length);
-        console.log('[PlantUML] PlantUML code:', plantUMLCode);
-        console.log('[PlantUML] SVG path:', svgRelativePath);
 
         // Escape special regex characters in code, accounting for indentation
         const escapedCode = plantUMLCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -3712,7 +3849,6 @@ export class MessageHandler {
         // Split the code into lines to handle per-line matching with indentation
         // NOTE: The frontend sends TRIMMED code, but the file may have indented code
         const codeLines = plantUMLCode.split('\n').filter(line => line.trim().length > 0);
-        console.log('[PlantUML] Code has', codeLines.length, 'non-empty lines');
         const escapedLines = codeLines.map(line =>
             line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         );
@@ -3721,14 +3857,12 @@ export class MessageHandler {
 
         // Create regex to match ```plantuml ... ``` block with any indentation
         const regexPattern = '([ \\t]*)```plantuml\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
-        console.log('[PlantUML] Testing regex match...');
         const regex = new RegExp(regexPattern, 'g');
 
         // Replace with custom function to preserve indentation
         let replacementCount = 0;
         let updatedContent = content.replace(regex, (_match, indent) => {
             replacementCount++;
-            console.log('[PlantUML] Replacement #' + replacementCount + ', indent:', JSON.stringify(indent));
 
             // Indent each line of the code
             const indentedCode = plantUMLCode.split('\n').map(line =>
@@ -3746,12 +3880,10 @@ ${indent}![PlantUML Diagram](${svgRelativePath})`;
         // Check if replacement happened
         if (updatedContent === content) {
             console.warn('[PlantUML] No matching PlantUML block found for replacement');
-            console.log('[PlantUML] Trying fuzzy matching...');
             // Try fuzzy matching as fallback
             return this.replacePlantUMLWithSVGFuzzy(content, plantUMLCode, svgRelativePath);
         }
 
-        console.log('[PlantUML] Replacement successful, count:', replacementCount);
         return updatedContent;
     }
 
@@ -3784,7 +3916,6 @@ ${indent}![PlantUML Diagram](${svgRelativePath})`;
         }
 
         if (bestMatch) {
-            console.log(`[PlantUML] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
 
             const replacement = `\`\`\`plantuml-disabled
 ${plantUMLCode}
@@ -3897,7 +4028,6 @@ ${plantUMLCode}
                 });
             }
 
-            console.log(`[Mermaid] Converted to SVG: ${svgFilePath}`);
         } catch (error) {
             console.error('[Mermaid] Conversion failed:', error);
             const panel = this._getWebviewPanel();
@@ -3918,17 +4048,12 @@ ${plantUMLCode}
         mermaidCode: string,
         svgRelativePath: string
     ): string {
-        console.log('[Mermaid] replaceMermaidWithSVG called');
-        console.log('[Mermaid] Mermaid code length:', mermaidCode.length);
-        console.log('[Mermaid] Mermaid code:', mermaidCode);
-        console.log('[Mermaid] SVG path:', svgRelativePath);
 
         // Escape special regex characters in code
         const escapedCode = mermaidCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         // Split the code into lines to handle per-line matching with indentation
         const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
-        console.log('[Mermaid] Code has', codeLines.length, 'non-empty lines');
         const escapedLines = codeLines.map(line =>
             line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         );
@@ -3937,14 +4062,12 @@ ${plantUMLCode}
 
         // Create regex to match ```mermaid ... ``` block with any indentation
         const regexPattern = '([ \\t]*)```mermaid\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
-        console.log('[Mermaid] Testing regex match...');
         const regex = new RegExp(regexPattern, 'g');
 
         // Replace with custom function to preserve indentation
         let replacementCount = 0;
         let updatedContent = content.replace(regex, (_match, indent) => {
             replacementCount++;
-            console.log('[Mermaid] Replacement #' + replacementCount + ', indent:', JSON.stringify(indent));
 
             // Indent each line of the code
             const indentedCode = mermaidCode.split('\n').map(line =>
@@ -3962,12 +4085,10 @@ ${indent}![Mermaid Diagram](${svgRelativePath})`;
         // Check if replacement happened
         if (updatedContent === content) {
             console.warn('[Mermaid] No matching Mermaid block found for replacement');
-            console.log('[Mermaid] Trying fuzzy matching...');
             // Try fuzzy matching as fallback
             return this.replaceMermaidWithSVGFuzzy(content, mermaidCode, svgRelativePath);
         }
 
-        console.log('[Mermaid] Replacement successful, count:', replacementCount);
         return updatedContent;
     }
 
@@ -4000,7 +4121,6 @@ ${indent}![Mermaid Diagram](${svgRelativePath})`;
         }
 
         if (bestMatch) {
-            console.log(`[Mermaid] Found fuzzy match with ${(similarity * 100).toFixed(1)}% similarity`);
 
             const replacement = `\`\`\`mermaid-disabled
 ${mermaidCode}

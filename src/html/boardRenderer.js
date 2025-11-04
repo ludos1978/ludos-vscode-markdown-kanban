@@ -402,35 +402,10 @@ function ensureTagStyleExists(tagName) {
         styleElement.textContent += newStyles;
     }
 }
-
-/**
- * Extract the first tag from text (boardRenderer.js internal use)
- * @param {string} text - Text to extract tag from
- * @returns {string|null} First tag or null
- */
-function extractFirstTag(text) {
-    if (!text) {
-        return null;
-    }
-
-    // Use boardRenderer.js compatible regex with exclusions for layout tags
-    const re = /#(?!row\d+\b)(?!span\d+\b)(?!stack\b)([a-zA-Z0-9_-]+(?:[=|><][a-zA-Z0-9_-]+)*)/g;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-        const raw = m[1];
-        const baseMatch = raw.match(/^([a-zA-Z0-9_-]+)/);
-        const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
-        if (base.startsWith('gather_')) {
-            continue; // do not use gather tags for styling
-        }
-        return base;
-    }
-    return null;
-}
+// Note: extractFirstTag is now provided by utils/tagUtils.js via window.tagUtils.extractFirstTag()
 
 // Make functions globally available
 window.ensureTagStyleExists = ensureTagStyleExists;
-window.extractFirstTag = extractFirstTag;
 
 
 
@@ -863,6 +838,23 @@ function getUserAddedTags() {
 
 // Helper function to generate tag menu items from configuration and user-added tags
 /**
+ * Generate numeric badge HTML for columns and tasks
+ * @param {string} title - Column or task title
+ * @returns {string} HTML string for numeric badge or empty string
+ */
+function generateNumericBadge(title) {
+    if (!title || !window.tagUtils) return '';
+
+    const numericTag = window.tagUtils.extractNumericTag(title);
+    if (numericTag === null) return '';
+
+    // Format the badge display - show the numeric value
+    const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+
+    return `<div class="numeric-badge" title="Index: ${displayValue}">${displayValue}</div>`;
+}
+
+/**
  * Generates complete HTML for tag selection menu
  * Purpose: Creates interactive tag toggle menu for columns/tasks
  * Used by: Column and task burger menus
@@ -1194,7 +1186,7 @@ function renderSingleColumn(columnId, columnData) {
  * Side effects: Updates DOM, applies styles, restores state
  * Performance: Debounced to prevent rapid re-renders
  */
-function renderBoard() {
+function renderBoard(options = null) {
 
     // Apply tag styles first
     applyTagStyles();
@@ -1203,6 +1195,37 @@ function renderBoard() {
     if (window.taskEditor && window.taskEditor.currentEditor) {
         return;
     }
+
+    // Selective rendering: only update specific columns or tasks
+    if (options) {
+        if (options.tasks && options.tasks.length > 0) {
+            // Re-render specific tasks - delegate to column re-render
+            // Group tasks by column to minimize re-renders
+            const columnIds = new Set();
+            options.tasks.forEach(({ columnId }) => {
+                if (columnId) columnIds.add(columnId);
+            });
+            options = { columns: Array.from(columnIds) };
+            // Fall through to column rendering below
+        }
+        if (options.columns && options.columns.length > 0) {
+            // Re-render specific columns only using existing renderSingleColumn
+            if (!window.cachedBoard || !window.cachedBoard.columns) {
+                console.warn('[renderBoard] No cached board for selective render, doing full render');
+                options = null; // Fall through to full render
+            } else {
+                options.columns.forEach(columnId => {
+                    const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                    if (column) {
+                        renderSingleColumn(columnId, column);
+                    }
+                });
+                return;
+            }
+        }
+    }
+
+    // Full board render (default behavior)
 
     const boardElement = getBoardElement();
     if (!boardElement) {
@@ -1658,9 +1681,9 @@ function createColumnElement(column, columnIndex) {
 
     // Extract ALL tags from column title for stacking features
     const allTags = getActiveTagsInTitle(column.title);
-    
+
     // Use first tag for background color (never stack backgrounds)
-    const columnTag = extractFirstTag(column.title);
+    const columnTag = window.tagUtils ? window.tagUtils.extractFirstTag(column.title) : null;
     
     const columnDiv = document.createElement('div');
     const isCollapsed = window.collapsedColumns.has(column.id);
@@ -1708,8 +1731,16 @@ function createColumnElement(column, columnIndex) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
 
+    // Check if column has current week tag
+    if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+        columnDiv.setAttribute('data-current-week', 'true');
+    }
+
     // Corner badges handled by immediate update system
     const cornerBadgesHtml = '';
+
+    // Generate numeric badge if present
+    const numericBadgeHtml = generateNumericBadge(column.title);
 
     // Get display title using shared utility function
     const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
@@ -1727,6 +1758,7 @@ function createColumnElement(column, columnIndex) {
 				</div>
 				<div class="column-title">
 						${cornerBadgesHtml}
+						${numericBadgeHtml}
 						<div class="column-title-section">
 								<span class="drag-handle column-drag-handle" draggable="true">⋮⋮</span>
 								<span class="collapse-toggle ${isCollapsed ? 'rotated' : ''}" data-column-id="${column.id}">▶</span>
@@ -1877,6 +1909,7 @@ function createTaskElement(task, columnId, taskIndex) {
     
     // Corner badges and header/footer bars handled by immediate update system
     const cornerBadgesHtml = '';
+    const numericBadgeHtml = generateNumericBadge(task.title);
     const headerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     const footerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     
@@ -1899,18 +1932,22 @@ function createTaskElement(task, columnId, taskIndex) {
     
     const headerBarsHtml = headerBarsData.html || '';
     const footerBarsHtml = footerBarsData.html || '';
-    
+
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
+
+    // Check if task has current week tag
+    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isCurrentWeek(task.title)) ? ' data-current-week="true"' : '';
 
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
-             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}
+             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}${currentWeekAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
             ${loadingOverlay}
             ${headerBarsHtml}
             ${cornerBadgesHtml}
+            ${numericBadgeHtml}
             <div class="task-header">
                 <div class="task-drag-handle" title="Drag to move task">⋮⋮</div>
                 <span class="task-collapse-toggle ${isCollapsed ? 'rotated' : ''}" onclick="toggleTaskCollapse('${task.id}'); updateFoldAllButton('${columnId}')">▶</span>
@@ -3054,6 +3091,18 @@ function getTagConfig(tagName) {
     return null;
 }
 
+/**
+ * Escape special characters in tag names for CSS attribute selectors
+ * Dots, colons, brackets, etc. need to be escaped in CSS
+ * @param {string} tagName - Tag name to escape
+ * @returns {string} Escaped tag name
+ */
+function escapeCSSAttributeValue(tagName) {
+    if (!tagName) return '';
+    // Escape dots and other special CSS characters
+    return tagName.replace(/\./g, '\\.');
+}
+
 // Generate dynamic CSS for tag colors and additional styles
 /**
  * Generates all CSS styles for tag-based theming
@@ -3210,6 +3259,7 @@ function generateTagStyles() {
             if (config.light || config.dark) {
                 const themeColors = config[themeKey] || config.light || {};
                 const lowerTagName = tagName.toLowerCase();
+                const escapedTagName = escapeCSSAttributeValue(lowerTagName);
 
                 // Tag pill styles (the tag text itself) - only if background is configured
                 if (themeColors.background) {
@@ -3221,7 +3271,7 @@ function generateTagStyles() {
                     const tagTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBackground) : '#000000';
                     const tagTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(tagTextColor, opaqueBackground) : '';
 
-                    styles += `.kanban-tag[data-tag="${lowerTagName}"] {
+                    styles += `.kanban-tag[data-tag="${escapedTagName}"] {
                         color: ${tagTextColor} !important;
                         background-color: ${themeColors.background} !important;
                         border: 1px solid ${themeColors.background};${tagTextShadow ? `\n                        text-shadow: ${tagTextShadow};` : ''}
@@ -3230,8 +3280,8 @@ function generateTagStyles() {
                     // Highlight lines/paragraphs containing this tag in descriptions
                     // Only p and li elements, not the task-section div wrappers
                     const lineBgAlpha = themeColors.background + '20'; // Add 20 for ~12% opacity
-                    styles += `.task-description-display p:has(.kanban-tag[data-tag="${lowerTagName}"]),
-.task-description-display li:has(.kanban-tag[data-tag="${lowerTagName}"]) {
+                    styles += `.task-description-display p:has(.kanban-tag[data-tag="${escapedTagName}"]),
+.task-description-display li:has(.kanban-tag[data-tag="${escapedTagName}"]) {
     background-color: ${lineBgAlpha} !important;
     border-left: 2px solid ${themeColors.background} !important;
     padding: 2px 4px !important;
@@ -3252,32 +3302,32 @@ function generateTagStyles() {
                     const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-header {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-title {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column title text color - higher specificity to override base CSS
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-title .column-title-text,
-.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title .column-title-text,
+.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title .column-title-text * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
                     // Column content background
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-content {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-content {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column footer background and text
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-footer,
-.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer,
+.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
@@ -3289,41 +3339,41 @@ function generateTagStyles() {
                     const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-header {
+                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-header {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-title {
+                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
                     // Collapsed title text color - higher specificity
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-title .column-title-text,
-.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title .column-title-text,
+.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title .column-title-text * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
 
                     // Collapsed column footer background and text
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-footer,
-.kanban-full-height-column.collapsed[data-column-tag="${lowerTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer,
+.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
                     
                     // Card background styles - only for primary tag
                     // Interpolate 25% towards the darker color
                     const cardBg = interpolateColor(editorBg, bgDark, 0.25);
-                    styles += `.task-item[data-task-tag="${lowerTagName}"] {
+                    styles += `.task-item[data-task-tag="${escapedTagName}"] {
                         background-color: ${cardBg} !important;
                         position: relative;
                     }\n`;
                     
                     // Card hover state - interpolate 35% towards the darker color
                     const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-                    styles += `.task-item[data-task-tag="${lowerTagName}"]:hover {
+                    styles += `.task-item[data-task-tag="${escapedTagName}"]:hover {
                         background-color: ${cardHoverBg} !important;
                     }\n`;
                 }
@@ -3336,43 +3386,43 @@ function generateTagStyles() {
                         
                         if (config.border.position === 'left') {
                             // Use data-column-tag for left border on all column parts
-                            styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-header {
+                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-title {
+                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-inner {
+                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-footer {
+                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${lowerTagName}"] {
+                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         } else {
                             // Full border split the border for top and bottom part
-                            styles += `.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-header {
+                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-top: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-title {
+														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-inner {
+														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: none !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${lowerTagName}"] .column-footer {
+														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${lowerTagName}"] {
+                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
                                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         }

@@ -21,3 +21,5 @@ tests/kanban-graph-tools/_Export
 tests/kanban-graph-tools/Media-kanban-graphs
 tests/kanban-graph-tools/kanban-graphs-*
 logs/*.log
+tests/kanban-include-tests/root/.backups
+tmp

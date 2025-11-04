@@ -2,8 +2,23 @@ import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './configurationService';
 
+// Global output channel for extension logging
+let outputChannel: vscode.OutputChannel | undefined;
+
+export function getOutputChannel(): vscode.OutputChannel | undefined {
+	return outputChannel;
+}
+
 export function activate(context: vscode.ExtensionContext) {
-	console.log('[Kanban Extension] Activating markdown-kanban-obsidian extension...');
+	console.log('[Extension] Activation started');
+
+	// Create output channel for debugging
+	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
+	context.subscriptions.push(outputChannel);
+
+	console.log('[Extension] Activating markdown-kanban-obsidian extension');
+	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
+
 	let fileListenerEnabled = true;
 
 	// Function to get file listener status

@@ -2,10 +2,59 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-10-29
+**Last Updated:** 2025-11-04
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Critical Fixes & New Functions (Phase 1-6)
+
+### Phase 6: State Machine Architecture (2025-11-02)
+
+#### STATE-MACHINE: Unified Change Handler
+**File:** [src/core/ChangeStateMachine.ts](src/core/ChangeStateMachine.ts)
+- **New**: `ChangeStateMachine` - SINGLE ENTRY POINT for all file changes in the system
+- **Why**: Eliminates scattered entry points (file watcher, user edits, saves, switches)
+- **Solution**: State machine with 15 states guarantees consistent execution order
+- **Impact**: All changes follow predictable flow, unsaved check ALWAYS executed before switches
+- **Architecture**: See [STATE_MACHINE_DESIGN.md](../STATE_MACHINE_DESIGN.md) for complete design
+- **Migration**: See [STATE_MACHINE_MIGRATION_GUIDE.md](../STATE_MACHINE_MIGRATION_GUIDE.md) for implementation guide
+
+**Public Methods:**
+- `getInstance()` - Get singleton instance
+- `initialize(fileRegistry, webviewPanel)` - Inject dependencies
+- `processChange(event)` - **SINGLE ENTRY POINT** - Process any file change event
+- `getCurrentState()` - Get current state (for debugging/testing)
+- `getCurrentContext()` - Get current context (for debugging/testing)
+
+**State Handlers (Private):**
+- `_handleReceivingChange()` - Capture event information
+- `_handleAnalyzingImpact()` - Classify change type and determine affected files
+- `_handleCheckingEditState()` - Check if user is editing affected files
+- `_handleCapturingEdit()` - Capture user's current edit to baseline
+- `_handleCheckingUnsaved()` - Check for unsaved files being unloaded (ALWAYS executed)
+- `_handlePromptingUser()` - Show Save/Discard/Cancel dialog for unsaved changes
+- `_handleSavingUnsaved()` - Save unsaved files per user request
+- `_handleClearingCache()` - Clear frontend & backend cache for old includes
+- `_handleLoadingNew()` - Load new include file content from disk
+- `_handleUpdatingBackend()` - Update board state and file registry
+- `_handleSyncingFrontend()` - Send targeted updates to webview
+- `_handleComplete()` - Log success and return to IDLE
+- `_handleCancelled()` - Handle user cancellation
+- `_handleError()` - Handle errors and attempt recovery
+
+**Event Types:**
+- `FileSystemChangeEvent` - External file modifications
+- `UserEditEvent` - User edits in webview
+- `SaveEvent` - File save operations
+- `IncludeSwitchEvent` - Include file switches
+
+**Documentation:**
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Complete architecture overview
+- [STATE_MACHINE_DESIGN.md](../STATE_MACHINE_DESIGN.md) - State machine specification
+- [STATE_MACHINE_MIGRATION_GUIDE.md](../STATE_MACHINE_MIGRATION_GUIDE.md) - Migration guide
 
 ---
 
@@ -578,19 +627,33 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/services/MarpExportService-MarpExportService_getMarpVersion - Get Marp CLI version
 - src/services/MarpExportService-MarpExportService_getAvailableThemes - Get available Marp themes
 
+## src/constants/IncludeConstants.ts
+
+**Centralized Constants** (Added 2025-11-04)
+- **INCLUDE_SYNTAX** - Include directive constants (PREFIX, SUFFIX, REGEX, REGEX_SINGLE)
+  - PREFIX: '!!!include('
+  - SUFFIX: ')!!!'
+  - REGEX: Global regex pattern for matching include directives
+  - REGEX_SINGLE: Non-global regex for single match
+- **FILE_TYPES** - File type constants (MAIN, INCLUDE_COLUMN, INCLUDE_TASK, INCLUDE_REGULAR)
+- **Purpose**: Eliminates 783+ duplicate string instances across the codebase
+- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts, IncludeProcessor.ts
+
+**Note**: All include syntax pattern matching should use INCLUDE_SYNTAX constants instead of hardcoded strings.
+
 ## src/services/IncludeProcessor.ts - IncludeProcessor
 
-- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content
+- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content (uses INCLUDE_SYNTAX constants)
 - src/services/IncludeProcessor-IncludeProcessor_processIncludeType - Process specific type of include
 - src/services/IncludeProcessor-IncludeProcessor_processIncludeContent - Process include content recursively
-- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing
+- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing (uses INCLUDE_SYNTAX.REGEX)
 - src/services/IncludeProcessor-IncludeProcessor_detectIncludeType - Detect includes of specific type
 - src/services/IncludeProcessor-IncludeProcessor_convertIncludeContent - Convert include content based on format
-- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type
+- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type (uses INCLUDE_SYNTAX constants)
 - src/services/IncludeProcessor-IncludeProcessor_detectIncludeFormat - Detect format of include file
-- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file
-- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers
-- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers
+- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file (uses INCLUDE_SYNTAX.PREFIX and SUFFIX)
+- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers (uses INCLUDE_SYNTAX.REGEX)
+- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers (uses INCLUDE_SYNTAX.REGEX)
 
 ## src/services/FormatConverter.ts - FormatConverter
 

@@ -5,6 +5,7 @@ import { MarkdownFile } from './MarkdownFile';
 import { ConflictResolver, ConflictContext } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { MainKanbanFile } from './MainKanbanFile';
+import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 
 /**
  * Abstract base class for all include files (column, task, regular includes).
@@ -131,32 +132,12 @@ export abstract class IncludeFile extends MarkdownFile {
     // ============= EXTERNAL CHANGE HANDLING =============
 
     /**
-     * Handle external file change
+     * Handle external file change using unified change handler
+     * This replaces the complex conflict detection logic with a single, consistent system
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        console.log(`[${this.getFileType()}] Handling external change: ${changeType} - ${this._relativePath}`);
-
-        if (changeType === 'deleted') {
-            this._exists = false;
-            console.warn(`[${this.getFileType()}] Include file was deleted: ${this._relativePath}`);
-            await this.notifyParentOfChange();
-            return;
-        }
-
-        if (changeType === 'created') {
-            this._exists = true;
-        }
-
-        // Check for conflict FIRST - only clear content if auto-reloading
-        if (this.hasConflict()) {
-            console.log(`[${this.getFileType()}] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
-            await this.showConflictDialog();
-        } else if (this.needsReload()) {
-            console.log(`[${this.getFileType()}] ⚠ Auto-reload: Reloading from disk`);
-            await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
-        } else {
-            console.log(`[${this.getFileType()}] ⏸ External change detected but neither conflict nor reload needed`);
-        }
+        const changeHandler = UnifiedChangeHandler.getInstance();
+        await changeHandler.handleExternalChange(this, changeType);
     }
 
     // ============= PARENT NOTIFICATION =============
@@ -208,16 +189,132 @@ export abstract class IncludeFile extends MarkdownFile {
         }
     }
 
+    // ============= BASELINE CAPTURE FOR INCLUDE FILES =============
+
+    /**
+     * Apply a captured edit to the baseline for include files
+     * CRITICAL: Include files need to apply edits directly to content baseline
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        console.log(`[${this.getFileType()}] Applying captured edit to include file baseline:`, capturedEdit);
+
+        // For include files (column/task), the edit is a description edit
+        // Apply the new value directly to the baseline content
+        if (capturedEdit && capturedEdit.value !== undefined) {
+            // Update baseline with the edited content
+            this._baseline = capturedEdit.value;
+            console.log(`[${this.getFileType()}] ✓ Baseline updated with captured edit (${capturedEdit.value.length} chars)`);
+        } else {
+            console.warn(`[${this.getFileType()}] No edit value to apply to baseline`);
+        }
+    }
+
+    // ============= SIMPLIFIED CONFLICT DETECTION =============
+
+    /**
+     * Check if there are ANY unsaved changes (simplified 3-variant approach)
+     * Returns true if ANY of these conditions are met:
+     * - Internal state flag is true (kanban UI edits)
+     * - User is in edit mode
+     * - VSCode document is dirty (text editor edits)
+     * - Document is open but we can't access it (safe default)
+     */
+    public hasAnyUnsavedChanges(): boolean {
+        // Check 1: Internal state flag (from kanban UI)
+        if (this._hasUnsavedChanges) return true;
+
+        // Check 2: Edit mode (user is actively editing)
+        if (this._isInEditMode) return true;
+
+        // Check 3: VSCode document dirty status (text editor edits)
+        // Need to search through all open documents since IncludeFile doesn't have FileManager
+        const openDocuments = vscode.workspace.textDocuments;
+        const documentIsDirty = openDocuments.some(doc =>
+            doc.uri.fsPath === this._path && doc.isDirty
+        );
+        if (documentIsDirty) {
+            return true;
+        }
+
+        // Check 4: If document is open but not dirty, we already checked above
+        // No need for additional safety check here
+
+        return false;
+    }
+
+    /**
+     * Get detailed reasons for unsaved changes (for logging)
+     */
+    private _getUnsavedChangesReasons(): { [key: string]: boolean } {
+        const openDocuments = vscode.workspace.textDocuments;
+        const documentIsDirty = openDocuments.some(doc =>
+            doc.uri.fsPath === this._path && doc.isDirty
+        );
+
+        return {
+            hasUnsavedChanges_flag: this._hasUnsavedChanges,
+            isInEditMode_flag: this._isInEditMode,
+            documentIsDirty: documentIsDirty
+        };
+    }
+
+    // ============= CONFLICT DETECTION =============
+
+    /**
+     * Override hasConflict to also check VSCode document dirty status
+     * This ensures conflicts are detected when include file is edited in text editor
+     */
+    public hasConflict(): boolean {
+        // Check base class flags (kanban UI changes)
+        const baseHasConflict = super.hasConflict();
+
+        // Also check if VSCode document is dirty (text editor changes)
+        // Need to search through all open documents since IncludeFile doesn't have FileManager
+        const openDocuments = vscode.workspace.textDocuments;
+        const documentIsDirty = openDocuments.some(doc =>
+            doc.uri.fsPath === this._path && doc.isDirty
+        );
+
+        // Conflict if:
+        // - Base class detects conflict (kanban UI changes + external changes)
+        // - OR document is dirty (text editor changes) AND has external changes
+        const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
+
+        if (hasConflict) {
+            console.log(`[${this.getFileType()}.hasConflict] CONFLICT DETECTED:`, {
+                file: this._relativePath,
+                baseConflict: baseHasConflict,
+                documentIsDirty: documentIsDirty,
+                hasFileSystemChanges: this._hasFileSystemChanges,
+                hasUnsavedChanges: this._hasUnsavedChanges,
+                isInEditMode: this._isInEditMode
+            });
+        }
+
+        return hasConflict;
+    }
+
     // ============= CONFLICT CONTEXT =============
 
     protected getConflictContext(): ConflictContext {
+        // Check if VSCode document is dirty (text editor unsaved changes)
+        const openDocuments = vscode.workspace.textDocuments;
+        const documentIsDirty = openDocuments.some(doc =>
+            doc.uri.fsPath === this._path && doc.isDirty
+        );
+
+        // Include has unsaved changes if either:
+        // - Internal state flag is true (from kanban UI edits)
+        // - OR VSCode document is dirty (from text editor edits)
+        const hasIncludeUnsavedChanges = this._hasUnsavedChanges || documentIsDirty;
+
         return {
             type: 'external_include',
             fileType: 'include',
             filePath: this._absolutePath,
             fileName: path.basename(this._relativePath),
             hasMainUnsavedChanges: this._parentFile.hasUnsavedChanges(),
-            hasIncludeUnsavedChanges: this._hasUnsavedChanges,
+            hasIncludeUnsavedChanges: hasIncludeUnsavedChanges,
             hasExternalChanges: this._hasFileSystemChanges,
             changedIncludeFiles: [this._relativePath],
             isClosing: false,

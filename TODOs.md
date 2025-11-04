@@ -4,6 +4,7 @@ kanban-plugin: board
 
 # Markdown Kanban - Development Roadmap
 
+
 **Analysis**: See [COLUMNIMPORT_ANALYSIS.md](COLUMNIMPORT_ANALYSIS.md) for detailed issue analysis
 **Cleanup Plan**: See [tmp/10-cleanup-areas.md](tmp/10-cleanup-areas.md) for simplification strategy
 

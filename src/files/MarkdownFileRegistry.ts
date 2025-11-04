@@ -20,9 +20,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     private _files: Map<string, MarkdownFile> = new Map();        // Path -> File
     private _filesByRelativePath: Map<string, MarkdownFile> = new Map(); // Relative path -> File
 
+    // ============= PERFORMANCE OPTIMIZATIONS =============
+    private _registrationCache = new Set<string>(); // Prevent duplicate registrations
+
     // ============= CHANGE EVENTS =============
     private _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
     public readonly onDidChange = this._onDidChange.event;
+
+    // ============= PANEL REFERENCE (for stopping edit mode during conflicts) =============
+    private _messageHandler?: any; // MessageHandler reference for requestStopEditing()
 
     // ============= LIFECYCLE =============
     private _disposables: vscode.Disposable[] = [];
@@ -31,7 +37,35 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         this._disposables.push(this._onDidChange);
     }
 
+    // ============= MESSAGE HANDLER ACCESS =============
+
+    /**
+     * Set the message handler reference (used for stopping edit mode during conflicts)
+     */
+    public setMessageHandler(messageHandler: any): void {
+        this._messageHandler = messageHandler;
+    }
+
+    /**
+     * Request frontend to stop editing and return the captured edit value
+     * Used during conflict resolution to preserve user's edit in baseline
+     */
+    public async requestStopEditing(): Promise<any> {
+        if (this._messageHandler && typeof this._messageHandler.requestStopEditing === 'function') {
+            return await this._messageHandler.requestStopEditing();
+        }
+        return null;
+    }
+
     // ============= REGISTRATION =============
+
+    /**
+     * Check if file is already being registered (fast lookup to prevent duplicates)
+     */
+    public isBeingRegistered(relativePath: string): boolean {
+        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        return this._registrationCache.has(normalized);
+    }
 
     /**
      * Register a file in the registry
@@ -42,6 +76,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         const path = file.getPath();
         const relativePath = file.getRelativePath();
         const normalizedRelativePath = file.getNormalizedRelativePath();
+
+        // PERFORMANCE: Check registration cache first
+        if (this._registrationCache.has(normalizedRelativePath)) {
+            console.debug(`[MarkdownFileRegistry] Skipping duplicate registration: ${relativePath}`);
+            return;
+        }
 
         // FOUNDATION-1: Check for duplicates BEFORE registering (collision detection)
         const existingFile = this._filesByRelativePath.get(normalizedRelativePath);
@@ -57,6 +97,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
 
         console.log(`[MarkdownFileRegistry] Registering: "${relativePath}" → "${normalizedRelativePath}" (${file.getFileType()})`);
+
+        // PERFORMANCE: Add to registration cache
+        this._registrationCache.add(normalizedRelativePath);
 
         // Store by absolute path (unchanged) and NORMALIZED relative path
         this._files.set(path, file);
@@ -389,10 +432,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * 3. For each task with includeFiles, load description from TaskIncludeFiles
      * 4. Return complete board
      *
+     * @param existingBoard Optional existing board to preserve column/task IDs during regeneration
      * @returns KanbanBoard with all include content loaded, or undefined if main file not ready
      */
-    public generateBoard(): KanbanBoard | undefined {
+    public generateBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
         console.log('[MarkdownFileRegistry] generateBoard() - Generating board from registry');
+
+        if (existingBoard) {
+            console.log(`[MarkdownFileRegistry] generateBoard() - Preserving IDs from existing board with ${existingBoard.columns.length} columns`);
+        }
 
         // Step 1: Get main file
         const mainFile = this.getMainFile();
@@ -401,8 +449,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             return undefined;
         }
 
-        // Step 2: Get parsed board from main file
-        const board = mainFile.getBoard();
+        // Step 2: Get parsed board from main file (parser will preserve IDs if existingBoard passed)
+        const board = mainFile.getBoard(existingBoard);
         if (!board) {
             console.warn('[MarkdownFileRegistry] generateBoard() - Main file has no board');
             return undefined;
@@ -424,7 +472,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                     const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file && file.getFileType() === 'include-column') {
                         // Parse tasks from include file, preserving existing task IDs
-                        const tasks = file.parseToTasks(column.tasks);
+                        const tasks = file.parseToTasks(column.tasks, column.id);
                         column.tasks = tasks;
                         console.log(`[MarkdownFileRegistry] generateBoard() - Loaded ${tasks.length} tasks from ${relativePath}`);
                     } else {

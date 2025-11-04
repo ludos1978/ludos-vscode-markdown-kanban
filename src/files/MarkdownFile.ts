@@ -4,6 +4,8 @@ import * as path from 'path';
 import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
+import { SaveCoordinator } from '../core/SaveCoordinator';
+import { SaveOptions } from './SaveOptions';
 
 /**
  * File change event emitted when file state changes
@@ -46,10 +48,182 @@ export abstract class MarkdownFile implements vscode.Disposable {
     protected _hasUnsavedChanges: boolean = false;     // Kanban UI has modifications
     protected _isInEditMode: boolean = false;          // User actively editing in task/column editor
 
+    // ============= SAVE STATE (Instance-level, no global registry!) =============
+    private _skipNextReloadDetection: boolean = false; // Skip reload for our own save
+
     // ============= CHANGE DETECTION =============
     protected _fileWatcher?: vscode.FileSystemWatcher;
     protected _watcherDisposable?: vscode.Disposable;
     protected _isWatching: boolean = false;
+
+    // PERFORMANCE: Shared watcher registry to prevent duplicates
+    private static _activeWatchers = new Map<string, { watcher: vscode.FileSystemWatcher; refCount: number; lastActivity: Date }>();
+
+    // PERFORMANCE: Transaction-based save operations
+    private static _saveTransactionManager = {
+        // Track active save transactions
+        activeTransactions: new Map<string, {
+            transactionId: string;
+            startTime: Date;
+            originalState: {
+                content: string;
+                baseline: string;
+                hasUnsavedChanges: boolean;
+                hasFileSystemChanges: boolean;
+                lastModified: Date | null;
+            };
+            timeout: NodeJS.Timeout;
+        }>(),
+
+        // Start a save transaction
+        beginTransaction: function(filePath: string, originalState: any): string {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            const transactionId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            // Set timeout for transaction (30 seconds)
+            const timeout = setTimeout(() => {
+                console.error(`[SaveTransaction] Transaction ${transactionId} timed out for ${normalizedPath}`);
+                this.rollbackTransaction(filePath, transactionId);
+            }, 30000);
+
+            this.activeTransactions.set(normalizedPath, {
+                transactionId,
+                startTime: new Date(),
+                originalState,
+                timeout
+            });
+
+            console.log(`[SaveTransaction] Started transaction ${transactionId} for ${normalizedPath}`);
+            return transactionId;
+        },
+
+        // Commit a save transaction
+        commitTransaction: function(filePath: string, transactionId: string): boolean {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            const transaction = this.activeTransactions.get(normalizedPath);
+
+            if (!transaction || transaction.transactionId !== transactionId) {
+                console.error(`[SaveTransaction] Cannot commit - transaction ${transactionId} not found for ${normalizedPath}`);
+                return false;
+            }
+
+            clearTimeout(transaction.timeout);
+            this.activeTransactions.delete(normalizedPath);
+            console.log(`[SaveTransaction] Committed transaction ${transactionId} for ${normalizedPath}`);
+            return true;
+        },
+
+        // Rollback a save transaction
+        rollbackTransaction: function(filePath: string, transactionId: string): boolean {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            const transaction = this.activeTransactions.get(normalizedPath);
+
+            if (!transaction || transaction.transactionId !== transactionId) {
+                console.error(`[SaveTransaction] Cannot rollback - transaction ${transactionId} not found for ${normalizedPath}`);
+                return false;
+            }
+
+            clearTimeout(transaction.timeout);
+            this.activeTransactions.delete(normalizedPath);
+            console.log(`[SaveTransaction] Rolled back transaction ${transactionId} for ${normalizedPath}`);
+            return true;
+        },
+
+        // Get active transaction for debugging
+        getActiveTransaction: function(filePath: string): any {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            return this.activeTransactions.get(normalizedPath);
+        }
+    };
+
+    // PERFORMANCE: Centralized watcher coordination
+    private static _watcherCoordinator = {
+        // Track active operations per file to prevent conflicts
+        activeOperations: new Map<string, { operation: string; startTime: Date; timeout: NodeJS.Timeout }>(),
+
+        // Queue operations when conflicts occur
+        operationQueue: new Map<string, Array<{ operation: string; callback: () => Promise<void> }>>(),
+
+        // Start an operation with conflict detection
+        startOperation: function(filePath: string, operation: string, timeoutMs: number = 5000): Promise<void> {
+            return new Promise((resolve, reject) => {
+                const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+                const existing = this.activeOperations.get(normalizedPath);
+
+                if (existing) {
+                    console.log(`[WatcherCoordinator] Operation "${operation}" waiting for "${existing.operation}" on ${normalizedPath}`);
+
+                    // Queue the operation
+                    if (!this.operationQueue.has(normalizedPath)) {
+                        this.operationQueue.set(normalizedPath, []);
+                    }
+                    this.operationQueue.get(normalizedPath)!.push({
+                        operation,
+                        callback: async () => {
+                            try {
+                                await this.startOperation(filePath, operation, timeoutMs);
+                                resolve();
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    });
+                    return;
+                }
+
+                // Start the operation
+                const timeout = setTimeout(() => {
+                    console.error(`[WatcherCoordinator] Operation "${operation}" timed out on ${normalizedPath}`);
+                    this.endOperation(filePath, operation);
+                    reject(new Error(`Operation timeout: ${operation}`));
+                }, timeoutMs);
+
+                this.activeOperations.set(normalizedPath, {
+                    operation,
+                    startTime: new Date(),
+                    timeout
+                });
+
+                console.log(`[WatcherCoordinator] Started operation "${operation}" on ${normalizedPath}`);
+                resolve();
+            });
+        },
+
+        // End an operation and process queued operations
+        endOperation: function(filePath: string, operation: string): void {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            const existing = this.activeOperations.get(normalizedPath);
+
+            if (existing && existing.operation === operation) {
+                clearTimeout(existing.timeout);
+                this.activeOperations.delete(normalizedPath);
+                console.log(`[WatcherCoordinator] Ended operation "${operation}" on ${normalizedPath}`);
+
+                // Process next queued operation
+                const queue = this.operationQueue.get(normalizedPath);
+                if (queue && queue.length > 0) {
+                    const next = queue.shift()!;
+                    console.log(`[WatcherCoordinator] Processing queued operation "${next.operation}" on ${normalizedPath}`);
+                    next.callback().catch(error => {
+                        console.error(`[WatcherCoordinator] Queued operation failed:`, error);
+                    });
+                }
+            }
+        },
+
+        // Check if file has active operations
+        hasActiveOperations: function(filePath: string): boolean {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            return this.activeOperations.has(normalizedPath);
+        },
+
+        // Get active operation info for debugging
+        getActiveOperation: function(filePath: string): { operation: string; startTime: Date } | undefined {
+            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
+            const active = this.activeOperations.get(normalizedPath);
+            return active ? { operation: active.operation, startTime: active.startTime } : undefined;
+        }
+    };
 
     // ============= EVENT EMITTER =============
     protected _onDidChange = new vscode.EventEmitter<FileChangeEvent>();
@@ -77,11 +251,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         // FOUNDATION-1: Normalize and cache the normalized path
         this._normalizedRelativePath = MarkdownFile.normalizeRelativePath(relativePath);
-
-        // Log normalization for debugging (only if different)
-        if (this._relativePath !== this._normalizedRelativePath) {
-            console.log(`[MarkdownFile] Path normalized: "${this._relativePath}" → "${this._normalizedRelativePath}"`);
-        }
 
         this._conflictResolver = conflictResolver;
         this._backupManager = backupManager;
@@ -223,25 +392,11 @@ export abstract class MarkdownFile implements vscode.Disposable {
         }
 
         // Check 2: Absolute path passed as relative (security/correctness issue)
-        if (path.isAbsolute(relativePath)) {
-            throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
-        }
+        // if (path.isAbsolute(relativePath)) {
+        //     throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
+        // }
 
-        // Check 3: Already normalized (suspicious - likely pre-normalized)
-        // If path is all lowercase AND has path separators AND is trimmed, it's likely pre-normalized
-        const trimmed = relativePath.trim();
-        if (trimmed === relativePath.toLowerCase() &&
-            (trimmed.includes('/') || trimmed.includes('\\')) &&
-            trimmed === relativePath) {
-            console.warn(`[MarkdownFile] ⚠️  Path appears pre-normalized: "${relativePath}"`);
-            console.warn('  Expected: Original casing (e.g., "Folder/File.md")');
-            console.warn('  Received: All lowercase (e.g., "folder/file.md")');
-            console.warn('  This may indicate double normalization!');
-            console.warn('  Stack trace:');
-            console.warn(new Error().stack);
-        }
-
-        // Check 4: Excessive parent directory traversal (potential security concern)
+        // Check 3: Excessive parent directory traversal (potential security concern)
         const normalized = path.normalize(relativePath);
         const parentDirCount = (normalized.match(/\.\.\//g) || []).length;
         if (parentDirCount > 3) {
@@ -389,40 +544,50 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * FOUNDATION-2: Protected against race conditions via sequence counter
      */
     public async reload(): Promise<void> {
-        // FOUNDATION-2: Start new reload sequence, invalidating previous operations
-        const mySequence = this._startNewReload();
+        console.log(`[${this.getFileType()}] Reloading from disk: ${this._relativePath}`);
 
-        const content = await this._readFromDiskWithVerification();
+        // PERFORMANCE: Use watcher coordinator to prevent conflicts
+        await MarkdownFile._watcherCoordinator.startOperation(this._relativePath, 'reload');
 
-        // FOUNDATION-2: Check if this reload was cancelled during async operation
-        if (this._checkReloadCancelled(mySequence, 'after disk read')) {
-            return;
-        }
+        try {
+            // FOUNDATION-2: Start new reload sequence, invalidating previous operations
+            const mySequence = this._startNewReload();
 
-        if (content !== null) {
-            // Check if content actually changed (verification returns baseline if unchanged)
-            if (content !== this._baseline) {
-                // FOUNDATION-2: Final check before applying changes
-                if (this._checkReloadCancelled(mySequence, 'before applying changes')) {
-                    return;
-                }
+            const content = await this._readFromDiskWithVerification();
 
-                this._content = content;
-                this._baseline = content;
-                this._hasUnsavedChanges = false;
-                this._hasFileSystemChanges = false;
-                this._lastModified = await this._getFileModifiedTime();
-
-                this._emitChange('reloaded');
-                console.log(`[${this.getFileType()}] ✅ Reload sequence ${mySequence} completed successfully: ${this._relativePath}`);
-            } else {
-                // Content unchanged - verification returned baseline, this is a false alarm
-                console.log(`[${this.getFileType()}] Content unchanged - false alarm from watcher, keeping existing content`);
-                this._hasFileSystemChanges = false;
-                this._lastModified = await this._getFileModifiedTime();
+            // FOUNDATION-2: Check if this reload was cancelled during async operation
+            if (this._checkReloadCancelled(mySequence, 'after disk read')) {
+                return;
             }
-        } else {
-            console.warn(`[${this.getFileType()}] ⚠ Reload failed - null returned`);
+
+            if (content !== null) {
+                // Check if content actually changed (verification returns baseline if unchanged)
+                if (content !== this._baseline) {
+                    // FOUNDATION-2: Final check before applying changes
+                    if (this._checkReloadCancelled(mySequence, 'before applying changes')) {
+                        return;
+                    }
+
+                    this._content = content;
+                    this._baseline = content;
+                    this._hasUnsavedChanges = false;
+                    this._hasFileSystemChanges = false;
+                    this._lastModified = await this._getFileModifiedTime();
+
+                    this._emitChange('reloaded');
+                    console.log(`[${this.getFileType()}] ✅ Reload sequence ${mySequence} completed successfully: ${this._relativePath}`);
+                } else {
+                    // Content unchanged - verification returned baseline, this is a false alarm
+                    console.log(`[${this.getFileType()}] Content unchanged - false alarm from watcher, keeping existing content`);
+                    this._hasFileSystemChanges = false;
+                    this._lastModified = await this._getFileModifiedTime();
+                }
+            } else {
+                console.warn(`[${this.getFileType()}] ⚠ Reload failed - null returned`);
+            }
+        } finally {
+            // PERFORMANCE: End operation in coordinator
+            MarkdownFile._watcherCoordinator.endOperation(this._relativePath, 'reload');
         }
     }
 
@@ -493,16 +658,26 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
     /**
      * Save current content to disk and update baseline
+     * @param options - Save options (skipReloadDetection, source, etc.)
      */
-    public async save(): Promise<void> {
-        console.log(`[${this.getFileType()}] Saving to disk: ${this._relativePath}`);
+    public async save(options: SaveOptions = {}): Promise<void> {
+        const skipReloadDetection = options.skipReloadDetection ?? true; // Default: skip (our own save)
+        const source = options.source ?? 'unknown';
 
-        // Validate before saving
-        const validation = this.validate(this._content);
-        if (!validation.valid) {
-            const errors = validation.errors?.join(', ') || 'Unknown validation error';
-            throw new Error(`Cannot save ${this._relativePath}: ${errors}`);
-        }
+        console.log(`[${this.getFileType()}] Saving to disk: ${this._relativePath} (source: ${source})`);
+
+        // PERFORMANCE: Use watcher coordinator to prevent conflicts
+        await MarkdownFile._watcherCoordinator.startOperation(this._relativePath, 'save');
+
+        // TRANSACTION: Begin save transaction for rollback capability
+        const originalState = {
+            content: this._content,
+            baseline: this._baseline,
+            hasUnsavedChanges: this._hasUnsavedChanges,
+            hasFileSystemChanges: this._hasFileSystemChanges,
+            lastModified: this._lastModified
+        };
+        const transactionId = MarkdownFile._saveTransactionManager.beginTransaction(this._relativePath, originalState);
 
         // Pause file watcher before saving to prevent our own save from triggering "external" change
         const wasWatching = this._isWatching;
@@ -511,19 +686,54 @@ export abstract class MarkdownFile implements vscode.Disposable {
         }
 
         try {
+            // Validate before saving
+            const validation = this.validate(this._content);
+            if (!validation.valid) {
+                const errors = validation.errors?.join(', ') || 'Unknown validation error';
+                throw new Error(`Cannot save ${this._relativePath}: ${errors}`);
+            }
+
             await this.writeToDisk(this._content);
+
+            // CRITICAL: Set flag AFTER successful write (not before!)
+            // This prevents flag from lingering if write fails
+            if (skipReloadDetection) {
+                this._skipNextReloadDetection = true;
+                console.log(`[${this.getFileType()}] ✓ Will skip reload detection for this save`);
+            }
+
+            // Update state after successful write
             this._baseline = this._content;
             this._hasUnsavedChanges = false;
             this._hasFileSystemChanges = false;
             this._lastModified = new Date();
 
+            // TRANSACTION: Commit the transaction
+            MarkdownFile._saveTransactionManager.commitTransaction(this._relativePath, transactionId);
+
             this._emitChange('saved');
             console.log(`[${this.getFileType()}] Saved successfully: ${this._relativePath}`);
+        } catch (error) {
+            // TRANSACTION: Rollback on failure
+            console.error(`[${this.getFileType()}] Save failed, rolling back:`, error);
+            MarkdownFile._saveTransactionManager.rollbackTransaction(this._relativePath, transactionId);
+
+            // Restore original state
+            this._content = originalState.content;
+            this._baseline = originalState.baseline;
+            this._hasUnsavedChanges = originalState.hasUnsavedChanges;
+            this._hasFileSystemChanges = originalState.hasFileSystemChanges;
+            this._lastModified = originalState.lastModified;
+
+            throw error; // Re-throw the error
         } finally {
             // Resume file watcher after save
             if (wasWatching) {
                 this.startWatching();
             }
+
+            // PERFORMANCE: End operation in coordinator
+            MarkdownFile._watcherCoordinator.endOperation(this._relativePath, 'save');
         }
     }
 
@@ -574,16 +784,37 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async showConflictDialog(): Promise<ConflictResolution | null> {
         const context = this.getConflictContext();
+        console.log(`[${this.getFileType()}] showConflictDialog - Awaiting user choice...`);
         const resolution = await this._conflictResolver.resolveConflict(context);
+        console.log(`[${this.getFileType()}] showConflictDialog - Resolution received:`, {
+            action: resolution?.action,
+            shouldProceed: resolution?.shouldProceed,
+            shouldCreateBackup: resolution?.shouldCreateBackup,
+            shouldSave: resolution?.shouldSave,
+            shouldReload: resolution?.shouldReload,
+            shouldIgnore: resolution?.shouldIgnore
+        });
 
         if (resolution && resolution.shouldProceed) {
-            if (resolution.shouldSave) {
+            // Check shouldCreateBackup FIRST because backup-and-reload sets both flags
+            if (resolution.shouldCreateBackup) {
+                console.log(`[${this.getFileType()}] → Executing: backup-and-reload`);
+                // resolveConflict('backup') creates backup AND reloads
+                await this.resolveConflict('backup');
+            } else if (resolution.shouldSave) {
+                console.log(`[${this.getFileType()}] → Executing: save`);
+                // save() method marks itself as legitimate automatically
                 await this.save();
             } else if (resolution.shouldReload) {
+                console.log(`[${this.getFileType()}] → Executing: reload`);
                 await this.reload();
-            } else if (resolution.shouldCreateBackup) {
-                await this.resolveConflict('backup');
+            } else if (resolution.shouldIgnore) {
+                console.log(`[${this.getFileType()}] → Executing: ignore (no action)`);
+            } else {
+                console.log(`[${this.getFileType()}] → No action flags set`);
             }
+        } else {
+            console.log(`[${this.getFileType()}] → Resolution cancelled or shouldProceed=false`);
         }
 
         return resolution;
@@ -597,24 +828,56 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async createBackup(label: string = 'manual'): Promise<void> {
         console.log(`[${this.getFileType()}] Creating backup with label '${label}': ${this._relativePath}`);
-        // DEFERRED: Implement backup logic (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #2)
-        // Decision needed: Is backup functionality required, or can this be removed?
-        // For now, this is a placeholder that subclasses can override
-        // to integrate with BackupManager which requires a TextDocument
+
+        try {
+            // Get the VS Code TextDocument for this file
+            const document = await vscode.workspace.openTextDocument(this._path);
+
+            if (!document) {
+                console.error(`[${this.getFileType()}] Cannot create backup - failed to open document: ${this._relativePath}`);
+                return;
+            }
+
+            // Use BackupManager to create the backup
+            const backupManager = new BackupManager();
+            const success = await backupManager.createBackup(document, {
+                label: label,
+                forceCreate: true  // Always create backup for conflict resolution
+            });
+
+            if (success) {
+                console.log(`[${this.getFileType()}] ✅ Backup created successfully: ${this._relativePath}`);
+            } else {
+                console.warn(`[${this.getFileType()}] ⚠️  Backup creation returned false: ${this._relativePath}`);
+            }
+        } catch (error) {
+            console.error(`[${this.getFileType()}] ❌ Failed to create backup:`, error);
+        }
     }
 
     // ============= FILE WATCHING & CHANGE DETECTION =============
 
     /**
-     * Start watching file for external changes
+     * Start watching file for external changes (with deduplication)
      */
     public startWatching(): void {
         if (this._isWatching) {
-            console.log(`[${this.getFileType()}] Already watching: ${this._relativePath}`);
             return;
         }
 
-        console.log(`[${this.getFileType()}] Starting to watch: ${this._relativePath}`);
+        const watchPath = this._path;
+
+        // PERFORMANCE: Check if we already have a watcher for this file
+        const existingWatcher = MarkdownFile._activeWatchers.get(watchPath);
+        if (existingWatcher) {
+            console.log(`[${this.getFileType()}] Reusing existing watcher for: ${this._relativePath} (refCount: ${existingWatcher.refCount + 1})`);
+            existingWatcher.refCount++;
+            this._fileWatcher = existingWatcher.watcher;
+            this._isWatching = true;
+            return;
+        }
+
+        console.log(`[${this.getFileType()}] Creating new file watcher: ${this._relativePath}`);
 
         const pattern = new vscode.RelativePattern(
             path.dirname(this._path),
@@ -625,41 +888,53 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         // Watch for modifications
         this._fileWatcher.onDidChange(async (uri) => {
-            console.log(`[${this.getFileType()}] File changed on disk: ${uri.fsPath}`);
             await this._onFileSystemChange('modified');
         });
 
         // Watch for deletion
         this._fileWatcher.onDidDelete(async (uri) => {
-            console.log(`[${this.getFileType()}] File deleted: ${uri.fsPath}`);
             await this._onFileSystemChange('deleted');
         });
 
         // Watch for creation
         this._fileWatcher.onDidCreate(async (uri) => {
-            console.log(`[${this.getFileType()}] File created: ${uri.fsPath}`);
             await this._onFileSystemChange('created');
         });
+
+        // PERFORMANCE: Register in shared watcher registry
+        MarkdownFile._activeWatchers.set(watchPath, { watcher: this._fileWatcher, refCount: 1, lastActivity: new Date() });
 
         this._disposables.push(this._fileWatcher);
         this._isWatching = true;
     }
 
     /**
-     * Stop watching file
+     * Stop watching file (with reference counting)
      */
     public stopWatching(): void {
         if (!this._isWatching) {
             return;
         }
 
-        console.log(`[${this.getFileType()}] Stopping watch: ${this._relativePath}`);
+        const watchPath = this._path;
+        const existingWatcher = MarkdownFile._activeWatchers.get(watchPath);
 
-        if (this._fileWatcher) {
-            this._fileWatcher.dispose();
-            this._fileWatcher = undefined;
+        if (existingWatcher) {
+            existingWatcher.refCount--;
+
+            if (existingWatcher.refCount <= 0) {
+                // Last reference - dispose the watcher
+                console.log(`[${this.getFileType()}] Disposing watcher (last ref): ${this._relativePath}`);
+                existingWatcher.watcher.dispose();
+                MarkdownFile._activeWatchers.delete(watchPath);
+            } else {
+                console.log(`[${this.getFileType()}] Decrementing watcher refCount (${existingWatcher.refCount}): ${this._relativePath}`);
+            }
+        } else {
+            console.warn(`[${this.getFileType()}] No watcher found in registry for: ${this._relativePath}`);
         }
 
+        this._fileWatcher = undefined;
         this._isWatching = false;
     }
 
@@ -669,12 +944,71 @@ export abstract class MarkdownFile implements vscode.Disposable {
     protected async _onFileSystemChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
         console.log(`[${this.getFileType()}] File system change detected: ${changeType} - ${this._relativePath}`);
 
+        // CRITICAL: Always reset flag when watcher fires (prevents lingering flag)
+        const hadSkipFlag = this._skipNextReloadDetection;
+        if (hadSkipFlag) {
+            this._skipNextReloadDetection = false; // Reset flag immediately
+
+            // Only skip reload for 'modified' events (our own save)
+            if (changeType === 'modified') {
+                console.log(`[${this.getFileType()}] ✓ Skipping reload detection - this is our own save`);
+                this._hasFileSystemChanges = false; // No need to mark as external
+                return; // Skip external change handling
+            }
+
+            // For 'deleted' or 'created', flag was set but file state changed unexpectedly
+            // Continue to handle as external change (don't skip)
+            console.log(`[${this.getFileType()}] ⚠️ Flag was set but file was ${changeType} - handling as external change`);
+        }
+
+        // CRITICAL: If user is in edit mode, stop editing IMMEDIATELY before any processing
+        // This prevents board corruption when external changes occur during editing
+        if (this._isInEditMode) {
+            console.log(`[${this.getFileType()}] 🛑 STOPPING EDIT MODE - External change detected while editing`);
+            await this.requestStopEditing();
+            // Keep the edit mode flag true for conflict detection (will be cleared after resolution)
+            console.log(`[${this.getFileType()}] ✓ Edit mode stopped, edit flag kept for conflict detection`);
+        }
+
         // Mark as having external changes
         this._hasFileSystemChanges = true;
         this._emitChange('external');
 
         // Delegate to subclass for specific handling
         await this.handleExternalChange(changeType);
+    }
+
+    /**
+     * Request the frontend to stop editing and capture the edited value
+     * The captured value is applied to the baseline (not saved to disk)
+     * This preserves the user's edit as "local state" for conflict resolution
+     */
+    protected async requestStopEditing(): Promise<void> {
+        // Access the file registry to request stop editing and capture value
+        const mainFile = this.getFileType() === 'main' ? this as any : (this as any)._parentFile;
+        if (mainFile && mainFile._fileRegistry) {
+            const capturedEdit = await mainFile._fileRegistry.requestStopEditing();
+
+            // If we got an edit value, apply it to the baseline (not save to disk)
+            if (capturedEdit && capturedEdit.value !== undefined) {
+                console.log(`[${this.getFileType()}] Applying captured edit to baseline:`, capturedEdit);
+
+                // Apply the edit to baseline - this becomes the "local state" for conflict
+                await this.applyEditToBaseline(capturedEdit);
+
+                console.log(`[${this.getFileType()}] ✓ Edit applied to baseline (not saved to disk)`);
+            }
+        }
+    }
+
+    /**
+     * Apply a captured edit to the baseline (in-memory, not saved to disk)
+     * This updates the "local state" to include the user's edit
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        // Subclasses override this to handle their specific edit types
+        // Default: do nothing (main file handles via board, includes override)
+        console.log(`[${this.getFileType()}] Default applyEditToBaseline - no action`);
     }
 
     /**

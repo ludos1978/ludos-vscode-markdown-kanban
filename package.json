@@ -3,7 +3,7 @@
   "displayName": "Markdown Kanban Obsidian",
   "description": "Kanban board for Markdown files, compatible with obsidian kanban boards",
   "publisher": "ludos",
-  "version": "0.24.1",
+  "version": "0.27.42",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -4048,7 +4048,7 @@
     "markdown-it-underline": "^1.0.1",
     "mermaid-it": "^0.5.2",
     "npm-run-all": "^4.1.5",
-    "typescript": "^4.9.4"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@marp-team/marp-cli": "^4.2.3",

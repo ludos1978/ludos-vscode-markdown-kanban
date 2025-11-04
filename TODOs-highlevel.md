@@ -8,8 +8,19 @@
   - [x] SVG rendering via com.plantuml.wasm.v1.Svg Java class
   - [x] Package size: 4.2MB jar + 17MB jar.js (one-time load, then cached)
 
-- [ ] Add mermaid rendering into the kanban and the export!
+- [x] Add mermaid rendering into the kanban and the export!
 - [ ] Could we add a feature that we could add full pdf files or individual pages from pdf files, where each page is a task? 
   - the format would be something like ![](path/to/document.pdf p13)  for page 13 of the pdf.
   - best if you create a markdown-it plugin for it. as it should also work in the export.
-- [ ] saving and change detection still are not reliably working. create 3 comprehensive solution suggestions that will fix the problem. choose the best and implement it if it has a very high reliably. if it's not very reliably analyze it again in 3 variants and select the best one. using this method improve the solution and find the fix!!!
+- [x] COMPLETED: Simplified conflict detection using 3-variant structure
+  - [x] Implemented hasAnyUnsavedChanges() method (checks 4 conditions)
+  - [x] Simplified handleExternalChange() to just 2 decision paths
+  - [x] Added JSON.stringify logging for better debugging
+  - [x] VARIANT 1: ANY unsaved changes → show conflict dialog
+  - [x] VARIANT 2: NO unsaved changes → auto-reload
+  - [x] Prevents ALL data loss without user consent
+  - [x] Works for main kanban and all include file types
+  - [x] See: tmp/IMPLEMENTATION-SUMMARY.md, tmp/TEST-PLAN.md
+- Add tags that parse numbers such as #1 #2 #13 and #04 #032 . They should be displayed as batches next to the column or task in a good contrast.
+
+- Re-Analyze the full process of file change detection and caching, conflict checking and user response as well as saving the data in the different ways. then i save the main file externally with an unsaved internal change its overwriting the external file. BUT THERE ARE OTHER PROBLEMS AS WELL. I WANT A COMPLETE AND FULL ANALYSIS, USING AN UML STRUCTURE. THEN VERIFY EACH STEP WETHER ITS NEEDED AND IN ORDER. THEN MAKE 3 SUGGESTIONS HOW TO SOLVE EACH OF THE PROBLEMS, IF CONFIDENCE IN SOLVING THE PROBLEM IS NOT 100% ANALYZE AGAIN AND REPEAT UNTIL YOU ARE SURE THE PROBLEM IS PROPERLY SOLVED. WORK AUTOMATICALLY UNTIL I INTERRUPT YOU!!!

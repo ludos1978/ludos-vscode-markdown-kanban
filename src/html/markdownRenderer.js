@@ -124,12 +124,13 @@ function tagPlugin(md, options = {}) {
             // For regular tags, use existing logic
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
-                // Allow alphanumeric, underscore, hyphen
+                // Allow alphanumeric, underscore, hyphen, dot
                 if ((char >= 0x30 && char <= 0x39) || // 0-9
                     (char >= 0x41 && char <= 0x5A) || // A-Z
                     (char >= 0x61 && char <= 0x7A) || // a-z
                     char === 0x5F || // _
-                    char === 0x2D) { // -
+                    char === 0x2D || // -
+                    char === 0x2E) { // .
                     pos++;
                 } else {
                     break;
@@ -163,7 +164,7 @@ function tagPlugin(md, options = {}) {
         if (tagContent.startsWith('gather_')) {
             baseTagName = 'gather'; // Use 'gather' as base for all gather tags
         } else {
-            const baseMatch = tagContent.match(/^([a-zA-Z0-9_-]+)/);
+            const baseMatch = tagContent.match(/^([a-zA-Z0-9_.-]+)/);
             baseTagName = baseMatch ? baseMatch[1].toLowerCase() : tagContent.toLowerCase();
         }
         
@@ -189,15 +190,24 @@ function datePersonTagPlugin(md, options = {}) {
         let tagContent = '';
         let tagType = '';
         
-        // Check if it's a date pattern (YYYY-MM-DD or DD-MM-YYYY)
+        // Check if it's a week date pattern (@YYYY-WNN, @YYYYWNN, @WNN)
         const remaining = state.src.slice(pos);
-        const dateMatch = remaining.match(/^(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/);
-        
-        if (dateMatch) {
-            tagContent = dateMatch[1];
-            tagType = 'date';
+        const weekMatch = remaining.match(/^(\d{4}-?W\d{1,2}|W\d{1,2})/i);
+
+        if (weekMatch) {
+            tagContent = weekMatch[1];
+            tagType = 'week';
             pos += tagContent.length;
-        } else {
+        }
+        // Check if it's a date pattern (YYYY-MM-DD or DD-MM-YYYY)
+        else {
+            const dateMatch = remaining.match(/^(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/);
+
+            if (dateMatch) {
+                tagContent = dateMatch[1];
+                tagType = 'date';
+                pos += tagContent.length;
+            } else {
             // Parse as person name (letters, numbers, underscore, hyphen)
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
@@ -212,10 +222,11 @@ function datePersonTagPlugin(md, options = {}) {
                 }
             }
             
-            if (pos === tagStart) {return false;} // No content
-            
-            tagContent = state.src.slice(tagStart, pos);
-            tagType = 'person';
+                if (pos === tagStart) {return false;} // No content
+
+                tagContent = state.src.slice(tagStart, pos);
+                tagType = 'person';
+            }
         }
         
         if (silent) {return true;}
@@ -237,10 +248,15 @@ function datePersonTagPlugin(md, options = {}) {
         const tagContent = token.content;
         const tagType = token.meta.type;
         const fullTag = '@' + token.content;
-        
+
+        // Week tags get their own class (no icon)
+        if (tagType === 'week') {
+            return `<span class="kanban-week-tag" data-week="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
+        }
+
         const className = tagType === 'date' ? 'kanban-date-tag' : 'kanban-person-tag';
         const dataAttr = tagType === 'date' ? 'data-date' : 'data-person';
-        
+
         return `<span class="${className}" ${dataAttr}="${escapeHtml(tagContent)}">${escapeHtml(fullTag)}</span>`;
     };
 }

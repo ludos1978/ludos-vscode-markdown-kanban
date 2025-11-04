@@ -4,9 +4,11 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { KanbanBoard, MarkdownKanbanParser } from '../markdownParser';
-import { ConflictResolver, ConflictContext } from '../conflictResolver';
+import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { FileManager } from '../fileManager';
+import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
+import { SaveCoordinator } from '../core/SaveCoordinator';
 
 /**
  * Represents the main kanban markdown file.
@@ -24,6 +26,7 @@ export class MainKanbanFile extends MarkdownFile {
     private _yamlHeader: string | null = null;
     private _kanbanFooter: string | null = null;
     private _includedFiles: string[] = []; // Regular includes (!!!include(file)!!!)
+    private _cachedBoardFromWebview?: KanbanBoard; // Cached board from webview for conflict detection
 
     // ============= DEPENDENCIES =============
     private _fileManager: FileManager;
@@ -58,18 +61,34 @@ export class MainKanbanFile extends MarkdownFile {
 
     /**
      * Get the parsed board (cached)
+     *
+     * @param existingBoard Optional existing board to preserve IDs during re-parsing.
+     *                      When provided, triggers re-parse with ID preservation.
      */
-    public getBoard(): KanbanBoard | undefined {
+    public getBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
+        // If existingBoard provided, re-parse to preserve IDs
+        if (existingBoard) {
+            console.log(`[MainKanbanFile] Re-parsing with ID preservation from existing board`);
+            return this.parseToBoard(existingBoard);
+        }
         return this._board;
     }
 
     /**
      * Parse current content into board structure
+     *
+     * @param existingBoard Optional existing board to preserve task/column IDs during re-parse
      */
-    public parseToBoard(): KanbanBoard {
+    public parseToBoard(existingBoard?: KanbanBoard): KanbanBoard {
         console.log(`[MainKanbanFile] Parsing content to board: ${this._relativePath}`);
+
         // Pass existing board to preserve task/column IDs during re-parse
-        const parseResult = this._parser.parseMarkdown(this._content, undefined, this._board);
+        // Priority: provided existingBoard > cached _board
+        const boardForIdPreservation = existingBoard || this._board;
+
+        // CRITICAL FIX: Pass basePath for resolving relative include paths
+        const basePath = path.dirname(this._path);
+        const parseResult = this._parser.parseMarkdown(this._content, basePath, boardForIdPreservation);
         this._board = parseResult.board;
         this._includedFiles = parseResult.includedFiles || [];
 
@@ -104,6 +123,75 @@ export class MainKanbanFile extends MarkdownFile {
     }
 
     /**
+     * Apply a captured edit to the baseline (in-memory, not saved to disk)
+     * This updates the "local state" to include the user's edit for conflict resolution
+     */
+    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+        console.log(`[MainKanbanFile] Applying captured edit to baseline:`, capturedEdit);
+
+        // Get the current board (from webview cache or parse from content)
+        let board = this._cachedBoardFromWebview;
+        if (!board) {
+            console.log(`[MainKanbanFile] No cached board, parsing from content`);
+            board = this.parseToBoard();
+        }
+
+        // Apply the edit to the board based on type
+        if (capturedEdit.type === 'task-title') {
+            const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
+            if (task) {
+                console.log(`[MainKanbanFile] Updating task title: "${task.title}" → "${capturedEdit.value}"`);
+                task.title = capturedEdit.value;
+            }
+        } else if (capturedEdit.type === 'task-description') {
+            const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
+            if (task) {
+                console.log(`[MainKanbanFile] Updating task description`);
+                task.description = capturedEdit.value;
+            }
+        } else if (capturedEdit.type === 'column-title') {
+            const column = board.columns.find(c => c.id === capturedEdit.columnId);
+            if (column) {
+                console.log(`[MainKanbanFile] Updating column title: "${column.title}" → "${capturedEdit.value}"`);
+                column.title = capturedEdit.value;
+            }
+        }
+
+        // Regenerate markdown from the modified board
+        const newContent = this._generateMarkdownFromBoard(board);
+
+        // Update BOTH content and baseline with the edit
+        // This makes the edit part of the "local state" for conflict detection
+        this._content = newContent;
+        this._baseline = newContent;
+        this._hasUnsavedChanges = true;  // Mark as unsaved (edit in memory, not on disk)
+
+        console.log(`[MainKanbanFile] ✓ Edit applied to baseline (${newContent.length} chars)`);
+    }
+
+    /**
+     * Find a task in the board by ID
+     */
+    private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): any {
+        // If columnId provided, search only that column first
+        if (columnId) {
+            const column = board.columns.find(c => c.id === columnId);
+            if (column) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) return task;
+            }
+        }
+
+        // Search all columns
+        for (const column of board.columns) {
+            const task = column.tasks.find(t => t.id === taskId);
+            if (task) return task;
+        }
+
+        return null;
+    }
+
+    /**
      * Get YAML frontmatter
      */
     public getYamlHeader(): string | null {
@@ -129,6 +217,20 @@ export class MainKanbanFile extends MarkdownFile {
      */
     public setKanbanFooter(footer: string | null): void {
         this._kanbanFooter = footer;
+    }
+
+    /**
+     * Update cached board from webview (for conflict detection)
+     */
+    public setCachedBoardFromWebview(board: KanbanBoard | undefined): void {
+        this._cachedBoardFromWebview = board;
+    }
+
+    /**
+     * Get cached board from webview (for conflict detection)
+     */
+    public getCachedBoardFromWebview(): KanbanBoard | undefined {
+        return this._cachedBoardFromWebview;
     }
 
     // ============= FILE I/O =============
@@ -187,31 +289,122 @@ export class MainKanbanFile extends MarkdownFile {
     // ============= EXTERNAL CHANGE HANDLING =============
 
     /**
-     * Handle external file change (file changed on disk)
+     * Handle external file change using unified change handler
+     * This replaces the complex conflict detection logic with a single, consistent system
      */
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
-        console.log(`[MainKanbanFile] Handling external change: ${changeType} - ${this._relativePath}`);
+        const changeHandler = UnifiedChangeHandler.getInstance();
+        await changeHandler.handleExternalChange(this, changeType);
+    }
 
-        if (changeType === 'deleted') {
-            this._exists = false;
-            console.warn(`[MainKanbanFile] Main file was deleted: ${this._path}`);
-            return;
+    /**
+     * Ultra-comprehensive conflict analysis
+     * Checks EVERY possible source of unsaved changes to prevent data loss
+     */
+    private async _analyzeConflictSituation(): Promise<{
+        hasAnyUnsavedChanges: boolean;
+        reasons: string[];
+        details: {
+            internalState: boolean;
+            editMode: boolean;
+            documentDirty: boolean;
+            documentOpen: boolean;
+            boardModified: boolean;
+            cacheModified: boolean;
+        };
+    }> {
+        const reasons: string[] = [];
+        const details = {
+            internalState: false,
+            editMode: false,
+            documentDirty: false,
+            documentOpen: false,
+            boardModified: false,
+            cacheModified: false
+        };
+
+        // 1. Internal state flag (kanban UI modifications)
+        if (this._hasUnsavedChanges) {
+            details.internalState = true;
+            reasons.push('Internal unsaved changes flag is true');
         }
 
-        if (changeType === 'created') {
-            this._exists = true;
+        // 2. Edit mode (user actively editing)
+        if (this._isInEditMode) {
+            details.editMode = true;
+            reasons.push('User is in edit mode');
         }
 
-        // Check for conflict FIRST - only clear content if auto-reloading
-        if (this.hasConflict()) {
-            console.log(`[MainKanbanFile] ✋ Conflict detected - showing dialog (keeping current content for potential save)`);
-            await this.showConflictDialog();
-        } else if (this.needsReload()) {
-            console.log(`[MainKanbanFile] ⚠ Auto-reload: Reloading from disk`);
-            await this.reload(); // reload() emits 'reloaded' which triggers notification automatically
-        } else {
-            console.log(`[MainKanbanFile] ⏸ External change detected but neither conflict nor reload needed`);
+        // 3. VSCode document dirty status (text editor has unsaved changes)
+        const document = this._fileManager.getDocument();
+        if (document && document.uri.fsPath === this._path) {
+            details.documentOpen = true;
+            if (document.isDirty) {
+                details.documentDirty = true;
+                reasons.push('VSCode document is dirty (unsaved text editor changes)');
+            }
         }
+
+        // 4. Document is open but we can't access it (be safe)
+        const allDocs = vscode.workspace.textDocuments;
+        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
+        if (docOpen && !document) {
+            details.documentOpen = true;
+            reasons.push('Document is open but inaccessible (assuming unsaved changes)');
+        }
+
+        // 5. Board state differs from baseline (extra safety check)
+        if (this._board) {
+            // Generate what the content SHOULD be from current board
+            const expectedContent = this._generateMarkdownFromBoard(this._board);
+            if (expectedContent !== this._baseline) {
+                details.boardModified = true;
+                reasons.push('Board state differs from saved baseline');
+            }
+        }
+
+        // 6. Check if there's a cached board that differs from current board
+        // This would indicate unsaved kanban changes
+        const currentBoard = this._board;
+        if (currentBoard && this._cachedBoardFromWebview) {
+            // Deep comparison of board structure (excluding volatile fields like timestamps)
+            const currentNormalized = this._normalizeBoardForComparison(currentBoard);
+            const cachedNormalized = this._normalizeBoardForComparison(this._cachedBoardFromWebview);
+
+            if (JSON.stringify(currentNormalized) !== JSON.stringify(cachedNormalized)) {
+                details.cacheModified = true;
+                reasons.push('Cached board differs from current board (unsaved kanban changes)');
+                console.log(`[MainKanbanFile._analyzeConflictSituation] 🔍 BOARD DIFFERENCE DETECTED:`);
+                console.log(`[MainKanbanFile._analyzeConflictSituation]   Current board columns: ${currentBoard.columns.length}`);
+                console.log(`[MainKanbanFile._analyzeConflictSituation]   Cached board columns: ${this._cachedBoardFromWebview.columns.length}`);
+            }
+        } else if (!this._cachedBoardFromWebview) {
+            console.log(`[MainKanbanFile._analyzeConflictSituation] ⚠️  No cached board available for comparison`);
+        }
+
+        // 7. Check file registry for any unsaved include files
+        const includeFiles = this._fileRegistry.getIncludeFiles();
+        const unsavedIncludes = includeFiles.filter(f => f.hasUnsavedChanges());
+        if (unsavedIncludes.length > 0) {
+            reasons.push(`${unsavedIncludes.length} include files have unsaved changes`);
+        }
+
+        // 8. Time-based safety check: If external change happened very recently,
+        // it might be concurrent editing
+        const now = Date.now();
+        const lastModified = this._lastModified?.getTime() || 0;
+        const timeSinceChange = now - lastModified;
+        if (timeSinceChange < 2000) { // Less than 2 seconds ago
+            reasons.push(`External change very recent (${timeSinceChange}ms ago) - possible concurrent editing`);
+        }
+
+        const hasAnyUnsavedChanges = reasons.length > 0;
+
+        return {
+            hasAnyUnsavedChanges,
+            reasons,
+            details
+        };
     }
 
     // ============= VALIDATION =============
@@ -221,7 +414,9 @@ export class MainKanbanFile extends MarkdownFile {
      */
     public validate(content: string): { valid: boolean; errors?: string[] } {
         try {
-            const parseResult = this._parser.parseMarkdown(content);
+            // CRITICAL FIX: Pass basePath for resolving relative include paths
+            const basePath = path.dirname(this._path);
+            const parseResult = this._parser.parseMarkdown(content, basePath);
             const board = parseResult.board;
 
             if (!board.valid) {
@@ -259,12 +454,32 @@ export class MainKanbanFile extends MarkdownFile {
             file.hasUnsavedChanges()
         );
 
+        // Check if VSCode document is dirty (text editor unsaved changes)
+        const document = this._fileManager.getDocument();
+        const documentIsDirty = !!(document && document.uri.fsPath === this._path && document.isDirty);
+
+        // CRITICAL: Check if there's a cached board from webview (UI edits not yet saved)
+        const cachedBoard = this.getCachedBoardFromWebview();
+        const hasCachedBoardChanges = !!cachedBoard;
+
+        // Main has unsaved changes if ANY of:
+        // - Internal state flag is true (from kanban UI edits)
+        // - OR VSCode document is dirty (from text editor edits)
+        // - OR Cached board exists (UI edits not yet written to file)
+        const hasMainUnsavedChanges = this._hasUnsavedChanges || documentIsDirty || hasCachedBoardChanges;
+
+        console.log(`[MainKanbanFile.getConflictContext] Computing hasMainUnsavedChanges:`);
+        console.log(`[MainKanbanFile.getConflictContext]   _hasUnsavedChanges: ${this._hasUnsavedChanges}`);
+        console.log(`[MainKanbanFile.getConflictContext]   documentIsDirty: ${documentIsDirty}`);
+        console.log(`[MainKanbanFile.getConflictContext]   hasCachedBoardChanges: ${hasCachedBoardChanges}`);
+        console.log(`[MainKanbanFile.getConflictContext]   → hasMainUnsavedChanges: ${hasMainUnsavedChanges}`);
+
         return {
             type: 'external_main',
             fileType: 'main',
             filePath: this._path,
             fileName: path.basename(this._path),
-            hasMainUnsavedChanges: this._hasUnsavedChanges,
+            hasMainUnsavedChanges: hasMainUnsavedChanges,
             hasIncludeUnsavedChanges: hasIncludeUnsavedChanges,
             hasExternalChanges: this._hasFileSystemChanges,
             changedIncludeFiles: [],
@@ -273,42 +488,138 @@ export class MainKanbanFile extends MarkdownFile {
         };
     }
 
+    // ============= SIMPLIFIED CONFLICT DETECTION =============
+
+    /**
+     * Check if there are ANY unsaved changes (simplified 3-variant approach)
+     * Returns true if ANY of these conditions are met:
+     * - Internal state flag is true (kanban UI edits)
+     * - User is in edit mode
+     * - VSCode document is dirty (text editor edits)
+     * - Document is open but we can't access it (safe default)
+     */
+    public hasAnyUnsavedChanges(): boolean {
+        // Check 1: Internal state flag (from kanban UI)
+        if (this._hasUnsavedChanges) return true;
+
+        // Check 2: Edit mode (user is actively editing)
+        if (this._isInEditMode) return true;
+
+        // Check 3: VSCode document dirty status (text editor edits)
+        const document = this._fileManager.getDocument();
+        if (document && document.uri.fsPath === this._path && document.isDirty) {
+            return true;
+        }
+
+        // Check 4: If document is open but we can't find it, be safe
+        const allDocs = vscode.workspace.textDocuments;
+        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
+        if (docOpen && !document) {
+            // Document is open but we can't access it - assume it might have changes
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get detailed reasons for unsaved changes (for logging)
+     */
+    private _getUnsavedChangesReasons(): { [key: string]: boolean } {
+        const document = this._fileManager.getDocument();
+        const allDocs = vscode.workspace.textDocuments;
+        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
+
+        return {
+            hasUnsavedChanges_flag: this._hasUnsavedChanges,
+            isInEditMode_flag: this._isInEditMode,
+            documentIsDirty: !!(document && document.uri.fsPath === this._path && document.isDirty),
+            documentOpenButInaccessible: docOpen && !document
+        };
+    }
+
     // ============= OVERRIDES =============
 
     /**
+     * Override hasConflict to also check VSCode document dirty status
+     * This ensures conflicts are detected when editing in text editor (not just kanban UI)
+     */
+    public hasConflict(): boolean {
+        // Check base class flags (kanban UI changes)
+        const baseHasConflict = super.hasConflict();
+
+        // Also check if VSCode document is dirty (text editor changes)
+        const document = this._fileManager.getDocument();
+        const documentIsDirty = !!(document && document.uri.fsPath === this._path && document.isDirty);
+
+        // Conflict if:
+        // - Base class detects conflict (kanban UI changes + external changes)
+        // - OR document is dirty (text editor changes) AND has external changes
+        const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
+
+        if (hasConflict) {
+            console.log(`[MainKanbanFile.hasConflict] CONFLICT DETECTED:`, {
+                file: this._relativePath,
+                baseConflict: baseHasConflict,
+                documentIsDirty: documentIsDirty,
+                hasFileSystemChanges: this._hasFileSystemChanges,
+                hasUnsavedChanges: this._hasUnsavedChanges,
+                isInEditMode: this._isInEditMode
+            });
+        }
+
+        return hasConflict;
+    }
+
+    /**
      * Override reload to also parse board
+     * OPTIMIZATION: Skip re-parsing if content hasn't actually changed
      */
     public async reload(): Promise<void> {
-        console.log(`[MainKanbanFile] Starting reload override`);
-        const baselineBeforeReload = this._baseline;
+        console.log(`[MainKanbanFile] ============ RELOAD START ============`);
+        console.log(`[MainKanbanFile] Current baseline length: ${this._baseline?.length || 0}`);
+        console.log(`[MainKanbanFile] Current content length: ${this._content?.length || 0}`);
 
         // Read and update content WITHOUT emitting events yet
         const content = await this._readFromDiskWithVerification();
         if (content !== null) {
-            // Check if content actually changed
-            if (content !== this._baseline) {
-                console.log(`[MainKanbanFile] Content changed, updating and re-parsing board`);
-                this._content = content;
-                this._baseline = content;
-                this._hasUnsavedChanges = false;
+            console.log(`[MainKanbanFile] Read ${content.length} chars from disk`);
+
+            // CRITICAL OPTIMIZATION: Skip re-parse if content exactly the same
+            // This prevents infinite loops and unnecessary board regeneration
+            if (content === this._baseline) {
+                console.log(`[MainKanbanFile] ✓ Content UNCHANGED - skipping parse and event`);
+                console.log(`[MainKanbanFile] → This prevents infinite reload loop`);
                 this._hasFileSystemChanges = false;
                 this._lastModified = await this._getFileModifiedTime();
-
-                // CRITICAL: Re-parse board BEFORE emitting event
-                // This ensures event handlers see the updated board
-                this.parseToBoard();
-
-                // Now emit the event
-                this._emitChange('reloaded');
-                console.log(`[MainKanbanFile] Reloaded successfully with updated board: ${this._relativePath}`);
-            } else {
-                // Content unchanged - false alarm from watcher
-                console.log(`[MainKanbanFile] Content unchanged - false alarm from watcher, keeping existing content`);
-                this._hasFileSystemChanges = false;
-                this._lastModified = await this._getFileModifiedTime();
+                console.log(`[MainKanbanFile] ============ RELOAD END (NO-OP) ============`);
+                return;
             }
+
+            // Content actually changed - proceed with full reload
+            console.log(`[MainKanbanFile] ⚡ Content CHANGED - proceeding with parse`);
+            console.log(`[MainKanbanFile]   Old length: ${this._baseline?.length || 0}`);
+            console.log(`[MainKanbanFile]   New length: ${content.length}`);
+
+            this._content = content;
+            this._baseline = content;
+            this._hasUnsavedChanges = false;
+            this._hasFileSystemChanges = false;
+            this._lastModified = await this._getFileModifiedTime();
+
+            // CRITICAL: Re-parse board BEFORE emitting event
+            // This ensures event handlers see the updated board
+            console.log(`[MainKanbanFile] → Re-parsing board...`);
+            this.parseToBoard();
+            console.log(`[MainKanbanFile] ✓ Board re-parsed successfully`);
+
+            // Now emit the event
+            this._emitChange('reloaded');
+            console.log(`[MainKanbanFile] ✓ Emitted 'reloaded' event`);
+            console.log(`[MainKanbanFile] ============ RELOAD END (SUCCESS) ============`);
         } else {
-            console.warn(`[MainKanbanFile] ⚠ Reload failed - null returned`);
+            console.warn(`[MainKanbanFile] ⚠️ Reload failed - null content returned`);
+            console.log(`[MainKanbanFile] ============ RELOAD END (FAILED) ============`);
         }
     }
 
@@ -316,14 +627,103 @@ export class MainKanbanFile extends MarkdownFile {
      * Override save to validate board before saving
      */
     public async save(): Promise<void> {
-        // Ensure we have a valid board
-        if (this._board) {
+        // CRITICAL: Use cached board from webview if it exists (current UI state)
+        // Otherwise fall back to parsed board
+        const boardToSave = this._cachedBoardFromWebview || this._board;
+
+        console.log(`[MainKanbanFile] save() - using ${this._cachedBoardFromWebview ? 'CACHED BOARD from webview' : 'parsed board'}`);
+
+        if (boardToSave) {
             // Regenerate content from board before saving
-            const content = this._generateMarkdownFromBoard(this._board);
+            const content = this._generateMarkdownFromBoard(boardToSave);
+            console.log(`[MainKanbanFile] Generated ${content.length} chars from board`);
             this._content = content;
         }
 
         await super.save();
+
+        // CRITICAL: Clear cached board AFTER save completes
+        // Note: save() method automatically sets instance-level skipNextReloadDetection flag
+        // This prevents the file watcher from triggering unnecessary reloads
+        console.log(`[MainKanbanFile] Clearing cached board after save`);
+        this._cachedBoardFromWebview = undefined;
+    }
+
+    /**
+     * Override to handle special reload case and clear cached board
+     */
+    public async showConflictDialog(): Promise<ConflictResolution | null> {
+        const hadCachedBoard = !!this._cachedBoardFromWebview;
+        console.log(`[MainKanbanFile] showConflictDialog - before resolution, cachedBoard exists: ${hadCachedBoard}`);
+
+        const context = this.getConflictContext();
+        console.log(`[MainKanbanFile] showConflictDialog - Awaiting user choice...`);
+        const resolution = await this._conflictResolver.resolveConflict(context);
+        console.log(`[MainKanbanFile] showConflictDialog - Resolution received:`, {
+            action: resolution?.action,
+            shouldProceed: resolution?.shouldProceed,
+            shouldCreateBackup: resolution?.shouldCreateBackup,
+            shouldSave: resolution?.shouldSave,
+            shouldReload: resolution?.shouldReload,
+            shouldIgnore: resolution?.shouldIgnore
+        });
+
+        if (resolution && resolution.shouldProceed) {
+            // CRITICAL: Check shouldCreateBackup FIRST because backup-and-reload sets both shouldCreateBackup AND shouldReload
+            console.log(`[MainKanbanFile] Checking shouldCreateBackup: ${resolution.shouldCreateBackup}`);
+            if (resolution.shouldCreateBackup) {
+                console.log(`[MainKanbanFile] → Executing: backup-and-reload`);
+                await this.resolveConflict('backup');
+                this._cachedBoardFromWebview = undefined;
+                this._hasFileSystemChanges = false;
+            } else if (resolution.shouldSave) {
+                console.log(`[MainKanbanFile] → Executing: save`);
+                // save() method marks itself as legitimate automatically
+                await this.save();  // save() already clears cached board
+            } else if (resolution.shouldReload && hadCachedBoard) {
+                // SPECIAL CASE: If reloading with cached board, force reload from disk
+                console.log(`[MainKanbanFile] → Special case: Reload with cached board - discarding UI edits`);
+                // Clear cached board FIRST
+                this._cachedBoardFromWebview = undefined;
+                this._hasFileSystemChanges = false;
+
+                // CRITICAL: Actually read from disk, don't just re-parse old content
+                console.log(`[MainKanbanFile] → Reading fresh content from disk...`);
+                const freshContent = await this.readFromDisk();
+                if (freshContent !== null && freshContent !== this._baseline) {
+                    // Content changed on disk
+                    console.log(`[MainKanbanFile] → Disk content changed (${freshContent.length} chars), updating...`);
+                    this._content = freshContent;
+                    this._baseline = freshContent;
+                    this._hasUnsavedChanges = false;
+                    this._lastModified = await this._getFileModifiedTime();
+                    this.parseToBoard();
+                    this._emitChange('reloaded');
+                    console.log(`[MainKanbanFile] → UI updated to show disk content`);
+                } else if (freshContent !== null) {
+                    // Content unchanged, but still re-parse to update UI (discard UI edits)
+                    console.log(`[MainKanbanFile] → Disk content unchanged, re-parsing to discard UI edits...`);
+                    this._content = freshContent;
+                    this.parseToBoard();
+                    this._emitChange('reloaded');
+                    console.log(`[MainKanbanFile] → UI updated (UI edits discarded)`);
+                }
+            } else if (resolution.shouldReload) {
+                console.log(`[MainKanbanFile] → Executing: reload (normal)`);
+                await this.reload();
+            } else if (resolution.shouldIgnore) {
+                console.log(`[MainKanbanFile] → Executing: ignore`);
+                // CRITICAL: Keep cached board (user wants to keep their UI edits!)
+                // Only clear the external change flag for this specific external change
+                this._hasFileSystemChanges = false;
+                // DO NOT clear cached board - user chose to ignore external, keep UI edits
+                console.log(`[MainKanbanFile] → Kept cached board (user's UI edits preserved)`);
+            }
+        }
+
+        console.log(`[MainKanbanFile] showConflictDialog - after cleanup, cachedBoard exists: ${!!this._cachedBoardFromWebview}`);
+
+        return resolution;
     }
 
     // ============= PRIVATE HELPERS =============
@@ -335,5 +735,32 @@ export class MainKanbanFile extends MarkdownFile {
         // Use the existing markdown generation logic from MarkdownKanbanParser
         // This ensures consistency with how the main save process generates markdown
         return this._parser.generateMarkdown(board);
+    }
+
+    /**
+     * Normalize board for comparison by removing volatile fields
+     * This ensures consistent comparison of board state for conflict detection
+     */
+    private _normalizeBoardForComparison(board: KanbanBoard): any {
+        // Deep clone to avoid modifying original
+        const normalized = JSON.parse(JSON.stringify(board));
+
+        // Remove volatile fields that don't affect content
+        if (normalized.columns) {
+            for (const column of normalized.columns) {
+                // Remove any volatile column properties
+                delete column.isLoadingContent;
+
+                if (column.tasks) {
+                    for (const task of column.tasks) {
+                        // Remove volatile task properties
+                        delete task.isLoadingContent;
+                        // Keep essential content: title, description, includeFiles, etc.
+                    }
+                }
+            }
+        }
+
+        return normalized;
     }
 }

@@ -16,6 +16,13 @@
   --task-hover-color: var(--vscode-focusBorder);
   --section-focus-color: gray;
 
+  /* Week tag highlighting - configurable */
+  --current-week-highlight-color: #ff0000;
+  --current-week-highlight-style: border; /* Options: border, background, glow */
+  --current-week-border-width: 3px;
+  --current-week-border-style: solid;
+  --current-week-glow-size: 0 0 10px;
+
   /* Compact view - smaller fonts and padding when content outside viewport */
   --compact-font-size: 0.85em;
   --compact-visibility-threshold: 0.3; /* Apply when < 30% visible */
@@ -836,8 +843,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 /* Column title text */
-.column-title-text,
-.column-title-text * {
+.column-title-text {
   color: var(--vscode-foreground);
   cursor: pointer;
   border-radius: 3px;
@@ -854,6 +860,11 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: none;
 }
 
+/* Don't apply block/width styles to tag children - they should be inline */
+.column-title-text *:not(.kanban-tag) {
+  color: inherit;
+}
+
 .column-title-text:hover {
   background-color: var(--vscode-list-hoverBackground);
 }
@@ -863,6 +874,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   color: var(--vscode-textLink-foreground);
   text-decoration: underline;
   cursor: pointer;
+  word-break: break-all;
   font-weight: 500;
 }
 
@@ -2067,13 +2079,12 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 .kanban-full-height-column.collapsed-horizontal .column-title-text {
   display: flex;
   align-items: center;
-  justify-content: center;
   flex: 1;
   width: 100%;
   padding: 0 5px;
   margin: 0;
   gap: 4px;
-  white-space: nowrap;
+  /* white-space: nowrap; */
 }
 
 /* .kanban-full-height-column.collapsed-horizontal .column-title-text {
@@ -3356,6 +3367,7 @@ blockquote {
   /* margin: 8px 0; */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   border: 1px solid var(--vscode-panel-border);
+  background-color: white;
 }
 
 .task-title-container .markdown-content img {
@@ -3531,8 +3543,8 @@ blockquote {
 
 .column-title-text .kanban-tag,
 .task-title-display .kanban-tag {
-  vertical-align: middle;
-  display: unset;
+  vertical-align: left;
+  display: inline-table;
 }
 
 /* Ensure tags in task descriptions are strictly inline without any card-level styling */
@@ -3625,6 +3637,76 @@ h6 .kanban-tag {
 
 .corner-badge[data-badge-index="3"] {
   z-index: 102;
+}
+
+/* Numeric badges for index tags (#1, #1.1, etc.) */
+.numeric-badge {
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background-color: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 12px;
+  z-index: 150;
+  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+}
+
+/* Numeric badge in tasks */
+.task-item .numeric-badge {
+  top: -12px;
+  left: -12px;
+}
+
+/* Numeric badge in columns */
+.kanban-full-height-column .numeric-badge {
+  top: -12px;
+  left: -12px;
+}
+
+/* Current week highlighting for columns and tasks */
+/* Border style (default) - apply to column elements, not container */
+.kanban-full-height-column[data-current-week="true"] .column-header,
+.kanban-full-height-column[data-current-week="true"] .column-title,
+.kanban-full-height-column[data-current-week="true"] .column-inner,
+.kanban-full-height-column[data-current-week="true"] .column-footer,
+.task-item[data-current-week="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Background style - add class 'week-highlight-background' to body to enable */
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-header,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-inner,
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] .column-footer {
+  background-color: var(--current-week-highlight-color) !important;
+  opacity: 0.2;
+}
+
+body.week-highlight-background .task-item[data-current-week="true"] {
+  background-color: var(--current-week-highlight-color) !important;
+  opacity: 0.9;
+}
+
+/* Glow style - add class 'week-highlight-glow' to body to enable */
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-header,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-title,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-inner,
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .column-footer {
+  box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
+}
+
+body.week-highlight-glow .task-item[data-current-week="true"] {
+  box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }
 
 /* Header and footer bars */
@@ -3807,6 +3889,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
     color: var(--vscode-charts-blue);
     background-color: rgba(0, 122, 204, 0.1);
     padding: 0px 4px;
+    display: inline;
     border-radius: 4px;
     font-size: 0.85em;
     font-weight: 500;
@@ -3829,6 +3912,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
     color: var(--vscode-charts-purple);
     background-color: rgba(138, 43, 226, 0.1);
     padding: 0px 4px;
+    display: inline;
     border-radius: 4px;
     font-size: 0.85em;
     font-weight: 500;
@@ -3850,6 +3934,31 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .kanban-date-tag:hover,
 .kanban-person-tag:hover {
     opacity: 0.8;
+}
+
+/* Week tag styling (same as date tag but no icon) */
+.kanban-week-tag {
+    color: var(--vscode-charts-blue);
+    background-color: rgba(0, 122, 204, 0.1);
+    padding: 0px 4px;
+    display: inline;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+    user-select: none;
+    border: 1px solid var(--vscode-charts-blue);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.kanban-week-tag:hover {
+    opacity: 0.8;
+}
+
+/* Ensure week tags stay inline in folded columns */
+.collapsed .kanban-week-tag {
+    display: inline !important;
 }
 
 /* Sort button */

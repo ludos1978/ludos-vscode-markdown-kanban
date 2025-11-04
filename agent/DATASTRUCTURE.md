@@ -2,7 +2,7 @@
 
 This document provides a comprehensive overview of all interfaces, types, classes, and enums that define data structures in the Markdown Kanban codebase.
 
-**Last Updated:** 2025-10-29
+**Last Updated:** 2025-11-04
 
 ---
 
@@ -19,6 +19,33 @@ The Markdown Kanban extension uses a **unified position-based include syntax**:
 - **Internal routing**: TypeScript uses `includeType: 'columninclude' | 'taskinclude' | 'include'` for internal logic, but the user NEVER sees these type names. The syntax is always `!!!include()!!!`.
 
 - **NEVER use `!!!columninclude()!!!` or `!!!taskinclude()!!!`** - these are deprecated and have been removed from the codebase.
+
+### Include Constants (2025-11-04)
+
+**File:** `/src/constants/IncludeConstants.ts`
+
+All include syntax patterns are now centralized in constants to avoid 783+ duplicate string instances:
+
+```typescript
+export const INCLUDE_SYNTAX = {
+    PREFIX: '!!!include(',
+    SUFFIX: ')!!!',
+    REGEX: /!!!include\(([^)]+)\)!!!/g,
+    REGEX_SINGLE: /!!!include\(([^)]+)\)!!!/,
+} as const;
+
+export const FILE_TYPES = {
+    MAIN: 'main',
+    INCLUDE_COLUMN: 'include-column',
+    INCLUDE_TASK: 'include-task',
+    INCLUDE_REGULAR: 'include-regular',
+} as const;
+```
+
+**Usage:** Import these constants instead of hardcoding strings:
+```typescript
+import { INCLUDE_SYNTAX, FILE_TYPES } from './constants/IncludeConstants';
+```
 
 ---
 

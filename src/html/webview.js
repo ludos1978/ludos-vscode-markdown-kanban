@@ -1991,6 +1991,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Function to auto-save pending changes
     function autoSavePendingChanges() {
+        // CRITICAL FIX: Do NOT auto-save if user is actively editing
+        // This prevents auto-save from setting skip flag when user switches to external editor,
+        // which would cause external saves to be incorrectly treated as "our own save"
+        if (window.taskEditor && window.taskEditor.currentEditor !== null) {
+            console.log('[webview] ⏸️ Skipping auto-save - user is actively editing');
+            return;
+        }
+
         const pendingColumnCount = window.pendingColumnChanges?.size || 0;
         const pendingTaskCount = window.pendingTaskChanges?.size || 0;
         const totalPending = pendingColumnCount + pendingTaskCount;
@@ -2314,8 +2322,21 @@ document.addEventListener('click', (e) => {
 // Listen for messages from the extension
 window.addEventListener('message', event => {
     const message = event.data;
-    
+
     switch (message.type) {
+        case 'batch':
+            // CRITICAL FIX: Handle batched messages from backend
+            // Backend uses queueMessage() which batches multiple messages into one
+            if (message.messages && Array.isArray(message.messages)) {
+                for (const batchedMessage of message.messages) {
+                    // Re-dispatch each batched message through this same handler
+                    window.dispatchEvent(new MessageEvent('message', {
+                        data: batchedMessage,
+                        origin: event.origin
+                    }));
+                }
+            }
+            break;
         case 'boardUpdate':
             const previousBoard = window.cachedBoard;
             
@@ -2718,8 +2739,8 @@ window.addEventListener('message', event => {
 
         case 'updateIncludeContent':
             // Handle processed include content from backend
-            if (typeof window.updateIncludeContent === 'function') {
-                window.updateIncludeContent(message.filePath, message.content);
+            if (typeof window.updateIncludeFileCache === 'function') {
+                window.updateIncludeFileCache(message.filePath, message.content);
             }
             break;
 
@@ -2760,6 +2781,12 @@ window.addEventListener('message', event => {
         case 'insertSnippetContent':
             // Insert VS Code snippet content into the active editor
             insertVSCodeSnippetContent(message.content, message.fieldType, message.taskId);
+            break;
+        case 'replaceSelection':
+            // Replace selected text with result from command (e.g., translation)
+            if (window.taskEditorManager) {
+                window.taskEditorManager.replaceSelection(message.text);
+            }
             break;
         case 'proceedDisableIncludeMode':
             // User confirmed disable include mode in VS Code dialog - proceed with the action
@@ -2878,6 +2905,8 @@ window.addEventListener('message', event => {
             console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
             console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
             console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
+            console.log('[FRONTEND updateTaskContent] taskTitle:', message.taskTitle);
+            console.log('[FRONTEND updateTaskContent] originalTitle:', message.originalTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2899,10 +2928,12 @@ window.addEventListener('message', event => {
                     console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
 
                     // Update task metadata
-                    foundTask.description = message.description || '';
-                    foundTask.title = message.taskTitle || foundTask.title;
-                    foundTask.displayTitle = message.displayTitle || foundTask.displayTitle;
-                    foundTask.originalTitle = message.originalTitle || foundTask.originalTitle;
+                    // CRITICAL FIX: Use !== undefined checks instead of || operator
+                    // Empty string "" is falsy and would fall back to old value with ||
+                    foundTask.description = message.description !== undefined ? message.description : '';
+                    foundTask.title = message.taskTitle !== undefined ? message.taskTitle : foundTask.title;
+                    foundTask.displayTitle = message.displayTitle !== undefined ? message.displayTitle : foundTask.displayTitle;
+                    foundTask.originalTitle = message.originalTitle !== undefined ? message.originalTitle : foundTask.originalTitle;
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
                     if (message.includeMode !== undefined) {
@@ -2917,29 +2948,24 @@ window.addEventListener('message', event => {
                     }
 
                     console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
+                    console.log('[FRONTEND updateTaskContent] NEW title:', foundTask.title);
+                    console.log('[FRONTEND updateTaskContent] NEW displayTitle:', foundTask.displayTitle);
+                    console.log('[FRONTEND updateTaskContent] NEW originalTitle:', foundTask.originalTitle);
                     console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
-                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    // Check if user is currently editing - if so, handle carefully
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
+                    const isEditingThisTask = isEditing && window.taskEditor.currentEditor.taskId === message.taskId;
 
-                    // CRITICAL: If user is editing THIS task, update the editor value with new content
-                    if (isEditing && window.taskEditor.currentEditor.taskId === message.taskId) {
-                        if (window.taskEditor.currentEditor.type === 'task-title') {
-                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task title:', message.taskTitle);
-                            window.taskEditor.currentEditor.element.value = message.taskTitle;
-                            window.taskEditor.currentEditor.originalValue = message.taskTitle;
-                            // Auto-resize the textarea if needed
-                            if (typeof window.taskEditor.autoResize === 'function') {
-                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
-                            }
-                        } else if (window.taskEditor.currentEditor.type === 'task-description') {
-                            console.log('[FRONTEND updateTaskContent] Updating editor value with new task description (length:', message.description ? message.description.length : 0, ')');
-                            window.taskEditor.currentEditor.element.value = message.description || '';
-                            window.taskEditor.currentEditor.originalValue = message.description || '';
-                            // Auto-resize the textarea if needed
-                            if (typeof window.taskEditor.autoResize === 'function') {
-                                window.taskEditor.autoResize(window.taskEditor.currentEditor.element);
-                            }
+                    // CRITICAL FIX: For include changes, update the editor field value even if editing
+                    // The backend has processed the include removal/addition and stopped editing
+                    // We need to update the textarea to reflect the new title
+                    if (isEditingThisTask && message.taskTitle !== undefined) {
+                        const editor = window.taskEditor.currentEditor;
+                        if (editor.type === 'task-title') {
+                            // Update the editor field value to match the backend's processed title
+                            editor.element.value = message.taskTitle || '';
+                            console.log('[FRONTEND updateTaskContent] Updated editor value for include change:', message.taskTitle);
                         }
                     }
 
@@ -3003,9 +3029,9 @@ window.addEventListener('message', event => {
                         column.includeFiles = colData.includeFiles;
 
                         // Update DOM directly (minimal update, no full re-render)
-                        const headerEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-header`);
-                        if (headerEl && typeof window.getColumnDisplayTitle === 'function') {
-                            headerEl.innerHTML = window.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        const titleEl = document.querySelector(`[data-column-id="${colData.columnId}"] .column-title-text`);
+                        if (titleEl && window.tagUtils) {
+                            titleEl.innerHTML = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
                         }
                     }
                 }
@@ -3019,38 +3045,74 @@ window.addEventListener('message', event => {
                             // Update cache
                             task.displayTitle = taskData.displayTitle;
                             task.description = taskData.description;
-
-                            // Update DOM directly (minimal update)
-                            const taskEl = document.querySelector(`[data-task-id="${taskData.taskId}"]`);
-                            if (taskEl) {
-                                // Re-render just this task element
-                                if (typeof window.renderSingleTask === 'function') {
-                                    window.renderSingleTask(taskData.columnId, taskData.taskId, task);
-                                }
-                            }
                         }
+                    }
+                }
+
+                // Re-render all dirty columns (after cache is updated)
+                const renderedColumnIds = new Set();
+                if (message.columns.length > 0) {
+                    const columnIds = message.columns.map(col => col.columnId).filter(id => id);
+                    if (columnIds.length > 0) {
+                        window.renderBoard({ columns: columnIds });
+                        // Track which columns were rendered (they include all their tasks)
+                        columnIds.forEach(id => renderedColumnIds.add(id));
+                    }
+                }
+
+                // Re-render dirty tasks that are NOT in columns we just rendered
+                // (to avoid double-rendering the same column)
+                if (message.tasks.length > 0) {
+                    const taskUpdates = message.tasks
+                        .filter(taskData => !renderedColumnIds.has(taskData.columnId))
+                        .map(taskData => ({
+                            columnId: taskData.columnId,
+                            taskId: taskData.taskId
+                        }))
+                        .filter(t => t.columnId && t.taskId);
+                    if (taskUpdates.length > 0) {
+                        window.renderBoard({ tasks: taskUpdates });
                     }
                 }
             }
             break;
         case 'stopEditing':
             // Backend requests to stop editing (e.g., due to external file conflict)
+            let capturedEdit = null;
+
             if (window.taskEditor && window.taskEditor.currentEditor) {
                 console.log('[Frontend] Stopping editing due to backend request');
-                // Save current field before stopping
-                if (typeof window.taskEditor.saveCurrentField === 'function') {
-                    window.taskEditor.saveCurrentField();
+
+                if (message.captureValue) {
+                    // CAPTURE mode: Extract edit value WITHOUT modifying board
+                    console.log('[Frontend] Capturing edit value without saving to board');
+                    const editor = window.taskEditor.currentEditor;
+                    capturedEdit = {
+                        type: editor.type,
+                        taskId: editor.taskId,
+                        columnId: editor.columnId,
+                        value: editor.element.value,
+                        originalValue: editor.originalValue
+                    };
+                    console.log('[Frontend] Captured edit:', capturedEdit);
+                } else {
+                    // SAVE mode: Normal save (for backwards compatibility)
+                    if (typeof window.taskEditor.saveCurrentField === 'function') {
+                        window.taskEditor.saveCurrentField();
+                    }
                 }
+
                 // Clear editor state
                 window.taskEditor.currentEditor = null;
             }
 
-            // Send confirmation back to backend
+            // Send confirmation back to backend with captured value
             if (message.requestId) {
                 console.log('[Frontend] Confirming editing stopped:', message.requestId);
                 vscode.postMessage({
                     type: 'editingStopped',
-                    requestId: message.requestId
+                    requestId: message.requestId,
+                    capturedEdit: capturedEdit  // Include captured edit (null if not capturing)
                 });
             }
             break;
