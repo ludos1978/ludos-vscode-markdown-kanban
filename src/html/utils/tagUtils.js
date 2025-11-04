@@ -762,10 +762,13 @@ class TagUtils {
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
 
             if (additionalTitle) {
-                // Don't use renderMarkdown for columninclude titles - it causes markdown-it-include to process the title
-                // The additionalTitle has already been cleaned by the backend parser
-                const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-                return `${escapeHtml(additionalTitle)} ${linkHtml}`;
+                // Strip !!!include()!!! syntax before rendering markdown
+                // This allows markdown-it to render other markdown syntax (bold, italic, links, etc.)
+                // while preventing markdown-it-include plugin from processing include directives
+                const cleanedTitle = additionalTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+                const renderedTitle = renderFn ? renderFn(cleanedTitle) : cleanedTitle;
+                return `${renderedTitle} ${linkHtml}`;
             } else {
                 return linkHtml;
             }
@@ -824,10 +827,14 @@ class TagUtils {
             // Just return the include link - displayTitle is not shown because it's the file content, not metadata
             return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
         } else {
-            // Normal task - render displayTitle as-is
+            // Normal task - render displayTitle as-is, but strip !!!include()!!! first
             const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
+            // Strip !!!include()!!! syntax before rendering markdown
+            // This allows markdown-it to render other markdown syntax (bold, italic, links, etc.)
+            // while preventing markdown-it-include plugin from processing include directives
+            const cleanedTitle = displayTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
             const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-            return renderFn ? renderFn(displayTitle) : displayTitle;
+            return renderFn ? renderFn(cleanedTitle) : cleanedTitle;
         }
     }
 }
