@@ -206,11 +206,35 @@ function setupGlobalDragAndDrop() {
 
     const boardContainer = document.getElementById('kanban-container');
     const dropFeedback = document.getElementById('drop-zone-feedback');
-    
+
     if (!boardContainer) {
         // Board container not found
         return;
     }
+
+    // CRITICAL FIX: Prevent text selections from being draggable
+    // This prevents the bug where selecting text and dragging creates unintended tasks from text content
+    document.addEventListener('dragstart', (e) => {
+        // Only prevent if it's a text selection being dragged (not our drag handles)
+        const target = e.target;
+        const isDragHandle = target && (
+            target.classList.contains('drag-handle') ||
+            target.closest('.drag-handle')
+        );
+
+        // If dragging from a non-handle element, check if there's a text selection
+        if (!isDragHandle && window.getSelection) {
+            const selection = window.getSelection();
+            if (selection && selection.toString().length > 0) {
+                // There's a text selection - prevent it from being dragged
+                e.preventDefault();
+                e.stopPropagation();
+                // Clear the selection
+                selection.removeAllRanges();
+                return false;
+            }
+        }
+    }, true); // Use capture phase to intercept early
     
     // Variables for throttling
     let lastIndicatorUpdate = 0;
@@ -2271,6 +2295,16 @@ function setupTaskDragHandle(handle) {
 
         if (taskItem) {
             e.stopPropagation();
+
+            // CRITICAL FIX: Clear any text selection to prevent it from being dragged instead of the task
+            // This prevents the bug where selecting text and then dragging creates unintended tasks
+            if (window.getSelection) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    selection.removeAllRanges();
+                }
+            }
+
             const taskId = taskItem.dataset.taskId;
             const columnId = window.getColumnIdFromElement(taskItem);
 
@@ -2750,6 +2784,14 @@ function setupColumnDragAndDrop() {
         dragHandle.addEventListener('dragstart', e => {
             const columnElement = column;
             const columnId = columnElement.getAttribute('data-column-id');
+
+            // CRITICAL FIX: Clear any text selection to prevent interference with drag operation
+            if (window.getSelection) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    selection.removeAllRanges();
+                }
+            }
 
             // Find the original position in the data model
             const originalIndex = currentBoard.columns.findIndex(c => c.id === columnId);
