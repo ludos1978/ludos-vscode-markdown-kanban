@@ -3010,12 +3010,16 @@ function setupColumnDragAndDrop() {
                 dragState.cachedAllRows.forEach(row => {
                     row.classList.remove('drag-over');
                 });
-                // Calculate target position based on where the column is in the DOM now
-                const draggedColumn = dragState.draggedColumn;
-                if (!draggedColumn) {return;}
+            });
 
-                // PERFORMANCE: Use cached columns instead of querying again
-                const allColumns = Array.from(dragState.cachedAllColumns);
+            // Calculate target position based on where the column is in the DOM now
+            const draggedColumn = dragState.draggedColumn;
+            if (!draggedColumn) {return;}
+
+            // PERFORMANCE: Use cached columns if available, otherwise query
+            const allColumns = dragState.cachedAllColumns ?
+                Array.from(dragState.cachedAllColumns) :
+                Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
             const targetDOMIndex = allColumns.indexOf(draggedColumn);
 
             // Map DOM position to data model position
