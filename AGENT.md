@@ -76,4 +76,4 @@
 - after working on a problem and verifying that it's solved, check if any of the changes are obsolete or unneeded and remove these changes if it's so.
 - Do not assume, rather ask if something is required to implement a feature or change
 - If we worked on a problem which was not successfully solved, analyze what might have gone wrong and dont repeat the error.
-- dont write REPORTS of the tasks you finish, it's track the progress myself.
+- dont write reports of the tasks you finish, except if the user specifically requests it, othervise the chat is enough to track the progress.

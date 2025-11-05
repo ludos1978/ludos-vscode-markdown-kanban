@@ -54,6 +54,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // ============= CHANGE DETECTION =============
     protected _fileWatcher?: vscode.FileSystemWatcher;
     protected _watcherDisposable?: vscode.Disposable;
+    protected _watcherSubscriptions: vscode.Disposable[] = []; // Store event listener disposables
     protected _isWatching: boolean = false;
 
     // PERFORMANCE: Shared watcher registry to prevent duplicates
@@ -873,6 +874,23 @@ export abstract class MarkdownFile implements vscode.Disposable {
             console.log(`[${this.getFileType()}] Reusing existing watcher for: ${this._relativePath} (refCount: ${existingWatcher.refCount + 1})`);
             existingWatcher.refCount++;
             this._fileWatcher = existingWatcher.watcher;
+
+            // CRITICAL: Each instance needs its own event subscriptions even when sharing a watcher
+            const changeSubscription = this._fileWatcher.onDidChange(async (uri) => {
+                await this._onFileSystemChange('modified');
+            });
+            this._watcherSubscriptions.push(changeSubscription);
+
+            const deleteSubscription = this._fileWatcher.onDidDelete(async (uri) => {
+                await this._onFileSystemChange('deleted');
+            });
+            this._watcherSubscriptions.push(deleteSubscription);
+
+            const createSubscription = this._fileWatcher.onDidCreate(async (uri) => {
+                await this._onFileSystemChange('created');
+            });
+            this._watcherSubscriptions.push(createSubscription);
+
             this._isWatching = true;
             return;
         }
@@ -886,20 +904,23 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         this._fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-        // Watch for modifications
-        this._fileWatcher.onDidChange(async (uri) => {
+        // Watch for modifications - CRITICAL: Store disposables to prevent memory leak
+        const changeSubscription = this._fileWatcher.onDidChange(async (uri) => {
             await this._onFileSystemChange('modified');
         });
+        this._watcherSubscriptions.push(changeSubscription);
 
         // Watch for deletion
-        this._fileWatcher.onDidDelete(async (uri) => {
+        const deleteSubscription = this._fileWatcher.onDidDelete(async (uri) => {
             await this._onFileSystemChange('deleted');
         });
+        this._watcherSubscriptions.push(deleteSubscription);
 
         // Watch for creation
-        this._fileWatcher.onDidCreate(async (uri) => {
+        const createSubscription = this._fileWatcher.onDidCreate(async (uri) => {
             await this._onFileSystemChange('created');
         });
+        this._watcherSubscriptions.push(createSubscription);
 
         // PERFORMANCE: Register in shared watcher registry
         MarkdownFile._activeWatchers.set(watchPath, { watcher: this._fileWatcher, refCount: 1, lastActivity: new Date() });
@@ -915,6 +936,11 @@ export abstract class MarkdownFile implements vscode.Disposable {
         if (!this._isWatching) {
             return;
         }
+
+        // CRITICAL: Dispose event listener subscriptions to prevent memory leak
+        console.log(`[${this.getFileType()}] Disposing ${this._watcherSubscriptions.length} watcher subscriptions: ${this._relativePath}`);
+        this._watcherSubscriptions.forEach(sub => sub.dispose());
+        this._watcherSubscriptions = [];
 
         const watchPath = this._path;
         const existingWatcher = MarkdownFile._activeWatchers.get(watchPath);
