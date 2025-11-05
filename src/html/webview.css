@@ -834,13 +834,13 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 /* Align control elements (icons/buttons) with the title baseline */
-.column-title-section > .drag-handle,
+/* .column-title-section > .drag-handle,
 .column-title-section > .collapse-toggle,
 .column-title-section > .task-count,
 .column-title-section > .collapsed-add-task-btn,
 .column-title-section > .donut-menu {
-  margin-top: 2px; /* Align with title text baseline */
-}
+  margin-top: 2px; 
+} */
 
 /* Column title text */
 .column-title-text {
@@ -1090,6 +1090,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
   transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
+  width: 12px;
+  height: 12px;
   transform: rotate(90deg);
 }
 
@@ -2081,7 +2083,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   align-items: center;
   flex: 1;
   width: 100%;
-  padding: 0 5px;
+  /* padding: 0 5px; */
   margin: 0;
   gap: 4px;
   /* white-space: nowrap; */
@@ -3222,7 +3224,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 .markdown-content h4,
 .markdown-content h5,
 .markdown-content h6 {
-  /* margin: 0.25em 0 0.125em 0; */
+  margin: 0.25em 0 0.25em 0;
 }
 
 .markdown-content p {
@@ -4047,7 +4049,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .markdown-content h5::before { content: "H5"; }
 .markdown-content h6::before { content: "H6"; }
 
-.column-title-text .markdown-content h1,
+/* .column-title-text .markdown-content h1,
 .column-title-text .markdown-content h2,
 .column-title-text .markdown-content h3,
 .column-title-text .markdown-content h4,
@@ -4056,7 +4058,7 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .column-title-text .markdown-content p {
   margin-top: 0.25em;
   margin-bottom: 0.25em;
-}
+} */
 
 /* Paragraph - only before (DISABLED - too common) */
 /*
