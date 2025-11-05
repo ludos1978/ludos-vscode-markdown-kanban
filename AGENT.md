@@ -66,6 +66,7 @@
 - after finishing a problem and before working on another cleanup the obsolete and unused changes. comiit before doing this and after.
 - before working on a new feature make a branch.
 - after finishing working on a feature merge the branch with main.
+- you are forbidden from using git reset!
 
 ## General rules about your behaviour:
 - dont be overly optimistic, ony things that are tested are proved, othervise we assume it's still broken.
