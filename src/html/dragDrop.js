@@ -1802,24 +1802,36 @@ function createNewTaskWithContent(content, dropPosition, description = '', expli
             description: typeof description === 'string' ? description : ''
         };
 
-        // Update cached board directly
-        if (typeof updateCacheForNewTask === 'function') {
-            updateCacheForNewTask(targetColumnId, newTask, insertionIndex);
-        }
+        // Find the target column in cached board
+        const targetColumn = window.cachedBoard.columns.find(col => col.id === targetColumnId);
+        if (targetColumn) {
+            // Insert task into cache
+            if (insertionIndex >= 0 && insertionIndex <= targetColumn.tasks.length) {
+                targetColumn.tasks.splice(insertionIndex, 0, newTask);
+            } else {
+                targetColumn.tasks.push(newTask);
+                insertionIndex = targetColumn.tasks.length - 1;
+            }
 
-        // Mark as unsaved changes
-        if (typeof markUnsavedChanges === 'function') {
-            markUnsavedChanges();
-        }
+            // Mark as unsaved changes
+            if (typeof markUnsavedChanges === 'function') {
+                markUnsavedChanges();
+            }
 
-        // Update refresh button to show unsaved state
-        if (typeof updateRefreshButtonState === 'function') {
-            updateRefreshButtonState('unsaved', 1);
-        }
+            // Update refresh button to show unsaved state
+            if (typeof updateRefreshButtonState === 'function') {
+                updateRefreshButtonState('unsaved', 1);
+            }
 
-        // Re-render board to show the new task
-        if (typeof renderBoard === 'function') {
-            renderBoard();
+            // PERFORMANCE: Use incremental DOM update instead of full re-render
+            if (typeof window.addSingleTaskToDOM === 'function') {
+                window.addSingleTaskToDOM(targetColumnId, newTask, insertionIndex);
+            } else {
+                // Fallback to full render if incremental function not available
+                if (typeof renderBoard === 'function') {
+                    renderBoard();
+                }
+            }
         }
     } else {
         // Could not find suitable column
@@ -1954,8 +1966,12 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
         }));
 
         // Insert all tasks into the column at the correct position
-        if (insertionIndex >= 0 && insertionIndex <= targetColumn.tasks.length) {
-            targetColumn.tasks.splice(insertionIndex, 0, ...newTasks);
+        const actualInsertionIndex = insertionIndex >= 0 && insertionIndex <= targetColumn.tasks.length
+            ? insertionIndex
+            : targetColumn.tasks.length;
+
+        if (actualInsertionIndex >= 0 && actualInsertionIndex <= targetColumn.tasks.length) {
+            targetColumn.tasks.splice(actualInsertionIndex, 0, ...newTasks);
         } else {
             targetColumn.tasks.push(...newTasks);
         }
@@ -1970,9 +1986,18 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
             updateRefreshButtonState('unsaved', newTasks.length);
         }
 
-        // Re-render board ONCE to show all new tasks
-        if (typeof renderBoard === 'function') {
-            renderBoard();
+        // PERFORMANCE: Use incremental DOM updates instead of full re-render
+        if (typeof window.addSingleTaskToDOM === 'function') {
+            // Add each task to DOM incrementally (much faster than full re-render)
+            newTasks.forEach((task, index) => {
+                const taskInsertIndex = actualInsertionIndex + index;
+                window.addSingleTaskToDOM(targetColumnId, task, taskInsertIndex);
+            });
+        } else {
+            // Fallback to full render if incremental function not available
+            if (typeof renderBoard === 'function') {
+                renderBoard();
+            }
         }
     } else {
         vscode.postMessage({
