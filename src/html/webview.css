@@ -1020,6 +1020,49 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: stretch;
 }
 
+/* CRITICAL FIX: Prevent task content from being draggable (only drag handle should be draggable) */
+/* This prevents text selections from being dragged and creating unintended tasks */
+.task-item * {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Allow only the drag handle to be draggable */
+.task-drag-handle {
+  -webkit-user-drag: element !important;
+  -khtml-user-drag: element !important;
+  -moz-user-drag: element !important;
+  -o-user-drag: element !important;
+  user-drag: element !important;
+  cursor: grab;
+}
+
+.task-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* CRITICAL FIX: Prevent column content from being draggable */
+.kanban-full-height-column * {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Allow only the column drag handle to be draggable */
+.column-drag-handle {
+  -webkit-user-drag: element !important;
+  cursor: grab;
+}
+
+.column-drag-handle:active {
+  cursor: grabbing;
+}
+
 /* Apply min and max height when task height is limited */
 .task-height-limited .task-item {
   min-height: var(--task-height) !important;

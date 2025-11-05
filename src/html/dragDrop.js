@@ -214,24 +214,37 @@ function setupGlobalDragAndDrop() {
 
     // CRITICAL FIX: Prevent text selections from being draggable
     // This prevents the bug where selecting text and dragging creates unintended tasks from text content
+    // STRENGTHENED: Now prevents ALL text selection drags, even with Alt key
     document.addEventListener('dragstart', (e) => {
-        // Only prevent if it's a text selection being dragged (not our drag handles)
-        const target = e.target;
-        const isDragHandle = target && (
-            target.classList.contains('drag-handle') ||
-            target.closest('.drag-handle')
-        );
-
-        // If dragging from a non-handle element, check if there's a text selection
-        if (!isDragHandle && window.getSelection) {
+        // Check if there's an active text selection
+        if (window.getSelection) {
             const selection = window.getSelection();
-            if (selection && selection.toString().length > 0) {
-                // There's a text selection - prevent it from being dragged
-                e.preventDefault();
-                e.stopPropagation();
-                // Clear the selection
-                selection.removeAllRanges();
-                return false;
+            const hasSelection = selection && selection.toString().trim().length > 0;
+
+            if (hasSelection) {
+                // There's a text selection - check if drag is from a designated drag handle
+                const target = e.target;
+
+                // More robust check for drag handles
+                const isDragHandle = target &&
+                    typeof target.closest === 'function' && (
+                        target.classList?.contains('drag-handle') ||
+                        target.classList?.contains('task-drag-handle') ||
+                        target.closest('.drag-handle') ||
+                        target.closest('.task-drag-handle') ||
+                        target.closest('.column-drag-handle')
+                    );
+
+                // If NOT from a drag handle, prevent the text selection from being dragged
+                if (!isDragHandle) {
+                    console.warn('[DragDrop] Prevented text selection drag (text: "' + selection.toString().substring(0, 30) + '...")');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation(); // Stop other listeners too
+                    // Clear the selection
+                    selection.removeAllRanges();
+                    return false;
+                }
             }
         }
     }, true); // Use capture phase to intercept early
