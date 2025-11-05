@@ -321,6 +321,12 @@ function createDebugOverlayContent() {
                     <button onclick="reloadAllIncludedFiles()" class="debug-btn">
                         🔄 Reload All
                     </button>
+                    <button onclick="verifyContentSync()" class="debug-btn debug-verify-btn" title="Verify frontend/backend content synchronization">
+                        🔍 Verify Sync
+                    </button>
+                    <button onclick="forceWriteAllContent()" class="debug-btn debug-force-write-btn" title="Force write all files (emergency recovery)">
+                        ⚠️ Force Save All
+                    </button>
                     <button onclick="hideDebugOverlay()" class="debug-close">
                         ✕
                     </button>
@@ -952,6 +958,192 @@ function reloadAllIncludedFiles() {
         setTimeout(() => {
             refreshDebugOverlay();
         }, 500);
+    }
+}
+
+// Force write state
+let pendingForceWrite = false;
+let lastVerificationResults = null;
+
+/**
+ * Force write all content (EMERGENCY RECOVERY)
+ * Writes ALL files unconditionally, bypassing broken change detection
+ */
+function forceWriteAllContent() {
+    if (pendingForceWrite) {
+        return;
+    }
+
+    if (!window.vscode) {
+        alert('Error: vscode API not available');
+        return;
+    }
+
+    // Show confirmation dialog
+    showForceWriteConfirmation();
+}
+
+/**
+ * Show confirmation dialog before force write
+ */
+function showForceWriteConfirmation() {
+    const allFiles = createAllFilesArray();
+    const fileCount = allFiles.length;
+
+    const confirmHtml = `
+        <div class="force-write-confirmation-overlay" id="force-write-confirmation">
+            <div class="confirmation-dialog">
+                <div class="confirmation-header">
+                    <h3>⚠️ Force Write All Files</h3>
+                </div>
+                <div class="confirmation-content">
+                    <p><strong>WARNING:</strong> This will unconditionally write ALL ${fileCount} files to disk, bypassing change detection.</p>
+                    <p>Use this ONLY when:</p>
+                    <ul>
+                        <li>Normal save is not working</li>
+                        <li>You suspect frontend/backend are out of sync</li>
+                        <li>You need emergency recovery</li>
+                    </ul>
+                    <p><strong>A backup will be created before writing.</strong></p>
+                    <div class="affected-files">
+                        <strong>Files to be written (${fileCount}):</strong>
+                        <ul>
+                            ${allFiles.map(f => `<li>${f.relativePath}</li>`).slice(0, 10).join('')}
+                            ${fileCount > 10 ? `<li><em>... and ${fileCount - 10} more files</em></li>` : ''}
+                        </ul>
+                    </div>
+                </div>
+                <div class="confirmation-actions">
+                    <button onclick="cancelForceWrite()" class="btn-cancel">Cancel</button>
+                    <button onclick="confirmForceWrite()" class="btn-confirm">Force Write All</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add to DOM
+    const confirmElement = document.createElement('div');
+    confirmElement.innerHTML = confirmHtml;
+    document.body.appendChild(confirmElement.firstElementChild);
+}
+
+/**
+ * Cancel force write operation
+ */
+function cancelForceWrite() {
+    const confirmDialog = document.getElementById('force-write-confirmation');
+    if (confirmDialog) {
+        confirmDialog.remove();
+    }
+}
+
+/**
+ * Confirm and execute force write
+ */
+function confirmForceWrite() {
+    // Remove confirmation dialog
+    cancelForceWrite();
+
+    // Set pending flag
+    pendingForceWrite = true;
+
+    // Send force write message to backend
+    window.vscode.postMessage({ type: 'forceWriteAllContent' });
+
+    // Show progress indicator
+    alert('Force write in progress... Please wait.');
+}
+
+/**
+ * Verify content synchronization between frontend and backend
+ */
+function verifyContentSync() {
+    if (!window.vscode) {
+        alert('Error: vscode API not available');
+        return;
+    }
+
+    // Send verification request to backend
+    window.vscode.postMessage({ type: 'verifyContentSync' });
+
+    // Show loading indicator
+    alert('Verifying content synchronization... Please wait.');
+}
+
+/**
+ * Show verification results
+ */
+function showVerificationResults(results) {
+    lastVerificationResults = results;
+
+    const resultClass = results.mismatchedFiles > 0 ? 'verification-warning' : 'verification-success';
+
+    const resultsHtml = `
+        <div class="verification-results-overlay" id="verification-results">
+            <div class="verification-dialog ${resultClass}">
+                <div class="verification-header">
+                    <h3>🔍 Content Synchronization Verification</h3>
+                    <button onclick="closeVerificationResults()" class="close-btn">✕</button>
+                </div>
+                <div class="verification-content">
+                    <div class="verification-summary">
+                        <div class="summary-stat">
+                            <span class="stat-label">Total Files:</span>
+                            <span class="stat-value">${results.totalFiles}</span>
+                        </div>
+                        <div class="summary-stat status-good">
+                            <span class="stat-label">✅ Matching:</span>
+                            <span class="stat-value">${results.matchingFiles}</span>
+                        </div>
+                        <div class="summary-stat ${results.mismatchedFiles > 0 ? 'status-warn' : ''}">
+                            <span class="stat-label">⚠️ Mismatched:</span>
+                            <span class="stat-value">${results.mismatchedFiles}</span>
+                        </div>
+                    </div>
+                    <div class="verification-details">
+                        <strong>File Details:</strong>
+                        <div class="file-results-list">
+                            ${results.fileResults.map(file => `
+                                <div class="file-result-item ${file.matches ? 'match' : 'mismatch'}">
+                                    <div class="file-result-name">${file.relativePath}</div>
+                                    <div class="file-result-status">
+                                        ${file.matches ?
+                                            '✅ Match' :
+                                            `⚠️ Differs by ${file.differenceSize} chars`}
+                                    </div>
+                                    <div class="file-result-hashes">
+                                        Frontend: ${file.frontendHash} | Backend: ${file.backendHash}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="verification-timestamp">
+                        Verified: ${new Date(results.timestamp).toLocaleString()}
+                    </div>
+                </div>
+                <div class="verification-actions">
+                    ${results.mismatchedFiles > 0 ?
+                        '<button onclick="forceWriteAllContent()" class="btn-force-write">Force Write All</button>' : ''}
+                    <button onclick="closeVerificationResults()" class="btn-close">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add to DOM
+    const resultsElement = document.createElement('div');
+    resultsElement.innerHTML = resultsHtml;
+    document.body.appendChild(resultsElement.firstElementChild);
+}
+
+/**
+ * Close verification results dialog
+ */
+function closeVerificationResults() {
+    const resultsDialog = document.getElementById('verification-results');
+    if (resultsDialog) {
+        resultsDialog.remove();
     }
 }
 
@@ -1606,6 +1798,228 @@ function getDebugOverlayStyles() {
             overflow-y: auto;
             scrollbar-width: thin;
         }
+
+        /* Force Write & Verification Styles */
+        .debug-verify-btn {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
+
+        .debug-force-write-btn {
+            background: var(--vscode-gitDecoration-modifiedResourceForeground);
+            color: white;
+            font-weight: bold;
+        }
+
+        .force-write-confirmation-overlay,
+        .verification-results-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--vscode-font-family);
+        }
+
+        .confirmation-dialog,
+        .verification-dialog {
+            background: var(--vscode-editor-background);
+            border: 2px solid var(--vscode-panel-border);
+            border-radius: 8px;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .confirmation-header,
+        .verification-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            background: var(--vscode-titleBar-activeBackground);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .confirmation-header h3,
+        .verification-header h3 {
+            margin: 0;
+            color: var(--vscode-titleBar-activeForeground);
+        }
+
+        .confirmation-content,
+        .verification-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .confirmation-content p {
+            margin: 8px 0;
+        }
+
+        .confirmation-content ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .affected-files {
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--vscode-textBlockQuote-background);
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .affected-files ul {
+            margin: 8px 0 0 0;
+            padding-left: 20px;
+        }
+
+        .confirmation-actions,
+        .verification-actions {
+            padding: 16px;
+            border-top: 1px solid var(--vscode-panel-border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel,
+        .btn-close {
+            padding: 8px 16px;
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-cancel:hover,
+        .btn-close:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .btn-confirm,
+        .btn-force-write {
+            padding: 8px 16px;
+            background: var(--vscode-gitDecoration-modifiedResourceForeground);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-confirm:hover,
+        .btn-force-write:hover {
+            opacity: 0.9;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--vscode-titleBar-activeForeground);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        .close-btn:hover {
+            opacity: 0.7;
+        }
+
+        .verification-summary {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: var(--vscode-textBlockQuote-background);
+            border-radius: 4px;
+        }
+
+        .summary-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .summary-stat .stat-label {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .summary-stat .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .verification-details {
+            margin-top: 16px;
+        }
+
+        .file-results-list {
+            margin-top: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file-result-item {
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-panel-border);
+        }
+
+        .file-result-item.match {
+            background: rgba(0, 128, 0, 0.1);
+        }
+
+        .file-result-item.mismatch {
+            background: rgba(255, 165, 0, 0.1);
+        }
+
+        .file-result-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .file-result-status {
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        .file-result-hashes {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .verification-timestamp {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--vscode-panel-border);
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            text-align: right;
+        }
+
+        .verification-success {
+            border-color: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .verification-warning {
+            border-color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
     `;
 }
 
@@ -1667,11 +2081,47 @@ function initializeDebugOverlay() {
     // Listen for document state changes from backend to auto-refresh overlay
     window.addEventListener('message', (event) => {
         const message = event.data;
-        if (message && message.type === 'documentStateChanged') {
-            if (debugOverlayVisible) {
-                refreshDebugOverlay();
-            }
+
+        if (!message || !message.type) return;
+
+        switch (message.type) {
+            case 'documentStateChanged':
+                if (debugOverlayVisible) {
+                    refreshDebugOverlay();
+                }
+                break;
+
+            case 'forceWriteAllResult':
+                // Clear pending flag
+                pendingForceWrite = false;
+
+                // Show result to user
+                if (message.success) {
+                    const resultMsg = `Force write completed successfully!\n\n` +
+                        `Files written: ${message.filesWritten}\n` +
+                        `Backup created: ${message.backupCreated ? 'Yes' : 'No'}\n` +
+                        `${message.backupPath ? `Backup: ${message.backupPath}` : ''}`;
+                    alert(resultMsg);
+
+                    // Refresh overlay
+                    refreshDebugOverlay();
+                } else {
+                    const errorMsg = `Force write failed!\n\n` +
+                        `Errors:\n${message.errors.join('\n')}`;
+                    alert(errorMsg);
+                }
+                break;
+
+            case 'verifyContentSyncResult':
+                // Show verification results
+                if (message.success) {
+                    showVerificationResults(message);
+                } else {
+                    alert(`Verification failed: ${message.summary}`);
+                }
+                break;
         }
     });
 }
+
 

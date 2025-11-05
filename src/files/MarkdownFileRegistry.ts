@@ -336,6 +336,36 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     }
 
     /**
+     * Force write ALL files unconditionally (emergency recovery)
+     * This bypasses all change detection and writes every registered file
+     * Use ONLY when sync is broken and normal save doesn't work
+     */
+    public async forceWriteAll(): Promise<{ filesWritten: number; errors: string[] }> {
+        const allFiles = this.getAll();
+        console.warn(`[MarkdownFileRegistry] FORCE WRITE: Writing ${allFiles.length} files unconditionally`);
+
+        const errors: string[] = [];
+        let filesWritten = 0;
+
+        // Write all files in parallel
+        await Promise.all(
+            allFiles.map(async (file) => {
+                try {
+                    await file.save();
+                    filesWritten++;
+                } catch (error) {
+                    const errorMsg = `Failed to write ${file.getRelativePath()}: ${error}`;
+                    console.error(`[MarkdownFileRegistry] ${errorMsg}`);
+                    errors.push(errorMsg);
+                }
+            })
+        );
+
+        console.log(`[MarkdownFileRegistry] Force write completed: ${filesWritten} written, ${errors.length} errors`);
+        return { filesWritten, errors };
+    }
+
+    /**
      * Check all files for external changes
      */
     public async checkAllForExternalChanges(): Promise<Map<string, boolean>> {

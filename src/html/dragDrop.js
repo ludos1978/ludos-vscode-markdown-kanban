@@ -1420,7 +1420,8 @@ function handleMultipleFilesDrop(e, filesContent) {
     // Split the pre-formatted markdown links by lines
     const links = filesContent.split(/\r\n|\r|\n/).filter(line => line.trim().length > 0);
 
-    links.forEach((link, index) => {
+    // Prepare all tasks data
+    const tasksData = links.map(link => {
         // Extract title from the markdown link format
         let title = 'File';
 
@@ -1457,15 +1458,14 @@ function handleMultipleFilesDrop(e, filesContent) {
             }
         }
 
-        // Stagger creation slightly if multiple files
-        setTimeout(() => {
-            createNewTaskWithContent(
-                title,
-                { x: e.clientX, y: e.clientY },
-                link
-            );
-        }, index * 10);
+        return {
+            title: title,
+            description: link
+        };
     });
+
+    // Batch create all tasks at once (single render)
+    createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
 }
 
 function handleClipboardImageDrop(e, imageData) {
@@ -1585,8 +1585,8 @@ function handleVSCodeUriDrop(e, uriData) {
     });
 
     if (uris.length > 0) {
-        // Create tasks for each URI using cache-first approach
-        uris.forEach((uri, index) => {
+        // Prepare all tasks data
+        const tasksData = uris.map(uri => {
             let filename = uri;
             let fullPath = uri;
 
@@ -1603,15 +1603,14 @@ function handleVSCodeUriDrop(e, uriData) {
             // Create appropriate link format based on file type
             const fileLink = createFileMarkdownLink(fullPath);
 
-            // Stagger the creation slightly if multiple files
-            setTimeout(() => {
-                createNewTaskWithContent(
-                    filename,  // Title: actual filename
-                    { x: e.clientX, y: e.clientY },
-                    fileLink   // Description: formatted link
-                );
-            }, index * 10);
+            return {
+                title: filename,
+                description: fileLink
+            };
         });
+
+        // Batch create all tasks at once (single render)
+        createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
     } else {
         // Could not process dropped file URIs
     }
@@ -1643,115 +1642,117 @@ function getActiveTextEditor() {
  * @param {string} description - Optional description
  * Side effects: Sends create task message to VS Code
  */
-function createNewTaskWithContent(content, dropPosition, description = '') {
-    
+function createNewTaskWithContent(content, dropPosition, description = '', explicitColumnId = null, explicitInsertionIndex = null) {
+
     // Check board availability - NEW CACHE SYSTEM
-    
+
     if (!window.cachedBoard) {
         // No cached board available
-        vscode.postMessage({ 
-            type: 'showMessage', 
-            text: 'Cannot create task: No board loaded' 
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Cannot create task: No board loaded'
         });
         return;
     }
-    
+
     if (!window.cachedBoard.columns || window.cachedBoard.columns.length === 0) {
         // Board has no columns
-        vscode.postMessage({ 
-            type: 'showMessage', 
-            text: 'Cannot create task: No columns available' 
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Cannot create task: No columns available'
         });
         return;
     }
-    
+
     // Find target column
-    let targetColumnId = null;
-    let insertionIndex = -1;
-    
-    const elementAtPoint = document.elementFromPoint(dropPosition.x, dropPosition.y);
-    
-    // Try multiple strategies to find the column
-    let columnElement = elementAtPoint?.closest('.kanban-full-height-column');
-    
-    // If we didn't find a column, try the parent elements
-    if (!columnElement) {
-        // Check if we're on a row
-        const row = elementAtPoint?.closest('.kanban-row');
-        if (row) {
-            // Find the column that contains this x position
-            const columns = row.querySelectorAll('.kanban-full-height-column');
-            for (const col of columns) {
-                const rect = col.getBoundingClientRect();
-                if (dropPosition.x >= rect.left && dropPosition.x <= rect.right) {
-                    columnElement = col;
-                    break;
-                }
-            }
-        }
-    }
-    
-    
-    if (columnElement) {
-        targetColumnId = columnElement.dataset.columnId;
-        
-        // Unfold the column if it's collapsed
-        if (columnElement.classList.contains('collapsed')) {
-            if (typeof unfoldColumnIfCollapsed === 'function') {
-                unfoldColumnIfCollapsed(targetColumnId);
-            }
-        }
-        
-        insertionIndex = calculateInsertionIndex(columnElement, dropPosition.y);
-    } else {
-        const columns = document.querySelectorAll('.kanban-full-height-column'); // Allow collapsed columns
-        let minDistance = Infinity;
-        
-        columns.forEach(column => {
-            const rect = column.getBoundingClientRect();
-            const distX = Math.abs((rect.left + rect.right) / 2 - dropPosition.x);
-            const distY = Math.abs((rect.top + rect.bottom) / 2 - dropPosition.y);
-            const distance = Math.sqrt(distX * distX + distY * distY);
-            
-            if (distance < minDistance) {
-                minDistance = distance;
-                targetColumnId = column.dataset.columnId;
-                
-                // Unfold the nearest column if it's collapsed
-                if (column.classList.contains('collapsed')) {
-                    if (typeof unfoldColumnIfCollapsed === 'function') {
-                        unfoldColumnIfCollapsed(targetColumnId);
+    let targetColumnId = explicitColumnId;
+    let insertionIndex = explicitInsertionIndex !== null ? explicitInsertionIndex : -1;
+
+    // Only calculate position if explicit values not provided
+    if (targetColumnId === null) {
+        const elementAtPoint = document.elementFromPoint(dropPosition.x, dropPosition.y);
+
+        // Try multiple strategies to find the column
+        let columnElement = elementAtPoint?.closest('.kanban-full-height-column');
+
+        // If we didn't find a column, try the parent elements
+        if (!columnElement) {
+            // Check if we're on a row
+            const row = elementAtPoint?.closest('.kanban-row');
+            if (row) {
+                // Find the column that contains this x position
+                const columns = row.querySelectorAll('.kanban-full-height-column');
+                for (const col of columns) {
+                    const rect = col.getBoundingClientRect();
+                    if (dropPosition.x >= rect.left && dropPosition.x <= rect.right) {
+                        columnElement = col;
+                        break;
                     }
                 }
-                
-                insertionIndex = calculateInsertionIndex(column, dropPosition.y);
             }
-        });
-        
-        if (targetColumnId) {
         }
-    }
-    
-    if (!targetColumnId && window.cachedBoard.columns.length > 0) {
-        // Try non-collapsed first, then any column
-        let fallbackColumn = window.cachedBoard.columns.find(col => 
-            !window.collapsedColumns || !window.collapsedColumns.has(col.id)
-        );
-        
-        if (!fallbackColumn) {
-            // If all columns are collapsed, use the first one and unfold it
-            fallbackColumn = window.cachedBoard.columns[0];
-        }
-        
-        if (fallbackColumn) {
-            targetColumnId = fallbackColumn.id;
-            
-            // Unfold if collapsed
-            if (typeof unfoldColumnIfCollapsed === 'function') {
-                unfoldColumnIfCollapsed(targetColumnId);
+
+        if (columnElement) {
+            targetColumnId = columnElement.dataset.columnId;
+
+            // Unfold the column if it's collapsed
+            if (columnElement.classList.contains('collapsed')) {
+                if (typeof unfoldColumnIfCollapsed === 'function') {
+                    unfoldColumnIfCollapsed(targetColumnId);
+                }
             }
-            
-            insertionIndex = -1;
+
+            insertionIndex = calculateInsertionIndex(columnElement, dropPosition.y);
+        } else {
+            const columns = document.querySelectorAll('.kanban-full-height-column'); // Allow collapsed columns
+            let minDistance = Infinity;
+
+            columns.forEach(column => {
+                const rect = column.getBoundingClientRect();
+                const distX = Math.abs((rect.left + rect.right) / 2 - dropPosition.x);
+                const distY = Math.abs((rect.top + rect.bottom) / 2 - dropPosition.y);
+                const distance = Math.sqrt(distX * distX + distY * distY);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    targetColumnId = column.dataset.columnId;
+
+                    // Unfold the nearest column if it's collapsed
+                    if (column.classList.contains('collapsed')) {
+                        if (typeof unfoldColumnIfCollapsed === 'function') {
+                            unfoldColumnIfCollapsed(targetColumnId);
+                        }
+                    }
+
+                    insertionIndex = calculateInsertionIndex(column, dropPosition.y);
+                }
+            });
+
+            if (targetColumnId) {
+            }
+        }
+
+        if (!targetColumnId && window.cachedBoard.columns.length > 0) {
+            // Try non-collapsed first, then any column
+            let fallbackColumn = window.cachedBoard.columns.find(col =>
+                !window.collapsedColumns || !window.collapsedColumns.has(col.id)
+            );
+
+            if (!fallbackColumn) {
+                // If all columns are collapsed, use the first one and unfold it
+                fallbackColumn = window.cachedBoard.columns[0];
+            }
+
+            if (fallbackColumn) {
+                targetColumnId = fallbackColumn.id;
+
+                // Unfold if collapsed
+                if (typeof unfoldColumnIfCollapsed === 'function') {
+                    unfoldColumnIfCollapsed(targetColumnId);
+                }
+
+                insertionIndex = -1;
+            }
         }
     }
     
@@ -1788,6 +1789,158 @@ function createNewTaskWithContent(content, dropPosition, description = '') {
         vscode.postMessage({ 
             type: 'showMessage', 
             text: 'Could not find a suitable column. Please ensure at least one column is not collapsed.' 
+        });
+    }
+}
+
+
+/**
+ * Batch create multiple tasks at once (optimized for performance)
+ * @param {Array} tasksData - Array of {title, description} objects
+ * @param {Object} dropPosition - Drop position {x, y}
+ */
+function createMultipleTasksWithContent(tasksData, dropPosition) {
+    if (!tasksData || tasksData.length === 0) {
+        return;
+    }
+
+    // Check board availability
+    if (!window.cachedBoard) {
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Cannot create tasks: No board loaded'
+        });
+        return;
+    }
+
+    if (!window.cachedBoard.columns || window.cachedBoard.columns.length === 0) {
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Cannot create tasks: No columns available'
+        });
+        return;
+    }
+
+    // Calculate target column and insertion index ONCE
+    let targetColumnId = null;
+    let insertionIndex = -1;
+
+    const elementAtPoint = document.elementFromPoint(dropPosition.x, dropPosition.y);
+    let columnElement = elementAtPoint?.closest('.kanban-full-height-column');
+
+    if (!columnElement) {
+        const row = elementAtPoint?.closest('.kanban-row');
+        if (row) {
+            const columns = row.querySelectorAll('.kanban-full-height-column');
+            for (const col of columns) {
+                const rect = col.getBoundingClientRect();
+                if (dropPosition.x >= rect.left && dropPosition.x <= rect.right) {
+                    columnElement = col;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (columnElement) {
+        targetColumnId = columnElement.dataset.columnId;
+
+        // Unfold the column if it's collapsed
+        if (columnElement.classList.contains('collapsed')) {
+            if (typeof unfoldColumnIfCollapsed === 'function') {
+                unfoldColumnIfCollapsed(targetColumnId);
+            }
+        }
+
+        insertionIndex = calculateInsertionIndex(columnElement, dropPosition.y);
+    } else {
+        const columns = document.querySelectorAll('.kanban-full-height-column');
+        let minDistance = Infinity;
+
+        columns.forEach(column => {
+            const rect = column.getBoundingClientRect();
+            const distX = Math.abs((rect.left + rect.right) / 2 - dropPosition.x);
+            const distY = Math.abs((rect.top + rect.bottom) / 2 - dropPosition.y);
+            const distance = Math.sqrt(distX * distX + distY * distY);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                targetColumnId = column.dataset.columnId;
+
+                if (column.classList.contains('collapsed')) {
+                    if (typeof unfoldColumnIfCollapsed === 'function') {
+                        unfoldColumnIfCollapsed(targetColumnId);
+                    }
+                }
+
+                insertionIndex = calculateInsertionIndex(column, dropPosition.y);
+            }
+        });
+    }
+
+    if (!targetColumnId && window.cachedBoard.columns.length > 0) {
+        let fallbackColumn = window.cachedBoard.columns.find(col =>
+            !window.collapsedColumns || !window.collapsedColumns.has(col.id)
+        );
+
+        if (!fallbackColumn) {
+            fallbackColumn = window.cachedBoard.columns[0];
+        }
+
+        if (fallbackColumn) {
+            targetColumnId = fallbackColumn.id;
+
+            if (typeof unfoldColumnIfCollapsed === 'function') {
+                unfoldColumnIfCollapsed(targetColumnId);
+            }
+
+            insertionIndex = -1;
+        }
+    }
+
+    if (targetColumnId) {
+        // Find the target column in cached board
+        const targetColumn = window.cachedBoard.columns.find(col => col.id === targetColumnId);
+        if (!targetColumn) {
+            vscode.postMessage({
+                type: 'showMessage',
+                text: 'Could not find target column'
+            });
+            return;
+        }
+
+        // Create all tasks at once
+        const newTasks = tasksData.map((taskData, index) => ({
+            id: `temp-drop-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            title: typeof taskData.title === 'string' ? taskData.title : 'New Task',
+            description: typeof taskData.description === 'string' ? taskData.description : ''
+        }));
+
+        // Insert all tasks into the column at the correct position
+        if (insertionIndex >= 0 && insertionIndex <= targetColumn.tasks.length) {
+            targetColumn.tasks.splice(insertionIndex, 0, ...newTasks);
+        } else {
+            targetColumn.tasks.push(...newTasks);
+        }
+
+        // Mark as unsaved changes
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+
+        // Update refresh button to show unsaved state
+        if (typeof updateRefreshButtonState === 'function') {
+            updateRefreshButtonState('unsaved', newTasks.length);
+        }
+
+        // Re-render board ONCE to show all new tasks
+        if (typeof renderBoard === 'function') {
+            renderBoard();
+        }
+    } else {
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Could not find a suitable column. Please ensure at least one column is not collapsed.'
         });
     }
 }

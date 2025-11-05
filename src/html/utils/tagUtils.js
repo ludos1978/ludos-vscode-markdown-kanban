@@ -764,20 +764,20 @@ class TagUtils {
             if (additionalTitle) {
                 // Backend has already inserted %INCLUDE_BADGE:filepath% placeholder in displayTitle
                 // We just need to replace it with the badge HTML
-                console.log('[tagUtils.getColumnDisplayTitle] additionalTitle:', additionalTitle);
-                console.log('[tagUtils.getColumnDisplayTitle] fileName:', fileName);
+                // console.log('[tagUtils.getColumnDisplayTitle] additionalTitle:', additionalTitle);
+                // console.log('[tagUtils.getColumnDisplayTitle] fileName:', fileName);
 
                 // Render markdown first (with the placeholder still in place)
                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
                 const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
-                console.log('[tagUtils.getColumnDisplayTitle] renderedTitle:', renderedTitle);
+                // console.log('[tagUtils.getColumnDisplayTitle] renderedTitle:', renderedTitle);
 
                 // Replace the backend-inserted placeholder with our badge HTML
                 // The placeholder format is: %INCLUDE_BADGE:filepath%
                 const placeholder = `%INCLUDE_BADGE:${fileName}%`;
-                console.log('[tagUtils.getColumnDisplayTitle] looking for placeholder:', placeholder);
+                // console.log('[tagUtils.getColumnDisplayTitle] looking for placeholder:', placeholder);
                 const result = renderedTitle.replace(placeholder, linkHtml);
-                console.log('[tagUtils.getColumnDisplayTitle] result:', result);
+                // console.log('[tagUtils.getColumnDisplayTitle] result:', result);
                 return result;
             } else {
                 return linkHtml;

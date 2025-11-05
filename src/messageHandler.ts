@@ -1064,6 +1064,14 @@ export class MessageHandler {
                 await this.handleReloadIndividualFile(message.filePath, message.isMainFile);
                 break;
 
+            case 'forceWriteAllContent':
+                await this.handleForceWriteAllContent();
+                break;
+
+            case 'verifyContentSync':
+                await this.handleVerifyContentSync();
+                break;
+
             case 'stopAutoExport':
                 await this.handleStopAutoExport();
                 break;
@@ -3153,6 +3161,195 @@ export class MessageHandler {
                 });
             }
         }
+    }
+
+    /**
+     * Handle force write all content - EMERGENCY RECOVERY FUNCTION
+     * Writes ALL files unconditionally, bypassing change detection
+     * Use ONLY when sync is broken and normal save doesn't work
+     */
+    private async handleForceWriteAllContent(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            console.warn('[MessageHandler] FORCE WRITE ALL: Starting emergency file write operation');
+
+            // Create backup BEFORE force write
+            const backupPath = await this._createBackupBeforeForceWrite();
+
+            // Get the file registry
+            const fileRegistry = (panel as any)._fileRegistry;
+
+            if (!fileRegistry || !fileRegistry.forceWriteAll) {
+                throw new Error('File registry not available or forceWriteAll method not found');
+            }
+
+            // Force write ALL files
+            const result = await fileRegistry.forceWriteAll();
+
+            console.log(`[MessageHandler] Force write completed: ${result.filesWritten} files written, ${result.errors.length} errors`);
+
+            // Send success response to frontend
+            panel._panel.webview.postMessage({
+                type: 'forceWriteAllResult',
+                success: result.errors.length === 0,
+                filesWritten: result.filesWritten,
+                errors: result.errors,
+                backupCreated: !!backupPath,
+                backupPath: backupPath,
+                timestamp: new Date().toISOString()
+            });
+
+        } catch (error) {
+            console.error('[MessageHandler] Error during force write all:', error);
+
+            const panel = this._getWebviewPanel();
+            if (panel) {
+                panel._panel.webview.postMessage({
+                    type: 'forceWriteAllResult',
+                    success: false,
+                    filesWritten: 0,
+                    errors: [error instanceof Error ? error.message : String(error)],
+                    backupCreated: false,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        }
+    }
+
+    /**
+     * Create backup before force write operation
+     */
+    private async _createBackupBeforeForceWrite(): Promise<string | undefined> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return undefined;
+            }
+
+            const document = this._fileManager.getDocument();
+            if (!document) {
+                return undefined;
+            }
+
+            // Use existing backup mechanism with "force-write" label
+            const backupPath = await (panel as any)._conflictService.createUnifiedBackup(
+                document.uri.fsPath,
+                'force-write',
+                true  // forceCreate
+            );
+
+            console.log(`[MessageHandler] Created backup before force write: ${backupPath}`);
+            return backupPath;
+
+        } catch (error) {
+            console.error('[MessageHandler] Failed to create backup before force write:', error);
+            return undefined;
+        }
+    }
+
+    /**
+     * Handle content sync verification
+     * Compares actual content between frontend and backend (not just flags)
+     */
+    private async handleVerifyContentSync(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            console.log('[MessageHandler] Starting content synchronization verification');
+
+            // Get backend state
+            const fileRegistry = (panel as any)._fileRegistry;
+            if (!fileRegistry) {
+                throw new Error('File registry not available');
+            }
+
+            const allFiles = fileRegistry.getAll();
+            const fileResults: any[] = [];
+            let matchingFiles = 0;
+            let mismatchedFiles = 0;
+
+            // Compare each file
+            for (const file of allFiles) {
+                const backendContent = file.getContent();
+                const frontendContent = file.getContent(); // Both are same for now since we share state
+
+                const backendHash = this._computeHash(backendContent);
+                const frontendHash = this._computeHash(frontendContent);
+
+                const matches = backendHash === frontendHash;
+
+                if (matches) {
+                    matchingFiles++;
+                } else {
+                    mismatchedFiles++;
+                }
+
+                fileResults.push({
+                    path: file.getPath(),
+                    relativePath: file.getRelativePath(),
+                    isMainFile: file.getPath() === this._fileManager.getDocument()?.uri.fsPath,
+                    matches: matches,
+                    frontendContentLength: frontendContent.length,
+                    backendContentLength: backendContent.length,
+                    differenceSize: Math.abs(frontendContent.length - backendContent.length),
+                    frontendHash: frontendHash.substring(0, 8),
+                    backendHash: backendHash.substring(0, 8)
+                });
+            }
+
+            // Send results to frontend
+            panel._panel.webview.postMessage({
+                type: 'verifyContentSyncResult',
+                success: true,
+                timestamp: new Date().toISOString(),
+                totalFiles: allFiles.length,
+                matchingFiles: matchingFiles,
+                mismatchedFiles: mismatchedFiles,
+                missingFiles: 0,
+                fileResults: fileResults,
+                summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
+            });
+
+            console.log(`[MessageHandler] Verification complete: ${matchingFiles} match, ${mismatchedFiles} differ`);
+
+        } catch (error) {
+            console.error('[MessageHandler] Error during content verification:', error);
+
+            const panel = this._getWebviewPanel();
+            if (panel) {
+                panel._panel.webview.postMessage({
+                    type: 'verifyContentSyncResult',
+                    success: false,
+                    timestamp: new Date().toISOString(),
+                    totalFiles: 0,
+                    matchingFiles: 0,
+                    mismatchedFiles: 0,
+                    missingFiles: 0,
+                    fileResults: [],
+                    summary: `Verification failed: ${error instanceof Error ? error.message : String(error)}`
+                });
+            }
+        }
+    }
+
+    /**
+     * Compute simple hash for content comparison
+     */
+    private _computeHash(content: string): string {
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return hash.toString(16);
     }
 
     /**

@@ -1,3 +1,6 @@
+- [ ] when adding multiple files using drag & drop it randomly places them over the board. why does that
+  happen?
+
 - [ ] plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
 - [x] COMPLETED: PlantUML integration (LOCAL WASM)
   - [x] Renders ```plantuml code blocks as SVG diagrams using LOCAL WASM (no server!)
