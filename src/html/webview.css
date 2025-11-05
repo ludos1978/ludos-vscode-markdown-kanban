@@ -28,6 +28,8 @@
   --compact-visibility-threshold: 0.3; /* Apply when < 30% visible */
   --compact-column-footer-padding: var(--whitespace-div4);
   --compact-column-margin-height: var(--whitespace-div4);
+  
+
 }
 
 * {
@@ -42,6 +44,8 @@ body {
   padding: 0;
   overflow: hidden; /* Prevent body scroll - container handles it */
   height: 100vh;
+
+  transform-style: preserve-3d;
 }
 
 /* File info bar - fixed at top */
@@ -765,22 +769,47 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Column title */
 .column-title {
-	transform: translateZ(0.1px);
+  transform: translateZ(0.1px); /* put it above */
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--whitespace);
   position: sticky;
-  /* top: var(--whitespace-div2); */
   z-index: 10;
   background-color: var(--vscode-editor-background);
-	/* border-radius: 4px 4px 0px 0px; */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-  border-bottom: 0.25px dashed var(--vscode-panel-border);
-	border-top: 0.25px dashed var(--vscode-panel-border);
+  /* Keep your original left and right borders */
+  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+  border-top: none;
+  border-bottom: none;
   margin-bottom: 0;
   flex-direction: column;
+  position: relative; /* Required for pseudo-elements */
+}
+
+/* Add dashed top and bottom borders with pseudo-elements */
+.column-title::before,
+.column-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vscode-panel-border) 50%, transparent),  /* 50% transparent dash */
+    color-mix(in srgb, var(--vscode-panel-border) 50%, transparent) 4px,
+    transparent 4px,
+    transparent 10px  /* Dash + gap total */
+  );
+}
+
+.column-title::before {
+  top: 0;
+}
+
+.column-title::after {
+  bottom: 0;
 }
 
 .column-inner {

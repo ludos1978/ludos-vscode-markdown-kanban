@@ -2460,15 +2460,31 @@ function updateStackBottomDropZones() {
         // This matches the calculation in recalculateStackHeights()
         let cumulativeTop = 0;
         columns.forEach(col => {
+            const isVerticallyFolded = col.classList.contains('collapsed-vertical');
+            const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
+
             const columnMargin = col.querySelector('.column-margin');
             const columnHeader = col.querySelector('.column-header');
             const columnTitle = col.querySelector('.column-title');
+            const columnInner = col.querySelector('.column-inner');
             const columnFooter = col.querySelector('.column-footer');
 
             if (columnMargin) {cumulativeTop += columnMargin.offsetHeight;}
             if (columnHeader) {cumulativeTop += columnHeader.offsetHeight;}
             if (columnTitle) {cumulativeTop += columnTitle.offsetHeight;}
-            if (columnFooter) {cumulativeTop += columnFooter.offsetHeight;}
+
+            // Include column-inner content height (skip if column is folded)
+            if (columnInner && !isVerticallyFolded && !isHorizontallyFolded) {
+                cumulativeTop += columnInner.scrollHeight;
+            }
+
+            if (columnFooter) {
+                cumulativeTop += columnFooter.offsetHeight;
+                // Account for footer borders and margins using computed style
+                const footerStyle = window.getComputedStyle(columnFooter);
+                const marginBottom = parseFloat(footerStyle.marginBottom) || 0;
+                cumulativeTop += marginBottom;
+            }
         });
 
         dropZone.style.cssText = `
