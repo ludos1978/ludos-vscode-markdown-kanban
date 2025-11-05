@@ -2286,7 +2286,13 @@ function setupTaskDragAndDrop() {
                             item.element.classList.add('drag-transitioning');
                         });
                     } else {
-                        tasksContainer.querySelectorAll('.task-item').forEach(task => {
+                        // PERFORMANCE: Cache task queries for the new column to avoid repeated querySelectorAll
+                        const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
+                        if (!dragState.cachedNewColumnTasks || dragState.cachedNewColumnTasksKey !== cacheKey) {
+                            dragState.cachedNewColumnTasks = Array.from(tasksContainer.querySelectorAll('.task-item'));
+                            dragState.cachedNewColumnTasksKey = cacheKey;
+                        }
+                        dragState.cachedNewColumnTasks.forEach(task => {
                             if (task !== dragState.draggedTask) {
                                 task.classList.add('drag-transitioning');
                             }
@@ -2926,6 +2932,7 @@ function setupColumnDragAndDrop() {
 
         // NOTE: Column dragend handler removed - now handled by unified global dragend handler
 
+        // PERFORMANCE: Throttled column dragover handler
         column.addEventListener('dragover', e => {
             if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
@@ -2960,35 +2967,55 @@ function setupColumnDragAndDrop() {
                 dragState.pendingDropZone = null;
             }
 
-            // Clean up any duplicate or orphaned elements in the DOM before processing
-            const allColumnsForCleanup = document.querySelectorAll('.kanban-full-height-column');
-            const seenColumnIds = new Set();
-            allColumnsForCleanup.forEach(col => {
-                const colId = col.getAttribute('data-column-id');
-                if (seenColumnIds.has(colId)) {
-                    col.remove();
-                } else {
-                    seenColumnIds.add(colId);
-                }
-            });
-
-            // Clean up visual feedback
-            if (dragState.draggedColumn) {
-                dragState.draggedColumn.classList.remove('dragging', 'drag-preview');
+            // PERFORMANCE: Throttle expensive operations using requestAnimationFrame
+            if (dragState.columnCleanupThrottleId) {
+                return; // Already scheduled
             }
 
-            document.querySelectorAll('.kanban-full-height-column').forEach(col => {
-                col.classList.remove('drag-over', 'drag-transitioning');
-            });
-            document.querySelectorAll('.kanban-row').forEach(row => {
-                row.classList.remove('drag-over');
-            });
+            dragState.columnCleanupThrottleId = requestAnimationFrame(() => {
+                dragState.columnCleanupThrottleId = null;
 
-            // Calculate target position based on where the column is in the DOM now
-            const draggedColumn = dragState.draggedColumn;
-            if (!draggedColumn) {return;}
+                // PERFORMANCE: Cache column queries to avoid repeated querySelectorAll
+                if (!dragState.cachedAllColumns || Date.now() - dragState.cachedAllColumnsTime > 500) {
+                    dragState.cachedAllColumns = document.querySelectorAll('.kanban-full-height-column');
+                    dragState.cachedAllColumnsTime = Date.now();
+                }
 
-            const allColumns = Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
+                // Clean up any duplicate or orphaned elements in the DOM before processing
+                const seenColumnIds = new Set();
+                dragState.cachedAllColumns.forEach(col => {
+                    const colId = col.getAttribute('data-column-id');
+                    if (seenColumnIds.has(colId)) {
+                        col.remove();
+                    } else {
+                        seenColumnIds.add(colId);
+                    }
+                });
+
+                // Clean up visual feedback
+                if (dragState.draggedColumn) {
+                    dragState.draggedColumn.classList.remove('dragging', 'drag-preview');
+                }
+
+                // PERFORMANCE: Use cached columns
+                dragState.cachedAllColumns.forEach(col => {
+                    col.classList.remove('drag-over', 'drag-transitioning');
+                });
+
+                // PERFORMANCE: Cache row queries
+                if (!dragState.cachedAllRows || Date.now() - dragState.cachedAllRowsTime > 500) {
+                    dragState.cachedAllRows = document.querySelectorAll('.kanban-row');
+                    dragState.cachedAllRowsTime = Date.now();
+                }
+                dragState.cachedAllRows.forEach(row => {
+                    row.classList.remove('drag-over');
+                });
+                // Calculate target position based on where the column is in the DOM now
+                const draggedColumn = dragState.draggedColumn;
+                if (!draggedColumn) {return;}
+
+                // PERFORMANCE: Use cached columns instead of querying again
+                const allColumns = Array.from(dragState.cachedAllColumns);
             const targetDOMIndex = allColumns.indexOf(draggedColumn);
 
             // Map DOM position to data model position
