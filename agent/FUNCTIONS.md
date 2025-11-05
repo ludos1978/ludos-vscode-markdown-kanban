@@ -399,6 +399,8 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 - src/messageHandler-MessageHandler_handleAutoExportMode - Handle auto-export mode
 - src/messageHandler-MessageHandler_handleSwitchColumnIncludeFile - Switch column include file without saving main file, save old file if needed, create/load new file, update column content
 - src/messageHandler-MessageHandler_handleSwitchTaskIncludeFile - Switch task include file without saving main file, save old file if needed, create/load new file, update task content
+- src/messageHandler-MessageHandler_handleForceWriteAllContent - (NEW 2025-11-05) Force write all content from frontend to backend files unconditionally, bypasses change detection when sync is broken
+- src/messageHandler-MessageHandler_handleVerifyContentSync - (NEW 2025-11-05) Verify content synchronization between frontend and backend, compares actual content not just flags
 
 ## src/extension.ts
 
@@ -841,6 +843,7 @@ Total functions documented: **523**
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_getFilesInEditMode - Get files in edit mode
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_saveAll - Save all files with unsaved changes
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_reloadAll - Reload all files with external changes
+- src/files/MarkdownFileRegistry-MarkdownFileRegistry_forceWriteAll - (NEW 2025-11-05) Force write ALL files unconditionally, ignores change detection flags, emergency recovery function
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_checkAllForExternalChanges - Check all files for external changes
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_startWatchingAll - Start watching all files
 - src/files/MarkdownFileRegistry-MarkdownFileRegistry_stopWatchingAll - Stop watching all files
@@ -856,3 +859,28 @@ Total functions documented: **523**
 - src/files/FileFactory-FileFactory_createTaskInclude - Create TaskIncludeFile instance
 - src/files/FileFactory-FileFactory_createRegularInclude - Create RegularIncludeFile instance
 - src/files/FileFactory-FileFactory_createInclude - Create include file with type auto-detection
+
+---
+
+## Frontend JavaScript Functions
+
+## src/html/debugOverlay.js - Debug Overlay System
+
+### Existing Functions:
+- src/html/debugOverlay-showDebugOverlay - Create and show the debug overlay panel
+- src/html/debugOverlay-hideDebugOverlay - Hide and remove the debug overlay
+- src/html/debugOverlay-refreshDebugOverlay - Update debug overlay with fresh data
+- src/html/debugOverlay-updateTrackedFilesData - Update tracked files data from backend
+- src/html/debugOverlay-saveIndividualFile - Save individual file (main or include)
+- src/html/debugOverlay-reloadIndividualFile - Reload individual file from disk
+- src/html/debugOverlay-reloadAllIncludedFiles - Reload all included files (images, videos, includes)
+- src/html/debugOverlay-openFile - Open file in VS Code editor
+- src/html/debugOverlay-reloadImages - Force reload all images and media content
+- src/html/debugOverlay-clearDebugCache - Clear debug cache and request fresh data
+- src/html/debugOverlay-toggleDebugOverlaySticky - Toggle sticky/pin state of debug overlay
+
+### New Functions (2025-11-05):
+- src/html/debugOverlay-forceWriteAllContent - (NEW) Force write complete board state from frontend to backend files unconditionally, bypasses broken change detection
+- src/html/debugOverlay-verifyContentSync - (NEW) Request content synchronization verification between frontend and backend, compares actual content
+- src/html/debugOverlay-showVerificationResults - (NEW) Display verification results in modal overlay showing which files match/differ
+- src/html/debugOverlay-showForceWriteConfirmation - (NEW) Show confirmation dialog before force write operation with affected files list

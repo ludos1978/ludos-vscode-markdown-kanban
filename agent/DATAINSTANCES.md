@@ -627,4 +627,35 @@ private static readonly VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.wmv', '.fl
 
 ---
 
+---
+
+## 6. FORCE WRITE & VERIFICATION STATE (2025-11-05)
+
+### 6.1 Debug Overlay Force Write State
+**File:** `/src/html/debugOverlay.js`
+**Lines:** Will be added
+
+**Instance Name:** Module-level variables
+**Type:** Module-scoped variables
+**Scope:** Frontend JavaScript module
+
+**Purpose:**
+- Track active force write operations
+- Store verification results for display
+- Manage confirmation dialog state
+
+**Data Held:**
+```javascript
+let pendingForceWrite = false;
+let lastVerificationResults = null;
+let forceWriteConfirmationDialog = null;
+```
+
+**Key Data:**
+- `pendingForceWrite`: Boolean flag indicating force write in progress
+- `lastVerificationResults`: Cached verification results for re-display
+- `forceWriteConfirmationDialog`: Reference to active confirmation dialog
+
+---
+
 **End of Documentation**

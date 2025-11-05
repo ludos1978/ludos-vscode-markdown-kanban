@@ -921,3 +921,93 @@ Factory for creating file instances with dependency injection.
 
 **New Data Structures Added**: 8 classes + 1 interface
 **Total Data Structures**: 50+
+
+---
+
+## Force Write & Verification System (2025-11-05)
+
+### `/src/messageHandler.ts`
+
+#### `ForceWriteResult`
+Result of force write operation.
+
+```typescript
+interface ForceWriteResult {
+    success: boolean;
+    filesWritten: number;
+    errors: string[];
+    backupCreated: boolean;
+    backupPath?: string;
+    timestamp: Date;
+}
+```
+
+**Purpose**: Provides detailed information about force write operation results including backup details.
+
+#### `FileVerificationResult`
+Individual file verification result.
+
+```typescript
+interface FileVerificationResult {
+    path: string;
+    relativePath: string;
+    isMainFile: boolean;
+    matches: boolean;
+    frontendContentLength: number;
+    backendContentLength: number;
+    differenceSize: number;
+    frontendHash: string;
+    backendHash: string;
+}
+```
+
+**Purpose**: Detailed comparison result for a single file showing exact differences.
+
+#### `ContentVerificationResult`
+Complete verification result for all files.
+
+```typescript
+interface ContentVerificationResult {
+    success: boolean;
+    timestamp: Date;
+    totalFiles: number;
+    matchingFiles: number;
+    mismatchedFiles: number;
+    missingFiles: number;
+    fileResults: FileVerificationResult[];
+    summary: string;
+}
+```
+
+**Purpose**: Aggregated verification results showing sync status across all files.
+
+### Frontend Message Types
+
+#### `ForceWriteAllContentMessage`
+Message from frontend requesting force write.
+
+```typescript
+interface ForceWriteAllContentMessage {
+    type: 'forceWriteAllContent';
+    board: KanbanBoard;
+    includeFiles: Map<string, string>;  // path -> content
+    confirmed: boolean;
+}
+```
+
+**Purpose**: Carries complete board state and all include file contents from frontend to backend for unconditional write.
+
+#### `VerifyContentSyncMessage`
+Message from frontend requesting verification.
+
+```typescript
+interface VerifyContentSyncMessage {
+    type: 'verifyContentSync';
+    frontendState: {
+        boardMarkdown: string;
+        includeFiles: Map<string, string>;  // path -> content
+    };
+}
+```
+
+**Purpose**: Carries frontend content for comparison with backend state.
