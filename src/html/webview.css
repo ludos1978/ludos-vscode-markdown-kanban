@@ -3144,6 +3144,20 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 
 .drag-transitioning {
   transition: transform 0.05s ease;
+  /* PERFORMANCE: Tell browser this element will transform, optimize ahead of time */
+  will-change: transform;
+  /* PERFORMANCE: Isolate layout calculations to this element only */
+  contain: layout;
+}
+
+/* PERFORMANCE: Hide images during active drag to eliminate expensive repaints/reflows */
+body.is-dragging .task-item:not(.dragging) img {
+  visibility: hidden;
+}
+
+/* PERFORMANCE: Disable pointer events on images during drag */
+body.is-dragging .task-item img {
+  pointer-events: none;
 }
 
 .drag-ghost {

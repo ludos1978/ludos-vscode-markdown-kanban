@@ -1028,6 +1028,9 @@ function setupGlobalDragAndDrop() {
     }
 
     function cleanupDragVisuals() {
+        // PERFORMANCE: Remove is-dragging class to show images again
+        document.body.classList.remove('is-dragging');
+
         // Remove visual feedback from tasks
         if (dragState.draggedTask) {
             dragState.draggedTask.classList.remove('dragging', 'drag-preview');
@@ -2411,6 +2414,9 @@ function setupTaskDragHandle(handle) {
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
             dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
+
+            // PERFORMANCE: Add class to hide images during drag (eliminates expensive repaints)
+            document.body.classList.add('is-dragging');
 
             // PERFORMANCE: Cache task positions for all tasks in the column
             // This eliminates repeated querySelectorAll and getBoundingClientRect during drag
