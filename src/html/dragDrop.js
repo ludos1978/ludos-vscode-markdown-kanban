@@ -2248,11 +2248,43 @@ function setupTaskDragAndDrop() {
 
             dragState.dragoverThrottleId = requestAnimationFrame(() => {
                 // PERFORMANCE: Check if we're in the same column as when drag started
-                // If different column, cached positions are invalid - use non-cached version
                 const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
-                const afterElement = isOriginalColumn
-                    ? getDragAfterTaskElementCached(e.clientY)
-                    : getDragAfterTaskElement(tasksContainer, e.clientY);
+                let afterElement;
+
+                if (isOriginalColumn) {
+                    // Use cached positions for original column
+                    afterElement = getDragAfterTaskElementCached(e.clientY);
+                } else {
+                    // PERFORMANCE: Cache positions for new columns too (TTL: 100ms)
+                    const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
+                    const now = Date.now();
+
+                    if (!dragState.newColumnPositionCache ||
+                        dragState.newColumnPositionCacheKey !== cacheKey ||
+                        now - dragState.newColumnPositionCacheTime > 100) {
+
+                        // Recalculate and cache positions for this column
+                        const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
+                            .filter(el => el !== dragState.draggedTask);
+                        dragState.newColumnPositionCache = tasks.map(task => ({
+                            element: task,
+                            rect: task.getBoundingClientRect()
+                        }));
+                        dragState.newColumnPositionCacheKey = cacheKey;
+                        dragState.newColumnPositionCacheTime = now;
+
+                        // Cache add button position too
+                        const addButton = tasksContainer.querySelector('.add-task-btn');
+                        dragState.newColumnAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
+                    }
+
+                    // Use cached positions to find drop location
+                    afterElement = getDragAfterTaskElementFromCache(
+                        e.clientY,
+                        dragState.newColumnPositionCache,
+                        dragState.newColumnAddButtonRect
+                    );
+                }
 
                 // PERFORMANCE: Only update DOM if position actually changed
                 if (afterElement !== dragState.lastAfterElement) {
@@ -2458,6 +2490,38 @@ function getDragAfterTaskElementCached(y) {
         if (y >= dragState.cachedAddButtonRect.top - 10) {
             return null; // Drop at end (before add button)
         }
+    }
+
+    // Use cached positions instead of getBoundingClientRect
+    const result = cachedPositions.reduce((closest, item) => {
+        const offset = y - item.rect.top - item.rect.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: item.element };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY });
+
+    return result.element;
+}
+
+/**
+ * PERFORMANCE-OPTIMIZED: Get element to insert after using ANY cached positions
+ * Generic version that works with any position cache (original column or new column)
+ * @param {number} y - Mouse Y position
+ * @param {Array} cachedPositions - Array of {element, rect} objects
+ * @param {DOMRect|null} addButtonRect - Optional add button rect
+ */
+function getDragAfterTaskElementFromCache(y, cachedPositions, addButtonRect) {
+    // If column is empty, return null (insert at end)
+    if (!cachedPositions || cachedPositions.length === 0) {
+        return null;
+    }
+
+    // Check if dragging over add button area
+    if (addButtonRect && y >= addButtonRect.top - 10) {
+        return null; // Drop at end (before add button)
     }
 
     // Use cached positions instead of getBoundingClientRect

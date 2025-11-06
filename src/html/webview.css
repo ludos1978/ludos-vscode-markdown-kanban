@@ -3143,7 +3143,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .drag-transitioning {
-  transition: transform 0.2s ease;
+  transition: transform 0.05s ease;
 }
 
 .drag-ghost {
