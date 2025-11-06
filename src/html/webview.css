@@ -3150,16 +3150,6 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   contain: layout;
 }
 
-/* PERFORMANCE: Hide images during active drag to eliminate expensive repaints/reflows */
-body.is-dragging .task-item:not(.dragging) img {
-  visibility: hidden;
-}
-
-/* PERFORMANCE: Disable pointer events on images during drag */
-body.is-dragging .task-item img {
-  pointer-events: none;
-}
-
 .drag-ghost {
   position: absolute;
   pointer-events: none;

@@ -1028,9 +1028,6 @@ function setupGlobalDragAndDrop() {
     }
 
     function cleanupDragVisuals() {
-        // PERFORMANCE: Remove is-dragging class to show images again
-        document.body.classList.remove('is-dragging');
-
         // Remove visual feedback from tasks
         if (dragState.draggedTask) {
             dragState.draggedTask.classList.remove('dragging', 'drag-preview');
@@ -2300,8 +2297,9 @@ function setupTaskDragAndDrop() {
                         dragState.newColumnPositionCacheKey = cacheKey;
                         dragState.newColumnPositionCacheTime = now;
 
-                        // Cache add button position too
+                        // Cache add button position AND element for new column
                         const addButton = tasksContainer.querySelector('.add-task-btn');
+                        dragState.newColumnAddButton = addButton; // Cache element
                         dragState.newColumnAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
                     }
 
@@ -2325,9 +2323,10 @@ function setupTaskDragAndDrop() {
 
                     if (afterElement === null) {
                         // Insert at the end, but before the add button if it exists
-                        const addButton = isOriginalColumn && dragState.cachedAddButton
+                        // PERFORMANCE: Use cached add button (both original and new columns)
+                        const addButton = isOriginalColumn
                             ? dragState.cachedAddButton
-                            : tasksContainer.querySelector('.add-task-btn');
+                            : dragState.newColumnAddButton;
                         if (addButton) {
                             tasksContainer.insertBefore(dragState.draggedTask, addButton);
                         } else {
@@ -2420,9 +2419,6 @@ function setupTaskDragHandle(handle) {
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
             dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
-
-            // PERFORMANCE: Add class to hide images during drag (eliminates expensive repaints)
-            document.body.classList.add('is-dragging');
 
             // PERFORMANCE: Cache task positions for all tasks in the column
             // This eliminates repeated querySelectorAll and getBoundingClientRect during drag
