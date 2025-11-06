@@ -3348,15 +3348,26 @@ export class MessageHandler {
 
                 const backendHash = this._computeHash(backendContent);
                 const frontendHash = this._computeHash(frontendContent);
+                const savedHash = savedFileContent !== null ? this._computeHash(savedFileContent) : null;
 
                 // DEBUG: Log hash calculation
                 console.log(`  Backend hash: ${backendHash.substring(0, 8)}`);
                 console.log(`  Frontend hash: ${frontendHash.substring(0, 8)}`);
-                console.log(`  Matches: ${backendHash === frontendHash}`);
+                if (savedHash) {
+                    console.log(`  Saved file hash: ${savedHash.substring(0, 8)}`);
+                }
+                console.log(`  Frontend vs Backend match: ${backendHash === frontendHash}`);
+                if (savedHash) {
+                    console.log(`  Backend vs Saved match: ${backendHash === savedHash}`);
+                    console.log(`  Frontend vs Saved match: ${frontendHash === savedHash}`);
+                }
 
-                const matches = backendHash === frontendHash;
+                const frontendBackendMatch = backendHash === frontendHash;
+                const backendSavedMatch = savedHash ? backendHash === savedHash : true;
+                const frontendSavedMatch = savedHash ? frontendHash === savedHash : true;
+                const allMatch = frontendBackendMatch && backendSavedMatch;
 
-                if (matches) {
+                if (allMatch) {
                     matchingFiles++;
                 } else {
                     mismatchedFiles++;
@@ -3366,12 +3377,19 @@ export class MessageHandler {
                     path: file.getPath(),
                     relativePath: file.getRelativePath(),
                     isMainFile: file.getFileType() === 'main',
-                    matches: matches,
+                    matches: allMatch,
+                    frontendBackendMatch,
+                    backendSavedMatch,
+                    frontendSavedMatch,
                     frontendContentLength: frontendContent.length,
                     backendContentLength: backendContent.length,
-                    differenceSize: Math.abs(frontendContent.length - backendContent.length),
+                    savedContentLength: savedFileContent?.length ?? null,
+                    frontendBackendDiff: Math.abs(frontendContent.length - backendContent.length),
+                    backendSavedDiff: savedFileContent ? Math.abs(backendContent.length - savedFileContent.length) : null,
+                    frontendSavedDiff: savedFileContent ? Math.abs(frontendContent.length - savedFileContent.length) : null,
                     frontendHash: frontendHash.substring(0, 8),
-                    backendHash: backendHash.substring(0, 8)
+                    backendHash: backendHash.substring(0, 8),
+                    savedHash: savedHash?.substring(0, 8) ?? null
                 });
             }
 

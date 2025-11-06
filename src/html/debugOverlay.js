@@ -90,6 +90,9 @@ function showDebugOverlay() {
     // Start auto-refresh when overlay is visible
     startAutoRefresh();
 
+    // Auto-verify content sync on open (silent mode)
+    verifyContentSync(true);
+
 }
 
 /**
@@ -772,6 +775,131 @@ function createFileStatesSummary(allFiles) {
 }
 
 /**
+ * Truncate path to specified length with ellipsis
+ */
+function truncatePath(path, maxLength = 10) {
+    if (!path || path.length <= maxLength) {
+        return path;
+    }
+    return path.substring(0, maxLength) + '...';
+}
+
+/**
+ * Get sync status for a file from last verification results
+ */
+function getFileSyncStatus(filePath) {
+    if (!lastVerificationResults || !lastVerificationResults.fileResults) {
+        return null;
+    }
+
+    return lastVerificationResults.fileResults.find(f => f.path === filePath);
+}
+
+/**
+ * Toggle sync details section visibility
+ */
+function toggleSyncDetails() {
+    syncDetailsExpanded = !syncDetailsExpanded;
+    updateFileStatesContent();
+}
+
+/**
+ * Create the sync details collapsible section
+ */
+function createSyncDetailsSection() {
+    if (!lastVerificationResults) {
+        return `
+            <div class="sync-details-section collapsed">
+                <div class="sync-details-header" onclick="toggleSyncDetails()">
+                    <span class="sync-details-toggle">▶</span>
+                    <span class="sync-details-title">🔍 Sync Verification Details</span>
+                    <span class="sync-details-hint">(Not run yet - click Verify Sync button)</span>
+                </div>
+            </div>
+        `;
+    }
+
+    const toggleIcon = syncDetailsExpanded ? '▼' : '▶';
+    const contentClass = syncDetailsExpanded ? 'expanded' : 'collapsed';
+    const timestamp = new Date(lastVerificationResults.timestamp).toLocaleString();
+
+    const detailsContent = syncDetailsExpanded ? `
+        <div class="sync-details-content">
+            <div class="sync-details-summary">
+                <div class="sync-stat">
+                    <span class="sync-stat-label">Total Files:</span>
+                    <span class="sync-stat-value">${lastVerificationResults.totalFiles}</span>
+                </div>
+                <div class="sync-stat sync-stat-good">
+                    <span class="sync-stat-label">✅ Matching:</span>
+                    <span class="sync-stat-value">${lastVerificationResults.matchingFiles}</span>
+                </div>
+                <div class="sync-stat ${lastVerificationResults.mismatchedFiles > 0 ? 'sync-stat-warn' : ''}">
+                    <span class="sync-stat-label">⚠️ Mismatched:</span>
+                    <span class="sync-stat-value">${lastVerificationResults.mismatchedFiles}</span>
+                </div>
+                <div class="sync-stat-timestamp">
+                    Last verified: ${timestamp}
+                </div>
+            </div>
+            <div class="sync-details-note">
+                <strong>Frontend is the baseline</strong> - comparing Frontend → Backend and Frontend → Saved File
+            </div>
+            <div class="sync-details-files">
+                ${lastVerificationResults.fileResults.map(file => {
+                    const backendMatch = file.frontendBackendMatch;
+                    const savedMatch = file.savedHash ? file.frontendSavedMatch : null;
+                    const allMatch = backendMatch && (savedMatch === null || savedMatch);
+
+                    return `
+                    <div class="sync-file-detail ${allMatch ? 'sync-match' : 'sync-mismatch'}">
+                        <div class="sync-file-header">
+                            <span class="sync-file-icon">${allMatch ? '✅' : '⚠️'}</span>
+                            <span class="sync-file-name" title="${file.path}">${file.relativePath}</span>
+                        </div>
+                        <div class="sync-file-stats">
+                            <div class="sync-file-stat baseline-stat">
+                                <span class="sync-file-stat-label">📋 Frontend (Baseline):</span>
+                                <span class="sync-file-stat-value">${file.frontendHash} (${file.frontendContentLength} chars)</span>
+                            </div>
+                            <div class="sync-file-stat">
+                                <span class="sync-file-stat-label">Backend:</span>
+                                <span class="sync-file-stat-value ${backendMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
+                                    ${file.backendHash} (${file.backendContentLength} chars)
+                                    ${backendMatch ? '✅ synced' : `⚠️ differs by ${file.frontendBackendDiff} chars`}
+                                </span>
+                            </div>
+                            ${file.savedHash ? `
+                                <div class="sync-file-stat">
+                                    <span class="sync-file-stat-label">Saved File:</span>
+                                    <span class="sync-file-stat-value ${savedMatch ? 'sync-match-indicator' : 'sync-mismatch-indicator'}">
+                                        ${file.savedHash} (${file.savedContentLength} chars)
+                                        ${savedMatch ? '✅ synced' : `⚠️ differs by ${file.frontendSavedDiff} chars`}
+                                    </span>
+                                </div>
+                            ` : '<div class="sync-file-stat"><span class="sync-file-stat-label">Saved File:</span><span class="sync-file-stat-value sync-unknown-indicator">Not available</span></div>'}
+                        </div>
+                    </div>
+                `}).join('')}
+            </div>
+        </div>
+    ` : '';
+
+    return `
+        <div class="sync-details-section ${contentClass}">
+            <div class="sync-details-header" onclick="toggleSyncDetails()">
+                <span class="sync-details-toggle">${toggleIcon}</span>
+                <span class="sync-details-title">🔍 Sync Verification Details</span>
+                <span class="sync-details-status ${lastVerificationResults.mismatchedFiles > 0 ? 'status-warn' : 'status-good'}">
+                    ${lastVerificationResults.matchingFiles} match, ${lastVerificationResults.mismatchedFiles} differ
+                </span>
+            </div>
+            ${detailsContent}
+        </div>
+    `;
+}
+
+/**
  * Create list of all files with their states and action buttons
  */
 function createFileStatesList(allFiles) {
@@ -783,6 +911,8 @@ function createFileStatesList(allFiles) {
                         <th class="col-file">File</th>
                         <th class="col-internal">Internal</th>
                         <th class="col-external">External</th>
+                        <th class="col-sync-backend" title="Frontend → Backend sync status">BE</th>
+                        <th class="col-sync-saved" title="Frontend → Saved file sync status">SF</th>
                         <th class="col-actions">Actions</th>
                     </tr>
                 </thead>
@@ -793,17 +923,64 @@ function createFileStatesList(allFiles) {
                         const hasAnyChanges = file.hasInternalChanges || hasExternalChanges;
                         const mainFileClass = file.isMainFile ? 'main-file' : '';
 
-                        // Debug log for each file being rendered
+                        // Get sync status from verification results
+                        const syncStatus = getFileSyncStatus(file.path);
+
+                        // Backend sync (Frontend → Backend)
+                        let backendIcon = '⚪';
+                        let backendTitle = 'Not verified yet';
+                        let backendClass = 'sync-unknown';
+
+                        // Saved file sync (Frontend → Saved)
+                        let savedIcon = '⚪';
+                        let savedTitle = 'Not verified yet';
+                        let savedClass = 'sync-unknown';
+
+                        if (syncStatus) {
+                            // Backend status
+                            if (syncStatus.frontendBackendMatch) {
+                                backendIcon = '✅';
+                                backendClass = 'sync-good';
+                                backendTitle = `Backend synced with frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nBackend: ${syncStatus.backendHash} (${syncStatus.backendContentLength} chars)`;
+                            } else {
+                                backendIcon = '⚠️';
+                                backendClass = 'sync-warn';
+                                backendTitle = `Backend differs from frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nBackend: ${syncStatus.backendHash} (${syncStatus.backendContentLength} chars)\nDifference: ${syncStatus.frontendBackendDiff} chars`;
+                            }
+
+                            // Saved file status
+                            if (syncStatus.savedHash) {
+                                if (syncStatus.frontendSavedMatch) {
+                                    savedIcon = '✅';
+                                    savedClass = 'sync-good';
+                                    savedTitle = `Saved file synced with frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nSaved: ${syncStatus.savedHash} (${syncStatus.savedContentLength} chars)`;
+                                } else {
+                                    savedIcon = '⚠️';
+                                    savedClass = 'sync-warn';
+                                    savedTitle = `Saved file differs from frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nSaved: ${syncStatus.savedHash} (${syncStatus.savedContentLength} chars)\nDifference: ${syncStatus.frontendSavedDiff} chars`;
+                                }
+                            } else {
+                                savedIcon = '❓';
+                                savedClass = 'sync-unknown';
+                                savedTitle = 'Saved file not available';
+                            }
+                        }
+
+                        // Truncate directory path
+                        const dirPath = file.relativePath.includes('/')
+                            ? file.relativePath.substring(0, file.relativePath.lastIndexOf('/'))
+                            : '.';
+                        const truncatedDirPath = truncatePath(dirPath, 10);
 
                         return `
-                            <tr class="file-row ${mainFileClass}">
+                            <tr class="file-row ${mainFileClass}" data-file-path="${file.path}">
                                 <td class="col-file">
                                     <div class="file-directory-path" title="${file.path}">
-                                        ${file.relativePath.includes('/') ? file.relativePath.substring(0, file.relativePath.lastIndexOf('/')) : '.'}
+                                        ${truncatedDirPath}
                                         ${!file.isMainFile ? `<span class="include-type-label ${file.type || 'include'}">[${getIncludeTypeShortLabel(file.type)}]</span>` : ''}
                                     </div>
-                                    <div class="file-name-clickable" onclick="openFile('${file.path}')" title="Click to open file">
-                                        ${file.isMainFile ? '📄' : '📎'} ${file.name}
+                                    <div class="file-name-clickable" onclick="openFile('${file.path}')" title="${file.path}">
+                                        ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
                                     </div>
                                 </td>
                                 <td class="col-internal">
@@ -814,6 +991,16 @@ function createFileStatesList(allFiles) {
                                 <td class="col-external">
                                     <span class="status-icon" title="External changes (modified outside Kanban interface)">
                                         ${hasExternalChanges ? '🔄' : '🟢'}
+                                    </span>
+                                </td>
+                                <td class="col-sync-backend">
+                                    <span class="status-icon sync-status-icon ${backendClass}" title="${backendTitle}">
+                                        ${backendIcon}
+                                    </span>
+                                </td>
+                                <td class="col-sync-saved">
+                                    <span class="status-icon sync-status-icon ${savedClass}" title="${savedTitle}">
+                                        ${savedIcon}
                                     </span>
                                 </td>
                                 <td class="col-actions">
@@ -831,6 +1018,8 @@ function createFileStatesList(allFiles) {
                 </tbody>
             </table>
 
+            ${createSyncDetailsSection()}
+
             <div class="icon-legend">
                 <div class="legend-section">
                     <div class="legend-title">Status Icons:</div>
@@ -846,6 +1035,31 @@ function createFileStatesList(allFiles) {
                         <div class="legend-item">
                             <span class="legend-icon">🔄</span>
                             <span class="legend-text">External changes (needs reloading)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="legend-section">
+                    <div class="legend-title">Sync Status (Frontend as baseline):</div>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <span class="legend-icon">BE</span>
+                            <span class="legend-text">Backend sync</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-icon">SF</span>
+                            <span class="legend-text">Saved file sync</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-icon">✅</span>
+                            <span class="legend-text">Synced</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-icon">⚠️</span>
+                            <span class="legend-text">Differs</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-icon">⚪</span>
+                            <span class="legend-text">Unknown</span>
                         </div>
                     </div>
                 </div>
@@ -964,6 +1178,7 @@ function reloadAllIncludedFiles() {
 // Force write state
 let pendingForceWrite = false;
 let lastVerificationResults = null;
+let syncDetailsExpanded = false;
 
 /**
  * Force write all content (EMERGENCY RECOVERY)
@@ -1057,9 +1272,11 @@ function confirmForceWrite() {
 /**
  * Verify content synchronization between frontend and backend
  */
-function verifyContentSync() {
+function verifyContentSync(silent = false) {
     if (!window.vscode) {
-        alert('Error: vscode API not available');
+        if (!silent) {
+            alert('Error: vscode API not available');
+        }
         return;
     }
 
@@ -1069,8 +1286,10 @@ function verifyContentSync() {
         frontendBoard: window.currentBoard  // Send the actual frontend board state
     });
 
-    // Show loading indicator
-    alert('Verifying content synchronization... Please wait.');
+    // Show loading indicator only if not silent
+    if (!silent) {
+        alert('Verifying content synchronization... Please wait.');
+    }
 }
 
 /**
@@ -1111,11 +1330,15 @@ function showVerificationResults(results) {
                                     <div class="file-result-name">${file.relativePath}</div>
                                     <div class="file-result-status">
                                         ${file.matches ?
-                                            '✅ Match' :
-                                            `⚠️ Differs by ${file.differenceSize} chars`}
+                                            '✅ All Match' :
+                                            `⚠️ Differences detected`}
                                     </div>
                                     <div class="file-result-hashes">
-                                        Frontend: ${file.frontendHash} | Backend: ${file.backendHash}
+                                        <div>Frontend: ${file.frontendHash} (${file.frontendContentLength} chars)</div>
+                                        <div>Backend: ${file.backendHash} (${file.backendContentLength} chars)
+                                            ${file.frontendBackendMatch ? '✅' : '⚠️ differs by ' + file.frontendBackendDiff}</div>
+                                        ${file.savedHash ? `<div>Saved: ${file.savedHash} (${file.savedContentLength} chars)
+                                            ${file.backendSavedMatch ? '✅' : '⚠️ differs by ' + file.backendSavedDiff}</div>` : ''}
                                     </div>
                                 </div>
                             `).join('')}
@@ -1175,10 +1398,11 @@ function getDebugOverlayStyles() {
         .debug-panel {
             background: var(--vscode-editor-background);
             border: 1px solid var(--vscode-panel-border);
-            border-radius: 8px;
-            max-width: 500px;
+            border-radius: 4px;
             max-height: 85vh;
-            width: 500px;
+            max-width: 80vw;
+            // width: 500px;
+            min-width: 40vw;
             // min-height: 400px;
             display: flex;
             flex-direction: column;
@@ -1609,13 +1833,33 @@ function getDebugOverlayStyles() {
         }
 
         .col-internal, .col-external {
-            width: 15%;
+            width: 10%;
             text-align: center;
+        }
+
+        .col-sync-backend, .col-sync-saved {
+            width: 8%;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 600;
         }
 
         .col-actions {
             width: 25%;
             text-align: center;
+        }
+
+        .sync-status-icon.sync-good {
+            color: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .sync-status-icon.sync-warn {
+            color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+
+        .sync-status-icon.sync-unknown {
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.5;
         }
 
         .file-path {
@@ -2023,6 +2267,199 @@ function getDebugOverlayStyles() {
         .verification-warning {
             border-color: var(--vscode-gitDecoration-modifiedResourceForeground);
         }
+
+        /* Sync Details Section Styles */
+        .sync-details-section {
+            margin-top: 12px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .sync-details-header {
+            padding: 8px 12px;
+            background: var(--vscode-list-inactiveSelectionBackground);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .sync-details-header:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .sync-details-toggle {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .sync-details-section.expanded .sync-details-toggle {
+            transform: rotate(90deg);
+        }
+
+        .sync-details-title {
+            font-weight: 600;
+            font-size: 12px;
+            flex: 1;
+        }
+
+        .sync-details-hint {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+        }
+
+        .sync-details-status {
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .sync-details-content {
+            padding: 12px;
+            background: var(--vscode-editor-background);
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+
+        .sync-details-summary {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: var(--vscode-textBlockQuote-background);
+            border-radius: 4px;
+            flex-wrap: wrap;
+        }
+
+        .sync-stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sync-stat-label {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .sync-stat-value {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .sync-stat-good .sync-stat-value {
+            color: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .sync-stat-warn .sync-stat-value {
+            color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+
+        .sync-stat-timestamp {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            margin-left: auto;
+            align-self: center;
+        }
+
+        .sync-details-files {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sync-file-detail {
+            padding: 8px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            background: var(--vscode-editor-background);
+        }
+
+        .sync-file-detail.sync-match {
+            border-left: 3px solid var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .sync-file-detail.sync-mismatch {
+            border-left: 3px solid var(--vscode-gitDecoration-modifiedResourceForeground);
+            background: rgba(255, 165, 0, 0.05);
+        }
+
+        .sync-file-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .sync-file-icon {
+            font-size: 14px;
+        }
+
+        .sync-file-name {
+            font-weight: 500;
+            font-size: 12px;
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .sync-file-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding-left: 22px;
+        }
+
+        .sync-file-stat {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .sync-file-stat-label {
+            color: var(--vscode-descriptionForeground);
+            min-width: 70px;
+        }
+
+        .sync-file-stat-value {
+            color: var(--vscode-foreground);
+        }
+
+        .sync-match-indicator {
+            color: var(--vscode-gitDecoration-addedResourceForeground);
+        }
+
+        .sync-mismatch-indicator {
+            color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+
+        .sync-unknown-indicator {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        .sync-details-note {
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            background: rgba(100, 150, 200, 0.1);
+            border-left: 3px solid var(--vscode-textLink-foreground);
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--vscode-foreground);
+        }
+
+        .baseline-stat {
+            background: rgba(100, 150, 200, 0.05);
+            padding: 4px;
+            border-radius: 3px;
+            margin-bottom: 4px;
+        }
+
+        .baseline-stat .sync-file-stat-label {
+            font-weight: 600;
+            color: var(--vscode-textLink-foreground);
+        }
     `;
 }
 
@@ -2116,11 +2553,12 @@ function initializeDebugOverlay() {
                 break;
 
             case 'verifyContentSyncResult':
-                // Show verification results
-                if (message.success) {
-                    showVerificationResults(message);
-                } else {
-                    alert(`Verification failed: ${message.summary}`);
+                // Store verification results and update display
+                lastVerificationResults = message;
+
+                // Update the file states content to show sync status
+                if (debugOverlayVisible && debugOverlayElement) {
+                    updateFileStatesContent();
                 }
                 break;
         }
