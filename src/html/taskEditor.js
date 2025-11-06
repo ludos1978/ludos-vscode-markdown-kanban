@@ -837,12 +837,54 @@ class TaskEditor {
 
                         // If include syntax changed, send editColumnTitle message immediately for backend processing
                         if (hasIncludeChanges) {
+                            // OPTIMISTIC UPDATE: Immediately generate temporary displayTitle
+                            // Strip !!!include()!!! syntax to prevent markdown-it from rendering it
+                            let tempDisplayTitle = newTitle;
+                            const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+                            let match;
+                            const filePaths = [];
+
+                            while ((match = includeRegex.exec(newTitle)) !== null) {
+                                filePaths.push(match[1]);
+                            }
+
+                            // Replace each !!!include()!!! with a placeholder badge
+                            filePaths.forEach((filePath, index) => {
+                                const fileName = filePath.split('/').pop() || filePath;
+                                const placeholder = `!(${fileName})!`;
+                                tempDisplayTitle = tempDisplayTitle.replace(/!!!include\s*\([^)]+\)\s*!!!/, placeholder);
+                            });
+
+                            // If nothing left after stripping, use filename
+                            if (!tempDisplayTitle.trim() && filePaths.length > 0) {
+                                const fileName = filePaths[0].split('/').pop() || filePaths[0];
+                                const baseName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                                tempDisplayTitle = baseName;
+                            }
+
+                            // Update column state optimistically
+                            column.displayTitle = tempDisplayTitle;
+                            column.isLoadingContent = true;
+
+                            // Update the display immediately (close editor and show temporary title)
+                            this.closeEditor();
+
+                            // Re-render just this column's title to show the optimistic state with loading indicator
+                            const columnElement = element.closest('.kanban-full-height-column');
+                            if (columnElement) {
+                                const titleContainer = columnElement.querySelector('.column-title-text');
+                                if (titleContainer && window.renderMarkdown) {
+                                    // Add a subtle loading indicator next to the title
+                                    const loadingSpinner = '<span class="title-loading-spinner" style="margin-left: 8px; opacity: 0.5;">⟳</span>';
+                                    titleContainer.innerHTML = window.renderMarkdown(tempDisplayTitle) + loadingSpinner;
+                                }
+                            }
+
                             // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
                             // DOM might have stale IDs if a boardUpdate just arrived
                             let currentColumnId = columnId; // Default to what we have
 
                             // Find column's position in DOM to match with current board
-                            const columnElement = element.closest('.kanban-full-height-column');
                             if (columnElement) {
                                 const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                                 const columnIndex = allColumns.indexOf(columnElement);
@@ -861,7 +903,7 @@ class TaskEditor {
                                 title: newTitle
                             });
 
-                            // Don't update local state here - let the backend handle it and reload
+                            // Don't continue with regular updates - backend will handle the rest
                             return; // Skip the rest of the local updates for include changes
                         }
 

@@ -1134,7 +1134,8 @@ export class ChangeStateMachine {
                             displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeMode: column.includeMode,
-                            includeFiles: column.includeFiles
+                            includeFiles: column.includeFiles,
+                            isLoadingContent: false
                         });
                         context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
 
@@ -1179,7 +1180,8 @@ export class ChangeStateMachine {
                             displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeMode: column.includeMode,
-                            includeFiles: column.includeFiles
+                            includeFiles: column.includeFiles,
+                            isLoadingContent: false
                         });
                         context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
 
@@ -1291,7 +1293,8 @@ export class ChangeStateMachine {
                             displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeFiles: column.includeFiles,
-                            includeMode: column.includeMode
+                            includeMode: column.includeMode,
+                            isLoadingContent: false
                         });
                     }
                 } else if (context.rollback.taskId && context.rollback.taskColumnId) {
