@@ -2875,9 +2875,10 @@ window.addEventListener('message', event => {
                         }
 
                         // Recalculate stacked column heights after include content update
+                        // Only update this column's stack for efficiency
                         if (typeof window.applyStackedColumnStyles === 'function') {
                             requestAnimationFrame(() => {
-                                window.applyStackedColumnStyles();
+                                window.applyStackedColumnStyles(message.columnId);
                             });
                         }
 

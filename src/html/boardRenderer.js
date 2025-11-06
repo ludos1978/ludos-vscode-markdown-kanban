@@ -2218,20 +2218,27 @@ function toggleColumnCollapse(columnId, event) {
  * Side effects: Adds/removes CSS classes, sets inline styles for header positions
  */
 /**
- * Legacy function - calls both enforcement and height recalculation
- * For new code, use enforceFoldModesForStacks() and recalculateStackHeights() separately
+ * Apply stacked column styles for a specific column or all columns
+ * @param {string|null} columnId - Column ID to update its stack, or null for all stacks
  */
-function applyStackedColumnStyles() {
+function applyStackedColumnStyles(columnId = null) {
     // Preserve scroll position during layout changes
     const kanbanBoard = document.getElementById('kanban-board');
     const scrollLeft = kanbanBoard ? kanbanBoard.scrollLeft : 0;
     const scrollTop = kanbanBoard ? kanbanBoard.scrollTop : 0;
 
-    enforceFoldModesForStacks();
-    // CRITICAL FIX: Use immediate version instead of debounced to prevent scroll issues
-    // The debounced version would delay layout changes until after scroll restoration,
-    // causing the browser to auto-scroll to focused elements
-    recalculateStackHeightsImmediate();
+    let targetStack = null;
+    if (columnId) {
+        // Find the specific stack containing this column
+        const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+        if (columnElement) {
+            targetStack = columnElement.closest('.kanban-column-stack');
+        }
+    }
+
+    // Update only the target stack (or all if columnId is null)
+    enforceFoldModesForStacks(targetStack);
+    recalculateStackHeightsImmediate(targetStack);
 
     // Update bottom drop zones after layout changes
     if (typeof window.updateStackBottomDropZones === 'function') {

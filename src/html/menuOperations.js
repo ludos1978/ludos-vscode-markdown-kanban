@@ -1112,9 +1112,10 @@ function toggleColumnStack(columnId) {
 
     // CRITICAL: Recalculate stack positions after toggle
     // This ensures columns stack/unstack immediately
+    // Only update this column's stack for efficiency
     if (typeof window.applyStackedColumnStyles === 'function') {
         requestAnimationFrame(() => {
-            window.applyStackedColumnStyles();
+            window.applyStackedColumnStyles(columnId);
         });
     }
 

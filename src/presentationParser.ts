@@ -169,7 +169,8 @@ export class PresentationParser {
     });
 
     // Join slides with slide separators
-    return slides.filter(slide => slide).join('\n\n---\n\n') + '\n';
+    // Format: ---\n[slide1]\n\n---\n[slide2]\n\n---\n
+    return '---' + slides.filter(slide => slide).join('\n\n---') + '\n\n---\n';
   }
 
   /**

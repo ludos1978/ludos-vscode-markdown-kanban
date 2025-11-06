@@ -919,9 +919,10 @@ class TaskEditor {
 
                             // CRITICAL: Recalculate stack positions after layout change
                             // This handles #stack tag additions/removals immediately
+                            // Only update the affected column's stack for efficiency
                             if (typeof window.applyStackedColumnStyles === 'function') {
                                 requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles();
+                                    window.applyStackedColumnStyles(columnId);
                                 });
                             }
                         }
