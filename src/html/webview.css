@@ -628,18 +628,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   font-size: var(--compact-font-size);
 }
 
-/* .kanban-full-height-column.compact-view .column-title {
-  padding: calc(var(--whitespace) * var(--compact-padding-scale));
-} */
-
-/* .kanban-full-height-column.compact-view .column-footer {
-  padding-top: calc(var(--whitespace) * var(--compact-padding-scale));
-} */
-
-/* .kanban-full-height-column.compact-view .task-item {
-  padding: calc(var(--whitespace) * var(--compact-padding-scale));
-} */
-
 .kanban-full-height-column.compact-view .column-footer {
   padding-top: var(--compact-column-footer-padding);
 }
@@ -3240,7 +3228,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 .kanban-full-height-column.external-drag-over .column-content {
   background-color: var(--vscode-list-hoverBackground);
   border: 2px dashed var(--vscode-focusBorder);
-  border-radius: 8px;
+  border-radius: 8px 0px 8px 0px;
   position: relative;
 }
 
@@ -4004,9 +3992,16 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 
 .kanban-person-tag::before {
     content: '👤';
-    position: absolute;
+    position: relative;
     left: 2px;
+    /* top: -6px; */
     font-size: 10px;
+}
+
+kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
+    position: relative;
+    left: -2px;
+    top: -6px;
 }
 
 .kanban-date-tag:hover,
@@ -4124,30 +4119,6 @@ body.vscode-high-contrast-light .collapsed-add-task-btn:hover {
 .markdown-content h4::before { content: "H4"; }
 .markdown-content h5::before { content: "H5"; }
 .markdown-content h6::before { content: "H6"; }
-
-/* .column-title-text .markdown-content h1,
-.column-title-text .markdown-content h2,
-.column-title-text .markdown-content h3,
-.column-title-text .markdown-content h4,
-.column-title-text .markdown-content h5,
-.column-title-text .markdown-content h6,
-.column-title-text .markdown-content p {
-  margin-top: 0.25em;
-  margin-bottom: 0.25em;
-} */
-
-/* Paragraph - only before (DISABLED - too common) */
-/*
-.markdown-content p::before {
-  content: "¶"; display: inline-block;
-  width: 16px; height: 16px; margin-right: 4px;
-  border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
-  font-family: monospace; font-size: 11px !important;
-  background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
-  text-align: center; line-height: 16px !important;
-  vertical-align: middle; opacity: 0.7;
-}
-*/
 
 /* Bold - before and after */
 .markdown-content strong::before, .markdown-content strong::after,

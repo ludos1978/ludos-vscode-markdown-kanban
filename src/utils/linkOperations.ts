@@ -7,6 +7,39 @@
  */
 export class LinkOperations {
     /**
+     * Check if content in angle brackets is an actual link (not HTML tag)
+     * A link must have:
+     * - A file extension (e.g., .md, .txt, .png)
+     * - A path separator (/ or \)
+     * - Start with http/https
+     *
+     * @param content - The content between angle brackets
+     * @returns true if it's a link, false if it's likely an HTML tag
+     */
+    private static isActualLink(content: string): boolean {
+        if (!content) { return false; }
+
+        const trimmed = content.trim();
+
+        // Has file extension (e.g., file.md, image.png)
+        if (/\.[a-zA-Z0-9]+$/.test(trimmed)) {
+            return true;
+        }
+
+        // Has path separator (/ or \)
+        if (trimmed.includes('/') || trimmed.includes('\\')) {
+            return true;
+        }
+
+        // Starts with http:// or https://
+        if (/^https?:\/\//i.test(trimmed)) {
+            return true;
+        }
+
+        // Otherwise, it's likely an HTML tag like <hr>, <br>, etc.
+        return false;
+    }
+    /**
      * Replace only the specific occurrence (by index) of a specific link in text
      * Handles both already strikethrough and regular links properly
      *
@@ -42,6 +75,19 @@ export class LinkOperations {
             let match;
             const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
             while ((match = regex.exec(text)) !== null) {
+                // For angle bracket links, validate that they're actual links (not HTML tags)
+                if (pattern.type === 'auto' || pattern.type === 'strikeAuto') {
+                    // Extract content between angle brackets
+                    const content = originalPath; // The path we're searching for
+                    if (!this.isActualLink(content)) {
+                        // Skip this match - it's likely an HTML tag like <hr> or <br>
+                        if (match.index === regex.lastIndex) {
+                            regex.lastIndex++;
+                        }
+                        continue;
+                    }
+                }
+
                 allMatches.push({
                     match: match,
                     start: match.index,

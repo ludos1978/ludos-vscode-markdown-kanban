@@ -828,9 +828,22 @@ export class ExportService {
             }
         } else if (link.startsWith('<') && link.endsWith('>')) {
             // Angle bracket link: <path>
-            filePath = link.slice(1, -1);
-            linkStart = '<';
-            linkEnd = '>';
+            // Validate that it's an actual link, not an HTML tag like <hr> or <br>
+            const content = link.slice(1, -1);
+
+            // Check if it's an actual link (has file extension, path separator, or starts with http)
+            const hasExtension = /\.[a-zA-Z0-9]+$/.test(content);
+            const hasPathSeparator = content.includes('/') || content.includes('\\');
+            const isUrl = /^https?:\/\//i.test(content);
+
+            if (hasExtension || hasPathSeparator || isUrl) {
+                filePath = content;
+                linkStart = '<';
+                linkEnd = '>';
+            } else {
+                // It's an HTML tag like <hr>, <br>, etc. - don't treat as link
+                return link;
+            }
         }
 
         if (!filePath) {
