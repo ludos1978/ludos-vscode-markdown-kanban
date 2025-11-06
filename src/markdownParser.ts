@@ -506,7 +506,13 @@ export class MarkdownKanbanParser {
             const descriptionToUse = task.description;
             if (descriptionToUse && descriptionToUse.trim() !== '') {
               const descriptionLines = descriptionToUse.split('\n');
-              for (const descLine of descriptionLines) {
+              // Filter out the last element if it's empty (happens when description ends with \n)
+              // This prevents adding extra blank lines
+              const linesToWrite = descriptionLines[descriptionLines.length - 1] === ''
+                ? descriptionLines.slice(0, -1)
+                : descriptionLines;
+
+              for (const descLine of linesToWrite) {
                 markdown += `  ${descLine}\n`;
               }
             }

@@ -558,8 +558,10 @@ export class MessageHandler {
                 );
                 break;
             case 'deleteTask':
-                await this.performBoardAction(() => 
-                    this._boardOperations.deleteTask(this._getCurrentBoard()!, message.taskId, message.columnId)
+                // Frontend already updated (cache-first), don't send update back
+                await this.performBoardAction(() =>
+                    this._boardOperations.deleteTask(this._getCurrentBoard()!, message.taskId, message.columnId),
+                    { sendUpdate: false }
                 );
                 break;
             case 'duplicateTask':
@@ -3286,10 +3288,57 @@ export class MessageHandler {
             for (const file of allFiles) {
                 const backendContent = file.getContent();
                 let frontendContent: string;
+                let savedFileContent: string | null = null;
+
+                // Read the actual saved file from disk
+                try {
+                    const fs = require('fs');
+                    savedFileContent = fs.readFileSync(file.getPath(), 'utf8');
+                } catch (error) {
+                    console.error(`[MessageHandler] Could not read saved file ${file.getPath()}:`, error);
+                }
+
+                // DEBUG: Log file details
+                console.log(`[MessageHandler] Verifying file: ${file.getRelativePath()}`);
+                console.log(`  File type: ${file.getFileType()}`);
+                console.log(`  Backend content length: ${backendContent.length}`);
+                console.log(`  Backend content preview: ${backendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
+                if (savedFileContent !== null) {
+                    console.log(`  Saved file content length: ${savedFileContent.length}`);
+                    console.log(`  Saved file content preview: ${savedFileContent.substring(0, 100).replace(/\n/g, '\\n')}`);
+                }
 
                 // For main file, regenerate markdown from frontend board
                 if (file.getFileType() === 'main') {
                     frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
+
+                    // DEBUG: Log regenerated content details
+                    console.log(`  Frontend content length: ${frontendContent.length}`);
+                    console.log(`  Frontend content preview: ${frontendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
+                    console.log(`  Length difference: ${frontendContent.length - backendContent.length}`);
+
+                    // If there's a difference, show where they diverge
+                    if (frontendContent !== backendContent) {
+                        const minLen = Math.min(frontendContent.length, backendContent.length);
+                        let firstDiff = -1;
+                        for (let i = 0; i < minLen; i++) {
+                            if (frontendContent[i] !== backendContent[i]) {
+                                firstDiff = i;
+                                break;
+                            }
+                        }
+                        if (firstDiff >= 0) {
+                            const start = Math.max(0, firstDiff - 20);
+                            const end = Math.min(minLen, firstDiff + 80);
+                            console.log(`  First difference at character ${firstDiff}:`);
+                            console.log(`    Backend: ${JSON.stringify(backendContent.substring(start, end))}`);
+                            console.log(`    Frontend: ${JSON.stringify(frontendContent.substring(start, end))}`);
+                        } else if (frontendContent.length !== backendContent.length) {
+                            console.log(`  Content matches up to character ${minLen}, but lengths differ`);
+                            console.log(`    Backend end: ${JSON.stringify(backendContent.substring(minLen - 20))}`);
+                            console.log(`    Frontend end: ${JSON.stringify(frontendContent.substring(minLen - 20))}`);
+                        }
+                    }
                 } else {
                     // For include files, get their actual content
                     // (For now, we don't have a way to get modified include content from frontend)
@@ -3299,6 +3348,11 @@ export class MessageHandler {
 
                 const backendHash = this._computeHash(backendContent);
                 const frontendHash = this._computeHash(frontendContent);
+
+                // DEBUG: Log hash calculation
+                console.log(`  Backend hash: ${backendHash.substring(0, 8)}`);
+                console.log(`  Frontend hash: ${frontendHash.substring(0, 8)}`);
+                console.log(`  Matches: ${backendHash === frontendHash}`);
 
                 const matches = backendHash === frontendHash;
 

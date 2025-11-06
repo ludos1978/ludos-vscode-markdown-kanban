@@ -1499,6 +1499,17 @@ function renderBoard(options = null) {
                 window.applyColumnWidth(window.currentColumnWidth, true); // Skip render to prevent loop
             }
 
+            // CRITICAL: If any columns have loading placeholders, recalculate again after a short delay
+            // This ensures the placeholder heights are properly measured
+            const loadingColumns = document.querySelectorAll('.column-loading-placeholder');
+            if (loadingColumns.length > 0) {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        applyStackedColumnStyles();
+                    });
+                });
+            }
+
             window.stackedColumnStylesTimeout = null;
         }, 50);
     }
@@ -1830,10 +1841,12 @@ function createColumnElement(column, columnIndex) {
 				</div>
         <div class="column-inner${column.isLoadingContent ? ' column-loading' : ''}">
             <div class="column-content">
-                ${column.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading include content...</div></div>' : ''}
                 <div class="tasks-container" id="tasks-${column.id}">
-                    ${column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')}
-                    ${column.tasks.length === 0 ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
+                    ${column.isLoadingContent
+                        ? '<div class="column-loading-placeholder"><div class="loading-spinner"></div><div class="loading-text">Loading tasks...</div></div>'
+                        : column.tasks.map((task, index) => createTaskElement(task, column.id, index)).join('')
+                    }
+                    ${!column.isLoadingContent && column.tasks.length === 0 ? `<button class="add-task-btn" onclick="addTask('${column.id}')">
                         + Add Task
                     </button>` : ''}
                 </div>
@@ -3997,9 +4010,32 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
         // The "+ Add Task" button is inside the tasks container, so we need to insert before it
         const addTaskBtn = tasksContainer.querySelector('.add-task-btn');
 
+        // DEBUG: Log insertion details
+        console.log('[addSingleTaskToDOM] Inserting task:', {
+            taskId: task.id,
+            taskTitle: task.title,
+            insertIndex,
+            childrenLength: tasksContainer.children.length,
+            hasAddButton: !!addTaskBtn,
+            childrenTypes: Array.from(tasksContainer.children).map(c => ({
+                tag: c.tagName,
+                class: c.className,
+                id: c.id,
+                dataTaskId: c.getAttribute('data-task-id')
+            })),
+            columnTasksLength: column.tasks.length,
+            columnTaskIds: column.tasks.map(t => t.id)
+        });
+
         // Insert the task at the correct position
         if (insertIndex >= 0 && insertIndex < tasksContainer.children.length) {
             const referenceNode = tasksContainer.children[insertIndex];
+            console.log('[addSingleTaskToDOM] Inserting before element:', {
+                refNodeTag: referenceNode.tagName,
+                refNodeClass: referenceNode.className,
+                refNodeId: referenceNode.id,
+                refNodeTaskId: referenceNode.getAttribute('data-task-id')
+            });
             if (referenceNode && referenceNode.parentNode === tasksContainer) {
                 tasksContainer.insertBefore(taskElement, referenceNode);
             } else {

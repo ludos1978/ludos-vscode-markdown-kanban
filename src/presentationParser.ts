@@ -34,7 +34,8 @@ export class PresentationParser {
     }
 
     // Split by slide separators
-    const rawSlides = content.split(/^---\s*$/gm);
+    // Use [ \t]* instead of \s* to match only spaces/tabs, NOT newlines
+    const rawSlides = content.split(/^---[ \t]*$/gm);
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
@@ -151,26 +152,31 @@ export class PresentationParser {
       // Check if task has a non-empty title
       if (task.title && task.title.trim() !== '') {
         // Has title: 1 blank line, title, 1 blank line, description
-        slideContent += '\n';               // 1 empty line
-        slideContent += task.title + '\n';  // Title
-        slideContent += '\n';               // 1 empty line
+        // After split, we want: ['', 'Title', '', 'Description']
+        slideContent += '\n';              // Start with newline (creates first empty line after split)
+        slideContent += task.title + '\n'; // Title
+        slideContent += '\n';              // Empty line separator
         if (task.description) {
           slideContent += task.description;
         }
       } else {
         // No title or empty title: 3 blank lines, description
-        slideContent += '\n\n\n';           // 3 empty lines
+        // After split, we want: ['', '', '', 'Description']
+        slideContent += '\n\n\n';          // 3 newlines = 3 empty lines after split
         if (task.description) {
           slideContent += task.description;
         }
       }
 
+      // Add 1 empty line at the end of each slide (before ---)
+      slideContent += '\n';
+
       return slideContent;
     });
 
     // Join slides with slide separators
-    // Format: ---\n[slide1]\n\n---\n[slide2]\n\n---\n
-    return '---' + slides.filter(slide => slide).join('\n\n---') + '\n\n---\n';
+    // Format: ---\n[slide1]\n---\n[slide2]\n---\n
+    return '---' + slides.filter(slide => slide).join('\n---\n') + '\n---\n';
   }
 
   /**

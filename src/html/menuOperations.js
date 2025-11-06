@@ -1721,6 +1721,17 @@ function insertTaskBefore(taskId, columnId) {
         if (found) {
             const { column: targetColumn, columnId: actualColumnId } = found;
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+
+            // DEBUG: Log what we found
+            console.log('[insertTaskBefore] Found task:', {
+                taskId,
+                targetIndex,
+                columnId: actualColumnId,
+                targetTask: targetColumn.tasks[targetIndex],
+                allTaskIds: targetColumn.tasks.map(t => t.id),
+                allTaskTitles: targetColumn.tasks.map(t => t.title)
+            });
+
             if (targetIndex >= 0) {
                 const newTask = {
                     id: `temp-insert-before-${Date.now()}`,
