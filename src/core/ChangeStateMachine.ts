@@ -1,5 +1,6 @@
 import { MarkdownFile } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
+import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 
 /**
  * Unified Change State Machine
@@ -481,6 +482,7 @@ export class ChangeStateMachine {
                         columnId: targetColumn.id,
                         oldState: {
                             title: oldTitle,
+                            displayTitle: targetColumn.displayTitle,
                             tasks: [...(targetColumn.tasks || [])],
                             includeFiles: [...(targetColumn.includeFiles || [])],
                             includeMode: targetColumn.includeMode
@@ -856,6 +858,31 @@ export class ChangeStateMachine {
                     if (event.type === 'include_switch' && event.newTitle !== undefined) {
                         targetColumn.title = event.newTitle;
                         targetColumn.originalTitle = event.newTitle;
+
+                        // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
+                        const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
+                        if (includeMatches && includeMatches.length > 0) {
+                            let displayTitle = event.newTitle;
+                            includeMatches.forEach((match: string, index: number) => {
+                                const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
+                                if (pathMatch && newFiles[index]) {
+                                    const filePath = newFiles[index];
+                                    const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+                                    displayTitle = displayTitle.replace(match, placeholder);
+                                } else {
+                                    displayTitle = displayTitle.replace(match, '').trim();
+                                }
+                            });
+
+                            if (!displayTitle && newFiles.length > 0) {
+                                const path = require('path');
+                                displayTitle = path.basename(newFiles[0], path.extname(newFiles[0]));
+                            }
+
+                            targetColumn.displayTitle = displayTitle || 'Included Column';
+                        } else {
+                            targetColumn.displayTitle = event.newTitle;
+                        }
                     }
 
                     // Re-load tasks from already-loaded files
@@ -894,6 +921,35 @@ export class ChangeStateMachine {
             if (event.type === 'include_switch' && event.newTitle !== undefined) {
                 targetColumn.title = event.newTitle;
                 targetColumn.originalTitle = event.newTitle;
+
+                // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
+                // This matches the behavior in markdownParser.ts:228-242
+                const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
+                if (includeMatches && includeMatches.length > 0) {
+                    let displayTitle = event.newTitle;
+                    includeMatches.forEach((match: string, index: number) => {
+                        // Extract the file path from the match: !!!include(path)!!!
+                        const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
+                        if (pathMatch && loadingFiles[index]) {
+                            const filePath = loadingFiles[index];
+                            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+                            displayTitle = displayTitle.replace(match, placeholder);
+                        } else {
+                            displayTitle = displayTitle.replace(match, '').trim();
+                        }
+                    });
+
+                    // If no display title after stripping, use filename as title
+                    if (!displayTitle && loadingFiles.length > 0) {
+                        const path = require('path');
+                        displayTitle = path.basename(loadingFiles[0], path.extname(loadingFiles[0]));
+                    }
+
+                    targetColumn.displayTitle = displayTitle || 'Included Column';
+                } else {
+                    // No include syntax - just copy the title
+                    targetColumn.displayTitle = event.newTitle;
+                }
             }
 
             // Create/register file instances and load content
@@ -1074,6 +1130,8 @@ export class ChangeStateMachine {
                         panel.webview.postMessage({
                             type: 'updateColumnContent',
                             columnId: column.id,
+                            columnTitle: column.title,
+                            displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeMode: column.includeMode,
                             includeFiles: column.includeFiles
@@ -1117,6 +1175,8 @@ export class ChangeStateMachine {
                         panel.webview.postMessage({
                             type: 'updateColumnContent',
                             columnId: column.id,
+                            columnTitle: column.title,
+                            displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeMode: column.includeMode,
                             includeFiles: column.includeFiles
@@ -1218,6 +1278,7 @@ export class ChangeStateMachine {
                     if (column) {
                         // Restore backend board state
                         column.title = context.rollback.oldState.title || column.title;
+                        column.displayTitle = context.rollback.oldState.displayTitle || column.displayTitle;
                         column.tasks = context.rollback.oldState.tasks || [];
                         column.includeFiles = context.rollback.oldState.includeFiles || [];
                         column.includeMode = context.rollback.oldState.includeMode || false;
@@ -1227,6 +1288,7 @@ export class ChangeStateMachine {
                             type: 'updateColumnContent',
                             columnId: column.id,
                             columnTitle: column.title,
+                            displayTitle: column.displayTitle,
                             tasks: column.tasks,
                             includeFiles: column.includeFiles,
                             includeMode: column.includeMode
