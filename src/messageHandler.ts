@@ -3023,33 +3023,27 @@ export class MessageHandler {
                     throw new Error(`File not found in registry: ${filePath}`);
                 }
 
-                // Get the content to save
-                const contentToSave = file.getContent();
+                // Save the file (force save always writes to disk)
+                console.log(`[MessageHandler] Saving ${filePath} (forceSave: ${forceSave})`);
+                await file.save({
+                    skipReloadDetection: true,
+                    source: 'ui-edit',
+                    skipValidation: false
+                });
 
-                if (forceSave || file.hasInternalChanges()) {
-                    // Force write the content to disk
-                    console.log(`[MessageHandler] Force writing ${filePath} (${contentToSave.length} chars)`);
-                    await file.write(contentToSave);
+                console.log(`[MessageHandler] Successfully saved ${filePath}`);
 
-                    panel._panel.webview.postMessage({
-                        type: 'individualFileSaved',
-                        filePath: filePath,
-                        isMainFile: false,
-                        success: true,
-                        forceSave: forceSave
-                    });
-                } else {
-                    console.log(`[MessageHandler] No changes to save for ${filePath}`);
+                // Send success message to frontend
+                panel._panel.webview.postMessage({
+                    type: 'individualFileSaved',
+                    filePath: filePath,
+                    isMainFile: false,
+                    success: true,
+                    forceSave: forceSave
+                });
 
-                    panel._panel.webview.postMessage({
-                        type: 'individualFileSaved',
-                        filePath: filePath,
-                        isMainFile: false,
-                        success: true,
-                        message: 'No changes to save',
-                        forceSave: forceSave
-                    });
-                }
+                // Send updated debug info immediately after save
+                await this.handleGetTrackedFilesDebugInfo();
             }
 
         } catch (error) {

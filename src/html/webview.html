@@ -334,7 +334,7 @@
                     <span id="auto-export-icon" class="auto-export-icon">▶</span>
                 </button>
 
-                <button id="refresh-btn" class="refresh-btn" onmousedown="event.preventDefault();" onclick="manualRefresh()" onmouseenter="if(window.scheduleDebugOverlayShow) window.scheduleDebugOverlayShow()" onmouseleave="if(window.cancelDebugOverlayShow) window.cancelDebugOverlayShow(); if(window.hideDebugOverlayDelayed) window.hideDebugOverlayDelayed()" title="Refresh from source markdown&#13;&#10;Hover to see debug info">
+                <button id="refresh-btn" class="refresh-btn" onmousedown="event.preventDefault();" onclick="showDebugOverlay()" title="Show File Info">
                     <span class="refresh-icon">↻</span>
                     <span class="refresh-text">Refresh</span>
                 </button>

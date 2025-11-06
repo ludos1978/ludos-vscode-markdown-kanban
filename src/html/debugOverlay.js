@@ -278,29 +278,45 @@ function updateTrackedFilesData(data) {
  * Update only the content without rebuilding the entire DOM
  */
 function updateFileStatesContent() {
+    console.log('[DebugOverlay] updateFileStatesContent called, overlay element:', !!debugOverlayElement);
+    console.log('[DebugOverlay] lastVerificationResults:', lastVerificationResults);
+
     if (!debugOverlayElement) {
+        console.log('[DebugOverlay] No overlay element, aborting update');
         return;
     }
 
     // Batch DOM updates to reduce reflow
     requestAnimationFrame(() => {
+        console.log('[DebugOverlay] requestAnimationFrame executing');
         const allFiles = createAllFilesArray();
+        console.log('[DebugOverlay] All files count:', allFiles.length);
 
         // Update summary stats (includes timestamp now)
         const summaryElement = debugOverlayElement.querySelector('.file-states-summary');
+        console.log('[DebugOverlay] Summary element found:', !!summaryElement);
         if (summaryElement) {
             const newSummaryHTML = createFileStatesSummary(allFiles);
             if (summaryElement.innerHTML !== newSummaryHTML) {
+                console.log('[DebugOverlay] Updating summary HTML');
                 summaryElement.innerHTML = newSummaryHTML;
+            } else {
+                console.log('[DebugOverlay] Summary HTML unchanged, skipping update');
             }
         }
 
         // Update file list (only if content changed)
         const listElement = debugOverlayElement.querySelector('.file-states-list');
+        console.log('[DebugOverlay] List element found:', !!listElement);
         if (listElement) {
             const newListHTML = createFileStatesList(allFiles);
-            if (listElement.innerHTML !== newListHTML) {
+            const htmlChanged = listElement.innerHTML !== newListHTML;
+            console.log('[DebugOverlay] List HTML changed:', htmlChanged, 'old length:', listElement.innerHTML.length, 'new length:', newListHTML.length);
+            if (htmlChanged) {
+                console.log('[DebugOverlay] Updating list HTML');
                 listElement.innerHTML = newListHTML;
+            } else {
+                console.log('[DebugOverlay] List HTML unchanged, skipping update');
             }
         }
     });
@@ -909,8 +925,6 @@ function createFileStatesList(allFiles) {
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
-                        <th class="col-internal">Internal</th>
-                        <th class="col-external">External</th>
                         <th class="col-sync-backend" title="Frontend → Backend sync status">BE</th>
                         <th class="col-sync-saved" title="Frontend → Saved file sync status">SF</th>
                         <th class="col-actions">Actions</th>
@@ -918,9 +932,6 @@ function createFileStatesList(allFiles) {
                 </thead>
                 <tbody>
                     ${allFiles.map(file => {
-                        // Combine editor unsaved state + external changes into one "external" indicator
-                        const hasExternalChanges = file.hasExternalChanges || file.isUnsavedInEditor;
-                        const hasAnyChanges = file.hasInternalChanges || hasExternalChanges;
                         const mainFileClass = file.isMainFile ? 'main-file' : '';
 
                         // Get sync status from verification results
@@ -983,16 +994,6 @@ function createFileStatesList(allFiles) {
                                         ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
                                     </div>
                                 </td>
-                                <td class="col-internal">
-                                    <span class="status-icon" title="Internal changes (Kanban interface modifications)">
-                                        ${file.hasInternalChanges ? '🟡' : '🟢'}
-                                    </span>
-                                </td>
-                                <td class="col-external">
-                                    <span class="status-icon" title="External changes (modified outside Kanban interface)">
-                                        ${hasExternalChanges ? '🔄' : '🟢'}
-                                    </span>
-                                </td>
                                 <td class="col-sync-backend">
                                     <span class="status-icon sync-status-icon ${backendClass}" title="${backendTitle}">
                                         ${backendIcon}
@@ -1006,8 +1007,7 @@ function createFileStatesList(allFiles) {
                                 <td class="col-actions">
                                     <div class="action-buttons">
                                         <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
-                                        ${hasAnyChanges ?
-                                            `<button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload">🔄</button>` : ''}
+                                        <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">🔄</button>
                                         <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload images">🖼️</button>
                                     </div>
                                 </td>
@@ -1020,23 +1020,6 @@ function createFileStatesList(allFiles) {
             ${createSyncDetailsSection()}
 
             <div class="icon-legend">
-                <div class="legend-section">
-                    <div class="legend-title">Status Icons:</div>
-                    <div class="legend-items">
-                        <div class="legend-item">
-                            <span class="legend-icon">🟢</span>
-                            <span class="legend-text">Clean / No changes</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-icon">🟡</span>
-                            <span class="legend-text">Internal changes (needs saving)</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-icon">🔄</span>
-                            <span class="legend-text">External changes (needs reloading)</span>
-                        </div>
-                    </div>
-                </div>
                 <div class="legend-section">
                     <div class="legend-title">Sync Status (Frontend as baseline):</div>
                     <div class="legend-items">
@@ -1832,11 +1815,6 @@ function getDebugOverlayStyles() {
             min-width: 200px;
         }
 
-        .col-internal, .col-external {
-            width: 10%;
-            text-align: center;
-        }
-
         .col-sync-backend, .col-sync-saved {
             width: 8%;
             text-align: center;
@@ -2524,10 +2502,28 @@ function initializeDebugOverlay() {
 
         if (!message || !message.type) return;
 
+        console.log('[DebugOverlay] Received message:', message.type);
+
         switch (message.type) {
             case 'documentStateChanged':
                 if (debugOverlayVisible) {
                     refreshDebugOverlay();
+                }
+                break;
+
+            case 'saveCompleted':
+                // After save completes, automatically re-verify sync status
+                console.log('[DebugOverlay] saveCompleted received, triggering verification');
+                if (debugOverlayVisible) {
+                    verifyContentSync(true); // Silent mode
+                }
+                break;
+
+            case 'individualFileSaved':
+                // After individual file save completes, automatically re-verify sync status
+                console.log('[DebugOverlay] individualFileSaved received, triggering verification');
+                if (debugOverlayVisible && message.success) {
+                    verifyContentSync(true); // Silent mode
                 }
                 break;
 
@@ -2553,12 +2549,16 @@ function initializeDebugOverlay() {
                 break;
 
             case 'verifyContentSyncResult':
+                console.log('[DebugOverlay] Received verifyContentSyncResult:', message);
                 // Store verification results and update display
                 lastVerificationResults = message;
 
                 // Update the file states content to show sync status
                 if (debugOverlayVisible && debugOverlayElement) {
+                    console.log('[DebugOverlay] Updating file states content');
                     updateFileStatesContent();
+                } else {
+                    console.log('[DebugOverlay] Overlay not visible, skipping update. visible:', debugOverlayVisible, 'element:', !!debugOverlayElement);
                 }
                 break;
         }
