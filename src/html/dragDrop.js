@@ -2261,8 +2261,11 @@ function setupTaskDragAndDrop() {
             }
             dragState.affectedColumns.add(tasksContainer);
 
+            // PERFORMANCE: Store latest mouse position (don't use stale position from closure!)
+            dragState.latestMouseY = e.clientY;
+
             // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
-            // Skip if already scheduled
+            // Skip if already scheduled - but we've stored the latest position above
             if (dragState.dragoverThrottleId) {
                 return;
             }
@@ -2272,9 +2275,12 @@ function setupTaskDragAndDrop() {
                 const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
                 let afterElement;
 
+                // CRITICAL: Use latest mouse position, not stale closure variable!
+                const mouseY = dragState.latestMouseY;
+
                 if (isOriginalColumn) {
                     // Use cached positions for original column
-                    afterElement = getDragAfterTaskElementCached(e.clientY);
+                    afterElement = getDragAfterTaskElementCached(mouseY);
                 } else {
                     // PERFORMANCE: Cache positions for new columns too (TTL: 100ms)
                     const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
@@ -2301,7 +2307,7 @@ function setupTaskDragAndDrop() {
 
                     // Use cached positions to find drop location
                     afterElement = getDragAfterTaskElementFromCache(
-                        e.clientY,
+                        mouseY,
                         dragState.newColumnPositionCache,
                         dragState.newColumnAddButtonRect
                     );
