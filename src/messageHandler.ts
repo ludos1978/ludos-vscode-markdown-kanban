@@ -1059,7 +1059,7 @@ export class MessageHandler {
                 break;
 
             case 'saveIndividualFile':
-                await this.handleSaveIndividualFile(message.filePath, message.isMainFile);
+                await this.handleSaveIndividualFile(message.filePath, message.isMainFile, message.forceSave);
                 break;
 
             case 'reloadIndividualFile':
@@ -2990,53 +2990,64 @@ export class MessageHandler {
     /**
      * Handle request to save an individual file
      */
-    private async handleSaveIndividualFile(filePath: string, isMainFile: boolean): Promise<void> {
+    private async handleSaveIndividualFile(filePath: string, isMainFile: boolean, forceSave: boolean = false): Promise<void> {
         try {
             const panel = this._getWebviewPanel();
             if (!panel) {
                 return;
             }
 
+            console.log(`[MessageHandler] Saving individual file ${filePath} (forceSave: ${forceSave})`);
+
             if (isMainFile) {
                 // Save the main kanban file by triggering the existing save mechanism
+                // Force save bypasses any change detection
                 await panel.saveToMarkdown();
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileSaved',
                     filePath: filePath,
                     isMainFile: true,
-                    success: true
+                    success: true,
+                    forceSave: forceSave
                 });
             } else {
-                // For include files, save the current content to disk
-                const includeFileMap = (panel as any)._includeFiles;
-                const includeFile = includeFileMap?.get(filePath);
+                // For include files, get the file from the registry
+                const fileRegistry = (panel as any)._fileRegistry;
+                if (!fileRegistry) {
+                    throw new Error('File registry not available');
+                }
 
-                if (includeFile && includeFile.content) {
-                    // Write the current content to disk
-                    await (panel as any)._writeFileContent(filePath, includeFile.content);
+                const file = fileRegistry.get(filePath);
+                if (!file) {
+                    throw new Error(`File not found in registry: ${filePath}`);
+                }
 
-                    // Update baseline to match saved content
-                    includeFile.baseline = includeFile.content;
-                    includeFile.hasUnsavedChanges = false;
-                    includeFile.lastModified = Date.now();
+                // Get the content to save
+                const contentToSave = file.getContent();
 
+                if (forceSave || file.hasInternalChanges()) {
+                    // Force write the content to disk
+                    console.log(`[MessageHandler] Force writing ${filePath} (${contentToSave.length} chars)`);
+                    await file.write(contentToSave);
 
                     panel._panel.webview.postMessage({
                         type: 'individualFileSaved',
                         filePath: filePath,
                         isMainFile: false,
-                        success: true
+                        success: true,
+                        forceSave: forceSave
                     });
                 } else {
-                    console.warn(`[MessageHandler] Include file not found or has no content: ${filePath}`);
+                    console.log(`[MessageHandler] No changes to save for ${filePath}`);
 
                     panel._panel.webview.postMessage({
                         type: 'individualFileSaved',
                         filePath: filePath,
                         isMainFile: false,
-                        success: false,
-                        error: 'File not found or has no content'
+                        success: true,
+                        message: 'No changes to save',
+                        forceSave: forceSave
                     });
                 }
             }
@@ -3051,6 +3062,7 @@ export class MessageHandler {
                     filePath: filePath,
                     isMainFile: isMainFile,
                     success: false,
+                    forceSave: forceSave,
                     error: error instanceof Error ? error.message : String(error)
                 });
             }

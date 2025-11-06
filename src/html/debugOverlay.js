@@ -1005,8 +1005,7 @@ function createFileStatesList(allFiles) {
                                 </td>
                                 <td class="col-actions">
                                     <div class="action-buttons">
-                                        ${file.hasInternalChanges ?
-                                            `<button onclick="saveIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn save-btn" title="Save">💾</button>` : ''}
+                                        <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
                                         ${hasAnyChanges ?
                                             `<button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload">🔄</button>` : ''}
                                         <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload images">🖼️</button>
@@ -1086,14 +1085,15 @@ function createFileStatesList(allFiles) {
 }
 
 /**
- * Save an individual file
+ * Save an individual file (force write)
  */
-function saveIndividualFile(filePath, isMainFile) {
+function saveIndividualFile(filePath, isMainFile, forceSave = true) {
     if (window.vscode) {
         window.vscode.postMessage({
             type: 'saveIndividualFile',
             filePath: filePath,
-            isMainFile: isMainFile
+            isMainFile: isMainFile,
+            forceSave: forceSave
         });
     }
 }
