@@ -1040,10 +1040,22 @@ function setupGlobalDragAndDrop() {
 
         const boardElement = document.getElementById('kanban-board');
         if (boardElement) {
-            // Clean up task styles
-            boardElement.querySelectorAll('.task-item').forEach(task => {
-                task.classList.remove('drag-transitioning');
-            });
+            // PERFORMANCE: Clean up task styles ONLY in affected columns (not all tasks on board!)
+            if (dragState.affectedColumns && dragState.affectedColumns.size > 0) {
+                dragState.affectedColumns.forEach(tasksContainer => {
+                    if (tasksContainer && tasksContainer.querySelectorAll) {
+                        tasksContainer.querySelectorAll('.task-item').forEach(task => {
+                            task.classList.remove('drag-transitioning');
+                        });
+                    }
+                });
+                dragState.affectedColumns.clear();
+            } else {
+                // Fallback: clean all tasks if tracking failed
+                boardElement.querySelectorAll('.task-item').forEach(task => {
+                    task.classList.remove('drag-transitioning');
+                });
+            }
 
             // Clean up column styles
             boardElement.querySelectorAll('.kanban-full-height-column').forEach(col => {
@@ -2240,6 +2252,12 @@ function setupTaskDragAndDrop() {
             // Remove any column-level visual feedback when over tasks
             columnElement.classList.remove('drag-over-append');
 
+            // PERFORMANCE: Track affected columns for targeted cleanup later
+            if (!dragState.affectedColumns) {
+                dragState.affectedColumns = new Set();
+            }
+            dragState.affectedColumns.add(tasksContainer);
+
             // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
             // Skip if already scheduled
             if (dragState.dragoverThrottleId) {
@@ -2391,6 +2409,8 @@ function setupTaskDragHandle(handle) {
             dragState.originalTaskIndex = Array.from(dragState.originalTaskParent.children).indexOf(taskItem);
             dragState.isDragging = true; // IMPORTANT: Set this BEFORE setting data
             dragState.altKeyPressed = e.altKey; // Track Alt key state from the start
+            dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
+            dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
 
             // PERFORMANCE: Cache task positions for all tasks in the column
             // This eliminates repeated querySelectorAll and getBoundingClientRect during drag
