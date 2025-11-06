@@ -913,11 +913,17 @@ class TaskEditor {
 
                         if (layoutChanged) {
                             // Layout tags changed - refresh the board layout
-                            setTimeout(() => {
-                                if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                    window.renderBoard(window.cachedBoard);
-                                }
-                            }, 50);
+                            if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+                                window.renderBoard(window.cachedBoard);
+                            }
+
+                            // CRITICAL: Recalculate stack positions after layout change
+                            // This handles #stack tag additions/removals immediately
+                            if (typeof window.applyStackedColumnStyles === 'function') {
+                                requestAnimationFrame(() => {
+                                    window.applyStackedColumnStyles();
+                                });
+                            }
                         }
 
                         // Mark as unsaved since we made a change

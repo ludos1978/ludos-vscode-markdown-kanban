@@ -439,12 +439,12 @@ export class MarkdownKanbanParser {
   private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null, existingBoard?: KanbanBoard, columnIndex?: number): void {
     if (!task || !column) {return;}
 
-    // Clean up description
-    if (task.description) {
-      task.description = task.description.trimEnd();
-      if (task.description === '') {
+    // Clean up description - only remove if completely empty, preserve whitespace otherwise
+    if (task.description !== undefined) {
+      if (task.description.trim() === '') {
         delete task.description;
       }
+      // DO NOT trim whitespace - preserve user's formatting including trailing newlines
     }
 
     // CRITICAL: Match by content to preserve ID (Backend is source of truth)

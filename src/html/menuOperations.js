@@ -1106,11 +1106,17 @@ function toggleColumnStack(columnId) {
     }
 
     // Trigger board refresh for layout changes
-    setTimeout(() => {
-        if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-            window.renderBoard(window.cachedBoard);
-        }
-    }, 50);
+    if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+        window.renderBoard(window.cachedBoard);
+    }
+
+    // CRITICAL: Recalculate stack positions after toggle
+    // This ensures columns stack/unstack immediately
+    if (typeof window.applyStackedColumnStyles === 'function') {
+        requestAnimationFrame(() => {
+            window.applyStackedColumnStyles();
+        });
+    }
 
     // Mark as unsaved
     if (typeof markUnsavedChanges === 'function') {

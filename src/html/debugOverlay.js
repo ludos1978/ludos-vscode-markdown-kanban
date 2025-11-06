@@ -1063,8 +1063,11 @@ function verifyContentSync() {
         return;
     }
 
-    // Send verification request to backend
-    window.vscode.postMessage({ type: 'verifyContentSync' });
+    // Send verification request to backend WITH actual frontend board data
+    window.vscode.postMessage({
+        type: 'verifyContentSync',
+        frontendBoard: window.currentBoard  // Send the actual frontend board state
+    });
 
     // Show loading indicator
     alert('Verifying content synchronization... Please wait.');

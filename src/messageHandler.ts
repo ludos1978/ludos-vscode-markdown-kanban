@@ -1069,7 +1069,7 @@ export class MessageHandler {
                 break;
 
             case 'verifyContentSync':
-                await this.handleVerifyContentSync();
+                await this.handleVerifyContentSync(message.frontendBoard);
                 break;
 
             case 'stopAutoExport':
@@ -3253,9 +3253,9 @@ export class MessageHandler {
 
     /**
      * Handle content sync verification
-     * Compares actual content between frontend and backend (not just flags)
+     * Compares actual frontend board data to backend file content
      */
-    private async handleVerifyContentSync(): Promise<void> {
+    private async handleVerifyContentSync(frontendBoard?: any): Promise<void> {
         try {
             const panel = this._getWebviewPanel();
             if (!panel) {
@@ -3264,11 +3264,18 @@ export class MessageHandler {
 
             console.log('[MessageHandler] Starting content synchronization verification');
 
+            if (!frontendBoard) {
+                throw new Error('Frontend board data not provided');
+            }
+
             // Get backend state
             const fileRegistry = (panel as any)._fileRegistry;
             if (!fileRegistry) {
                 throw new Error('File registry not available');
             }
+
+            // Import the parser to regenerate markdown from frontend board
+            const { MarkdownKanbanParser } = require('./markdownParser');
 
             const allFiles = fileRegistry.getAll();
             const fileResults: any[] = [];
@@ -3278,7 +3285,17 @@ export class MessageHandler {
             // Compare each file
             for (const file of allFiles) {
                 const backendContent = file.getContent();
-                const frontendContent = file.getContent(); // Both are same for now since we share state
+                let frontendContent: string;
+
+                // For main file, regenerate markdown from frontend board
+                if (file.getFileType() === 'main') {
+                    frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
+                } else {
+                    // For include files, get their actual content
+                    // (For now, we don't have a way to get modified include content from frontend)
+                    // So we compare backend to backend for includes
+                    frontendContent = backendContent;
+                }
 
                 const backendHash = this._computeHash(backendContent);
                 const frontendHash = this._computeHash(frontendContent);
@@ -3294,7 +3311,7 @@ export class MessageHandler {
                 fileResults.push({
                     path: file.getPath(),
                     relativePath: file.getRelativePath(),
-                    isMainFile: file.getPath() === this._fileManager.getDocument()?.uri.fsPath,
+                    isMainFile: file.getFileType() === 'main',
                     matches: matches,
                     frontendContentLength: frontendContent.length,
                     backendContentLength: backendContent.length,

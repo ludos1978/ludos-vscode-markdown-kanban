@@ -11,6 +11,22 @@ export class PresentationParser {
   /**
    * Parse presentation markdown content into individual slides
    * Slides are separated by '---'
+   *
+   * Format:
+   * With title:
+   *   ---
+   *   [1 blank line]
+   *   Title
+   *   [1 blank line]
+   *   Description
+   *   ---
+   *
+   * Without title (description only):
+   *   ---
+   *   [2+ blank lines]
+   *
+   *   Description
+   *   ---
    */
   static parsePresentation(content: string): PresentationSlide[] {
     if (!content || !content.trim()) {
@@ -22,51 +38,53 @@ export class PresentationParser {
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
-      const trimmedContent = slideContent.trim();
-      if (!trimmedContent) {
+      if (!slideContent.trim()) {
         return; // Skip empty slides
       }
 
-      const lines = trimmedContent.split('\n');
-      let title: string | undefined;
-      let remainingContent: string;
+      const lines = slideContent.split('\n');
 
-      // Find title: either a heading (# to ######) or the first non-empty line within first 3 lines
-      let titleLineIndex = -1;
-      let titleLine: string | undefined;
-
-      for (let i = 0; i < Math.min(3, lines.length); i++) {
-        const line = lines[i].trim();
-        if (line) {
-          // Check if it's a heading (H1-H6 only, not H7)
-          if (line.match(/^#{1,6}\s+/)) {
-            titleLine = lines[i]; // Keep original line with exact spacing and heading level
-            title = titleLine; // Store the full heading with depth (H1-H6)
-            titleLineIndex = i;
-            break;
-          } else if (titleLineIndex === -1) {
-            // First non-empty line that's not a heading - use as plain text title
-            title = line;
-            titleLineIndex = i;
-            break;
-          }
+      // Count leading empty lines after ---
+      let emptyLineCount = 0;
+      for (const line of lines) {
+        if (line.trim() === '') {
+          emptyLineCount++;
+        } else {
+          break; // Stop at first non-empty line
         }
       }
 
-      if (titleLineIndex >= 0) {
-        // Remove the title line from content
-        const contentLines = [
-          ...lines.slice(0, titleLineIndex),
-          ...lines.slice(titleLineIndex + 1)
-        ];
-        remainingContent = contentLines.join('\n').trim();
+      let title: string | undefined;
+      let description: string;
+
+      if (emptyLineCount >= 2) {
+        // 2+ empty lines → no title, everything after empty lines is description
+        title = undefined;
+        description = lines.slice(emptyLineCount).join('\n').trim();
+      } else if (emptyLineCount === 1) {
+        // 1 empty line → next line is title
+        // Format: [empty line (0), title line (1), empty line (2), ...description (3+)]
+        const titleLine = lines[1];
+        title = titleLine !== undefined ? titleLine : ''; // Can be empty string
+
+        // Description starts after: empty line (0), title (1), empty line (2)
+        description = lines.slice(3).join('\n').trim();
       } else {
-        remainingContent = trimmedContent;
+        // 0 empty lines → fallback to old behavior for backwards compatibility
+        // First non-empty line is title
+        const firstNonEmpty = lines.findIndex(l => l.trim() !== '');
+        if (firstNonEmpty !== -1) {
+          title = lines[firstNonEmpty].trim();
+          description = lines.slice(firstNonEmpty + 1).join('\n').trim();
+        } else {
+          title = undefined;
+          description = '';
+        }
       }
 
       slides.push({
         title,
-        content: remainingContent,
+        content: description,
         slideNumber: index + 1
       });
     });
@@ -96,6 +114,23 @@ export class PresentationParser {
   /**
    * Convert kanban tasks back to presentation format
    * This enables bidirectional editing
+   *
+   * Format:
+   * With title:
+   *   ---
+   *   [1 blank line]
+   *   Title
+   *   [1 blank line]
+   *   Description
+   *   ---
+   *
+   * Without title (description only):
+   *   ---
+   *   [3 blank lines]
+   *
+   *
+   *   Description
+   *   ---
    */
   static tasksToPresentation(tasks: KanbanTask[]): string {
     if (!tasks || tasks.length === 0) {
@@ -113,15 +148,21 @@ export class PresentationParser {
     const slides = regularTasks.map(task => {
       let slideContent = '';
 
-      // Add title with preserved heading depth if it exists
-      if (task.title) {
-        // Plain text title: place on first line, followed by empty line
-        slideContent += `${task.title}\n\n`;
-      }
-
-      // Add description content
-      if (task.description) {
-        slideContent += task.description;
+      // Check if task has a non-empty title
+      if (task.title && task.title.trim() !== '') {
+        // Has title: 1 blank line, title, 1 blank line, description
+        slideContent += '\n';               // 1 empty line
+        slideContent += task.title + '\n';  // Title
+        slideContent += '\n';               // 1 empty line
+        if (task.description) {
+          slideContent += task.description;
+        }
+      } else {
+        // No title or empty title: 3 blank lines, description
+        slideContent += '\n\n\n';           // 3 empty lines
+        if (task.description) {
+          slideContent += task.description;
+        }
       }
 
       return slideContent;
