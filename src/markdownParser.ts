@@ -12,7 +12,8 @@ export interface KanbanTask {
   title: string;
   description?: string;
   includeMode?: boolean;  // When true, content is generated from included files
-  includeFiles?: string[]; // Paths to included files
+  includeFiles?: string[]; // Paths to included files (for task includes - includeMode=true)
+  regularIncludeFiles?: string[]; // Paths to regular includes (!!!include()!!! in description)
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
@@ -422,14 +423,29 @@ export class MarkdownKanbanParser {
         }
 
         if (task.description) {
+          // Track which regular includes this task uses
+          const taskIncludes: string[] = [];
+
           let match;
           // Reset regex state
           includeRegex.lastIndex = 0;
           while ((match = includeRegex.exec(task.description)) !== null) {
             const includeFile = match[1].trim();
+
+            // Add to global list if not already present
             if (!includedFiles.includes(includeFile)) {
               includedFiles.push(includeFile);
             }
+
+            // Track this include for this specific task
+            if (!taskIncludes.includes(includeFile)) {
+              taskIncludes.push(includeFile);
+            }
+          }
+
+          // Store the list of regular includes for this task
+          if (taskIncludes.length > 0) {
+            task.regularIncludeFiles = taskIncludes;
           }
         }
       }

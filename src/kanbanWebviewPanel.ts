@@ -2113,40 +2113,54 @@ export class KanbanWebviewPanel {
                 // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-regular') {
-            // Regular include - regenerate board from registry
-            // Note: Main file structure hasn't changed, but include content has
+            // Regular include - find and update only affected tasks
             // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
-            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - regenerating board`);
+            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed: ${relativePath}`);
 
-            // CRITICAL: Send updated include content BEFORE board update
-            // This ensures frontend cache is updated before rendering
+            // CRITICAL: Send updated include content to frontend cache
             const content = file.getContent();
-            console.log(`[_sendIncludeFileUpdateToFrontend] Sending updated content first (${content.length} chars): ${relativePath}`);
+            console.log(`[_sendIncludeFileUpdateToFrontend] Sending updated content (${content.length} chars)`);
             this.queueMessage({
                 type: 'updateIncludeContent',
                 filePath: relativePath,
                 content: content
             });
 
-            // Invalidate cache and regenerate from registry
-            // This ensures column/task includes are properly loaded
-            this.invalidateBoardCache();
-            const board = this.getBoard();
-
-            if (board && board.valid) {
-                console.log(`[_sendIncludeFileUpdateToFrontend] Board regenerated, sending update to frontend`);
-                // Send full board update - frontend will re-render markdown with updated includes
-                await this.sendBoardUpdate(false, true);
-
-                // CRITICAL: Trigger re-render after board update (same as initial load)
-                // This ensures markdown-it re-processes includes with updated cache
-                console.log(`[_sendIncludeFileUpdateToFrontend] Triggering re-render for updated regular include`);
-                this.queueMessage({
-                    type: 'includesUpdated'
-                });
-            } else {
-                console.warn(`[_sendIncludeFileUpdateToFrontend] Board regeneration failed or invalid`);
+            // Find all tasks that use this regular include
+            const affectedTasks: Array<{task: KanbanTask, column: KanbanColumn}> = [];
+            for (const column of board.columns) {
+                for (const task of column.tasks) {
+                    // Check if this task has the regular include in its description
+                    if (task.regularIncludeFiles?.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
+                        affectedTasks.push({ task, column });
+                    }
+                }
             }
+
+            console.log(`[_sendIncludeFileUpdateToFrontend] Found ${affectedTasks.length} tasks using regular include: ${relativePath}`);
+
+            // Send targeted updates for each affected task
+            // IMPORTANT: Use queueMessage (not postMessage) to ensure cache update arrives BEFORE task updates
+            for (const {task, column} of affectedTasks) {
+                // Send task update with current description (frontend will re-render the markdown with updated cache)
+                this.queueMessage({
+                    type: 'updateTaskContent',
+                    columnId: column.id,
+                    taskId: task.id,
+                    description: task.description, // Same description, but frontend will re-render includes
+                    displayTitle: task.displayTitle,
+                    taskTitle: task.title,
+                    originalTitle: task.originalTitle,
+                    includeMode: false, // Regular includes are NOT includeMode
+                    regularIncludeFiles: task.regularIncludeFiles // Send the list so frontend knows what changed
+                });
+
+                console.log(`[_sendIncludeFileUpdateToFrontend] Queued task update for ${task.id} in column ${column.id}`);
+            }
+
+            // NOTE: No need for 'includesUpdated' message - updateTaskContent already triggers
+            // renderSingleColumn() for each affected column, which re-renders markdown with updated cache
+            console.log(`[_sendIncludeFileUpdateToFrontend] Completed targeted updates for ${affectedTasks.length} tasks`);
         }
     }
 
