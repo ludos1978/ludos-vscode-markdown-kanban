@@ -273,6 +273,13 @@ export class IncludeFileManager {
             console.log(`[IncludeFileManager] 🔄 Converted absolute to relative: ${relativePath}`);
         }
 
+        // BUGFIX: Normalize ./ prefix to match registry format
+        // Registry may store "root/file.md" but frontend sends "./root/file.md"
+        if (relativePath.startsWith('./')) {
+            relativePath = relativePath.substring(2);
+            console.log(`[IncludeFileManager] 🔄 Normalized path (removed ./): ${relativePath}`);
+        }
+
         // PERFORMANCE: Fast check using registration cache
         if (this.fileRegistry.isBeingRegistered(relativePath)) {
             console.debug(`[IncludeFileManager] ⏭️  Already being registered: ${relativePath}`);

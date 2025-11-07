@@ -444,18 +444,18 @@ export class KanbanWebviewPanel {
 
                     if (hasChanges && cachedBoard) {
                         // User edited the board - mark as having unsaved changes
-                        // NOTE: Do NOT generate markdown here - only during actual save operation
                         console.log('[markUnsavedChanges callback] User edited board - marking as unsaved changes');
 
                         // Track changes in include files (updates their cache)
                         await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
 
-                        // Mark main file as having unsaved changes (without updating content)
+                        // Update main file content from board (for verification sync)
                         const mainFile = this._getMainFile();
                         if (mainFile) {
-                            // CRITICAL FIX: Only mark as unsaved, do NOT update content here
-                            // Content generation happens ONLY during save operation
-                            mainFile.setContent(mainFile.getContent(), false); // Force hasUnsavedChanges = true
+                            // Generate markdown from cached board to keep backend in sync with frontend
+                            const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
+                            mainFile.setContent(markdown, false); // false = mark as unsaved
+                            console.log('[markUnsavedChanges callback] Updated main file content from board (not saved to disk yet)');
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -477,11 +477,13 @@ export class KanbanWebviewPanel {
 
                         // If we get here, it's a valid state change from frontend (marking something as changed)
                         if (cachedBoard) {
-                            // Frontend sent board changes - mark main file as having unsaved changes
-                            // CRITICAL FIX: Only mark as unsaved, do NOT update content here
+                            // Frontend sent board changes - update main file content and mark as unsaved
                             const mainFile = this._getMainFile();
                             if (mainFile) {
-                                mainFile.setContent(mainFile.getContent(), false); // Force hasUnsavedChanges = true
+                                // Generate markdown from cached board to keep backend in sync with frontend
+                                const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
+                                mainFile.setContent(markdown, false); // false = mark as unsaved
+                                console.log('[markUnsavedChanges callback] Updated main file content from board (edge case)');
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
