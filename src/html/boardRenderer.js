@@ -171,8 +171,14 @@ function ensureTagStyleExists(tagName) {
     if (!config) {
         return;
     }
-    
-    const isDarkTheme = document.body.classList.contains('vscode-dark') || 
+
+    // Safety check: ensure document.body exists before accessing classList
+    if (!document.body) {
+        console.warn('[applyTagHighlight] document.body not ready yet, skipping');
+        return;
+    }
+
+    const isDarkTheme = document.body.classList.contains('vscode-dark') ||
                         document.body.classList.contains('vscode-high-contrast');
     const themeKey = isDarkTheme ? 'dark' : 'light';
     
@@ -3135,8 +3141,14 @@ function generateTagStyles() {
     if (!window.tagColors) {
         return '';
     }
-    
-    const isDarkTheme = document.body.classList.contains('vscode-dark') || 
+
+    // Safety check: ensure document.body exists before accessing classList
+    if (!document.body) {
+        console.warn('[generateTagStyles] document.body not ready yet, skipping');
+        return '';
+    }
+
+    const isDarkTheme = document.body.classList.contains('vscode-dark') ||
                         document.body.classList.contains('vscode-high-contrast');
     const themeKey = isDarkTheme ? 'dark' : 'light';
     

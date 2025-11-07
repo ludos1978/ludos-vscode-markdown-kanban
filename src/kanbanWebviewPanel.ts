@@ -1513,6 +1513,45 @@ export class KanbanWebviewPanel {
             }
         }
 
+        // Load regular includes - send update for each one
+        const mainFile = this._fileRegistry.getMainFile();
+        if (mainFile) {
+            const regularIncludes = mainFile.getIncludedFiles();
+            console.log(`[_loadIncludeContentAsync] Loading ${regularIncludes.length} regular includes`);
+
+            for (const relativePath of regularIncludes) {
+                const file = this._fileRegistry.getByRelativePath(relativePath) as RegularIncludeFile;
+                if (file) {
+                    try {
+                        // Reload from disk
+                        await file.reload();
+                        const content = file.getContent();
+
+                        console.log(`[_loadIncludeContentAsync] Loaded regular include ${relativePath} (${content.length} chars)`);
+
+                        // Send update to frontend
+                        if (this._panel) {
+                            this.queueMessage({
+                                type: 'updateIncludeContent',
+                                filePath: relativePath,
+                                content: content
+                            });
+                        }
+                    } catch (error) {
+                        console.error(`[_loadIncludeContentAsync] Failed to load regular include ${relativePath}:`, error);
+                    }
+                }
+            }
+
+            // Trigger re-render after all regular includes are loaded
+            if (regularIncludes.length > 0 && this._panel) {
+                console.log(`[_loadIncludeContentAsync] All ${regularIncludes.length} regular includes loaded - triggering re-render`);
+                this.queueMessage({
+                    type: 'includesUpdated'
+                });
+            }
+        }
+
         console.log('[_loadIncludeContentAsync] All include content loaded');
     }
 
@@ -1624,6 +1663,45 @@ export class KanbanWebviewPanel {
                         }
                     }
                 }
+            }
+        }
+
+        // Sync regular includes (!!!include(path)!!! in task descriptions)
+        const regularIncludes = mainFile.getIncludedFiles();
+        console.log(`[KanbanWebviewPanel] Found ${regularIncludes.length} regular includes to sync`);
+
+        for (const relativePath of regularIncludes) {
+            const existingFile = this._fileRegistry.getByRelativePath(relativePath);
+
+            // Check if file exists with WRONG type
+            if (existingFile && existingFile.getFileType() !== 'include-regular') {
+                console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-regular! Replacing...`);
+                this._fileRegistry.unregister(relativePath);
+            }
+
+            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
+                console.log(`[KanbanWebviewPanel] Creating RegularIncludeFile: ${relativePath}`);
+
+                const regularInclude = this._fileFactory.createRegularInclude(
+                    relativePath,
+                    mainFile,
+                    true // Regular includes are inline
+                );
+
+                // Register and start watching
+                this._fileRegistry.register(regularInclude);
+                regularInclude.startWatching();
+
+                // Register with coordinator
+                if (this._changeCoordinator) {
+                    this._changeCoordinator.registerIncludeFile(
+                        relativePath,
+                        'regular',
+                        regularInclude.getPath()
+                    );
+                }
+
+                createdCount++;
             }
         }
 
@@ -2040,6 +2118,16 @@ export class KanbanWebviewPanel {
             // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
             console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - regenerating board`);
 
+            // CRITICAL: Send updated include content BEFORE board update
+            // This ensures frontend cache is updated before rendering
+            const content = file.getContent();
+            console.log(`[_sendIncludeFileUpdateToFrontend] Sending updated content first (${content.length} chars): ${relativePath}`);
+            this.queueMessage({
+                type: 'updateIncludeContent',
+                filePath: relativePath,
+                content: content
+            });
+
             // Invalidate cache and regenerate from registry
             // This ensures column/task includes are properly loaded
             this.invalidateBoardCache();
@@ -2049,6 +2137,13 @@ export class KanbanWebviewPanel {
                 console.log(`[_sendIncludeFileUpdateToFrontend] Board regenerated, sending update to frontend`);
                 // Send full board update - frontend will re-render markdown with updated includes
                 await this.sendBoardUpdate(false, true);
+
+                // CRITICAL: Trigger re-render after board update (same as initial load)
+                // This ensures markdown-it re-processes includes with updated cache
+                console.log(`[_sendIncludeFileUpdateToFrontend] Triggering re-render for updated regular include`);
+                this.queueMessage({
+                    type: 'includesUpdated'
+                });
             } else {
                 console.warn(`[_sendIncludeFileUpdateToFrontend] Board regeneration failed or invalid`);
             }

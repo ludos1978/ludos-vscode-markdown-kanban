@@ -776,6 +776,12 @@ function addPlantUMLRenderer(md) {
 function renderMarkdown(text) {
     if (!text) {return '';}
 
+    // Debug logging to trace include rendering
+    const hasInclude = text.includes('!!!include(');
+    if (hasInclude) {
+        console.log('[renderMarkdown] 🔍 Processing text with include directive:', text.substring(0, 100));
+    }
+
     try {
         // Get HTML rendering settings
         const htmlCommentRenderMode = window.configManager?.getConfig('htmlCommentRenderMode', 'hidden') ?? 'hidden';

@@ -212,10 +212,14 @@ export class UnifiedChangeHandler {
 
     /**
      * Notify parent of changes (for include files)
+     *
+     * NOTE: This is intentionally minimal because the file registry change notification
+     * already triggers proper updates through _handleFileRegistryChange -> _sendIncludeFileUpdateToFrontend
+     * Adding additional board updates here would cause duplicate updates and race conditions.
      */
     private async notifyParentOfChange(file: MarkdownFile): Promise<void> {
-        // This would need to be implemented to notify the parent file registry
-        // For now, this is a placeholder
-        console.log(`[UnifiedChangeHandler] Notifying parent of change for ${file.getFileType()}:${file.getPath()}`);
+        console.log(`[UnifiedChangeHandler] Include file change will be handled by file registry notification system`);
+        console.log(`[UnifiedChangeHandler]   File: ${file.getFileType()}:${file.getPath()}`);
+        // The file registry change notification system handles the rest
     }
 }

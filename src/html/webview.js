@@ -2621,11 +2621,13 @@ window.addEventListener('message', event => {
             // Save folding state before re-render
             saveCurrentFoldingState();
             const isEditing = window.taskEditor && window.taskEditor.currentEditor;
-            
-            
+
+
             if (!isEditing && !shouldSkipRender) {
                 // Only render if not editing and not explicitly skipping
-                debouncedRenderBoard();
+                if (typeof window.renderBoard === 'function') {
+                    window.renderBoard();
+                }
                 
                 // Apply default folding if this is from an external change
                 if (message.applyDefaultFolding) {
@@ -2737,15 +2739,25 @@ window.addEventListener('message', event => {
             break;
         case 'includeFileContent':
             // Handle include file content response from backend
+            console.log('[webview.js] 📨 Received includeFileContent:', message.filePath);
+            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
             if (typeof window.updateIncludeFileCache === 'function') {
+                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
                 window.updateIncludeFileCache(message.filePath, message.content);
+            } else {
+                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }
             break;
 
         case 'updateIncludeContent':
             // Handle processed include content from backend
+            console.log('[webview.js] 📨 Received updateIncludeContent:', message.filePath);
+            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
             if (typeof window.updateIncludeFileCache === 'function') {
+                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
                 window.updateIncludeFileCache(message.filePath, message.content);
+            } else {
+                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }
             break;
 
