@@ -1440,7 +1440,7 @@ function getDebugOverlayStyles() {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: var(--whitespace-div2);
+            padding: var(--whitespace-div4) var(--whitespace-div2);
             border-bottom: 1px solid var(--vscode-panel-border);
             background: var(--vscode-titleBar-activeBackground);
         }
@@ -1474,6 +1474,8 @@ function getDebugOverlayStyles() {
             background: var(--vscode-errorForeground);
             color: white;
             font-weight: bold;
+            width: 18px;
+            height: 18px;
         }
 
         .debug-content {
@@ -1569,7 +1571,7 @@ function getDebugOverlayStyles() {
 
         /* File States Overview Styles */
         .file-states-section {
-            padding: 8px;
+            padding: var(--whitespace-div4) var(--whitespace-div2);
         }
 
         .file-states-stats {
@@ -1808,6 +1810,10 @@ function getDebugOverlayStyles() {
             font-size: 13px;
         }
 
+        .file-row {
+            height: 44px;
+        }
+
         .files-table thead {
             border-bottom: 2px solid var(--vscode-panel-border);
         }
@@ -1891,7 +1897,7 @@ function getDebugOverlayStyles() {
             font-size: 9px;
             color: var(--vscode-descriptionForeground);
             font-family: var(--vscode-editor-font-family);
-            margin-bottom: 3px;
+            margin-top: 6px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;

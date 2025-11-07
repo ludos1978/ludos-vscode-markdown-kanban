@@ -167,6 +167,18 @@ body {
   font-weight: bold;
 }
 
+/* File States Button (formerly refresh-btn) */
+.refresh-btn {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-color: var(--vscode-button-border);
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
 .refresh-btn.pending {
   background: var(--vscode-inputValidation-warningBackground);
   color: var(--vscode-inputValidation-warningForeground);
@@ -1472,9 +1484,9 @@ body.vscode-high-contrast-light .task-count {
 /* Fold buttons */
 .fold-all-btn,
 .global-fold-btn {
-  background: none;
-  border: none;
-  color: var(--vscode-foreground);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-color: var(--vscode-button-border);
   cursor: pointer;
   border-radius: 3px;
   transition: all 0.2s;
@@ -1487,29 +1499,25 @@ body.vscode-high-contrast-light .task-count {
   padding: 2px 4px;
   font-size: 10px;
   line-height: 1;
-  opacity: 0.6;
   min-width: 16px;
   height: 16px;
 }
 
 .fold-all-btn:hover {
-  opacity: 1;
-  background-color: var(--vscode-list-hoverBackground);
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .global-fold-btn {
   padding: 4px 8px;
   font-size: 12px;
   line-height: 1;
-  opacity: 0.7;
   gap: 4px;
   flex-shrink: 0;
   margin-left: 8px;
 }
 
 .global-fold-btn:hover {
-  opacity: 1;
-  background-color: var(--vscode-list-hoverBackground);
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .fold-icon,
@@ -1611,21 +1619,19 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-bar-menu-btn {
-  background: none;
-  border: none;
-  color: var(--vscode-titleBar-activeForeground);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-color: var(--vscode-button-border);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 16px;
   line-height: 1;
-  opacity: 0.8;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   border-radius: 3px;
 }
 
 .file-bar-menu-btn:hover {
-  opacity: 1;
-  background-color: var(--vscode-list-hoverBackground);
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .donut-menu-dropdown,
@@ -4036,9 +4042,9 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 
 /* Sort button */
 .sort-btn {
-    background: none;
-    border: none;
-    color: var(--vscode-foreground);
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border-color: var(--vscode-button-border);
     cursor: pointer;
     border-radius: 3px;
     transition: all 0.2s;
@@ -4048,15 +4054,13 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     padding: 4px 8px;
     font-size: 12px;
     line-height: 1;
-    opacity: 0.7;
     gap: 4px;
     flex-shrink: 0;
     margin-left: 8px;
 }
 
 .sort-btn:hover {
-    opacity: 1;
-    background-color: var(--vscode-list-hoverBackground);
+    background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .sort-icon {
