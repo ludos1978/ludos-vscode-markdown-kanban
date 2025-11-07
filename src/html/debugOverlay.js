@@ -2532,6 +2532,14 @@ function initializeDebugOverlay() {
                 }
                 break;
 
+            case 'individualFileReloaded':
+                // After individual file reload completes, automatically re-verify sync status
+                console.log('[DebugOverlay] individualFileReloaded received, triggering verification');
+                if (debugOverlayVisible && message.success) {
+                    verifyContentSync(true); // Silent mode
+                }
+                break;
+
             case 'forceWriteAllResult':
                 // Clear pending flag
                 pendingForceWrite = false;

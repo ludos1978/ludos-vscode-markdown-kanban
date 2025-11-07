@@ -3102,11 +3102,24 @@ export class MessageHandler {
             console.log(`[MessageHandler] Reloading individual file ${filePath} (isMainFile: ${isMainFile})`);
 
             if (isMainFile) {
-                // Reload the main file by refreshing from the document
+                // Reload ONLY the main kanban file (not includes)
+                // Get the file registry and main file
+                const fileRegistry = (panel as any)._fileRegistry;
+                const mainFile = fileRegistry?.getMainFile();
+                if (!mainFile) {
+                    throw new Error('Main file not found in registry');
+                }
+
+                // Reload the file from disk
+                await mainFile.reloadFromDisk();
+
+                // Reload the document to refresh the board
                 const document = this._fileManager.getDocument();
                 if (document) {
                     await panel.loadMarkdownFile(document);
                 }
+
+                console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileReloaded',
@@ -3114,8 +3127,11 @@ export class MessageHandler {
                     isMainFile: true,
                     success: true
                 });
+
+                // Send updated debug info immediately after reload
+                await this.handleGetTrackedFilesDebugInfo();
             } else {
-                // For include files, use the file registry
+                // For include files, get the file from the registry
                 const fileRegistry = (panel as any)._fileRegistry;
                 if (!fileRegistry) {
                     throw new Error('File registry not available');
@@ -3127,6 +3143,7 @@ export class MessageHandler {
                 }
 
                 // Reload the file from disk
+                console.log(`[MessageHandler] Reloading ${filePath}`);
                 await file.reloadFromDisk();
 
                 // Trigger webview refresh to show updated content
@@ -3137,12 +3154,16 @@ export class MessageHandler {
 
                 console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
 
+                // Send success message to frontend
                 panel._panel.webview.postMessage({
                     type: 'individualFileReloaded',
                     filePath: filePath,
                     isMainFile: false,
                     success: true
                 });
+
+                // Send updated debug info immediately after reload
+                await this.handleGetTrackedFilesDebugInfo();
             }
 
         } catch (error) {
