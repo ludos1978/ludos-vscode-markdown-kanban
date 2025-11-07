@@ -14,19 +14,23 @@ export class PresentationParser {
    *
    * Format:
    * With title:
-   *   ---
    *   [1 blank line]
    *   Title
    *   [1 blank line]
    *   Description
+   *   [1 blank line]
    *   ---
+   *   [next slide...]
    *
    * Without title (description only):
-   *   ---
    *   [2+ blank lines]
    *
    *   Description
+   *   [1 blank line]
    *   ---
+   *   [next slide...]
+   *
+   * Note: Any '---' at the beginning or end of the file are ignored (treated as empty slides)
    */
   static parsePresentation(content: string): PresentationSlide[] {
     if (!content || !content.trim()) {
@@ -118,20 +122,24 @@ export class PresentationParser {
    *
    * Format:
    * With title:
-   *   ---
    *   [1 blank line]
    *   Title
    *   [1 blank line]
    *   Description
+   *   [1 blank line]
    *   ---
+   *   [next slide...]
    *
    * Without title (description only):
-   *   ---
    *   [3 blank lines]
    *
    *
    *   Description
+   *   [1 blank line]
    *   ---
+   *   [next slide...]
+   *
+   * Note: No --- at the beginning or end of the file, only between slides
    */
   static tasksToPresentation(tasks: KanbanTask[]): string {
     if (!tasks || tasks.length === 0) {
@@ -175,8 +183,15 @@ export class PresentationParser {
     });
 
     // Join slides with slide separators
-    // Format: ---\n[slide1]\n---\n[slide2]\n---\n
-    return '---' + slides.filter(slide => slide).join('\n---\n') + '\n---\n';
+    // Format: [slide1]\n---\n[slide2]\n---\n[slide3]
+    // Note: We don't add --- at the beginning or end - only between slides
+    const filteredSlides = slides.filter(slide => slide);
+    if (filteredSlides.length === 0) {
+      return '';
+    }
+
+    // Join slides with --- separator between them (not at start/end)
+    return filteredSlides.join('\n---\n');
   }
 
   /**

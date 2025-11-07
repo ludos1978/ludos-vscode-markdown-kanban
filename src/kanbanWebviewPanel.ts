@@ -1538,6 +1538,14 @@ export class KanbanWebviewPanel {
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
+                    const existingFile = this._fileRegistry.getByRelativePath(relativePath);
+
+                    // Check if file exists with WRONG type - this can happen if inline includes register before board sync
+                    if (existingFile && existingFile.getFileType() !== 'include-column') {
+                        console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-column! Replacing...`);
+                        this._fileRegistry.unregister(relativePath);
+                    }
+
                     if (!this._fileRegistry.hasByRelativePath(relativePath)) {
                         console.log(`[KanbanWebviewPanel] Creating ColumnIncludeFile: ${relativePath}`);
 
@@ -1575,6 +1583,14 @@ export class KanbanWebviewPanel {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
+                        const existingFile = this._fileRegistry.getByRelativePath(relativePath);
+
+                        // Check if file exists with WRONG type - this can happen if inline includes register before board sync
+                        if (existingFile && existingFile.getFileType() !== 'include-task') {
+                            console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-task! Replacing...`);
+                            this._fileRegistry.unregister(relativePath);
+                        }
+
                         if (!this._fileRegistry.hasByRelativePath(relativePath)) {
                             console.log(`[KanbanWebviewPanel] Creating TaskIncludeFile: ${relativePath}`);
 

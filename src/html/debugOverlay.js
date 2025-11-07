@@ -334,18 +334,6 @@ function createDebugOverlayContent() {
                     <button onclick="toggleDebugOverlaySticky()" class="debug-btn debug-pin-btn">
                         📌 Pin
                     </button>
-                    <button onclick="refreshDebugOverlay()" class="debug-btn">
-                        🔄 Refresh
-                    </button>
-                    <button onclick="reloadAllIncludedFiles()" class="debug-btn">
-                        🔄 Reload All
-                    </button>
-                    <button onclick="verifyContentSync()" class="debug-btn debug-verify-btn" title="Verify frontend/backend content synchronization">
-                        🔍 Verify Sync
-                    </button>
-                    <button onclick="forceWriteAllContent()" class="debug-btn debug-force-write-btn" title="Force write all files (emergency recovery)">
-                        ⚠️ Force Save All
-                    </button>
                     <button onclick="hideDebugOverlay()" class="debug-close">
                         ✕
                     </button>
@@ -808,7 +796,22 @@ function getFileSyncStatus(filePath) {
         return null;
     }
 
-    return lastVerificationResults.fileResults.find(f => f.path === filePath);
+    // Normalize path for comparison (remove ./ prefix and get basename for main files)
+    const normalizedInputPath = filePath.replace(/^\.\//, '');
+    const inputBasename = filePath.split('/').pop();
+
+    return lastVerificationResults.fileResults.find(f => {
+        const resultPath = f.path.replace(/^\.\//, '');
+        const resultBasename = f.path.split('/').pop();
+
+        // Try multiple matching strategies:
+        // 1. Exact match on normalized paths
+        // 2. Match on basenames (for main file which might be full path vs filename)
+        // 3. Match if input path ends with result path (for absolute vs relative)
+        return resultPath === normalizedInputPath ||
+               resultBasename === inputBasename ||
+               normalizedInputPath.endsWith(resultPath);
+    });
 }
 
 /**
@@ -921,12 +924,24 @@ function createSyncDetailsSection() {
 function createFileStatesList(allFiles) {
     return `
         <div class="files-table-container">
+            <div class="files-table-actions">
+                <button onclick="verifyContentSync()" class="debug-btn" title="Re-verify all hashes and sync status">
+                    🔍 Verify Sync
+                </button>
+                <button onclick="forceWriteAllContent()" class="debug-btn" title="Force write all files (emergency recovery)">
+                    ⚠️ Force Save All
+                </button>
+                <button onclick="reloadAllIncludedFiles()" class="debug-btn" title="Reload all included files from disk">
+                    🔄 Reload All
+                </button>
+            </div>
             <table class="files-table">
                 <thead>
                     <tr>
                         <th class="col-file">File</th>
-                        <th class="col-sync-backend" title="Frontend → Backend sync status">BE</th>
-                        <th class="col-sync-saved" title="Frontend → Saved file sync status">SF</th>
+                        <th class="col-frontend" title="Frontend board state">Frontend</th>
+                        <th class="col-backend" title="Backend cache state">Backend</th>
+                        <th class="col-saved" title="Saved file on disk">Saved File</th>
                         <th class="col-actions">Save/Load</th>
                         <th class="col-image">Image</th>
                     </tr>
@@ -938,43 +953,59 @@ function createFileStatesList(allFiles) {
                         // Get sync status from verification results
                         const syncStatus = getFileSyncStatus(file.path);
 
-                        // Backend sync (Frontend → Backend)
-                        let backendIcon = '⚪';
-                        let backendTitle = 'Not verified yet';
-                        let backendClass = 'sync-unknown';
+                        // Frontend data
+                        let frontendHash = 'N/A';
+                        let frontendChars = '?';
+                        let frontendDisplay = '⚪ Not verified';
 
-                        // Saved file sync (Frontend → Saved)
+                        // Backend data and sync status
+                        let backendHash = 'N/A';
+                        let backendChars = '?';
+                        let backendIcon = '⚪';
+                        let backendClass = 'sync-unknown';
+                        let backendDisplay = '⚪ Not verified';
+
+                        // Saved file data and sync status
+                        let savedHash = 'N/A';
+                        let savedChars = '?';
                         let savedIcon = '⚪';
-                        let savedTitle = 'Not verified yet';
                         let savedClass = 'sync-unknown';
+                        let savedDisplay = '⚪ Not verified';
 
                         if (syncStatus) {
-                            // Backend status
+                            // Frontend data (always available from verification)
+                            frontendHash = syncStatus.frontendHash || 'N/A';
+                            frontendChars = syncStatus.frontendContentLength || 0;
+                            frontendDisplay = `${frontendHash}<br><span class="char-count">${frontendChars} chars</span>`;
+
+                            // Backend data and sync
+                            backendHash = syncStatus.backendHash || 'N/A';
+                            backendChars = syncStatus.backendContentLength || 0;
+
                             if (syncStatus.frontendBackendMatch) {
                                 backendIcon = '✅';
                                 backendClass = 'sync-good';
-                                backendTitle = `Backend synced with frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nBackend: ${syncStatus.backendHash} (${syncStatus.backendContentLength} chars)`;
                             } else {
                                 backendIcon = '⚠️';
                                 backendClass = 'sync-warn';
-                                backendTitle = `Backend differs from frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nBackend: ${syncStatus.backendHash} (${syncStatus.backendContentLength} chars)\nDifference: ${syncStatus.frontendBackendDiff} chars`;
                             }
+                            backendDisplay = `${backendIcon} ${backendHash}<br><span class="char-count">${backendChars} chars</span>`;
 
-                            // Saved file status
+                            // Saved file data and sync
                             if (syncStatus.savedHash) {
+                                savedHash = syncStatus.savedHash;
+                                savedChars = syncStatus.savedContentLength || 0;
+
                                 if (syncStatus.frontendSavedMatch) {
                                     savedIcon = '✅';
                                     savedClass = 'sync-good';
-                                    savedTitle = `Saved file synced with frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nSaved: ${syncStatus.savedHash} (${syncStatus.savedContentLength} chars)`;
                                 } else {
                                     savedIcon = '⚠️';
                                     savedClass = 'sync-warn';
-                                    savedTitle = `Saved file differs from frontend\nFrontend: ${syncStatus.frontendHash} (${syncStatus.frontendContentLength} chars)\nSaved: ${syncStatus.savedHash} (${syncStatus.savedContentLength} chars)\nDifference: ${syncStatus.frontendSavedDiff} chars`;
                                 }
+                                savedDisplay = `${savedIcon} ${savedHash}<br><span class="char-count">${savedChars} chars</span>`;
                             } else {
-                                savedIcon = '❓';
-                                savedClass = 'sync-unknown';
-                                savedTitle = 'Saved file not available';
+                                savedDisplay = '❓ Not available';
                             }
                         }
 
@@ -995,15 +1026,20 @@ function createFileStatesList(allFiles) {
                                         ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
                                     </div>
                                 </td>
-                                <td class="col-sync-backend">
-                                    <span class="status-icon sync-status-icon ${backendClass}" title="${backendTitle}">
-                                        ${backendIcon}
-                                    </span>
+                                <td class="col-frontend">
+                                    <div class="hash-display">
+                                        ${frontendDisplay}
+                                    </div>
                                 </td>
-                                <td class="col-sync-saved">
-                                    <span class="status-icon sync-status-icon ${savedClass}" title="${savedTitle}">
-                                        ${savedIcon}
-                                    </span>
+                                <td class="col-backend">
+                                    <div class="hash-display ${backendClass}">
+                                        ${backendDisplay}
+                                    </div>
+                                </td>
+                                <td class="col-saved">
+                                    <div class="hash-display ${savedClass}">
+                                        ${savedDisplay}
+                                    </div>
                                 </td>
                                 <td class="col-actions">
                                     <div class="action-buttons">
@@ -1022,31 +1058,21 @@ function createFileStatesList(allFiles) {
                 </tbody>
             </table>
 
-            ${createSyncDetailsSection()}
-
             <div class="icon-legend">
                 <div class="legend-section">
-                    <div class="legend-title">Sync Status (Frontend as baseline):</div>
+                    <div class="legend-title">Sync Status Icons:</div>
                     <div class="legend-items">
                         <div class="legend-item">
-                            <span class="legend-icon">BE</span>
-                            <span class="legend-text">Backend sync</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-icon">SF</span>
-                            <span class="legend-text">Saved file sync</span>
-                        </div>
-                        <div class="legend-item">
                             <span class="legend-icon">✅</span>
-                            <span class="legend-text">Synced</span>
+                            <span class="legend-text">Matches Frontend</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-icon">⚠️</span>
-                            <span class="legend-text">Differs</span>
+                            <span class="legend-text">Differs from Frontend</span>
                         </div>
                         <div class="legend-item">
                             <span class="legend-icon">⚪</span>
-                            <span class="legend-text">Unknown</span>
+                            <span class="legend-text">Not Verified</span>
                         </div>
                     </div>
                 </div>
@@ -1816,20 +1842,27 @@ function getDebugOverlayStyles() {
         }
 
         .col-file {
-            width: 60%;
-            min-width: 200px;
+            width: 20%;
         }
+        
+        .col-frontend,
+        .col-backend,
+        .col-saved {
+            width: 20%;
+        }
+        .col-actions {
+            width: 12%;
+        }
+        .col-image {
+            width: 8%;
+        }
+
 
         .col-sync-backend, .col-sync-saved {
             width: 8%;
             text-align: center;
             font-size: 10px;
             font-weight: 600;
-        }
-
-        .col-actions {
-            width: 25%;
-            text-align: center;
         }
 
         .sync-status-icon.sync-good {
@@ -1981,6 +2014,8 @@ function getDebugOverlayStyles() {
             // margin-top: 12px;
             padding-top: 4px;
             border-top: 1px solid var(--vscode-panel-border);
+            display: grid;
+            grid-template-columns: repeat(1, 1fr);
         }
 
         .legend-title {
@@ -1993,7 +2028,7 @@ function getDebugOverlayStyles() {
 
         .legend-items {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(1, 1fr);
             gap: 4px 12px;
         }
 
