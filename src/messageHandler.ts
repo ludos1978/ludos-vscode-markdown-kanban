@@ -3000,9 +3000,35 @@ export class MessageHandler {
             console.log(`[MessageHandler] Saving individual file ${filePath} (forceSave: ${forceSave})`);
 
             if (isMainFile) {
-                // Save the main kanban file by triggering the existing save mechanism
-                // Force save bypasses any change detection
-                await panel.saveToMarkdown();
+                // Save ONLY the main kanban file (not includes)
+                // Get the file service and board
+                const fileService = (panel as any)._fileService;
+                const board = fileService?.board();
+
+                if (!board || !board.valid) {
+                    throw new Error('Invalid board state');
+                }
+
+                // Generate markdown from current board
+                const MarkdownKanbanParser = require('./markdownParser').MarkdownKanbanParser;
+                const markdown = MarkdownKanbanParser.generateMarkdown(board);
+
+                // Get main file from registry and save it directly
+                const fileRegistry = (panel as any)._fileRegistry;
+                const mainFile = fileRegistry?.getMainFile();
+                if (!mainFile) {
+                    throw new Error('Main file not found in registry');
+                }
+
+                // Use save coordinator to save only the main file
+                const saveCoordinator = (fileService as any)._saveCoordinator;
+                await saveCoordinator.saveFile(mainFile, markdown);
+
+                // Update main file state after save
+                mainFile.updateFromBoard(board);
+                mainFile.setContent(markdown, true); // true = update baseline
+
+                console.log(`[MessageHandler] Successfully saved ${filePath}`);
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileSaved',
@@ -3073,6 +3099,8 @@ export class MessageHandler {
                 return;
             }
 
+            console.log(`[MessageHandler] Reloading individual file ${filePath} (isMainFile: ${isMainFile})`);
+
             if (isMainFile) {
                 // Reload the main file by refreshing from the document
                 const document = this._fileManager.getDocument();
@@ -3087,72 +3115,34 @@ export class MessageHandler {
                     success: true
                 });
             } else {
-                // For include files, reload content from disk
-                const includeFileMap = (panel as any)._includeFiles;
-                const includeFile = includeFileMap?.get(filePath);
-
-
-                if (includeFile) {
-                    try {
-                        // Read fresh content from disk
-                        const freshContent = await (panel as any)._readFileContent(filePath);
-
-                        if (freshContent !== null) {
-                            // Update content and reset baseline
-                            includeFile.content = freshContent;
-                            includeFile.baseline = freshContent;
-                            includeFile.hasUnsavedChanges = false;
-                            includeFile.hasExternalChanges = false; // Clear external changes flag
-                            includeFile.isUnsavedInEditor = false; // Clear editor unsaved flag
-                            includeFile.externalContent = undefined; // Clear external content
-                            includeFile.lastModified = Date.now();
-
-
-                            // Trigger webview refresh to show updated content
-                            const document = this._fileManager.getDocument();
-                            if (document) {
-                                await panel.loadMarkdownFile(document);
-                            }
-
-                            panel._panel.webview.postMessage({
-                                type: 'individualFileReloaded',
-                                filePath: filePath,
-                                isMainFile: false,
-                                success: true
-                            });
-                        } else {
-                            console.warn(`[MessageHandler] Could not read include file: ${filePath}`);
-
-                            panel._panel.webview.postMessage({
-                                type: 'individualFileReloaded',
-                                filePath: filePath,
-                                isMainFile: false,
-                                success: false,
-                                error: 'Could not read file from disk'
-                            });
-                        }
-                    } catch (readError) {
-                        console.error(`[MessageHandler] Error reading include file ${filePath}:`, readError);
-
-                        panel._panel.webview.postMessage({
-                            type: 'individualFileReloaded',
-                            filePath: filePath,
-                            isMainFile: false,
-                            success: false,
-                            error: readError instanceof Error ? readError.message : String(readError)
-                        });
-                    }
-                } else {
-                    console.warn(`[MessageHandler] Include file not tracked: ${filePath}`);
-
-                    panel._panel.webview.postMessage({
-                        type: 'individualFileReloaded',
-                        filePath: filePath,
-                        isMainFile: false,
-                        success: false,
-                        error: 'File not tracked'
-                    });
+                // For include files, use the file registry
+                const fileRegistry = (panel as any)._fileRegistry;
+                if (!fileRegistry) {
+                    throw new Error('File registry not available');
                 }
+
+                const file = fileRegistry.get(filePath);
+                if (!file) {
+                    throw new Error(`File not found in registry: ${filePath}`);
+                }
+
+                // Reload the file from disk
+                await file.reloadFromDisk();
+
+                // Trigger webview refresh to show updated content
+                const document = this._fileManager.getDocument();
+                if (document) {
+                    await panel.loadMarkdownFile(document);
+                }
+
+                console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
+
+                panel._panel.webview.postMessage({
+                    type: 'individualFileReloaded',
+                    filePath: filePath,
+                    isMainFile: false,
+                    success: true
+                });
             }
 
         } catch (error) {

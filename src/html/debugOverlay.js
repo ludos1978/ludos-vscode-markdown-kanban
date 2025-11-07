@@ -927,7 +927,8 @@ function createFileStatesList(allFiles) {
                         <th class="col-file">File</th>
                         <th class="col-sync-backend" title="Frontend → Backend sync status">BE</th>
                         <th class="col-sync-saved" title="Frontend → Saved file sync status">SF</th>
-                        <th class="col-actions">Actions</th>
+                        <th class="col-actions">Save/Load</th>
+                        <th class="col-image">Image</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1008,7 +1009,11 @@ function createFileStatesList(allFiles) {
                                     <div class="action-buttons">
                                         <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
                                         <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">🔄</button>
-                                        <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload images">🖼️</button>
+                                    </div>
+                                </td>
+                                <td class="col-image">
+                                    <div class="action-buttons">
+                                        <button onclick="reloadImages()" class="action-btn reload-images-btn" title="Reload all images in the board">🖼️</button>
                                     </div>
                                 </td>
                             </tr>
