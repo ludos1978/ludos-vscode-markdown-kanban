@@ -136,24 +136,8 @@
 
   // Function to update cache when file content is received
   function updateFileCache(filePath, content) {
-    // Remove from pending requests
     pendingRequests.delete(filePath);
-
-    // Update cache
     fileCache.set(filePath, content);
-
-    // Register this inline include in the backend's unified system for conflict resolution
-    if (typeof vscode !== 'undefined') {
-      try {
-        vscode.postMessage({
-          type: 'registerInlineInclude',
-          filePath: filePath,
-          content: content
-        });
-      } catch (error) {
-        console.error('Error registering inline include:', error);
-      }
-    }
   }
 
   // Helper function for HTML escaping - now using global ValidationUtils.escapeHtml
