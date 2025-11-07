@@ -742,7 +742,7 @@ export class KanbanWebviewPanel {
         return localResourceRoots;
     }
 
-    private async _getLayoutPresetsConfiguration(): Promise<any> {
+    private _getLayoutPresetsConfiguration(): any {
         const userPresets = configService.getConfig('layoutPresets', {});
 
         // Default presets as fallback

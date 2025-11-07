@@ -4601,6 +4601,9 @@ function applyLayoutPreset(presetKey) {
     const preset = layoutPresets[presetKey];
     if (!preset) { return; }
 
+    // Track if any height-related settings changed
+    let needsRecalculation = false;
+
     // Apply each setting in the preset
     Object.entries(preset.settings).forEach(([settingKey, value]) => {
         switch (settingKey) {
@@ -4609,12 +4612,15 @@ function applyLayoutPreset(presetKey) {
                 break;
             case 'cardHeight':
                 setTaskMinHeight(value);
+                needsRecalculation = true;
                 break;
             case 'sectionHeight':
                 setSectionHeight(value);
+                needsRecalculation = true;
                 break;
             case 'taskSectionHeight':
                 setTaskSectionHeight(value);
+                needsRecalculation = true;
                 break;
             case 'fontSize':
                 setFontSize(value);
@@ -4624,9 +4630,11 @@ function applyLayoutPreset(presetKey) {
                 break;
             case 'layoutRows':
                 setLayoutRows(value);
+                needsRecalculation = true; // layoutRows already triggers renderBoard internally
                 break;
             case 'rowHeight':
                 setRowHeight(value);
+                needsRecalculation = true;
                 break;
             case 'stickyStackMode':
                 setStickyStackMode(value);
@@ -4667,6 +4675,16 @@ function applyLayoutPreset(presetKey) {
     // Update all menu indicators
     updateAllMenuIndicators();
     updateLayoutPresetsActiveState();
+
+    // Recalculate board layout if any height-related settings changed
+    // Note: layoutRows already triggers renderBoard internally, but we need to ensure
+    // other height changes also trigger recalculation
+    if (needsRecalculation && currentBoard) {
+        // Use setTimeout to ensure all CSS changes are applied first
+        setTimeout(() => {
+            renderBoard(); // Full board re-render to recalculate positions
+        }, 50);
+    }
 }
 
 /**
