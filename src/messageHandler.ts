@@ -3110,13 +3110,28 @@ export class MessageHandler {
                     throw new Error('Main file not found in registry');
                 }
 
-                // Reload the file from disk
-                await mainFile.reloadFromDisk();
+                // Force reload the file from disk (bypass mtime check AND open document)
+                console.log(`[MessageHandler] Force reloading ${filePath} from ACTUAL disk file (not open document)`);
+                const fs = require('fs').promises;
+                const freshContent = await fs.readFile(filePath, 'utf-8');
+                mainFile.setContent(freshContent, true); // true = update baseline
+                console.log(`[MessageHandler] Successfully force reloaded ${filePath} (${freshContent.length} chars) from disk`);
 
-                // Reload the document to refresh the board
-                const document = this._fileManager.getDocument();
-                if (document) {
-                    await panel.loadMarkdownFile(document);
+                // Re-parse the board from the fresh content
+                (mainFile as any).parseToBoard();
+
+                // Get the fresh board and send it to frontend
+                const fileService = (panel as any)._fileService;
+                const freshBoard = mainFile.getBoard();
+                if (freshBoard && freshBoard.valid) {
+                    // Force update the file service board
+                    fileService.setBoard(freshBoard);
+
+                    // Send the fresh board to frontend
+                    await fileService.sendBoardUpdate(false, false); // don't preserve selection, don't force reload
+                    console.log(`[MessageHandler] Sent fresh board to frontend after reload`);
+                } else {
+                    console.warn(`[MessageHandler] Board invalid after parsing reloaded content`);
                 }
 
                 console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
@@ -3128,8 +3143,7 @@ export class MessageHandler {
                     success: true
                 });
 
-                // Send updated debug info immediately after reload
-                await this.handleGetTrackedFilesDebugInfo();
+                // Debug info will be updated automatically by verification trigger
             } else {
                 // For include files, get the file from the registry
                 const fileRegistry = (panel as any)._fileRegistry;
@@ -3137,22 +3151,38 @@ export class MessageHandler {
                     throw new Error('File registry not available');
                 }
 
-                const file = fileRegistry.get(filePath);
+                // Convert relative path to absolute if needed
+                const absolutePath = filePath.startsWith('/')
+                    ? filePath
+                    : require('path').join(this._fileManager.getDocument()!.uri.fsPath.replace(/[^\/]+$/, ''), filePath);
+
+                const file = fileRegistry.get(absolutePath);
                 if (!file) {
-                    throw new Error(`File not found in registry: ${filePath}`);
+                    throw new Error(`File not found in registry: ${absolutePath}`);
                 }
 
-                // Reload the file from disk
-                console.log(`[MessageHandler] Reloading ${filePath}`);
-                await file.reloadFromDisk();
+                // Force reload the file from disk (bypass mtime check)
+                console.log(`[MessageHandler] Force reloading ${absolutePath} from ACTUAL disk file`);
+                const fs = require('fs').promises;
+                const freshContent = await fs.readFile(absolutePath, 'utf-8');
+                file.setContent(freshContent, true); // true = update baseline
+                console.log(`[MessageHandler] Successfully force reloaded ${absolutePath} (${freshContent.length} chars) from disk`);
 
-                // Trigger webview refresh to show updated content
-                const document = this._fileManager.getDocument();
-                if (document) {
-                    await panel.loadMarkdownFile(document);
+                // Trigger board regeneration from main file (which includes this include file)
+                const fileService = (panel as any)._fileService;
+                const mainFile = fileRegistry.getMainFile();
+                if (mainFile) {
+                    // Re-parse main file which will pick up the fresh include content
+                    (mainFile as any).parseToBoard();
+                    const freshBoard = mainFile.getBoard();
+                    if (freshBoard && freshBoard.valid) {
+                        fileService.setBoard(freshBoard);
+                        await fileService.sendBoardUpdate(false, false);
+                        console.log(`[MessageHandler] Sent fresh board to frontend after include file reload`);
+                    }
                 }
 
-                console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
+                console.log(`[MessageHandler] Successfully reloaded ${absolutePath}`);
 
                 // Send success message to frontend
                 panel._panel.webview.postMessage({
@@ -3162,8 +3192,7 @@ export class MessageHandler {
                     success: true
                 });
 
-                // Send updated debug info immediately after reload
-                await this.handleGetTrackedFilesDebugInfo();
+                // Debug info will be updated automatically by verification trigger
             }
 
         } catch (error) {
