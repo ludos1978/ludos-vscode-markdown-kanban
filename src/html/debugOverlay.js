@@ -329,7 +329,7 @@ function createDebugOverlayContent() {
     return `
         <div class="debug-panel">
             <div class="debug-header">
-                <h3>📁 File States Overview</h3>
+                <h3>ⓘ File States Overview</h3>
                 <div class="debug-controls">
                     <button onclick="toggleDebugOverlaySticky()" class="debug-btn debug-pin-btn">
                         📌 Pin
@@ -1579,8 +1579,6 @@ function getDebugOverlayStyles() {
             gap: 16px;
             margin-bottom: 6px;
             padding: 4px;
-            background: var(--vscode-editor-inactiveSelectionBackground);
-            border-radius: 4px;
         }
 
         .stat-group {
@@ -2015,7 +2013,7 @@ function getDebugOverlayStyles() {
             padding-top: 4px;
             border-top: 1px solid var(--vscode-panel-border);
             display: grid;
-            grid-template-columns: repeat(1, 1fr);
+            grid-template-columns: repeat(2, 1fr);
         }
 
         .legend-title {

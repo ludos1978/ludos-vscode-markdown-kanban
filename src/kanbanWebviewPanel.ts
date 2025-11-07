@@ -2131,8 +2131,21 @@ export class KanbanWebviewPanel {
             for (const column of board.columns) {
                 for (const task of column.tasks) {
                     // Check if this task has the regular include in its description
-                    if (task.regularIncludeFiles?.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
-                        affectedTasks.push({ task, column });
+                    if (task.regularIncludeFiles?.length) {
+                        console.log(`[_sendIncludeFileUpdateToFrontend] Checking task ${task.id}:`);
+                        console.log(`[_sendIncludeFileUpdateToFrontend]   regularIncludeFiles:`, task.regularIncludeFiles);
+                        console.log(`[_sendIncludeFileUpdateToFrontend]   Looking for: ${relativePath}`);
+
+                        const hasThisInclude = task.regularIncludeFiles.some((p: string) => {
+                            const matches = MarkdownFile.isSameFile(p, relativePath);
+                            console.log(`[_sendIncludeFileUpdateToFrontend]   Comparing "${p}" with "${relativePath}": ${matches}`);
+                            return matches;
+                        });
+
+                        if (hasThisInclude) {
+                            console.log(`[_sendIncludeFileUpdateToFrontend]   ✅ Task uses this include!`);
+                            affectedTasks.push({ task, column });
+                        }
                     }
                 }
             }
