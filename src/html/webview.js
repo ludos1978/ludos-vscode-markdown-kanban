@@ -2738,26 +2738,10 @@ window.addEventListener('message', event => {
             window.pendingFocusTargets = message.focusTargets;
             break;
         case 'includeFileContent':
-            // Handle include file content response from backend
-            console.log('[webview.js] 📨 Received includeFileContent:', message.filePath);
-            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
-            if (typeof window.updateIncludeFileCache === 'function') {
-                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
-                window.updateIncludeFileCache(message.filePath, message.content);
-            } else {
-                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
-            }
-            break;
-
         case 'updateIncludeContent':
-            // Handle processed include content from backend
-            console.log('[webview.js] 📨 Received updateIncludeContent:', message.filePath);
-            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
+            // Update include file cache
             if (typeof window.updateIncludeFileCache === 'function') {
-                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
                 window.updateIncludeFileCache(message.filePath, message.content);
-            } else {
-                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }
             break;
 

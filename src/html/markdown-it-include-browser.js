@@ -42,18 +42,15 @@
 
       // Try to get file content
       let content = getFileContent(filePath);
-      console.log(`[markdown-it-include] Processing !!!include(${filePath})!!! - content:`, content ? `${content.length} chars` : 'NULL');
 
       if (content === null) {
         // File not cached yet - show placeholder and request content
-        console.log(`[markdown-it-include] ⏳ No cache - showing placeholder for ${filePath}`);
         const token = state.push('include_placeholder', 'span', 0);
         token.content = filePath;
         token.attrSet('class', 'include-placeholder');
         token.attrSet('title', `Loading include file: ${filePath}`);
       } else {
         // Successfully got content - render it inline as markdown
-        console.log(`[markdown-it-include] ✅ Cache hit - rendering ${content.length} chars for ${filePath}`);
         const token = state.push('include_content', 'span', 0);
         token.content = content;
         token.attrSet('class', 'included-content-inline');
@@ -137,26 +134,13 @@
     return null;
   }
 
-  // Track if we've received includes for debouncing
-  let includeRenderTimer = null;
-  let pendingBoardUpdate = false; // Prevent infinite loop
-
   // Function to update cache when file content is received
   function updateFileCache(filePath, content) {
-    console.log('[updateIncludeFileCache] 🟢 FUNCTION CALLED:', filePath);
-    console.log('[updateIncludeFileCache]   content.length:', content ? content.length : 'null');
-
     // Remove from pending requests
     pendingRequests.delete(filePath);
 
-    // Check if content actually changed
-    const oldContent = fileCache.get(filePath);
-    const contentChanged = oldContent !== content;
-    console.log('[updateIncludeFileCache]   Content changed:', contentChanged);
-
     // Update cache
     fileCache.set(filePath, content);
-    console.log('[updateIncludeFileCache]   ✅ Cache updated, total cached files:', fileCache.size);
 
     // Register this inline include in the backend's unified system for conflict resolution
     if (typeof vscode !== 'undefined') {
@@ -166,25 +150,10 @@
           filePath: filePath,
           content: content
         });
-        console.log('[updateIncludeFileCache]   ✅ Sent registerInlineInclude message');
       } catch (error) {
         console.error('Error registering inline include:', error);
       }
     }
-
-    // Trigger re-render if board already exists
-    // On initial load, board renders first (with null includes), then includes arrive
-    // We need to re-render to show the includes
-    console.log('[updateIncludeFileCache]   🔍 Checking render conditions:');
-    console.log('[updateIncludeFileCache]     typeof window:', typeof window);
-    console.log('[updateIncludeFileCache]     window.cachedBoard:', typeof window !== 'undefined' ? !!window.cachedBoard : 'no window');
-    console.log('[updateIncludeFileCache]     window.renderBoard:', typeof window !== 'undefined' ? typeof window.renderBoard : 'no window');
-
-    // DON'T trigger re-render here - the backend already sends a boardUpdate message
-    // when a regular include file changes. Calling renderBoard() here causes a race
-    // condition where the frontend render might use stale data before the backend
-    // update arrives.
-    console.log('[updateIncludeFileCache]   ℹ️  Cache updated. Backend will send boardUpdate for regular includes.');
   }
 
   // Helper function for HTML escaping - now using global ValidationUtils.escapeHtml

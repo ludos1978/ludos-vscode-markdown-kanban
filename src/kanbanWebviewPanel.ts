@@ -1513,39 +1513,14 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Load regular includes - send update for each one
+        // Trigger re-render for regular includes after initial load
+        // Regular includes are already sent via updateIncludeContent messages from sendBoardUpdate
+        // This message triggers markdown-it to re-process includes with the cached content
         const mainFile = this._fileRegistry.getMainFile();
-        if (mainFile) {
+        if (mainFile && this._panel) {
             const regularIncludes = mainFile.getIncludedFiles();
-            console.log(`[_loadIncludeContentAsync] Loading ${regularIncludes.length} regular includes`);
-
-            for (const relativePath of regularIncludes) {
-                const file = this._fileRegistry.getByRelativePath(relativePath) as RegularIncludeFile;
-                if (file) {
-                    try {
-                        // Reload from disk
-                        await file.reload();
-                        const content = file.getContent();
-
-                        console.log(`[_loadIncludeContentAsync] Loaded regular include ${relativePath} (${content.length} chars)`);
-
-                        // Send update to frontend
-                        if (this._panel) {
-                            this.queueMessage({
-                                type: 'updateIncludeContent',
-                                filePath: relativePath,
-                                content: content
-                            });
-                        }
-                    } catch (error) {
-                        console.error(`[_loadIncludeContentAsync] Failed to load regular include ${relativePath}:`, error);
-                    }
-                }
-            }
-
-            // Trigger re-render after all regular includes are loaded
-            if (regularIncludes.length > 0 && this._panel) {
-                console.log(`[_loadIncludeContentAsync] All ${regularIncludes.length} regular includes loaded - triggering re-render`);
+            if (regularIncludes.length > 0) {
+                console.log(`[_loadIncludeContentAsync] Triggering re-render for ${regularIncludes.length} regular includes`);
                 this.queueMessage({
                     type: 'includesUpdated'
                 });
@@ -2113,34 +2088,19 @@ export class KanbanWebviewPanel {
                 // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-regular') {
-            // Regular include - regenerate board from registry
-            // Note: Main file structure hasn't changed, but include content has
+            // Regular include - invalidate cache and regenerate board
             // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
-            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed - regenerating board`);
+            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed: ${relativePath}`);
 
-            // CRITICAL: Send updated include content BEFORE board update
-            // This ensures frontend cache is updated before rendering
-            const content = file.getContent();
-            console.log(`[_sendIncludeFileUpdateToFrontend] Sending updated content first (${content.length} chars): ${relativePath}`);
-            this.queueMessage({
-                type: 'updateIncludeContent',
-                filePath: relativePath,
-                content: content
-            });
-
-            // Invalidate cache and regenerate from registry
-            // This ensures column/task includes are properly loaded
             this.invalidateBoardCache();
             const board = this.getBoard();
 
             if (board && board.valid) {
-                console.log(`[_sendIncludeFileUpdateToFrontend] Board regenerated, sending update to frontend`);
-                // Send full board update - frontend will re-render markdown with updated includes
+                // Send full board update (includes updateIncludeContent messages for all includes)
                 await this.sendBoardUpdate(false, true);
 
-                // CRITICAL: Trigger re-render after board update (same as initial load)
-                // This ensures markdown-it re-processes includes with updated cache
-                console.log(`[_sendIncludeFileUpdateToFrontend] Triggering re-render for updated regular include`);
+                // CRITICAL: Trigger re-render so markdown-it re-processes includes with updated cache
+                // This replicates the initial load behavior
                 this.queueMessage({
                     type: 'includesUpdated'
                 });
