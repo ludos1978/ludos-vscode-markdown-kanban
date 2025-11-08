@@ -463,20 +463,24 @@ export class MarkdownKanbanParser {
       // DO NOT trim whitespace - preserve user's formatting including trailing newlines
     }
 
-    // CRITICAL: Match by content to preserve ID (Backend is source of truth)
-    // Find existing column by POSITION (title may have changed with include switch!)
+    // CRITICAL: Match by POSITION to preserve ID (Backend is source of truth)
+    // Content matching alone is WRONG - empty tasks would all share the same ID!
     let existingCol: KanbanColumn | undefined;
     if (existingBoard && columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
       existingCol = existingBoard.columns[columnIndex];
     }
 
     if (existingCol) {
-      // Try to find matching task by complete content (title + description)
-      const existingTask = this.findExistingTask(existingCol, task.title, task.description);
+      // CRITICAL FIX: Match by POSITION in array, not content
+      // Position determines identity - content can be duplicated (e.g., multiple empty tasks)
+      const taskPosition = column.tasks.length; // Current position being added
+      const existingTask = existingCol.tasks[taskPosition];
+
       if (existingTask) {
-        // Content matches - preserve the existing ID
+        // Position matches - preserve the existing ID
         task.id = existingTask.id;
       }
+      // else: New task at this position - keep the generated UUID
     }
 
     column.tasks.push(task);
