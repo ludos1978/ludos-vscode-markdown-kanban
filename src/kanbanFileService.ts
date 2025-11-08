@@ -503,8 +503,9 @@ export class KanbanFileService {
         if (mainFile) {
             const currentBoard = this.board();
             if (currentBoard) {
-                mainFile.updateFromBoard(currentBoard);
-                mainFile.setContent(markdown, true); // true = update baseline
+                // CRITICAL: Pass updateBaseline=true since we just saved to disk
+                mainFile.updateFromBoard(currentBoard, true, true);
+                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
             }
         }
 

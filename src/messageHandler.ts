@@ -3025,8 +3025,9 @@ export class MessageHandler {
                 await saveCoordinator.saveFile(mainFile, markdown);
 
                 // Update main file state after save
-                mainFile.updateFromBoard(board);
-                mainFile.setContent(markdown, true); // true = update baseline
+                // CRITICAL: Pass updateBaseline=true since we just saved to disk
+                mainFile.updateFromBoard(board, true, true);
+                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
 
                 console.log(`[MessageHandler] Successfully saved ${filePath}`);
 

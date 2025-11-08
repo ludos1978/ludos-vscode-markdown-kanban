@@ -108,9 +108,14 @@ export class MainKanbanFile extends MarkdownFile {
 
     /**
      * Update content from board structure
+     *
+     * @param board The board to generate content from
+     * @param preserveYaml Whether to preserve YAML frontmatter (default: true)
+     * @param updateBaseline Whether to update the baseline (default: false)
+     *                       Set to true when called after save to mark content as saved
      */
-    public updateFromBoard(board: KanbanBoard, preserveYaml: boolean = true): void {
-        console.log(`[MainKanbanFile] Updating content from board: ${this._relativePath}`);
+    public updateFromBoard(board: KanbanBoard, preserveYaml: boolean = true, updateBaseline: boolean = false): void {
+        console.log(`[MainKanbanFile] Updating content from board (updateBaseline: ${updateBaseline}): ${this._relativePath}`);
 
         this._board = board;
 
@@ -119,7 +124,8 @@ export class MainKanbanFile extends MarkdownFile {
         // For now, we'll just mark that this needs to be implemented
         const generatedContent = this._generateMarkdownFromBoard(board);
 
-        this.setContent(generatedContent, false);
+        // Update content and optionally baseline
+        this.setContent(generatedContent, updateBaseline);
     }
 
     /**
