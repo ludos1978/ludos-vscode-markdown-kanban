@@ -1623,15 +1623,15 @@ function toggleAllTasksInColumn(columnId) {
     }
 
     // Apply the action to all tasks using existing toggleTaskCollapse function
+    // CRITICAL: Pass the task ELEMENT directly, not the ID, to avoid querySelector issues
     taskElements.forEach(taskElement => {
-        const taskId = taskElement.getAttribute('data-task-id');
         const isCollapsed = taskElement.classList.contains('collapsed');
 
         // Only toggle if state needs to change (skip recalculation for bulk operation)
         if (shouldCollapse && !isCollapsed) {
-            toggleTaskCollapse(taskId, true);
+            toggleTaskCollapse(taskElement, true); // Pass element directly!
         } else if (!shouldCollapse && isCollapsed) {
-            toggleTaskCollapse(taskId, true);
+            toggleTaskCollapse(taskElement, true); // Pass element directly!
         }
     });
 
@@ -2854,9 +2854,36 @@ window.setupCompactViewHandler = setupCompactViewHandler;
  * @param {string} taskId - ID of task to toggle
  * Side effects: Updates collapsedTasks set, DOM classes
  */
-function toggleTaskCollapse(taskId, skipRecalculation = false) {
-    const task = document.querySelector(`[data-task-id="${taskId}"]`);
+function toggleTaskCollapse(taskIdOrElement, skipRecalculation = false) {
+    // Accept either task ID (string) or task element (DOM element)
+    let task;
+    let taskId;
+
+    if (typeof taskIdOrElement === 'string') {
+        // Legacy: passed as ID string - search for element
+        // IMPORTANT: Use querySelectorAll and filter to handle potential duplicates
+        taskId = taskIdOrElement;
+        const allMatches = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+        if (allMatches.length > 1) {
+            console.warn(`[toggleTaskCollapse] Multiple tasks found with ID: ${taskId} (${allMatches.length} matches)`);
+        }
+        task = allMatches[0]; // Use first match for backwards compatibility
+    } else {
+        // Modern: passed as element directly
+        task = taskIdOrElement;
+        taskId = task.getAttribute('data-task-id');
+    }
+
+    if (!task) {
+        console.error(`[toggleTaskCollapse] Task not found:`, taskIdOrElement);
+        return;
+    }
+
     const toggle = task.querySelector('.task-collapse-toggle');
+    if (!toggle) {
+        console.error(`[toggleTaskCollapse] Toggle button not found in task:`, taskId);
+        return;
+    }
 
     task.classList.toggle('collapsed');
     toggle.classList.toggle('rotated');
