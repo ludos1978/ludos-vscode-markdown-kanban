@@ -109,11 +109,17 @@ export class PresentationParser {
       }
 
       // Extract description - ALL lines from start to end (NO TRIMMING)
+      // Remove the last line if it's empty (accounts for the trailing newline we add when writing)
       let description: string;
       if (descriptionStartLine !== -1 && descriptionStartLine < descriptionEndLine) {
         const descriptionLines: string[] = [];
         for (let i = descriptionStartLine; i < descriptionEndLine; i++) {
           descriptionLines.push(lines[i]);
+        }
+        // Remove one trailing empty line (we add it automatically when writing)
+        // This preserves any extra empty lines the user manually added
+        if (descriptionLines.length > 0 && descriptionLines[descriptionLines.length - 1] === '') {
+          descriptionLines.pop();
         }
         description = descriptionLines.join('\n');
       } else {
