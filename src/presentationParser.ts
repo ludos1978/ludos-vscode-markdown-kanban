@@ -37,9 +37,9 @@ export class PresentationParser {
       return [];
     }
 
-    // Split by slide separators
-    // Use [ \t]* instead of \s* to match only spaces/tabs, NOT newlines
-    const rawSlides = content.split(/^---[ \t]*$/gm);
+    // Split by slide separators including the newline after ---
+    // This prevents an extra leading empty line in each slide
+    const rawSlides = content.split(/^---[ \t]*\n/gm);
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
@@ -49,42 +49,75 @@ export class PresentationParser {
 
       const lines = slideContent.split('\n');
 
-      // Count leading empty lines after ---
+      // Count CONSECUTIVE leading empty lines from the start
       let emptyLineCount = 0;
-      for (const line of lines) {
-        if (line.trim() === '') {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === '') {
           emptyLineCount++;
         } else {
           break; // Stop at first non-empty line
         }
       }
 
-      let title: string | undefined;
-      let description: string;
-
-      if (emptyLineCount >= 2) {
-        // 2+ empty lines → no title, everything after empty lines is description
-        title = undefined;
-        description = lines.slice(emptyLineCount).join('\n').trim();
-      } else if (emptyLineCount === 1) {
-        // 1 empty line → next line is title
-        // Format: [empty line (0), title line (1), empty line (2), ...description (3+)]
-        const titleLine = lines[1];
-        title = titleLine !== undefined ? titleLine : ''; // Can be empty string
-
-        // Description starts after: empty line (0), title (1), empty line (2)
-        description = lines.slice(3).join('\n').trim();
-      } else {
-        // 0 empty lines → fallback to old behavior for backwards compatibility
-        // First non-empty line is title
-        const firstNonEmpty = lines.findIndex(l => l.trim() !== '');
-        if (firstNonEmpty !== -1) {
-          title = lines[firstNonEmpty].trim();
-          description = lines.slice(firstNonEmpty + 1).join('\n').trim();
-        } else {
-          title = undefined;
-          description = '';
+      // Get the first 2 lines with content (to determine structure)
+      const contentLines: number[] = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() !== '') {
+          contentLines.push(i);
+          if (contentLines.length >= 2) {
+            break;
+          }
         }
+      }
+
+      let titleLine: number = -1; // -1 means undefined/no title
+      let descriptionStartLine: number = -1; // -1 means no description
+      const descriptionEndLine: number = lines.length; // Always read to end
+
+      if (contentLines.length >= 1) {
+        // Check empty line count: 0-1 empty lines = has title, 2+ = no title
+        if (emptyLineCount < 2) {
+          // 0 or 1 empty lines => first content is title
+          titleLine = contentLines[0];
+
+          if (contentLines.length === 2) {
+            // Have a second content line - description starts after title
+            // Take the line after the title, or at max one empty line after that
+            const gap = contentLines[1] - contentLines[0];
+            descriptionStartLine = Math.min(contentLines[0] + Math.max(gap, 1), contentLines[0] + 3);
+          } else {
+            // Only one content line (the title) - no description
+            descriptionStartLine = lines.length; // Beyond end = no description
+          }
+        } else {
+          // 2+ empty lines => no title, all is description
+          titleLine = -1; // undefined
+          descriptionStartLine = Math.min(contentLines[0], 3);
+        }
+      } else {
+        // No content at all
+        titleLine = -1;
+        descriptionStartLine = -1;
+      }
+
+      // Extract title - NO TRIMMING
+      let title: string | undefined;
+      if (titleLine !== -1) {
+        title = lines[titleLine];
+      } else {
+        title = undefined;
+      }
+
+      // Extract description - ALL lines from start to end (NO TRIMMING)
+      let description: string;
+      if (descriptionStartLine !== -1 && descriptionStartLine < descriptionEndLine) {
+        const descriptionLines: string[] = [];
+        for (let i = descriptionStartLine; i < descriptionEndLine; i++) {
+          descriptionLines.push(lines[i]);
+        }
+        description = descriptionLines.join('\n');
+      } else {
+        description = '';
       }
 
       slides.push({
@@ -108,7 +141,8 @@ export class PresentationParser {
       };
 
       // Add content as description if it exists
-      if (slide.content && slide.content.trim()) {
+      // NO TRIMMING - preserve exact content including whitespace
+      if (slide.content !== undefined && slide.content !== '') {
         task.description = slide.content;
       }
 

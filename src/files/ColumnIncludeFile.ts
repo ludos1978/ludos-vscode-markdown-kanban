@@ -70,17 +70,8 @@ export class ColumnIncludeFile extends IncludeFile {
     // ============= PARSING =============
 
     /**
-     * Find existing task by title to preserve ID during re-parse
-     */
-    private findExistingTask(existingTasks: KanbanTask[] | undefined, title: string): KanbanTask | undefined {
-        if (!existingTasks) {
-            return undefined;
-        }
-        return existingTasks.find(task => task.title === title);
-    }
-
-    /**
      * Parse presentation format into tasks, preserving IDs for existing tasks
+     * CRITICAL: Match by POSITION only, never by title/content
      * @param existingTasks Optional array of existing tasks to preserve IDs from
      * @param columnId Optional columnId to use for task ID generation (supports file reuse across columns)
      */
@@ -94,10 +85,10 @@ export class ColumnIncludeFile extends IncludeFile {
         // Use provided columnId if available, otherwise fall back to stored _columnId
         const effectiveColumnId = columnId || this._columnId;
 
-        // Update task IDs, preserving existing IDs when task titles match
+        // CRITICAL: Match by POSITION, not title - tasks identified by position
         return tasks.map((task, index) => {
-            // Try to find existing task with same title to preserve ID
-            const existingTask = this.findExistingTask(existingTasks, task.title);
+            // Get existing task at SAME POSITION to preserve ID
+            const existingTask = existingTasks?.[index];
 
             return {
                 ...task,

@@ -45,63 +45,21 @@ export class MarkdownKanbanParser {
    * Find existing column by position with content verification
    * Backend markdown is source of truth - preserve IDs only when content matches
    */
+  /**
+   * Find existing column by POSITION ONLY
+   * CRITICAL: NEVER match by title - position determines identity
+   * Titles can be duplicated, changed, or empty
+   */
   private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number, newTasks?: KanbanTask[]): KanbanColumn | undefined {
     if (!existingBoard) return undefined;
 
-    // Try to match by position first
+    // ONLY match by position - title/content matching is FORBIDDEN
     if (columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
-      const candidateColumn = existingBoard.columns[columnIndex];
-
-      // CRITICAL VERIFICATION: For columns, verify task composition hasn't changed
-      // If we're checking a column with tasks, verify all task IDs are present
-      if (newTasks && newTasks.length > 0) {
-        const newTaskIds = new Set(newTasks.map(t => t.id));
-        const oldTaskIds = new Set(candidateColumn.tasks.map(t => t.id));
-
-        // If task IDs match, it's the same column (even if title changed)
-        const sameTaskIds =
-          newTaskIds.size === oldTaskIds.size &&
-          [...newTaskIds].every(id => oldTaskIds.has(id));
-
-        if (sameTaskIds) {
-          return candidateColumn;
-        }
-        // Task composition changed - this is a DIFFERENT column, don't preserve ID
-        return undefined;
-      }
-
-      // For include columns, match by position only (title changes when switching files)
-      const isIncludeColumn = title.includes('!!!include(') || candidateColumn.includeMode;
-      if (isIncludeColumn) {
-        return candidateColumn; // Same position = same column, even if title/content changed
-      }
-
-      // For regular columns without tasks, match by title
-      if (candidateColumn.title === title) {
-        return candidateColumn;
-      }
-
-      return undefined;
+      return existingBoard.columns[columnIndex];
     }
 
-    // Fallback: match by title
-    return existingBoard.columns.find(col => col.title === title);
-  }
-
-  /**
-   * Find existing task by CONTENT (title + description)
-   * Backend markdown is source of truth - match by complete content, not position
-   * Position can change when tasks are reordered, but content is the identifier
-   */
-  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, description?: string): KanbanTask | undefined {
-    if (!existingColumn) return undefined;
-
-    // CRITICAL: Match by CONTENT (title + description), not position
-    // If both title AND description match exactly, it's the same task
-    return existingColumn.tasks.find(task =>
-      task.title === title &&
-      task.description === (description || '')
-    );
+    // No position provided or out of bounds - this is a NEW column
+    return undefined;
   }
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {

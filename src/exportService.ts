@@ -9,7 +9,6 @@ import { PresentationParser } from './presentationParser';
 import { ContentPipelineService } from './services/content/ContentPipelineService';
 import { OperationOptionsBuilder, OperationOptions, FormatStrategy } from './services/OperationOptions';
 import { PathResolver } from './services/PathResolver';
-import { MarpConverter, MarpConversionOptions } from './services/export/MarpConverter';
 import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
 import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
 import { getMermaidExportService } from './services/export/MermaidExportService';
@@ -1469,7 +1468,7 @@ export class ExportService {
             }
         }
 
-        return slides.join('\n\n---\n\n') + '\n';
+        return slides.join('\n---\n') + '\n';
     }
 
     /**
@@ -1551,7 +1550,7 @@ export class ExportService {
             i++;
         }
 
-        return slides.join('\n\n---\n\n') + '\n';
+        return slides.join('\n---\n') + '\n';
     }
 
 

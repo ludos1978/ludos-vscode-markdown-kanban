@@ -94,7 +94,7 @@ export class FormatConverter {
             i++;
         }
 
-        const presentationContent = slides.join('\n\n---\n\n');
+        const presentationContent = slides.join('\n---\n');
 
         // Add YAML back if requested
         if (preserveYaml && yaml) {
