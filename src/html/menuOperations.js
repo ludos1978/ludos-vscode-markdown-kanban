@@ -448,36 +448,56 @@ class SimpleMenuManager {
     startHideTimer() {
         this.clearTimeout();
         this.hideTimeout = setTimeout(() => {
+            // RECHECK: Verify we're actually not hovering before closing
+            // This prevents menus from closing if mouse quickly re-enters
+            const isHoveringSubmenu = this.activeSubmenu && this.activeSubmenu.matches(':hover');
+            const isHoveringDropdown = Array.from(document.querySelectorAll('.donut-menu-dropdown, .file-bar-menu-dropdown'))
+                .some(el => el.matches(':hover'));
+
+            if (isHoveringSubmenu || isHoveringDropdown) {
+                // Mouse is back in menu, don't close
+                return;
+            }
+
             this.hideSubmenu();
-            
+
             // Also close parent menu if we're not hovering over it
             setTimeout(() => {
-                if (!window._inDropdown && !window._inSubmenu) {
-                    // CRITICAL: Don't close menu if a button inside a moved dropdown has focus
-                    // This prevents scroll issues when clicking tag buttons
-                    const activeElement = document.activeElement;
-                    const isInMovedDropdown = activeElement?.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+                // RECHECK again before closing parent menu
+                const isHoveringMenu = document.querySelector('.donut-menu.active:hover') !== null;
+                const isHoveringAnyDropdown = Array.from(document.querySelectorAll('.donut-menu-dropdown, .file-bar-menu-dropdown'))
+                    .some(el => el.matches(':hover'));
+                const isHoveringAnySubmenu = document.querySelector('.dynamic-submenu:hover') !== null;
 
-                    if (isInMovedDropdown) {
-                        return; // Don't close the menu
+                if (isHoveringMenu || isHoveringAnyDropdown || isHoveringAnySubmenu) {
+                    // Still hovering, don't close
+                    return;
+                }
+
+                // CRITICAL: Don't close menu if a button inside a moved dropdown has focus
+                // This prevents scroll issues when clicking tag buttons
+                const activeElement = document.activeElement;
+                const isInMovedDropdown = activeElement?.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+
+                if (isInMovedDropdown) {
+                    return; // Don't close the menu
+                }
+
+                document.querySelectorAll('.donut-menu.active').forEach(menu => {
+                    menu.classList.remove('active');
+
+                    // Clean up any moved dropdowns - check both in menu and moved to body
+                    let dropdown = menu.querySelector('.donut-menu-dropdown, .file-bar-menu-dropdown');
+                    if (!dropdown) {
+                        // Look for moved dropdowns in body that belong to this menu
+                        const movedDropdowns = document.body.querySelectorAll('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+                        dropdown = Array.from(movedDropdowns).find(d => d._originalParent === menu);
                     }
 
-                    document.querySelectorAll('.donut-menu.active').forEach(menu => {
-                        menu.classList.remove('active');
-
-                        // Clean up any moved dropdowns - check both in menu and moved to body
-                        let dropdown = menu.querySelector('.donut-menu-dropdown, .file-bar-menu-dropdown');
-                        if (!dropdown) {
-                            // Look for moved dropdowns in body that belong to this menu
-                            const movedDropdowns = document.body.querySelectorAll('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
-                            dropdown = Array.from(movedDropdowns).find(d => d._originalParent === menu);
-                        }
-
-                        if (dropdown) {
-                            cleanupDropdown(dropdown);
-                        }
-                    });
-                }
+                    if (dropdown) {
+                        cleanupDropdown(dropdown);
+                    }
+                });
             }, 100);
         }, 300);
     }
@@ -1103,6 +1123,13 @@ function toggleColumnStack(columnId) {
                 stackToggleBtn.classList.remove('active');
             }
         }
+    }
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    // This breaks hover detection, so we must close menus first
+    if (typeof closeAllMenus === 'function') {
+        closeAllMenus();
     }
 
     // Trigger full board re-render for layout changes
@@ -1775,6 +1802,10 @@ function insertTaskAfter(taskId, columnId) {
 
 function moveTaskToTop(taskId, columnId) {
 
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
+
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
@@ -1798,12 +1829,13 @@ function moveTaskToTop(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskToTop', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskUp(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1829,12 +1861,13 @@ function moveTaskUp(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskUp', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskDown(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1860,12 +1893,13 @@ function moveTaskDown(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskDown', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskToBottom(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1889,9 +1923,6 @@ function moveTaskToBottom(taskId, columnId) {
 
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskToBottom', taskId, columnId });
-
-    // Close all menus
-    closeAllMenus();
 
 }
 
