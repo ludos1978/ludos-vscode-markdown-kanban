@@ -914,15 +914,15 @@ class TaskEditor {
                         if (layoutChanged) {
                             // Layout tags changed - refresh the board layout
                             if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                window.renderBoard(window.cachedBoard);
+                                window.renderBoard(); // Full re-render to recalculate positions
                             }
 
                             // CRITICAL: Recalculate stack positions after layout change
                             // This handles #stack tag additions/removals immediately
-                            // Only update the affected column's stack for efficiency
+                            // Recalculate all stacks since adding/removing #stack affects neighboring columns
                             if (typeof window.applyStackedColumnStyles === 'function') {
                                 requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles(columnId);
+                                    window.applyStackedColumnStyles(); // Recalculate all stacks
                                 });
                             }
                         }

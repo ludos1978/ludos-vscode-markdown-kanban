@@ -1105,17 +1105,18 @@ function toggleColumnStack(columnId) {
         }
     }
 
-    // Trigger board refresh for layout changes
+    // Trigger full board re-render for layout changes
+    // This recalculates all column positions including stacks
     if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-        window.renderBoard(window.cachedBoard);
+        window.renderBoard(); // Full re-render to recalculate positions
     }
 
-    // CRITICAL: Recalculate stack positions after toggle
-    // This ensures columns stack/unstack immediately
-    // Only update this column's stack for efficiency
+    // CRITICAL: Recalculate stack positions after board re-render
+    // This ensures columns stack/unstack immediately with proper positioning
+    // Recalculate all stacks since adding/removing #stack affects neighboring columns
     if (typeof window.applyStackedColumnStyles === 'function') {
         requestAnimationFrame(() => {
-            window.applyStackedColumnStyles(columnId);
+            window.applyStackedColumnStyles(); // Recalculate all stacks, not just one
         });
     }
 
