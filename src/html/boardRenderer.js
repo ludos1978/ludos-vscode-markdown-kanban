@@ -10,6 +10,75 @@ window.globalColumnFoldState = window.globalColumnFoldState || 'fold-mixed'; // 
 // let window.cachedBoard = null; // Removed to avoid conflicts
 let renderTimeout = null;
 
+/**
+ * Generate alternative title from task description when no title exists
+ *
+ * Format for images:
+ * ![alt text](path/to/screenshot.png "image description") => image description - alt text
+ * ![](path/to/screenshot.png "image description") => image description (screenshot.png)
+ * ![alt text](path/to/screenshot.png) => alt text (screenshot.png)
+ * ![](path/to/screenshot.png) => (screenshot.png)
+ *
+ * If no images: Use first 20 characters of text
+ */
+function generateAlternativeTitle(description) {
+    if (!description || typeof description !== 'string' || description.trim() === '') {
+        return undefined;
+    }
+
+    // Match markdown images: ![alt text](path "title")
+    const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/;
+    const match = imageRegex.exec(description);
+
+    if (match) {
+        const altText = match[1] || '';  // Can be empty
+        const imagePath = match[2];
+        const imageDescription = match[3] || '';  // Title attribute
+
+        // Extract filename from path
+        const filename = imagePath.split('/').pop().split('\\').pop() || imagePath;
+
+        // Apply formatting rules
+        if (imageDescription && altText) {
+            // Rule 1: image description - alt text
+            return `${imageDescription} - ${altText}`;
+        } else if (imageDescription && !altText) {
+            // Rule 2: image description (filename)
+            return `${imageDescription} (${filename})`;
+        } else if (altText && !imageDescription) {
+            // Rule 3: alt text (filename)
+            return `${altText} (${filename})`;
+        } else {
+            // Rule 4: (filename)
+            return `(${filename})`;
+        }
+    }
+
+    // Fallback: First 20 characters of text content
+    // Remove all markdown syntax to get clean text
+    let cleanText = description
+        .replace(/^#+\s+/gm, '')           // Remove headers
+        .replace(/^\s*[-*+]\s+/gm, '')     // Remove list markers
+        .replace(/^\s*\d+\.\s+/gm, '')     // Remove numbered lists
+        .replace(/!\[.*?\]\(.*?\)/g, '')   // Remove images
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
+        .replace(/\[\[([^\]]+)\]\]/g, '$1')      // Convert wiki links to text
+        .replace(/`{1,3}[^`]*`{1,3}/g, '')       // Remove code
+        .replace(/[*_~]{1,2}([^*_~]+)[*_~]{1,2}/g, '$1') // Remove bold/italic
+        .replace(/\n+/g, ' ')              // Replace newlines with spaces
+        .trim();
+
+    if (cleanText.length > 0) {
+        // Return first 60 characters (no ellipsis - CSS will handle overflow)
+        if (cleanText.length > 60) {
+            return cleanText.substring(0, 60);
+        }
+        return cleanText;
+    }
+
+    return undefined;
+}
+
 // Cache board element reference for performance
 let cachedBoardElement = null;
 function getBoardElement() {
@@ -1908,12 +1977,26 @@ function createTaskElement(task, columnId, taskIndex) {
     // Check if task has no meaningful title
     const hasNoTitle = !task.title || !task.title.trim();
 
-    // Use alternativeTitle when task is folded and has no title
+    // DEBUG: Log ALL tasks to see what's happening
+    console.log('[createTaskElement] Task', task.id, '- title:', JSON.stringify(task.title), 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'hasDescription:', !!task.description);
+
+    // Generate alternative title when task is folded and has no title
     let renderedTitle;
-    if (hasNoTitle && isCollapsed && task.alternativeTitle) {
-        // Show alternative title (generated from content) when folded
-        renderedTitle = `<span class="task-alternative-title">${escapeHtml(task.alternativeTitle)}</span>`;
+    if (hasNoTitle && isCollapsed && task.description) {
+        // Generate alternative title from description
+        const alternativeTitle = generateAlternativeTitle(task.description);
+        console.log('[createTaskElement] Task', task.id, 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'hasDescription:', !!task.description);
+        console.log('[createTaskElement] Generated alternativeTitle:', alternativeTitle);
+        console.log('[createTaskElement] Description preview:', task.description.substring(0, 100));
+        if (alternativeTitle) {
+            renderedTitle = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+        } else {
+            renderedTitle = '';
+        }
     } else {
+        if (hasNoTitle && isCollapsed) {
+            console.log('[createTaskElement] Task', task.id, 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'but NO description');
+        }
         // Normal title rendering
         renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
             ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
@@ -2910,6 +2993,8 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
         return;
     }
 
+    console.log('[toggleTaskCollapse] Called for task:', taskId);
+
     const toggle = taskElement.querySelector('.task-collapse-toggle');
     if (!toggle) {
         console.error(`[toggleTaskCollapse] Toggle button not found in task:`, taskId);
@@ -2922,11 +3007,37 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
     // Ensure state variables are initialized
     if (!window.collapsedTasks) {window.collapsedTasks = new Set();}
 
+    const isNowCollapsed = taskElement.classList.contains('collapsed');
+
     // Store state
-    if (taskElement.classList.contains('collapsed')) {
+    if (isNowCollapsed) {
         window.collapsedTasks.add(taskId);
     } else {
         window.collapsedTasks.delete(taskId);
+    }
+
+    // Update title for tasks with no title when folding/unfolding
+    const titleDisplay = taskElement.querySelector('.task-title-display');
+    if (titleDisplay) {
+        // Get task data from cached board
+        const task = findTaskById(taskId);
+        if (task) {
+            const hasNoTitle = !task.title || !task.title.trim();
+
+            console.log('[toggleTaskCollapse] Task:', taskId, 'hasNoTitle:', hasNoTitle, 'isNowCollapsed:', isNowCollapsed, 'hasDescription:', !!task.description);
+
+            // If task has no title and is now collapsed, show alternative title
+            if (hasNoTitle && isNowCollapsed && task.description) {
+                const alternativeTitle = generateAlternativeTitle(task.description);
+                console.log('[toggleTaskCollapse] Generated alternativeTitle:', alternativeTitle);
+                if (alternativeTitle) {
+                    titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+                }
+            } else if (hasNoTitle && !isNowCollapsed) {
+                // When unfolding, clear the alternative title
+                titleDisplay.innerHTML = '';
+            }
+        }
     }
 
     // Recalculate stacked column heights after collapse/expand (unless skipped for bulk operations)

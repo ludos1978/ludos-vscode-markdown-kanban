@@ -16,7 +16,6 @@ export interface KanbanTask {
   regularIncludeFiles?: string[]; // Paths to regular includes (!!!include()!!! in description)
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
-  alternativeTitle?: string; // Generated title from content when no title exists (used when folded)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
 }
 
@@ -411,75 +410,6 @@ export class MarkdownKanbanParser {
     }
   }
 
-  /**
-   * Generate alternative title from task content when no title exists
-   *
-   * Format for images:
-   * ![alt text](path/to/screenshot.png "image description") => image description - alt text
-   * ![](path/to/screenshot.png "image description") => image description (screenshot.png)
-   * ![alt text](path/to/screenshot.png) => alt text (screenshot.png)
-   * ![](path/to/screenshot.png) => (screenshot.png)
-   *
-   * If no images: Use first 20 characters of text
-   */
-  private static generateAlternativeTitle(description: string | undefined): string | undefined {
-    if (!description || description.trim() === '') {
-      return undefined;
-    }
-
-    // Match markdown images: ![alt text](path "title")
-    const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/g;
-    const match = imageRegex.exec(description);
-
-    if (match) {
-      const altText = match[1] || '';  // Can be empty
-      const imagePath = match[2];
-      const imageDescription = match[3] || '';  // Title attribute
-
-      // Extract filename from path
-      const filename = imagePath.split('/').pop()?.split('\\').pop() || imagePath;
-
-      // Apply formatting rules
-      if (imageDescription && altText) {
-        // Rule 1: image description - alt text
-        return `${imageDescription} - ${altText}`;
-      } else if (imageDescription && !altText) {
-        // Rule 2: image description (filename)
-        return `${imageDescription} (${filename})`;
-      } else if (altText && !imageDescription) {
-        // Rule 3: alt text (filename)
-        return `${altText} (${filename})`;
-      } else {
-        // Rule 4: (filename)
-        return `(${filename})`;
-      }
-    }
-
-    // Fallback: First 20 characters of text content
-    // Remove all markdown syntax to get clean text
-    let cleanText = description
-      .replace(/^#+\s+/gm, '')           // Remove headers
-      .replace(/^\s*[-*+]\s+/gm, '')     // Remove list markers
-      .replace(/^\s*\d+\.\s+/gm, '')     // Remove numbered lists
-      .replace(/!\[.*?\]\(.*?\)/g, '')   // Remove images
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
-      .replace(/\[\[([^\]]+)\]\]/g, '$1')      // Convert wiki links to text
-      .replace(/`{1,3}[^`]*`{1,3}/g, '')       // Remove code
-      .replace(/[*_~]{1,2}([^*_~]+)[*_~]{1,2}/g, '$1') // Remove bold/italic
-      .replace(/\n+/g, ' ')              // Replace newlines with spaces
-      .trim();
-
-    if (cleanText.length > 0) {
-      // Return first 20 characters
-      if (cleanText.length > 20) {
-        return cleanText.substring(0, 20) + '...';
-      }
-      return cleanText;
-    }
-
-    return undefined;
-  }
-
   private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null, existingBoard?: KanbanBoard, columnIndex?: number): void {
     if (!task || !column) {return;}
 
@@ -489,13 +419,6 @@ export class MarkdownKanbanParser {
         delete task.description;
       }
       // DO NOT trim whitespace - preserve user's formatting including trailing newlines
-    }
-
-    // Generate alternative title if no title exists
-    // This provides a meaningful preview when task is folded
-    const hasNoTitle = !task.title || task.title.trim() === '';
-    if (hasNoTitle && task.description) {
-      task.alternativeTitle = this.generateAlternativeTitle(task.description);
     }
 
     // CRITICAL: Match by POSITION to preserve ID (Backend is source of truth)

@@ -1427,6 +1427,37 @@ class TaskEditor {
             });
         }
 
+        // Update alternative title if task has no title and is collapsed
+        if (type === 'task-title' || type === 'task-description') {
+            const taskItem = element.closest('.task-item');
+            if (taskItem) {
+                const taskId = taskItem.getAttribute('data-task-id');
+                const isCollapsed = taskItem.classList.contains('collapsed');
+
+                if (taskId && isCollapsed) {
+                    // Get task data from cached board
+                    const task = findTaskById(taskId);
+                    if (task) {
+                        const hasNoTitle = !task.title || !task.title.trim();
+
+                        // Update title display if task has no title
+                        if (hasNoTitle && task.description) {
+                            const titleDisplay = taskItem.querySelector('.task-title-display');
+                            if (titleDisplay && typeof generateAlternativeTitle === 'function') {
+                                const alternativeTitle = generateAlternativeTitle(task.description);
+                                console.log('[taskEditor.hideEditor] Updating alternative title:', alternativeTitle, 'for task:', taskId);
+                                if (alternativeTitle) {
+                                    titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+                                } else {
+                                    titleDisplay.innerHTML = '';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         this.currentEditor = null;
     }
 
