@@ -1903,16 +1903,27 @@ function createTaskElement(task, columnId, taskIndex) {
     // - displayTitle for display (content from file or filtered title)
     // - task.title for editing (includes the !!!taskinclude(...)!!! syntax)
     // Use getTaskDisplayTitle to handle taskinclude filepaths as clickable links
-    const renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
-        ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
-         typeof (task.displayTitle || task.title) === 'string' &&
-         (task.displayTitle || task.title).trim()) ?
-        renderMarkdown(task.displayTitle || task.title) : '';
+    const isCollapsed = window.collapsedTasks.has(task.id);
+
+    // Check if task has no meaningful title
+    const hasNoTitle = !task.title || !task.title.trim();
+
+    // Use alternativeTitle when task is folded and has no title
+    let renderedTitle;
+    if (hasNoTitle && isCollapsed && task.alternativeTitle) {
+        // Show alternative title (generated from content) when folded
+        renderedTitle = `<span class="task-alternative-title">${escapeHtml(task.alternativeTitle)}</span>`;
+    } else {
+        // Normal title rendering
+        renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
+            ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
+             typeof (task.displayTitle || task.title) === 'string' &&
+             (task.displayTitle || task.title).trim()) ?
+            renderMarkdown(task.displayTitle || task.title) : '';
+    }
 
     // For editing, always use the full title including include syntax
     const editTitle = task.title || '';
-
-    const isCollapsed = window.collapsedTasks.has(task.id);
 
     // Extract ALL tags for stacking features (from the full title)
     const allTags = getActiveTagsInTitle(task.title);

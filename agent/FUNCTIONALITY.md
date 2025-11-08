@@ -103,4 +103,15 @@ when there is only content
 Content
 """
 
+## Title Alt
+
+when a task is folded and the title is empty, show the alternative text instead. The alternative text is generated from the content as following:
+
+![alt text](path/to/screenshot.png "image description") => image description - alt text
+![](path/to/screenshot.png "image description") => image description (screenshot.png)
+![alt text](path/to/screenshot.png) => alt text (screenshot.png)
+![](path/to/screenshot.png) => (screenshot.png)
+
+if there is no image in it, just use the first 20 characters of the text.
+
 
