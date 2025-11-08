@@ -45,7 +45,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
     protected _hasFileSystemChanges: boolean = false;  // File changed on disk outside VS Code
 
     // ============= FRONTEND STATE (Kanban UI) =============
-    protected _hasUnsavedChanges: boolean = false;     // Kanban UI has modifications
+    // NOTE: _hasUnsavedChanges removed - now computed from (_content !== _baseline)
     protected _isInEditMode: boolean = false;          // User actively editing in task/column editor
 
     // ============= SAVE STATE (Instance-level, no global registry!) =============
@@ -69,7 +69,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             originalState: {
                 content: string;
                 baseline: string;
-                hasUnsavedChanges: boolean;
+                // NOTE: hasUnsavedChanges removed - it's now computed from (content !== baseline)
                 hasFileSystemChanges: boolean;
                 lastModified: Date | null;
             };
@@ -480,11 +480,11 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         if (updateBaseline) {
             this._baseline = content;
-            this._hasUnsavedChanges = false;
+            // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
             // Do NOT emit 'content' event when updateBaseline=true
             // This is used after saving to update internal state - not an actual change
         } else {
-            this._hasUnsavedChanges = (this._content !== this._baseline);
+            // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
             // Only emit 'content' event for actual unsaved changes
             if (oldContent !== content) {
                 this._emitChange('content');
@@ -495,7 +495,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // ============= STATE QUERIES =============
 
     public hasUnsavedChanges(): boolean {
-        return this._hasUnsavedChanges;
+        // Computed property: always compare current content to baseline
+        // This ensures it's always accurate and can never drift out of sync
+        return this._content !== this._baseline;
     }
 
     public hasExternalChanges(): boolean {
@@ -518,7 +520,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * Check if file has a conflict (both local and external changes)
      */
     public hasConflict(): boolean {
-        return (this._hasUnsavedChanges || this._isInEditMode) && this._hasFileSystemChanges;
+        return (this.hasUnsavedChanges() || this._isInEditMode) && this._hasFileSystemChanges;
     }
 
     /**
@@ -526,7 +528,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * (has external changes, not editing, no unsaved changes)
      */
     public needsReload(): boolean {
-        return this._hasFileSystemChanges && !this._isInEditMode && !this._hasUnsavedChanges;
+        return this._hasFileSystemChanges && !this._isInEditMode && !this.hasUnsavedChanges();
     }
 
     /**
@@ -534,7 +536,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * (has unsaved changes, no external changes)
      */
     public needsSave(): boolean {
-        return this._hasUnsavedChanges && !this._hasFileSystemChanges;
+        return this.hasUnsavedChanges() && !this._hasFileSystemChanges;
     }
 
     // ============= FILE OPERATIONS =============
@@ -571,7 +573,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
                     this._content = content;
                     this._baseline = content;
-                    this._hasUnsavedChanges = false;
+                    // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
                     this._hasFileSystemChanges = false;
                     this._lastModified = await this._getFileModifiedTime();
 
@@ -674,7 +676,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
         const originalState = {
             content: this._content,
             baseline: this._baseline,
-            hasUnsavedChanges: this._hasUnsavedChanges,
+            // NOTE: No need to store hasUnsavedChanges - it's computed from (content !== baseline)
             hasFileSystemChanges: this._hasFileSystemChanges,
             lastModified: this._lastModified
         };
@@ -705,7 +707,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
             // Update state after successful write
             this._baseline = this._content;
-            this._hasUnsavedChanges = false;
+            // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
             this._hasFileSystemChanges = false;
             this._lastModified = new Date();
 
@@ -722,7 +724,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             // Restore original state
             this._content = originalState.content;
             this._baseline = originalState.baseline;
-            this._hasUnsavedChanges = originalState.hasUnsavedChanges;
+            // NOTE: No need to restore hasUnsavedChanges - it's computed from (content !== baseline)
             this._hasFileSystemChanges = originalState.hasFileSystemChanges;
             this._lastModified = originalState.lastModified;
 
@@ -744,7 +746,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
     public discardChanges(): void {
         console.log(`[${this.getFileType()}] Discarding unsaved changes: ${this._relativePath}`);
         this._content = this._baseline;
-        this._hasUnsavedChanges = false;
+        // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
 
         // NEVER emit 'content' event when discarding changes
         // We're reverting to baseline (what's on disk) - nothing on disk changed
@@ -1101,7 +1103,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 hasFileSystemChanges: this._hasFileSystemChanges
             },
             frontend: {
-                hasUnsavedChanges: this._hasUnsavedChanges,
+                hasUnsavedChanges: this.hasUnsavedChanges(), // Computed from (_content !== _baseline)
                 content: this._content,
                 baseline: this._baseline,
                 isInEditMode: this._isInEditMode
@@ -1123,7 +1125,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
         this._isDirtyInEditor = state.backend.isDirtyInEditor;
         this._documentVersion = state.backend.documentVersion;
         this._hasFileSystemChanges = state.backend.hasFileSystemChanges;
-        this._hasUnsavedChanges = state.frontend.hasUnsavedChanges;
+        // NOTE: No need to set _hasUnsavedChanges - it's computed from (_content !== _baseline)
         this._content = state.frontend.content;
         this._baseline = state.frontend.baseline;
         this._isInEditMode = state.frontend.isInEditMode;

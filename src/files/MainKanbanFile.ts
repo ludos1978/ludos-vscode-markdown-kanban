@@ -160,11 +160,11 @@ export class MainKanbanFile extends MarkdownFile {
         // Regenerate markdown from the modified board
         const newContent = this._generateMarkdownFromBoard(board);
 
-        // Update BOTH content and baseline with the edit
-        // This makes the edit part of the "local state" for conflict detection
+        // Update content with the edit
+        // NOTE: We only update content, NOT baseline, since baseline represents what's on disk
+        // hasUnsavedChanges() will now correctly return true since (_content !== _baseline)
         this._content = newContent;
-        this._baseline = newContent;
-        this._hasUnsavedChanges = true;  // Mark as unsaved (edit in memory, not on disk)
+        // Do NOT update baseline - baseline should always reflect what's on disk!
 
         console.log(`[MainKanbanFile] ✓ Edit applied to baseline (${newContent.length} chars)`);
     }
@@ -323,8 +323,8 @@ export class MainKanbanFile extends MarkdownFile {
             cacheModified: false
         };
 
-        // 1. Internal state flag (kanban UI modifications)
-        if (this._hasUnsavedChanges) {
+        // 1. Internal state flag (kanban UI modifications) - computed from content comparison
+        if (this.hasUnsavedChanges()) {
             details.internalState = true;
             reasons.push('Internal unsaved changes flag is true');
         }
@@ -463,13 +463,13 @@ export class MainKanbanFile extends MarkdownFile {
         const hasCachedBoardChanges = !!cachedBoard;
 
         // Main has unsaved changes if ANY of:
-        // - Internal state flag is true (from kanban UI edits)
+        // - Internal state flag is true (from kanban UI edits) - computed from content comparison
         // - OR VSCode document is dirty (from text editor edits)
         // - OR Cached board exists (UI edits not yet written to file)
-        const hasMainUnsavedChanges = this._hasUnsavedChanges || documentIsDirty || hasCachedBoardChanges;
+        const hasMainUnsavedChanges = this.hasUnsavedChanges() || documentIsDirty || hasCachedBoardChanges;
 
         console.log(`[MainKanbanFile.getConflictContext] Computing hasMainUnsavedChanges:`);
-        console.log(`[MainKanbanFile.getConflictContext]   _hasUnsavedChanges: ${this._hasUnsavedChanges}`);
+        console.log(`[MainKanbanFile.getConflictContext]   hasUnsavedChanges(): ${this.hasUnsavedChanges()}`);
         console.log(`[MainKanbanFile.getConflictContext]   documentIsDirty: ${documentIsDirty}`);
         console.log(`[MainKanbanFile.getConflictContext]   hasCachedBoardChanges: ${hasCachedBoardChanges}`);
         console.log(`[MainKanbanFile.getConflictContext]   → hasMainUnsavedChanges: ${hasMainUnsavedChanges}`);
@@ -499,8 +499,8 @@ export class MainKanbanFile extends MarkdownFile {
      * - Document is open but we can't access it (safe default)
      */
     public hasAnyUnsavedChanges(): boolean {
-        // Check 1: Internal state flag (from kanban UI)
-        if (this._hasUnsavedChanges) return true;
+        // Check 1: Internal state flag (from kanban UI) - computed from content comparison
+        if (this.hasUnsavedChanges()) return true;
 
         // Check 2: Edit mode (user is actively editing)
         if (this._isInEditMode) return true;
@@ -531,7 +531,7 @@ export class MainKanbanFile extends MarkdownFile {
         const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
 
         return {
-            hasUnsavedChanges_flag: this._hasUnsavedChanges,
+            hasUnsavedChanges_flag: this.hasUnsavedChanges(), // Computed from content comparison
             isInEditMode_flag: this._isInEditMode,
             documentIsDirty: !!(document && document.uri.fsPath === this._path && document.isDirty),
             documentOpenButInaccessible: docOpen && !document
@@ -563,7 +563,7 @@ export class MainKanbanFile extends MarkdownFile {
                 baseConflict: baseHasConflict,
                 documentIsDirty: documentIsDirty,
                 hasFileSystemChanges: this._hasFileSystemChanges,
-                hasUnsavedChanges: this._hasUnsavedChanges,
+                hasUnsavedChanges: this.hasUnsavedChanges(), // Computed from content comparison
                 isInEditMode: this._isInEditMode
             });
         }
@@ -603,7 +603,7 @@ export class MainKanbanFile extends MarkdownFile {
 
             this._content = content;
             this._baseline = content;
-            this._hasUnsavedChanges = false;
+            // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
             this._hasFileSystemChanges = false;
             this._lastModified = await this._getFileModifiedTime();
 
@@ -695,7 +695,7 @@ export class MainKanbanFile extends MarkdownFile {
                     console.log(`[MainKanbanFile] → Disk content changed (${freshContent.length} chars), updating...`);
                     this._content = freshContent;
                     this._baseline = freshContent;
-                    this._hasUnsavedChanges = false;
+                    // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
                     this._lastModified = await this._getFileModifiedTime();
                     this.parseToBoard();
                     this._emitChange('reloaded');

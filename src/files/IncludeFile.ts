@@ -220,8 +220,8 @@ export abstract class IncludeFile extends MarkdownFile {
      * - Document is open but we can't access it (safe default)
      */
     public hasAnyUnsavedChanges(): boolean {
-        // Check 1: Internal state flag (from kanban UI)
-        if (this._hasUnsavedChanges) return true;
+        // Check 1: Internal state flag (from kanban UI) - computed from content comparison
+        if (this.hasUnsavedChanges()) return true;
 
         // Check 2: Edit mode (user is actively editing)
         if (this._isInEditMode) return true;
@@ -252,7 +252,7 @@ export abstract class IncludeFile extends MarkdownFile {
         );
 
         return {
-            hasUnsavedChanges_flag: this._hasUnsavedChanges,
+            hasUnsavedChanges_flag: this.hasUnsavedChanges(), // Computed from content comparison
             isInEditMode_flag: this._isInEditMode,
             documentIsDirty: documentIsDirty
         };
@@ -286,7 +286,7 @@ export abstract class IncludeFile extends MarkdownFile {
                 baseConflict: baseHasConflict,
                 documentIsDirty: documentIsDirty,
                 hasFileSystemChanges: this._hasFileSystemChanges,
-                hasUnsavedChanges: this._hasUnsavedChanges,
+                hasUnsavedChanges: this.hasUnsavedChanges(), // Computed from content comparison
                 isInEditMode: this._isInEditMode
             });
         }
@@ -304,9 +304,9 @@ export abstract class IncludeFile extends MarkdownFile {
         );
 
         // Include has unsaved changes if either:
-        // - Internal state flag is true (from kanban UI edits)
+        // - Internal state flag is true (from kanban UI edits) - computed from content comparison
         // - OR VSCode document is dirty (from text editor edits)
-        const hasIncludeUnsavedChanges = this._hasUnsavedChanges || documentIsDirty;
+        const hasIncludeUnsavedChanges = this.hasUnsavedChanges() || documentIsDirty;
 
         return {
             type: 'external_include',
