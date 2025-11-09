@@ -105,28 +105,6 @@ export class FormatConverter {
     }
 
     /**
-     * Convert a single kanban task to presentation format
-     *
-     * @param task - Kanban task
-     * @returns Presentation slide content
-     */
-    static taskToPresentation(task: KanbanTask): string {
-        let slideContent = '';
-
-        // Add title
-        if (task.title && task.title.trim()) {
-            slideContent += `${task.title}\n\n`;
-        }
-
-        // Add description
-        if (task.description && task.description.trim()) {
-            slideContent += task.description;
-        }
-
-        return slideContent.trim();
-    }
-
-    /**
      * Convert presentation format to kanban format
      *
      * @param presentationContent - Content in presentation format
@@ -191,19 +169,18 @@ export class FormatConverter {
      * @param indentLevel - Indentation level (for subtasks)
      * @returns Markdown content
      */
-    static taskToMarkdown(task: KanbanTask, indentLevel: number = 0): string {
-        const indent = '  '.repeat(indentLevel);
+    static taskToMarkdown(task: KanbanTask): string {
         let markdown = '';
 
         // Task checkbox line (always unchecked for now)
-        markdown += `${indent}- [ ] ${task.title}\n`;
+        markdown += `- [ ] ${task.title}\n`;
 
         // Add description if it exists
         if (task.description && task.description.trim()) {
             // Indent description lines
             const descLines = task.description.split('\n');
             descLines.forEach(line => {
-                markdown += `${indent}  ${line}\n`;
+                markdown += `  ${line}\n`;
             });
         }
 

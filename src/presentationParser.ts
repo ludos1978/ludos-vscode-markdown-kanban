@@ -188,37 +188,31 @@ export class PresentationParser {
 
     // Filter out task includes - they shouldn't be written to presentation format
     // Task includes have includeMode=true or includeFiles set
+    // TODO: Verify if this is true or not
     const regularTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
 
     if (regularTasks.length === 0) {
       return '';
     }
 
-    const slides = regularTasks.map(task => {
+    const slides = regularTasks.map((task, index) => {
+      // After split, we want: ['', 'Title', '', 'Description']
+      // or           we want: ['', '', '', 'Description']
       let slideContent = '';
 
-      // Check if task has a non-empty title
+      // Check if task has a title
       if (task.title && task.title.trim() !== '') {
-        // Has title: 1 blank line, title, 1 blank line, description
-        // After split, we want: ['', 'Title', '', 'Description']
-        slideContent += '\n';              // Start with newline (creates first empty line after split)
-        slideContent += task.title + '\n'; // Title
-        slideContent += '\n';              // Empty line separator
-        if (task.description) {
-          slideContent += task.description;
-        }
+        slideContent += `\n${task.title}\n\n`;
       } else {
         // No title or empty title: 3 blank lines, description
-        // After split, we want: ['', '', '', 'Description']
-        slideContent += '\n\n\n';          // 3 newlines = 3 empty lines after split
-        if (task.description) {
-          slideContent += task.description;
-        }
+        slideContent += '\n\n\n';
       }
-
-      // Add 1 empty line at the end of each slide (before ---)
-      slideContent += '\n';
-
+      if (task.description) {
+        // NO TRIMMING - write exactly as stored
+        slideContent += task.description; 
+      } else {
+          slideContent += '\n';
+      }
       return slideContent;
     });
 
@@ -231,7 +225,7 @@ export class PresentationParser {
     }
 
     // Join slides with --- separator between them (not at start/end)
-    return filteredSlides.join('\n---\n');
+    return filteredSlides.join('\n\n---\n');
   }
 
   /**

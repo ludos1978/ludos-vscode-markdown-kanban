@@ -75,7 +75,8 @@
       "Bash(tee:*)",
       "Bash(timeout 30 npx tsc:*)",
       "Bash(python3:*)",
-      "Bash(/tmp/filtered-log.log)"
+      "Bash(/tmp/filtered-log.log)",
+      "Bash(npx ts-node:*)"
     ],
     "deny": [],
     "ask": []
