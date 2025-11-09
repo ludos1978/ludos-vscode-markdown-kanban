@@ -5,18 +5,18 @@ import { TagUtils, TagVisibility } from '../../utils/tagUtils';
  * Options for presentation generation
  */
 export interface PresentationOptions {
-    /** Output format: 'presentation' (simple) or 'marp' (Marp-compatible) */
-    format?: 'presentation' | 'marp';
-    /** Whether to preserve YAML frontmatter */
-    preserveYaml?: boolean;
+    /** Whether to include Marp directives in YAML frontmatter (default: false) */
+    includeMarpDirectives?: boolean;
     /** Remove !!!include()!!! syntax from titles */
     stripIncludes?: boolean;
     /** Filter out tasks with includeMode or includeFiles */
     filterIncludes?: boolean;
     /** Tag visibility settings */
     tagVisibility?: TagVisibility;
-    /** Marp-specific options */
+    /** Marp-specific options (theme, directives) */
     marp?: MarpOptions;
+    /** Custom YAML to merge (will be merged with Marp directives if both present) */
+    customYaml?: Record<string, any>;
 }
 
 /**
@@ -56,16 +56,16 @@ export class PresentationGenerator {
      *
      * @param board - Kanban board
      * @param options - Generation options
-     * @returns Presentation format string
+     * @returns Marp presentation format string
      *
      * @example
-     * // Simple presentation
+     * // Without Marp directives (for copying)
      * const output = PresentationGenerator.fromBoard(board);
      *
      * @example
-     * // Marp presentation with theme
+     * // With Marp directives (for export)
      * const output = PresentationGenerator.fromBoard(board, {
-     *     format: 'marp',
+     *     includeMarpDirectives: true,
      *     marp: { theme: 'gaia' }
      * });
      */
@@ -79,18 +79,16 @@ export class PresentationGenerator {
      *
      * @param markdown - Kanban markdown string
      * @param options - Generation options
-     * @returns Presentation format string
+     * @returns Marp presentation format string
      *
      * @example
-     * // Simple presentation, preserve YAML
-     * const output = PresentationGenerator.fromMarkdown(markdown, {
-     *     preserveYaml: true
-     * });
+     * // Without Marp directives (for copying)
+     * const output = PresentationGenerator.fromMarkdown(markdown);
      *
      * @example
-     * // Marp presentation with tag filtering
+     * // With Marp directives merged with existing YAML (for export)
      * const output = PresentationGenerator.fromMarkdown(markdown, {
-     *     format: 'marp',
+     *     includeMarpDirectives: true,
      *     tagVisibility: 'hide'
      * });
      */
@@ -104,10 +102,10 @@ export class PresentationGenerator {
      *
      * @param tasks - Array of kanban tasks
      * @param options - Generation options
-     * @returns Presentation format string
+     * @returns Marp presentation format string (without YAML - for copying)
      *
      * @example
-     * // Simple presentation, filter includes
+     * // Without Marp directives (for copying tasks)
      * const output = PresentationGenerator.fromTasks(tasks, {
      *     filterIncludes: true
      * });
@@ -288,12 +286,22 @@ export class PresentationGenerator {
         // Apply tag filtering if specified
         const filteredSlides = this.applyTagFiltering(slides, options.tagVisibility);
 
-        // Format based on output format
-        if (options.format === 'marp') {
-            return this.formatAsMarp(filteredSlides, options);
-        } else {
-            return this.formatAsPresentation(filteredSlides, options);
+        // Build YAML frontmatter if requested
+        let yaml = '';
+        if (options.includeMarpDirectives) {
+            yaml = this.buildYamlFrontmatter(filteredSlides, options);
         }
+
+        // Build slide content (just the content as-is, no added headers)
+        const slideContents = filteredSlides.map(slide => slide.content);
+        const content = slideContents.join('\n\n---\n\n');
+
+        // Combine YAML and content
+        if (yaml) {
+            return yaml + content + '\n';
+        }
+
+        return content + '\n';
     }
 
     /**
@@ -314,73 +322,47 @@ export class PresentationGenerator {
     }
 
     /**
-     * Format slides as simple presentation
+     * Build YAML frontmatter by merging existing YAML, Marp directives, and custom YAML
      */
-    private static formatAsPresentation(
+    private static buildYamlFrontmatter(
         slides: Slide[],
         options: PresentationOptions
     ): string {
-        // Extract YAML from first slide if preserving
-        let yaml = '';
-        if (options.preserveYaml && slides.length > 0 && slides[0].yaml) {
-            yaml = slides[0].yaml;
-        }
+        // Start with existing YAML from source if present
+        const allYaml: Record<string, any> = {};
 
-        // Join slides with standard separator
-        const content = slides
-            .map(slide => slide.content)
-            .join('\n---\n');
-
-        // Combine YAML and content
-        if (yaml) {
-            return yaml + content + '\n';
-        }
-
-        return content + '\n';
-    }
-
-    /**
-     * Format slides as Marp presentation
-     */
-    private static formatAsMarp(
-        slides: Slide[],
-        options: PresentationOptions
-    ): string {
-        // Generate Marp frontmatter
-        const directives: Record<string, any> = {
-            marp: true,
-            theme: options.marp?.theme || 'default',
-            ...options.marp?.directives
-        };
-
-        // Preserve existing YAML values if present
-        if (options.preserveYaml && slides.length > 0 && slides[0].yaml) {
+        if (slides.length > 0 && slides[0].yaml) {
             const existingYaml = this.parseYaml(slides[0].yaml);
-            if (existingYaml['kanban-plugin']) {
-                directives['kanban-plugin'] = existingYaml['kanban-plugin'];
-            }
+            Object.assign(allYaml, existingYaml);
+        }
+
+        // Add Marp directives
+        allYaml.marp = true;
+        allYaml.theme = options.marp?.theme || 'default';
+
+        // Merge additional Marp directives if provided
+        if (options.marp?.directives) {
+            Object.assign(allYaml, options.marp.directives);
+        }
+
+        // Merge custom YAML if provided
+        if (options.customYaml) {
+            Object.assign(allYaml, options.customYaml);
         }
 
         // Format YAML
         let result = '---\n';
-        for (const [key, value] of Object.entries(directives)) {
+        for (const [key, value] of Object.entries(allYaml)) {
             if (typeof value === 'string') {
                 result += `${key}: "${value}"\n`;
-            } else {
+            } else if (typeof value === 'boolean' || typeof value === 'number') {
                 result += `${key}: ${value}\n`;
+            } else {
+                // For complex values, use JSON stringification
+                result += `${key}: ${JSON.stringify(value)}\n`;
             }
         }
         result += '---\n\n';
-
-        // Add slides with Marp formatting
-        for (const slide of slides) {
-            if (slide.level === 'column') {
-                result += `## ${slide.content}\n\n`;
-            } else {
-                result += `### ${slide.content}\n\n`;
-            }
-            result += '---\n\n';
-        }
 
         return result;
     }

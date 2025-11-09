@@ -1052,8 +1052,8 @@ export class ExportService {
         if (convertToPresentation) {
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
             filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
-                format: options.format,  // 'presentation' or 'marp'
-                preserveYaml: false
+                includeMarpDirectives: true,  // Export always includes Marp directives
+                marp: { theme: (options as any).marpTheme || 'default' }
             });
         }
 
@@ -1598,9 +1598,9 @@ export class ExportService {
             // Use new unified presentation generator
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
             result = PresentationGenerator.fromBoard(filteredBoard, {
-                format: options.format,  // 'presentation' or 'marp'
+                includeMarpDirectives: true,  // Export always includes Marp directives
                 stripIncludes: true,
-                marp: options.format === 'marp' ? { theme: (options as any).marpTheme } : undefined
+                marp: { theme: (options as any).marpTheme || 'default' }
             });
 
             // Rewrite links if requested (same as simple path)

@@ -156,8 +156,7 @@ export class FormatConverter {
         if (targetFormat === 'presentation') {
             const { PresentationGenerator } = require('./PresentationGenerator');
             return PresentationGenerator.fromMarkdown(content, {
-                format: 'presentation',
-                preserveYaml: options.preserveYaml
+                includeMarpDirectives: false  // Format conversion doesn't add Marp directives
             });
         } else {
             return this.presentationToKanban(content, options.columnTitle);

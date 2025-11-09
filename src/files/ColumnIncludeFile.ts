@@ -105,11 +105,11 @@ export class ColumnIncludeFile extends IncludeFile {
     public generateFromTasks(tasks: KanbanTask[]): string {
         console.log(`[ColumnIncludeFile] Generating presentation from ${tasks.length} tasks: ${this._relativePath}`);
 
-        // Use unified presentation generator
+        // Use unified presentation generator (no YAML for copying)
         const { PresentationGenerator } = require('../services/export/PresentationGenerator');
         return PresentationGenerator.fromTasks(tasks, {
-            format: 'presentation',
             filterIncludes: true
+            // Note: includeMarpDirectives defaults to false (no YAML when copying)
         });
     }
 
