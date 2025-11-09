@@ -105,8 +105,12 @@ export class ColumnIncludeFile extends IncludeFile {
     public generateFromTasks(tasks: KanbanTask[]): string {
         console.log(`[ColumnIncludeFile] Generating presentation from ${tasks.length} tasks: ${this._relativePath}`);
 
-        // Use PresentationParser to convert tasks back to presentation format
-        return PresentationParser.tasksToPresentation(tasks);
+        // Use unified presentation generator
+        const { PresentationGenerator } = require('../services/export/PresentationGenerator');
+        return PresentationGenerator.fromTasks(tasks, {
+            format: 'presentation',
+            filterIncludes: true
+        });
     }
 
     /**

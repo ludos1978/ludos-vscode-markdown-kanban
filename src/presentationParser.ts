@@ -181,52 +181,6 @@ export class PresentationParser {
    *
    * Note: No --- at the beginning or end of the file, only between slides
    */
-  static tasksToPresentation(tasks: KanbanTask[]): string {
-    if (!tasks || tasks.length === 0) {
-      return '';
-    }
-
-    // Filter out task includes - they shouldn't be written to presentation format
-    // Task includes have includeMode=true or includeFiles set
-    // TODO: Verify if this is true or not
-    const regularTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
-
-    if (regularTasks.length === 0) {
-      return '';
-    }
-
-    const slides = regularTasks.map((task, index) => {
-      // After split, we want: ['', 'Title', '', 'Description']
-      // or           we want: ['', '', '', 'Description']
-      let slideContent = '';
-
-      // Check if task has a title
-      if (task.title && task.title.trim() !== '') {
-        slideContent += `\n${task.title}\n\n`;
-      } else {
-        // No title or empty title: 3 blank lines, description
-        slideContent += '\n\n\n';
-      }
-      if (task.description) {
-        // NO TRIMMING - write exactly as stored
-        slideContent += task.description; 
-      } else {
-          slideContent += '\n';
-      }
-      return slideContent;
-    });
-
-    // Join slides with slide separators
-    // Format: [slide1]\n---\n[slide2]\n---\n[slide3]
-    // Note: We don't add --- at the beginning or end - only between slides
-    const filteredSlides = slides.filter(slide => slide);
-    if (filteredSlides.length === 0) {
-      return '';
-    }
-
-    // Join slides with --- separator between them (not at start/end)
-    return filteredSlides.join('\n\n---\n');
-  }
 
   /**
    * Parse a markdown file and convert to kanban tasks

@@ -1050,7 +1050,11 @@ export class ExportService {
 
         // Convert to presentation format if requested
         if (convertToPresentation) {
-            filteredContent = this.convertToPresentationFormat(filteredContent, false);
+            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
+                format: options.format,  // 'presentation' or 'marp'
+                preserveYaml: false
+            });
         }
 
         return {
@@ -1417,141 +1421,7 @@ export class ExportService {
         return board;
     }
 
-    /**
-     * Convert board object directly to presentation format
-     * No parsing needed - works directly with in-memory data
-     */
-    private static boardToPresentation(board: any): string {
-        const slides: string[] = [];
 
-        for (const column of board.columns) {
-            // Add column title as slide
-            // Use displayTitle if available (has !!!include()!!! stripped), otherwise clean the title
-            let columnTitle = column.displayTitle || column.title;
-            if (columnTitle && columnTitle.trim()) {
-                // Strip !!!include()!!! syntax if still present
-                columnTitle = columnTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-                if (columnTitle) {
-                    slides.push(columnTitle);
-                }
-            }
-
-            // Add each task as slide
-            if (column.tasks && column.tasks.length > 0) {
-                for (const task of column.tasks) {
-                    let slideContent = '';
-
-                    // Add task title
-                    // Use displayTitle if available (has !!!include()!!! stripped), otherwise clean the title
-                    let taskTitle = task.displayTitle || task.title;
-                    if (taskTitle && taskTitle.trim()) {
-                        // Strip !!!include()!!! syntax if still present
-                        taskTitle = taskTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-                        if (taskTitle) {
-                            slideContent = taskTitle;
-                        }
-                    }
-
-                    // Add task description
-                    if (task.description && task.description.trim()) {
-                        if (slideContent) {
-                            slideContent += '\n\n' + task.description.trim();
-                        } else {
-                            slideContent = task.description.trim();
-                        }
-                    }
-
-                    if (slideContent) {
-                        slides.push(slideContent);
-                    }
-                }
-            }
-        }
-
-        return slides.join('\n---\n') + '\n';
-    }
-
-    /**
-     * Convert kanban format to presentation format
-     * Each task becomes a slide separated by ---
-     * Column titles are included as slides before their tasks
-     * Task checkboxes (- [ ]) are removed from titles
-     *
-     * @param content - The kanban content to convert
-     * @param mergeIncludes - If true, preserve column structure without separating tasks into slides
-     */
-    private static convertToPresentationFormat(content: string, mergeIncludes: boolean = false): string {
-
-        // Remove YAML frontmatter if present
-        let workingContent = content;
-        const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n\n?/);
-        if (yamlMatch) {
-            workingContent = content.substring(yamlMatch[0].length);
-        }
-
-        const slides: string[] = [];
-        const lines = workingContent.split('\n');
-        let i = 0;
-
-        while (i < lines.length) {
-            const line = lines[i];
-
-            // Column header: ## Title (ONLY if not indented - starts at beginning of line)
-            if (line.startsWith('## ') && !line.startsWith(' ')) {
-                const columnTitle = line.substring(3).trim();
-                if (columnTitle) {
-                    slides.push(columnTitle);
-                }
-                i++;
-                continue;
-            }
-
-            // Task: - [ ] Title or - [x] Title (ONLY if not indented - starts at beginning of line)
-            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
-                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
-
-                // Collect description (indented lines)
-                const descriptionLines: string[] = [];
-                i++;
-
-                while (i < lines.length) {
-                    const nextLine = lines[i];
-
-                    // Stop at next NON-INDENTED column or task
-                    if (!nextLine.startsWith(' ') && (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
-                        break;
-                    }
-
-                    // Collect indented or empty lines
-                    if (nextLine.startsWith('  ')) {
-                        descriptionLines.push(nextLine.substring(2));
-                        i++;
-                    } else if (nextLine.trim() === '') {
-                        descriptionLines.push('');
-                        i++;
-                    } else {
-                        break;
-                    }
-                }
-
-                // Build slide: title + description
-                let slide = taskTitle;
-                if (descriptionLines.length > 0) {
-                    const description = descriptionLines.join('\n').trim();
-                    if (description) {
-                        slide += '\n\n' + description;
-                    }
-                }
-
-                slides.push(slide);
-                continue;
-            }
-
-            i++;
-        }
-
-        return slides.join('\n---\n') + '\n';
-    }
 
 
     /**
@@ -1724,7 +1594,14 @@ export class ExportService {
         if (board && options.format !== 'kanban' && !options.packAssets) {
             // Filter board based on scope and selection
             const filteredBoard = this.filterBoard(board, options);
-            result = this.boardToPresentation(filteredBoard);
+
+            // Use new unified presentation generator
+            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            result = PresentationGenerator.fromBoard(filteredBoard, {
+                format: options.format,  // 'presentation' or 'marp'
+                stripIncludes: true,
+                marp: options.format === 'marp' ? { theme: (options as any).marpTheme } : undefined
+            });
 
             // Rewrite links if requested (same as simple path)
             if (options.linkHandlingMode !== 'no-modify') {

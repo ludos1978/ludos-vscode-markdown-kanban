@@ -2,107 +2,12 @@ import { PresentationParser } from '../../presentationParser';
 import { KanbanColumn, KanbanTask } from '../../markdownParser';
 
 /**
- * Unified format conversion utility
- * Consolidates all conversion logic from across the codebase
+ * Format conversion utility
  *
- * Replaces 8+ duplicate conversion functions:
- * - exportService.ts: convertToPresentationFormat, convertPresentationToKanban
- * - presentationParser.ts: parsePresentation, slidesToTasks, tasksToPresentation
- * - markdownParser.ts: parseKanban, columnsToMarkdown
- * - kanbanWebviewPanel.ts: Various inline conversions
+ * Handles conversion between kanban and presentation formats.
+ * For presentation generation, use PresentationGenerator instead.
  */
 export class FormatConverter {
-    /**
-     * Convert kanban format to presentation format
-     *
-     * @param kanbanContent - Markdown content in kanban format
-     * @param preserveYaml - Whether to preserve YAML frontmatter
-     * @returns Content in presentation format
-     */
-    static kanbanToPresentation(
-        kanbanContent: string,
-        preserveYaml: boolean = true
-    ): string {
-        // Extract YAML frontmatter if it exists
-        const yamlMatch = kanbanContent.match(/^---\n([\s\S]*?)\n---\n\n?/);
-        let yaml = '';
-        let workingContent = kanbanContent;
-
-        if (yamlMatch) {
-            yaml = yamlMatch[0];
-            workingContent = kanbanContent.substring(yamlMatch[0].length);
-        }
-
-        const slides: string[] = [];
-        const lines = workingContent.split('\n');
-        let i = 0;
-
-        while (i < lines.length) {
-            const line = lines[i];
-
-            // Column header: ## Title (ONLY if not indented - starts at beginning of line)
-            if (line.startsWith('## ') && !line.startsWith(' ')) {
-                const columnTitle = line.substring(3).trim();
-                if (columnTitle) {
-                    slides.push(columnTitle);
-                }
-                i++;
-                continue;
-            }
-
-            // Task: - [ ] Title or - [x] Title (ONLY if not indented - starts at beginning of line)
-            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
-                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
-
-                // Collect description (indented lines)
-                const descriptionLines: string[] = [];
-                i++;
-
-                while (i < lines.length) {
-                    const nextLine = lines[i];
-
-                    // Stop at next NON-INDENTED column or task
-                    if (!nextLine.startsWith(' ') && (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
-                        break;
-                    }
-
-                    // Collect indented or empty lines
-                    if (nextLine.startsWith('  ')) {
-                        descriptionLines.push(nextLine.substring(2));
-                        i++;
-                    } else if (nextLine.trim() === '') {
-                        descriptionLines.push('');
-                        i++;
-                    } else {
-                        break;
-                    }
-                }
-
-                // Build slide: title + description
-                let slide = taskTitle;
-                if (descriptionLines.length > 0) {
-                    const description = descriptionLines.join('\n').trim();
-                    if (description) {
-                        slide += '\n\n' + description;
-                    }
-                }
-
-                slides.push(slide);
-                continue;
-            }
-
-            i++;
-        }
-
-        const presentationContent = slides.join('\n---\n');
-
-        // Add YAML back if requested
-        if (preserveYaml && yaml) {
-            return yaml + presentationContent + '\n';
-        }
-
-        return presentationContent + '\n';
-    }
 
     /**
      * Convert presentation format to kanban format
@@ -249,7 +154,11 @@ export class FormatConverter {
 
         // Perform conversion
         if (targetFormat === 'presentation') {
-            return this.kanbanToPresentation(content, options.preserveYaml);
+            const { PresentationGenerator } = require('./PresentationGenerator');
+            return PresentationGenerator.fromMarkdown(content, {
+                format: 'presentation',
+                preserveYaml: options.preserveYaml
+            });
         } else {
             return this.presentationToKanban(content, options.columnTitle);
         }
