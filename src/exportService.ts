@@ -1386,38 +1386,38 @@ export class ExportService {
         }
 
         // Fallback to old scope-based system
-        if (!options.scope || options.scope === 'board') {
-            return board;
-        }
+        // if (!options.scope || options.scope === 'board') {
+        //     return board;
+        // }
 
-        if (options.scope === 'column' && options.selection?.columnIndex !== undefined) {
-            const columnIndex = options.selection.columnIndex;
-            if (columnIndex >= 0 && columnIndex < board.columns.length) {
-                return {
-                    columns: [board.columns[columnIndex]]
-                };
-            }
-        }
+        // if (options.scope === 'column' && options.selection?.columnIndex !== undefined) {
+        //     const columnIndex = options.selection.columnIndex;
+        //     if (columnIndex >= 0 && columnIndex < board.columns.length) {
+        //         return {
+        //             columns: [board.columns[columnIndex]]
+        //         };
+        //     }
+        // }
 
-        if (options.scope === 'task' && options.selection?.columnIndex !== undefined && options.selection?.taskId) {
-            const columnIndex = options.selection.columnIndex;
-            const taskId = options.selection.taskId;
+        // if (options.scope === 'task' && options.selection?.columnIndex !== undefined && options.selection?.taskId) {
+        //     const columnIndex = options.selection.columnIndex;
+        //     const taskId = options.selection.taskId;
 
-            if (columnIndex >= 0 && columnIndex < board.columns.length) {
-                const column = board.columns[columnIndex];
-                const task = column.tasks?.find((t: any) => t.id === taskId);
+        //     if (columnIndex >= 0 && columnIndex < board.columns.length) {
+        //         const column = board.columns[columnIndex];
+        //         const task = column.tasks?.find((t: any) => t.id === taskId);
 
-                if (task) {
-                    return {
-                        columns: [{
-                            id: column.id,
-                            title: '',
-                            tasks: [task]
-                        }]
-                    };
-                }
-            }
-        }
+        //         if (task) {
+        //             return {
+        //                 columns: [{
+        //                     id: column.id,
+        //                     title: '',
+        //                     tasks: [task]
+        //                 }]
+        //             };
+        //         }
+        //     }
+        // }
 
         return board;
     }

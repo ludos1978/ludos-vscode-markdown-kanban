@@ -336,7 +336,6 @@ export class OperationOptionsBuilder {
         // Set defaults based on operation type
         if (this.options.operation === 'export') {
             this.options.formatStrategy = this.options.formatStrategy || 'keep';
-            this.options.scope = this.options.scope || 'full';
             this.options.includeMode = this.options.includeMode || {
                 strategy: 'merge',
                 processTypes: ['include', 'columninclude', 'taskinclude'],

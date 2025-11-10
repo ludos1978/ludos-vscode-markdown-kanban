@@ -212,7 +212,7 @@ export class KanbanWebviewPanel {
                 localResourceRoots.push(folder.uri);
             });
         }
-
+        
         panel.webview.options = {
             enableScripts: true,
             localResourceRoots: localResourceRoots,
@@ -1320,7 +1320,7 @@ export class KanbanWebviewPanel {
         console.log(`[_syncMainFileToRegistry] Board exists: ${!!board}, Board valid: ${board?.valid}`);
         if (board && board.valid) {
             // Step 1: Create include file instances in registry
-            this._syncIncludeFilesWithRegistry(board);
+            this.syncIncludeFilesWithRegistry(board);
 
             // Step 2: Mark includes as loading (sets loading flags on columns/tasks)
             this._markIncludesAsLoading(board);
@@ -1556,16 +1556,9 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Public method to sync include files with registry (called from message handler after board updates)
-     */
-    public syncIncludeFilesWithBoard(board: KanbanBoard): void {
-        this._syncIncludeFilesWithRegistry(board);
-    }
-
-    /**
      * Phase 1: Sync include files with registry (create instances for all includes in the board)
      */
-    private _syncIncludeFilesWithRegistry(board: KanbanBoard): void {
+    private syncIncludeFilesWithRegistry(board: KanbanBoard): void {
         const mainFile = this._fileRegistry.getMainFile();
         if (!mainFile) {
             console.warn(`[KanbanWebviewPanel] Cannot sync include files - no main file in registry`);

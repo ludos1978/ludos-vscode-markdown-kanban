@@ -3989,7 +3989,7 @@ export class MessageHandler {
             // Handle SAVE / PREVIEW modes (with progress bar)
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `Exporting ${options.scope}...`,
+                title: `Exporting...`,
                 cancellable: false
             }, async (progress) => {
 

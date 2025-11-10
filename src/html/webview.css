@@ -584,6 +584,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Main container - fills viewport below file bar */
 #kanban-container {
+  background-color: var(--vscode-titleBar-activeBackground);
   position: fixed;
   top: calc(var(--whitespace) + 1px + 24px);
   left: 0;
@@ -622,7 +623,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 /* Kanban columns - Full height wrapper for sticky positioning */
 .kanban-full-height-column {
   /* Transparent wrapper that provides full height for sticky positioning */
-  background-color: transparent;
+  /* background-color: transparent; */
   border: none;
   width: var(--column-width);
   flex-shrink: 0;
@@ -733,7 +734,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 /* Footer bars in stacked columns are part of sticky column-footer */
 .kanban-column-stack .column-footer > .stacked-footer-bars {
   position: relative;
-  background-color: var(--vscode-editor-background);
+  /* background-color: var(--vscode-titleBar-activeBackground);; */
   margin-top: 0;
   width: 100%;
   flex-shrink: 0;
@@ -2047,7 +2048,7 @@ button.file-bar-menu-item {
 /* Margin spacer above column-title with background (top/bottom set dynamically by JavaScript) */
 .kanban-column-stack .kanban-full-height-column .column-margin {
   position: sticky;
-  background: var(--vscode-editor-background);
+  /* background: var(--vscode-editor-background); */
   height: var(--whitespace-div2);
 }
 
@@ -4665,7 +4666,7 @@ s {
     display: flex;
     align-items: center;
     padding: 4px 8px;
-    background-color: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+    /* background-color: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05)); */
     border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
     font-size: 0.9em;
     font-family: var(--vscode-font-family);
