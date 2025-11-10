@@ -4014,16 +4014,9 @@ export class MessageHandler {
                     });
                 }
 
-                // Open in browser if requested
-                if (result.success && options.openAfterExport && result.exportedPath) {
-                    const uri = vscode.Uri.file(result.exportedPath);
-
-                    if (result.exportedPath.endsWith('.html')) {
-                        await vscode.env.openExternal(vscode.Uri.parse(uri.toString()));
-                    } else {
-                        await vscode.env.openExternal(uri);
-                    }
-                }
+                // Note: When marpWatch is enabled (Live Preview mode), Marp CLI handles
+                // opening the browser automatically with --watch --preview flags.
+                // We don't need to call MarpExtensionService.openInMarpPreview() here.
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 100);

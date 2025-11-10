@@ -24,7 +24,7 @@ export interface NewExportOptions {
     columnIndexes?: number[];
 
     // SCOPE: What to export
-    scope?: 'board' | 'column' | 'task';
+    // scope?: 'board' | 'column' | 'task';
 
     // SELECTION: Specific item to export (for column/task scope)
     selection?: {
@@ -236,9 +236,10 @@ export class ExportService {
         convertToPresentation: boolean = false,
         mergeIncludes: boolean = false
     ): Promise<{ processedContent: string; includeStats: number }> {
-        if (!options.packOptions?.includeFiles || false) {
-            return { processedContent: content, includeStats: 0 };
-        }
+        // IMPORTANT: Always process includes - they must be either:
+        // 1. Merged (inlined) into the document, OR
+        // 2. Copied to export folder with rewritten paths
+        // The packOptions.includeFiles setting is for OTHER markdown files, not includes
 
         let processedContent = content;
         let includeCount = 0;
@@ -1585,25 +1586,46 @@ export class ExportService {
         let notIncludedAssets: AssetInfo[] = [];
 
         // ROUTING LOGIC:
-        // - Converting format (presentation/marp) → Use in-memory board (kanban-data)
+        // - Converting format (presentation/marp) WITH includes → Use file-based pipeline
+        // - Converting format (presentation/marp) WITHOUT includes → Use board-based (faster)
         // - Keeping original format (kanban) → Use file (kanban-markdown) to preserve formatting
         // - Asset packing → Use file to process includes correctly
         const convertToPresentation = (options.format === 'presentation' || options.format === 'marp');
 
-        // Use board-based conversion for ANY format conversion (not just presentation)
-        if (board && options.format !== 'kanban' && !options.packAssets) {
+        // Determine settings
+        // Default: Don't merge includes (keep them separate with rewritten paths)
+        const mergeIncludes = options.mergeIncludes ?? false;
+
+        // Check if we need to process includes
+        // When mergeIncludes is false, we need file-based pipeline to copy include files
+        const hasIncludes = result.includes('!!!include(');
+        const needsIncludeProcessing = hasIncludes && !mergeIncludes;
+
+        // Use board-based conversion ONLY when:
+        // - Converting format AND
+        // - NOT packing assets AND
+        // - mergeIncludes is true (content already inlined in board, no separate files needed)
+        const useBoardBasedConversion = board &&
+                                        options.format !== 'kanban' &&
+                                        !options.packAssets &&
+                                        mergeIncludes;
+
+        if (useBoardBasedConversion) {
+            // BOARD-BASED PATH: Use in-memory board (includes already resolved)
+            console.log('[ExportService.transformContent] Taking BOARD-BASED path');
             // Filter board based on scope and selection
             const filteredBoard = this.filterBoard(board, options);
 
-            // Use new unified presentation generator
+            // Use unified presentation generator
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+
             result = PresentationGenerator.fromBoard(filteredBoard, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
-                stripIncludes: true,
+                stripIncludes: true,  // Strip include syntax (content already inlined in board)
                 marp: { theme: (options as any).marpTheme || 'default' }
             });
 
-            // Rewrite links if requested (same as simple path)
+            // Rewrite links if requested
             if (options.linkHandlingMode !== 'no-modify') {
                 result = this.rewriteLinksForExport(
                     result,
@@ -1614,14 +1636,16 @@ export class ExportService {
                 );
             }
 
-            return { content: result, notIncludedAssets: [] };
+            // Don't return early - continue to outputContent phase for Marp CLI execution
         }
-
-        // Use file-based pipeline only for keeping original format or packing assets
-        if (options.packAssets || options.format !== 'kanban') {
-
-            // Determine settings
-            const mergeIncludes = options.mergeIncludes ?? (options.columnIndexes && options.columnIndexes.length > 0);
+        // Use file-based pipeline when:
+        // - Packing assets OR
+        // - Converting format OR
+        // - Need to process includes (mergeIncludes is false)
+        else if (options.packAssets || options.format !== 'kanban' || needsIncludeProcessing) {
+            // FILE-BASED PATH: Process raw markdown to handle includes correctly
+            console.log('[ExportService.transformContent] Taking FILE-BASED path');
+            console.log('[ExportService.transformContent] Input content length:', result.length);
 
             // Use existing processMarkdownContent (it does everything)
             const processed = await this.processMarkdownContent(
@@ -1637,8 +1661,10 @@ export class ExportService {
 
             result = processed.exportedContent;
             notIncludedAssets = processed.notIncludedAssets;
+            console.log('[ExportService.transformContent] Output content length:', result.length);
 
         } else {
+            console.log('[ExportService.transformContent] Taking SIMPLE path (no conversion)');
             // Simple path: tag filtering and link rewriting (no asset packing)
             result = this.applyTagFiltering(result, options.tagVisibility);
 
@@ -1853,31 +1879,32 @@ export class ExportService {
                 };
             }
         }
-
-        // MODE: SAVE (single conversion)
-        try {
-            await MarpExportService.export({
-                inputFilePath: processedMarkdownPath, // Use preprocessed markdown
-                format: marpFormat,
-                outputPath: outputPath,
-                enginePath: options.marpEnginePath,
-                theme: options.marpTheme
-            });
-            return {
-                success: true,
-                message: `Exported to ${outputPath}`,
-                exportedPath: outputPath
-            };
-        } catch (error) {
-            console.error(`[kanban.exportService.runMarpConversion] Conversion failed:`, error);
-            return {
-                success: false,
-                message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
-            };
-        } finally {
-            // Cleanup preprocessed file
-            if (preprocessCleanup) {
-                await preprocessCleanup();
+        else {
+            // MODE: SAVE (single conversion)
+            try {
+                await MarpExportService.export({
+                    inputFilePath: processedMarkdownPath, // Use preprocessed markdown
+                    format: marpFormat,
+                    outputPath: outputPath,
+                    enginePath: options.marpEnginePath,
+                    theme: options.marpTheme
+                });
+                return {
+                    success: true,
+                    message: `Exported to ${outputPath}`,
+                    exportedPath: outputPath
+                };
+            } catch (error) {
+                console.error(`[kanban.exportService.runMarpConversion] Conversion failed:`, error);
+                return {
+                    success: false,
+                    message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
+                };
+            } finally {
+                // Cleanup preprocessed file
+                if (preprocessCleanup) {
+                    await preprocessCleanup();
+                }
             }
         }
     }
@@ -1903,19 +1930,16 @@ export class ExportService {
             this.exportedFiles.clear();
 
             // PHASE 1: EXTRACTION
-            // Use in-memory board for ANY conversion (kanban or presentation)
-            // Only use file-based extraction when keeping original format or packing assets
-            const useBoardDirectly = board && options.format !== 'kanban' && !options.packAssets;
+            // Determine if we need to extract content from file
+            // Skip extraction only when using board-based conversion (mergeIncludes: true)
+            const mergeIncludes = options.mergeIncludes ?? false;
             let extracted: string;
 
-            if (useBoardDirectly) {
-                extracted = ''; // Dummy value, won't be used
-            } else {
-                extracted = await this.extractContent(
-                    sourceDocument,
-                    options.columnIndexes
-                );
-            }
+            // Extract content from file (needed for file-based pipeline)
+            extracted = await this.extractContent(
+                sourceDocument,
+                options.columnIndexes
+            );
 
             // PHASE 2: TRANSFORMATION
             const transformed = await this.transformContent(

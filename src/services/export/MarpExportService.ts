@@ -223,12 +223,14 @@ export class MarpExportService {
     private static buildMarpCliArgs(inputPath: string, options: MarpExportOptions): string[] {
         const args: string[] = [inputPath];
 
-        // Output format
+        // Output format - must be html, pdf, or pptx
+        // Format comes from UI dropdown, so should always be valid
         if (options.format === 'pdf') {
             args.push('--pdf');
         } else if (options.format === 'pptx') {
             args.push('--pptx');
-        } else if (options.format === 'html') {
+        } else {
+            // Default to HTML (covers 'html' and any legacy 'markdown' from old saved settings)
             args.push('--html');
         }
 

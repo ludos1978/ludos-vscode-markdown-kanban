@@ -76,7 +76,9 @@
       "Bash(timeout 30 npx tsc:*)",
       "Bash(python3:*)",
       "Bash(/tmp/filtered-log.log)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(npx @marp-team/marp-cli:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
