@@ -4130,7 +4130,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 .markdown-content strong::before, .markdown-content strong::after,
 .markdown-content b::before, .markdown-content b::after {
   content: "*"; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 9px !important; font-weight: bold;
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
@@ -4144,7 +4144,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 .markdown-content em::before, .markdown-content em::after,
 .markdown-content i::before, .markdown-content i::after {
   content: "_"; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 9px !important; font-style: normal;
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
@@ -4159,7 +4159,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 .markdown-content s::before, .markdown-content s::after,
 .markdown-content strike::before, .markdown-content strike::after {
   content: "~"; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 9px !important;
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
@@ -4172,7 +4172,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 /* Inline code - before and after */
 .markdown-content code::before, .markdown-content code::after {
   content: "`"; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 10px !important; font-weight: bold;
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
@@ -4197,7 +4197,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 /* Underline - before and after */
 .markdown-content u::before, .markdown-content u::after {
   content: "u"; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 8px !important; font-weight: bold;
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
@@ -4211,7 +4211,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 /* Mark/Highlight - before and after */
 .markdown-content mark::before, .markdown-content mark::after {
   content: "="; display: inline-block;
-  width: 10px; height: 14px;
+  width: 12px; height: 14px;
   border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
   font-family: monospace; font-size: 9px !important; font-weight: bold;
   background: rgba(255, 235, 59, 0.4); color: rgba(51, 51, 51, 0.7);
@@ -4467,7 +4467,7 @@ mark {
     color: var(--vscode-editor-foreground);
     padding: 1px 2px;
     border-radius: 2px;
-    display: inline-flex;
+    display: inline-block;
     word-break: break-word;
 }
 
