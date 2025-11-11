@@ -374,19 +374,8 @@ class SimpleMenuManager {
             });
         });
 
-        // Hover management - track when we're in a submenu
-        submenu.addEventListener('mouseenter', () => {
-            this.clearTimeout();
-            window._inSubmenu = true;
-            // Also set dropdown state to prevent closing during transition
-            window._inDropdown = true;
-        });
-        submenu.addEventListener('mouseleave', () => {
-            window._inSubmenu = false;
-            // Clear dropdown state when leaving submenu
-            window._inDropdown = false;
-            this.startHideTimer();
-        });
+        // Note: Hover management is now handled in setupMenuHoverHandlers
+        // to track state per menu item instead of globally
     }
 
     // Smart positioning that handles viewport boundaries
@@ -445,17 +434,15 @@ class SimpleMenuManager {
     }
 
     // Timeout management
-    startHideTimer() {
+    startHideTimer(delay = 200) {
         this.clearTimeout();
         this.hideTimeout = setTimeout(() => {
-            // RECHECK: Verify we're actually not hovering before closing
-            // This prevents menus from closing if mouse quickly re-enters
+            // RECHECK: Verify submenu is actually not hovered before closing
+            // This is a final safety check in case event handlers didn't fire correctly
             const isHoveringSubmenu = this.activeSubmenu && this.activeSubmenu.matches(':hover');
-            const isHoveringDropdown = Array.from(document.querySelectorAll('.donut-menu-dropdown, .file-bar-menu-dropdown'))
-                .some(el => el.matches(':hover'));
 
-            if (isHoveringSubmenu || isHoveringDropdown) {
-                // Mouse is back in menu, don't close
+            if (isHoveringSubmenu) {
+                // Mouse is back in submenu, don't close
                 return;
             }
 
@@ -499,7 +486,7 @@ class SimpleMenuManager {
                     }
                 });
             }, 100);
-        }, 300);
+        }, delay);
     }
 
     clearTimeout() {
@@ -637,25 +624,55 @@ function setupMenuHoverHandlers(menu, dropdown) {
         window._inDropdown = false;
         window.menuManager.startHideTimer();
     });
-    
-    dropdown.querySelectorAll('.donut-menu-item.has-submenu').forEach(menuItem => {
+
+    // Add handlers to ALL menu items to close submenu when hovering non-submenu items
+    dropdown.querySelectorAll('.donut-menu-item:not(.has-submenu)').forEach(menuItem => {
         menuItem.addEventListener('mouseenter', () => {
+            window.menuManager.hideSubmenu();
+        });
+    });
+
+    dropdown.querySelectorAll('.donut-menu-item.has-submenu').forEach(menuItem => {
+        // Track hover state for this specific menu item and its submenu
+        let isMenuItemHovered = false;
+        let isSubmenuHovered = false;
+
+        const checkAndHideSubmenu = () => {
+            if (!isMenuItemHovered && !isSubmenuHovered) {
+                window.menuManager.startHideTimer();
+            }
+        };
+
+        menuItem.addEventListener('mouseenter', () => {
+            isMenuItemHovered = true;
             window.menuManager.clearTimeout();
-            
+
             const submenu = window.menuManager.showSubmenu(
-                menuItem, 
-                menuItem.dataset.id, 
-                menuItem.dataset.type, 
+                menuItem,
+                menuItem.dataset.id,
+                menuItem.dataset.type,
                 menuItem.dataset.columnId
             );
-            
+
             if (submenu) {
                 window.menuManager.positionSubmenu(menuItem, submenu);
+
+                // Add hover tracking to the submenu
+                submenu.addEventListener('mouseenter', () => {
+                    isSubmenuHovered = true;
+                    window.menuManager.clearTimeout();
+                });
+
+                submenu.addEventListener('mouseleave', () => {
+                    isSubmenuHovered = false;
+                    checkAndHideSubmenu();
+                });
             }
         });
-        
+
         menuItem.addEventListener('mouseleave', () => {
-            window.menuManager.startHideTimer();
+            isMenuItemHovered = false;
+            checkAndHideSubmenu();
         });
     });
 }

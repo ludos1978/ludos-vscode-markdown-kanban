@@ -5009,15 +5009,17 @@ figcaption {
 }
 
 .debug-btn, .debug-close {
+    background: var(--button-background);
+    color: var(--button-foreground);
+    border: var(--button-border);
     padding: 2px 4px 2px 4px;
-    border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
 }
 
 .debug-btn:hover, .debug-close:hover {
-  background: var(--button-secondary-background-hover);
+    background: var(--button-secondary-background-hover);
 }
 
 .debug-close {
