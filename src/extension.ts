@@ -39,65 +39,6 @@ export function activate(context: vscode.ExtensionContext) {
 		setStatus: setFileListenerStatus
 	};
 
-	// Register onWillSaveTextDocument to sync board changes before save
-	const willSaveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
-		const document = event.document;
-		console.log(`[Extension.onWillSave] Document about to save: ${document.uri.fsPath}`);
-
-		// Find panel for this document
-		const panel = KanbanWebviewPanel.getPanelForDocument(document.uri.toString());
-		if (!panel) {
-			console.log('[Extension.onWillSave] No panel found for document');
-			return; // No panel for this document
-		}
-
-		const hasUnsaved = panel.hasUnsavedChanges();
-		console.log(`[Extension.onWillSave] Panel found, hasUnsavedChanges: ${hasUnsaved}`);
-
-		// If there are unsaved changes in the UI, update the document before save
-		if (hasUnsaved) {
-			console.log('[Extension.onWillSave] Updating document with board changes before save');
-
-			// Use waitUntil to ensure the document is updated before the save proceeds
-			event.waitUntil(
-				(async () => {
-					// Save board to markdown file
-					console.log(`[Extension.onWillSave] ===== SAVING BOARD TO MARKDOWN =====`);
-					await panel.saveToMarkdown(false, false); // updateVersionTracking=false, triggerSave=false
-					console.log(`[Extension.onWillSave] ===== BOARD SAVED =====`);
-
-					// Manually trigger save event handlers since workspace.fs.writeFile doesn't fire onDidSaveTextDocument
-					// This ensures auto-export handlers (like marpWatch) are triggered
-					const SaveEventCoordinator = require('./saveEventCoordinator').SaveEventCoordinator;
-					const coordinator = SaveEventCoordinator.getInstance();
-
-					// Get all registered handlers
-					const handlers = Array.from((coordinator as any).handlers.values()) as Array<any>;
-					console.log(`[Extension.onWillSave] ===== MANUALLY TRIGGERING ${handlers.length} SAVE EVENT HANDLERS =====`);
-
-					for (const handler of handlers) {
-						try {
-							console.log(`[Extension.onWillSave] Handler: ${handler.id}, isEnabled: ${handler.isEnabled ? handler.isEnabled() : 'no isEnabled function'}`);
-							if (handler.isEnabled && !handler.isEnabled()) {
-								console.log(`[Extension.onWillSave] Handler '${handler.id}' is disabled, skipping`);
-								continue;
-							}
-							console.log(`[Extension.onWillSave] ===== CALLING HANDLER '${handler.id}' =====`);
-							await handler.handleSave(document);
-							console.log(`[Extension.onWillSave] ===== HANDLER '${handler.id}' COMPLETED =====`);
-						} catch (error) {
-							console.error(`[Extension.onWillSave] Handler '${handler.id}' failed:`, error);
-						}
-					}
-					console.log(`[Extension.onWillSave] ===== ALL HANDLERS COMPLETED =====`);
-				})()
-			);
-		} else {
-			console.log('[Extension.onWillSave] No unsaved changes, allowing save to proceed normally');
-		}
-	});
-
-	context.subscriptions.push(willSaveListener);
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {

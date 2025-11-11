@@ -1457,10 +1457,35 @@ export class MessageHandler {
         // Triggering _onBoardUpdate() would cause folding state to be lost
         await this._onSaveToMarkdown();
 
+        // DEBUG: Check marpWatch state
+        console.log(`[MessageHandler.saveBoardState] ===== MARPWATCH DEBUG =====`);
+        console.log(`[MessageHandler.saveBoardState] _autoExportSettings:`, this._autoExportSettings);
+        console.log(`[MessageHandler.saveBoardState] _autoExportSettings?.marpWatch:`, this._autoExportSettings?.marpWatch);
+        console.log(`[MessageHandler.saveBoardState] ===========================`);
+
         // Trigger marpWatch export if active
         if (this._autoExportSettings?.marpWatch) {
             console.log(`[MessageHandler.saveBoardState] MarpWatch active - triggering export after save`);
-            const document = this._fileManager.getDocument();
+
+            // Get document from fileManager, or reopen from file path if needed
+            let document = this._fileManager.getDocument();
+            const filePath = this._fileManager.getFilePath();
+
+            console.log(`[MessageHandler.saveBoardState] document from fileManager:`, !!document);
+            console.log(`[MessageHandler.saveBoardState] file path:`, filePath);
+
+            // If document is closed but we have a file path, reopen it
+            if (!document && filePath) {
+                console.log(`[MessageHandler.saveBoardState] Document closed, reopening from file path:`, filePath);
+                const vscode = require('vscode');
+                try {
+                    document = await vscode.workspace.openTextDocument(filePath);
+                    console.log(`[MessageHandler.saveBoardState] Document reopened successfully`);
+                } catch (error) {
+                    console.error(`[MessageHandler.saveBoardState] Failed to reopen document:`, error);
+                }
+            }
+
             if (document) {
                 const ExportService = require('./exportService').ExportService;
                 try {
@@ -1469,6 +1494,8 @@ export class MessageHandler {
                 } catch (error) {
                     console.error('[MessageHandler.saveBoardState] MarpWatch export failed:', error);
                 }
+            } else {
+                console.warn(`[MessageHandler.saveBoardState] Cannot trigger marpWatch export - no document or file path available`);
             }
         }
 
@@ -2417,33 +2444,8 @@ export class MessageHandler {
                 panel.syncIncludeFilesWithBoard(board);
             }
 
-            // If this is an immediate update (like column include changes), trigger a save and reload
-            if (message.immediate) {
-
-                // Save the changes to markdown
-                await this._onSaveToMarkdown();
-
-                // Trigger marpWatch export if active
-                if (this._autoExportSettings?.marpWatch) {
-                    console.log(`[MessageHandler.handleBoardUpdate] MarpWatch active - triggering export after immediate save`);
-                    const document = this._fileManager.getDocument();
-                    if (document) {
-                        const ExportService = require('./exportService').ExportService;
-                        try {
-                            await ExportService.export(document, this._autoExportSettings, board);
-                            console.log(`[MessageHandler.handleBoardUpdate] MarpWatch export completed`);
-                        } catch (error) {
-                            console.error('[MessageHandler.handleBoardUpdate] MarpWatch export failed:', error);
-                        }
-                    }
-                }
-
-                // Trigger a board update to reload with new include files
-                await this._onBoardUpdate();
-            } else {
-                // Regular update - just mark as unsaved
-                this._markUnsavedChanges(true, board);
-            }
+            // Mark as unsaved - user must explicitly save via Cmd+S or debug overlay
+            this._markUnsavedChanges(true, board);
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);
@@ -3066,16 +3068,37 @@ export class MessageHandler {
 
                 // Trigger marpWatch export if active
                 if (this._autoExportSettings?.marpWatch) {
-                    console.log(`[MessageHandler] MarpWatch active - triggering export after save`);
-                    const document = this._fileManager.getDocument();
+                    console.log(`[MessageHandler.saveIndividualFile] MarpWatch active - triggering export after save`);
+
+                    // Get document from fileManager, or reopen from file path if needed
+                    let document = this._fileManager.getDocument();
+                    const filePathForReopen = this._fileManager.getFilePath();
+
+                    console.log(`[MessageHandler.saveIndividualFile] document from fileManager:`, !!document);
+                    console.log(`[MessageHandler.saveIndividualFile] file path:`, filePathForReopen);
+
+                    // If document is closed but we have a file path, reopen it
+                    if (!document && filePathForReopen) {
+                        console.log(`[MessageHandler.saveIndividualFile] Document closed, reopening from file path:`, filePathForReopen);
+                        const vscode = require('vscode');
+                        try {
+                            document = await vscode.workspace.openTextDocument(filePathForReopen);
+                            console.log(`[MessageHandler.saveIndividualFile] Document reopened successfully`);
+                        } catch (error) {
+                            console.error(`[MessageHandler.saveIndividualFile] Failed to reopen document:`, error);
+                        }
+                    }
+
                     if (document) {
                         const ExportService = require('./exportService').ExportService;
                         try {
                             await ExportService.export(document, this._autoExportSettings, board);
-                            console.log(`[MessageHandler] MarpWatch export completed`);
+                            console.log(`[MessageHandler.saveIndividualFile] MarpWatch export completed`);
                         } catch (error) {
-                            console.error('[MessageHandler] MarpWatch export failed:', error);
+                            console.error('[MessageHandler.saveIndividualFile] MarpWatch export failed:', error);
                         }
+                    } else {
+                        console.warn(`[MessageHandler.saveIndividualFile] Cannot trigger marpWatch export - no document or file path available`);
                     }
                 }
 
@@ -3107,6 +3130,46 @@ export class MessageHandler {
                 });
 
                 console.log(`[MessageHandler] Successfully saved ${filePath}`);
+
+                // Trigger marpWatch export if active (include file change requires re-export)
+                if (this._autoExportSettings?.marpWatch) {
+                    console.log(`[MessageHandler.saveIndividualFile] Include file saved - triggering marpWatch export`);
+
+                    // Get document from fileManager, or reopen from file path if needed
+                    let document = this._fileManager.getDocument();
+                    const filePathForReopen = this._fileManager.getFilePath();
+
+                    console.log(`[MessageHandler.saveIndividualFile] document from fileManager:`, !!document);
+                    console.log(`[MessageHandler.saveIndividualFile] file path:`, filePathForReopen);
+
+                    // If document is closed but we have a file path, reopen it
+                    if (!document && filePathForReopen) {
+                        console.log(`[MessageHandler.saveIndividualFile] Document closed, reopening from file path:`, filePathForReopen);
+                        const vscode = require('vscode');
+                        try {
+                            document = await vscode.workspace.openTextDocument(filePathForReopen);
+                            console.log(`[MessageHandler.saveIndividualFile] Document reopened successfully`);
+                        } catch (error) {
+                            console.error(`[MessageHandler.saveIndividualFile] Failed to reopen document:`, error);
+                        }
+                    }
+
+                    if (document) {
+                        const ExportService = require('./exportService').ExportService;
+                        // Get current board state for export
+                        const fileService = (panel as any)._fileService;
+                        const board = fileService?.board();
+
+                        try {
+                            await ExportService.export(document, this._autoExportSettings, board);
+                            console.log(`[MessageHandler.saveIndividualFile] MarpWatch export completed after include file save`);
+                        } catch (error) {
+                            console.error('[MessageHandler.saveIndividualFile] MarpWatch export failed:', error);
+                        }
+                    } else {
+                        console.warn(`[MessageHandler.saveIndividualFile] Cannot trigger marpWatch export - no document or file path available`);
+                    }
+                }
 
                 // Send success message to frontend
                 panel._panel.webview.postMessage({

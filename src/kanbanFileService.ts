@@ -478,9 +478,10 @@ export class KanbanFileService {
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
         console.log(`[KanbanFileService.saveToMarkdown] Using unified SaveCoordinator`);
 
-        const document = this.fileManager.getDocument();
-        if (!document || !this.board() || !this.board()!.valid) {
-            console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - document: ${!!document}, board: ${!!this.board()}, valid: ${this.board()?.valid}`);
+        // Check for main file and valid board (document is NOT required - panel can stay open without it)
+        const mainFile = this.fileRegistry.getMainFile();
+        if (!mainFile || !this.board() || !this.board()!.valid) {
+            console.warn(`[KanbanFileService.saveToMarkdown] Cannot save - mainFile: ${!!mainFile}, board: ${!!this.board()}, valid: ${this.board()?.valid}`);
             return;
         }
 
@@ -488,7 +489,7 @@ export class KanbanFileService {
         const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
 
         // Use SaveCoordinator for unified save handling
-        await this._saveCoordinator.saveFile(this.fileRegistry.getMainFile()!, markdown);
+        await this._saveCoordinator.saveFile(mainFile, markdown);
 
         // Save include files that have unsaved changes
         const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
@@ -498,15 +499,12 @@ export class KanbanFileService {
             console.log('[KanbanFileService.saveToMarkdown] All include files saved');
         }
 
-        // Update state after successful save
-        const mainFile = this.fileRegistry.getMainFile();
-        if (mainFile) {
-            const currentBoard = this.board();
-            if (currentBoard) {
-                // CRITICAL: Pass updateBaseline=true since we just saved to disk
-                mainFile.updateFromBoard(currentBoard, true, true);
-                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
-            }
+        // Update state after successful save (reuse mainFile from line 482)
+        const currentBoard = this.board();
+        if (currentBoard) {
+            // CRITICAL: Pass updateBaseline=true since we just saved to disk
+            mainFile.updateFromBoard(currentBoard, true, true);
+            // NOTE: No need for second setContent call - updateFromBoard already updated baseline
         }
 
         // Update known file content
