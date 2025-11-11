@@ -1,3 +1,9 @@
+- [ ] Remove the "immediate" parameter from the boardUpdate function. 
+  We should never use the feature to mark something as unsaved, but use the hash to determine wether a file needs saving to file, because the file content is different to the saved content! Remove this feature and replace it by comparing the hashes from cache and files.
+  saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
+   So onWillSaveTextDocument is completely redundant and wrong! 
+
+
 - [ ] when adding multiple files using drag & drop it randomly places them over the board. why does that
   happen?
 
