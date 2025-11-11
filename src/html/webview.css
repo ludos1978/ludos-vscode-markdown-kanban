@@ -35,14 +35,27 @@
   --column-background: transparent;
   --task-background: transparent;
 
+  /* Primary Button Styles */
   --button-background: var(--vscode-button-background);
   --button-foreground: var(--vscode-button-foreground);
   --button-border: 1px solid var(--vscode-button-border, transparent);
-  --button-background-hover: var(--vscode-button-background);
+  --button-background-hover: var(--vscode-button-hoverBackground);
   --button-foreground-hover: var(--vscode-button-foreground);
+  --button-border-hover: 1px solid var(--vscode-button-border, transparent);
   --button-background-active: var(--vscode-button-background);
   --button-foreground-active: var(--vscode-button-foreground);
   --button-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
+
+  /* Secondary Button Styles */
+  --button-secondary-background: var(--vscode-button-secondaryBackground);
+  --button-secondary-foreground: var(--vscode-button-secondaryForeground);
+  --button-secondary-border: 1px solid var(--vscode-button-border, transparent);
+  --button-secondary-background-hover: var(--vscode-button-secondaryHoverBackground);
+  --button-secondary-foreground-hover: var(--vscode-button-secondaryForeground);
+  --button-secondary-border-hover: 1px solid var(--vscode-button-border, transparent);
+  --button-secondary-background-active: var(--vscode-button-secondaryBackground);
+  --button-secondary-foreground-active: var(--vscode-button-secondaryForeground);
+  --button-secondary-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 }
 
 * {
@@ -155,7 +168,7 @@ body {
 .file-info-right .auto-export-btn,
 .file-info-right .layout-presets-btn,
 .file-info-right .file-bar-menu-btn {
-  border: 1px solid var(--vscode-button-border, transparent);
+  border: var(--button-border);
   padding: 4px 8px;
   margin: 0;
   height: 24px;
@@ -164,6 +177,23 @@ body {
   gap: 4px;
   box-sizing: border-box;
   font-size: 12px;
+}
+
+.file-info-right .file-bar-menu-btn {
+  padding: 4px 4px;
+}
+
+.file-info-left .sort-btn,
+.file-info-right .sort-btn {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+}
+
+.file-info-left .sort-btn:hover,
+.file-info-right .sort-btn:hover {
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 /* Text styling for button labels */
@@ -455,10 +485,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   padding: 3px 6px;
   background: var(--button-background);
   color: var(--button-foreground);
-  border-color: var(--button-border);
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-button-border, transparent);
+  border: var(--button-border);
   border-radius: 4px;
   cursor: grab;
   font-size: 12px;
@@ -468,7 +495,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .clipboard-card-source:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 /* Clipboard hover preview */
@@ -528,9 +556,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: center;
   gap: var(--whitespace-div2);
   padding: 3px 6px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   border-radius: 4px;
   cursor: grab;
   font-size: 12px;
@@ -539,7 +567,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .empty-card-source:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .empty-card-source:active,
@@ -1143,7 +1172,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   color: var(--vscode-descriptionForeground);
   cursor: grab;
   font-size: 14px;
-  opacity: 0.4;
+  /* opacity: 0.4; */
   transition: opacity 0.2s;
   flex-shrink: 0;
   line-height: 1;
@@ -1152,7 +1181,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-item:hover .task-drag-handle {
-  opacity: 0.8;
+  /* opacity: 0.8; */
 }
 
 .task-drag-handle:hover {
@@ -1410,8 +1439,8 @@ body.section-height-limited .task-section figure img {
 /* the add task button is styled horizontally and is listed after the last card */
 .add-task-btn {
   width: calc(100%);
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   border: 1px dashed var(--vscode-panel-border);
   border-radius: 6px;
   padding: 8px;
@@ -1422,14 +1451,14 @@ body.section-height-limited .task-section figure img {
 
 
 .add-task-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
   border-color: var(--vscode-focusBorder);
 }
 
 /* the column button should be styled vertically and is displayed at the end of each row after the last column */
 .add-column-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-background);
+  color: var(--button-foreground);
   border: 1px dashed var(--vscode-panel-border);
   border-radius: 6px;
   padding: 16px 8px;  /* Adjust padding for vertical text */
@@ -1445,9 +1474,9 @@ body.section-height-limited .task-section figure img {
 }
 
 .add-column-btn:hover {
-  /* background: var(--vscode-button-hoverBackground); */
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
   border-color: var(--vscode-focusBorder);
-  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .kanban-board.multi-row .add-column-btn.multi-row-add-btn {
@@ -1457,8 +1486,8 @@ body.section-height-limited .task-section figure img {
 }
 
 .initialise-btn {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background);
+  color: var(--button-foreground);
   border: 1px solid var(--vscode-panel-border);
   border-radius: 6px;
   padding: 16px;
@@ -1499,9 +1528,9 @@ body.vscode-high-contrast-light .task-count {
 /* Fold buttons */
 .fold-all-btn,
 .global-fold-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-color: var(--vscode-button-border);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
   border-radius: 3px;
   transition: all 0.2s;
@@ -1519,8 +1548,9 @@ body.vscode-high-contrast-light .task-count {
   width: 18px;
 }
 
-.fold-all-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+.fold-all-btn:hover,
+.global-fold-btn:hover {
+  background: var(--button-secondary-background-hover);
 }
 
 .global-fold-btn {
@@ -1530,10 +1560,6 @@ body.vscode-high-contrast-light .task-count {
   gap: 4px;
   flex-shrink: 0;
   margin-left: 8px;
-}
-
-.global-fold-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .fold-icon,
@@ -1570,8 +1596,8 @@ body.vscode-high-contrast-light .task-count {
 
 /* File control buttons */
 .file-control-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   border: none;
   border-radius: 4px;
   padding: 2px;
@@ -1582,7 +1608,7 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-control-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
 }
 
 .file-control-btn:disabled {
@@ -1591,12 +1617,12 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-control-btn.primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background);
+  color: var(--button-foreground);
 }
 
 .file-control-btn.primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--button-background-hover);
 }
 
 
@@ -1635,9 +1661,9 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-bar-menu-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-color: var(--vscode-button-border);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 16px;
@@ -1647,7 +1673,8 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .file-bar-menu-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .donut-menu-dropdown,
@@ -1954,8 +1981,8 @@ button.file-bar-menu-item {
 
 .span-width-btn {
   background: var(--button-background);
-  border: 1px solid var(--vscode-button-border, transparent);
-  color: var(--vscode-button-foreground);
+  border: var(--button-border);
+  color: var(--button-foreground);
   width: 16px;
   height: 16px;
   display: flex;
@@ -1969,11 +1996,11 @@ button.file-bar-menu-item {
 }
 
 .span-width-btn:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--button-background-hover);
 }
 
 .span-width-btn:active {
-  background: var(--vscode-button-background);
+  background: var(--button-background);
   transform: scale(0.95);
 }
 
@@ -1998,9 +2025,9 @@ button.file-bar-menu-item {
 }
 
 .stack-toggle-btn {
-  background: var(--vscode-button-background);
-  border: 1px solid var(--vscode-button-border, transparent);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background);
+  border: var(--button-border);
+  color: var(--button-foreground);
   padding: 4px 8px;
   height: 16px;
   display: flex;
@@ -2014,13 +2041,14 @@ button.file-bar-menu-item {
 }
 
 .stack-toggle-btn:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .stack-toggle-btn.active {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-color: var(--vscode-focusBorder);
+  background: var(--button-background-active);
+  color: var(--button-foreground-active);
+  border: var(--button-border-active);
 }
 
 .kanban-column-stack {
@@ -2363,7 +2391,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   padding: 3px 8px;
   font-size: 12px;
   line-height: 1.2;
-  border: 1px solid var(--vscode-button-border, transparent);
+  border: var(--button-border);
   box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
@@ -2379,14 +2407,14 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .close-btn {
-  background: var(--vscode-button-secondaryBackground);
-  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--button-secondary-background);
+  border: var(--button-border);
   box-shadow: 0 0 0 1px var(--vscode-focusBorder);
   border-radius: 4px;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  color: var(--vscode-button-secondaryForeground);
+  color: var(--button-secondary-foreground);
   padding: 0;
   width: 20px;
   height: 20px;
@@ -2397,7 +2425,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .close-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
   box-shadow: 0 0 0 2px var(--vscode-focusBorder);
 }
 
@@ -2438,23 +2466,23 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .btn-primary {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background);
+  color: var(--button-foreground);
 }
 
 .btn-primary:hover {
-  background: var(--vscode-button-hoverBackground);
+  background: var(--button-background-hover);
 }
 
 .btn-secondary {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
+  border: var(--button-border);
   box-shadow: 0 0 0 1px var(--vscode-focusBorder);
 }
 
 .btn-secondary:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
   box-shadow: 0 0 0 2px var(--vscode-focusBorder);
 }
 
@@ -2658,8 +2686,8 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   font-weight: 500;
   cursor: pointer;
   border-radius: 2px;
-  background-color: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   font-size: 0.85em;
   white-space: nowrap;
   flex-shrink: 0;
@@ -2667,7 +2695,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .export-selector-row-label:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground);
+  background-color: var(--button-secondary-background-hover);
 }
 
 /* Columns container (horizontal) */
@@ -2721,8 +2749,8 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   padding: 2px 8px;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 3px;
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background-color: var(--button-background);
+  color: var(--button-foreground);
   cursor: pointer;
   font-size: 0.9em;
   white-space: normal;
@@ -2751,8 +2779,8 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
   padding: 2px 6px;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 2px;
-  background-color: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background-color: var(--button-background);
+  color: var(--button-foreground);
   cursor: pointer;
   font-size: 0.85em;
   white-space: normal;
@@ -2869,10 +2897,10 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 
 .search-toggle-btn {
   padding: 4px 8px;
-  border: 1px solid var(--vscode-button-border);
+  border: var(--button-border);
   border-radius: 4px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   font-size: 11px;
   font-weight: bold;
   cursor: pointer;
@@ -2881,12 +2909,12 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .search-toggle-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
 }
 
 .search-toggle-btn.active {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background);
+  color: var(--button-foreground);
   border-color: var(--vscode-focusBorder);
 }
 
@@ -2900,17 +2928,17 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 
 .search-nav-btn {
   padding: 4px 8px;
-  border: 1px solid var(--vscode-button-border);
+  border: var(--button-border);
   border-radius: 4px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .search-nav-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
 }
 
 .search-close-btn {
@@ -3485,8 +3513,8 @@ blockquote {
   display: inline-flex;
   align-items: center;
   padding: 4px 8px;
-  background-color: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
   border-radius: 4px;
   text-decoration: none;
   margin: 2px;
@@ -3500,7 +3528,7 @@ blockquote {
 .markdown-content a[href$=".txt"]:hover,
 .markdown-content a[href$=".zip"]:hover,
 .markdown-content a[href$=".rar"]:hover {
-  background-color: var(--vscode-button-secondaryHoverBackground);
+  background-color: var(--button-secondary-background-hover);
 }
 
 .markdown-content a[href$=".pdf"]::before { content: "📄 "; }
@@ -4058,9 +4086,9 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 
 /* Sort button */
 .sort-btn {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    border-color: var(--vscode-button-border);
+    background: var(--button-secondary-background);
+    color: var(--button-secondary-foreground);
+    border-color: var(--button-border);
     cursor: pointer;
     border-radius: 3px;
     transition: all 0.2s;
@@ -4076,7 +4104,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 }
 
 .sort-btn:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: var(--button-secondary-background-hover);
 }
 
 .sort-icon {
@@ -4621,7 +4649,7 @@ s {
 
 .included-content-inline:hover::before {
     opacity: 1;
-    background-color: var(--vscode-button-hoverBackground, rgba(255, 255, 255, 0.1));
+    background-color: var(--button-background-hover);
     transform: scale(1.1);
 }
 
@@ -4663,7 +4691,7 @@ s {
 
 .included-content-block:hover::before {
     opacity: 1;
-    background-color: var(--vscode-button-hoverBackground, rgba(255, 255, 255, 0.1));
+    background-color: var(--button-background-hover);
     transform: scale(1.1);
 }
 
@@ -4932,7 +4960,7 @@ figcaption {
 }
 
 .debug-btn:hover, .debug-close:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-secondary-background-hover);
 }
 
 .debug-close {
@@ -5115,8 +5143,8 @@ figcaption {
 }
 
 .action-btn {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--button-background);
+    color: var(--button-foreground);
     border: none;
     padding: 6px 10px;
     border-radius: 4px;
@@ -5127,7 +5155,7 @@ figcaption {
 }
 
 .action-btn:hover {
-    background: var(--vscode-button-hoverBackground);
+    background: var(--button-background-hover);
 }
 
 .save-btn {
@@ -5421,9 +5449,9 @@ figcaption {
 }
 
 .action-btn {
-    background: var(--vscode-button-background);
-    border: 1px solid var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--button-background);
+    border: var(--button-border);
+    color: var(--button-foreground);
     padding: 4px 6px;
     border-radius: 4px;
     cursor: pointer;
@@ -5516,8 +5544,8 @@ figcaption {
 
 /* Force Write & Verification Styles */
 .debug-verify-btn {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--button-background);
+    color: var(--button-foreground);
 }
 
 .debug-force-write-btn {
@@ -5611,8 +5639,8 @@ figcaption {
 .btn-cancel,
 .btn-close {
     padding: 8px 16px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+    background: var(--button-secondary-background);
+    color: var(--button-secondary-foreground);
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -5621,7 +5649,7 @@ figcaption {
 
 .btn-cancel:hover,
 .btn-close:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: var(--button-secondary-background-hover);
 }
 
 .btn-confirm,

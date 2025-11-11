@@ -78,7 +78,8 @@
       "Bash(/tmp/filtered-log.log)",
       "Bash(npx ts-node:*)",
       "Bash(npx @marp-team/marp-cli:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(src/html/webview.css)"
     ],
     "deny": [],
     "ask": []
