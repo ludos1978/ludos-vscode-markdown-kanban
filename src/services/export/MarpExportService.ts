@@ -119,6 +119,13 @@ export class MarpExportService {
      * @returns Promise that resolves when export is complete
      */
     static async export(options: MarpExportOptions): Promise<void> {
+        console.log('[kanban.MarpExportService] 🚀 export() START');
+        console.log('[kanban.MarpExportService] 🚀 options.inputFilePath:', `"${options.inputFilePath}"`);
+        console.log('[kanban.MarpExportService] 🚀 inputFilePath type:', typeof options.inputFilePath);
+        console.log('[kanban.MarpExportService] 🚀 inputFilePath length:', options.inputFilePath?.length);
+        console.log('[kanban.MarpExportService] 🚀 options.watchMode:', options.watchMode);
+        console.log('[kanban.MarpExportService] 🚀 Full options:', JSON.stringify(options, null, 2));
+
         // Check if a Marp process is already running for this file (watch mode only)
         if (options.watchMode) {
             const existingPid = this.getMarpPid(options.inputFilePath);
@@ -129,17 +136,23 @@ export class MarpExportService {
         }
 
         // Validate Marp CLI availability
+        console.log('[kanban.MarpExportService] Checking Marp CLI availability...');
         const isAvailable = await this.isMarpCliAvailable();
+        console.log('[kanban.MarpExportService] Marp CLI available:', isAvailable);
         if (!isAvailable) {
             throw new Error('Marp CLI is not available. Please ensure @marp-team/marp-cli is installed.');
         }
 
         // Ensure required build files exist in dist directory
+        console.log('[kanban.MarpExportService] Ensuring Marp build files exist...');
         await this.ensureMarpBuildFiles();
+        console.log('[kanban.MarpExportService] Build files ready');
 
         try {
             // Build Marp CLI arguments using input file path
+            console.log('[kanban.MarpExportService] Building Marp CLI arguments for:', `"${options.inputFilePath}"`);
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
+            console.log('[kanban.MarpExportService] Arguments built successfully:', args);
 
             // Log for debugging
             console.log(`[kanban.MarpExportService] Exporting with Marp CLI: ${args.join(' ')}`);
@@ -154,18 +167,46 @@ export class MarpExportService {
             // WATCH MODE: Run Marp as detached background process
             console.log(`[kanban.MarpExportService] Starting Marp in watch mode (detached process)`);
 
-            const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
-                ? workspaceFolders[0].uri.fsPath
-                : process.cwd();
+            // IMPORTANT: Use the directory of the input file as CWD
+            // This ensures markdown-it-include resolves paths relative to the markdown file location
+            const inputFileDir = path.dirname(options.inputFilePath);
+            console.log(`[kanban.MarpExportService] Using CWD: ${inputFileDir}`);
+            console.log(`[kanban.MarpExportService] Input file: ${options.inputFilePath}`);
 
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
             // Spawn Marp as a detached background process
+            // Use 'pipe' for stdio to capture errors for debugging
             const marpProcess = spawn(command, commandArgs, {
-                cwd: workspaceRoot,
+                cwd: inputFileDir,  // Use input file directory, not workspace root
                 detached: true,
-                stdio: 'ignore'
+                stdio: ['ignore', 'pipe', 'pipe'] // stdin: ignore, stdout: pipe, stderr: pipe
+            });
+
+            // Log any output or errors from the Marp process
+            if (marpProcess.stdout) {
+                marpProcess.stdout.on('data', (data) => {
+                    console.log(`[kanban.MarpExportService.stdout] ${data.toString()}`);
+                });
+            }
+
+            if (marpProcess.stderr) {
+                marpProcess.stderr.on('data', (data) => {
+                    console.error(`[kanban.MarpExportService.stderr] ${data.toString()}`);
+                });
+            }
+
+            // Handle process errors
+            marpProcess.on('error', (error) => {
+                console.error(`[kanban.MarpExportService] Process error:`, error);
+            });
+
+            marpProcess.on('exit', (code, signal) => {
+                console.log(`[kanban.MarpExportService] Process exited with code ${code} and signal ${signal}`);
+                if (options.inputFilePath) {
+                    this.marpProcessPids.delete(options.inputFilePath);
+                }
             });
 
             // Detach from parent process to allow it to run independently

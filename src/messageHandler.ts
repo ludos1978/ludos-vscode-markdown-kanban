@@ -1027,6 +1027,9 @@ export class MessageHandler {
                 break;
 
             case 'openInMarpPreview':
+                console.log(`[kanban.messageHandler] 🟠 Received openInMarpPreview message`);
+                console.log(`[kanban.messageHandler] message.filePath: "${message.filePath}"`);
+                console.log(`[kanban.messageHandler] Full message:`, JSON.stringify(message, null, 2));
                 await this.handleOpenInMarpPreview(message.filePath);
                 break;
 
@@ -3803,12 +3806,23 @@ export class MessageHandler {
      * Open a markdown file in Marp preview
      */
     private async handleOpenInMarpPreview(filePath: string): Promise<void> {
+        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] 🟢 START - received filePath: "${filePath}"`);
+        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath type: ${typeof filePath}`);
+        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath is null: ${filePath === null}`);
+        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath is undefined: ${filePath === undefined}`);
+        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath length: ${filePath?.length}`);
+
         try {
+            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] Calling MarpExtensionService.openInMarpPreview...`);
             await MarpExtensionService.openInMarpPreview(filePath);
+            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] ✅ 🟢 END (success)`);
         } catch (error) {
-            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error:', error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] ❌ Error:', error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error type:', typeof error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error stack:', error instanceof Error ? error.stack : 'N/A');
             const errorMessage = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
+            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] 🟢 END (with error)`);
         }
     }
 

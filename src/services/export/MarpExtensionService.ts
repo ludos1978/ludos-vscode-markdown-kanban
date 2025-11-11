@@ -46,36 +46,59 @@ export class MarpExtensionService {
      * @returns Promise that resolves when preview is opened
      */
     static async openInMarpPreview(filePath: string): Promise<void> {
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] 🔵 START - filePath: "${filePath}"`);
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] filePath type: ${typeof filePath}`);
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] filePath length: ${filePath?.length}`);
+
         // Ensure file exists
-        if (!fs.existsSync(filePath)) {
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Checking if file exists...`);
+        const fileExists = fs.existsSync(filePath);
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] File exists: ${fileExists}`);
+
+        if (!fileExists) {
+            console.error(`[kanban.MarpExtensionService.openInMarpPreview] ❌ File not found: ${filePath}`);
             throw new Error(`File not found: ${filePath}`);
         }
 
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Creating URI from file path...`);
         const uri = vscode.Uri.file(filePath);
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] URI created: ${uri.toString()}`);
 
         // Open the document
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Opening text document...`);
         const doc = await vscode.workspace.openTextDocument(uri);
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Document opened: ${doc.fileName}`);
+
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Showing text document in editor...`);
         await vscode.window.showTextDocument(doc, { preview: false });
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] ✅ Document shown in editor`);
 
         // Check if extension is installed
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Checking if Marp extension is installed...`);
         const extensionInstalled = this.isMarpExtensionInstalled();
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Marp extension installed: ${extensionInstalled}`);
 
         if (!extensionInstalled) {
+            console.log(`[kanban.MarpExtensionService.openInMarpPreview] Extension not installed - prompting user...`);
             // Extension not installed - show install prompt
             const choice = await this.promptInstallMarpExtension();
+            console.log(`[kanban.MarpExtensionService.openInMarpPreview] User choice: ${choice}`);
 
             vscode.window.showInformationMessage(
                 'Marp presentation file opened. After installing the Marp extension, click the preview button in the editor toolbar to start the presentation.',
                 'OK'
             );
+            console.log(`[kanban.MarpExtensionService.openInMarpPreview] 🔵 END (extension not installed)`);
             return;
         }
 
         // Extension is installed - show helpful message
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] Showing info message to user...`);
         vscode.window.showInformationMessage(
             'Marp presentation file opened. Click the preview button (top-right) or use Cmd+K V to preview.',
             'OK'
         );
+        console.log(`[kanban.MarpExtensionService.openInMarpPreview] ✅ 🔵 END (success)`);
     }
 
     /**

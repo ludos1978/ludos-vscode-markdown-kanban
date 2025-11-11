@@ -191,10 +191,10 @@ function toggleDebugOverlaySticky() {
     const pinButton = debugOverlayElement?.querySelector('.debug-pin-btn');
     if (pinButton) {
         pinButton.textContent = debugOverlaySticky ? '📌 Pinned' : '📌 Pin';
-        pinButton.style.background = debugOverlaySticky ?
-            'var(--vscode-gitDecoration-addedResourceForeground)' :
-            'var(--vscode-button-background)';
-        pinButton.style.color = debugOverlaySticky ? 'white' : 'var(--vscode-button-foreground)';
+        // pinButton.style.background = debugOverlaySticky ?
+        //     'var(--vscode-button-background)' :
+        //     'var(--vscode-button-background)';
+        // pinButton.style.color = debugOverlaySticky ? 'white' : 'var(--vscode-button-foreground)';
     }
 
 }
@@ -1017,7 +1017,7 @@ function createFileStatesList(allFiles) {
                                         ${truncatedDirPath}
                                         ${!file.isMainFile ? `<span class="include-type-label ${file.type || 'include'}">[${getIncludeTypeShortLabel(file.type)}]</span>` : ''}
                                     </div>
-                                    <div class="file-name-clickable" onclick="openFile('${file.path}')" title="${file.path}">
+                                    <div class="file-name-clickable" onclick="openFile('${file.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')" title="${file.path}">
                                         ${file.isMainFile ? '📄' : '📎'} ${truncatePath(file.name, 15)}
                                     </div>
                                 </td>
