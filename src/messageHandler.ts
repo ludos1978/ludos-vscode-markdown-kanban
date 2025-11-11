@@ -1457,6 +1457,21 @@ export class MessageHandler {
         // Triggering _onBoardUpdate() would cause folding state to be lost
         await this._onSaveToMarkdown();
 
+        // Trigger marpWatch export if active
+        if (this._autoExportSettings?.marpWatch) {
+            console.log(`[MessageHandler.saveBoardState] MarpWatch active - triggering export after save`);
+            const document = this._fileManager.getDocument();
+            if (document) {
+                const ExportService = require('./exportService').ExportService;
+                try {
+                    await ExportService.export(document, this._autoExportSettings, board);
+                    console.log(`[MessageHandler.saveBoardState] MarpWatch export completed`);
+                } catch (error) {
+                    console.error('[MessageHandler.saveBoardState] MarpWatch export failed:', error);
+                }
+            }
+        }
+
         // No board update needed - webview state is already correct
     }
 
@@ -2408,6 +2423,21 @@ export class MessageHandler {
                 // Save the changes to markdown
                 await this._onSaveToMarkdown();
 
+                // Trigger marpWatch export if active
+                if (this._autoExportSettings?.marpWatch) {
+                    console.log(`[MessageHandler.handleBoardUpdate] MarpWatch active - triggering export after immediate save`);
+                    const document = this._fileManager.getDocument();
+                    if (document) {
+                        const ExportService = require('./exportService').ExportService;
+                        try {
+                            await ExportService.export(document, this._autoExportSettings, board);
+                            console.log(`[MessageHandler.handleBoardUpdate] MarpWatch export completed`);
+                        } catch (error) {
+                            console.error('[MessageHandler.handleBoardUpdate] MarpWatch export failed:', error);
+                        }
+                    }
+                }
+
                 // Trigger a board update to reload with new include files
                 await this._onBoardUpdate();
             } else {
@@ -3033,6 +3063,21 @@ export class MessageHandler {
                 // NOTE: No need for second setContent call - updateFromBoard already updated baseline
 
                 console.log(`[MessageHandler] Successfully saved ${filePath}`);
+
+                // Trigger marpWatch export if active
+                if (this._autoExportSettings?.marpWatch) {
+                    console.log(`[MessageHandler] MarpWatch active - triggering export after save`);
+                    const document = this._fileManager.getDocument();
+                    if (document) {
+                        const ExportService = require('./exportService').ExportService;
+                        try {
+                            await ExportService.export(document, this._autoExportSettings, board);
+                            console.log(`[MessageHandler] MarpWatch export completed`);
+                        } catch (error) {
+                            console.error('[MessageHandler] MarpWatch export failed:', error);
+                        }
+                    }
+                }
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileSaved',

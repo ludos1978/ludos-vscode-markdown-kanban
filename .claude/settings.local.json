@@ -79,7 +79,8 @@
       "Bash(npx ts-node:*)",
       "Bash(npx @marp-team/marp-cli:*)",
       "Bash(git restore:*)",
-      "Bash(src/html/webview.css)"
+      "Bash(src/html/webview.css)",
+      "Bash(/tmp/menuOperations_before.js)"
     ],
     "deny": [],
     "ask": []

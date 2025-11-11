@@ -60,7 +60,37 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// Use waitUntil to ensure the document is updated before the save proceeds
 			event.waitUntil(
-				panel.saveToMarkdown(false, false) // updateVersionTracking=false, triggerSave=false (save will happen automatically)
+				(async () => {
+					// Save board to markdown file
+					console.log(`[Extension.onWillSave] ===== SAVING BOARD TO MARKDOWN =====`);
+					await panel.saveToMarkdown(false, false); // updateVersionTracking=false, triggerSave=false
+					console.log(`[Extension.onWillSave] ===== BOARD SAVED =====`);
+
+					// Manually trigger save event handlers since workspace.fs.writeFile doesn't fire onDidSaveTextDocument
+					// This ensures auto-export handlers (like marpWatch) are triggered
+					const SaveEventCoordinator = require('./saveEventCoordinator').SaveEventCoordinator;
+					const coordinator = SaveEventCoordinator.getInstance();
+
+					// Get all registered handlers
+					const handlers = Array.from((coordinator as any).handlers.values()) as Array<any>;
+					console.log(`[Extension.onWillSave] ===== MANUALLY TRIGGERING ${handlers.length} SAVE EVENT HANDLERS =====`);
+
+					for (const handler of handlers) {
+						try {
+							console.log(`[Extension.onWillSave] Handler: ${handler.id}, isEnabled: ${handler.isEnabled ? handler.isEnabled() : 'no isEnabled function'}`);
+							if (handler.isEnabled && !handler.isEnabled()) {
+								console.log(`[Extension.onWillSave] Handler '${handler.id}' is disabled, skipping`);
+								continue;
+							}
+							console.log(`[Extension.onWillSave] ===== CALLING HANDLER '${handler.id}' =====`);
+							await handler.handleSave(document);
+							console.log(`[Extension.onWillSave] ===== HANDLER '${handler.id}' COMPLETED =====`);
+						} catch (error) {
+							console.error(`[Extension.onWillSave] Handler '${handler.id}' failed:`, error);
+						}
+					}
+					console.log(`[Extension.onWillSave] ===== ALL HANDLERS COMPLETED =====`);
+				})()
 			);
 		} else {
 			console.log('[Extension.onWillSave] No unsaved changes, allowing save to proceed normally');

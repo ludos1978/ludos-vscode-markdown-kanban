@@ -191,12 +191,7 @@ function toggleDebugOverlaySticky() {
     const pinButton = debugOverlayElement?.querySelector('.debug-pin-btn');
     if (pinButton) {
         pinButton.textContent = debugOverlaySticky ? '📌 Pinned' : '📌 Pin';
-        // pinButton.style.background = debugOverlaySticky ?
-        //     'var(--vscode-button-background)' :
-        //     'var(--vscode-button-background)';
-        // pinButton.style.color = debugOverlaySticky ? 'white' : 'var(--vscode-button-foreground)';
     }
-
 }
 
 /**
