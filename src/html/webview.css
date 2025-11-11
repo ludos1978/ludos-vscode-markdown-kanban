@@ -56,6 +56,17 @@
   --button-secondary-background-active: var(--vscode-button-secondaryBackground);
   --button-secondary-foreground-active: var(--vscode-button-secondaryForeground);
   --button-secondary-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
+
+  /* Alternative Button Styles (for drag handles and card sources) */
+  --button-alternative-background: var(--vscode-button-secondaryBackground);
+  --button-alternative-foreground: var(--vscode-button-secondaryForeground);
+  --button-alternative-border: 1px solid var(--vscode-button-border, transparent);
+  --button-alternative-background-hover: var(--vscode-button-secondaryHoverBackground);
+  --button-alternative-foreground-hover: var(--vscode-button-secondaryForeground);
+  --button-alternative-border-hover: 1px solid var(--vscode-button-border, transparent);
+  --button-alternative-background-active: var(--vscode-button-secondaryBackground);
+  --button-alternative-foreground-active: var(--vscode-button-secondaryForeground);
+  --button-alternative-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 }
 
 * {
@@ -483,9 +494,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: center;
   gap: 4px;
   padding: 3px 6px;
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-alternative-border);
   border-radius: 4px;
   cursor: grab;
   font-size: 12px;
@@ -495,8 +506,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .clipboard-card-source:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
 }
 
 /* Clipboard hover preview */
@@ -556,9 +567,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: center;
   gap: var(--whitespace-div2);
   padding: 3px 6px;
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-alternative-border);
   border-radius: 4px;
   cursor: grab;
   font-size: 12px;
@@ -567,8 +578,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .empty-card-source:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
 }
 
 .empty-card-source:active,
@@ -1100,8 +1111,21 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Allow only the column drag handle to be draggable */
 .column-drag-handle {
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-alternative-border);
   -webkit-user-drag: element !important;
   cursor: grab;
+  border-radius: 3px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.column-drag-handle:hover {
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
 }
 
 .column-drag-handle:active {
@@ -1135,7 +1159,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 .task-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--whitespace-div4);
 	padding-left: 8px;
 	padding-right: 8px;
   margin-left: 0;
@@ -1152,16 +1176,25 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Drag handles */
 .drag-handle {
-  color: var(--vscode-descriptionForeground);
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-alternative-border);
   cursor: grab;
-  font-size: 14px;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
 }
 
 .drag-handle:hover {
-  opacity: 0.8;
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
 }
 
 .drag-handle:active {
@@ -1169,24 +1202,28 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-drag-handle {
-  color: var(--vscode-descriptionForeground);
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-alternative-border);
   cursor: grab;
-  font-size: 14px;
-  /* opacity: 0.4; */
-  transition: opacity 0.2s;
+  transition: all 0.2s;
   flex-shrink: 0;
   line-height: 1;
   margin-top: 2px;
   user-select: none;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
 }
 
-.task-item:hover .task-drag-handle {
-  /* opacity: 0.8; */
-}
 
 .task-drag-handle:hover {
-  opacity: 1;
-  color: var(--vscode-foreground);
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
 }
 
 .task-drag-handle:active {
@@ -1195,19 +1232,25 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Collapse toggles */
 .collapse-toggle {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
-  font-size: 12px;
-  opacity: 0.6;
+  font-size: 10px;
   transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   transform: rotate(90deg);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .collapse-toggle:hover {
-  opacity: 1;
+  background: var(--button-secondary-background-hover);
 }
 
 .collapse-toggle.rotated {
@@ -1216,18 +1259,26 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 
 .task-collapse-toggle {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
-  font-size: 12px;
-  opacity: 0.6;
+  font-size: 10px;
   transition: all 0.2s;
   user-select: none;
   flex-shrink: 0;
   margin-top: 2px;
   transform: rotate(90deg);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
 }
 
 .task-collapse-toggle:hover {
-  opacity: 1;
+  background: var(--button-secondary-background-hover);
 }
 
 .task-collapse-toggle.rotated {
@@ -1544,8 +1595,8 @@ body.vscode-high-contrast-light .task-count {
   font-size: 10px;
   line-height: 1;
   min-width: 16px;
-  height: 18px;
-  width: 18px;
+  height: 16px;
+  width: 16px;
 }
 
 .fold-all-btn:hover,
@@ -1575,10 +1626,10 @@ body.vscode-high-contrast-light .task-count {
 }
 
 /* Fold button states */
-.fold-all-btn.fold-expanded .fold-icon,
+/* .fold-all-btn.fold-expanded .fold-icon,
 .global-fold-btn.fold-expanded .global-fold-icon {
   color: var(--vscode-foreground);
-}
+} */
 
 .fold-all-btn.fold-collapsed .fold-icon,
 .global-fold-btn.fold-collapsed .global-fold-icon {
@@ -1645,19 +1696,25 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .donut-menu-btn {
-  background: none;
-  border: none;
-  color: var(--vscode-foreground);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
   padding: 2px 2px;
   font-size: 18px;
   line-height: 1;
-  opacity: 0.6;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
 }
 
 .donut-menu-btn:hover {
-  opacity: 1;
+  background: var(--button-secondary-background-hover);
 }
 
 .file-bar-menu-btn {
