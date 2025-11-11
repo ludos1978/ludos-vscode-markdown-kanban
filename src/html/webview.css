@@ -34,6 +34,15 @@
   --board-background: var(--vscode-editor-background);
   --column-background: transparent;
   --task-background: transparent;
+
+  --button-background: var(--vscode-button-background);
+  --button-foreground: var(--vscode-button-foreground);
+  --button-border: 1px solid var(--vscode-button-border, transparent);
+  --button-background-hover: var(--vscode-button-background);
+  --button-foreground-hover: var(--vscode-button-foreground);
+  --button-background-active: var(--vscode-button-background);
+  --button-foreground-active: var(--vscode-button-foreground);
+  --button-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 }
 
 * {
@@ -173,14 +182,15 @@ body {
 
 /* File States Button (formerly refresh-btn) */
 .refresh-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-color: var(--vscode-button-border);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
   cursor: pointer;
 }
 
 .refresh-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .refresh-btn.pending {
@@ -197,18 +207,20 @@ body {
 
 /* Auto Export Button */
 .auto-export-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
 }
 
 .auto-export-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .auto-export-btn.active {
-  background: var(--vscode-inputValidation-infoBackground);
-  color: var(--vscode-inputValidation-infoForeground);
-  border-color: var(--vscode-inputValidation-infoBorder);
+  background: var(--button-background-active);
+  color: var(--button-foreground-active);
+  border: var(--button-border-active);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -255,19 +267,20 @@ body {
 }
 
 .layout-presets-btn {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-color: var(--vscode-button-border);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border-color: var(--button-border);
   cursor: pointer;
 }
 
 .layout-presets-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
 }
 
 .layout-presets-btn.active {
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
+  background: var(--button-background-active);
+  color: var(--button-foreground-active);
 }
 
 .layout-presets-dropdown {
@@ -440,6 +453,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: center;
   gap: 4px;
   padding: 3px 6px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border-color: var(--button-border);
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
   border: 1px solid var(--vscode-button-border, transparent);
@@ -1937,7 +1953,7 @@ button.file-bar-menu-item {
 }
 
 .span-width-btn {
-  background: var(--vscode-button-background);
+  background: var(--button-background);
   border: 1px solid var(--vscode-button-border, transparent);
   color: var(--vscode-button-foreground);
   width: 16px;
