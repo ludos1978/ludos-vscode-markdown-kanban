@@ -974,8 +974,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   color: var(--vscode-errorForeground, #f48771) !important;
 }
 
-
-
 /* Left side controls (drag handle, collapse toggle) */
 .column-left-controls {
   display: flex;
@@ -1071,12 +1069,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: var(--task-height) !important;
 }
 
-.task-item:not(:has(.header-bars-container)) {
-	padding-top: var(--whitespace-div2);
-}
-
 .task-item:not(:has(.footer-bars-container)) {
-	padding-bottom: var(--whitespace-div2);
+	padding-top: var(--whitespace-div4);
+	padding-bottom: var(--whitespace-div4);
 }
 
 .task-item:last-child {
@@ -1092,15 +1087,12 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: none;
 }
 
-/* Task header */
 .task-header {
   display: flex;
   align-items: center;
   gap: 8px;
 	padding-left: 8px;
 	padding-right: 8px;
-	/* padding: 8px; */
-  /* margin-bottom: 4px; */
   margin-left: 0;
   order: 1;
   flex-shrink: 0;
@@ -1437,8 +1429,9 @@ body.section-height-limited .task-section figure img {
 }
 
 .add-column-btn:hover {
-  background: var(--vscode-button-hoverBackground);
+  /* background: var(--vscode-button-hoverBackground); */
   border-color: var(--vscode-focusBorder);
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .kanban-board.multi-row .add-column-btn.multi-row-add-btn {
@@ -1469,6 +1462,9 @@ body.section-height-limited .task-section figure img {
   font-size: 12px;
   font-weight: 500;
   display: flex;
+  gap: 4px;
+  padding: 2px 2px 2px 4px;
+  align-items: center;
 }
 
 .kanban-full-height-column.collapsed-vertical .task-count,
@@ -1503,7 +1499,8 @@ body.vscode-high-contrast-light .task-count {
   font-size: 10px;
   line-height: 1;
   min-width: 16px;
-  height: 16px;
+  height: 18px;
+  width: 18px;
 }
 
 .fold-all-btn:hover {
@@ -3301,7 +3298,7 @@ body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .col
 }
 
 .markdown-content p {
-  margin: 1em 0;
+  margin: 0.5em 0;
 }
 
 .markdown-content p:first-child {
@@ -4659,7 +4656,7 @@ s {
     display: block;
     border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.2));
     border-radius: 4px;
-    margin: 8px 0;
+    margin: 0.5em 0;
     overflow: hidden;
 }
 
