@@ -4736,10 +4736,20 @@ function showExportDialogWithSelection(scope, index, id) {
     // Initialize export tree with pre-selection
     initializeExportTree(preSelectNodeId);
 
-    // Generate default export folder name
-    vscode.postMessage({
-        type: 'getExportDefaultFolder'
-    });
+    // Restore previous export settings if available
+    if (lastExportSettings && lastExportSettings.targetFolder) {
+        // Restore target folder from last export
+        const folderInput = document.getElementById('export-folder');
+        if (folderInput) {
+            folderInput.value = lastExportSettings.targetFolder;
+            exportDefaultFolder = lastExportSettings.targetFolder;
+        }
+    } else {
+        // Generate default export folder name only if no previous settings
+        vscode.postMessage({
+            type: 'getExportDefaultFolder'
+        });
+    }
 
     // Check Marp status when opening dialog
     checkMarpStatus();
@@ -4762,13 +4772,20 @@ function closeExportModal() {
 
 /**
  * Set the default export folder
+ * Only updates the input if it hasn't been manually changed by user/preset
  */
 function setExportDefaultFolder(folderPath) {
-    exportDefaultFolder = folderPath;
     const folderInput = document.getElementById('export-folder');
-    if (folderInput) {
+
+    // Only set the value if:
+    // 1. Input is empty, OR
+    // 2. Input still has the old default value (hasn't been manually changed)
+    if (folderInput && (!folderInput.value || folderInput.value === exportDefaultFolder)) {
         folderInput.value = folderPath;
     }
+
+    // Always update the default for future reference
+    exportDefaultFolder = folderPath;
 }
 
 /**
