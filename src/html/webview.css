@@ -33,7 +33,7 @@
   /* --board-background: var(--vscode-titleBar-activeBackground); */
   --board-background: var(--vscode-editor-background);
   --column-background: var(--vscode-editor-background); /* must be a color othervise the sticky headers are transparent */
-  --task-background: transparent;
+  --task-background: var(--vscode-editor-background);
 
   /* Primary Button Styles */
   --button-background: var(--vscode-button-background);
@@ -174,6 +174,7 @@ body {
 .file-info-center .empty-card-source,
 .file-info-right .global-fold-btn,
 .file-info-right .sort-btn,
+.file-info-right .global-sticky-btn,
 .file-info-right .font-size-btn,
 .file-info-right .refresh-btn,
 .file-info-right .auto-export-btn,
@@ -272,6 +273,27 @@ body {
   50% {
     opacity: 0.7;
   }
+}
+
+/* Global Sticky Button */
+.global-sticky-btn {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+  font-size: 14px;
+}
+
+.global-sticky-btn:hover {
+  background: var(--button-background-hover);
+  color: var(--button-foreground-hover);
+}
+
+.global-sticky-btn.all-sticky {
+  opacity: 1;
+}
+
+.global-sticky-btn.some-unsticky {
+  opacity: 0.5;
 }
 
 /* Layout Presets Menu */
@@ -1568,6 +1590,38 @@ body.vscode-high-contrast-light .task-count {
   width: 16px;
 }
 
+/* Pin button (sticky toggle) */
+.pin-btn {
+  padding: 2px 4px;
+  font-size: 10px;
+  line-height: 1;
+  min-width: 16px;
+  height: 16px;
+  width: 16px;
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+}
+
+.pin-btn:hover {
+  background: var(--button-secondary-background-hover);
+}
+
+.pin-btn.pinned {
+  opacity: 1;
+}
+
+.pin-btn.unpinned {
+  opacity: 0.4;
+}
+
 .fold-all-btn:hover,
 .global-fold-btn:hover {
   background: var(--button-secondary-background-hover);
@@ -2143,33 +2197,33 @@ button.file-bar-menu-item {
 }
 
 
-/* Stack sticky mode: titleonly - only title is sticky */
-body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column .column-header {
+/* Stack sticky mode: titleonly - only title is sticky (only for columns with #sticky tag) */
+body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column[data-column-sticky="true"] .column-header {
   position: relative !important;
 }
 
-body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column .column-footer {
+body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column[data-column-sticky="true"] .column-footer {
   position: relative !important;
 }
 
-body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column .column-margin {
+body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column[data-column-sticky="true"] .column-margin {
   position: relative !important;
 }
 
-/* Stack sticky mode: none - nothing is sticky */
-body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .column-header {
+/* Per-column sticky control: when data-column-sticky="false", nothing is sticky */
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-header {
   position: relative !important;
 }
 
-body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .column-title {
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-title {
   position: relative !important;
 }
 
-body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .column-footer {
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-footer {
   position: relative !important;
 }
 
-body.sticky-stack-mode-none .kanban-column-stack .kanban-full-height-column .column-margin {
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-margin {
   position: relative !important;
 }
 

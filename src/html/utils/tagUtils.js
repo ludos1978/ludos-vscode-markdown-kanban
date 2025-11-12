@@ -18,6 +18,7 @@ class TagUtils {
             rowTag: /#row(\d+)\b/gi,
             spanTag: /#span(\d+)\b/gi,
             stackTag: /#stack\b/gi,
+            stickyTag: /#sticky\b/gi,
             includeTag: /#include:([^\s]+)/i,
 
             // Special gather tags
@@ -40,7 +41,7 @@ class TagUtils {
         };
 
         // Layout tags that should not be displayed
-        this.layoutTags = ['row', 'span', 'stack', 'fold', 'archive', 'hidden', 'include'];
+        this.layoutTags = ['row', 'span', 'stack', 'sticky', 'fold', 'archive', 'hidden', 'include'];
 
         // Tags that should be excluded from menus
         this.excludedTags = ['gather_', 'ungathered', 'fold', 'archive', 'hidden'];
@@ -637,11 +638,12 @@ class TagUtils {
                 return text;
             case 'standard':
             case 'allexcludinglayout':
-                // Hide layout tags only (#span, #row, #stack) - direct replacement
+                // Hide layout tags only (#span, #row, #stack, #sticky) - direct replacement
                 return text
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
                     .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
                     .replace(/\s+/g, ' ')
                     .trim();
             case 'custom':
@@ -651,6 +653,7 @@ class TagUtils {
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
                     .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
                     .replace(/\s+/g, ' ')
                     .trim();
             case 'mentions':
@@ -688,11 +691,11 @@ class TagUtils {
                 // Export all tags - don't filter anything
                 return text;
             case 'allexcludinglayout':
-                // Export all except layout tags (#span, #row, #stack)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').trim();
+                // Export all except layout tags (#span, #row, #stack, #sticky)
+                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').replace(this.patterns.stickyTag, '').trim();
             case 'customonly':
                 // Export only custom tags and @ tags (remove standard layout tags)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').trim();
+                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').replace(this.patterns.stickyTag, '').trim();
             case 'mentionsonly':
                 // Export only @ tags - remove all # tags
                 return this.removeTagsFromText(text, {

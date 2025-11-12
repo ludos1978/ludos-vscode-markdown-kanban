@@ -867,7 +867,7 @@ export class ChangeStateMachine {
                                 const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
                                 if (pathMatch && newFiles[index]) {
                                     const filePath = newFiles[index];
-                                    const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+                                    const placeholder = `!({filePath})!`;
                                     displayTitle = displayTitle.replace(match, placeholder);
                                 } else {
                                     displayTitle = displayTitle.replace(match, '').trim();
@@ -932,7 +932,7 @@ export class ChangeStateMachine {
                         const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
                         if (pathMatch && loadingFiles[index]) {
                             const filePath = loadingFiles[index];
-                            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+                            const placeholder = `!({filePath})!`;
                             displayTitle = displayTitle.replace(match, placeholder);
                         } else {
                             displayTitle = displayTitle.replace(match, '').trim();

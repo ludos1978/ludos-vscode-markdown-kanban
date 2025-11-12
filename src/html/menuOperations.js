@@ -1029,6 +1029,196 @@ function changeColumnSpan(columnId, delta) {
     updateRefreshButtonState('unsaved', 1);
 }
 
+/**
+ * Global sticky toggle with two modes:
+ * - Normal click: Temporarily override all columns (no save)
+ * - Alt+click: Toggle all columns and save #sticky tags
+ */
+function toggleGlobalSticky(event) {
+    if (!currentBoard?.columns) { return; }
+
+    const isAltClick = event.altKey;
+    const allColumns = document.querySelectorAll('.kanban-full-height-column');
+
+    if (isAltClick) {
+        // Alt+click: Toggle #sticky tag on all columns and save
+        const hasAnyStickyColumn = Array.from(allColumns).some(col =>
+            col.getAttribute('data-column-sticky') === 'true'
+        );
+
+        // Toggle opposite: if any are sticky, make all non-sticky; otherwise make all sticky
+        const targetState = !hasAnyStickyColumn;
+
+        currentBoard.columns.forEach(column => {
+            const hasStickyTag = /#sticky\b/i.test(column.title);
+
+            if (targetState && !hasStickyTag) {
+                // Add #sticky tag
+                column.title += ' #sticky';
+            } else if (!targetState && hasStickyTag) {
+                // Remove #sticky tag
+                column.title = column.title.replace(/#sticky\b/gi, '').trim();
+            }
+
+            // Update cachedBoard
+            if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
+                const cachedColumn = cachedBoard.columns.find(c => c.id === column.id);
+                if (cachedColumn) {
+                    cachedColumn.title = column.title;
+                }
+            }
+        });
+
+        // Mark as unsaved and re-render
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+        updateRefreshButtonState('unsaved', currentBoard.columns.length);
+
+        // Trigger full board re-render to update all UI elements
+        if (typeof window.renderBoard === 'function') {
+            window.renderBoard(currentBoard);
+        }
+
+        // CRITICAL: Recalculate stack positions after board re-render
+        // This ensures sticky headers update immediately with proper positioning
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            requestAnimationFrame(() => {
+                window.applyStackedColumnStyles(null); // Recalculate all stacks
+            });
+        }
+
+    } else {
+        // Normal click: Temporarily toggle sticky state without saving
+        const hasAnySticky = Array.from(allColumns).some(col =>
+            col.getAttribute('data-column-sticky') === 'true'
+        );
+
+        // Toggle opposite: if any are sticky, make all non-sticky; otherwise make all sticky
+        const targetState = !hasAnySticky;
+
+        allColumns.forEach(columnElement => {
+            columnElement.setAttribute('data-column-sticky', targetState ? 'true' : 'false');
+
+            // Update pin button appearance (but don't update the model)
+            const pinBtn = columnElement.querySelector('.pin-btn');
+            if (pinBtn) {
+                pinBtn.classList.toggle('pinned', targetState);
+                pinBtn.classList.toggle('unpinned', !targetState);
+            }
+        });
+
+        // Recalculate stack positions for all columns
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            window.applyStackedColumnStyles(null);
+        }
+    }
+
+    // Update global button appearance
+    updateGlobalStickyButton();
+}
+
+/**
+ * Update the global sticky button appearance based on current state
+ */
+function updateGlobalStickyButton() {
+    const btn = document.getElementById('global-sticky-btn');
+    if (!btn) { return; }
+
+    const allColumns = document.querySelectorAll('.kanban-full-height-column');
+    const stickyCount = Array.from(allColumns).filter(col =>
+        col.getAttribute('data-column-sticky') === 'true'
+    ).length;
+
+    // Update button state
+    btn.classList.toggle('all-sticky', stickyCount === allColumns.length && allColumns.length > 0);
+    btn.classList.toggle('some-unsticky', stickyCount < allColumns.length);
+}
+
+/**
+ * Toggle #sticky tag on a column to control sticky header state
+ */
+function toggleColumnSticky(columnId) {
+    if (!currentBoard?.columns) { return; }
+
+    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    const column = currentBoard.columns[columnIndex];
+    if (!column || columnIndex === -1) { return; }
+
+    // Flush pending tag changes first
+    if ((window.pendingTaskChanges && window.pendingTaskChanges.size > 0) ||
+        (window.pendingColumnChanges && window.pendingColumnChanges.size > 0)) {
+        flushPendingTagChanges();
+    }
+
+    let newTitle = column.title;
+
+    // Check if #sticky tag exists
+    const hasStickyTag = /#sticky\b/i.test(newTitle);
+
+    if (hasStickyTag) {
+        // Remove #sticky tag
+        newTitle = newTitle.replace(/#sticky\b/gi, '').trim();
+    } else {
+        // Add #sticky tag at the end
+        newTitle += ' #sticky';
+    }
+
+    // Update the column in currentBoard and cachedBoard
+    column.title = newTitle;
+
+    if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
+        const cachedColumn = cachedBoard.columns.find(c => c.id === columnId);
+        if (cachedColumn) {
+            cachedColumn.title = newTitle;
+        }
+    }
+
+    // Update the column element immediately (no full re-render needed)
+    const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+    if (columnElement) {
+        // Update sticky data attribute
+        const newHasStickyTag = /#sticky\b/i.test(newTitle);
+        columnElement.setAttribute('data-column-sticky', newHasStickyTag ? 'true' : 'false');
+
+        // Update pin button state
+        const pinBtn = columnElement.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.toggle('pinned', newHasStickyTag);
+            pinBtn.classList.toggle('unpinned', !newHasStickyTag);
+            pinBtn.title = newHasStickyTag ? 'Unpin header (remove #sticky)' : 'Pin header (add #sticky)';
+        }
+
+        // Update the title display to filter #sticky tag
+        const titleElement = columnElement.querySelector('.column-title-text');
+        if (titleElement && window.cachedBoard) {
+            const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (columnData) {
+                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
+                titleElement.innerHTML = renderedTitle;
+            }
+        }
+    }
+
+    // Recalculate ONLY this column's stack (row), not the whole board
+    if (typeof window.applyStackedColumnStyles === 'function') {
+        window.applyStackedColumnStyles(columnId);
+    }
+
+    // Mark as unsaved
+    if (typeof markUnsavedChanges === 'function') {
+        markUnsavedChanges();
+    }
+
+    // Update button state to show unsaved changes
+    updateRefreshButtonState('unsaved', 1);
+
+    // Update global sticky button appearance
+    if (typeof updateGlobalStickyButton === 'function') {
+        updateGlobalStickyButton();
+    }
+}
+
 function toggleColumnStack(columnId) {
     if (!currentBoard?.columns) {return;}
 

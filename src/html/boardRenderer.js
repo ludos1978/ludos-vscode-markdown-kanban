@@ -1802,10 +1802,14 @@ function createColumnElement(column, columnIndex) {
         }
     }
 
+    // Check for #sticky tag to determine sticky state (default: false = not sticky)
+    const hasStickyTag = /#sticky\b/i.test(column.title);
+
     columnDiv.className = `kanban-full-height-column ${isCollapsed ? 'collapsed' : ''} ${headerClasses} ${footerClasses} ${spanClass}`.trim();
     columnDiv.setAttribute('data-column-id', column.id);
     columnDiv.setAttribute('data-column-index', columnIndex);
     columnDiv.setAttribute('data-row', getColumnRow(column.title));
+    columnDiv.setAttribute('data-column-sticky', hasStickyTag ? 'true' : 'false');
 
     // Add primary tag for background color only (ignore row/gather/span)
     if (columnTag && !columnTag.startsWith('row') && !columnTag.startsWith('gather_') && !columnTag.startsWith('span')) {
@@ -1848,6 +1852,9 @@ function createColumnElement(column, columnIndex) {
 						<div class="column-title-section">
 								<span class="drag-handle column-drag-handle" draggable="true">⋮⋮</span>
 								<span class="collapse-toggle ${isCollapsed ? 'rotated' : ''}" data-column-id="${column.id}">▶</span>
+								<button class="pin-btn ${hasStickyTag ? 'pinned' : 'unpinned'}" onclick="toggleColumnSticky('${column.id}')" title="${hasStickyTag ? 'Unpin header (remove #sticky)' : 'Pin header (add #sticky)'}">
+										<span class="pin-icon">📌</span>
+								</button>
 								<div class="column-title-container">
 										<div class="column-title-text markdown-content" onclick="handleColumnTitleClick(event, '${column.id}')">${renderedTitle}</div>
 										<textarea class="column-title-edit"
@@ -2540,16 +2547,23 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // All columns (including both horizontally and vertically folded) are included in stacking calculations
             const expandedColumns = columnData;
 
-            // Get current sticky stack mode
-            const stickyMode = window.currentStickyStackMode || 'titleonly';
-            const isFullMode = stickyMode === 'full';
-            const isTitleOnlyMode = stickyMode === 'titleonly';
-            const isNoneMode = stickyMode === 'none';
+            // Get current sticky stack mode (only applies to columns with #sticky tag)
+            const globalStickyMode = window.currentStickyStackMode || 'titleonly';
 
-            // Third pass: Calculate all sticky positions based on mode
+            // Third pass: Calculate all sticky positions based on per-column sticky state and global mode
             // Note: HTML order is: margin, column-header, column-title, column-inner, column-footer
             let cumulativeStickyTop = 0;
             const positions = expandedColumns.map((data, expandedIdx) => {
+                // Check if this column has sticky enabled
+                const isColumnSticky = data.col.getAttribute('data-column-sticky') === 'true';
+
+                // Determine effective mode for this column:
+                // - If data-column-sticky="false" (no #sticky tag) → behave like old "none" mode (nothing sticky)
+                // - If data-column-sticky="true" (#sticky tag) → use global sticky stack mode (full or titleonly)
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isTitleOnlyMode = isColumnSticky && globalStickyMode === 'titleonly';
+                const isNoneMode = !isColumnSticky; // Column has no #sticky tag
+
                 // Margin comes first in HTML
                 const marginTop = cumulativeStickyTop;
                 if (isFullMode) {
@@ -2564,7 +2578,7 @@ function recalculateStackHeightsImmediate(stackElement = null) {
 
                 // Then column-title
                 const headerTop = cumulativeStickyTop;
-                if (!isNoneMode) {
+                if (!isNoneMode) { // Both full and titleonly modes have sticky title
                     cumulativeStickyTop += data.headerHeight;
                 }
 
@@ -2580,14 +2594,20 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     columnHeaderTop,
                     headerTop,
                     footerTop,
-                    zIndex: 1000000 + (expandedColumns.length - expandedIdx)
+                    zIndex: 1000000 + (expandedColumns.length - expandedIdx),
+                    isColumnSticky, // Store for bottom calculation
+                    effectiveMode: isNoneMode ? 'none' : globalStickyMode
                 };
             });
 
-            // Calculate bottom positions based on mode
+            // Calculate bottom positions based on per-column mode
             // Bottom to top order: footer, column-inner, column-title, column-header, margin
             let cumulativeFromBottom = 0;
             for (let i = expandedColumns.length - 1; i >= 0; i--) {
+                const isColumnSticky = positions[i].isColumnSticky;
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isNoneMode = !isColumnSticky;
+
                 // Footer is at the bottom
                 const footerBottom = cumulativeFromBottom;
                 if (isFullMode) {
@@ -2596,7 +2616,7 @@ function recalculateStackHeightsImmediate(stackElement = null) {
 
                 // Then column-title
                 const headerBottom = cumulativeFromBottom;
-                if (!isNoneMode) {
+                if (!isNoneMode) { // Both full and titleonly modes have sticky title
                     cumulativeFromBottom += positions[i].headerHeight;
                 }
 
@@ -2629,7 +2649,11 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // This ensures all style changes happen in a single rendering frame
             requestAnimationFrame(() => {
                 // Apply all calculated positions
-                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
+                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded, isColumnSticky, effectiveMode }) => {
+                // Recalculate mode flags from stored values
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isNoneMode = !isColumnSticky;
+
                 col.dataset.columnHeaderTop = columnHeaderTop;
                 col.dataset.headerTop = headerTop;
                 col.dataset.footerTop = footerTop;
@@ -2649,67 +2673,68 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     col.dataset.contentAreaBottom = scrollY + footerRect.top;
                 }
 
-                // Only apply sticky positioning and values to elements that are sticky in this mode
+                // Apply inline styles only for elements that will be sticky
+                // - isNoneMode (no #sticky): No inline styles
+                // - isFullMode (#sticky + full): Margin, header, title, footer get inline styles
+                // - Title-only (#sticky + titleonly): Only title gets inline styles
+
+                // Column margin: only in full mode
+                const columnMargin = col.querySelector('.column-margin');
+                if (columnMargin) {
+                    if (isFullMode) {
+                        columnMargin.style.top = `${marginTop}px`;
+                        columnMargin.style.bottom = `${marginBottom}px`;
+                        columnMargin.style.zIndex = zIndex;
+                    } else {
+                        columnMargin.style.top = '';
+                        columnMargin.style.bottom = '';
+                        columnMargin.style.zIndex = '';
+                    }
+                }
+
+                // Column header: only in full mode
                 if (columnHeader) {
                     if (isFullMode) {
-                        columnHeader.style.position = 'sticky';
                         columnHeader.style.top = `${columnHeaderTop}px`;
                         columnHeader.style.bottom = `${columnHeaderBottom}px`;
                         columnHeader.style.zIndex = zIndex + 1;
                     } else {
-                        columnHeader.style.position = 'relative';
                         columnHeader.style.top = '';
                         columnHeader.style.bottom = '';
                         columnHeader.style.zIndex = '';
                     }
                 }
 
+                // Column title: in both full and title-only modes (not in none mode)
                 if (header) {
                     if (!isNoneMode) {
-                        header.style.position = 'sticky';
                         header.style.top = `${headerTop}px`;
                         header.style.bottom = `${headerBottom}px`;
                         header.style.zIndex = zIndex;
                     } else {
-                        header.style.position = '';
                         header.style.top = '';
                         header.style.bottom = '';
                         header.style.zIndex = '';
                     }
                 }
 
+                // Column footer: only in full mode
                 if (footer) {
                     if (isFullMode) {
-                        footer.style.position = 'sticky';
                         footer.style.top = `${footerTop}px`;
                         footer.style.bottom = `${footerBottom}px`;
                         footer.style.zIndex = zIndex;
                     } else {
-                        footer.style.position = '';
                         footer.style.top = '';
                         footer.style.bottom = '';
                         footer.style.zIndex = '';
                     }
                 }
 
+                // Column offset: always calculated for proper spacing
                 const columnOffset = col.querySelector('.column-offset');
                 if (columnOffset) {
                     columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
-                }
-
-                const columnMargin = col.querySelector('.column-margin');
-                if (columnMargin) {
-                    if (isFullMode) {
-                        columnMargin.style.position = 'sticky';
-                        columnMargin.style.top = `${marginTop}px`;
-                        columnMargin.style.bottom = `${marginBottom}px`;
-                        columnMargin.style.zIndex = zIndex;
-                    } else {
-                        columnMargin.style.position = '';
-                        columnMargin.style.top = '';
-                        columnMargin.style.bottom = '';
-                        columnMargin.style.zIndex = '';
-                    }
                 }
                 });
 

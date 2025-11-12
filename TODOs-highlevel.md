@@ -6,6 +6,14 @@
 - [ ] Can we make the sticky setting for headers (which is currently modified by
  the "sticky stack mode") individual for each column header, with a global 
 sticky flag in the "file info bar". so each column gets a sticky flag (a pin icon). when the sticky flag is active, the header will stay on the screeen using the current layout settings.analyze the influence of the "sticky stack mode" on the kanban board. check if we can make each column have it's individual sticky setting . we still want the "sticky stack mode settings, but only "Full stack" and "Title only", the none feature is after this modification modified trough the "sticky flag" 
+  -> the sticky state can be saved into the kanban as #sticky, it should be 
+considered a layout tag that is filtered when displaying depending on the 
+setting, also when exporting it might get filtered! the default state should be 
+not sticky. the global setting is overriding the setting if it's pressed 
+normally (and not saved as individual setting), if alt+pressed it toggles all 
+states of each column and is saved to the files. place the icon right of the 
+column folding. make sure it's applied after the rendering in the process where 
+all the tags are processed, as the user might add it by text. 
 
 - [ ] when adding multiple files using drag & drop it randomly places them over the board. why does that
   happen?

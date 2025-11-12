@@ -329,8 +329,7 @@ const baseOptions = {
     // Sticky stack mode options
     stickyStackMode: [
         { label: "Full Stack", value: "full", css: "full", description: "Header, title, footer & margin all sticky" },
-        { label: "Title Only", value: "titleonly", css: "titleonly", description: "Only title sticky (default)" },
-        { label: "None", value: "none", css: "none", description: "Nothing sticky in stacks" }
+        { label: "Title Only", value: "titleonly", css: "titleonly", description: "Only title sticky (default)" }
     ],
     // Tag visibility options
     tagVisibility: [
@@ -1487,7 +1486,7 @@ function applyStickyStackMode(mode) {
     window.currentStickyStackMode = mode;
 
     // Remove all mode classes
-    document.body.classList.remove('sticky-stack-mode-full', 'sticky-stack-mode-titleonly', 'sticky-stack-mode-none');
+    document.body.classList.remove('sticky-stack-mode-full', 'sticky-stack-mode-titleonly');
 
     // Add the appropriate class
     document.body.classList.add(`sticky-stack-mode-${mode}`);
