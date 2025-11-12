@@ -32,7 +32,7 @@
   
   /* --board-background: var(--vscode-titleBar-activeBackground); */
   --board-background: var(--vscode-editor-background);
-  --column-background: transparent;
+  --column-background: var(--vscode-editor-background); /* must be a color othervise the sticky headers are transparent */
   --task-background: transparent;
 
   /* Primary Button Styles */
@@ -703,7 +703,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .column-inner {
   /* This is the scrollable container for sticky positioning */
-	transform: translateZ(0.05px);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -787,7 +786,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Column header - receives tag-based header bars, can be styled/faded independently */
 .column-header {
-	transform: translateZ(0.066px);
   z-index: 11;
 	padding-bottom: var(--whitespace-div4);
 	position: sticky;
@@ -800,7 +798,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Column title */
 .column-title {
-  transform: translateZ(0.1px); /* put it above */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -845,7 +842,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .column-inner {
   /* This is the scrollable container for sticky positioning */
-	transform: translateZ(0.033px);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -861,7 +857,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .column-footer {
-	transform: translateZ(0.066px);
 	padding-top: var(--whitespace-div4);
   background-color: var(--column-background);
 	position: sticky;
@@ -2118,29 +2113,35 @@ button.file-bar-menu-item {
   background-color: var(--column-background);
 } */
 
-/* Margin spacer above column-title with background (top/bottom set dynamically by JavaScript) */
-.kanban-column-stack .kanban-full-height-column .column-margin {
-  position: sticky;
-  /* background: var(--vscode-editor-background); */
-  height: var(--whitespace-div2);
-}
-
 /* Sticky headers and titles at bottom with dynamic offsets (set by JavaScript inline styles) */
+.kanban-column-stack .kanban-full-height-column .column-margin,
 .kanban-column-stack .kanban-full-height-column .column-header,
-.kanban-column-stack .kanban-full-height-column .column-title {
-  position: sticky;
-  /* background: var(--vscode-editor-background); */
-  z-index: 100;
-  /* bottom value is set dynamically by applyStackedColumnStyles() */
-}
-
-/* Sticky footers at bottom with dynamic offsets (set by JavaScript inline styles) */
+.kanban-column-stack .kanban-full-height-column .column-title,
 .kanban-column-stack .kanban-full-height-column .column-footer {
   position: sticky;
-  /* background: var(--vscode-editor-background); */
+  background: var(--column-background); /* required for hiding other content in stacking mode */
   z-index: 100;
   /* bottom value is set dynamically by applyStackedColumnStyles() */
 }
+
+.kanban-column-stack .kanban-full-height-column .column-inner {
+	transform: translateZ(0.05px);
+}
+
+.kanban-column-stack .kanban-full-height-column .column-margin {
+  height: var(--whitespace-div2);
+  transform: translateZ(0.05px);
+}
+
+.kanban-column-stack .kanban-full-height-column .column-header,
+.kanban-column-stack .kanban-full-height-column .column-footer {
+	transform: translateZ(0.066px);
+}
+
+.kanban-column-stack .kanban-full-height-column .column-title {
+	transform: translateZ(0.1px);
+}
+
 
 /* Stack sticky mode: titleonly - only title is sticky */
 body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column .column-header {
