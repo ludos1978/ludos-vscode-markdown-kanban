@@ -1596,11 +1596,11 @@ body.vscode-high-contrast-light .task-count {
   font-size: 10px;
   line-height: 1;
   min-width: 16px;
-  height: 16px;
-  width: 16px;
-  background: var(--button-background);
+  height: 14px;
+  width: 14px;
+  background: transparent; /* Keep commented */
   color: var(--button-foreground);
-  border: var(--button-border);
+  /* border: var(--button-border); */
   cursor: pointer;
   border-radius: 3px;
   transition: all 0.2s;
@@ -1608,25 +1608,63 @@ body.vscode-high-contrast-light .task-count {
   align-items: center;
   justify-content: center;
   margin-left: 2px;
+  position: relative;
+  border: none;
 }
 
-.pin-btn:hover {
-  background: var(--button-secondary-background-hover);
+.pin-btn:before {
+  content: ''; /* REQUIRED for :before to show */
+  position: absolute; /* REQUIRED */
+  inset: 0; /* Fill the button */
+  border-radius: inherit;
+  z-index: -1;
 }
 
-.pin-btn.pinned {
+.pin-btn.global-override {
+  outline: 1px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: 2px;
+  border: none;
+}
+
+/* do the background using :before */
+.pin-btn:hover:before {
+  background: var(--button-background-hover);
   opacity: 1;
 }
 
-.pin-btn.unpinned {
+.pin-btn.pinned:before {
+  background: var(--button-background);
+  opacity: 1;
+}
+
+.pin-btn.unpinned:before {
+  background: var(--button-background);
   opacity: 0.4;
 }
 
-/* Visual indicator when pin button is overridden by global sticky */
-.pin-btn.global-override {
-  outline: 2px solid var(--vscode-focusBorder, #007acc);
+/* .pin-btn:hover {
+  background: var(--button-background-hover);
+  border: 2px solid var(rgba(var(--button-background-hover), 0.4), #007acc66);
   outline-offset: 1px;
-}
+} */
+
+/* .pin-btn.global-override:before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid var(--vscode-focusBorder, #007acc);
+  border-radius: 3px;
+  pointer-events: none;
+} */
+
+/* Visual indicator when pin button is overridden by global sticky */
+/* .pin-btn.global-override {
+  outline: 2px solid var(rgba(var(--vscode-focusBorder), 1.0), #007accff);
+  outline-offset: 1px;
+} */
 
 .fold-all-btn:hover,
 .global-fold-btn:hover {
