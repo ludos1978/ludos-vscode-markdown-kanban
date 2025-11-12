@@ -1926,8 +1926,6 @@ export class ExportService {
         board?: any
     ): Promise<ExportResult> {
         try {
-            console.log(`[ExportService.export] Called with board:`, !!board, `mergeIncludes:`, options.mergeIncludes);
-
             // Clear tracking maps for new export
             this.fileHashMap.clear();
             this.exportedFiles.clear();
@@ -1939,12 +1937,10 @@ export class ExportService {
             let extracted: string;
 
             // Extract content from file (needed for file-based pipeline)
-            console.log(`[ExportService.export] Extracting from file:`, sourceDocument.fileName);
             extracted = await this.extractContent(
                 sourceDocument,
                 options.columnIndexes
             );
-            console.log(`[ExportService.export] Extracted content length:`, extracted.length);
 
             // PHASE 2: TRANSFORMATION
             const transformed = await this.transformContent(
