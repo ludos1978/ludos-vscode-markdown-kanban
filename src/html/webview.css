@@ -1622,6 +1622,12 @@ body.vscode-high-contrast-light .task-count {
   opacity: 0.4;
 }
 
+/* Visual indicator when pin button is overridden by global sticky */
+.pin-btn.global-override {
+  outline: 2px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: 1px;
+}
+
 .fold-all-btn:hover,
 .global-fold-btn:hover {
   background: var(--button-secondary-background-hover);

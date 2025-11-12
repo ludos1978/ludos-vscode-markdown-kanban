@@ -1041,7 +1041,7 @@ function toggleGlobalSticky(event) {
     const allColumns = document.querySelectorAll('.kanban-full-height-column');
 
     if (isAltClick) {
-        // Alt+click: Toggle #sticky tag on all columns and save
+        // Alt+click: Toggle #sticky tag on all columns and save (clears global override)
         const hasAnyStickyColumn = Array.from(allColumns).some(col =>
             col.getAttribute('data-column-sticky') === 'true'
         );
@@ -1069,6 +1069,9 @@ function toggleGlobalSticky(event) {
             }
         });
 
+        // Clear global override since we're saving permanent state
+        window.globalStickyOverride = null;
+
         // Mark as unsaved and re-render
         if (typeof markUnsavedChanges === 'function') {
             markUnsavedChanges();
@@ -1089,24 +1092,56 @@ function toggleGlobalSticky(event) {
         }
 
     } else {
-        // Normal click: Temporarily toggle sticky state without saving
-        const hasAnySticky = Array.from(allColumns).some(col =>
-            col.getAttribute('data-column-sticky') === 'true'
-        );
+        // Normal click: Toggle between override active and override disabled
+        // If override is active, clicking disables it and restores actual #sticky tag states
+        // If override is not active, clicking enables it and forces all columns to same state
 
-        // Toggle opposite: if any are sticky, make all non-sticky; otherwise make all sticky
-        const targetState = !hasAnySticky;
+        if (typeof window.globalStickyOverride !== 'undefined' && window.globalStickyOverride !== null) {
+            // Override is active - disable it and restore actual states
+            window.globalStickyOverride = null;
 
-        allColumns.forEach(columnElement => {
-            columnElement.setAttribute('data-column-sticky', targetState ? 'true' : 'false');
+            allColumns.forEach(columnElement => {
+                // Restore to actual #sticky tag state
+                const columnId = columnElement.getAttribute('data-column-id');
+                const column = currentBoard.columns.find(c => c.id === columnId);
+                const hasStickyTag = column && /#sticky\b/i.test(column.title);
 
-            // Update pin button appearance (but don't update the model)
-            const pinBtn = columnElement.querySelector('.pin-btn');
-            if (pinBtn) {
-                pinBtn.classList.toggle('pinned', targetState);
-                pinBtn.classList.toggle('unpinned', !targetState);
-            }
-        });
+                columnElement.setAttribute('data-column-sticky', hasStickyTag ? 'true' : 'false');
+
+                // Update pin button
+                const pinBtn = columnElement.querySelector('.pin-btn');
+                if (pinBtn) {
+                    pinBtn.classList.toggle('pinned', hasStickyTag);
+                    pinBtn.classList.toggle('unpinned', !hasStickyTag);
+                    pinBtn.classList.remove('global-override');
+                }
+            });
+
+        } else {
+            // Override is not active - enable it (make all columns sticky)
+            window.globalStickyOverride = true;
+
+            allColumns.forEach(columnElement => {
+                // When global override is ON, all columns become sticky
+                columnElement.setAttribute('data-column-sticky', 'true');
+
+                // Keep pin button showing actual #sticky tag state, add outline when global override active
+                const pinBtn = columnElement.querySelector('.pin-btn');
+                if (pinBtn) {
+                    // Check actual #sticky tag in the model
+                    const columnId = columnElement.getAttribute('data-column-id');
+                    const column = currentBoard.columns.find(c => c.id === columnId);
+                    const hasStickyTag = column && /#sticky\b/i.test(column.title);
+
+                    // Pin button shows actual saved state
+                    pinBtn.classList.toggle('pinned', hasStickyTag);
+                    pinBtn.classList.toggle('unpinned', !hasStickyTag);
+
+                    // Add outline to all buttons when global override is active
+                    pinBtn.classList.add('global-override');
+                }
+            });
+        }
 
         // Recalculate stack positions for all columns
         if (typeof window.applyStackedColumnStyles === 'function') {
@@ -1187,6 +1222,13 @@ function toggleColumnSticky(columnId) {
             pinBtn.classList.toggle('pinned', newHasStickyTag);
             pinBtn.classList.toggle('unpinned', !newHasStickyTag);
             pinBtn.title = newHasStickyTag ? 'Unpin header (remove #sticky)' : 'Pin header (add #sticky)';
+
+            // ONLY OUTLINE CHANGE: show outline if global override is active
+            if (typeof window.globalStickyOverride !== 'undefined' && window.globalStickyOverride !== null) {
+                pinBtn.classList.add('global-override');
+            } else {
+                pinBtn.classList.remove('global-override');
+            }
         }
 
         // Update the title display to filter #sticky tag
