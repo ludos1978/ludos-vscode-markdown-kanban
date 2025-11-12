@@ -1160,14 +1160,9 @@ function updateGlobalStickyButton() {
     const btn = document.getElementById('global-sticky-btn');
     if (!btn) { return; }
 
-    const allColumns = document.querySelectorAll('.kanban-full-height-column');
-    const stickyCount = Array.from(allColumns).filter(col =>
-        col.getAttribute('data-column-sticky') === 'true'
-    ).length;
-
-    // Update button state
-    btn.classList.toggle('all-sticky', stickyCount === allColumns.length && allColumns.length > 0);
-    btn.classList.toggle('some-unsticky', stickyCount < allColumns.length);
+    // Button state only reflects global override, not individual column states
+    const isOverrideActive = window.globalStickyOverride === true;
+    btn.classList.toggle('active', isOverrideActive);
 }
 
 /**

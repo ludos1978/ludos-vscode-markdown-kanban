@@ -181,14 +181,17 @@ body {
 .file-info-right .layout-presets-btn,
 .file-info-right .file-bar-menu-btn {
   border: var(--button-border);
-  padding: 4px 8px;
+  padding: 4px 4px;
   margin: 0;
-  height: 24px;
-  min-width: 24px;
+  height: 22px;
+  min-height: 22px;
+  width: 22px;
+  min-width: 22px;
   justify-content: center;
   gap: 4px;
   box-sizing: border-box;
   font-size: 12px;
+  border-radius: 3px;
 }
 
 .file-info-right .file-bar-menu-btn {
@@ -906,6 +909,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 /* Title container that should expand to fill available space */
 .column-title-container {
   flex: auto;
+  margin-left: 2px;
   /* min-width: 0;
   display: flex;
   flex-direction: column; */
@@ -1595,38 +1599,41 @@ body.vscode-high-contrast-light .task-count {
   padding: 2px 4px;
   font-size: 10px;
   line-height: 1;
-  min-width: 16px;
   height: 14px;
   width: 14px;
   background: transparent; /* Keep commented */
   color: var(--button-foreground);
   /* border: var(--button-border); */
   cursor: pointer;
-  border-radius: 3px;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-left: 2px;
   position: relative;
+
+  border-radius: 2px;
+
+  outline: 2px solid transparent;
+  outline-offset: 0px;
   border: none;
 }
 
-.pin-btn:before {
-  content: ''; /* REQUIRED for :before to show */
-  position: absolute; /* REQUIRED */
-  inset: 0; /* Fill the button */
-  border-radius: inherit;
-  z-index: -1;
-}
-
 .pin-btn.global-override {
-  outline: 1px solid var(--vscode-focusBorder, #007acc);
-  outline-offset: 2px;
+  outline: 2px solid var(--vscode-focusBorder, #007accff);
+  outline-offset: 0px;
   border: none;
 }
 
 /* do the background using :before */
+.pin-btn:before {
+  content: ''; /* REQUIRED for :before to show */
+  position: absolute; /* REQUIRED */
+  inset: 0; /* Fill the button */
+  z-index: -1;
+  border-radius: 3px;
+}
+
 .pin-btn:hover:before {
   background: var(--button-background-hover);
   opacity: 1;
@@ -1640,6 +1647,7 @@ body.vscode-high-contrast-light .task-count {
 .pin-btn.unpinned:before {
   background: var(--button-background);
   opacity: 0.4;
+
 }
 
 /* .pin-btn:hover {
