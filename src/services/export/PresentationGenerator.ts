@@ -214,16 +214,13 @@ export class PresentationGenerator {
                         break;
                     }
 
-                    // Collect indented or empty lines
+                    // Collect ALL content (indented or not) until next column/task
+                    let descLine = nextLine;
                     if (nextLine.startsWith('  ')) {
-                        descriptionLines.push(nextLine.substring(2));
-                        i++;
-                    } else if (nextLine.trim() === '') {
-                        descriptionLines.push('');
-                        i++;
-                    } else {
-                        break;
+                        descLine = nextLine.substring(2);
                     }
+                    descriptionLines.push(descLine);
+                    i++;
                 }
 
                 // Build slide content
