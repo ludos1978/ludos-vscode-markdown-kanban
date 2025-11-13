@@ -170,8 +170,6 @@ body {
 /* Consistent styling for all file-info header elements */
 .file-info-left .global-fold-btn,
 .file-info-left .sort-btn,
-.file-info-center .clipboard-card-source,
-.file-info-center .empty-card-source,
 .file-info-right .global-fold-btn,
 .file-info-right .sort-btn,
 .file-info-right .global-sticky-btn,
@@ -186,6 +184,22 @@ body {
   height: 22px;
   min-height: 22px;
   width: 22px;
+  min-width: 22px;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.file-info-center .clipboard-card-source,
+.file-info-center .empty-card-source {
+  border: var(--button-border);
+  padding: 4px 4px;
+  margin: 0;
+  height: 22px;
+  min-height: 22px;
+  /* width: 22px; */
   min-width: 22px;
   justify-content: center;
   gap: 4px;
