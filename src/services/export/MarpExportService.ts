@@ -20,6 +20,8 @@ export interface MarpExportOptions {
     theme?: string;
     /** Watch mode: runs Marp with --watch and --preview, stores PID */
     watchMode?: boolean;
+    /** Editable mode: adds --pptx-editable flag for PowerPoint exports */
+    pptxEditable?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
 }
@@ -270,6 +272,11 @@ export class MarpExportService {
             args.push('--pdf');
         } else if (options.format === 'pptx') {
             args.push('--pptx');
+            // Add --pptx-editable flag if pptxEditable mode is enabled
+            if (options.pptxEditable) {
+                args.push('--pptx-editable');
+                console.log(`[kanban.MarpExportService] Adding --pptx-editable flag for editable PowerPoint export`);
+            }
         } else {
             // Default to HTML (covers 'html' and any legacy 'markdown' from old saved settings)
             args.push('--html');

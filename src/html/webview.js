@@ -5023,12 +5023,14 @@ function executeUnifiedExport() {
     let marpTheme = null;
     let marpBrowser = null;
     let marpPreview = false;
+    let marpPptxEditable = false;
 
     if (useMarp) {
         marpOutputFormat = document.getElementById('marp-output-format')?.value || 'html';
         marpTheme = document.getElementById('marp-theme')?.value || 'default';
         marpBrowser = document.getElementById('marp-browser')?.value || 'chrome';
         marpPreview = document.getElementById('marp-preview')?.checked || false;
+        marpPptxEditable = document.getElementById('marp-pptx-editable')?.checked || false;
     }
 
     // Close modal
@@ -5062,7 +5064,8 @@ function executeUnifiedExport() {
         // MARP SPECIFIC
         marpTheme: useMarp ? marpTheme : undefined,
         marpBrowser: useMarp ? marpBrowser : undefined,
-        marpWatch: useMarp && marpPreview ? true : undefined
+        marpWatch: useMarp && marpPreview ? true : undefined,
+        marpPptxEditable: useMarp && marpPptxEditable ? true : undefined
     };
 
     // Save last export settings for quick re-export
@@ -5199,10 +5202,33 @@ function handleUseMarpChange() {
             marpOptions.classList.remove('disabled-section');
             // Check Marp status when enabling Marp
             checkMarpStatus();
+            // Update editable checkbox state based on current format
+            handleMarpOutputFormatChange();
         } else {
             marpOptions.style.opacity = '0.5';
             marpOptions.style.pointerEvents = 'none';
             marpOptions.classList.add('disabled-section');
+        }
+    }
+}
+
+/**
+ * Handle Marp output format change - enable/disable pptx-editable checkbox
+ */
+function handleMarpOutputFormatChange() {
+    const outputFormatSelect = document.getElementById('marp-output-format');
+    const pptxEditableCheckbox = document.getElementById('marp-pptx-editable');
+
+    if (outputFormatSelect && pptxEditableCheckbox) {
+        const isPptx = outputFormatSelect.value === 'pptx';
+
+        if (isPptx) {
+            // Enable checkbox for PowerPoint format
+            pptxEditableCheckbox.disabled = false;
+        } else {
+            // Disable and uncheck for other formats
+            pptxEditableCheckbox.disabled = true;
+            pptxEditableCheckbox.checked = false;
         }
     }
 }
@@ -5287,7 +5313,10 @@ function applyPresetMarpPresentation(currentFilename) {
     
     // Live Preview: On
     document.getElementById('marp-preview').checked = true;
-    
+
+    // Editable: Off
+    document.getElementById('marp-pptx-editable').checked = false;
+
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
@@ -5296,6 +5325,9 @@ function applyPresetMarpPresentation(currentFilename) {
     // Link & Asset Handling: Rewrite relative links (no packing)
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
+
+    // Update editable checkbox state based on format
+    handleMarpOutputFormatChange();
 }
 
 /**
@@ -5325,7 +5357,10 @@ function applyPresetMarpPdf(currentFilename) {
     
     // Live Preview: Off
     document.getElementById('marp-preview').checked = false;
-    
+
+    // Editable: Off
+    document.getElementById('marp-pptx-editable').checked = false;
+
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
@@ -5334,6 +5369,9 @@ function applyPresetMarpPdf(currentFilename) {
     // Link & Asset Handling: Rewrite relative links (no packing)
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
+
+    // Update editable checkbox state based on format
+    handleMarpOutputFormatChange();
 }
 
 /**
@@ -5431,7 +5469,8 @@ function saveLastExportSettings() {
         marpOutputFormat: document.getElementById('marp-output-format')?.value || 'html',
         marpTheme: document.getElementById('marp-theme')?.value || 'default',
         marpBrowser: document.getElementById('marp-browser')?.value || 'chrome',
-        marpPreview: document.getElementById('marp-preview')?.checked || false
+        marpPreview: document.getElementById('marp-preview')?.checked || false,
+        marpPptxEditable: document.getElementById('marp-pptx-editable')?.checked || false
     };
 
     window.lastExportSettings = lastExportSettings;
@@ -5456,7 +5495,7 @@ function addExportSettingChangeListeners() {
     const elements = [
         'export-format', 'export-tag-visibility', 'merge-includes',
         'auto-export-on-save', 'use-marp', 'link-handling-mode',
-        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview',
+        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview', 'marp-pptx-editable',
         'include-files', 'include-images', 'include-videos',
         'include-other-media', 'include-documents', 'file-size-limit'
     ];

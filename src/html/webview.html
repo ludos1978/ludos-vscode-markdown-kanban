@@ -598,7 +598,7 @@
 										<div class="export-field-row">
 												<div class="export-field-third">
 														<label for="marp-output-format">Output Format:</label>
-														<select id="marp-output-format" class="form-input">
+														<select id="marp-output-format" class="form-input" onchange="handleMarpOutputFormatChange()">
 																<option value="html" selected>HTML</option>
 																<option value="pdf">PDF</option>
 																<option value="pptx">PowerPoint</option>
@@ -627,6 +627,12 @@
 														<label class="export-checkbox">
 																<input type="checkbox" id="marp-preview">
 																<span>Live preview (--preview)</span>
+														</label>
+												</div>
+												<div class="export-field-third">
+														<label class="export-checkbox">
+																<input type="checkbox" id="marp-pptx-editable" disabled>
+																<span>Editable (--pptx-editable)</span>
 														</label>
 												</div>
 												<div class="export-field-third">

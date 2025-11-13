@@ -68,6 +68,7 @@ export interface NewExportOptions {
     marpBrowser?: string;
     marpEnginePath?: string;
     marpWatch?: boolean;            // Run Marp in watch mode
+    marpPptxEditable?: boolean;     // Use --pptx-editable flag for PowerPoint exports
 }
 
 /**
@@ -1854,6 +1855,7 @@ export class ExportService {
                     format: marpFormat,
                     outputPath: outputPath,
                     watchMode: true,
+                    pptxEditable: options.marpPptxEditable,
                     enginePath: options.marpEnginePath,
                     theme: options.marpTheme
                 });
@@ -1887,6 +1889,7 @@ export class ExportService {
                     inputFilePath: processedMarkdownPath, // Use preprocessed markdown
                     format: marpFormat,
                     outputPath: outputPath,
+                    pptxEditable: options.marpPptxEditable,
                     enginePath: options.marpEnginePath,
                     theme: options.marpTheme
                 });
