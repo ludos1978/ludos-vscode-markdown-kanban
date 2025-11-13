@@ -120,7 +120,6 @@ export class BoardOriginator implements IOriginator<KanbanBoard> {
      */
     restoreFromMemento(memento: IMemento<KanbanBoard>): void {
         this.board = memento.getState();
-        console.log(`[BoardOriginator] Restored state: ${memento.getMetadata().description}`);
     }
 }
 
@@ -142,7 +141,6 @@ export class BoardCaretaker implements ICaretaker<KanbanBoard> {
             this.mementos.shift();
         }
 
-        console.log(`[BoardCaretaker] Added memento: ${memento.getMetadata().description} (total: ${this.mementos.length})`);
     }
 
     /**
@@ -209,7 +207,6 @@ export class BoardCaretaker implements ICaretaker<KanbanBoard> {
      */
     clear(): void {
         this.mementos = [];
-        console.log(`[BoardCaretaker] Cleared all mementos`);
     }
 
     /**
@@ -416,7 +413,6 @@ export class UndoableCommandManager {
         // Clear redo stack
         this.redoStack = [];
 
-        console.log(`[UndoableCommandManager] Executed command: ${command.getDescription()}`);
     }
 
     async undo(): Promise<void> {
@@ -430,7 +426,6 @@ export class UndoableCommandManager {
         // Add to redo stack
         this.redoStack.push(command);
 
-        console.log(`[UndoableCommandManager] Undid command: ${command.getDescription()}`);
     }
 
     async redo(): Promise<void> {
@@ -444,7 +439,6 @@ export class UndoableCommandManager {
         // Add back to history
         this.commandHistory.push(command);
 
-        console.log(`[UndoableCommandManager] Redid command: ${command.getDescription()}`);
     }
 
     canUndo(): boolean {
@@ -458,7 +452,6 @@ export class UndoableCommandManager {
     clear(): void {
         this.commandHistory = [];
         this.redoStack = [];
-        console.log(`[UndoableCommandManager] Cleared command history`);
     }
 
     getHistory(): string[] {

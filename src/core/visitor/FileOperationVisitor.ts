@@ -28,7 +28,6 @@ export interface IVisitableFile {
 
 export class ValidationVisitor implements IFileVisitor<boolean> {
     async visitMainFile(file: MainKanbanFile): Promise<boolean> {
-        console.log(`[ValidationVisitor] Validating main file: ${file.getRelativePath()}`);
 
         const validation = file.validate(file.getContent());
         if (!validation.valid) {
@@ -43,12 +42,10 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
             return false;
         }
 
-        console.log(`[ValidationVisitor] Main file validation passed`);
         return true;
     }
 
     async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<boolean> {
-        console.log(`[ValidationVisitor] Validating column include: ${file.getRelativePath()}`);
 
         const validation = file.validate(file.getContent());
         if (!validation.valid) {
@@ -67,12 +64,10 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
             return false;
         }
 
-        console.log(`[ValidationVisitor] Column include validation passed`);
         return true;
     }
 
     async visitTaskIncludeFile(file: TaskIncludeFile): Promise<boolean> {
-        console.log(`[ValidationVisitor] Validating task include: ${file.getRelativePath()}`);
 
         const validation = file.validate(file.getContent());
         if (!validation.valid) {
@@ -86,12 +81,10 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
             console.warn(`[ValidationVisitor] Task include is empty`);
         }
 
-        console.log(`[ValidationVisitor] Task include validation passed`);
         return true;
     }
 
     async visitRegularIncludeFile(file: RegularIncludeFile): Promise<boolean> {
-        console.log(`[ValidationVisitor] Validating regular include: ${file.getRelativePath()}`);
 
         const validation = file.validate(file.getContent());
         if (!validation.valid) {
@@ -99,7 +92,6 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
             return false;
         }
 
-        console.log(`[ValidationVisitor] Regular include validation passed`);
         return true;
     }
 }
@@ -108,22 +100,18 @@ export class BackupVisitor implements IFileVisitor<void> {
     constructor(private label: string = 'visitor-backup') {}
 
     async visitMainFile(file: MainKanbanFile): Promise<void> {
-        console.log(`[BackupVisitor] Creating backup for main file: ${file.getRelativePath()}`);
         await file.createBackup(this.label);
     }
 
     async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        console.log(`[BackupVisitor] Creating backup for column include: ${file.getRelativePath()}`);
         await file.createBackup(this.label);
     }
 
     async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        console.log(`[BackupVisitor] Creating backup for task include: ${file.getRelativePath()}`);
         await file.createBackup(this.label);
     }
 
     async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
-        console.log(`[BackupVisitor] Creating backup for regular include: ${file.getRelativePath()}`);
         await file.createBackup(this.label);
     }
 }
@@ -194,44 +182,36 @@ export class ContentAnalysisVisitor implements IFileVisitor<ContentStats> {
 
 export class SaveVisitor implements IFileVisitor<void> {
     async visitMainFile(file: MainKanbanFile): Promise<void> {
-        console.log(`[SaveVisitor] Saving main file: ${file.getRelativePath()}`);
         await file.save();
     }
 
     async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        console.log(`[SaveVisitor] Saving column include: ${file.getRelativePath()}`);
         await file.save();
     }
 
     async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        console.log(`[SaveVisitor] Saving task include: ${file.getRelativePath()}`);
         await file.save();
     }
 
     async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
-        console.log(`[SaveVisitor] Saving regular include: ${file.getRelativePath()}`);
         await file.save();
     }
 }
 
 export class ReloadVisitor implements IFileVisitor<void> {
     async visitMainFile(file: MainKanbanFile): Promise<void> {
-        console.log(`[ReloadVisitor] Reloading main file: ${file.getRelativePath()}`);
         await file.reload();
     }
 
     async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        console.log(`[ReloadVisitor] Reloading column include: ${file.getRelativePath()}`);
         await file.reload();
     }
 
     async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        console.log(`[ReloadVisitor] Reloading task include: ${file.getRelativePath()}`);
         await file.reload();
     }
 
     async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
-        console.log(`[ReloadVisitor] Reloading regular include: ${file.getRelativePath()}`);
         await file.reload();
     }
 }

@@ -24,13 +24,6 @@ class ExportTreeUI {
         }
 
         // Debug: log tree structure
-        console.log('[kanban.exportTreeUI.render] Tree structure:', JSON.stringify(tree, (key, value) => {
-            if (key === 'children' && Array.isArray(value)) {
-                return `[${value.length} children]`;
-            }
-            if (key === 'selected' || key === 'type' || key === 'label') return value;
-            return undefined;
-        }, 2));
 
         // Create main container
         const mainContainer = document.createElement('div');
@@ -43,7 +36,6 @@ class ExportTreeUI {
         // Render rows
         if (tree.children && tree.children.length > 0) {
             tree.children.forEach(rowNode => {
-                console.log('[kanban.exportTreeUI.render] Rendering row:', rowNode.label, 'with', rowNode.children?.length, 'children');
                 const rowElement = this.renderRow(rowNode);
                 mainContainer.appendChild(rowElement);
             });
@@ -94,7 +86,6 @@ class ExportTreeUI {
 
         if (rowNode.children && rowNode.children.length > 0) {
             rowNode.children.forEach(child => {
-                console.log('[kanban.exportTreeUI.renderRow] Child type:', child.type, 'label:', child.label, 'has', child.children?.length, 'children');
                 if (child.type === 'stack') {
                     const stackElement = this.renderStack(child);
                     columnsContainer.appendChild(stackElement);
@@ -243,7 +234,6 @@ class ExportTreeUI {
 // Export for use in other modules
 if (typeof window !== 'undefined') {
     window.ExportTreeUI = ExportTreeUI;
-    console.log('[kanban.exportTreeUI] ExportTreeUI loaded successfully');
 } else {
     console.error('[kanban.exportTreeUI] window is undefined');
 }

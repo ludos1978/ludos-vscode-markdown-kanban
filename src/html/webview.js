@@ -50,9 +50,7 @@ let currentLayoutRows = 1;
  * Handle click on "Convert to SVG" button
  */
 async function handlePlantUMLConvert(button) {
-    console.log('[PlantUML] handlePlantUMLConvert called');
     const code = button.getAttribute('data-code');
-    console.log('[PlantUML] Code length:', code ? code.length : 'null');
 
     if (!code) {
         console.error('[PlantUML] No code found for conversion');
@@ -62,31 +60,25 @@ async function handlePlantUMLConvert(button) {
     // Disable button during processing
     button.disabled = true;
     button.textContent = '⏳ Converting...';
-    console.log('[PlantUML] Button updated to "Converting..."');
 
     try {
         // Get SVG from cache or render it
         let svg;
         if (plantumlRenderCache && plantumlRenderCache.has(code)) {
             svg = plantumlRenderCache.get(code);
-            console.log('[PlantUML] Got SVG from cache');
         } else {
             // This shouldn't happen (already rendered), but handle it
-            console.log('[PlantUML] Rendering SVG (not in cache)');
             svg = await renderPlantUML(code);
         }
-        console.log('[PlantUML] SVG length:', svg ? svg.length : 'null');
 
         // Get current board file path
         const currentFilePath = window.currentKanbanFilePath;
-        console.log('[PlantUML] Current file path:', currentFilePath);
 
         if (!currentFilePath) {
             throw new Error('No kanban file currently open');
         }
 
         // Send message to backend to save SVG and update markdown
-        console.log('[PlantUML] Sending convertPlantUMLToSVG message to backend');
         vscode.postMessage({
             type: 'convertPlantUMLToSVG',
             filePath: currentFilePath,
@@ -96,7 +88,6 @@ async function handlePlantUMLConvert(button) {
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
-        console.log('[PlantUML] Message sent, waiting for backend response');
     } catch (error) {
         console.error('[PlantUML] Conversion error:', error);
         button.disabled = false;
@@ -111,12 +102,10 @@ async function handlePlantUMLConvert(button) {
 // Event delegation for convert buttons
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('plantuml-convert-btn')) {
-        console.log('[PlantUML] Convert button clicked');
         handlePlantUMLConvert(e.target);
     }
 
     if (e.target.classList.contains('mermaid-convert-btn')) {
-        console.log('[Mermaid] Convert button clicked');
         handleMermaidConvert(e.target);
     }
 });
@@ -130,9 +119,7 @@ document.addEventListener('click', (e) => {
  * @param {HTMLElement} button - The clicked button element
  */
 async function handleMermaidConvert(button) {
-    console.log('[Mermaid] Convert button clicked');
     const code = button.getAttribute('data-code');
-    console.log('[Mermaid] Code:', code);
 
     if (!code) {
         console.error('[Mermaid] No code found in button data-code attribute');
@@ -142,31 +129,25 @@ async function handleMermaidConvert(button) {
     // Disable button during processing
     button.disabled = true;
     button.textContent = '⏳ Converting...';
-    console.log('[Mermaid] Button updated to "Converting..."');
 
     try {
         // Get SVG from cache or render it
         let svg;
         if (mermaidRenderCache && mermaidRenderCache.has(code)) {
             svg = mermaidRenderCache.get(code);
-            console.log('[Mermaid] Got SVG from cache');
         } else {
             // This shouldn't happen (already rendered), but handle it
-            console.log('[Mermaid] Rendering SVG (not in cache)');
             svg = await renderMermaid(code);
         }
-        console.log('[Mermaid] SVG length:', svg ? svg.length : 'null');
 
         // Get current board file path
         const currentFilePath = window.currentKanbanFilePath;
-        console.log('[Mermaid] Current file path:', currentFilePath);
 
         if (!currentFilePath) {
             throw new Error('No kanban file currently open');
         }
 
         // Send message to backend to save SVG and update markdown
-        console.log('[Mermaid] Sending convertMermaidToSVG message to backend');
         vscode.postMessage({
             type: 'convertMermaidToSVG',
             filePath: currentFilePath,
@@ -176,7 +157,6 @@ async function handleMermaidConvert(button) {
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
-        console.log('[Mermaid] Message sent, waiting for backend response');
     } catch (error) {
         console.error('[Mermaid] Conversion error:', error);
         button.disabled = false;
@@ -1810,12 +1790,10 @@ function updateColumnRowTag(columnId, newRow) {
         if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
             // Match by position - use current ID from board at this position
             currentColumnId = window.currentBoard.columns[columnIndex].id;
-            console.log(`[Frontend] Column position ${columnIndex}: DOM ID ${columnId}, currentBoard ID ${currentColumnId}`);
         }
     }
 
     // Send update to backend with the full title including row tag
-    console.log(`[Frontend] Sending editColumnTitle - columnId: ${currentColumnId}, title: ${column.title}`);
     vscode.postMessage({
         type: 'editColumnTitle',
         columnId: currentColumnId,
@@ -1994,7 +1972,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // This prevents auto-save from setting skip flag when user switches to external editor,
         // which would cause external saves to be incorrectly treated as "our own save"
         if (window.taskEditor && window.taskEditor.currentEditor !== null) {
-            console.log('[webview] ⏸️ Skipping auto-save - user is actively editing');
             return;
         }
 
@@ -2481,12 +2458,10 @@ window.addEventListener('message', event => {
 
                 // Store border configuration from extension
                 if (message.columnBorder && message.taskBorder) {
-                    console.log('[Border-Debug] Received from extension - columnBorder:', message.columnBorder, 'taskBorder:', message.taskBorder);
                     window.borderConfig = {
                         columnBorder: message.columnBorder,
                         taskBorder: message.taskBorder
                     };
-                    console.log('[Border-Debug] Stored in window.borderConfig:', window.borderConfig);
                     updateBorderStyles();
                 }
 
@@ -2661,7 +2636,6 @@ window.addEventListener('message', event => {
             break;
         case 'saveCompleted':
             // Backend has confirmed save is complete, update frontend UI
-            console.log('[FRONTEND] Received saveCompleted from backend');
             if (typeof markSavedChanges === 'function') {
                 markSavedChanges();
             }
@@ -2713,7 +2687,6 @@ window.addEventListener('message', event => {
         case 'updateShortcuts':
             // Cache shortcuts for taskEditor to use
             window.cachedShortcuts = message.shortcuts || {};
-            console.log('[webview] Updated shortcuts cache:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
             break;
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
@@ -2725,7 +2698,6 @@ window.addEventListener('message', event => {
 
             // Send confirmation back to backend
             if (message.requestId) {
-                console.log('[Frontend] Confirming columns unfolded:', message.requestId);
                 vscode.postMessage({
                     type: 'columnsUnfolded',
                     requestId: message.requestId
@@ -2738,10 +2710,7 @@ window.addEventListener('message', event => {
             break;
         case 'includeFileContent':
             // Handle include file content response from backend
-            console.log('[webview.js] 📨 Received includeFileContent:', message.filePath);
-            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
             if (typeof window.updateIncludeFileCache === 'function') {
-                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
                 window.updateIncludeFileCache(message.filePath, message.content);
             } else {
                 console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
@@ -2750,10 +2719,7 @@ window.addEventListener('message', event => {
 
         case 'updateIncludeContent':
             // Handle processed include content from backend
-            console.log('[webview.js] 📨 Received updateIncludeContent:', message.filePath);
-            console.log('[webview.js]   typeof window.updateIncludeFileCache:', typeof window.updateIncludeFileCache);
             if (typeof window.updateIncludeFileCache === 'function') {
-                console.log('[webview.js]   ✅ Calling window.updateIncludeFileCache');
                 window.updateIncludeFileCache(message.filePath, message.content);
             } else {
                 console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
@@ -2818,12 +2784,7 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating include file
-            console.log('[FRONTEND proceedUpdateIncludeFile] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND proceedUpdateIncludeFile] columnId:', message.columnId);
-            console.log('[FRONTEND proceedUpdateIncludeFile] newFileName:', message.newFileName);
-            console.log('[FRONTEND proceedUpdateIncludeFile] currentFile:', message.currentFile);
             if (typeof updateColumnIncludeFile === 'function') {
-                console.log('[FRONTEND proceedUpdateIncludeFile] Calling updateColumnIncludeFile...');
                 updateColumnIncludeFile(message.columnId, message.newFileName, message.currentFile);
             } else {
                 console.error('[FRONTEND proceedUpdateIncludeFile] updateColumnIncludeFile function not found!');
@@ -2831,13 +2792,7 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateTaskIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating task include file
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] taskId:', message.taskId);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] columnId:', message.columnId);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] newFileName:', message.newFileName);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] currentFile:', message.currentFile);
             if (typeof updateTaskIncludeFile === 'function') {
-                console.log('[FRONTEND proceedUpdateTaskIncludeFile] Calling updateTaskIncludeFile...');
                 updateTaskIncludeFile(message.taskId, message.columnId, message.newFileName, message.currentFile);
             } else {
                 console.error('[FRONTEND proceedUpdateTaskIncludeFile] updateTaskIncludeFile function not found!');
@@ -2900,7 +2855,6 @@ window.addEventListener('message', event => {
                             itemId: message.columnId
                         });
                     } else {
-                        console.log('[Frontend updateColumnContent] Skipping render - user is editing');
 
                         // OPTIMIZATION 1: Tell backend this render was skipped
                         vscode.postMessage({
@@ -2917,13 +2871,6 @@ window.addEventListener('message', event => {
             break;
         case 'updateTaskContent':
             // Handle targeted task content update for include file changes
-            console.log('[FRONTEND updateTaskContent] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND updateTaskContent] taskId:', message.taskId);
-            console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
-            console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
-            console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
-            console.log('[FRONTEND updateTaskContent] taskTitle:', message.taskTitle);
-            console.log('[FRONTEND updateTaskContent] originalTitle:', message.originalTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2941,8 +2888,6 @@ window.addEventListener('message', event => {
                 }
 
                 if (foundTask && foundColumn) {
-                    console.log('[FRONTEND updateTaskContent] Found task in cachedBoard, updating...');
-                    console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
 
                     // Update task metadata
                     // CRITICAL FIX: Use !== undefined checks instead of || operator
@@ -2964,11 +2909,6 @@ window.addEventListener('message', event => {
                         foundTask.isLoadingContent = message.isLoadingContent;
                     }
 
-                    console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
-                    console.log('[FRONTEND updateTaskContent] NEW title:', foundTask.title);
-                    console.log('[FRONTEND updateTaskContent] NEW displayTitle:', foundTask.displayTitle);
-                    console.log('[FRONTEND updateTaskContent] NEW originalTitle:', foundTask.originalTitle);
-                    console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
                     // Check if user is currently editing - if so, handle carefully
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
@@ -2982,7 +2922,6 @@ window.addEventListener('message', event => {
                         if (editor.type === 'task-title') {
                             // Update the editor field value to match the backend's processed title
                             editor.element.value = message.taskTitle || '';
-                            console.log('[FRONTEND updateTaskContent] Updated editor value for include change:', message.taskTitle);
                         }
                     }
 
@@ -3017,7 +2956,6 @@ window.addEventListener('message', event => {
                             itemId: message.taskId
                         });
                     } else {
-                        console.log('[Frontend updateTaskContent] Skipping render - user is editing');
 
                         // OPTIMIZATION 1: Tell backend this render was skipped
                         vscode.postMessage({
@@ -3033,7 +2971,6 @@ window.addEventListener('message', event => {
         case 'syncDirtyItems':
             // OPTIMIZATION 2: Batch update multiple items with unrendered changes
             if (window.cachedBoard) {
-                console.log(`[Frontend syncDirtyItems] Syncing ${message.columns.length} columns, ${message.tasks.length} tasks`);
 
                 // Update columns
                 for (const colData of message.columns) {
@@ -3098,11 +3035,9 @@ window.addEventListener('message', event => {
             let capturedEdit = null;
 
             if (window.taskEditor && window.taskEditor.currentEditor) {
-                console.log('[Frontend] Stopping editing due to backend request');
 
                 if (message.captureValue) {
                     // CAPTURE mode: Extract edit value WITHOUT modifying board
-                    console.log('[Frontend] Capturing edit value without saving to board');
                     const editor = window.taskEditor.currentEditor;
                     capturedEdit = {
                         type: editor.type,
@@ -3111,7 +3046,6 @@ window.addEventListener('message', event => {
                         value: editor.element.value,
                         originalValue: editor.originalValue
                     };
-                    console.log('[Frontend] Captured edit:', capturedEdit);
                 } else {
                     // SAVE mode: Normal save (for backwards compatibility)
                     if (typeof window.taskEditor.saveCurrentField === 'function') {
@@ -3125,7 +3059,6 @@ window.addEventListener('message', event => {
 
             // Send confirmation back to backend with captured value
             if (message.requestId) {
-                console.log('[Frontend] Confirming editing stopped:', message.requestId);
                 vscode.postMessage({
                     type: 'editingStopped',
                     requestId: message.requestId,
@@ -3143,11 +3076,9 @@ window.addEventListener('message', event => {
             handleExportResult(message.result);
             break;
         case 'marpStatus':
-            console.log('[kanban.webview] Received marpStatus message:', message);
             handleMarpStatus(message);
             break;
         case 'marpThemesAvailable':
-            console.log('[kanban.webview] Received marpThemesAvailable message:', message);
             
             // Clear the retry timeout
             if (window.marpThemesTimeout) {
@@ -3237,13 +3168,10 @@ window.addEventListener('message', event => {
 
         case 'autoExportStopped':
             // Hide the auto-export button when auto-export is stopped
-            console.log('[kanban.webview] Received autoExportStopped message - hiding button');
             const autoExportBtn = document.getElementById('auto-export-btn');
-            console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
             if (autoExportBtn) {
                 autoExportBtn.style.display = 'none';
                 autoExportBtn.classList.remove('active');
-                console.log('[kanban.webview] Auto-export button hidden and deactivated');
             }
             // Reset auto-export state - both local and window variables
             autoExportActive = false;
@@ -3262,13 +3190,11 @@ window.addEventListener('message', event => {
                 if (btn) {
                     btn.style.display = 'none';
                     btn.classList.remove('active');
-                    console.log('[kanban.webview] Auto-export button force-hidden after timeout');
                 }
             }, 100);
             break;
 
         case 'plantUMLConvertSuccess':
-            console.log('[PlantUML] Conversion successful:', message.svgPath);
             // File will reload automatically, which will show the updated content
             break;
 
@@ -3279,12 +3205,10 @@ window.addEventListener('message', event => {
 
         // Mermaid export rendering (for PDF/Marp export)
         case 'renderMermaidForExport':
-            console.log('[Webview] Received Mermaid export render request:', message.requestId);
 
             // Use existing renderMermaid function to render the diagram
             renderMermaid(message.code)
                 .then(svg => {
-                    console.log('[Webview] Mermaid rendered successfully for export:', message.requestId);
 
                     // Send success response back to backend
                     vscode.postMessage({
@@ -4140,7 +4064,6 @@ function updateBorderStyles() {
     }
 
     const { columnBorder, taskBorder } = window.borderConfig;
-    console.log('[Border-Debug] Received from extension - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
     // Apply CSS variables
     document.documentElement.style.setProperty('--column-border', columnBorder);
@@ -4947,7 +4870,6 @@ function updateLinkHandlingOptionsVisibility() {
 function executeUnifiedExport() {
     // Stop existing auto-export and Marp processes before starting new export
     if (autoExportActive || lastExportSettings) {
-        console.log('[kanban.webview.executeUnifiedExport] Stopping existing processes before new export');
 
         // Stop auto-export
         if (autoExportActive) {
@@ -5252,7 +5174,6 @@ function applyExportPreset() {
         return; // Custom settings selected
     }
 
-    console.log('[kanban.webview] Applying export preset:', preset);
 
     // Get current filename for folder generation
     const currentFilename = window.currentKanbanFile ? 
@@ -5474,7 +5395,6 @@ function saveLastExportSettings() {
     };
 
     window.lastExportSettings = lastExportSettings;
-    console.log('[kanban.webview] Saved last export settings:', lastExportSettings);
 }
 
 /**
@@ -5484,7 +5404,6 @@ function resetPresetToCustom() {
     const presetSelect = document.getElementById('export-preset');
     if (presetSelect && presetSelect.value !== '') {
         presetSelect.value = '';
-        console.log('[kanban.webview] Reset preset to Custom Settings due to manual change');
     }
 }
 
@@ -5517,7 +5436,6 @@ function addExportSettingChangeListeners() {
  * Check Marp CLI and extension status
  */
 function checkMarpStatus() {
-    console.log('[kanban.webview] Checking Marp status...');
     vscode.postMessage({
         type: 'checkMarpStatus'
     });
@@ -5527,36 +5445,29 @@ function checkMarpStatus() {
  * Handle Marp status response from backend
  */
 function handleMarpStatus(status) {
-    console.log('[kanban.webview] handleMarpStatus called with:', status);
     const statusText = document.getElementById('marp-status-text');
     if (!statusText) {
         console.error('[kanban.webview] marp-status-text element not found');
         return;
     }
 
-    console.log('[kanban.webview] Updating Marp status display');
     statusText.className = 'status-text';
 
     if (status.cliAvailable && status.extensionInstalled) {
         statusText.textContent = '✓ Ready';
         statusText.classList.add('status-success');
-        console.log('[kanban.webview] Marp status: Ready');
     } else if (!status.cliAvailable && !status.extensionInstalled) {
         statusText.textContent = '⚠ CLI & Extension Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: CLI & Extension Missing');
     } else if (!status.cliAvailable) {
         statusText.textContent = '⚠ CLI Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: CLI Missing');
     } else if (!status.extensionInstalled) {
         statusText.textContent = '⚠ Extension Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: Extension Missing');
     } else {
         statusText.textContent = '⚠ Unknown Status';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: Unknown');
     }
 }
 
@@ -5564,14 +5475,12 @@ function handleMarpStatus(status) {
  * Handle Marp themes available response from backend
  */
 function handleMarpThemesAvailable(themes, error) {
-    console.log('[kanban.webview] handleMarpThemesAvailable called with:', { themes, error });
     const themeSelect = document.getElementById('marp-theme');
     if (!themeSelect) {
         console.error('[kanban.webview] marp-theme select element not found');
         return;
     }
 
-    console.log('[kanban.webview] Clearing existing theme options...');
     // Clear existing options except the first one
     while (themeSelect.children.length > 1) {
         themeSelect.removeChild(themeSelect.lastChild);
@@ -5588,7 +5497,6 @@ function handleMarpThemesAvailable(themes, error) {
         return;
     }
 
-    console.log('[kanban.webview] Adding themes to dropdown:', themes);
     // Add available themes
     themes.forEach(theme => {
         const option = document.createElement('option');
@@ -5601,7 +5509,6 @@ function handleMarpThemesAvailable(themes, error) {
     const savedTheme = localStorage.getItem('kanban-marp-theme');
     if (savedTheme && themes.includes(savedTheme)) {
         themeSelect.value = savedTheme;
-        console.log('[kanban.webview] Restored saved theme:', savedTheme);
     }
 
     // Restore previously selected browser if available
@@ -5609,17 +5516,14 @@ function handleMarpThemesAvailable(themes, error) {
     const browserSelect = document.getElementById('marp-browser');
     if (savedBrowser && browserSelect) {
         browserSelect.value = savedBrowser;
-        console.log('[kanban.webview] Restored saved browser:', savedBrowser);
     }
 
-    console.log('[kanban.webview] Theme and browser dropdowns updated successfully');
 }
 
 /**
  * Load Marp themes from backend
  */
 function loadMarpThemes() {
-    console.log('[kanban.webview] Loading Marp themes...');
     vscode.postMessage({
         type: 'getMarpThemes'
     });
@@ -5671,7 +5575,6 @@ function toggleAutoExport() {
         if (autoExportBtn) {
             autoExportBtn.style.display = 'none';
             autoExportBtn.classList.remove('active');
-            console.log('[kanban.webview] Auto-export button immediately hidden on user stop');
         }
 
         // Reset state immediately
@@ -5717,7 +5620,6 @@ function updateAutoExportButton() {
         btn.classList.remove('active');
         icon.textContent = '▶';
         btn.title = 'Start auto-export with last settings';
-        console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
         return;
     }
 
@@ -5728,12 +5630,10 @@ function updateAutoExportButton() {
         btn.classList.add('active');
         icon.textContent = '■'; // Stop icon
         btn.title = 'Stop auto-export';
-        console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
         btn.classList.remove('active');
         icon.textContent = '▶'; // Play icon
         btn.title = 'Start auto-export with last settings';
-        console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');
     }
 }
 
@@ -5877,7 +5777,6 @@ function handleCopyContentResult(result) {
         // Copy to clipboard
         if (navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(result.content).then(() => {
-                console.log('[kanban.webview.handleCopyContentResult] Content copied to clipboard');
             }).catch(err => {
                 console.error('[kanban.webview.handleCopyContentResult] Failed to copy:', err);
                 vscode.postMessage({
@@ -5895,7 +5794,6 @@ function handleCopyContentResult(result) {
             textarea.select();
             try {
                 document.execCommand('copy');
-                console.log('[kanban.webview.handleCopyContentResult] Content copied to clipboard (fallback)');
             } catch (err) {
                 console.error('[kanban.webview.handleCopyContentResult] Fallback copy failed:', err);
                 vscode.postMessage({

@@ -69,7 +69,6 @@ export class ContentPipelineService {
         // Create backup if requested
         if (options.createBackup) {
             const backupPath = await this.createBackupFile(options.sourcePath);
-            console.log(`[ContentPipeline] Created backup: ${backupPath}`);
         }
 
         // Write the file

@@ -514,7 +514,6 @@ function setupGlobalDragAndDrop() {
     document.addEventListener('dragover', function(e) {
         // If we left the view and now dragover is firing, we're back!
         if (dragState.isDragging && dragState.leftView) {
-            console.log('[DragDrop] *** DRAGOVER DETECTED AFTER LEAVING *** clearing leftView');
             dragState.leftView = false;
         }
 
@@ -526,7 +525,6 @@ function setupGlobalDragAndDrop() {
     // Use mousemove as a fallback to detect re-entry since dragenter/dragover might not fire
     document.addEventListener('mousemove', function(e) {
         if (dragState.isDragging && dragState.leftView) {
-            console.log('[DragDrop] *** MOUSEMOVE DETECTED AFTER LEAVING *** clearing leftView');
             dragState.leftView = false;
         }
     }, false);
@@ -534,7 +532,6 @@ function setupGlobalDragAndDrop() {
     // Try mouseenter on body as another detection method
     document.body.addEventListener('mouseenter', function(e) {
         if (dragState.isDragging && dragState.leftView) {
-            console.log('[DragDrop] *** MOUSEENTER ON BODY DETECTED *** clearing leftView');
             dragState.leftView = false;
         }
     }, false);
@@ -542,7 +539,6 @@ function setupGlobalDragAndDrop() {
     // Try pointerenter which works during drag in some browsers
     document.addEventListener('pointerenter', function(e) {
         if (dragState.isDragging && dragState.leftView) {
-            console.log('[DragDrop] *** POINTERENTER DETECTED *** clearing leftView');
             dragState.leftView = false;
         }
     }, { capture: true });
@@ -763,20 +759,6 @@ function setupGlobalDragAndDrop() {
                     const [task] = originalColumn.tasks.splice(taskIndex, 1);
 
                     // Log detailed task move information BEFORE the move
-                    console.log('====== FRONTEND MOVE TASK ======');
-                    console.log(`Task ID: ${task.id}`);
-                    console.log(`Task Title: ${task.title}`);
-                    console.log(`Task Description (first 100 chars): ${task.description?.substring(0, 100) || '(empty)'}`);
-                    console.log(`Task includeMode: ${task.includeMode}`);
-                    console.log(`Task includeFiles: ${task.includeFiles?.join(', ') || '(none)'}`);
-                    console.log(`From Column: ${originalColumn.title} (ID: ${originalColumnId})`);
-                    console.log(`To Column: ${finalColumn.title} (ID: ${finalColumnId})`);
-                    console.log(`From Index: ${taskIndex}, To Index: ${dropIndex}`);
-                    console.log(`From Column includeMode: ${originalColumn.includeMode}`);
-                    console.log(`From Column includeFiles: ${originalColumn.includeFiles?.join(', ') || '(none)'}`);
-                    console.log(`To Column includeMode: ${finalColumn.includeMode}`);
-                    console.log(`To Column includeFiles: ${finalColumn.includeFiles?.join(', ') || '(none)'}`);
-                    console.log('================================');
 
                     // Add task to new column at correct position
                     const insertIndex = Math.min(dropIndex, finalColumn.tasks.length);

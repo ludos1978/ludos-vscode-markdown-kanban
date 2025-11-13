@@ -36,7 +36,6 @@ export class FileEventBus {
         // Add sequence number for ordering
         event.id = event.id || `event_${++this._eventCounter}_${Date.now()}`;
 
-        console.log(`[FileEventBus] Queuing event: ${event.type} for ${event.filePath} (id: ${event.id})`);
         this._queue.push(event);
 
         await this._processQueue();
@@ -50,7 +49,6 @@ export class FileEventBus {
             this._handlers.set(eventType, []);
         }
         this._handlers.get(eventType)!.push(handler);
-        console.log(`[FileEventBus] Registered handler for ${eventType}`);
     }
 
     /**
@@ -62,7 +60,6 @@ export class FileEventBus {
             const index = handlers.indexOf(handler);
             if (index >= 0) {
                 handlers.splice(index, 1);
-                console.log(`[FileEventBus] Unregistered handler for ${eventType}`);
             }
         }
     }
@@ -76,18 +73,15 @@ export class FileEventBus {
         }
 
         this._processing = true;
-        console.log(`[FileEventBus] Starting queue processing (${this._queue.length} events)`);
 
         try {
             while (this._queue.length > 0) {
                 const event = this._queue.shift()!;
-                console.log(`[FileEventBus] Processing event: ${event.type} for ${event.filePath}`);
 
                 await this._processEvent(event);
             }
         } finally {
             this._processing = false;
-            console.log(`[FileEventBus] Queue processing complete`);
         }
     }
 
@@ -98,11 +92,9 @@ export class FileEventBus {
         const handlers = this._handlers.get(event.type) || [];
 
         if (handlers.length === 0) {
-            console.log(`[FileEventBus] No handlers registered for ${event.type}`);
             return;
         }
 
-        console.log(`[FileEventBus] Dispatching to ${handlers.length} handler(s)`);
 
         // Process all handlers for this event type
         const handlerPromises = handlers.map(async (handler) => {
@@ -121,7 +113,6 @@ export class FileEventBus {
      * Clear all queued events (useful for cleanup)
      */
     clearQueue(): void {
-        console.log(`[FileEventBus] Clearing queue (${this._queue.length} events)`);
         this._queue = [];
     }
 

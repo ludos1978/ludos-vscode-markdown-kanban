@@ -76,7 +76,6 @@ export class ColumnIncludeFile extends IncludeFile {
      * @param columnId Optional columnId to use for task ID generation (supports file reuse across columns)
      */
     public parseToTasks(existingTasks?: KanbanTask[], columnId?: string): KanbanTask[] {
-        console.log(`[ColumnIncludeFile] Parsing presentation to tasks: ${this._relativePath}`);
 
         // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
@@ -103,7 +102,6 @@ export class ColumnIncludeFile extends IncludeFile {
      * Generate presentation format from tasks
      */
     public generateFromTasks(tasks: KanbanTask[]): string {
-        console.log(`[ColumnIncludeFile] Generating presentation from ${tasks.length} tasks: ${this._relativePath}`);
 
         // Use unified presentation generator (no YAML for copying)
         const { PresentationGenerator } = require('../services/export/PresentationGenerator');

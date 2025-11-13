@@ -134,11 +134,6 @@ export class FileStateMachine {
 
         // Log transition
         if (this.config.enableLogging) {
-            console.log(
-                `[FileStateMachine:${this.filePath}] ${oldState} → ${newState}`,
-                reason ? `(${reason})` : '',
-                changeType ? `[${changeType}]` : ''
-            );
         }
     }
 
@@ -166,7 +161,6 @@ export class FileStateMachine {
         if (this.context.cacheState !== CacheState.INVALID) {
             this.context.cacheState = CacheState.INVALID;
             if (this.config.enableLogging) {
-                console.log(`[FileStateMachine:${this.filePath}] Cache invalidated`);
             }
         }
     }
@@ -178,7 +172,6 @@ export class FileStateMachine {
         if (this.context.cacheState !== CacheState.VALID) {
             this.context.cacheState = CacheState.VALID;
             if (this.config.enableLogging) {
-                console.log(`[FileStateMachine:${this.filePath}] Cache validated`);
             }
         }
     }
@@ -189,7 +182,6 @@ export class FileStateMachine {
     public setPartialCache(): void {
         this.context.cacheState = CacheState.PARTIAL;
         if (this.config.enableLogging) {
-            console.log(`[FileStateMachine:${this.filePath}] Cache set to partial`);
         }
     }
 
@@ -268,7 +260,6 @@ export class FileStateMachine {
     public saveRollbackPoint(content: string): void {
         this.context.previousContent = content;
         if (this.config.enableLogging) {
-            console.log(`[FileStateMachine:${this.filePath}] Rollback point saved`);
         }
     }
 
@@ -285,7 +276,6 @@ export class FileStateMachine {
         this.context.state = previousState;
 
         if (this.config.enableLogging) {
-            console.log(`[FileStateMachine:${this.filePath}] Rolled back to ${previousState}`);
         }
 
         return true;
@@ -316,7 +306,6 @@ export class FileStateMachine {
         };
 
         if (this.config.enableLogging) {
-            console.log(`[FileStateMachine:${this.filePath}] State machine reset`);
         }
     }
 }

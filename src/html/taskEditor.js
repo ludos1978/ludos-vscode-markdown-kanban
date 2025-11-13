@@ -133,7 +133,6 @@ class TaskEditor {
             // Shift+Cmd+V (Mac) or Shift+Ctrl+V (Windows) - URL encoding paste + image handling
             if ((isTitleField || isDescriptionField) &&
                 e.shiftKey && (e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
-                console.log('[Kanban Paste] Shift+Cmd+V detected, checking clipboard');
                 e.preventDefault(); // Prevent default paste
 
                 try {
@@ -142,7 +141,6 @@ class TaskEditor {
                     try {
                         clipboardItems = await navigator.clipboard.read();
                     } catch (readError) {
-                        console.log('[Kanban Paste] Could not read clipboard items, trying text only');
                         clipboardItems = null;
                     }
 
@@ -151,7 +149,6 @@ class TaskEditor {
                         for (const item of clipboardItems) {
                             for (const type of item.types) {
                                 if (type.startsWith('image/')) {
-                                    console.log('[Kanban Paste] Found image in clipboard:', type);
 
                                     // Get the image blob
                                     const blob = await item.getType(type);
@@ -210,7 +207,6 @@ class TaskEditor {
                                                     self.autoResize(target);
                                                 }
 
-                                                console.log('[Kanban Paste] Image pasted successfully:', event.data.relativePath);
                                             } else {
                                                 console.error('[Kanban Paste] Failed to save image');
                                             }
@@ -236,7 +232,6 @@ class TaskEditor {
 
                     // No image found, process as text
                     const text = await navigator.clipboard.readText();
-                    console.log('[Kanban Paste] Clipboard text:', text);
 
                     // Use existing processClipboardText function to convert URLs and file paths
                     let cleanText;
@@ -244,7 +239,6 @@ class TaskEditor {
                         try {
                             const processed = await processClipboardText(text);
                             cleanText = processed ? processed.content : text;
-                            console.log('[Kanban Paste] Processed text:', cleanText);
                         } catch (error) {
                             console.error('[Kanban Paste] Error processing:', error);
                             cleanText = text;
@@ -286,7 +280,6 @@ class TaskEditor {
 
             // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
             if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
-                console.log(`[TaskEditor] Keypress: key="${e.key}" code="${e.code}" keyCode=${e.keyCode} alt=${e.altKey} ctrl=${e.ctrlKey} meta=${e.metaKey} shift=${e.shiftKey}`);
             }
 
             // Check if this is a potential VS Code shortcut (any modifier + key)
@@ -325,7 +318,6 @@ class TaskEditor {
 
                 // Only process if we know this shortcut has a command
                 if (hasCommand) {
-                    console.log(`[TaskEditor] Executing known shortcut: ${shortcut}`);
                     e.preventDefault();
 
                     // Get current cursor position and text for context
@@ -827,11 +819,6 @@ class TaskEditor {
                             oldIncludeMatches.length !== newIncludeMatches.length ||
                             oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
 
-                        console.log('[TaskEditor COLUMN] Old title:', column.title);
-                        console.log('[TaskEditor COLUMN] New title:', newTitle);
-                        console.log('[TaskEditor COLUMN] Old includes:', oldIncludeMatches);
-                        console.log('[TaskEditor COLUMN] New includes:', newIncludeMatches);
-                        console.log('[TaskEditor COLUMN] hasIncludeChanges:', hasIncludeChanges);
 
                         column.title = newTitle;
 
@@ -892,7 +879,6 @@ class TaskEditor {
                                 if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
                                     // Match by position - use current ID from board at this position
                                     currentColumnId = window.currentBoard.columns[columnIndex].id;
-                                    console.log(`[TaskEditor] Column position ${columnIndex}: stored ID ${columnId}, current ID ${currentColumnId}`);
                                 }
                             }
 
@@ -1107,7 +1093,6 @@ class TaskEditor {
                             task.title = value;
 
                             // Use editTask message type for title changes
-                            console.log('[FRONTEND taskEditor] Sending editTask with title change');
 
                             vscode.postMessage({
                                 type: 'editTask',
@@ -1122,7 +1107,6 @@ class TaskEditor {
                             // If we reach here, the include syntax hasn't changed (caught by line 971)
                             // displayTitle should stay as "# include in path" (UI indicator only, read-only)
                             // Nothing to do - include syntax is unchanged
-                            console.log('[TaskEditor] Task include title unchanged, skipping');
                             return;
                         } else {
                             // Regular task title editing
@@ -1169,31 +1153,16 @@ class TaskEditor {
                         if (task.includeMode) {
                             // For include tasks, check if displayTitle changed
                             wasChanged = (task.displayTitle || '') !== originalDisplayTitle;
-                            console.log('[TaskEditor] Include task title edit:', {
-                                wasChanged,
-                                newDisplayTitle: task.displayTitle,
-                                originalDisplayTitle,
-                                includeMode: task.includeMode
-                            });
                         } else {
                             // For regular tasks, check if title changed
                             wasChanged = (task.title || '') !== originalTitle;
                         }
                     } else if (type === 'task-description') {
                         wasChanged = (task.description || '') !== originalDescription;
-                        console.log('[TaskEditor] Task description edit:', {
-                            wasChanged,
-                            type,
-                            includeMode: task.includeMode,
-                            newDescription: task.description ? task.description.substring(0, 50) : '',
-                            originalDescription: originalDescription ? originalDescription.substring(0, 50) : ''
-                        });
                     }
 
-                    console.log('[TaskEditor] After edit check - wasChanged:', wasChanged, 'type:', type);
 
                     if (wasChanged) {
-                        console.log('[TaskEditor] Change detected! Calling markUnsavedChanges()');
                         if (typeof markUnsavedChanges === 'function') {
                             markUnsavedChanges();
                         } else {
@@ -1204,7 +1173,6 @@ class TaskEditor {
                         // The markUnsavedChanges() call above already sends the complete
                         // updated board data via the cachedBoard parameter
                     } else {
-                        console.log('[TaskEditor] No change detected - NOT calling markUnsavedChanges()');
                     }
                     
                     if (this.currentEditor.displayElement) {
@@ -1445,7 +1413,6 @@ class TaskEditor {
                             const titleDisplay = taskItem.querySelector('.task-title-display');
                             if (titleDisplay && typeof generateAlternativeTitle === 'function') {
                                 const alternativeTitle = generateAlternativeTitle(task.description);
-                                console.log('[taskEditor.hideEditor] Updating alternative title:', alternativeTitle, 'for task:', taskId);
                                 if (alternativeTitle) {
                                     titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
                                 } else {
@@ -1624,7 +1591,6 @@ class TaskEditor {
      */
     replaceSelection(newText) {
         if (!this.currentEditor) {
-            console.log('[TaskEditor] No active editor for replaceSelection');
             return;
         }
 
@@ -1644,7 +1610,6 @@ class TaskEditor {
         // Focus the element
         element.focus();
 
-        console.log('[TaskEditor] Replaced selection with new text');
     }
 }
 

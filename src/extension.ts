@@ -10,13 +10,10 @@ export function getOutputChannel(): vscode.OutputChannel | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	console.log('[Extension] Activation started');
-
 	// Create output channel for debugging
 	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
 	context.subscriptions.push(outputChannel);
 
-	console.log('[Extension] Activating markdown-kanban-obsidian extension');
 	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
 
 	let fileListenerEnabled = true;
@@ -52,17 +49,14 @@ export function activate(context: vscode.ExtensionContext) {
 	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
 	const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
 	if (isDevelopment) {
-		console.log('[Kanban Extension] Development mode - refreshing all panels to load latest code');
 		const allPanels = KanbanWebviewPanel.getAllPanels();
 		Promise.all(allPanels.map(async (panel) => {
-			console.log('[Kanban Extension] Refreshing panel:', panel.getPanelId());
 			await panel.refreshWebviewContent();
 		})).catch(err => console.error('[Kanban Extension] Error refreshing panels:', err));
 	}
 
 	// Register command to open kanban panel
 	const openKanbanCommand = vscode.commands.registerCommand('markdown-kanban.openKanban', async (uri?: vscode.Uri) => {
-		console.log('[Kanban Extension] openKanban command executed!');
 		let targetUri = uri;
 
 		// If no URI provided, try to get from active editor

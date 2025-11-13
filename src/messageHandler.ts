@@ -1027,9 +1027,6 @@ export class MessageHandler {
                 break;
 
             case 'openInMarpPreview':
-                console.log(`[kanban.messageHandler] 🟠 Received openInMarpPreview message`);
-                console.log(`[kanban.messageHandler] message.filePath: "${message.filePath}"`);
-                console.log(`[kanban.messageHandler] Full message:`, JSON.stringify(message, null, 2));
                 await this.handleOpenInMarpPreview(message.filePath);
                 break;
 
@@ -1618,7 +1615,6 @@ export class MessageHandler {
 
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
-            console.log(`[MessageHandler] Handling shortcut: ${message.shortcut}, selected text: "${message.selectedText}"`);
 
             // First, check user keybindings
             let userCommand = await this.getCommandForShortcut(message.shortcut);
@@ -1629,13 +1625,11 @@ export class MessageHandler {
             }
 
             if (userCommand) {
-                console.log(`[MessageHandler] Found command: ${userCommand}`);
 
                 try {
                     // For commands that work on text selection (like translators):
                     // Create a temp document, execute the command, capture result, close document
                     if (message.selectedText && message.selectedText.length > 0) {
-                        console.log(`[MessageHandler] Creating temp document for command execution`);
 
                         // Create temp document with selected text
                         const tempDoc = await vscode.workspace.openTextDocument({
@@ -1657,7 +1651,6 @@ export class MessageHandler {
                             new vscode.Position(tempDoc.lineCount - 1, lastLine.text.length)
                         );
 
-                        console.log(`[MessageHandler] Executing command: ${userCommand}`);
                         // Execute the command (e.g., DeepL translate)
                         await vscode.commands.executeCommand(userCommand);
 
@@ -1666,7 +1659,6 @@ export class MessageHandler {
 
                         // Get the result
                         const resultText = tempDoc.getText();
-                        console.log(`[MessageHandler] Command executed, result length: ${resultText.length}`);
 
                         // Send the result back to the webview first
                         const panel = this._getWebviewPanel();
@@ -1698,7 +1690,6 @@ export class MessageHandler {
                     } else {
                         // No selection - execute normally
                         await vscode.commands.executeCommand(userCommand);
-                        console.log(`[MessageHandler] Command executed (no selection)`);
                     }
 
                     return;
@@ -1707,7 +1698,6 @@ export class MessageHandler {
                 }
             }
 
-            console.log(`[MessageHandler] Shortcut not found. Add to keybindings.json to use in kanban editor.`);
 
         } catch (error) {
             console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
@@ -1741,7 +1731,6 @@ export class MessageHandler {
             const extensionShortcuts = await this.getExtensionShortcuts();
             Object.assign(shortcutMap, extensionShortcuts);
 
-            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} shortcuts for webview`);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
@@ -1772,17 +1761,14 @@ export class MessageHandler {
     }
 
     private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
-        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
 
         const extensionShortcuts = await this.getExtensionShortcuts();
         const command = extensionShortcuts[shortcut];
 
         if (command) {
-            console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
             return command;
         }
 
-        console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
         return null;
     }
 
@@ -1791,31 +1777,25 @@ export class MessageHandler {
             // Read VS Code's keybindings configuration
             const keybindings = await this.loadVSCodeKeybindings();
 
-            console.log(`[MessageHandler] Looking for command for shortcut: ${shortcut}`);
-            console.log(`[MessageHandler] Loaded ${keybindings.length} keybindings`);
 
             // Debug: Show all keybindings that contain 'alt' or match the letter
             const shortcutLetter = shortcut.split('+').pop();
             const relevantBindings = keybindings.filter(b =>
                 b.key && (b.key.includes('alt') || b.key.includes(shortcutLetter || ''))
             );
-            console.log(`[MessageHandler] Relevant bindings:`, relevantBindings.slice(0, 10));
 
             // Find keybinding that matches our shortcut
             for (const binding of keybindings) {
                 if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
                     // Skip negative bindings (commands starting with -)
                     if (binding.command.startsWith('-')) {
-                        console.log(`[MessageHandler] Skipping negative binding: ${binding.command}`);
                         continue;
                     }
 
-                    console.log(`[MessageHandler] Found matching command: ${binding.command}`);
                     return binding.command;
                 }
             }
 
-            console.log(`[MessageHandler] No command found for shortcut ${shortcut}`);
             return null;
 
         } catch (error) {
@@ -3016,7 +2996,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log(`[MessageHandler] Saving individual file ${filePath} (forceSave: ${forceSave})`);
 
             if (isMainFile) {
                 // Save ONLY the main kanban file (not includes)
@@ -3048,7 +3027,6 @@ export class MessageHandler {
                 mainFile.updateFromBoard(board, true, true);
                 // NOTE: No need for second setContent call - updateFromBoard already updated baseline
 
-                console.log(`[MessageHandler] Successfully saved ${filePath}`);
 
                 // Trigger marpWatch export if active
                 if (this._autoExportSettings?.marpWatch) {
@@ -3096,14 +3074,12 @@ export class MessageHandler {
                 }
 
                 // Save the file (force save always writes to disk)
-                console.log(`[MessageHandler] Saving ${filePath} (forceSave: ${forceSave})`);
                 await file.save({
                     skipReloadDetection: true,
                     source: 'ui-edit',
                     skipValidation: false
                 });
 
-                console.log(`[MessageHandler] Successfully saved ${filePath}`);
 
                 // Trigger marpWatch export if active (include file change requires re-export)
                 if (this._autoExportSettings?.marpWatch) {
@@ -3175,7 +3151,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log(`[MessageHandler] Reloading individual file ${filePath} (isMainFile: ${isMainFile})`);
 
             if (isMainFile) {
                 // Reload ONLY the main kanban file (not includes)
@@ -3187,11 +3162,9 @@ export class MessageHandler {
                 }
 
                 // Force reload the file from disk (bypass mtime check AND open document)
-                console.log(`[MessageHandler] Force reloading ${filePath} from ACTUAL disk file (not open document)`);
                 const fs = require('fs').promises;
                 const freshContent = await fs.readFile(filePath, 'utf-8');
                 mainFile.setContent(freshContent, true); // true = update baseline
-                console.log(`[MessageHandler] Successfully force reloaded ${filePath} (${freshContent.length} chars) from disk`);
 
                 // Re-parse the board from the fresh content
                 (mainFile as any).parseToBoard();
@@ -3205,12 +3178,10 @@ export class MessageHandler {
 
                     // Send the fresh board to frontend
                     await fileService.sendBoardUpdate(false, false); // don't preserve selection, don't force reload
-                    console.log(`[MessageHandler] Sent fresh board to frontend after reload`);
                 } else {
                     console.warn(`[MessageHandler] Board invalid after parsing reloaded content`);
                 }
 
-                console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileReloaded',
@@ -3238,11 +3209,9 @@ export class MessageHandler {
                 }
 
                 // Force reload the file from disk (bypass mtime check)
-                console.log(`[MessageHandler] Force reloading ${absolutePath} from ACTUAL disk file`);
                 const fs = require('fs').promises;
                 const freshContent = await fs.readFile(absolutePath, 'utf-8');
                 file.setContent(freshContent, true); // true = update baseline
-                console.log(`[MessageHandler] Successfully force reloaded ${absolutePath} (${freshContent.length} chars) from disk`);
 
                 // Trigger board regeneration from main file (which includes this include file)
                 const fileService = (panel as any)._fileService;
@@ -3254,11 +3223,9 @@ export class MessageHandler {
                     if (freshBoard && freshBoard.valid) {
                         fileService.setBoard(freshBoard);
                         await fileService.sendBoardUpdate(false, false);
-                        console.log(`[MessageHandler] Sent fresh board to frontend after include file reload`);
                     }
                 }
 
-                console.log(`[MessageHandler] Successfully reloaded ${absolutePath}`);
 
                 // Send success message to frontend
                 panel._panel.webview.postMessage({
@@ -3314,7 +3281,6 @@ export class MessageHandler {
             // Force write ALL files
             const result = await fileRegistry.forceWriteAll();
 
-            console.log(`[MessageHandler] Force write completed: ${result.filesWritten} files written, ${result.errors.length} errors`);
 
             // Send success response to frontend
             panel._panel.webview.postMessage({
@@ -3366,7 +3332,6 @@ export class MessageHandler {
                 true  // forceCreate
             );
 
-            console.log(`[MessageHandler] Created backup before force write: ${backupPath}`);
             return backupPath;
 
         } catch (error) {
@@ -3386,7 +3351,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log('[MessageHandler] Starting content synchronization verification');
 
             if (!frontendBoard) {
                 throw new Error('Frontend board data not provided');
@@ -3421,13 +3385,7 @@ export class MessageHandler {
                 }
 
                 // DEBUG: Log file details
-                console.log(`[MessageHandler] Verifying file: ${file.getRelativePath()}`);
-                console.log(`  File type: ${file.getFileType()}`);
-                console.log(`  Backend content length: ${backendContent.length}`);
-                console.log(`  Backend content preview: ${backendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
                 if (savedFileContent !== null) {
-                    console.log(`  Saved file content length: ${savedFileContent.length}`);
-                    console.log(`  Saved file content preview: ${savedFileContent.substring(0, 100).replace(/\n/g, '\\n')}`);
                 }
 
                 // For main file, regenerate markdown from frontend board
@@ -3435,9 +3393,6 @@ export class MessageHandler {
                     frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
 
                     // DEBUG: Log regenerated content details
-                    console.log(`  Frontend content length: ${frontendContent.length}`);
-                    console.log(`  Frontend content preview: ${frontendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
-                    console.log(`  Length difference: ${frontendContent.length - backendContent.length}`);
 
                     // If there's a difference, show where they diverge
                     if (frontendContent !== backendContent) {
@@ -3452,13 +3407,7 @@ export class MessageHandler {
                         if (firstDiff >= 0) {
                             const start = Math.max(0, firstDiff - 20);
                             const end = Math.min(minLen, firstDiff + 80);
-                            console.log(`  First difference at character ${firstDiff}:`);
-                            console.log(`    Backend: ${JSON.stringify(backendContent.substring(start, end))}`);
-                            console.log(`    Frontend: ${JSON.stringify(frontendContent.substring(start, end))}`);
                         } else if (frontendContent.length !== backendContent.length) {
-                            console.log(`  Content matches up to character ${minLen}, but lengths differ`);
-                            console.log(`    Backend end: ${JSON.stringify(backendContent.substring(minLen - 20))}`);
-                            console.log(`    Frontend end: ${JSON.stringify(frontendContent.substring(minLen - 20))}`);
                         }
                     }
                 } else {
@@ -3473,15 +3422,9 @@ export class MessageHandler {
                 const savedHash = savedFileContent !== null ? this._computeHash(savedFileContent) : null;
 
                 // DEBUG: Log hash calculation
-                console.log(`  Backend hash: ${backendHash.substring(0, 8)}`);
-                console.log(`  Frontend hash: ${frontendHash.substring(0, 8)}`);
                 if (savedHash) {
-                    console.log(`  Saved file hash: ${savedHash.substring(0, 8)}`);
                 }
-                console.log(`  Frontend vs Backend match: ${backendHash === frontendHash}`);
                 if (savedHash) {
-                    console.log(`  Backend vs Saved match: ${backendHash === savedHash}`);
-                    console.log(`  Frontend vs Saved match: ${frontendHash === savedHash}`);
                 }
 
                 const frontendBackendMatch = backendHash === frontendHash;
@@ -3528,7 +3471,6 @@ export class MessageHandler {
                 summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
             });
 
-            console.log(`[MessageHandler] Verification complete: ${matchingFiles} match, ${mismatchedFiles} differ`);
 
         } catch (error) {
             console.error('[MessageHandler] Error during content verification:', error);
@@ -3878,23 +3820,15 @@ export class MessageHandler {
      * Open a markdown file in Marp preview
      */
     private async handleOpenInMarpPreview(filePath: string): Promise<void> {
-        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] 🟢 START - received filePath: "${filePath}"`);
-        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath type: ${typeof filePath}`);
-        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath is null: ${filePath === null}`);
-        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath is undefined: ${filePath === undefined}`);
-        console.log(`[kanban.messageHandler.handleOpenInMarpPreview] filePath length: ${filePath?.length}`);
 
         try {
-            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] Calling MarpExtensionService.openInMarpPreview...`);
             await MarpExtensionService.openInMarpPreview(filePath);
-            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] ✅ 🟢 END (success)`);
         } catch (error) {
             console.error('[kanban.messageHandler.handleOpenInMarpPreview] ❌ Error:', error);
             console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error type:', typeof error);
             console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error stack:', error instanceof Error ? error.stack : 'N/A');
             const errorMessage = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
-            console.log(`[kanban.messageHandler.handleOpenInMarpPreview] 🟢 END (with error)`);
         }
     }
 

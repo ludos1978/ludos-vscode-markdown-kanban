@@ -89,11 +89,9 @@ export abstract class IncludeFile extends MarkdownFile {
      * Read content from disk
      */
     public async readFromDisk(): Promise<string | null> {
-        console.log(`[${this.getFileType()}] Reading from disk: ${this._relativePath}`);
 
         try {
             const content = await fs.promises.readFile(this._absolutePath, 'utf-8');
-            console.log(`[${this.getFileType()}] Read ${content.length} characters from disk`);
             return content;
         } catch (error: any) {
             if (error.code === 'ENOENT') {
@@ -110,7 +108,6 @@ export abstract class IncludeFile extends MarkdownFile {
      * Write content to disk
      */
     public async writeToDisk(content: string): Promise<void> {
-        console.log(`[${this.getFileType()}] Writing to disk: ${this._relativePath} (${content.length} characters)`);
 
         try {
             // Ensure directory exists
@@ -122,7 +119,6 @@ export abstract class IncludeFile extends MarkdownFile {
 
             this._exists = true;
             this._lastModified = new Date();
-            console.log(`[${this.getFileType()}] Successfully wrote to disk`);
         } catch (error) {
             console.error(`[${this.getFileType()}] Failed to write file:`, error);
             throw error;
@@ -147,7 +143,6 @@ export abstract class IncludeFile extends MarkdownFile {
      * (Subclasses can override for specific behavior)
      */
     protected async notifyParentOfChange(): Promise<void> {
-        console.log(`[${this.getFileType()}] Notifying parent of change: ${this._relativePath}`);
 
         // Trigger parent to reload/reparse
         // The parent will re-read this include file and update the board
@@ -155,7 +150,6 @@ export abstract class IncludeFile extends MarkdownFile {
             // Check if parent needs to be reloaded
             const hasParentChanges = await this._parentFile.checkForExternalChanges();
             if (hasParentChanges) {
-                console.log(`[${this.getFileType()}] Parent also has changes - reloading parent`);
             }
         }
     }
@@ -167,7 +161,6 @@ export abstract class IncludeFile extends MarkdownFile {
      * Since include files don't have TextDocuments, we write directly to a backup file
      */
     public async createBackup(label: string = 'manual'): Promise<void> {
-        console.log(`[${this.getFileType()}] Creating backup with label '${label}': ${this._relativePath}`);
 
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -182,7 +175,6 @@ export abstract class IncludeFile extends MarkdownFile {
 
             // Write current content to backup file
             await fs.promises.writeFile(backupPath, this._content, 'utf8');
-            console.log(`[${this.getFileType()}] ✓ Backup created: ${backupPath}`);
         } catch (error) {
             console.error(`[${this.getFileType()}] ✗ Failed to create backup:`, error);
             throw error;
@@ -196,14 +188,12 @@ export abstract class IncludeFile extends MarkdownFile {
      * CRITICAL: Include files need to apply edits directly to content baseline
      */
     protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
-        console.log(`[${this.getFileType()}] Applying captured edit to include file baseline:`, capturedEdit);
 
         // For include files (column/task), the edit is a description edit
         // Apply the new value directly to the baseline content
         if (capturedEdit && capturedEdit.value !== undefined) {
             // Update baseline with the edited content
             this._baseline = capturedEdit.value;
-            console.log(`[${this.getFileType()}] ✓ Baseline updated with captured edit (${capturedEdit.value.length} chars)`);
         } else {
             console.warn(`[${this.getFileType()}] No edit value to apply to baseline`);
         }
@@ -281,14 +271,6 @@ export abstract class IncludeFile extends MarkdownFile {
         const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
 
         if (hasConflict) {
-            console.log(`[${this.getFileType()}.hasConflict] CONFLICT DETECTED:`, {
-                file: this._relativePath,
-                baseConflict: baseHasConflict,
-                documentIsDirty: documentIsDirty,
-                hasFileSystemChanges: this._hasFileSystemChanges,
-                hasUnsavedChanges: this.hasUnsavedChanges(), // Computed from content comparison
-                isInEditMode: this._isInEditMode
-            });
         }
 
         return hasConflict;

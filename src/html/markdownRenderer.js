@@ -409,7 +409,6 @@ function htmlCommentPlugin(md, options = {}) {
 // PlantUML is now rendered in the extension backend (Node.js)
 // No initialization needed in webview
 window.plantumlReady = true; // Always ready - backend handles rendering
-console.log('[PlantUML] Using backend rendering (Java + node-plantuml)');
 
 // Queue for pending PlantUML diagrams
 const pendingPlantUMLQueue = [];
@@ -440,7 +439,6 @@ let plantUMLRequestId = 0;
 async function renderPlantUML(code) {
     // Check cache first
     if (plantumlRenderCache.has(code)) {
-        console.log('[PlantUML] Using cached SVG');
         return plantumlRenderCache.get(code);
     }
 
@@ -450,7 +448,6 @@ async function renderPlantUML(code) {
     return new Promise((resolve, reject) => {
         const requestId = `plantuml-${++plantUMLRequestId}`;
 
-        console.log('[PlantUML] Sending render request to backend:', requestId);
 
         // Store promise callbacks
         plantUMLRenderRequests.set(requestId, { resolve, reject, code });
@@ -484,7 +481,6 @@ window.addEventListener('message', event => {
         const request = plantUMLRenderRequests.get(requestId);
 
         if (request) {
-            console.log('[PlantUML] ✅ Diagram rendered successfully (backend)');
 
             // Cache the result
             plantumlRenderCache.set(request.code, svg);
@@ -515,7 +511,6 @@ async function processPlantUMLQueue() {
 
     plantumlQueueProcessing = true;
 
-    console.log(`[PlantUML] Processing ${pendingPlantUMLQueue.length} diagrams...`);
 
     while (pendingPlantUMLQueue.length > 0) {
         const item = pendingPlantUMLQueue.shift();
@@ -562,7 +557,6 @@ async function processPlantUMLQueue() {
     }
 
     plantumlQueueProcessing = false;
-    console.log('[PlantUML] Queue processing complete');
 }
 
 // ============================================================================
@@ -592,7 +586,6 @@ function initializeMermaid() {
         });
         mermaidReady = true;
         mermaidInitialized = true;
-        console.log('[Mermaid] Initialized successfully');
     } catch (error) {
         console.error('[Mermaid] Initialization error:', error);
     }
@@ -620,7 +613,6 @@ window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
  */
 function queueMermaidRender(id, code) {
     pendingMermaidQueue.push({ id, code });
-    console.log(`[Mermaid] Queued diagram: ${id}`);
 
     // Process queue after a short delay (allows multiple diagrams to queue)
     setTimeout(() => processMermaidQueue(), 10);
@@ -634,7 +626,6 @@ function queueMermaidRender(id, code) {
 async function renderMermaid(code) {
     // Check cache first
     if (mermaidRenderCache.has(code)) {
-        console.log('[Mermaid] Using cached SVG');
         return mermaidRenderCache.get(code);
     }
 
@@ -648,7 +639,6 @@ async function renderMermaid(code) {
         // Use mermaid.render() to generate SVG
         const { svg } = await mermaid.render(diagramId, code);
 
-        console.log('[Mermaid] ✅ Diagram rendered successfully');
 
         // Cache the result
         mermaidRenderCache.set(code, svg);
@@ -673,7 +663,6 @@ async function processMermaidQueue() {
 
     mermaidQueueProcessing = true;
 
-    console.log(`[Mermaid] Processing ${pendingMermaidQueue.length} diagrams...`);
 
     while (pendingMermaidQueue.length > 0) {
         const item = pendingMermaidQueue.shift();
@@ -720,7 +709,6 @@ async function processMermaidQueue() {
     }
 
     mermaidQueueProcessing = false;
-    console.log('[Mermaid] Queue processing complete');
 }
 
 /**
@@ -779,7 +767,6 @@ function renderMarkdown(text) {
     // Debug logging to trace include rendering
     const hasInclude = text.includes('!!!include(');
     if (hasInclude) {
-        console.log('[renderMarkdown] 🔍 Processing text with include directive:', text.substring(0, 100));
     }
 
     try {

@@ -1375,12 +1375,10 @@ export class ExportService {
     private static filterBoard(board: any, options: NewExportOptions): any {
         // Check for columnIndexes (new export dialog system)
         if (options.columnIndexes && options.columnIndexes.length > 0) {
-            console.log(`[kanban.exportService.filterBoard] Filtering board: ${board.columns.length} total columns, selecting indexes ${options.columnIndexes.join(', ')}`);
             const selectedColumns = options.columnIndexes
                 .filter(index => index >= 0 && index < board.columns.length)
                 .map(index => board.columns[index]);
 
-            console.log(`[kanban.exportService.filterBoard] Filtered to ${selectedColumns.length} columns`);
             return {
                 columns: selectedColumns
             };
@@ -1613,7 +1611,6 @@ export class ExportService {
 
         if (useBoardBasedConversion) {
             // BOARD-BASED PATH: Use in-memory board (includes already resolved)
-            console.log('[ExportService.transformContent] Taking BOARD-BASED path');
             // Filter board based on scope and selection
             const filteredBoard = this.filterBoard(board, options);
 
@@ -1645,8 +1642,6 @@ export class ExportService {
         // - Need to process includes (mergeIncludes is false)
         else if (options.packAssets || options.format !== 'kanban' || needsIncludeProcessing) {
             // FILE-BASED PATH: Process raw markdown to handle includes correctly
-            console.log('[ExportService.transformContent] Taking FILE-BASED path');
-            console.log('[ExportService.transformContent] Input content length:', result.length);
 
             // Use existing processMarkdownContent (it does everything)
             const processed = await this.processMarkdownContent(
@@ -1662,10 +1657,8 @@ export class ExportService {
 
             result = processed.exportedContent;
             notIncludedAssets = processed.notIncludedAssets;
-            console.log('[ExportService.transformContent] Output content length:', result.length);
 
         } else {
-            console.log('[ExportService.transformContent] Taking SIMPLE path (no conversion)');
             // Simple path: tag filtering and link rewriting (no asset packing)
             result = this.applyTagFiltering(result, options.tagVisibility);
 
@@ -1767,20 +1760,15 @@ export class ExportService {
             // Get the webview panel for the SOURCE document (needed for Mermaid rendering)
             // NOTE: Use sourceFilePath, not markdownPath (which is the exported file)
             const docUri = vscode.Uri.file(sourceFilePath).toString();
-            console.log('[ExportService] Looking for webview panel for SOURCE file:', sourceFilePath);
-            console.log('[ExportService] Source URI:', docUri);
 
             const { KanbanWebviewPanel } = await import('./kanbanWebviewPanel');
             const webviewPanel = KanbanWebviewPanel.getPanelForDocument(docUri);
 
-            console.log('[ExportService] Webview panel found:', webviewPanel ? 'YES' : 'NO');
 
             if (webviewPanel) {
-                console.log('[ExportService] Setting webview panel on MermaidExportService');
                 // Set up Mermaid export service with webview
                 const mermaidService = getMermaidExportService();
                 mermaidService.setWebviewPanel(webviewPanel.getPanel());
-                console.log('[ExportService] MermaidExportService ready:', mermaidService.isReady());
             } else {
                 console.warn('[ExportService] ⚠️ No webview panel found for document. Mermaid diagrams will not be converted.');
                 console.warn('[ExportService] Document URI:', docUri);
@@ -1791,7 +1779,6 @@ export class ExportService {
             const preprocessor = new DiagramPreprocessor(webviewPanel ? webviewPanel.getPanel() : undefined);
 
             // Preprocess diagrams
-            console.log('[ExportService] Preprocessing diagrams for Marp export...');
             const preprocessResult = await preprocessor.preprocess(
                 markdownPath,
                 dir,
@@ -1800,7 +1787,6 @@ export class ExportService {
 
             // If diagrams were processed, write to temp file
             if (preprocessResult.diagramFiles.length > 0) {
-                console.log(`[ExportService] Processed ${preprocessResult.diagramFiles.length} diagrams`);
 
                 // Write processed markdown to temp file
                 const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
@@ -1812,13 +1798,11 @@ export class ExportService {
                 preprocessCleanup = async () => {
                     try {
                         await fs.promises.unlink(tempFile);
-                        console.log('[ExportService] Cleaned up preprocessed markdown file');
                     } catch (error) {
                         // Ignore cleanup errors
                     }
                 };
             } else {
-                console.log('[ExportService] No diagrams found, using original markdown');
             }
         } catch (error) {
             console.error('[ExportService] Diagram preprocessing failed:', error);
@@ -1840,7 +1824,6 @@ export class ExportService {
         if (options.marpWatch) {
             // Check if Marp is already watching this file (check PREPROCESSED path, not original)
             if (MarpExportService.isWatching(processedMarkdownPath)) {
-                console.log(`[ExportService] Marp already watching ${processedMarkdownPath}, file updated automatically`);
                 // DON'T cleanup - Marp is still watching the preprocessed file
                 return {
                     success: true,

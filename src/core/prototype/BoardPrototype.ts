@@ -81,7 +81,6 @@ export class BoardStateManager {
             this.currentStateId = id;
         }
 
-        console.log(`[BoardStateManager] Saved state: ${id}`);
     }
 
     /**
@@ -94,7 +93,6 @@ export class BoardStateManager {
             const prototype = new BoardPrototype(state);
             const restoredBoard = prototype.clone();
             this.currentStateId = id;
-            console.log(`[BoardStateManager] Restored state: ${id}`);
             return restoredBoard;
         }
         return null;
@@ -120,7 +118,6 @@ export class BoardStateManager {
     deleteState(id: string): boolean {
         const deleted = this.states.delete(id);
         if (deleted) {
-            console.log(`[BoardStateManager] Deleted state: ${id}`);
         }
         return deleted;
     }
@@ -131,7 +128,6 @@ export class BoardStateManager {
     clearStates(): void {
         this.states.clear();
         this.currentStateId = null;
-        console.log(`[BoardStateManager] Cleared all states`);
     }
 
     /**
@@ -306,7 +302,6 @@ export class UndoRedoManager {
         // Clear redo stack when new action is performed
         this.redoStack = [];
 
-        console.log(`[UndoRedoManager] Saved state for undo (${this.undoStack.length} in history)`);
     }
 
     /**
@@ -324,7 +319,6 @@ export class UndoRedoManager {
         // Save current state to redo stack
         this.redoStack.push(restoredBoard);
 
-        console.log(`[UndoRedoManager] Undid operation (${this.undoStack.length} remaining in undo stack)`);
         return restoredBoard;
     }
 
@@ -343,7 +337,6 @@ export class UndoRedoManager {
         // Save to undo stack
         this.undoStack.push(restoredBoard);
 
-        console.log(`[UndoRedoManager] Redid operation (${this.redoStack.length} remaining in redo stack)`);
         return restoredBoard;
     }
 
@@ -367,7 +360,6 @@ export class UndoRedoManager {
     clear(): void {
         this.undoStack = [];
         this.redoStack = [];
-        console.log(`[UndoRedoManager] Cleared undo/redo history`);
     }
 
     /**

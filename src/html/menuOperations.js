@@ -29,12 +29,6 @@ function scrollToElementIfNeeded(element, type = 'element') {
         isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
     }
 
-    console.log(`[scrollToElementIfNeeded] ${type} visibility check:`, {
-        isVisible,
-        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-        willScroll: !isVisible
-    });
 
     if (!isVisible) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1587,7 +1581,6 @@ function editColumnIncludeFile(columnId) {
     // Get current include file path
     const currentFile = column.includeFiles[0]; // For now, handle single file includes
 
-    console.log('[editColumnIncludeFile] Sending requestEditIncludeFileName message:', { columnId, currentFile });
 
     // Request new file path via VS Code dialog
     vscode.postMessage({
@@ -1595,7 +1588,6 @@ function editColumnIncludeFile(columnId) {
         columnId: columnId,
         currentFile: currentFile
     });
-    console.log('[editColumnIncludeFile] Message sent');
     return; // Exit here, the backend will handle the input and response
 }
 
@@ -1985,14 +1977,6 @@ function insertTaskBefore(taskId, columnId) {
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
 
             // DEBUG: Log what we found
-            console.log('[insertTaskBefore] Found task:', {
-                taskId,
-                targetIndex,
-                columnId: actualColumnId,
-                targetTask: targetColumn.tasks[targetIndex],
-                allTaskIds: targetColumn.tasks.map(t => t.id),
-                allTaskTitles: targetColumn.tasks.map(t => t.title)
-            });
 
             if (targetIndex >= 0) {
                 const newTask = {
@@ -2170,9 +2154,6 @@ function moveTaskToBottom(taskId, columnId) {
  * Side effects: Flushes pending changes, unfolds target
  */
 function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
-    console.log(`[moveTaskToColumn] Moving task ${taskId}`);
-    console.log(`[moveTaskToColumn]   FROM column: ${fromColumnId}`);
-    console.log(`[moveTaskToColumn]   TO column: ${toColumnId}`);
 
     // Unfold the destination column if it's collapsed BEFORE any DOM changes
     unfoldColumnIfCollapsed(toColumnId);
@@ -2182,8 +2163,6 @@ function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
         const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
         const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
 
-        console.log(`[moveTaskToColumn] Found FROM column:`, fromColumn ? fromColumn.title : 'NOT FOUND');
-        console.log(`[moveTaskToColumn] Found TO column:`, toColumn ? toColumn.title : 'NOT FOUND');
 
         if (fromColumn && toColumn) {
             const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
@@ -2191,7 +2170,6 @@ function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
                 const task = fromColumn.tasks.splice(taskIndex, 1)[0];
                 toColumn.tasks.push(task);
 
-                console.log(`[moveTaskToColumn] Task moved successfully, calling renderBoard()`);
 
                 // Re-render UI to reflect changes
                 if (typeof renderBoard === 'function') {
@@ -3069,10 +3047,7 @@ function markUnsavedChanges() {
     if (typeof vscode !== 'undefined') {
         const boardToSend = window.cachedBoard || window.cachedBoard;
 
-        console.log('[FRONTEND markUnsavedChanges] ===== SENDING TO BACKEND =====');
-        console.log('[FRONTEND markUnsavedChanges] boardToSend exists:', !!boardToSend);
         if (boardToSend && boardToSend.columns) {
-            console.log('[FRONTEND markUnsavedChanges] columns:', boardToSend.columns.length);
             // Log all include tasks
             let includeTaskCount = 0;
             boardToSend.columns.forEach((col, colIdx) => {
@@ -3080,18 +3055,10 @@ function markUnsavedChanges() {
                     col.tasks.forEach((task, taskIdx) => {
                         if (task.includeMode) {
                             includeTaskCount++;
-                            console.log(`[FRONTEND markUnsavedChanges] Column ${colIdx} Task ${taskIdx} (include):`, {
-                                title: task.title,
-                                displayTitle: task.displayTitle,
-                                descriptionLength: task.description ? task.description.length : 0,
-                                descriptionFirst50: task.description ? task.description.substring(0, 50) : '',
-                                includeFiles: task.includeFiles
-                            });
                         }
                     });
                 }
             });
-            console.log('[FRONTEND markUnsavedChanges] Total include tasks:', includeTaskCount);
         }
 
         vscode.postMessage({
@@ -3238,14 +3205,10 @@ function saveCachedBoard() {
         return;
     }
 
-    console.log('[FRONTEND saveCurrentBoard] ========================================');
-    console.log('[FRONTEND saveCurrentBoard] Preparing to save board');
-    console.log(`[FRONTEND saveCurrentBoard] cachedBoard has ${window.cachedBoard.columns?.length || 0} columns`);
 
     // Log each column's includeMode status
     if (window.cachedBoard.columns) {
         for (const col of window.cachedBoard.columns) {
-            console.log(`[FRONTEND saveCurrentBoard] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
         }
     }
 
@@ -3260,8 +3223,6 @@ function saveCachedBoard() {
         }
     }
 
-    console.log('[FRONTEND saveCurrentBoard] Sending board to backend');
-    console.log('[FRONTEND saveCurrentBoard] ========================================');
 
     // Send the complete board state to VS Code using a simple message
     // This avoids complex sequential processing that might cause issues

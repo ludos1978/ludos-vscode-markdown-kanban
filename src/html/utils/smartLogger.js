@@ -24,7 +24,6 @@ function createSmartLogger(prefix) {
 
             if (cached !== dataStr) {
                 cache.set(key, dataStr);
-                console.log(`[${prefix}] ${label || key}:`, data);
             }
         },
 
@@ -35,9 +34,7 @@ function createSmartLogger(prefix) {
          */
         always(message, data) {
             if (data !== undefined) {
-                console.log(`[${prefix}] ${message}`, data);
             } else {
-                console.log(`[${prefix}] ${message}`);
             }
         },
 
@@ -61,7 +58,6 @@ function createSmartLogger(prefix) {
         once(key, message) {
             if (!cache.has(key)) {
                 cache.set(key, true);
-                console.log(`[${prefix}] ${message}`);
             }
         }
     };

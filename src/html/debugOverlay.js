@@ -268,45 +268,33 @@ function updateTrackedFilesData(data) {
  * Update only the content without rebuilding the entire DOM
  */
 function updateFileStatesContent() {
-    console.log('[DebugOverlay] updateFileStatesContent called, overlay element:', !!debugOverlayElement);
-    console.log('[DebugOverlay] lastVerificationResults:', lastVerificationResults);
 
     if (!debugOverlayElement) {
-        console.log('[DebugOverlay] No overlay element, aborting update');
         return;
     }
 
     // Batch DOM updates to reduce reflow
     requestAnimationFrame(() => {
-        console.log('[DebugOverlay] requestAnimationFrame executing');
         const allFiles = createAllFilesArray();
-        console.log('[DebugOverlay] All files count:', allFiles.length);
 
         // Update summary stats (includes timestamp now)
         const summaryElement = debugOverlayElement.querySelector('.file-states-summary');
-        console.log('[DebugOverlay] Summary element found:', !!summaryElement);
         if (summaryElement) {
             const newSummaryHTML = createFileStatesSummary(allFiles);
             if (summaryElement.innerHTML !== newSummaryHTML) {
-                console.log('[DebugOverlay] Updating summary HTML');
                 summaryElement.innerHTML = newSummaryHTML;
             } else {
-                console.log('[DebugOverlay] Summary HTML unchanged, skipping update');
             }
         }
 
         // Update file list (only if content changed)
         const listElement = debugOverlayElement.querySelector('.file-states-list');
-        console.log('[DebugOverlay] List element found:', !!listElement);
         if (listElement) {
             const newListHTML = createFileStatesList(allFiles);
             const htmlChanged = listElement.innerHTML !== newListHTML;
-            console.log('[DebugOverlay] List HTML changed:', htmlChanged, 'old length:', listElement.innerHTML.length, 'new length:', newListHTML.length);
             if (htmlChanged) {
-                console.log('[DebugOverlay] Updating list HTML');
                 listElement.innerHTML = newListHTML;
             } else {
-                console.log('[DebugOverlay] List HTML unchanged, skipping update');
             }
         }
     });
@@ -1439,7 +1427,6 @@ function initializeDebugOverlay() {
 
         if (!message || !message.type) return;
 
-        console.log('[DebugOverlay] Received message:', message.type);
 
         switch (message.type) {
             case 'documentStateChanged':
@@ -1450,7 +1437,6 @@ function initializeDebugOverlay() {
 
             case 'saveCompleted':
                 // After save completes, automatically re-verify sync status
-                console.log('[DebugOverlay] saveCompleted received, triggering verification');
                 if (debugOverlayVisible) {
                     verifyContentSync(true); // Silent mode
                 }
@@ -1458,7 +1444,6 @@ function initializeDebugOverlay() {
 
             case 'individualFileSaved':
                 // After individual file save completes, automatically re-verify sync status
-                console.log('[DebugOverlay] individualFileSaved received, triggering verification');
                 if (debugOverlayVisible && message.success) {
                     verifyContentSync(true); // Silent mode
                 }
@@ -1466,7 +1451,6 @@ function initializeDebugOverlay() {
 
             case 'individualFileReloaded':
                 // After individual file reload completes, automatically re-verify sync status
-                console.log('[DebugOverlay] individualFileReloaded received, triggering verification');
                 if (debugOverlayVisible && message.success) {
                     verifyContentSync(true); // Silent mode
                 }
@@ -1494,16 +1478,13 @@ function initializeDebugOverlay() {
                 break;
 
             case 'verifyContentSyncResult':
-                console.log('[DebugOverlay] Received verifyContentSyncResult:', message);
                 // Store verification results and update display
                 lastVerificationResults = message;
 
                 // Update the file states content to show sync status
                 if (debugOverlayVisible && debugOverlayElement) {
-                    console.log('[DebugOverlay] Updating file states content');
                     updateFileStatesContent();
                 } else {
-                    console.log('[DebugOverlay] Overlay not visible, skipping update. visible:', debugOverlayVisible, 'element:', !!debugOverlayElement);
                 }
                 break;
         }

@@ -201,7 +201,6 @@ export class IncludeFileStateMachine extends FileStateMachine {
         this.context.lastError = error;
 
         if (this.config.enableAutoRollback && this.context.previousContent) {
-            console.log(`[IncludeFileStateMachine:${this.filePath}] Auto-rolling back after reload failure`);
             this.rollback();
         } else {
             // Enter IDLE state on failure
@@ -237,7 +236,6 @@ export class IncludeFileStateMachine extends FileStateMachine {
         this.context.cacheState = CacheState.INVALID;
 
         if (this.config.enableLogging) {
-            console.log(`[IncludeFileStateMachine:${this.filePath}] Reset for reuse`);
         }
     }
 

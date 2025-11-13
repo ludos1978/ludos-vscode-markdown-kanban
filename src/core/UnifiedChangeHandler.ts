@@ -38,18 +38,15 @@ export class UnifiedChangeHandler {
         const fileType = file.getFileType();
         const filePath = file.getPath();
 
-        console.log(`[UnifiedChangeHandler] 🔴 EXTERNAL CHANGE DETECTED: ${changeType} - ${fileType}:${filePath}`);
 
         // Handle file deletion
         if (changeType === 'deleted') {
-            console.log(`[UnifiedChangeHandler] FILE-DELETED: ${filePath}`);
             await this.handleFileDeleted(file);
             return;
         }
 
         // Handle file creation
         if (changeType === 'created') {
-            console.log(`[UnifiedChangeHandler] FILE-CREATED: ${filePath}`);
             await this.handleFileCreated(file);
             return;
         }
@@ -101,23 +98,12 @@ export class UnifiedChangeHandler {
             ? this.hasAnyUnsavedChangesInRegistry(file)
             : hasUnsavedChanges;
 
-        console.log(`[UnifiedChangeHandler] 🔍 DETAILED CONFLICT ANALYSIS for ${file.getFileType()}:${file.getPath()}:`);
-        console.log(`[UnifiedChangeHandler]   hasUnsavedChanges: ${hasUnsavedChanges}`);
-        console.log(`[UnifiedChangeHandler]   hasAnyUnsavedChanges: ${hasAnyUnsavedChanges}`);
-        console.log(`[UnifiedChangeHandler]   isInEditMode: ${isInEditMode}`);
-        console.log(`[UnifiedChangeHandler]   hasFileSystemChanges: ${hasFileSystemChanges}`);
-        console.log(`[UnifiedChangeHandler]   hasConflict (computed): ${hasConflict}`);
 
         // Additional debugging for MainKanbanFile
         if (file.getFileType() === 'main') {
             const mainFile = file as any;
             const document = mainFile._fileManager?.getDocument();
             const documentIsDirty = document ? document.isDirty : 'no document';
-            console.log(`[UnifiedChangeHandler]   MAIN FILE DETAILS:`);
-            console.log(`[UnifiedChangeHandler]     document.isDirty: ${documentIsDirty}`);
-            console.log(`[UnifiedChangeHandler]     _content.length: ${mainFile._content?.length || 0}`);
-            console.log(`[UnifiedChangeHandler]     _baseline.length: ${mainFile._baseline?.length || 0}`);
-            console.log(`[UnifiedChangeHandler]     content === baseline: ${mainFile._content === mainFile._baseline}`);
         }
 
         // NOTE: Legitimate saves are already filtered out by _onFileSystemChange()
@@ -127,10 +113,6 @@ export class UnifiedChangeHandler {
         // CASE 1: Check for race condition - external save with unsaved Kanban changes
         // This happens when user saves externally (Ctrl+S) while having Kanban UI changes
         if (file.getFileType() === 'main' && hasAnyUnsavedChanges && hasFileSystemChanges) {
-            console.log(`[UnifiedChangeHandler] ⚠️  CASE 1: CONFLICT DETECTED - External save with Kanban changes`);
-            console.log(`[UnifiedChangeHandler]   User has unsaved Kanban changes (including include files) AND external file changes`);
-            console.log(`[UnifiedChangeHandler]   This indicates external save (Ctrl+S) while Kanban UI had changes`);
-            console.log(`[UnifiedChangeHandler]   → TREATING AS CONFLICT: Showing dialog`);
 
             await this.showConflictDialog(file);
             return;
@@ -138,7 +120,6 @@ export class UnifiedChangeHandler {
 
         // CASE 3: No conflict detected by file's logic (safe auto-reload)
         if (!hasConflict) {
-            console.log(`[UnifiedChangeHandler] ✅ CASE 3: SAFE AUTO-RELOAD - No conflict detected`);
             await file.reload();
 
             // For include files, notify parent of change
@@ -149,8 +130,6 @@ export class UnifiedChangeHandler {
         }
 
         // CASE 4: Conflict detected (show dialog)
-        console.log(`[UnifiedChangeHandler] ⚠️  CASE 4: CONFLICT DETECTED - About to show dialog`);
-        console.log(`[UnifiedChangeHandler]   Conflict reason: hasUnsavedChanges=${hasUnsavedChanges}, hasFileSystemChanges=${hasFileSystemChanges}`);
         await this.showConflictDialog(file);
     }
 
@@ -162,21 +141,18 @@ export class UnifiedChangeHandler {
             // NOTE: Editing is already stopped in MarkdownFile._onFileSystemChange()
             // Just clear the flag here before showing dialog
             if (file.isInEditMode()) {
-                console.log(`[UnifiedChangeHandler] Clearing edit mode flag before showing conflict dialog`);
                 file.setEditMode(false);
             }
 
             const resolution = await file.showConflictDialog();
 
             if (resolution) {
-                console.log(`[UnifiedChangeHandler] Conflict resolved:`, resolution);
 
                 // For include files, notify parent after conflict resolution
                 if (file.getFileType() !== 'main') {
                     await this.notifyParentOfChange(file);
                 }
             } else {
-                console.log(`[UnifiedChangeHandler] Conflict dialog cancelled or failed`);
             }
         } catch (error) {
             console.error(`[UnifiedChangeHandler] Conflict dialog failed:`, error);
@@ -199,9 +175,6 @@ export class UnifiedChangeHandler {
             const cachedBoard = mainFile.getCachedBoardFromWebview?.();
             const hasCachedBoardChanges = !!cachedBoard;
 
-            console.log(`[UnifiedChangeHandler] hasAnyUnsavedChangesInRegistry check:`);
-            console.log(`[UnifiedChangeHandler]   filesWithChanges.length: ${filesWithChanges.length}`);
-            console.log(`[UnifiedChangeHandler]   hasCachedBoardChanges: ${hasCachedBoardChanges}`);
 
             return filesWithChanges.length > 0 || hasCachedBoardChanges;
         }
@@ -218,8 +191,6 @@ export class UnifiedChangeHandler {
      * Adding additional board updates here would cause duplicate updates and race conditions.
      */
     private async notifyParentOfChange(file: MarkdownFile): Promise<void> {
-        console.log(`[UnifiedChangeHandler] Include file change will be handled by file registry notification system`);
-        console.log(`[UnifiedChangeHandler]   File: ${file.getFileType()}:${file.getPath()}`);
         // The file registry change notification system handles the rest
     }
 }

@@ -1985,16 +1985,12 @@ function createTaskElement(task, columnId, taskIndex) {
     const hasNoTitle = !task.title || !task.title.trim();
 
     // DEBUG: Log ALL tasks to see what's happening
-    console.log('[createTaskElement] Task', task.id, '- title:', JSON.stringify(task.title), 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'hasDescription:', !!task.description);
 
     // Generate alternative title when task is folded and has no title
     let renderedTitle;
     if (hasNoTitle && isCollapsed && task.description) {
         // Generate alternative title from description
         const alternativeTitle = generateAlternativeTitle(task.description);
-        console.log('[createTaskElement] Task', task.id, 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'hasDescription:', !!task.description);
-        console.log('[createTaskElement] Generated alternativeTitle:', alternativeTitle);
-        console.log('[createTaskElement] Description preview:', task.description.substring(0, 100));
         if (alternativeTitle) {
             renderedTitle = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
         } else {
@@ -2002,7 +1998,6 @@ function createTaskElement(task, columnId, taskIndex) {
         }
     } else {
         if (hasNoTitle && isCollapsed) {
-            console.log('[createTaskElement] Task', task.id, 'hasNoTitle:', hasNoTitle, 'isCollapsed:', isCollapsed, 'but NO description');
         }
         // Normal title rendering
         renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
@@ -3018,7 +3013,6 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
         return;
     }
 
-    console.log('[toggleTaskCollapse] Called for task:', taskId);
 
     const toggle = taskElement.querySelector('.task-collapse-toggle');
     if (!toggle) {
@@ -3049,12 +3043,10 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
         if (task) {
             const hasNoTitle = !task.title || !task.title.trim();
 
-            console.log('[toggleTaskCollapse] Task:', taskId, 'hasNoTitle:', hasNoTitle, 'isNowCollapsed:', isNowCollapsed, 'hasDescription:', !!task.description);
 
             // If task has no title and is now collapsed, show alternative title
             if (hasNoTitle && isNowCollapsed && task.description) {
                 const alternativeTitle = generateAlternativeTitle(task.description);
-                console.log('[toggleTaskCollapse] Generated alternativeTitle:', alternativeTitle);
                 if (alternativeTitle) {
                     titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
                 }
@@ -4217,31 +4209,10 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
         const addTaskBtn = tasksContainer.querySelector('.add-task-btn');
 
         // DEBUG: Log insertion details
-        console.log('[addSingleTaskToDOM] Inserting task:', {
-            taskId: task.id,
-            taskTitle: task.title,
-            insertIndex,
-            childrenLength: tasksContainer.children.length,
-            hasAddButton: !!addTaskBtn,
-            childrenTypes: Array.from(tasksContainer.children).map(c => ({
-                tag: c.tagName,
-                class: c.className,
-                id: c.id,
-                dataTaskId: c.getAttribute('data-task-id')
-            })),
-            columnTasksLength: column.tasks.length,
-            columnTaskIds: column.tasks.map(t => t.id)
-        });
 
         // Insert the task at the correct position
         if (insertIndex >= 0 && insertIndex < tasksContainer.children.length) {
             const referenceNode = tasksContainer.children[insertIndex];
-            console.log('[addSingleTaskToDOM] Inserting before element:', {
-                refNodeTag: referenceNode.tagName,
-                refNodeClass: referenceNode.className,
-                refNodeId: referenceNode.id,
-                refNodeTaskId: referenceNode.getAttribute('data-task-id')
-            });
             if (referenceNode && referenceNode.parentNode === tasksContainer) {
                 tasksContainer.insertBefore(taskElement, referenceNode);
             } else {

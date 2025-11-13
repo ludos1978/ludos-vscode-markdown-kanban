@@ -13,7 +13,6 @@ export class EventBus implements IEventBus {
     private maxHistorySize: number = 1000;
 
     publish<T extends DomainEvent<any>>(event: T): Promise<void> {
-        console.log(`[EventBus] Publishing event: ${event.eventType} (${event.eventId})`);
 
         // Store in history
         this.eventHistory.push(event);
@@ -25,11 +24,9 @@ export class EventBus implements IEventBus {
         const subscribers = this.subscribers.get(event.eventType) || [];
 
         if (subscribers.length === 0) {
-            console.log(`[EventBus] No subscribers for event: ${event.eventType}`);
             return Promise.resolve();
         }
 
-        console.log(`[EventBus] Notifying ${subscribers.length} subscribers for: ${event.eventType}`);
 
         // Notify all subscribers asynchronously
         const notifications = subscribers.map(subscription =>
@@ -43,7 +40,6 @@ export class EventBus implements IEventBus {
         eventType: string,
         handler: EventHandler<T>
     ): Subscription {
-        console.log(`[EventBus] Adding subscription for: ${eventType}`);
 
         if (!this.subscribers.has(eventType)) {
             this.subscribers.set(eventType, []);
@@ -59,7 +55,6 @@ export class EventBus implements IEventBus {
         eventType: string,
         handler: EventHandler<T>
     ): void {
-        console.log(`[EventBus] Removing subscription for: ${eventType}`);
 
         const subscribers = this.subscribers.get(eventType);
         if (!subscribers) {
@@ -69,7 +64,6 @@ export class EventBus implements IEventBus {
         const index = subscribers.findIndex(sub => sub.handler === handler);
         if (index >= 0) {
             subscribers.splice(index, 1);
-            console.log(`[EventBus] Subscription removed for: ${eventType}`);
         }
     }
 
@@ -78,7 +72,6 @@ export class EventBus implements IEventBus {
     }
 
     clear(): void {
-        console.log('[EventBus] Clearing all subscriptions');
         this.subscribers.clear();
         this.eventHistory = [];
     }
@@ -122,7 +115,6 @@ export class EventBus implements IEventBus {
      * Replay events for testing or recovery
      */
     async replayEvents(events: DomainEvent<any>[]): Promise<void> {
-        console.log(`[EventBus] Replaying ${events.length} events`);
 
         for (const event of events) {
             await this.publish(event);

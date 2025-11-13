@@ -338,7 +338,6 @@ export class KanbanWebviewPanel {
         // Initialize unified change state machine (Phase 6)
         this._stateMachine = ChangeStateMachine.getInstance();
         this._stateMachine.initialize(this._fileRegistry, this);
-        console.log('[KanbanWebviewPanel] State machine initialized');
 
         // Subscribe to registry change events
         this._disposables.push(
@@ -415,16 +414,11 @@ export class KanbanWebviewPanel {
                 },
                 getWebviewPanel: () => this,
                 saveWithBackup: async (label?: string) => {
-                    console.log('[saveWithBackup callback] Backup requested with label:', label);
                     // TODO: Implement backup creation if needed
                 },
                 markUnsavedChanges: async (hasChanges: boolean, cachedBoard?: any) => {
-                    console.log('[markUnsavedChanges callback] ===== CALLBACK INVOKED =====');
-                    console.log('[markUnsavedChanges callback] hasChanges:', hasChanges);
-                    console.log('[markUnsavedChanges callback] cachedBoard exists:', !!cachedBoard);
 
                     if (!this._isRegistryReady()) {
-                        console.log('[markUnsavedChanges callback] Registry not ready');
                         return;
                     }
 
@@ -438,13 +432,11 @@ export class KanbanWebviewPanel {
                         const mainFile = this._getMainFile();
                         if (mainFile) {
                             mainFile.setCachedBoardFromWebview(cachedBoard);
-                            console.log('[markUnsavedChanges callback] Updated MainKanbanFile cached board for conflict detection');
                         }
                     }
 
                     if (hasChanges && cachedBoard) {
                         // User edited the board - mark as having unsaved changes
-                        console.log('[markUnsavedChanges callback] User edited board - marking as unsaved changes');
 
                         // Track changes in include files (updates their cache)
                         await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
@@ -455,7 +447,6 @@ export class KanbanWebviewPanel {
                             // Generate markdown from cached board to keep backend in sync with frontend
                             const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
                             mainFile.setContent(markdown, false); // false = mark as unsaved
-                            console.log('[markUnsavedChanges callback] Updated main file content from board (not saved to disk yet)');
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -483,7 +474,6 @@ export class KanbanWebviewPanel {
                                 // Generate markdown from cached board to keep backend in sync with frontend
                                 const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
                                 mainFile.setContent(markdown, false); // false = mark as unsaved
-                                console.log('[markUnsavedChanges callback] Updated main file content from board (edge case)');
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
@@ -735,7 +725,6 @@ export class KanbanWebviewPanel {
                         addedCount++;
                     }
                 }
-                console.log(`[LocalResourceRoots] Added ${addedCount} asset directories to localResourceRoots (total: ${localResourceRoots.length})`);
             }
         }
 
@@ -881,7 +870,6 @@ export class KanbanWebviewPanel {
 
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
-                console.log(`[PANEL] Message received: ${message.type}`);
 
                 try {
                     await this._messageHandler.handleMessage(message);
@@ -918,7 +906,6 @@ export class KanbanWebviewPanel {
             // CRITICAL: Set initial board load flag BEFORE loading main file
             // This prevents the main file's 'reloaded' event from triggering board regeneration
             this._isInitialBoardLoad = true;
-            console.log('[loadMarkdownFile] Starting initial board load - blocking reloaded events');
 
             await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
             // Sync state back from file service
@@ -1163,13 +1150,11 @@ export class KanbanWebviewPanel {
 
         const board = this.getBoard();
         if (!board) {
-            console.log('[AssetDirs] No board available');
             return [];
         }
 
         const document = this._fileManager.getDocument();
         if (!document) {
-            console.log('[AssetDirs] No document available');
             return [];
         }
 
@@ -1196,7 +1181,6 @@ export class KanbanWebviewPanel {
         }
 
         const assetDirsArray = Array.from(assetDirs);
-        console.log(`[AssetDirs] Found ${assetDirsArray.length} unique asset directories:`, assetDirsArray);
         return assetDirsArray;
     }
 
@@ -1254,10 +1238,8 @@ export class KanbanWebviewPanel {
                         const dir = path.dirname(absolutePath);
                         assetDirs.add(dir);
                     } else {
-                        console.log(`[AssetDirs] Asset not found: ${absolutePath}`);
                     }
                 } catch (error) {
-                    console.log(`[AssetDirs] Error processing path: ${assetPath}`, error);
                 }
             }
         }
@@ -1278,7 +1260,6 @@ export class KanbanWebviewPanel {
     private async _syncMainFileToRegistry(document: vscode.TextDocument): Promise<void> {
         const filePath = document.uri.fsPath;
 
-        console.log(`[KanbanWebviewPanel] Loading main file to registry: ${filePath}`);
 
         // Check if MainKanbanFile already exists
         let mainFile = this._fileRegistry.getMainFile();
@@ -1286,19 +1267,16 @@ export class KanbanWebviewPanel {
         if (!mainFile || mainFile.getPath() !== filePath) {
             // Clear existing files if switching to a different file
             if (mainFile && mainFile.getPath() !== filePath) {
-                console.log(`[KanbanWebviewPanel] Switching files - clearing registry`);
                 this._fileRegistry.clear();
             }
 
             // Create new MainKanbanFile instance
-            console.log(`[KanbanWebviewPanel] Creating new MainKanbanFile instance`);
             mainFile = this._fileFactory.createMainFile(filePath);
             this._fileRegistry.register(mainFile);
             mainFile.startWatching();
 
             // Initialize change coordinator for this main file
             if (!this._changeCoordinator) {
-                console.log(`[KanbanWebviewPanel] Initializing MainFileCoordinator for ${filePath}`);
                 this._changeCoordinator = new MainFileCoordinator(filePath, {
                     enableLogging: true,
                     maxHistorySize: 50,
@@ -1310,14 +1288,12 @@ export class KanbanWebviewPanel {
         // Load content into file instance directly from document/disk
         try {
             await mainFile.reload();
-            console.log(`[KanbanWebviewPanel] MainKanbanFile content loaded`);
         } catch (error) {
             console.error(`[KanbanWebviewPanel] Failed to load MainKanbanFile content:`, error);
         }
 
         // Load include files if board is available
         const board = this.getBoard();
-        console.log(`[_syncMainFileToRegistry] Board exists: ${!!board}, Board valid: ${board?.valid}`);
         if (board && board.valid) {
             // Step 1: Create include file instances in registry
             this.syncIncludeFilesWithRegistry(board);
@@ -1332,12 +1308,10 @@ export class KanbanWebviewPanel {
             this._loadIncludeContentAsync(board)
                 .then(() => {
                     this._isInitialBoardLoad = false;
-                    console.log('[_syncMainFileToRegistry] Initial board load complete - allowing reloaded events');
                 })
                 .catch(error => {
                     console.error('[_syncMainFileToRegistry] Error loading include content:', error);
                     this._isInitialBoardLoad = false;
-                    console.log('[_syncMainFileToRegistry] Initial board load failed - allowing reloaded events');
                 });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
@@ -1351,7 +1325,6 @@ export class KanbanWebviewPanel {
      * Mark all columns/tasks with includes as loading
      */
     private _markIncludesAsLoading(board: KanbanBoard): void {
-        console.log('[_markIncludesAsLoading] Marking includes with loading flags');
 
         // Mark column includes as loading
         for (const column of board.columns) {
@@ -1375,7 +1348,6 @@ export class KanbanWebviewPanel {
      * Runs asynchronously in background, sending updates as each include loads
      */
     private async _loadIncludeContentAsync(board: KanbanBoard): Promise<void> {
-        console.log('[_loadIncludeContentAsync] Loading content from all include files');
 
         // Load column includes - send update for each one
         for (const column of board.columns) {
@@ -1391,12 +1363,10 @@ export class KanbanWebviewPanel {
                             column.tasks = tasks;
                             column.isLoadingContent = false; // Clear loading flag
 
-                            console.log(`[_loadIncludeContentAsync] Loaded ${tasks.length} tasks from ${relativePath}`);
 
                             // CRITICAL FIX: Don't send updates during include switch
                             // The state machine handles all updates during switches
                             if (this._includeSwitchInProgress) {
-                                console.log(`[_loadIncludeContentAsync] ⚠️ Skipped sending update - include switch in progress`);
                                 continue;
                             }
 
@@ -1462,12 +1432,10 @@ export class KanbanWebviewPanel {
                                 // Sync baseline to prevent false "unsaved" detection
                                 file.setContent(fullFileContent, true);
 
-                                console.log(`[_loadIncludeContentAsync] Loaded task include ${relativePath}`);
 
                                 // CRITICAL FIX: Don't send updates during include switch
                                 // The state machine handles all updates during switches
                                 if (this._includeSwitchInProgress) {
-                                    console.log(`[_loadIncludeContentAsync] ⚠️ Skipped sending update - include switch in progress`);
                                     continue;
                                 }
 
@@ -1517,7 +1485,6 @@ export class KanbanWebviewPanel {
         const mainFile = this._fileRegistry.getMainFile();
         if (mainFile) {
             const regularIncludes = mainFile.getIncludedFiles();
-            console.log(`[_loadIncludeContentAsync] Loading ${regularIncludes.length} regular includes`);
 
             for (const relativePath of regularIncludes) {
                 const file = this._fileRegistry.getByRelativePath(relativePath) as RegularIncludeFile;
@@ -1527,7 +1494,6 @@ export class KanbanWebviewPanel {
                         await file.reload();
                         const content = file.getContent();
 
-                        console.log(`[_loadIncludeContentAsync] Loaded regular include ${relativePath} (${content.length} chars)`);
 
                         // Send update to frontend
                         if (this._panel) {
@@ -1545,14 +1511,12 @@ export class KanbanWebviewPanel {
 
             // Trigger re-render after all regular includes are loaded
             if (regularIncludes.length > 0 && this._panel) {
-                console.log(`[_loadIncludeContentAsync] All ${regularIncludes.length} regular includes loaded - triggering re-render`);
                 this.queueMessage({
                     type: 'includesUpdated'
                 });
             }
         }
 
-        console.log('[_loadIncludeContentAsync] All include content loaded');
     }
 
     /**
@@ -1565,7 +1529,6 @@ export class KanbanWebviewPanel {
             return;
         }
 
-        console.log(`[KanbanWebviewPanel] Syncing include files with registry`);
         let createdCount = 0;
 
         // Sync column includes
@@ -1581,7 +1544,6 @@ export class KanbanWebviewPanel {
                     }
 
                     if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-                        console.log(`[KanbanWebviewPanel] Creating ColumnIncludeFile: ${relativePath}`);
 
                         const columnInclude = this._fileFactory.createColumnInclude(
                             relativePath,
@@ -1626,7 +1588,6 @@ export class KanbanWebviewPanel {
                         }
 
                         if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-                            console.log(`[KanbanWebviewPanel] Creating TaskIncludeFile: ${relativePath}`);
 
                             const taskInclude = this._fileFactory.createTaskInclude(
                                 relativePath,
@@ -1661,7 +1622,6 @@ export class KanbanWebviewPanel {
 
         // Sync regular includes (!!!include(path)!!! in task descriptions)
         const regularIncludes = mainFile.getIncludedFiles();
-        console.log(`[KanbanWebviewPanel] Found ${regularIncludes.length} regular includes to sync`);
 
         for (const relativePath of regularIncludes) {
             const existingFile = this._fileRegistry.getByRelativePath(relativePath);
@@ -1673,7 +1633,6 @@ export class KanbanWebviewPanel {
             }
 
             if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-                console.log(`[KanbanWebviewPanel] Creating RegularIncludeFile: ${relativePath}`);
 
                 const regularInclude = this._fileFactory.createRegularInclude(
                     relativePath,
@@ -1698,7 +1657,6 @@ export class KanbanWebviewPanel {
             }
         }
 
-        console.log(`[KanbanWebviewPanel] Created ${createdCount} include file instances`);
 
         // CRITICAL FIX: Also UPDATE content of existing include files with board changes
         this._updateIncludeFilesContent(board);
@@ -1709,7 +1667,6 @@ export class KanbanWebviewPanel {
      * This ensures that when you edit tasks/columns in the Kanban, the include files are updated
      */
     private _updateIncludeFilesContent(board: KanbanBoard): void {
-        console.log('[_updateIncludeFilesContent] Updating include file content from board');
 
         // Update column include files
         for (const column of board.columns) {
@@ -1723,7 +1680,6 @@ export class KanbanWebviewPanel {
                         const columnIncludeFile = file as ColumnIncludeFile;
                         columnIncludeFile.updateTasks(column.tasks);
 
-                        console.log(`[_updateIncludeFilesContent] Updated column include: ${relativePath} (${column.tasks.length} tasks)`);
                     }
                 }
             }
@@ -1742,7 +1698,6 @@ export class KanbanWebviewPanel {
                             // Update file content (marks as having unsaved changes)
                             file.setContent(taskContent, false);  // false = don't update baseline, mark as unsaved
 
-                            console.log(`[_updateIncludeFilesContent] Updated task include: ${relativePath} (${taskContent.length} chars)`);
                         }
                     }
                 }
@@ -1772,7 +1727,6 @@ export class KanbanWebviewPanel {
      */
     public setEditingInProgress(isEditing: boolean): void {
         this._isEditingInProgress = isEditing;
-        console.log(`[KanbanWebviewPanel] Editing in progress: ${isEditing}`);
     }
 
     /**
@@ -1780,7 +1734,6 @@ export class KanbanWebviewPanel {
      */
     public markColumnDirty(columnId: string): void {
         this._dirtyColumns.add(columnId);
-        console.log(`[KanbanWebviewPanel] Marked column ${columnId} as dirty`);
     }
 
     /**
@@ -1788,7 +1741,6 @@ export class KanbanWebviewPanel {
      */
     public markTaskDirty(taskId: string): void {
         this._dirtyTasks.add(taskId);
-        console.log(`[KanbanWebviewPanel] Marked task ${taskId} as dirty`);
     }
 
     /**
@@ -1796,7 +1748,6 @@ export class KanbanWebviewPanel {
      */
     public clearColumnDirty(columnId: string): void {
         this._dirtyColumns.delete(columnId);
-        console.log(`[KanbanWebviewPanel] Cleared dirty flag for column ${columnId}`);
     }
 
     /**
@@ -1804,7 +1755,6 @@ export class KanbanWebviewPanel {
      */
     public clearTaskDirty(taskId: string): void {
         this._dirtyTasks.delete(taskId);
-        console.log(`[KanbanWebviewPanel] Cleared dirty flag for task ${taskId}`);
     }
 
     /**
@@ -1818,7 +1768,6 @@ export class KanbanWebviewPanel {
         // During include switch, board might be regenerated with empty descriptions (before async load completes)
         // This would send stale/empty data and cause content flapping
         if (this._includeSwitchInProgress) {
-            console.log(`[syncDirtyItems] ⚠️ Skipped - include switch in progress (state machine handles updates)`);
             return;
         }
 
@@ -1829,7 +1778,6 @@ export class KanbanWebviewPanel {
             return; // Nothing to sync
         }
 
-        console.log(`[syncDirtyItems] Syncing ${this._dirtyColumns.size} columns, ${this._dirtyTasks.size} tasks`);
 
         // Collect dirty columns
         const dirtyColumns: any[] = [];
@@ -1889,7 +1837,6 @@ export class KanbanWebviewPanel {
         newFiles: string[];
         newTitle?: string;
     }): Promise<void> {
-        console.log(`[handleIncludeSwitch] Routing ${params.columnId ? 'column' : 'task'} include switch through STATE MACHINE`);
 
         // Route through unified change state machine
         const board = this.getBoard();
@@ -1911,7 +1858,6 @@ export class KanbanWebviewPanel {
             throw result.error || new Error('Include switch failed');
         }
 
-        console.log('[handleIncludeSwitch] ✅ Include switch completed via state machine');
     }
 
     /**
@@ -1942,7 +1888,6 @@ export class KanbanWebviewPanel {
      * Handle file registry change events - ROUTES TO UNIFIED HANDLER
      */
     private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
-        console.log(`[KanbanWebviewPanel] File registry change: ${event.file.getRelativePath()} (${event.changeType})`);
 
         const file = event.file;
         const fileType = file.getFileType();
@@ -1953,7 +1898,6 @@ export class KanbanWebviewPanel {
         // 'reloaded' events are explicit reload requests - DO reload!
         if (event.changeType === 'content' || event.changeType === 'saved') {
             // Internal cache update - do NOT trigger reload
-            console.log(`[KanbanWebviewPanel] Ignoring ${event.changeType} event - internal cache update`);
             return;
         }
 
@@ -1965,7 +1909,6 @@ export class KanbanWebviewPanel {
             // All files handle external changes independently via handleExternalChange()
             // They will show dialogs, reload, and emit 'reloaded' event
             // We just wait for the 'reloaded' event to update frontend
-            console.log(`[KanbanWebviewPanel] External change detected - file will handle autonomously: ${file.getRelativePath()}`);
             return;
         }
 
@@ -1974,12 +1917,10 @@ export class KanbanWebviewPanel {
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
                 if (this._isInitialBoardLoad) {
-                    console.log(`[KanbanWebviewPanel] Skipping main file reloaded event during initial board load`);
                     return;
                 }
 
                 // Main file reloaded from disk, regenerate board and update frontend
-                console.log(`[KanbanWebviewPanel] Main file reloaded - regenerating board`);
                 this.invalidateBoardCache();
                 const board = this.getBoard();
                 if (board) {
@@ -1992,7 +1933,6 @@ export class KanbanWebviewPanel {
                 // CRITICAL: Skip 'reloaded' events during initial board load
                 // These are just loading content for the first time, not actual changes
                 if (this._isInitialBoardLoad) {
-                    console.log(`[KanbanWebviewPanel] Skipping reloaded event during initial board load: ${file.getRelativePath()}`);
                     return;
                 }
 
@@ -2000,13 +1940,11 @@ export class KanbanWebviewPanel {
                 // When multiple external changes happen rapidly, reloads can complete out of order.
                 // This ensures only the newest data is applied to the frontend.
                 if (!this._isEventNewer(file, event.timestamp)) {
-                    console.log(`[RACE-3] Skipping stale reloaded event for ${file.getRelativePath()}`);
                     return;
                 }
 
                 // File has been reloaded (either from external change or manual reload)
                 // Send updated content to frontend
-                console.log(`[KanbanWebviewPanel] File reloaded - sending frontend update: ${file.getRelativePath()}`);
                 await this._sendIncludeFileUpdateToFrontend(file);
             }
         }
@@ -2026,7 +1964,6 @@ export class KanbanWebviewPanel {
         const relativePath = file.getRelativePath();
         const fileType = file.getFileType();
 
-        console.log(`[_sendIncludeFileUpdateToFrontend] Sending update for ${fileType}: ${relativePath}`);
 
         if (fileType === 'include-column') {
             // Find column that uses this include file
@@ -2052,7 +1989,6 @@ export class KanbanWebviewPanel {
                     includeFiles: column.includeFiles
                 });
 
-                console.log(`[_sendIncludeFileUpdateToFrontend] Sent column update with ${tasks.length} tasks`);
 
                 // DON'T invalidate cache for include files - state machine already updated it
                 // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
@@ -2098,7 +2034,6 @@ export class KanbanWebviewPanel {
                     includeFiles: foundTask.includeFiles
                 });
 
-                console.log(`[_sendIncludeFileUpdateToFrontend] Sent task update with ${fullContent.length} chars`);
 
                 // DON'T invalidate cache for include files - state machine already updated it
                 // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
@@ -2108,11 +2043,9 @@ export class KanbanWebviewPanel {
         } else if (fileType === 'include-regular') {
             // Regular include - find and update only affected tasks
             // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
-            console.log(`[_sendIncludeFileUpdateToFrontend] Regular include changed: ${relativePath}`);
 
             // CRITICAL: Send updated include content to frontend cache
             const content = file.getContent();
-            console.log(`[_sendIncludeFileUpdateToFrontend] Sending updated content (${content.length} chars)`);
             this.queueMessage({
                 type: 'updateIncludeContent',
                 filePath: relativePath,
@@ -2125,25 +2058,19 @@ export class KanbanWebviewPanel {
                 for (const task of column.tasks) {
                     // Check if this task has the regular include in its description
                     if (task.regularIncludeFiles?.length) {
-                        console.log(`[_sendIncludeFileUpdateToFrontend] Checking task ${task.id}:`);
-                        console.log(`[_sendIncludeFileUpdateToFrontend]   regularIncludeFiles:`, task.regularIncludeFiles);
-                        console.log(`[_sendIncludeFileUpdateToFrontend]   Looking for: ${relativePath}`);
 
                         const hasThisInclude = task.regularIncludeFiles.some((p: string) => {
                             const matches = MarkdownFile.isSameFile(p, relativePath);
-                            console.log(`[_sendIncludeFileUpdateToFrontend]   Comparing "${p}" with "${relativePath}": ${matches}`);
                             return matches;
                         });
 
                         if (hasThisInclude) {
-                            console.log(`[_sendIncludeFileUpdateToFrontend]   ✅ Task uses this include!`);
                             affectedTasks.push({ task, column });
                         }
                     }
                 }
             }
 
-            console.log(`[_sendIncludeFileUpdateToFrontend] Found ${affectedTasks.length} tasks using regular include: ${relativePath}`);
 
             // Send targeted updates for each affected task
             // IMPORTANT: Use queueMessage (not postMessage) to ensure cache update arrives BEFORE task updates
@@ -2161,12 +2088,10 @@ export class KanbanWebviewPanel {
                     regularIncludeFiles: task.regularIncludeFiles // Send the list so frontend knows what changed
                 });
 
-                console.log(`[_sendIncludeFileUpdateToFrontend] Queued task update for ${task.id} in column ${column.id}`);
             }
 
             // NOTE: No need for 'includesUpdated' message - updateTaskContent already triggers
             // renderSingleColumn() for each affected column, which re-renders markdown with updated cache
-            console.log(`[_sendIncludeFileUpdateToFrontend] Completed targeted updates for ${affectedTasks.length} tasks`);
         }
     }
 
@@ -2239,7 +2164,6 @@ export class KanbanWebviewPanel {
     private async _withLock<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
         // If operation already in progress, queue this one
         if (this._operationInProgress) {
-            console.log(`[RACE-4] Operation "${operationName}" waiting for "${this._operationInProgress}" to complete`);
 
             return new Promise((resolve, reject) => {
                 this._pendingOperations.push({
@@ -2258,7 +2182,6 @@ export class KanbanWebviewPanel {
 
         // Acquire lock
         this._operationInProgress = operationName;
-        console.log(`[RACE-4] Operation "${operationName}" started (lock acquired)`);
 
         try {
             const result = await operation();
@@ -2266,12 +2189,10 @@ export class KanbanWebviewPanel {
         } finally {
             // Release lock
             this._operationInProgress = null;
-            console.log(`[RACE-4] Operation "${operationName}" completed (lock released)`);
 
             // Process next queued operation
             const next = this._pendingOperations.shift();
             if (next) {
-                console.log(`[RACE-4] Processing queued operation "${next.name}"`);
                 // Run next operation (it will acquire lock)
                 next.operation().catch(error => {
                     console.error(`[RACE-4] Queued operation "${next.name}" failed:`, error);
@@ -2298,19 +2219,16 @@ export class KanbanWebviewPanel {
         if (!lastProcessed) {
             // First event for this file - accept it
             this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
-            console.log(`[RACE-3] First event for ${relativePath}, accepting`);
             return true;
         }
 
         if (eventTimestamp > lastProcessed) {
             // Newer event - accept and update timestamp
-            console.log(`[RACE-3] Newer event for ${relativePath} (${eventTimestamp.toISOString()} > ${lastProcessed.toISOString()})`);
             this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
             return true;
         }
 
         // Older or same timestamp - reject
-        console.log(`[RACE-3] Ignoring stale event for ${relativePath} (${eventTimestamp.toISOString()} <= ${lastProcessed.toISOString()})`);
         return false;
     }
 
@@ -2370,14 +2288,12 @@ export class KanbanWebviewPanel {
     public getBoard(): KanbanBoard | undefined {
         // Check if cache is valid
         if (this._boardCacheValid && this._cachedBoard) {
-            console.log('[STATE-2] getBoard() - Returning cached board');
             return this._cachedBoard;
         }
 
         // Generate fresh board from registry
         // CRITICAL FIX: Pass existing cached board to preserve column/task IDs
         // This prevents "Column not found" errors when cache is invalidated
-        console.log('[STATE-2] getBoard() - Cache invalid, generating fresh board');
         const board = this._fileRegistry.generateBoard(this._cachedBoard || undefined);
 
         // Cache the result
@@ -2402,14 +2318,10 @@ export class KanbanWebviewPanel {
         // This prevents column/task IDs from regenerating mid-switch
         if (this._includeSwitchInProgress) {
             const stack = new Error().stack;
-            console.log('[Cache] ⚠️ Blocked invalidation - include switch in progress');
-            console.log('[Cache] Attempted from:', stack?.split('\n').slice(1, 4).join('\n'));
             return;
         }
 
         const stack = new Error().stack;
-        console.log('[STATE-2] invalidateBoardCache() - Cache invalidated');
-        console.log('[STATE-2] Called from:', stack?.split('\n').slice(1, 4).join('\n'));
         this._boardCacheValid = false;
     }
 
@@ -2420,7 +2332,6 @@ export class KanbanWebviewPanel {
      * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
      */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
-        console.log(`[Cache] Include switch in-progress: ${inProgress}`);
         this._includeSwitchInProgress = inProgress;
     }
 
@@ -2560,7 +2471,6 @@ export class KanbanWebviewPanel {
 
         // If no unsaved changes, allow close
         if (!hasUnsavedChanges && !includeStatus.hasChanges) {
-            console.log('[PanelClose] No unsaved changes - allowing close');
             this.dispose();
             return;
         }
@@ -2590,16 +2500,13 @@ export class KanbanWebviewPanel {
         if (!choice || choice === cancel) {
             // User cancelled - prevent close
             this._isClosingPrevented = true;
-            console.log('[PanelClose] User cancelled close');
             return;
         }
 
         if (choice === saveAndClose) {
             // Save all changes and then close
-            console.log('[PanelClose] Saving all changes before close');
             try {
                 await this.saveToMarkdown(true, true); // Save with version tracking and trigger save
-                console.log('[PanelClose] Save completed, now closing');
                 this.dispose();
             } catch (error) {
                 console.error('[PanelClose] Save failed:', error);
@@ -2608,7 +2515,6 @@ export class KanbanWebviewPanel {
             }
         } else if (choice === closeWithoutSaving) {
             // Discard changes and close
-            console.log('[PanelClose] Discarding changes and closing');
             if (mainFile) {
                 mainFile.discardChanges();
             }
@@ -2811,8 +2717,6 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
-        console.log(`[updateIncludeContentUnified] Called with ${newIncludeFiles.length} files:`, newIncludeFiles);
-        console.log(`[updateIncludeContentUnified] Column ID: ${column.id}, Column title: ${column.title}`);
 
         // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
 
@@ -2826,16 +2730,13 @@ export class KanbanWebviewPanel {
             !normalizedNewFiles.includes(old)
         );
 
-        console.log(`[updateIncludeContentUnified] Files to remove: ${filesToRemove.length}`, filesToRemove);
 
         // STEP 1: Cleanup old files
         for (const oldFilePath of filesToRemove) {
             const oldFile = this._fileRegistry.getByRelativePath(oldFilePath);
             if (oldFile) {
-                console.log(`[updateIncludeContentUnified] Cleaning up old include file: ${oldFilePath}`);
                 oldFile.stopWatching();
                 this._fileRegistry.unregister(oldFile.getPath());
-                console.log(`[updateIncludeContentUnified] ✓ Old file unregistered and disposed`);
             }
         }
 
@@ -2844,7 +2745,6 @@ export class KanbanWebviewPanel {
         for (const newFilePath of normalizedNewFiles) {
             const existingFile = this._fileRegistry.getByRelativePath(newFilePath);
             if (existingFile) {
-                console.log(`[updateIncludeContentUnified] Unregistering existing file for fresh start: ${newFilePath}`);
                 existingFile.stopWatching();
                 this._fileRegistry.unregister(existingFile.getPath());
             }
@@ -2866,7 +2766,6 @@ export class KanbanWebviewPanel {
             }
 
             // ALWAYS create fresh instance (Solution 3)
-            console.log('[updateIncludeContentUnified] Creating fresh ColumnIncludeFile instance:', relativePath);
             const columnInclude = this._fileFactory.createColumnInclude(
                 relativePath,
                 mainFile,
@@ -2878,12 +2777,10 @@ export class KanbanWebviewPanel {
             columnInclude.startWatching();
 
             // Reload the file content from disk before parsing
-            console.log('[updateIncludeContentUnified] Reloading file content:', relativePath);
             await columnInclude.reload();
 
             // Pass existing tasks to preserve IDs during re-parse
             const tasks = columnInclude.parseToTasks(existingTasks, column.id);
-            console.log(`[updateIncludeContentUnified] Parsed ${tasks.length} tasks from ${relativePath}`);
             allTasks.push(...tasks);
         }
 
@@ -2901,7 +2798,6 @@ export class KanbanWebviewPanel {
                 includeMode: true,
                 includeFiles: normalizedNewFiles
             });
-            console.log(`[updateIncludeContentUnified] Sent updateColumnContent with ${allTasks.length} tasks to frontend`);
         }
     }
 
@@ -3041,7 +2937,6 @@ export class KanbanWebviewPanel {
     ): Promise<void> {
         // This method is now handled by the unified conflict resolution system
         // External changes are detected and handled by file watchers and the registry
-        console.log('[notifyExternalChanges] External changes are now handled by the unified system');
     }
 
     /**

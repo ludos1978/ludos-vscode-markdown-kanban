@@ -149,9 +149,7 @@ class ExportTreeBuilder {
      * Logic: [base column] + [all consecutive #stack columns after it] = one stack
      */
     static groupIntoStacks(columns) {
-        console.log('[kanban.exportTreeBuilder.groupIntoStacks] Processing', columns.length, 'columns');
         columns.forEach((item, i) => {
-            console.log(`  [${i}] "${item.column.title}" - isStacked: ${item.isStacked}`);
         });
 
         const stacks = [];
@@ -159,21 +157,17 @@ class ExportTreeBuilder {
 
         while (i < columns.length) {
             const currentStack = [columns[i]]; // Start with base column
-            console.log(`[kanban.exportTreeBuilder.groupIntoStacks] Starting stack with base column: "${columns[i].column.title}"`);
             i++;
 
             // Add all consecutive #stack columns to this stack
             while (i < columns.length && columns[i].isStacked) {
-                console.log(`[kanban.exportTreeBuilder.groupIntoStacks]   Adding stacked column: "${columns[i].column.title}"`);
                 currentStack.push(columns[i]);
                 i++;
             }
 
             stacks.push(currentStack);
-            console.log(`[kanban.exportTreeBuilder.groupIntoStacks] Created stack with ${currentStack.length} column(s)`);
         }
 
-        console.log('[kanban.exportTreeBuilder.groupIntoStacks] Result:', stacks.length, 'stacks/columns total');
         return stacks;
     }
 
@@ -196,7 +190,6 @@ class ExportTreeBuilder {
 
         traverse(tree);
         const result = Array.from(columnIndexes);
-        console.log('[kanban.exportTreeBuilder.getSelectedItems] Collected column indexes:', result);
         return result;
     }
 
@@ -307,7 +300,6 @@ class ExportTreeBuilder {
 // Export for use in other modules
 if (typeof window !== 'undefined') {
     window.ExportTreeBuilder = ExportTreeBuilder;
-    console.log('[kanban.exportTreeBuilder] ExportTreeBuilder loaded successfully');
 } else {
     console.error('[kanban.exportTreeBuilder] window is undefined');
 }

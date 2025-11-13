@@ -79,7 +79,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         // PERFORMANCE: Check registration cache first
         if (this._registrationCache.has(normalizedRelativePath)) {
-            console.debug(`[MarkdownFileRegistry] Skipping duplicate registration: ${relativePath}`);
             return;
         }
 
@@ -96,7 +95,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             existingFile.dispose();
         }
 
-        console.log(`[MarkdownFileRegistry] Registering: "${relativePath}" → "${normalizedRelativePath}" (${file.getFileType()})`);
 
         // PERFORMANCE: Add to registration cache
         this._registrationCache.add(normalizedRelativePath);
@@ -126,7 +124,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
 
         const normalizedRelativePath = file.getNormalizedRelativePath();
-        console.log(`[MarkdownFileRegistry] Unregistering: "${file.getRelativePath()}" (${normalizedRelativePath})`);
 
         this._files.delete(path);
         this._filesByRelativePath.delete(normalizedRelativePath); // FOUNDATION-1: Use normalized key
@@ -139,7 +136,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Clear all files from the registry
      */
     public clear(): void {
-        console.log(`[MarkdownFileRegistry] Clearing all files (${this._files.size} files)`);
 
         // Dispose all files
         for (const file of this._files.values()) {
@@ -179,7 +175,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         // Debug logging for lookup misses (helps catch issues)
         if (!file && relativePath) {
-            console.debug(`[MarkdownFileRegistry] Lookup miss: "${relativePath}" (normalized: "${normalized}")`);
         }
 
         return file;
@@ -320,7 +315,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public async saveAll(): Promise<void> {
         const filesToSave = this.getFilesWithUnsavedChanges();
-        console.log(`[MarkdownFileRegistry] Saving ${filesToSave.length} files`);
 
         await Promise.all(filesToSave.map(f => f.save()));
     }
@@ -330,7 +324,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public async reloadAll(): Promise<void> {
         const filesToReload = this.getFilesThatNeedReload();
-        console.log(`[MarkdownFileRegistry] Reloading ${filesToReload.length} files`);
 
         await Promise.all(filesToReload.map(f => f.reload()));
     }
@@ -361,7 +354,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             })
         );
 
-        console.log(`[MarkdownFileRegistry] Force write completed: ${filesWritten} written, ${errors.length} errors`);
         return { filesWritten, errors };
     }
 
@@ -369,7 +361,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Check all files for external changes
      */
     public async checkAllForExternalChanges(): Promise<Map<string, boolean>> {
-        console.log(`[MarkdownFileRegistry] Checking ${this._files.size} files for external changes`);
 
         const results = new Map<string, boolean>();
 
@@ -387,7 +378,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Start watching all files
      */
     public startWatchingAll(): void {
-        console.log(`[MarkdownFileRegistry] Starting watch on ${this._files.size} files`);
         this.getAll().forEach(f => f.startWatching());
     }
 
@@ -395,7 +385,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Stop watching all files
      */
     public stopWatchingAll(): void {
-        console.log(`[MarkdownFileRegistry] Stopping watch on ${this._files.size} files`);
         this.getAll().forEach(f => f.stopWatching());
     }
 
@@ -404,7 +393,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public async backupAll(label: string = 'manual'): Promise<void> {
         const filesToBackup = this.getFilesWithUnsavedChanges();
-        console.log(`[MarkdownFileRegistry] Creating backups for ${filesToBackup.length} files`);
 
         await Promise.all(filesToBackup.map(f => f.createBackup(label)));
     }
@@ -445,7 +433,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public logStatistics(): void {
         const stats = this.getStatistics();
-        console.log('[MarkdownFileRegistry] Statistics:', stats);
     }
 
     // ============= BOARD GENERATION (STATE-2) =============
@@ -466,10 +453,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns KanbanBoard with all include content loaded, or undefined if main file not ready
      */
     public generateBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
-        console.log('[MarkdownFileRegistry] generateBoard() - Generating board from registry');
 
         if (existingBoard) {
-            console.log(`[MarkdownFileRegistry] generateBoard() - Preserving IDs from existing board with ${existingBoard.columns.length} columns`);
         }
 
         // Step 1: Get main file
@@ -491,12 +476,10 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             return board; // Return invalid board so caller can handle
         }
 
-        console.log(`[MarkdownFileRegistry] generateBoard() - Base board has ${board.columns.length} columns`);
 
         // Step 3: Load content for column includes
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
-                console.log(`[MarkdownFileRegistry] generateBoard() - Column "${column.title}" has ${column.includeFiles.length} includes`);
 
                 for (const relativePath of column.includeFiles) {
                     const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
@@ -504,7 +487,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         // Parse tasks from include file, preserving existing task IDs
                         const tasks = file.parseToTasks(column.tasks, column.id);
                         column.tasks = tasks;
-                        console.log(`[MarkdownFileRegistry] generateBoard() - Loaded ${tasks.length} tasks from ${relativePath}`);
                     } else {
                         console.warn(`[MarkdownFileRegistry] generateBoard() - Column include not found: ${relativePath}`);
                     }
@@ -514,14 +496,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             // Step 4: Load content for task includes (if any)
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
-                    console.log(`[MarkdownFileRegistry] generateBoard() - Task "${task.title}" has ${task.includeFiles.length} includes`);
 
                     for (const relativePath of task.includeFiles) {
                         const file = this.getByRelativePath(relativePath) as TaskIncludeFile;
                         if (file && file.getFileType() === 'include-task') {
                             // Load description from task include file
                             task.description = file.getContent();
-                            console.log(`[MarkdownFileRegistry] generateBoard() - Loaded description from ${relativePath}`);
                         } else {
                             console.warn(`[MarkdownFileRegistry] generateBoard() - Task include not found: ${relativePath}`);
                         }
@@ -530,7 +510,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             }
         }
 
-        console.log('[MarkdownFileRegistry] generateBoard() - Board generation complete');
         return board;
     }
 
@@ -540,7 +519,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Dispose of all resources
      */
     public dispose(): void {
-        console.log(`[MarkdownFileRegistry] Disposing registry with ${this._files.size} files`);
         this.clear();
         this._disposables.forEach(d => d.dispose());
         this._disposables = [];

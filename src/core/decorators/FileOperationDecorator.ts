@@ -32,12 +32,10 @@ export class LoggingDecorator extends FileOperationDecorator {
         const startTime = Date.now();
         const fileInfo = this.file ? ` (${this.file.getRelativePath()})` : '';
 
-        console.log(`[FileOp] Starting ${this.operationName}${fileInfo}`);
 
         try {
             await this.operation.execute();
             const duration = Date.now() - startTime;
-            console.log(`[FileOp] Completed ${this.operationName}${fileInfo} in ${duration}ms`);
         } catch (error) {
             const duration = Date.now() - startTime;
             console.error(`[FileOp] Failed ${this.operationName}${fileInfo} after ${duration}ms:`, error);
@@ -87,7 +85,6 @@ export class BackupDecorator extends FileOperationDecorator {
         // Create backup before operation
         try {
             await this.file.createBackup(this.backupLabel);
-            console.log(`[BackupDecorator] Created backup for ${this.file.getRelativePath()}`);
         } catch (error) {
             console.warn(`[BackupDecorator] Failed to create backup:`, error);
             // Continue with operation even if backup fails
@@ -165,7 +162,6 @@ export class TransactionDecorator extends FileOperationDecorator {
             try {
                 const content = file.getContent();
                 snapshots.set(file, content);
-                console.log(`[TransactionDecorator] Created snapshot for ${file.getRelativePath()}`);
             } catch (error) {
                 console.warn(`[TransactionDecorator] Failed to create snapshot for ${file.getRelativePath()}:`, error);
             }
@@ -175,12 +171,10 @@ export class TransactionDecorator extends FileOperationDecorator {
     }
 
     private async rollbackSnapshots(snapshots: Map<MarkdownFile, string>): Promise<void> {
-        console.log(`[TransactionDecorator] Rolling back ${snapshots.size} files`);
 
         for (const [file, content] of snapshots) {
             try {
                 file.setContent(content, true); // Update baseline
-                console.log(`[TransactionDecorator] Rolled back ${file.getRelativePath()}`);
             } catch (error) {
                 console.error(`[TransactionDecorator] Failed to rollback ${file.getRelativePath()}:`, error);
             }

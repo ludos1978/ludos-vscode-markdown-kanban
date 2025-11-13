@@ -95,7 +95,6 @@ export class BackupManager {
             this._lastBackupTime = new Date();
             this._lastContentHash = contentHash;
 
-            console.log(`✅ Backup created: ${backupPath} (Label: ${options.label || 'backup'}, Forced: ${options.forceCreate || false})`);
             
             // Clean up old backups
             await this.cleanupOldBackups(document);
@@ -306,7 +305,6 @@ export class BackupManager {
                 for (const file of filesToDelete) {
                     try {
                         fs.unlinkSync(file.path);
-                        console.log(`Deleted old backup (exceeded limit of ${maxBackups}): ${file.name}`);
                     } catch (error) {
                         console.error(`Failed to delete backup ${file.name}:`, error);
                     }
@@ -444,12 +442,10 @@ export class BackupManager {
                 } catch (error) {
                     // Silently fail if attrib command fails
                     // The . prefix will still make it hidden in most file managers
-                    console.debug(`Failed to set hidden attribute for ${filePath}:`, error);
                 }
             }
         } catch (error) {
             // Silently fail - file is still created with . prefix
-            console.debug(`Error setting file hidden:`, error);
         }
     }
 
