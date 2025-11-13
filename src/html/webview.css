@@ -1613,8 +1613,8 @@ body.vscode-high-contrast-light .task-count {
   padding: 2px 4px;
   font-size: 10px;
   line-height: 1;
-  height: 14px;
-  width: 14px;
+  height: 16px;
+  width: 16px;
   background: transparent; /* Keep commented */
   color: var(--button-foreground);
   /* border: var(--button-border); */
@@ -1634,8 +1634,8 @@ body.vscode-high-contrast-light .task-count {
 }
 
 .pin-btn.global-override {
-  outline: 2px solid var(--vscode-focusBorder, #007accff);
-  outline-offset: 0px;
+  outline: 2px dashed var(--vscode-errorBorder, #cc007aff);
+  outline-offset: -2px;
   border: none;
 }
 
