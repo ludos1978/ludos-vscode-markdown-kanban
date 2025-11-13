@@ -250,7 +250,7 @@ export class ConfigurationService {
     public getEnabledTagCategoriesTask(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         const enabledArray = config.get<string[]>('enabledTagCategoriesTask', [
-            'priority', 'status', 'importance', 'type',
+            'priority', 'positivity', 'status', 'importance', 'type',
             'colors', 'review-status', 'time-estimate', 'testing-status',
             'platform-teaching', 'platform-product', 'version', 'impact'
         ]);

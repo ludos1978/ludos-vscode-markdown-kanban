@@ -834,6 +834,98 @@
                 }
               }
             },
+            "positivity": {
+              "++": {
+                "light": {
+                  "text": "#ffffff",
+                  "background": "#3b82f6",
+                  "backgroundDark": "#1e40af"
+                },
+                "dark": {
+                  "text": "#ffffff",
+                  "background": "#60a5fa",
+                  "backgroundDark": "#2563eb"
+                },
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "left",
+                  "color": "#3b82f6"
+                }
+              },
+              "+": {
+                "light": {
+                  "text": "#000000",
+                  "background": "#93c5fd",
+                  "backgroundDark": "#3b82f6"
+                },
+                "dark": {
+                  "text": "#000000",
+                  "background": "#bfdbfe",
+                  "backgroundDark": "#60a5fa"
+                },
+                "border": {
+                  "style": "solid",
+                  "width": "1px",
+                  "position": "left",
+                  "color": "#60a5fa"
+                }
+              },
+              "ø": {
+                "light": {
+                  "text": "#000000",
+                  "background": "#d1d5db",
+                  "backgroundDark": "#6b7280"
+                },
+                "dark": {
+                  "text": "#ffffff",
+                  "background": "#6b7280",
+                  "backgroundDark": "#374151"
+                },
+                "border": {
+                  "style": "solid",
+                  "width": "1px",
+                  "position": "left",
+                  "color": "#9ca3af"
+                }
+              },
+              "-": {
+                "light": {
+                  "text": "#000000",
+                  "background": "#fecaca",
+                  "backgroundDark": "#f87171"
+                },
+                "dark": {
+                  "text": "#000000",
+                  "background": "#fca5a5",
+                  "backgroundDark": "#ef4444"
+                },
+                "border": {
+                  "style": "solid",
+                  "width": "1px",
+                  "position": "left",
+                  "color": "#f87171"
+                }
+              },
+              "--": {
+                "light": {
+                  "text": "#ffffff",
+                  "background": "#dc3545",
+                  "backgroundDark": "#991b1b"
+                },
+                "dark": {
+                  "text": "#ffffff",
+                  "background": "#ef4444",
+                  "backgroundDark": "#b91c1c"
+                },
+                "border": {
+                  "style": "solid",
+                  "width": "2px",
+                  "position": "left",
+                  "color": "#dc3545"
+                }
+              }
+            },
             "category": {
               "backend": {
                 "light": {
@@ -3737,7 +3829,7 @@
         },
         "markdown-kanban.tagCategoryReference": {
           "type": "null",
-          "markdownDescription": "## Tag Category Reference\n\nAll 21 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
+          "markdownDescription": "## Tag Category Reference\n\nAll 22 tag categories available for both columns and tasks. Each category uses consistent styling:\n\n### Column-Optimized Categories (headerBar + border)\n- `workflow` - Workflow stages: ideas, outline, draft, review, polish, ready, published, active, testing, production, archive\n- `organization` - Organization: intro, core, advanced, frontend, backend, infrastructure, design\n- `content-type-teaching` - Teaching content: slide, video, reading, exercise, quiz, demo, interactive, handout, discussion  \n- `content-type-product` - Product content: story, task, chore, improvement, design, infrastructure-task\n- `complexity` - Complexity levels: trivial, beginner, intermediate, advanced-level, expert\n\n### Task-Optimized Categories (cornerBadge + background)\n- `priority` - Priority levels: urgent, high, medium, low, delayed, stopped\n- `positivity` - Sentiment levels: ++ (very positive), + (positive), ø (neutral), - (negative), -- (very negative)\n- `status` - Status states: todo, inprogress, done, blocked, testing, wip, cancelled, archived\n- `review-status` - Review states: needs-review, in-review, needs-changes, reviewed, needs-approval, approved, rejected\n- `time-estimate` - Time estimates: quick, medium-time, long\n- `testing-status` - Testing states: untested, unit-tested, integration-tested, e2e-tested, security-tested, performance-tested, regression-tested, uat-passed\n- `platform-teaching` - Teaching platforms: online, in-person, hybrid, async, sync\n- `platform-product` - Product platforms: web, mobile, ios, android, desktop, api\n- `version` - Version tags: v1, v2, v3, rc, stable, legacy, eol\n- `impact` - Impact levels: minor, moderate, major, breaking\n\n### Universal Categories (work on both)\n- `importance` - Importance: critical, normal\n- `type` - Item types: bug, feature, enhancement, documentation, epic, spike, refactor\n- `category` - Technical areas: backend, frontend, database, api, security, performance, ux, ui\n\n### Color Categories (background only)\n- `dark-colors` - 12 dark colors: dark-red, dark-orange, dark-yellow, dark-green, dark-cyan, dark-blue, dark-purple, dark-pink, dark-brown, dark-gray, black, dark-charcoal\n- `colors` - 12 normal colors: red, orange, yellow, green, cyan, blue, purple, pink, brown, gray, teal, indigo\n- `light-colors` - 12 light colors: light-red, light-orange, light-yellow, light-green, light-cyan, light-blue, light-purple, light-pink, light-brown, light-gray, white, light-beige\n- `accessible-colors` - 8 WCAG colors: accessible-indigo (#332288), accessible-green (#117733), accessible-teal (#44AA99), accessible-cyan (#88CCEE), accessible-yellow (#DDCC77), accessible-rose (#CC6677), accessible-purple (#AA4499), accessible-magenta (#882255)"
         },
         "markdown-kanban.enabledTagCategoriesColumn": {
           "type": "array",
@@ -3745,6 +3837,7 @@
             "type": "string",
             "enum": [
               "priority",
+              "positivity",
               "status",
               "workflow",
               "organization",
@@ -3779,7 +3872,7 @@
             "complexity"
           ],
           "uniqueItems": true,
-          "markdownDescription": "**Column Tag Categories** - Select which categories appear in column burger menus. All 21 categories available. See 'Tag Category Reference' above for details.\n\n**Column Defaults (9):** workflow, organization, importance, type, category, colors, content-type-teaching, content-type-product, complexity"
+          "markdownDescription": "**Column Tag Categories** - Select which categories appear in column burger menus. All 22 categories available. See 'Tag Category Reference' above for details.\n\n**Column Defaults (9):** workflow, organization, importance, type, category, colors, content-type-teaching, content-type-product, complexity"
         },
         "markdown-kanban.enabledTagCategoriesTask": {
           "type": "array",
@@ -3787,6 +3880,7 @@
             "type": "string",
             "enum": [
               "priority",
+              "positivity",
               "status",
               "workflow",
               "organization",
@@ -3811,6 +3905,7 @@
           },
           "default": [
             "priority",
+            "positivity",
             "status",
             "importance",
             "type",
@@ -3824,7 +3919,7 @@
             "impact"
           ],
           "uniqueItems": true,
-          "markdownDescription": "**Task Tag Categories** - Select which categories appear in task burger menus. All 21 categories available. See 'Tag Category Reference' above for details.\n\n**Task Defaults (12):** priority, status, importance, type, colors, review-status, time-estimate, testing-status, platform-teaching, platform-product, version, impact"
+          "markdownDescription": "**Task Tag Categories** - Select which categories appear in task burger menus. All 22 categories available. See 'Tag Category Reference' above for details.\n\n**Task Defaults (13):** priority, positivity, status, importance, type, colors, review-status, time-estimate, testing-status, platform-teaching, platform-product, version, impact"
         },
         "markdown-kanban.customTagCategories": {
           "type": "object",

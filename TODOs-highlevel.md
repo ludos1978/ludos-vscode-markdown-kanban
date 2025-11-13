@@ -3,6 +3,20 @@
   saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
    So onWillSaveTextDocument is completely redundant and wrong! 
 
+- [ ] add a feature to add templates for marp styles. the user would be able to defined those, but a current list would be. Each can be toggled on or off. 
+  - _class stylings which are set as <!-- class: style --> . style can be
+    - fontXX : where XX is a number. the list of fonts tags are in the section.fontXX in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/marp-engine/themes/style-roboto-light.css
+    - invert 
+    - center
+    - no_wordbreak
+    - highlight
+    - column_spacing
+    - column_border
+    - fontbg
+    more elements should be addable by the user in the configuration. as a string list.
+  - check more styles from @https://github.com/marp-team/marp/blob/ffe6cd99/website/docs/guide/directives.md#L74-L84
+  - and the website: https://deepwiki.com/marp-team/marp/3.4-theming-and-styling  
+
 - [ ] Can we make the sticky setting for headers (which is currently modified by
  the "sticky stack mode") individual for each column header, with a global 
 sticky flag in the "file info bar". so each column gets a sticky flag (a pin icon). when the sticky flag is active, the header will stay on the screeen using the current layout settings.analyze the influence of the "sticky stack mode" on the kanban board. check if we can make each column have it's individual sticky setting . we still want the "sticky stack mode settings, but only "Full stack" and "Title only", the none feature is after this modification modified trough the "sticky flag" 
