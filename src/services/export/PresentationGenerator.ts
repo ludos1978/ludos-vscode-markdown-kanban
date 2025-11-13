@@ -27,6 +27,12 @@ export interface MarpOptions {
     theme?: string;
     /** Additional Marp directives */
     directives?: Record<string, string | boolean | number>;
+    /** Global CSS classes to apply to all slides (e.g., ['font24', 'center']) */
+    globalClasses?: string[];
+    /** Local CSS classes to apply to specific slides (e.g., ['invert', 'highlight']) */
+    localClasses?: string[];
+    /** Per-slide class overrides: map of slide index to class array */
+    perSlideClasses?: Map<number, string[]>;
 }
 
 /**
@@ -289,8 +295,27 @@ export class PresentationGenerator {
             yaml = this.buildYamlFrontmatter(filteredSlides, options);
         }
 
-        // Build slide content (just the content as-is, no added headers)
-        const slideContents = filteredSlides.map(slide => slide.content);
+        // Build slide content with local class directives
+        const slideContents = filteredSlides.map((slide, index) => {
+            let content = slide.content;
+
+            // Add local class directive for this specific slide if configured
+            if (options.marp?.localClasses && options.marp.localClasses.length > 0) {
+                const classDirective = `<!-- _class: ${options.marp.localClasses.join(' ')} -->\n\n`;
+                content = classDirective + content;
+            }
+
+            // Add per-slide class overrides if specified
+            if (options.marp?.perSlideClasses) {
+                const slideClasses = options.marp.perSlideClasses.get(index);
+                if (slideClasses && slideClasses.length > 0) {
+                    const classDirective = `<!-- _class: ${slideClasses.join(' ')} -->\n\n`;
+                    content = classDirective + content;
+                }
+            }
+
+            return content;
+        });
         const content = slideContents.join('\n\n---\n\n');
 
         // Combine YAML and content
@@ -336,6 +361,11 @@ export class PresentationGenerator {
         // Add Marp directives
         allYaml.marp = true;
         allYaml.theme = options.marp?.theme || 'default';
+
+        // Add global class directive if specified
+        if (options.marp?.globalClasses && options.marp.globalClasses.length > 0) {
+            allYaml.class = options.marp.globalClasses.join(' ');
+        }
 
         // Merge additional Marp directives if provided
         if (options.marp?.directives) {

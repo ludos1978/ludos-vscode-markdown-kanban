@@ -4,7 +4,7 @@ import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
-import { configService } from './configurationService';
+import { configService, ConfigurationService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
 import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/export/MarpExtensionService';
@@ -1032,6 +1032,10 @@ export class MessageHandler {
 
             case 'checkMarpStatus':
                 await this.handleCheckMarpStatus();
+                break;
+
+            case 'getMarpAvailableClasses':
+                await this.handleGetMarpAvailableClasses();
                 break;
 
             case 'showError':
@@ -3855,6 +3859,27 @@ export class MessageHandler {
             }
         } catch (error) {
             console.error('[kanban.messageHandler.handleCheckMarpStatus] Error:', error);
+        }
+    }
+
+    /**
+     * Get available Marp CSS classes
+     */
+    private async handleGetMarpAvailableClasses(): Promise<void> {
+        try {
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
+            const availableClasses = marpConfig.availableClasses || [];
+
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpAvailableClasses',
+                    classes: availableClasses
+                });
+            }
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleGetMarpAvailableClasses] Error:', error);
         }
     }
 

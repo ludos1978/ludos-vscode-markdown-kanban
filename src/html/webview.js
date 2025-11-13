@@ -3079,14 +3079,17 @@ window.addEventListener('message', event => {
             handleMarpStatus(message);
             break;
         case 'marpThemesAvailable':
-            
+
             // Clear the retry timeout
             if (window.marpThemesTimeout) {
                 clearTimeout(window.marpThemesTimeout);
                 window.marpThemesTimeout = null;
             }
-            
+
             handleMarpThemesAvailable(message.themes, message.error);
+            break;
+        case 'marpAvailableClasses':
+            handleMarpAvailableClasses(message.classes);
             break;
         case 'columnExportResult':
             handleColumnExportResult(message.result);
@@ -5442,6 +5445,16 @@ function checkMarpStatus() {
 }
 
 /**
+ * Populate Marp class dropdowns with available classes
+ */
+function populateMarpClassDropdowns() {
+    // Request available classes from backend
+    vscode.postMessage({
+        type: 'getMarpAvailableClasses'
+    });
+}
+
+/**
  * Handle Marp status response from backend
  */
 function handleMarpStatus(status) {
@@ -5474,6 +5487,35 @@ function handleMarpStatus(status) {
 /**
  * Handle Marp themes available response from backend
  */
+/**
+ * Handle Marp available classes response
+ */
+function handleMarpAvailableClasses(classes) {
+    const globalSelect = document.getElementById('marp-global-classes');
+    const localSelect = document.getElementById('marp-local-classes');
+
+    if (!globalSelect || !localSelect) {
+        return;
+    }
+
+    // Clear existing options
+    globalSelect.innerHTML = '';
+    localSelect.innerHTML = '';
+
+    // Populate both selects with same options
+    classes.forEach(className => {
+        const globalOption = document.createElement('option');
+        globalOption.value = className;
+        globalOption.textContent = className;
+        globalSelect.appendChild(globalOption);
+
+        const localOption = document.createElement('option');
+        localOption.value = className;
+        localOption.textContent = className;
+        localSelect.appendChild(localOption);
+    });
+}
+
 function handleMarpThemesAvailable(themes, error) {
     const themeSelect = document.getElementById('marp-theme');
     if (!themeSelect) {

@@ -80,7 +80,9 @@
       "Bash(npx @marp-team/marp-cli:*)",
       "Bash(git restore:*)",
       "Bash(src/html/webview.css)",
-      "Bash(/tmp/menuOperations_before.js)"
+      "Bash(/tmp/menuOperations_before.js)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)"
     ],
     "deny": [],
     "ask": []

@@ -3,7 +3,7 @@
   "displayName": "Markdown Kanban Obsidian",
   "description": "Kanban board for Markdown files, compatible with obsidian kanban boards",
   "publisher": "ludos",
-  "version": "0.29.2",
+  "version": "0.29.3",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -4017,6 +4017,62 @@
           "items": {
             "type": "string",
             "description": "Path to a directory containing Marp theme CSS files"
+          }
+        },
+        "markdown-kanban.marp.availableClasses": {
+          "type": "array",
+          "default": [
+            "invert",
+            "center",
+            "center100",
+            "no_wordbreak",
+            "highlight",
+            "column_spacing",
+            "column_border",
+            "fontbg",
+            "font8",
+            "font10",
+            "font12",
+            "font13",
+            "font14",
+            "font15",
+            "font16",
+            "font20",
+            "font22",
+            "font24",
+            "font26",
+            "font28",
+            "font29",
+            "font30",
+            "font31",
+            "font32",
+            "font36",
+            "font50",
+            "font60",
+            "font80"
+          ],
+          "description": "Available CSS class names that can be used in Marp presentations. These are applied using <!-- class: ... --> directives. Add custom classes here to extend with your own theme styles.",
+          "items": {
+            "type": "string",
+            "description": "CSS class name (without the dot)"
+          }
+        },
+        "markdown-kanban.marp.globalClasses": {
+          "type": "array",
+          "default": [],
+          "description": "Global CSS classes to apply to all slides in exported Marp presentations. Uses global directive syntax (class: ...). Example: ['font24', 'center']",
+          "items": {
+            "type": "string",
+            "description": "CSS class name from availableClasses"
+          }
+        },
+        "markdown-kanban.marp.localClasses": {
+          "type": "array",
+          "default": [],
+          "description": "Local CSS classes to apply only to specific slides (per-column or per-task). Uses scoped directive syntax (_class: ...). Configure per-export or via task metadata.",
+          "items": {
+            "type": "string",
+            "description": "CSS class name from availableClasses"
           }
         }
       }

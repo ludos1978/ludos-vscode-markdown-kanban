@@ -1914,6 +1914,8 @@ function createColumnElement(column, columnIndex) {
 														Sort by
 												</div>
 												<div class="donut-menu-divider"></div>
+												<button class="donut-menu-item" onclick="showMarpClassesDialog('column', '${column.id}')">Set Marp Classes</button>
+												<div class="donut-menu-divider"></div>
 												${generateTagMenuItems(column.id, 'column', null)}
 												<div class="donut-menu-divider"></div>
 												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
@@ -2091,6 +2093,8 @@ function createTaskElement(task, columnId, taskIndex) {
                             </div>
                             <div class="donut-menu-divider"></div>
                             ${generateTagMenuItems(task.id, 'task', columnId)}
+                            <div class="donut-menu-divider"></div>
+                            <button class="donut-menu-item" onclick="showMarpClassesDialog('task', '${columnId}', '${task.id}')">Set Marp Classes</button>
                             <div class="donut-menu-divider"></div>
                             ${task.includeMode ?
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Disable include mode</button>

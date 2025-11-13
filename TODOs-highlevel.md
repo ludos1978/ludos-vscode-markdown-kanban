@@ -3,6 +3,9 @@
   saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
    So onWillSaveTextDocument is completely redundant and wrong! 
 
+- [ ] The shortcuts dont work properly anymore. Also the complex feature for translation does not work properly. The complexity it adds is not feasable. We could try again with the paste version which just pastes the replaced content, but using new files is too much.
+
+
 - [ ] add a feature to add templates for marp styles. the user would be able to defined those, but a current list would be. Each can be toggled on or off. 
   - _class stylings which are set as <!-- class: style --> . style can be
     - fontXX : where XX is a number. the list of fonts tags are in the section.fontXX in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/marp-engine/themes/style-roboto-light.css

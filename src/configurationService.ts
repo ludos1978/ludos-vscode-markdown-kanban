@@ -39,6 +39,9 @@ export interface KanbanConfiguration {
         browser: 'auto' | 'chrome' | 'edge' | 'firefox';
         themeFolders: string[];
         keepTempFiles: boolean;
+        availableClasses: string[];
+        globalClasses: string[];
+        localClasses: string[];
     };
 }
 
@@ -74,6 +77,9 @@ export interface ConfigurationDefaults {
         browser: 'auto' | 'chrome' | 'edge' | 'firefox';
         themeFolders: string[];
         keepTempFiles: boolean;
+        availableClasses: string[];
+        globalClasses: string[];
+        localClasses: string[];
     };
 }
 
@@ -114,7 +120,16 @@ export class ConfigurationService {
             allowLocalFiles: true,
             browser: 'chrome' as 'auto' | 'chrome' | 'edge' | 'firefox',
             themeFolders: [],
-            keepTempFiles: false
+            keepTempFiles: false,
+            availableClasses: [
+                'invert', 'center', 'center100', 'no_wordbreak', 'highlight',
+                'column_spacing', 'column_border', 'fontbg',
+                'font8', 'font10', 'font12', 'font13', 'font14', 'font15', 'font16',
+                'font20', 'font22', 'font24', 'font26', 'font28', 'font29', 'font30',
+                'font31', 'font32', 'font36', 'font50', 'font60', 'font80'
+            ],
+            globalClasses: [],
+            localClasses: []
         }
     };
 

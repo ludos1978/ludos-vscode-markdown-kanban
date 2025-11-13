@@ -12,6 +12,7 @@ import { PathResolver } from './services/PathResolver';
 import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
 import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
 import { getMermaidExportService } from './services/export/MermaidExportService';
+import { ConfigurationService } from './configurationService';
 
 export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
@@ -1053,9 +1054,16 @@ export class ExportService {
         // Convert to presentation format if requested
         if (convertToPresentation) {
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
+
             filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
-                marp: { theme: (options as any).marpTheme || 'default' }
+                marp: {
+                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
+                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
+                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
+                }
             });
         }
 
@@ -1616,11 +1624,17 @@ export class ExportService {
 
             // Use unified presentation generator
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
 
             result = PresentationGenerator.fromBoard(filteredBoard, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
                 stripIncludes: true,  // Strip include syntax (content already inlined in board)
-                marp: { theme: (options as any).marpTheme || 'default' }
+                marp: {
+                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
+                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
+                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
+                }
             });
 
             // Rewrite links if requested
