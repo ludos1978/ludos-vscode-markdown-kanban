@@ -3925,8 +3925,6 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 // Update tag category counts in the open dropdown menu
 function updateTagCategoryCounts(id, type, columnId = null) {
 
-    console.log('[updateTagCategoryCounts] Called with:', {id, type, columnId});
-
     // Get current title to check which tags are active
     const currentBoard = window.cachedBoard;
 
@@ -3936,21 +3934,15 @@ function updateTagCategoryCounts(id, type, columnId = null) {
         currentTitle = column?.title || '';
     } else if (type === 'task') {
         // For tasks, columnId is required
-        console.log('[updateTagCategoryCounts] Task case - columnId:', columnId, 'truthy:', !!columnId);
         if (columnId) {
             const column = currentBoard?.columns?.find(c => c.id === columnId);
-            console.log('[updateTagCategoryCounts] Found column:', column?.id);
             const task = column?.tasks?.find(t => t.id === id);
-            console.log('[updateTagCategoryCounts] Found task:', task?.id, 'title:', task?.title);
             currentTitle = task?.title || '';
-        } else {
-            console.log('[updateTagCategoryCounts] columnId is falsy, cannot find task');
         }
     }
 
     // Get active tags
     const activeTags = getActiveTagsInTitle(currentTitle);
-    console.log('[updateTagCategoryCounts] currentTitle:', currentTitle, 'activeTags:', activeTags);
 
     // Find the active dropdown menu that contains category items for this element
     // First try to find it in the menu, then check if it's been moved to body
@@ -4053,10 +4045,8 @@ function updateTagCategoryCounts(id, type, columnId = null) {
 
     // Show/hide "Remove all tags" option - ensure only one exists
     const existingRemoveAllButtons = activeDropdown.querySelectorAll('[data-action="remove-all-tags"]');
-    console.log('[updateTagCategoryCounts] activeTags.length:', activeTags.length, 'existing buttons:', existingRemoveAllButtons.length);
 
     if (activeTags.length > 0) {
-        console.log('[updateTagCategoryCounts] Adding "Remove all tags" button');
         // Remove any existing "remove all tags" buttons first to prevent duplicates
         existingRemoveAllButtons.forEach(button => {
             button.remove();
@@ -4071,14 +4061,11 @@ function updateTagCategoryCounts(id, type, columnId = null) {
 
         // Find all tag category items (they have data-submenu-type="tags")
         const tagItems = activeDropdown.querySelectorAll('[data-submenu-type="tags"]');
-        console.log('[updateTagCategoryCounts] Found tag items:', tagItems.length);
 
         // Also check for the "No tags available" message
         const noTagsMessage = activeDropdown.querySelector('.donut-menu-item[disabled][data-group="none"]');
-        console.log('[updateTagCategoryCounts] Found noTagsMessage:', !!noTagsMessage);
 
         if (tagItems.length > 0) {
-            console.log('[updateTagCategoryCounts] Using tag items path');
             // Get the last tag category item
             const lastTagItem = tagItems[tagItems.length - 1];
 
