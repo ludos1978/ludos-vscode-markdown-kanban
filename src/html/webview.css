@@ -3878,6 +3878,8 @@ h6 .kanban-tag {
   pointer-events: none;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  background: #666; /* Default background color as fallback */
+  color: #fff; /* Default text color as fallback */
 }
 
 /* Ensure corner badges for specific tags (like corner-badge-feature) appear above borders */

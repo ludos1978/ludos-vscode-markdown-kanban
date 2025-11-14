@@ -218,6 +218,14 @@ function applyTagStyles() {
     const styles = generateTagStyles();
 
     if (styles) {
+        // Debug: Log positivity badge styles
+        const positivityBadgeStyles = styles.match(/\.corner-badge-(plusplus|plus|minusminus|minus|oslash)[^}]+}/g);
+        if (positivityBadgeStyles) {
+            console.log('[DEBUG] Positivity badge styles generated:', positivityBadgeStyles);
+        } else {
+            console.warn('[DEBUG] No positivity badge styles found in generated CSS');
+        }
+
         // Create and inject style element
         const styleElement = document.createElement('style');
         styleElement.id = 'dynamic-tag-styles';

@@ -3865,6 +3865,10 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
     // Get all active tags from the new title
     const activeTags = getActiveTagsInTitle(newTitle);
 
+    // Debug: Log what tags were found
+    if (activeTags.some(tag => ['++', '+', '--', '-', 'ø'].includes(tag))) {
+        console.log(`[DEBUG] Active positivity tags found in "${newTitle}":`, activeTags.filter(tag => ['++', '+', '--', '-', 'ø'].includes(tag)));
+    }
 
     // Update data-all-tags attribute
     if (activeTags.length > 0) {
@@ -3891,6 +3895,14 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
     // Generate new badges HTML
     let newBadgesHtml = '';
     if (window.tagColors && activeTags.length > 0) {
+        // Debug: Check if positivity group exists
+        if (activeTags.some(tag => ['++', '+', '--', '-', 'ø'].includes(tag))) {
+            console.log('[DEBUG] window.tagColors has positivity group:', !!window.tagColors.positivity);
+            if (window.tagColors.positivity) {
+                console.log('[DEBUG] Positivity tags in config:', Object.keys(window.tagColors.positivity));
+            }
+        }
+
         const positions = {
             'top-left': [],
             'top-right': [],
@@ -3901,11 +3913,37 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         // Collect badges by position
         activeTags.forEach(tag => {
             const config = getTagConfig(tag);
+
+            // Debug: Log positivity tag config lookup
+            if (['++', '+', '--', '-', 'ø'].includes(tag)) {
+                console.log(`[DEBUG] Looking up config for tag "${tag}":`, config ? 'Found' : 'NOT FOUND');
+                if (config) {
+                    console.log(`[DEBUG] Config for "${tag}":`, { hasCornerBadge: !!config.cornerBadge, cornerBadge: config.cornerBadge });
+                }
+            }
+
             if (config && config.cornerBadge) {
+                // Get theme colors for this tag
+                const isDarkTheme = document.body.classList.contains('vscode-dark') ||
+                                    document.body.classList.contains('vscode-high-contrast');
+                const themeKey = isDarkTheme ? 'dark' : 'light';
+                const themeColors = config[themeKey] || config.light || {};
+
+                // Fallback to themeColors.background if badge.color is not defined (like other tags)
+                const badgeColor = config.cornerBadge.color || themeColors.background;
+
+                // Calculate text color automatically (matching boardRenderer.js logic)
+                const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
+                const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+
                 const position = config.cornerBadge.position || 'top-right';
                 positions[position].push({
                     tag: tag,
-                    badge: config.cornerBadge
+                    badge: {
+                        ...config.cornerBadge,
+                        color: badgeColor,
+                        labelColor: badgeTextColor
+                    }
                 });
             }
         });
@@ -3946,7 +3984,21 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
                 }
 
                 const badgeContent = badge.image ? '' : (badge.label || '');
-                newBadgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+
+                // Debug: Log positivity badges being created
+                if (['plusplus', 'plus', 'minusminus', 'minus', 'oslash'].includes(cssClassName)) {
+                    console.log(`[DEBUG] Creating badge: tag="${item.tag}", cssClassName="${cssClassName}", badge.color="${badge.color}", badge.labelColor="${badge.labelColor}"`);
+                }
+
+                // Add inline styles for background and color to ensure they're always applied
+                // Fallback to red if color is missing to make it obvious
+                const bgColor = badge.color || '#FF0000';
+                const textColor = badge.labelColor || '#ffffff';
+                const inlineStyles = `${positionStyle}; background: ${bgColor} !important; color: ${textColor} !important;`;
+
+                console.log(`[DEBUG] Badge inline styles for "${item.tag}":`, inlineStyles);
+
+                newBadgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${inlineStyles}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
             });
         });
     }
@@ -4295,10 +4347,27 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             allTags.forEach(tag => {
                 const config = window.getTagConfig(tag);
                 if (config && config.cornerBadge) {
+                    // Get theme colors for this tag
+                    const isDarkTheme = document.body.classList.contains('vscode-dark') ||
+                                        document.body.classList.contains('vscode-high-contrast');
+                    const themeKey = isDarkTheme ? 'dark' : 'light';
+                    const themeColors = config[themeKey] || config.light || {};
+
+                    // Fallback to themeColors.background if badge.color is not defined (like other tags)
+                    const badgeColor = config.cornerBadge.color || themeColors.background;
+
+                    // Calculate text color automatically (matching boardRenderer.js logic)
+                    const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
+                    const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+
                     const position = config.cornerBadge.position || 'top-right';
                     positions[position].push({
                         tag: tag,
-                        badge: config.cornerBadge
+                        badge: {
+                            ...config.cornerBadge,
+                            color: badgeColor,
+                            labelColor: badgeTextColor
+                        }
                     });
                 }
             });
@@ -4325,8 +4394,22 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                             break;
                     }
 
+                    // Encode special characters for CSS class names to match boardRenderer.js encoding
+                    let cssClassName = item.tag;
+                    if (cssClassName === '++') cssClassName = 'plusplus';
+                    else if (cssClassName === '+') cssClassName = 'plus';
+                    else if (cssClassName === '--') cssClassName = 'minusminus';
+                    else if (cssClassName === '-') cssClassName = 'minus';
+                    else if (cssClassName === 'ø') cssClassName = 'oslash';
+
                     const badgeContent = badge.image ? '' : (badge.label || '');
-                    badgesHtml += `<div class="corner-badge corner-badge-${item.tag}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+
+                    // Add inline styles for background and color to ensure they're always applied
+                    const bgColor = badge.color || '#FF0000';
+                    const textColor = badge.labelColor || '#ffffff';
+                    const inlineStyles = `${positionStyle}; background: ${bgColor} !important; color: ${textColor} !important;`;
+
+                    badgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${inlineStyles}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
                 });
             });
         }
