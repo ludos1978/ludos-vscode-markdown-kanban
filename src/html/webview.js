@@ -5740,11 +5740,11 @@ function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
     // Find the currently open submenu (could be any of the three Marp submenus)
     const openSubmenu = document.querySelector('.donut-menu-submenu[data-submenu-type^="marp-"]');
 
-    console.log('refreshMarpDirectivesSubmenu called:', {
-        scope, id, type, columnId,
-        openSubmenu: openSubmenu ? 'found' : 'not found',
-        submenuType: openSubmenu?.getAttribute('data-submenu-type')
-    });
+    // console.log('refreshMarpDirectivesSubmenu called:', {
+    //     scope, id, type, columnId,
+    //     openSubmenu: openSubmenu ? 'found' : 'not found',
+    //     submenuType: openSubmenu?.getAttribute('data-submenu-type')
+    // });
 
     if (!openSubmenu) {
         console.warn('No open Marp submenu found');
@@ -5753,18 +5753,18 @@ function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
 
     const submenuType = openSubmenu.getAttribute('data-submenu-type');
 
-    // Use menuOperations to regenerate content based on submenu type
-    if (window.menuOperations) {
+    // Use menuManager to regenerate content based on submenu type
+    if (window.menuManager) {
         let newContent = '';
 
-        if (submenuType === 'marp-classes' && typeof window.menuOperations.createMarpClassesContent === 'function') {
-            newContent = window.menuOperations.createMarpClassesContent(scope, id, type, columnId);
-        } else if (submenuType === 'marp-colors' && typeof window.menuOperations.createMarpColorsContent === 'function') {
-            newContent = window.menuOperations.createMarpColorsContent(scope, id, type, columnId);
-        } else if (submenuType === 'marp-header-footer' && typeof window.menuOperations.createMarpHeaderFooterContent === 'function') {
-            newContent = window.menuOperations.createMarpHeaderFooterContent(scope, id, type, columnId);
-        } else if (submenuType === 'marp-theme' && typeof window.menuOperations.createMarpThemeContent === 'function') {
-            newContent = window.menuOperations.createMarpThemeContent(scope, id, type, columnId);
+        if (submenuType === 'marp-classes' && typeof window.menuManager.createMarpClassesContent === 'function') {
+            newContent = window.menuManager.createMarpClassesContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-colors' && typeof window.menuManager.createMarpColorsContent === 'function') {
+            newContent = window.menuManager.createMarpColorsContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-header-footer' && typeof window.menuManager.createMarpHeaderFooterContent === 'function') {
+            newContent = window.menuManager.createMarpHeaderFooterContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-theme' && typeof window.menuManager.createMarpThemeContent === 'function') {
+            newContent = window.menuManager.createMarpThemeContent(scope, id, type, columnId);
         }
 
         if (newContent) {
@@ -5774,7 +5774,7 @@ function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
             console.warn('No new content generated for submenu type:', submenuType);
         }
     } else {
-        console.warn('window.menuOperations not available');
+        console.warn('window.menuManager not available');
     }
 }
 
@@ -6670,8 +6670,8 @@ function populateMarpGlobalMenu() {
         ? window.getMarpClassesForElement('global', null, null)
         : [];
 
-    html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">';
-    html += '<div style="font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase; white-space: nowrap;">Marp Classes</div>';
+    html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-direction: column;">';
+    html += '<div style="font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase; white-space: nowrap; flex-direction: column; align-items: flex-start; align-self: baseline; width: 120px;">Marp Classes</div>';
 
     html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1;">';
     availableClasses.forEach(className => {
@@ -6720,14 +6720,14 @@ function createMarpInputField(key, label, value, placeholder) {
     value = value || '';
     placeholder = placeholder || '';
 
-    let html = '<div style="margin-bottom: 10px;">';
-    html += `<div style="font-size: 12px; margin-bottom: 4px; color: #ccc;">${label}</div>`;
+    let html = '<div style="margin-bottom: 4px; display: flex; align-items: baseline;">';
+    html += `<div style="font-size: 12px; margin-bottom: 4px; color: #ccc; width: 180px;">${label}</div>`;
     html += `<input type="text" value="${escapeHtml(value)}" placeholder="${placeholder}"
                     data-marp-key="${escapeHtml(key)}"
                     data-original-value="${escapeHtml(value)}"
                     onkeypress="if(event.key==='Enter'){updateMarpGlobalSetting(this.dataset.marpKey, this.value);}"
                     onblur="if(this.value !== this.dataset.originalValue){updateMarpGlobalSetting(this.dataset.marpKey, this.value); this.dataset.originalValue = this.value;}"
-                    style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #555; color: white; border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
+                    style="width: 100%; padding: 4px; background: #2a2a2a; border: 1px solid #555; color: white; border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
     html += '</div>';
 
     return html;

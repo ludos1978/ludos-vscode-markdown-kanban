@@ -316,12 +316,12 @@ class SimpleMenuManager {
         // Classes grid - TWO sections: Local and Scoped
         html += '<div style="margin-bottom: 12px;">';
 
-        // LOCAL classes section
-        html += '<div style="margin-bottom: 8px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">LOCAL (this + following)</div>';
-        html += '<div class="donut-menu-tags-grid">';
-
         const availableClasses = window.marpAvailableClasses || [];
+
+        // LOCAL classes section - title and content on same line
+        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
+        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">LOCAL</div>';
+        html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
 
         availableClasses.forEach(className => {
             const isActive = localClasses.includes(className);
@@ -336,10 +336,10 @@ class SimpleMenuManager {
         });
         html += '</div></div>';
 
-        // SCOPED classes section
-        html += '<div style="margin-bottom: 8px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">SCOPED (this slide only)</div>';
-        html += '<div class="donut-menu-tags-grid">';
+        // SCOPED classes section - title and content on same line
+        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
+        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">SCOPED</div>';
+        html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
 
         availableClasses.forEach(className => {
             const isActive = scopedClasses.includes(className);
@@ -355,35 +355,6 @@ class SimpleMenuManager {
         html += '</div></div>';
 
         html += '</div>';
-
-        // Paginate - TWO buttons: local and scoped
-        const isLocalPaginateActive = /<!--\s*paginate:\s*true\s*-->/.test(title);
-        const isScopedPaginateActive = /<!--\s*_paginate:\s*true\s*-->/.test(title);
-
-        html += '<div style="margin-bottom: 8px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">PAGE NUMBERING</div>';
-        html += '<div style="display: flex; gap: 8px;">';
-
-        // Local paginate button
-        html += `
-            <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
-                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
-                ${isLocalPaginateActive ? '✓ ' : ''}Local
-            </button>
-        `;
-
-        // Scoped paginate button
-        html += `
-            <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
-                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
-                ${isScopedPaginateActive ? '✓ ' : ''}Scoped
-            </button>
-        `;
-
-        html += '</div></div>';
-
         html += '</div>';
         return html;
     }
@@ -464,6 +435,34 @@ class SimpleMenuManager {
 
         html += createDirectiveInput('header', 'HEADER TEXT', 'Header content');
         html += createDirectiveInput('footer', 'FOOTER TEXT', 'Footer content');
+
+        // Paginate - TWO buttons: local and scoped
+        const isLocalPaginateActive = /<!--\s*paginate:\s*true\s*-->/.test(title);
+        const isScopedPaginateActive = /<!--\s*_paginate:\s*true\s*-->/.test(title);
+
+        html += '<div style="margin-bottom: 8px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">PAGE NUMBERING</div>';
+        html += '<div style="display: flex; gap: 8px;">';
+
+        // Local paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #4a90e2; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                ${isLocalPaginateActive ? '✓ ' : ''}Local
+            </button>
+        `;
+
+        // Scoped paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #ff9500; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                ${isScopedPaginateActive ? '✓ ' : ''}Scoped
+            </button>
+        `;
+
+        html += '</div></div>';
 
         html += '</div>';
         return html;
