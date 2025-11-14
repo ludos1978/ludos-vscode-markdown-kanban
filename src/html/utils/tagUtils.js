@@ -8,8 +8,13 @@ class TagUtils {
         // Centralized regex patterns for tag matching
         this.patterns = {
             // Basic tag patterns
-            basicTags: /#([a-zA-Z0-9_-]+)/g,
+            // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
+            basicTags: /#([a-zA-Z0-9_][a-zA-Z0-9_-]*)/g,
             atTags: /@([a-zA-Z0-9_&-]+)/g,
+
+            // Special positivity tags (#++, #+, #ø, #-, #--)
+            // Use negative lookahead to ensure - doesn't match when it's part of --
+            positivityTags: /#(\+\+|--|\+|ø|Ø|-(?!-))/g,
 
             // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01)
             numericTag: /#(\d+(?:\.\d+)?)\b/g,
@@ -74,6 +79,13 @@ class TagUtils {
                 const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
                 tags.push(tag);
             }
+
+            // Extract special positivity tags
+            const positivityMatches = text.matchAll(this.patterns.positivityTags);
+            for (const match of positivityMatches) {
+                const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
+                tags.push(tag);
+            }
         }
 
         // Extract @ tags
@@ -107,6 +119,14 @@ class TagUtils {
     extractFirstTag(text, excludeLayout = true) {
         if (!text) return null;
 
+        // First check for special positivity tags at the beginning
+        // Use negative lookahead to ensure - doesn't match when it's part of --
+        // Order matters: match longer patterns first
+        const positivityMatch = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/);
+        if (positivityMatch) {
+            return positivityMatch[1].toLowerCase();
+        }
+
         // Use boardRenderer.js compatible regex with exclusions (includes dots for numeric tags like #1.5)
         const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_.-]+(?:[=|><][a-zA-Z0-9_.-]+)*)/g;
         let m;
@@ -137,6 +157,15 @@ class TagUtils {
      */
     extractFirstTagSimple(text) {
         if (!text) return null;
+
+        // First check for special positivity tags
+        // Use negative lookahead to ensure - doesn't match when it's part of --
+        // Order matters: match longer patterns first
+        const positivityMatch = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/);
+        if (positivityMatch) {
+            return positivityMatch[1].toLowerCase();
+        }
+
         const tagMatch = text.match(/#([a-zA-Z0-9_.-]+)/);
         return tagMatch ? tagMatch[1].toLowerCase() : null;
     }

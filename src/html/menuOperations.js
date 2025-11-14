@@ -2741,15 +2741,24 @@ function toggleColumnTag(columnId, tagName, event) {
         return;
     }
 
-    
+
     const tagWithHash = `#${tagName}`;
     let title = column.title || '';
-    const wasActive = new RegExp(`#${tagName}\\b`, 'gi').test(title);
+
+    // Escape special regex characters in tag name
+    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
+    // Word boundary \b doesn't work with non-word characters
+    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
+    const pattern = isSpecialTag
+        ? `#${escapedTagName}(?=\\s|$)`
+        : `#${escapedTagName}\\b`;
+    const wasActive = new RegExp(pattern, 'gi').test(title);
 
 
     if (wasActive) {
-        const beforeRemoval = title;
-        title = title.replace(new RegExp(`#${tagName}\\b`, 'gi'), '').replace(/\s+/g, ' ').trim();
+        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
     } else {
         const rowMatch = title.match(/(#row\d+)$/i);
         if (rowMatch) {
@@ -2924,11 +2933,21 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
 
     const tagWithHash = `#${tagName}`;
     let title = task.title || '';
-    const wasActive = new RegExp(`#${tagName}\\b`, 'gi').test(title);
+
+    // Escape special regex characters in tag name
+    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
+    // Word boundary \b doesn't work with non-word characters
+    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
+    const pattern = isSpecialTag
+        ? `#${escapedTagName}(?=\\s|$)`
+        : `#${escapedTagName}\\b`;
+    const wasActive = new RegExp(pattern, 'gi').test(title);
 
 
     if (wasActive) {
-        title = title.replace(new RegExp(`#${tagName}\\b`, 'gi'), '').replace(/\s+/g, ' ').trim();
+        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
     } else {
         title = `${title} ${tagWithHash}`.trim();
     }
@@ -3750,9 +3769,16 @@ function updateRefreshButtonState(state, count = 0) {
 
 // Update tag button appearance immediately when toggled
 function updateTagButtonAppearance(id, type, tagName, isActive) {
-    
+
     // Find the tag button using the same ID pattern as in generateGroupTagItems
-    const buttonId = `tag-chip-${type}-${id}-${tagName}`.replace(/[^a-zA-Z0-9-]/g, '-');
+    // Encode special characters to match the encoding in generateGroupTagItems
+    const encodedTag = tagName
+        .replace(/\+\+/g, 'plus-plus')
+        .replace(/\+/g, 'plus')
+        .replace(/--/g, 'minus-minus')
+        .replace(/-/g, 'minus')
+        .replace(/ø/gi, 'o-slash');
+    const buttonId = `tag-chip-${type}-${id}-${encodedTag}`.replace(/[^a-zA-Z0-9-]/g, '-');
     const button = document.getElementById(buttonId);
     
     if (!button) {
@@ -3906,8 +3932,21 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
                         break;
                 }
 
+                // Encode special characters for CSS class names to match boardRenderer.js encoding
+                // E.g., ++ becomes plusplus, -- becomes minusminus, ø becomes oslash
+                let cssClassName = item.tag;
+                if (cssClassName === '++') cssClassName = 'plusplus';
+                else if (cssClassName === '+') cssClassName = 'plus';
+                else if (cssClassName === '--') cssClassName = 'minusminus';
+                else if (cssClassName === '-') cssClassName = 'minus';
+                else if (cssClassName === 'ø') cssClassName = 'oslash';
+                else {
+                    // For other tags, just use as-is (they start with alphanumeric)
+                    cssClassName = item.tag;
+                }
+
                 const badgeContent = badge.image ? '' : (badge.label || '');
-                newBadgesHtml += `<div class="corner-badge corner-badge-${item.tag}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+                newBadgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
             });
         });
     }

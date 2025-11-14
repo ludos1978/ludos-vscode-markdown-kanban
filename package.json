@@ -851,6 +851,13 @@
                   "width": "2px",
                   "position": "left",
                   "color": "#3b82f6"
+                },
+                "cornerBadge": {
+                  "label": "++",
+                  "position": "top-left",
+                  "style": "circle",
+                  "color": "#3b82f6",
+                  "labelColor": "#ffffff"
                 }
               },
               "+": {
@@ -869,6 +876,13 @@
                   "width": "1px",
                   "position": "left",
                   "color": "#60a5fa"
+                },
+                "cornerBadge": {
+                  "label": "+",
+                  "position": "top-left",
+                  "style": "circle",
+                  "color": "#93c5fd",
+                  "labelColor": "#000000"
                 }
               },
               "ø": {
@@ -887,42 +901,63 @@
                   "width": "1px",
                   "position": "left",
                   "color": "#9ca3af"
+                },
+                "cornerBadge": {
+                  "label": "Ø",
+                  "position": "top-left",
+                  "style": "circle",
+                  "color": "#9ca3af",
+                  "labelColor": "#ffffff"
                 }
               },
               "-": {
                 "light": {
                   "text": "#000000",
-                  "background": "#fecaca",
-                  "backgroundDark": "#f87171"
+                  "background": "#a7f3d0",
+                  "backgroundDark": "#34d399"
                 },
                 "dark": {
                   "text": "#000000",
-                  "background": "#fca5a5",
-                  "backgroundDark": "#ef4444"
+                  "background": "#6ee7b7",
+                  "backgroundDark": "#10b981"
                 },
                 "border": {
                   "style": "solid",
                   "width": "1px",
                   "position": "left",
-                  "color": "#f87171"
+                  "color": "#34d399"
+                },
+                "cornerBadge": {
+                  "label": "-",
+                  "position": "top-left",
+                  "style": "circle",
+                  "color": "#34d399",
+                  "labelColor": "#000000"
                 }
               },
               "--": {
                 "light": {
                   "text": "#ffffff",
-                  "background": "#dc3545",
-                  "backgroundDark": "#991b1b"
+                  "background": "#10b981",
+                  "backgroundDark": "#047857"
                 },
                 "dark": {
                   "text": "#ffffff",
-                  "background": "#ef4444",
-                  "backgroundDark": "#b91c1c"
+                  "background": "#34d399",
+                  "backgroundDark": "#059669"
                 },
                 "border": {
                   "style": "solid",
                   "width": "2px",
                   "position": "left",
-                  "color": "#dc3545"
+                  "color": "#10b981"
+                },
+                "cornerBadge": {
+                  "label": "--",
+                  "position": "top-left",
+                  "style": "circle",
+                  "color": "#10b981",
+                  "labelColor": "#ffffff"
                 }
               }
             },

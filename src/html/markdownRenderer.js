@@ -122,9 +122,16 @@ function tagPlugin(md, options = {}) {
         // Parse tag content - for gather tags, include full expression
         let tagStart = pos;
         let tagContent = '';
-        
+
+        // Check for special positivity tags: ++, +, ø, Ø, --, -
+        const remaining = state.src.slice(pos);
+        const positivityMatch = remaining.match(/^(\+\+|\+|ø|Ø|--|-(?!-))/);
+        if (positivityMatch) {
+            tagContent = positivityMatch[1];
+            pos += tagContent.length;
+        }
         // Check if it's a gather tag
-        if (state.src.substr(pos, 7) === 'gather_') {
+        else if (state.src.substr(pos, 7) === 'gather_') {
             // For gather tags, capture everything until next space or end
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
@@ -171,16 +178,19 @@ function tagPlugin(md, options = {}) {
         const token = tokens[idx];
         const tagContent = token.content;
         const fullTag = '#' + token.content;
-        
+
         // Extract base tag name for styling (before any operators)
         let baseTagName = tagContent;
         if (tagContent.startsWith('gather_')) {
             baseTagName = 'gather'; // Use 'gather' as base for all gather tags
+        } else if (/^(\+\+|\+|ø|Ø|--|-(?!-))$/.test(tagContent)) {
+            // Positivity tags - use as-is but lowercase
+            baseTagName = tagContent.toLowerCase();
         } else {
             const baseMatch = tagContent.match(/^([a-zA-Z0-9_.-]+)/);
             baseTagName = baseMatch ? baseMatch[1].toLowerCase() : tagContent.toLowerCase();
         }
-        
+
         return `<span class="kanban-tag" data-tag="${escapeHtml(baseTagName)}">${escapeHtml(fullTag)}</span>`;
     };
 }
