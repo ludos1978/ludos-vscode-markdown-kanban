@@ -692,10 +692,20 @@ class TagUtils {
                 return text;
             case 'allexcludinglayout':
                 // Export all except layout tags (#span, #row, #stack, #sticky)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').replace(this.patterns.stickyTag, '').trim();
+                return text
+                    .replace(this.patterns.rowTag, '')
+                    .replace(this.patterns.spanTag, '')
+                    .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
+                    .trim();
             case 'customonly':
                 // Export only custom tags and @ tags (remove standard layout tags)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').replace(this.patterns.stickyTag, '').trim();
+                return text
+                    .replace(this.patterns.rowTag, '')
+                    .replace(this.patterns.spanTag, '')
+                    .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
+                    .trim();
             case 'mentionsonly':
                 // Export only @ tags - remove all # tags
                 return this.removeTagsFromText(text, {

@@ -3884,6 +3884,217 @@ export class MessageHandler {
     }
 
     /**
+     * Save Marp CSS classes as HTML comment directives in markdown
+     * Format: <!-- _class: font24 center -->
+     */
+    private async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
+        try {
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Called with:', { scope, columnId, taskId, classes });
+
+            // Create HTML comment directive
+            const classString = classes.join(' ');
+            const directive = classes.length > 0 ? `<!-- _class: ${classString} -->\n` : '';
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Directive:', directive);
+
+            // Get panel to access board
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No panel found');
+                return;
+            }
+
+            // Get current board
+            const board = panel.getBoard();
+            if (!board) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No board found');
+                return;
+            }
+
+            // Get current markdown content from main file
+            const mainFile = panel._fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No main file found');
+                return;
+            }
+
+            let markdown = mainFile.getContent();
+            if (!markdown) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No markdown content found');
+                return;
+            }
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Got markdown, length:', markdown.length);
+
+            if (scope === 'global') {
+                // For global scope, add directive at the very beginning (or after YAML)
+                const yamlMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+                const afterYaml = yamlMatch ? yamlMatch[0].length : 0;
+                const beforeFirstColumn = markdown.indexOf('\n## ', afterYaml);
+                const globalEnd = beforeFirstColumn > 0 ? beforeFirstColumn : markdown.length;
+
+                // Remove existing global marp directive (only in global section)
+                const beforeGlobal = markdown.slice(0, afterYaml);
+                let globalSection = markdown.slice(afterYaml, globalEnd);
+                const afterGlobal = markdown.slice(globalEnd);
+
+                // Remove directive from global section only
+                globalSection = globalSection.replace(/<!-- _class: [^>]+ -->\n?/g, '');
+
+                // Insert new directive at start of global section
+                markdown = beforeGlobal + directive + globalSection + afterGlobal;
+            } else if (scope === 'column' && columnId) {
+                // Find column in board
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (!column) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found:', columnId);
+                    return;
+                }
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found column:', column.title);
+
+                // Find column header and add directive BEFORE it
+                const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const columnRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(## ${titleClean})`, 'm');
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex:', columnRegex);
+
+                const originalMarkdown = markdown;
+                markdown = markdown.replace(columnRegex, (match: string, existingDirective: string, header: string) => {
+                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex matched:', { match, existingDirective, header });
+                    // Replace or add directive before column header
+                    return directive + header;
+                });
+                if (markdown === originalMarkdown) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column regex did not match anything!');
+                }
+            } else if (scope === 'task' && columnId && taskId) {
+                // Find task in board
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (!column) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found for task:', columnId);
+                    return;
+                }
+                const task = column.tasks.find((t: any) => t.id === taskId);
+                if (!task) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task not found:', taskId);
+                    return;
+                }
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found task:', task.title);
+
+                // Find task line and add directive BEFORE it
+                const titleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const taskRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(- \\[[ x]\\] ${titleClean})`, 'm');
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex:', taskRegex);
+
+                const originalMarkdown = markdown;
+                markdown = markdown.replace(taskRegex, (match: string, existingDirective: string, taskLine: string) => {
+                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex matched:', { match, existingDirective, taskLine });
+                    // Replace or add directive before task
+                    return directive + taskLine;
+                });
+                if (markdown === originalMarkdown) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task regex did not match anything!');
+                }
+            }
+
+            // Update file content (marks as unsaved)
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Setting content, changed:', markdown.length);
+            mainFile.setContent(markdown, false);
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Content set successfully');
+
+            // After saving, send updated directives to frontend
+            await this.sendMarpDirectivesToFrontend();
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleSaveMarpClasses] Error:', error);
+        }
+    }
+
+    /**
+     * Parse HTML comment directives from markdown and send to frontend
+     */
+    private async sendMarpDirectivesToFrontend(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            const board = panel.getBoard();
+            if (!board) {
+                return;
+            }
+
+            const mainFile = panel._fileRegistry.getMainFile();
+            if (!mainFile) {
+                return;
+            }
+
+            const markdown = mainFile.getContent();
+            if (!markdown) {
+                return;
+            }
+
+            // Parse directives from markdown
+            const directives: any = {
+                global: [],
+                columns: {},
+                tasks: {}
+            };
+
+            // Extract global directive (after YAML frontmatter, before first column)
+            const yamlMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+            const afterYaml = yamlMatch ? yamlMatch[0].length : 0;
+            const beforeFirstColumn = markdown.indexOf('\n## ', afterYaml);
+            const globalSection = beforeFirstColumn > 0
+                ? markdown.slice(afterYaml, beforeFirstColumn)
+                : markdown.slice(afterYaml, Math.min(afterYaml + 500, markdown.length));
+
+            const globalDirectiveMatch = globalSection.match(/<!-- _class: ([^>]+) -->/);
+            if (globalDirectiveMatch) {
+                directives.global = globalDirectiveMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+            }
+
+            // Extract column and task directives
+            if (board.columns) {
+                for (const column of board.columns) {
+                    // Find directive before column header
+                    const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const columnRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*## ${titleClean}`, 'm');
+                    const columnMatch = markdown.match(columnRegex);
+
+                    if (columnMatch) {
+                        const classes = columnMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+                        directives.columns[column.id] = classes;
+                    }
+
+                    // Extract from tasks
+                    if (column.tasks) {
+                        for (const task of column.tasks) {
+                            const taskTitleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const taskRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*- \\[[ x]\\] ${taskTitleClean}`, 'm');
+                            const taskMatch = markdown.match(taskRegex);
+
+                            if (taskMatch) {
+                                const classes = taskMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+                                directives.tasks[task.id] = classes;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Send to frontend
+            if (panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpClassDirectives',
+                    directives: directives
+                });
+            }
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.sendMarpDirectivesToFrontend] Error:', error);
+        }
+    }
+
+    /**
      * Present kanban content with Marp
      */
     /**

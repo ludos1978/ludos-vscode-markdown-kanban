@@ -225,10 +225,16 @@ class SimpleMenuManager {
 
         const submenu = document.createElement('div');
         submenu.className = 'donut-menu-submenu dynamic-submenu';
-        
+
+        // Store submenu type as data attribute for refresh functionality
+        const submenuType = menuItem.dataset.submenuType;
+        if (submenuType) {
+            submenu.setAttribute('data-submenu-type', submenuType);
+        }
+
         // Create content based on submenu type
         submenu.innerHTML = this.createSubmenuContent(menuItem, id, type, columnId);
-        
+
         // Style and position of tag submenus
         submenu.style.cssText = `
             position: fixed;
@@ -238,16 +244,16 @@ class SimpleMenuManager {
             display: flex;
 						flex-wrap: wrap;
         `;
-        
+
         // Append to body to escape any stacking contexts
         document.body.appendChild(submenu);
-        
+
         // Store reference to the menu item for positioning
         submenu._menuItem = menuItem;
-        
+
         this.setupSubmenuEvents(submenu);
         this.activeSubmenu = submenu;
-        
+
         return submenu;
     }
 
@@ -258,6 +264,8 @@ class SimpleMenuManager {
         switch (submenuType) {
             case 'tags':
                 return this.createTagContent(menuItem.dataset.group, id, type, columnId);
+            case 'marp-directives':
+                return this.createMarpDirectivesContent(menuItem.dataset.scope, id, type, columnId);
             case 'move':
                 return `
                     <button class="donut-menu-item" onclick="moveTaskToTop('${id}', '${columnId}')">Top</button>
@@ -273,9 +281,243 @@ class SimpleMenuManager {
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'numericTag')">Sort by index (#)</button>
                 `;
+            case 'marp-classes':
+                return this.createMarpClassesContent(menuItem.dataset.scope, id, type, columnId);
+            case 'marp-colors':
+                return this.createMarpColorsContent(menuItem.dataset.scope, id, type, columnId);
+            case 'marp-header-footer':
+                return this.createMarpHeaderFooterContent(menuItem.dataset.scope, id, type, columnId);
+            case 'marp-theme':
+                return this.createMarpThemeContent(menuItem.dataset.scope, id, type, columnId);
             default:
                 return '';
         }
+    }
+
+    // Create Marp Classes submenu - includes class toggles and paginate
+    createMarpClassesContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 450px; min-width: 300px;">';
+
+        // Get current element to check scoped state
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Get both local and scoped classes
+        const localClassMatch = title.match(/<!--\s*class:\s*([^>]+?)\s*-->/);
+        const scopedClassMatch = title.match(/<!--\s*_class:\s*([^>]+?)\s*-->/);
+
+        const localClasses = localClassMatch ? localClassMatch[1].trim().split(/\s+/).filter(c => c.length > 0) : [];
+        const scopedClasses = scopedClassMatch ? scopedClassMatch[1].trim().split(/\s+/).filter(c => c.length > 0) : [];
+
+        // Classes grid - TWO sections: Local and Scoped
+        html += '<div style="margin-bottom: 12px;">';
+
+        // LOCAL classes section
+        html += '<div style="margin-bottom: 8px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">LOCAL (this + following)</div>';
+        html += '<div class="donut-menu-tags-grid">';
+
+        const availableClasses = window.marpAvailableClasses || [];
+
+        availableClasses.forEach(className => {
+            const isActive = localClasses.includes(className);
+            html += `
+                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'local')"
+                        style="border-color: #4a90e2; background: ${isActive ? '#4a90e2' : 'var(--vscode-menu-background)'};">
+                    <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
+                    <span class="tag-chip-name">${className}</span>
+                </button>
+            `;
+        });
+        html += '</div></div>';
+
+        // SCOPED classes section
+        html += '<div style="margin-bottom: 8px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">SCOPED (this slide only)</div>';
+        html += '<div class="donut-menu-tags-grid">';
+
+        availableClasses.forEach(className => {
+            const isActive = scopedClasses.includes(className);
+            html += `
+                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'scoped')"
+                        style="border-color: #ff9500; background: ${isActive ? '#ff9500' : 'var(--vscode-menu-background)'};">
+                    <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
+                    <span class="tag-chip-name">${className}</span>
+                </button>
+            `;
+        });
+        html += '</div></div>';
+
+        html += '</div>';
+
+        // Paginate - TWO buttons: local and scoped
+        const isLocalPaginateActive = /<!--\s*paginate:\s*true\s*-->/.test(title);
+        const isScopedPaginateActive = /<!--\s*_paginate:\s*true\s*-->/.test(title);
+
+        html += '<div style="margin-bottom: 8px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">PAGE NUMBERING</div>';
+        html += '<div style="display: flex; gap: 8px;">';
+
+        // Local paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                ${isLocalPaginateActive ? '✓ ' : ''}Local
+            </button>
+        `;
+
+        // Scoped paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                ${isScopedPaginateActive ? '✓ ' : ''}Scoped
+            </button>
+        `;
+
+        html += '</div></div>';
+
+        html += '</div>';
+        return html;
+    }
+
+    // Create Marp Colors submenu - includes color, backgroundColor, backgroundImage, and all background properties
+    createMarpColorsContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
+
+        // Get current element to check scoped states
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Helper function to create TWO directive inputs (local and scoped)
+        const createDirectiveInput = (directiveName, label, placeholder) => {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <input type="text" placeholder="Local (this + following)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
+                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #4a90e2; color: white; border-radius: 4px; font-size: 11px;">
+                        <input type="text" placeholder="Scoped (this only)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
+                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #ff9500; color: white; border-radius: 4px; font-size: 11px;">
+                    </div>
+                </div>
+            `;
+        };
+
+        // Use helper to create all color directive inputs
+        html += createDirectiveInput('color', 'TEXT COLOR', 'e.g., red, #FF5733');
+        html += createDirectiveInput('backgroundColor', 'BACKGROUND COLOR', 'e.g., black, #333333');
+        html += createDirectiveInput('backgroundImage', 'BACKGROUND IMAGE', 'e.g., url(image.jpg)');
+        html += createDirectiveInput('backgroundPosition', 'BACKGROUND POSITION', 'e.g., center, top left');
+        html += createDirectiveInput('backgroundRepeat', 'BACKGROUND REPEAT', 'e.g., no-repeat, repeat-x');
+        html += createDirectiveInput('backgroundSize', 'BACKGROUND SIZE', 'e.g., cover, contain, 50%');
+
+        html += '</div>';
+        return html;
+    }
+
+    // Create Marp Header & Footer submenu
+    createMarpHeaderFooterContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
+
+        // Get current element to check scoped states
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Helper function to create TWO directive inputs (local and scoped)
+        const createDirectiveInput = (directiveName, label, placeholder) => {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <input type="text" placeholder="Local (this + following)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
+                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #4a90e2; color: white; border-radius: 4px; font-size: 11px;">
+                        <input type="text" placeholder="Scoped (this only)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
+                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #ff9500; color: white; border-radius: 4px; font-size: 11px;">
+                    </div>
+                </div>
+            `;
+        };
+
+        html += createDirectiveInput('header', 'HEADER TEXT', 'Header content');
+        html += createDirectiveInput('footer', 'FOOTER TEXT', 'Footer content');
+
+        html += '</div>';
+        return html;
+    }
+
+    // Create Marp Theme & Style submenu
+    createMarpThemeContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 300px; min-width: 250px;">';
+
+        // Theme input
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Theme</div>';
+        html += `<input type="text" placeholder="e.g., default, gaia, uncover"
+                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','theme',this.value);this.value='';}"
+                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
+        html += '</div>';
+
+        // Size input
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Size</div>';
+        html += `<input type="text" placeholder="e.g., 4:3, 16:9, 1920x1080"
+                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','size',this.value);this.value='';}"
+                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
+        html += '</div>';
+
+        // Style input (multiline)
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Custom Style (CSS)</div>';
+        html += `<textarea placeholder="CSS styles for tweaking theme"
+                          onkeypress="if(event.key==='Enter' && event.ctrlKey){setMarpDirective('${scope}','${id}','${columnId||''}','style',this.value);this.value='';}"
+                          style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px; min-height: 60px; font-family: monospace; font-size: 11px;"></textarea>`;
+        html += '<div style="font-size: 10px; color: #999; margin-top: 4px;">Press Ctrl+Enter to apply</div>';
+        html += '</div>';
+
+        // Math library input
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Math Library</div>';
+        html += `<input type="text" placeholder="e.g., mathjax, katex"
+                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','math',this.value);this.value='';}"
+                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
+        html += '</div>';
+
+        // Heading Divider input
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Heading Divider</div>';
+        html += `<input type="text" placeholder="e.g., 1, 2, 3 (heading level)"
+                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','headingDivider',this.value);this.value='';}"
+                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
+        html += '</div>';
+
+        html += '</div>';
+        return html;
     }
 
     // Create tag content - simplified
@@ -2794,6 +3036,14 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         return;
     }
     
+    // Update cached board data first
+    if (window.cachedBoard) {
+        const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
+        if (columnData) {
+            columnData.title = newTitle;
+        }
+    }
+
     // Update title display using shared function
     const titleElement = columnElement.querySelector('.column-title-text');
     if (titleElement && window.cachedBoard) {

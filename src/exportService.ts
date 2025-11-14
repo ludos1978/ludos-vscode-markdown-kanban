@@ -1380,6 +1380,70 @@ export class ExportService {
      * Filter board based on scope and selection
      * Returns a filtered board object containing only the requested content
      */
+    /**
+     * Extract Marp classes from HTML comment directives in markdown
+     * Format: <!-- _class: font24 center -->
+     */
+    private static extractMarpClassesFromMarkdown(markdown: string, board: any): { global: string[], local: string[], perSlide: Map<number, string[]> } {
+        const result = {
+            global: [] as string[],
+            local: [] as string[],
+            perSlide: new Map<number, string[]>()
+        };
+
+        if (!markdown || !board) {
+            return result;
+        }
+
+        let slideIndex = 0;
+
+        // Extract global classes (directive after YAML frontmatter, before first column)
+        const yamlMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+        const afterYaml = yamlMatch ? yamlMatch[0].length : 0;
+        const beforeFirstColumn = markdown.indexOf('\n## ', afterYaml);
+        const globalSection = beforeFirstColumn > 0
+            ? markdown.slice(afterYaml, beforeFirstColumn)
+            : markdown.slice(afterYaml, Math.min(afterYaml + 500, markdown.length));
+
+        const globalDirectiveMatch = globalSection.match(/<!-- _class: ([^>]+) -->/);
+        if (globalDirectiveMatch) {
+            result.global = globalDirectiveMatch[1].split(/\s+/).filter(c => c.length > 0);
+        }
+
+        // Extract per-slide classes from columns and tasks
+        if (board.columns) {
+            for (const column of board.columns) {
+                // Find directive before column header
+                const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const columnRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*## ${titleClean}`, 'm');
+                const columnMatch = markdown.match(columnRegex);
+
+                if (columnMatch) {
+                    const classes = columnMatch[1].split(/\s+/).filter(c => c.length > 0);
+                    result.perSlide.set(slideIndex, classes);
+                }
+                slideIndex++;
+
+                // Extract from tasks
+                if (column.tasks) {
+                    for (const task of column.tasks) {
+                        const taskTitleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const taskRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*- \\[[ x]\\] ${taskTitleClean}`, 'm');
+                        const taskMatch = markdown.match(taskRegex);
+
+                        if (taskMatch) {
+                            const classes = taskMatch[1].split(/\s+/).filter(c => c.length > 0);
+                            result.perSlide.set(slideIndex, classes);
+                        }
+                        slideIndex++;
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     private static filterBoard(board: any, options: NewExportOptions): any {
         // Check for columnIndexes (new export dialog system)
         if (options.columnIndexes && options.columnIndexes.length > 0) {
@@ -1627,13 +1691,20 @@ export class ExportService {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
+            // Extract marp classes from HTML comment directives in markdown
+            // Global: from directive after YAML frontmatter
+            // Per-slide: from directives before column/task lines
+            const markdownContent = sourceDocument.getText();
+            const marpClasses = this.extractMarpClassesFromMarkdown(markdownContent, filteredBoard);
+
             result = PresentationGenerator.fromBoard(filteredBoard, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
                 stripIncludes: true,  // Strip include syntax (content already inlined in board)
                 marp: {
                     theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
-                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
-                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
+                    globalClasses: marpClasses.global.length > 0 ? marpClasses.global : (marpConfig.globalClasses || []),
+                    localClasses: marpClasses.local.length > 0 ? marpClasses.local : (marpConfig.localClasses || []),
+                    perSlideClasses: marpClasses.perSlide
                 }
             });
 

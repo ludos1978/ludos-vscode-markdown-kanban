@@ -96,12 +96,25 @@ function tagPlugin(md, options = {}) {
     
     function parseTag(state, silent) {
         let pos = state.pos;
-        
+
         // Check for # at word boundary
         if (state.src.charCodeAt(pos) !== 0x23 /* # */) {return false;}
-        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ && 
+        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ &&
             state.src.charCodeAt(pos - 1) !== 0x0A /* newline */ &&
             pos !== 0) {return false;}
+
+        // Exclude ATX headers: # followed by space or more # characters (##, ###, etc.)
+        // This prevents treating "# Header" as a tag
+        if (pos === 0 || state.src.charCodeAt(pos - 1) === 0x0A /* newline */) {
+            let headerCheckPos = pos + 1;
+            // Check if followed by space (single #) or more # chars (##, ###, etc.)
+            if (headerCheckPos < state.posMax) {
+                const nextChar = state.src.charCodeAt(headerCheckPos);
+                if (nextChar === 0x20 /* space */ || nextChar === 0x23 /* # */) {
+                    return false; // This is a header, not a tag
+                }
+            }
+        }
         
         pos++;
         if (pos >= state.posMax) {return false;}

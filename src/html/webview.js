@@ -1214,9 +1214,35 @@ function toggleFileBarMenu(event, button) {
                     // Menu item hover tracking
                     menuItem.addEventListener('mouseenter', () => {
                         isMenuItemHovered = true;
+
+                        // Populate Marp Classes submenu if needed
+                        const scope = submenu.dataset.scope;
+                        const menu = submenu.dataset.menu;
+                        if (menu === 'marpClasses' && scope === 'global') {
+                            const availableClasses = window.marpAvailableClasses || [];
+                            const activeClasses = window.getMarpClassesForElement
+                                ? window.getMarpClassesForElement('global', null, null)
+                                : [];
+
+                            let html = '<div class="donut-menu-tags-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; max-width: 350px;">';
+                            availableClasses.forEach(className => {
+                                const isActive = activeClasses.includes(className);
+                                const checkmark = isActive ? '✓ ' : '';
+                                html += `
+                                    <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                                            onclick="toggleMarpClass('global', null, null, '${className}')"
+                                            style="padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: left;">
+                                        ${checkmark}${className}
+                                    </button>
+                                `;
+                            });
+                            html += '</div>';
+                            submenu.innerHTML = html;
+                        }
+
                         // Position file bar submenu to the left (it's right-aligned)
                         const rect = menuItem.getBoundingClientRect();
-                        
+
                         // Temporarily show submenu to get its actual dimensions
                         submenu.style.visibility = 'hidden';
                         submenu.style.display = 'block';
@@ -1948,6 +1974,11 @@ function updateDocumentUri(newUri) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Request available Marp classes on load
+    vscode.postMessage({
+        type: 'getMarpAvailableClasses'
+    });
+
     // Theme observer is set up later in the file
 
     // Initialize clipboard card source - handled by HTML ondragstart/ondragend attributes
@@ -5445,13 +5476,436 @@ function checkMarpStatus() {
 }
 
 /**
- * Populate Marp class dropdowns with available classes
+ * Get Marp classes for an element by parsing its title
+ * Format: <!-- class: font24 center --> or <!-- _class: font24 --> (scoped)
  */
-function populateMarpClassDropdowns() {
-    // Request available classes from backend
-    vscode.postMessage({
-        type: 'getMarpAvailableClasses'
+function getMarpClassesForElement(scope, id, columnId) {
+    if (scope === 'global') {
+        // Global not supported yet
+        return [];
+    }
+
+    // Find the element (column or task)
+    let element = null;
+
+    if (scope === 'column') {
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element || !element.title) {
+        return [];
+    }
+
+    // Parse both <!-- class: ... --> and <!-- _class: ... --> from title
+    const title = element.title;
+    // Match both class: and _class: directives
+    const commentRegex = /<!--\s*(_?class):\s*([^>]+?)\s*-->/g;
+    const classes = [];
+    let match;
+
+    while ((match = commentRegex.exec(title)) !== null) {
+        // Split by whitespace to get individual classes
+        const classString = match[2].trim();
+        const classNames = classString.split(/\s+/).filter(c => c.length > 0);
+        classes.push(...classNames);
+    }
+
+    return classes;
+}
+
+/**
+ * Check if a Marp directive is active for an element
+ */
+function isMarpDirectiveActive(scope, id, columnId, directiveName) {
+    if (scope === 'global') {
+        return false;
+    }
+
+    // Find the element
+    let element = null;
+
+    if (scope === 'column') {
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element || !element.title) {
+        return false;
+    }
+
+    // Check if directive exists in title
+    const directiveRegex = new RegExp(`<!--\\s*${directiveName}:\\s*[^>]+\\s*-->`, 'g');
+    return directiveRegex.test(element.title);
+}
+
+// Make it available globally
+window.getMarpClassesForElement = getMarpClassesForElement;
+window.isMarpDirectiveActive = isMarpDirectiveActive;
+
+/**
+ * Set any Marp directive (color, backgroundColor, backgroundImage, header, footer, etc.)
+ * Format: <!-- directiveName: value --> (local) or <!-- _directiveName: value --> (scoped)
+ */
+function setMarpDirective(scope, id, columnId, directiveName, value, directiveScope) {
+    if (scope === 'global' || !value || !value.trim()) {
+        return;
+    }
+
+    // Find the element
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    let title = element.title || '';
+    const cleanValue = value.trim();
+
+    // Determine which directive to update based on directiveScope parameter (default: local)
+    const isScoped = directiveScope === 'scoped';
+    const finalDirectiveName = isScoped ? `_${directiveName}` : directiveName;
+
+    // Remove only the specific directive (local OR scoped, not both)
+    const targetRegex = new RegExp(`<!--\\s*${finalDirectiveName}:\\s*[^>]+\\s*-->`, 'g');
+    title = title.replace(targetRegex, '');
+
+    // Add new directive
+    const newDirective = `<!-- ${finalDirectiveName}: ${cleanValue} -->`;
+    title = `${title} ${newDirective}`.trim();
+
+    // Update element and save
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
+}
+
+/**
+ * Toggle a boolean Marp directive (paginate, etc.)
+ */
+function toggleMarpDirective(scope, id, columnId, directiveName, defaultValue, directiveScope) {
+    if (scope === 'global') {
+        return;
+    }
+
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    let title = element.title || '';
+
+    // Determine which directive to toggle based on directiveScope parameter (default: local)
+    const isScoped = directiveScope === 'scoped';
+    const finalDirectiveName = isScoped ? `_${directiveName}` : directiveName;
+
+    // Check for specific directive (local OR scoped, not both)
+    const targetRegex = new RegExp(`<!--\\s*${finalDirectiveName}:\\s*([^>]+)\\s*-->`, 'g');
+    const hasDirective = title.match(targetRegex);
+
+    if (hasDirective) {
+        // Remove directive (toggle off)
+        title = title.replace(targetRegex, '').replace(/\s+/g, ' ').trim();
+    } else {
+        // Add directive (toggle on)
+        const newDirective = `<!-- ${finalDirectiveName}: ${defaultValue} -->`;
+        title = `${title} ${newDirective}`.trim();
+    }
+
+    // Update element and save
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
+}
+
+/**
+ * Refresh the Marp Directives submenu to show current state
+ */
+function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
+    // Find the currently open submenu (could be any of the three Marp submenus)
+    const openSubmenu = document.querySelector('.donut-menu-submenu[data-submenu-type^="marp-"]');
+
+    console.log('refreshMarpDirectivesSubmenu called:', {
+        scope, id, type, columnId,
+        openSubmenu: openSubmenu ? 'found' : 'not found',
+        submenuType: openSubmenu?.getAttribute('data-submenu-type')
     });
+
+    if (!openSubmenu) {
+        console.warn('No open Marp submenu found');
+        return;
+    }
+
+    const submenuType = openSubmenu.getAttribute('data-submenu-type');
+
+    // Use menuOperations to regenerate content based on submenu type
+    if (window.menuOperations) {
+        let newContent = '';
+
+        if (submenuType === 'marp-classes' && typeof window.menuOperations.createMarpClassesContent === 'function') {
+            newContent = window.menuOperations.createMarpClassesContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-colors' && typeof window.menuOperations.createMarpColorsContent === 'function') {
+            newContent = window.menuOperations.createMarpColorsContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-header-footer' && typeof window.menuOperations.createMarpHeaderFooterContent === 'function') {
+            newContent = window.menuOperations.createMarpHeaderFooterContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-theme' && typeof window.menuOperations.createMarpThemeContent === 'function') {
+            newContent = window.menuOperations.createMarpThemeContent(scope, id, type, columnId);
+        }
+
+        if (newContent) {
+            console.log('Refreshing submenu with new content');
+            openSubmenu.innerHTML = newContent;
+        } else {
+            console.warn('No new content generated for submenu type:', submenuType);
+        }
+    } else {
+        console.warn('window.menuOperations not available');
+    }
+}
+
+// Make them globally available
+window.setMarpDirective = setMarpDirective;
+window.toggleMarpDirective = toggleMarpDirective;
+window.refreshMarpDirectivesSubmenu = refreshMarpDirectivesSubmenu;
+
+/**
+ * Toggle Marp class on column/task/global
+ * Format: <!-- class: font24 center --> (local) or <!-- _class: font24 center --> (scoped)
+ * All classes in one comment block, space-separated
+ */
+function toggleMarpClass(scope, id, columnId, className, classScope) {
+    if (scope === 'global') {
+        // Global not supported yet
+        return;
+    }
+
+    // Find the element (column or task)
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    // Get current title
+    let title = element.title || '';
+
+    // Determine directive name based on classScope parameter (default: local)
+    const isScoped = classScope === 'scoped';
+    const directiveName = isScoped ? '_class' : 'class';
+
+    // Find existing directive for this specific scope
+    const commentRegex = new RegExp(`<!--\\s*${directiveName}:\\s*([^>]+?)\\s*-->`);
+    const match = title.match(commentRegex);
+
+    let classes = [];
+
+    if (match) {
+        // Parse existing classes
+        const classString = match[1].trim();
+        classes = classString.split(/\s+/).filter(c => c.length > 0);
+    }
+
+    // Toggle the class
+    const classIndex = classes.indexOf(className);
+    if (classIndex > -1) {
+        // Remove class
+        classes.splice(classIndex, 1);
+    } else {
+        // Add class
+        classes.push(className);
+    }
+
+    // Update or remove the comment
+    if (classes.length > 0) {
+        const newComment = `<!-- ${directiveName}: ${classes.join(' ')} -->`;
+        if (match) {
+            // Replace existing comment
+            title = title.replace(commentRegex, newComment);
+        } else {
+            // Add new comment at the end
+            title = `${title} ${newComment}`.trim();
+        }
+    } else {
+        // Remove comment if no classes left
+        if (match) {
+            title = title.replace(commentRegex, '').replace(/\s+/g, ' ').trim();
+        }
+    }
+
+    // Update the element
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    // Send to backend (same as tags)
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        // Update display immediately
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        // Send editTask message immediately
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        // Update display immediately
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    // Update refresh button state
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
 }
 
 /**
@@ -5491,29 +5945,8 @@ function handleMarpStatus(status) {
  * Handle Marp available classes response
  */
 function handleMarpAvailableClasses(classes) {
-    const globalSelect = document.getElementById('marp-global-classes');
-    const localSelect = document.getElementById('marp-local-classes');
-
-    if (!globalSelect || !localSelect) {
-        return;
-    }
-
-    // Clear existing options
-    globalSelect.innerHTML = '';
-    localSelect.innerHTML = '';
-
-    // Populate both selects with same options
-    classes.forEach(className => {
-        const globalOption = document.createElement('option');
-        globalOption.value = className;
-        globalOption.textContent = className;
-        globalSelect.appendChild(globalOption);
-
-        const localOption = document.createElement('option');
-        localOption.value = className;
-        localOption.textContent = className;
-        localSelect.appendChild(localOption);
-    });
+    // Store available classes globally for submenu access
+    window.marpAvailableClasses = classes;
 }
 
 function handleMarpThemesAvailable(themes, error) {
@@ -6109,3 +6542,7 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
     vscode.postMessage(message);
 }
 
+
+// Export scope toggle functions globally
+window.toggleMarpClassScope = toggleMarpClassScope;
+window.toggleMarpDirectiveScope = toggleMarpDirectiveScope;

@@ -2001,8 +2001,8 @@ button.file-bar-menu-item {
 .donut-menu-submenu .donut-menu-tags-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 2px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -2026,12 +2026,12 @@ button.file-bar-menu-item {
 .donut-menu-submenu .donut-menu-tag-chip {
   display: flex;
   align-items: center;
-  min-width: 60px;
-  max-width: calc(50% - 2px);
+  /* min-width: 60px; */
+  /* max-width: calc(50% - 2px); */
   overflow: hidden;
   gap: 3px;
   margin: 2px;
-  padding: 3px 6px;
+  padding: 2px 6px;
   pointer-events: all !important;
   cursor: pointer;
   border-radius: 3px;

@@ -1914,7 +1914,18 @@ function createColumnElement(column, columnIndex) {
 														Sort by
 												</div>
 												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item" onclick="showMarpClassesDialog('column', '${column.id}')">Set Marp Classes</button>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="column" data-id="${column.id}">
+														Marp Classes
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="column" data-id="${column.id}">
+														Marp Colors
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="column" data-id="${column.id}">
+														Marp Header & Footer
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-theme" data-scope="column" data-id="${column.id}">
+														Marp Theme & Style
+												</div>
 												<div class="donut-menu-divider"></div>
 												${generateTagMenuItems(column.id, 'column', null)}
 												<div class="donut-menu-divider"></div>
@@ -2094,7 +2105,15 @@ function createTaskElement(task, columnId, taskIndex) {
                             <div class="donut-menu-divider"></div>
                             ${generateTagMenuItems(task.id, 'task', columnId)}
                             <div class="donut-menu-divider"></div>
-                            <button class="donut-menu-item" onclick="showMarpClassesDialog('task', '${columnId}', '${task.id}')">Set Marp Classes</button>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Classes
+                            </div>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Colors
+                            </div>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Header & Footer
+                            </div>
                             <div class="donut-menu-divider"></div>
                             ${task.includeMode ?
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Disable include mode</button>

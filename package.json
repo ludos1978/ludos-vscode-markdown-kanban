@@ -3863,12 +3863,8 @@
           "default": [
             "workflow",
             "organization",
-            "importance",
-            "type",
-            "category",
             "colors",
             "content-type-teaching",
-            "content-type-product",
             "complexity"
           ],
           "uniqueItems": true,
@@ -3904,18 +3900,12 @@
             ]
           },
           "default": [
-            "priority",
             "positivity",
             "status",
             "importance",
-            "type",
             "colors",
-            "review-status",
             "time-estimate",
-            "testing-status",
             "platform-teaching",
-            "platform-product",
-            "version",
             "impact"
           ],
           "uniqueItems": true,
@@ -4055,6 +4045,30 @@
           "items": {
             "type": "string",
             "description": "CSS class name (without the dot)"
+          }
+        },
+        "markdown-kanban.marp.commonColors": {
+          "type": "array",
+          "default": [
+            "white",
+            "black",
+            "red",
+            "green",
+            "blue",
+            "yellow",
+            "orange",
+            "purple",
+            "pink",
+            "gray",
+            "#FF5733",
+            "#33FF57",
+            "#3357FF",
+            "#F0F0F0",
+            "#333333"
+          ],
+          "description": "Common color values for color and backgroundColor directives",
+          "items": {
+            "type": "string"
           }
         },
         "markdown-kanban.marp.globalClasses": {

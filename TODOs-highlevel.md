@@ -1,4 +1,4 @@
-- [ ] Remove the "immediate" parameter from the boardUpdate function. 
+- Remove the "immediate" parameter from the boardUpdate function. 
   We should never use the feature to mark something as unsaved, but use the hash to determine wether a file needs saving to file, because the file content is different to the saved content! Remove this feature and replace it by comparing the hashes from cache and files.
   saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
    So onWillSaveTextDocument is completely redundant and wrong! 
@@ -17,8 +17,9 @@
     - column_border
     - fontbg
     more elements should be addable by the user in the configuration. as a string list.
-  - check more styles from @https://github.com/marp-team/marp/blob/ffe6cd99/website/docs/guide/directives.md#L74-L84
-  - and the website: https://deepwiki.com/marp-team/marp/3.4-theming-and-styling  
+  - check more styles from <https://github.com/marp-team/marp/blob/ffe6cd99/website/docs/guide/directives.md>
+  - and the website: <https://deepwiki.com/marp-team/marp/3.4-theming-and-styling> 
+  
 
 - [ ] Can we make the sticky setting for headers (which is currently modified by
  the "sticky stack mode") individual for each column header, with a global 
