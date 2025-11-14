@@ -779,14 +779,14 @@ function toggleDonutMenu(event, button) {
             positionDropdown(button, dropdown);
             setupMenuHoverHandlers(menu, dropdown);
             
-            // Update tag category counts (including "Remove all tags" button) when menu opens
-            // Use data-group selector to find tag menu items specifically (not Move/Move-to-list items)
-            const firstTagMenuItem = dropdown.querySelector('[data-group][data-id][data-type]');
-            if (firstTagMenuItem) {
-                const id = firstTagMenuItem.getAttribute('data-id');
-                const type = firstTagMenuItem.getAttribute('data-type');
-                const columnId = firstTagMenuItem.getAttribute('data-column-id');
-                updateTagCategoryCounts(id, type, columnId || null);
+            // Update tag category counts when menu opens
+            // Find tag menu items (including "No tags available" button which has data-group="none")
+            const tagMenuItem = dropdown.querySelector('[data-group][data-id][data-type]');
+            if (tagMenuItem) {
+                const id = tagMenuItem.getAttribute('data-id');
+                const type = tagMenuItem.getAttribute('data-type');
+                const columnId = tagMenuItem.getAttribute('data-column-id');
+                updateTagCategoryCounts(id, type, columnId);
             }
         }
     }
@@ -1059,6 +1059,42 @@ function insertColumnAfter(columnId) {
     };
 
     updateCacheForNewColumn(newColumn, referenceIndex + 1, columnId);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+function duplicateColumn(columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const originalIndex = window.cachedBoard.columns.findIndex(col => col.id === columnId);
+        if (originalIndex >= 0) {
+            const originalColumn = window.cachedBoard.columns[originalIndex];
+
+            // Deep copy the tasks array
+            const duplicatedTasks = originalColumn.tasks.map(task => ({
+                id: `temp-duplicate-task-${Date.now()}-${Math.random()}`,
+                title: task.title || '',
+                description: task.description || '',
+                includeMode: task.includeMode || false,
+                includeFile: task.includeFile || null
+            }));
+
+            // Create duplicated column
+            const duplicatedColumn = {
+                id: `temp-duplicate-column-${Date.now()}`,
+                title: originalColumn.title || '',
+                tasks: duplicatedTasks,
+                includeMode: originalColumn.includeMode || false,
+                includeFile: originalColumn.includeFile || null
+            };
+
+            // Insert after the original column
+            updateCacheForNewColumn(duplicatedColumn, originalIndex + 1, columnId);
+        }
+    }
 
     // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
@@ -3889,6 +3925,8 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 // Update tag category counts in the open dropdown menu
 function updateTagCategoryCounts(id, type, columnId = null) {
 
+    console.log('[updateTagCategoryCounts] Called with:', {id, type, columnId});
+
     // Get current title to check which tags are active
     const currentBoard = window.cachedBoard;
 
@@ -3896,15 +3934,24 @@ function updateTagCategoryCounts(id, type, columnId = null) {
     if (type === 'column') {
         const column = currentBoard?.columns?.find(c => c.id === id);
         currentTitle = column?.title || '';
-    } else if (type === 'task' && columnId) {
-        const column = currentBoard?.columns?.find(c => c.id === columnId);
-        const task = column?.tasks?.find(t => t.id === id);
-        currentTitle = task?.title || '';
+    } else if (type === 'task') {
+        // For tasks, columnId is required
+        console.log('[updateTagCategoryCounts] Task case - columnId:', columnId, 'truthy:', !!columnId);
+        if (columnId) {
+            const column = currentBoard?.columns?.find(c => c.id === columnId);
+            console.log('[updateTagCategoryCounts] Found column:', column?.id);
+            const task = column?.tasks?.find(t => t.id === id);
+            console.log('[updateTagCategoryCounts] Found task:', task?.id, 'title:', task?.title);
+            currentTitle = task?.title || '';
+        } else {
+            console.log('[updateTagCategoryCounts] columnId is falsy, cannot find task');
+        }
     }
 
     // Get active tags
     const activeTags = getActiveTagsInTitle(currentTitle);
-    
+    console.log('[updateTagCategoryCounts] currentTitle:', currentTitle, 'activeTags:', activeTags);
+
     // Find the active dropdown menu that contains category items for this element
     // First try to find it in the menu, then check if it's been moved to body
     const activeMenu = document.querySelector('.donut-menu.active');
@@ -4003,62 +4050,74 @@ function updateTagCategoryCounts(id, type, columnId = null) {
             }
         }
     }
-    
+
     // Show/hide "Remove all tags" option - ensure only one exists
     const existingRemoveAllButtons = activeDropdown.querySelectorAll('[data-action="remove-all-tags"]');
+    console.log('[updateTagCategoryCounts] activeTags.length:', activeTags.length, 'existing buttons:', existingRemoveAllButtons.length);
 
     if (activeTags.length > 0) {
+        console.log('[updateTagCategoryCounts] Adding "Remove all tags" button');
         // Remove any existing "remove all tags" buttons first to prevent duplicates
         existingRemoveAllButtons.forEach(button => {
-            const divider = button.previousElementSibling;
-            if (divider && divider.classList.contains('donut-menu-divider')) {
-                divider.remove();
-            }
             button.remove();
         });
 
-        // Add single "Remove all tags" option before the last item (usually Delete)
+        // Add single "Remove all tags" option as the last item in the tags group
         const button = document.createElement('button');
         button.className = 'donut-menu-item';
-        button.setAttribute('data-action', 'remove-all-tags'); // Add identifier for reliable detection
+        button.setAttribute('data-action', 'remove-all-tags');
         button.onclick = () => removeAllTags(id, type, columnId);
         button.textContent = 'Remove all tags';
 
-        // Find the last menu item (usually "Delete card" or "Delete list")
-        const lastMenuItem = activeDropdown.querySelector('.donut-menu-item.danger:last-of-type');
+        // Find all tag category items (they have data-submenu-type="tags")
+        const tagItems = activeDropdown.querySelectorAll('[data-submenu-type="tags"]');
+        console.log('[updateTagCategoryCounts] Found tag items:', tagItems.length);
 
-        if (lastMenuItem) {
-            // Check if there's already a divider before the delete button
-            const existingDivider = lastMenuItem.previousElementSibling;
-            const hasExistingDivider = existingDivider && existingDivider.classList.contains('donut-menu-divider');
+        // Also check for the "No tags available" message
+        const noTagsMessage = activeDropdown.querySelector('.donut-menu-item[disabled][data-group="none"]');
+        console.log('[updateTagCategoryCounts] Found noTagsMessage:', !!noTagsMessage);
 
-            // Insert the button before the delete button
-            activeDropdown.insertBefore(button, lastMenuItem);
+        if (tagItems.length > 0) {
+            console.log('[updateTagCategoryCounts] Using tag items path');
+            // Get the last tag category item
+            const lastTagItem = tagItems[tagItems.length - 1];
 
-            // Add a divider after the "Remove all tags" button (before delete) if none exists
-            if (!hasExistingDivider) {
-                const dividerAfter = document.createElement('div');
-                dividerAfter.className = 'donut-menu-divider';
-                activeDropdown.insertBefore(dividerAfter, lastMenuItem);
+            // Find the next divider after the last tag item
+            let nextElement = lastTagItem.nextElementSibling;
+            while (nextElement && !nextElement.classList.contains('donut-menu-divider')) {
+                nextElement = nextElement.nextElementSibling;
             }
-        } else {
-            // Fallback: add at the end if no danger button found
-            const divider = document.createElement('div');
-            divider.className = 'donut-menu-divider';
-            activeDropdown.appendChild(divider);
-            activeDropdown.appendChild(button);
+
+            // Insert before the divider (at the end of tags group)
+            if (nextElement && nextElement.classList.contains('donut-menu-divider')) {
+                activeDropdown.insertBefore(button, nextElement);
+            } else {
+                // Fallback: insert after the last tag item
+                if (lastTagItem.nextSibling) {
+                    activeDropdown.insertBefore(button, lastTagItem.nextSibling);
+                } else {
+                    activeDropdown.appendChild(button);
+                }
+            }
+        } else if (noTagsMessage) {
+            // Find divider after "No tags available"
+            let nextElement = noTagsMessage.nextElementSibling;
+            while (nextElement && !nextElement.classList.contains('donut-menu-divider')) {
+                nextElement = nextElement.nextElementSibling;
+            }
+
+            if (nextElement && nextElement.classList.contains('donut-menu-divider')) {
+                activeDropdown.insertBefore(button, nextElement);
+            } else {
+                activeDropdown.appendChild(button);
+            }
         }
     } else {
         // Remove all "Remove all tags" options if no active tags
         existingRemoveAllButtons.forEach(button => {
-            const divider = button.previousElementSibling;
-            if (divider && divider.classList.contains('donut-menu-divider')) {
-                divider.remove();
-            }
             button.remove();
         });
     }
-    
 }
 
 // Make functions globally available

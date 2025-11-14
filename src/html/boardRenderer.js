@@ -1025,9 +1025,9 @@ function generateTagMenuItems(id, type, columnId = null) {
     
     // Note: "Remove all tags" option is added dynamically by updateTagCategoryCounts() when tags are active
 
-    // If no tags at all, show a message
+    // If no tags at all, show a message (but keep data attributes for updateTagCategoryCounts)
     if (!hasAnyTags) {
-        menuHtml = '<button class="donut-menu-item" disabled>No tags available</button>';
+        menuHtml = `<button class="donut-menu-item" disabled data-group="none" data-id="${id}" data-type="${type}" data-column-id="${columnId || ''}">No tags available</button>`;
     }
 
     return menuHtml;
@@ -1872,12 +1872,23 @@ function createColumnElement(column, columnIndex) {
 										<div class="donut-menu-dropdown">
 												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert column before</button>
 												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert column after</button>
-												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
-												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
+												<button class="donut-menu-item" onclick="duplicateColumn('${column.id}')">Duplicate column</button>
+												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 												<div class="donut-menu-divider"></div>
 												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move column left</button>
 												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move column right</button>
+												<div class="donut-menu-divider"></div>
+												${generateTagMenuItems(column.id, 'column', null)}
+												<div class="donut-menu-divider"></div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="column" data-id="${column.id}">
+														Marp Classes
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="column" data-id="${column.id}">
+														Marp Colors
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="column" data-id="${column.id}">
+														Marp Header & Footer
+												</div>
 												<div class="donut-menu-divider"></div>
 												<div class="donut-menu-item span-width-control">
 													<span class="span-width-label">Width:</span>
@@ -1896,37 +1907,25 @@ function createColumnElement(column, columnIndex) {
 														${/#stack\b/i.test(column.title) ? 'On' : 'Off'}
 													</button>
 												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="sort" data-id="${column.id}" data-type="column" data-column-id="${column.id}">
+														Sort by
+												</div>
+												<div class="donut-menu-divider"></div>
+												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
+												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
 												<div class="donut-menu-divider"></div>
 												${column.includeMode ? `
-													<button class="donut-menu-item" onclick="editColumnIncludeFile('${column.id}')">
-														Edit include file
-													</button>
 													<button class="donut-menu-item" onclick="toggleColumnIncludeMode('${column.id}')">
 														Disable include mode
+													</button>
+													<button class="donut-menu-item" onclick="editColumnIncludeFile('${column.id}')">
+														Edit include file
 													</button>
 												` : `
 													<button class="donut-menu-item" onclick="toggleColumnIncludeMode('${column.id}')">
 														Enable include mode
 													</button>
 												`}
-												<div class="donut-menu-divider"></div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="sort" data-id="${column.id}" data-type="column" data-column-id="${column.id}">
-														Sort by
-												</div>
-												<div class="donut-menu-divider"></div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="column" data-id="${column.id}">
-														Marp Classes
-												</div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="column" data-id="${column.id}">
-														Marp Colors
-												</div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="column" data-id="${column.id}">
-														Marp Header & Footer
-												</div>
-												<div class="donut-menu-divider"></div>
-												${generateTagMenuItems(column.id, 'column', null)}
-												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 										</div>
 								</div>
 						</div>
@@ -2090,8 +2089,7 @@ function createTaskElement(task, columnId, taskIndex) {
                             <button class="donut-menu-item" onclick="insertTaskBefore('${task.id}', '${columnId}')">Insert card before</button>
                             <button class="donut-menu-item" onclick="insertTaskAfter('${task.id}', '${columnId}')">Insert card after</button>
                             <button class="donut-menu-item" onclick="duplicateTask('${task.id}', '${columnId}')">Duplicate card</button>
-                            <div class="donut-menu-divider"></div>
-                            <button class="donut-menu-item" onclick="copyTaskAsMarkdown('${task.id}', '${columnId}')">Copy as markdown</button>
+                            <button class="donut-menu-item danger" onclick="deleteTask('${task.id}', '${columnId}')">Delete card</button>
                             <div class="donut-menu-divider"></div>
                             <div class="donut-menu-item has-submenu" data-submenu-type="move" data-id="${task.id}" data-type="task">
                                 Move
@@ -2112,13 +2110,13 @@ function createTaskElement(task, columnId, taskIndex) {
                                 Marp Header & Footer
                             </div>
                             <div class="donut-menu-divider"></div>
+                            <button class="donut-menu-item" onclick="copyTaskAsMarkdown('${task.id}', '${columnId}')">Copy as markdown</button>
+                            <div class="donut-menu-divider"></div>
                             ${task.includeMode ?
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Disable include mode</button>
                                 <button class="donut-menu-item" onclick="editTaskIncludeFile('${task.id}', '${columnId}')">Edit include file</button>` :
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Enable include mode</button>`
                             }
-                            <div class="donut-menu-divider"></div>
-                            <button class="donut-menu-item danger" onclick="deleteTask('${task.id}', '${columnId}')">Delete card</button>
                         </div>
                     </div>
                 </div>

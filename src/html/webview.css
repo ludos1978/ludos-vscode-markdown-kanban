@@ -178,7 +178,7 @@ body {
 .file-info-right .layout-presets-btn,
 .file-info-right .file-bar-menu-btn {
   border: var(--button-border);
-  padding: 4px 4px;
+  padding: 2px 2px;
   margin: 0;
   height: 22px;
   min-height: 22px;
@@ -1610,7 +1610,7 @@ body.vscode-high-contrast-light .task-count {
 /* Pin button (sticky toggle) */
 .pin-btn {
   padding: 2px 4px;
-  font-size: 10px;
+  font-size: 8px;
   line-height: 1;
   height: 16px;
   width: 16px;
