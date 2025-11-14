@@ -287,8 +287,6 @@ class SimpleMenuManager {
                 return this.createMarpColorsContent(menuItem.dataset.scope, id, type, columnId);
             case 'marp-header-footer':
                 return this.createMarpHeaderFooterContent(menuItem.dataset.scope, id, type, columnId);
-            case 'marp-theme':
-                return this.createMarpThemeContent(menuItem.dataset.scope, id, type, columnId);
             default:
                 return '';
         }
@@ -471,54 +469,6 @@ class SimpleMenuManager {
         return html;
     }
 
-    // Create Marp Theme & Style submenu
-    createMarpThemeContent(scope, id, type, columnId) {
-        let html = '<div style="padding: 8px; max-width: 300px; min-width: 250px;">';
-
-        // Theme input
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Theme</div>';
-        html += `<input type="text" placeholder="e.g., default, gaia, uncover"
-                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','theme',this.value);this.value='';}"
-                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
-        html += '</div>';
-
-        // Size input
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Size</div>';
-        html += `<input type="text" placeholder="e.g., 4:3, 16:9, 1920x1080"
-                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','size',this.value);this.value='';}"
-                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
-        html += '</div>';
-
-        // Style input (multiline)
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Custom Style (CSS)</div>';
-        html += `<textarea placeholder="CSS styles for tweaking theme"
-                          onkeypress="if(event.key==='Enter' && event.ctrlKey){setMarpDirective('${scope}','${id}','${columnId||''}','style',this.value);this.value='';}"
-                          style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px; min-height: 60px; font-family: monospace; font-size: 11px;"></textarea>`;
-        html += '<div style="font-size: 10px; color: #999; margin-top: 4px;">Press Ctrl+Enter to apply</div>';
-        html += '</div>';
-
-        // Math library input
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Math Library</div>';
-        html += `<input type="text" placeholder="e.g., mathjax, katex"
-                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','math',this.value);this.value='';}"
-                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
-        html += '</div>';
-
-        // Heading Divider input
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd;">Heading Divider</div>';
-        html += `<input type="text" placeholder="e.g., 1, 2, 3 (heading level)"
-                        onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','headingDivider',this.value);this.value='';}"
-                        style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #666; color: white; border-radius: 4px;">`;
-        html += '</div>';
-
-        html += '</div>';
-        return html;
-    }
 
     // Create tag content - simplified
     createTagContent(group, id, type, columnId) {

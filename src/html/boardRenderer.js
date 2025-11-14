@@ -1923,9 +1923,6 @@ function createColumnElement(column, columnIndex) {
 												<div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="column" data-id="${column.id}">
 														Marp Header & Footer
 												</div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="marp-theme" data-scope="column" data-id="${column.id}">
-														Marp Theme & Style
-												</div>
 												<div class="donut-menu-divider"></div>
 												${generateTagMenuItems(column.id, 'column', null)}
 												<div class="donut-menu-divider"></div>

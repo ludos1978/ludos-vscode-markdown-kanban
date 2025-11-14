@@ -5481,8 +5481,10 @@ function checkMarpStatus() {
  */
 function getMarpClassesForElement(scope, id, columnId) {
     if (scope === 'global') {
-        // Global not supported yet
-        return [];
+        // Get global classes from YAML frontmatter
+        const currentValue = window.cachedBoard?.frontmatter?.class || '';
+        const classes = currentValue.split(/\s+/).filter(c => c.trim() !== '');
+        return classes;
     }
 
     // Find the element (column or task)
@@ -5788,7 +5790,24 @@ window.refreshMarpDirectivesSubmenu = refreshMarpDirectivesSubmenu;
  */
 function toggleMarpClass(scope, id, columnId, className, classScope) {
     if (scope === 'global') {
-        // Global not supported yet
+        // Handle global Marp classes (saved to YAML frontmatter)
+        const currentValue = window.cachedBoard?.frontmatter?.class || '';
+        const classes = currentValue.split(/\s+/).filter(c => c.trim() !== '');
+
+        const index = classes.indexOf(className);
+        if (index > -1) {
+            // Remove class
+            classes.splice(index, 1);
+        } else {
+            // Add class
+            classes.push(className);
+        }
+
+        const newValue = classes.join(' ');
+        updateMarpGlobalSetting('class', newValue);
+
+        // Refresh the menu to show updated state
+        populateMarpGlobalMenu();
         return;
     }
 
@@ -6546,3 +6565,288 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
 // Export scope toggle functions globally
 window.toggleMarpClassScope = toggleMarpClassScope;
 window.toggleMarpDirectiveScope = toggleMarpDirectiveScope;
+
+// =============================================================================
+// Marp Global Settings Functions
+// =============================================================================
+
+/**
+ * Toggle the Marp global settings burger menu
+ */
+function toggleMarpGlobalMenu(event, button) {
+    event.stopPropagation();
+    const menu = button.parentElement;
+    const dropdown = menu.querySelector('.marp-global-menu-dropdown');
+    const isActive = menu.classList.contains('active');
+
+    // Close all other menus
+    document.querySelectorAll('.marp-global-menu.active').forEach(m => {
+        if (m !== menu) m.classList.remove('active');
+    });
+
+    if (isActive) {
+        menu.classList.remove('active');
+    } else {
+        // Position the dropdown below the button
+        const rect = button.getBoundingClientRect();
+        dropdown.style.top = (rect.bottom + 2) + 'px';
+        dropdown.style.left = rect.left + 'px';
+
+        // Populate the menu content before showing
+        populateMarpGlobalMenu();
+        menu.classList.add('active');
+    }
+}
+
+/**
+ * Populate the Marp global settings menu with current values
+ */
+function populateMarpGlobalMenu() {
+    const content = document.getElementById('marp-global-settings-content');
+    if (!content) return;
+
+    const frontmatter = window.cachedBoard?.frontmatter || {};
+
+    let html = '<div style="padding: 8px; max-width: 400px; min-width: 300px;">';
+
+    // Marp Enable Toggle
+    const marpEnabled = frontmatter.marp === 'true' || frontmatter.marp === true;
+    html += '<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">';
+    html += '<label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1;">';
+    html += `<input type="checkbox" ${marpEnabled ? 'checked' : ''} onchange="updateMarpGlobalSetting('marp', this.checked ? 'true' : 'false')" style="cursor: pointer;">`;
+    html += '<span style="font-weight: bold; color: #ddd;">Enable Marp</span>';
+    html += '</label>';
+    html += '</div>';
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Presentation Settings
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Presentation</div>';
+
+    html += createMarpInputField('theme', '🎨 Theme', frontmatter.theme, 'e.g., default, gaia, uncover');
+    html += createMarpInputField('style', '✏️ Style', frontmatter.style, 'Custom CSS styles');
+    html += createMarpInputField('size', '📐 Size', frontmatter.size, 'e.g., 16:9, 4:3, 1920x1080');
+    html += createMarpInputField('headingDivider', '📑 Heading Divider', frontmatter.headingDivider, 'true/false or 1-6');
+    html += createMarpInputField('math', '∑ Math', frontmatter.math, 'mathjax or katex');
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Metadata
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Metadata</div>';
+
+    html += createMarpInputField('title', '📝 Title', frontmatter.title);
+    html += createMarpInputField('author', '👤 Author', frontmatter.author);
+    html += createMarpInputField('description', '📄 Description', frontmatter.description);
+    html += createMarpInputField('keywords', '🔑 Keywords', frontmatter.keywords);
+    html += createMarpInputField('url', '🔗 URL', frontmatter.url);
+    html += createMarpInputField('image', '🖼 Image', frontmatter.image);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Slide Settings
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Slide Settings</div>';
+
+    html += createMarpInputField('paginate', '📄 Paginate', frontmatter.paginate, 'true/false');
+    html += createMarpInputField('header', '⬆️ Header', frontmatter.header);
+    html += createMarpInputField('footer', '⬇️ Footer', frontmatter.footer);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Styling
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Styling</div>';
+
+    html += createMarpInputField('class', '🏷 Class', frontmatter.class);
+    html += createMarpInputField('color', '🎨 Color', frontmatter.color);
+    html += createMarpInputField('backgroundColor', '🎨 Background Color', frontmatter.backgroundColor);
+    html += createMarpInputField('backgroundImage', '🖼 Background Image', frontmatter.backgroundImage, 'URL');
+    html += createMarpInputField('backgroundPosition', '📍 BG Position', frontmatter.backgroundPosition);
+    html += createMarpInputField('backgroundRepeat', '🔄 BG Repeat', frontmatter.backgroundRepeat);
+    html += createMarpInputField('backgroundSize', '📏 BG Size', frontmatter.backgroundSize);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Marp Classes Section - title and content on same line
+    const availableClasses = window.marpAvailableClasses || [];
+    const activeClasses = window.getMarpClassesForElement
+        ? window.getMarpClassesForElement('global', null, null)
+        : [];
+
+    html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">';
+    html += '<div style="font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase; white-space: nowrap;">Marp Classes</div>';
+
+    html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1;">';
+    availableClasses.forEach(className => {
+        const isActive = activeClasses.includes(className);
+        const checkmark = isActive ? '✓ ' : '';
+        html += `
+            <button class="marp-class-chip ${isActive ? 'active' : ''}"
+                    onclick="toggleMarpClass('global', null, null, '${className}'); event.stopPropagation();"
+                    style="padding: 6px 8px; font-size: 11px; border: 1px solid #555; border-radius: 4px; background: ${isActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                ${checkmark}${className}
+            </button>
+        `;
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // YAML Preview Section
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Current YAML Frontmatter</div>';
+
+    const yamlContent = window.cachedBoard?.yamlHeader || '';
+    // Remove leading/trailing --- delimiters from display
+    let displayYaml = yamlContent;
+    if (displayYaml) {
+        const lines = displayYaml.split('\n').filter(line => line.trim() !== '---');
+        displayYaml = lines.join('\n').trim();
+    }
+    displayYaml = displayYaml || '(No YAML frontmatter found)';
+
+    html += '<div style="margin-bottom: 10px;">';
+    html += '<pre style="background: #1e1e1e; border: 1px solid #555; padding: 8px; border-radius: 4px; font-size: 11px; color: #d4d4d4; overflow-x: auto; margin: 0; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto;">';
+    html += escapeHtml(displayYaml);
+    html += '</pre>';
+    html += '</div>';
+
+    html += '</div>';
+
+    content.innerHTML = html;
+}
+
+/**
+ * Create an input field for a Marp setting
+ */
+function createMarpInputField(key, label, value, placeholder) {
+    value = value || '';
+    placeholder = placeholder || '';
+
+    let html = '<div style="margin-bottom: 10px;">';
+    html += `<div style="font-size: 12px; margin-bottom: 4px; color: #ccc;">${label}</div>`;
+    html += `<input type="text" value="${escapeHtml(value)}" placeholder="${placeholder}"
+                    data-marp-key="${escapeHtml(key)}"
+                    data-original-value="${escapeHtml(value)}"
+                    onkeypress="if(event.key==='Enter'){updateMarpGlobalSetting(this.dataset.marpKey, this.value);}"
+                    onblur="if(this.value !== this.dataset.originalValue){updateMarpGlobalSetting(this.dataset.marpKey, this.value); this.dataset.originalValue = this.value;}"
+                    style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #555; color: white; border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
+    html += '</div>';
+
+    return html;
+}
+
+/**
+ * Escape HTML for use in attributes
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+
+/**
+ * Update a single Marp global setting in the YAML frontmatter
+ */
+function updateMarpGlobalSetting(key, value) {
+    // Send to backend to update YAML frontmatter
+    vscode.postMessage({
+        type: "updateMarpGlobalSetting",
+        key: key,
+        value: value
+    });
+
+    // Update cached board frontmatter
+    if (!window.cachedBoard.frontmatter) {
+        window.cachedBoard.frontmatter = {};
+    }
+    // Delete key if value is empty (match backend behavior)
+    if (value === '' || value === null || value === undefined) {
+        delete window.cachedBoard.frontmatter[key];
+    } else {
+        window.cachedBoard.frontmatter[key] = value;
+    }
+
+    // Update yamlHeader string to reflect the change
+    updateYamlHeaderString(key, value);
+
+    // Refresh the YAML preview section
+    refreshYamlPreview();
+}
+
+/**
+ * Update the yamlHeader string with a new key-value pair
+ */
+function updateYamlHeaderString(key, value) {
+    if (!window.cachedBoard) return;
+
+    let yamlHeader = window.cachedBoard.yamlHeader || '';
+    const lines = yamlHeader.split('\n');
+
+    // Find if the key already exists
+    let keyFound = false;
+    for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+        if (match && match[1] === key) {
+            // Update existing key
+            if (value === '' || value === null || value === undefined) {
+                // Remove the line if value is empty
+                lines.splice(i, 1);
+            } else {
+                lines[i] = `${key}: ${value}`;
+            }
+            keyFound = true;
+            break;
+        }
+    }
+
+    // If key not found and value is not empty, add it
+    if (!keyFound && value !== '' && value !== null && value !== undefined) {
+        if (yamlHeader === '') {
+            // Create new YAML header
+            lines.push('kanban-plugin: board');
+            lines.push(`${key}: ${value}`);
+        } else {
+            // Add to existing YAML
+            lines.push(`${key}: ${value}`);
+        }
+    }
+
+    // Reconstruct yamlHeader from lines
+    window.cachedBoard.yamlHeader = lines.filter(line => line.trim() !== '').join('\n');
+}
+
+/**
+ * Refresh just the YAML preview section without rebuilding the entire menu
+ */
+function refreshYamlPreview() {
+    const yamlContent = window.cachedBoard?.yamlHeader || '';
+    // Remove leading/trailing --- delimiters from display
+    let displayYaml = yamlContent;
+    if (displayYaml) {
+        const lines = displayYaml.split('\n').filter(line => line.trim() !== '---');
+        displayYaml = lines.join('\n').trim();
+    }
+    displayYaml = displayYaml || '(No YAML frontmatter found)';
+
+    // Find and update the preview element
+    const preElement = document.querySelector('#marp-global-settings-content pre');
+    if (preElement) {
+        preElement.textContent = displayYaml;
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener("click", function(event) {
+    const menus = document.querySelectorAll('.marp-global-menu');
+    menus.forEach(menu => {
+        if (!menu.contains(event.target)) {
+            menu.classList.remove('active');
+        }
+    });
+});
+
+// Make functions globally available
+window.toggleMarpGlobalMenu = toggleMarpGlobalMenu;
+window.promptMarpSetting = promptMarpSetting;
+window.toggleMarpEnabled = toggleMarpEnabled;
+window.updateMarpGlobalSetting = updateMarpGlobalSetting;
+

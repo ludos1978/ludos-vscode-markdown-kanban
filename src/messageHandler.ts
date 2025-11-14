@@ -381,6 +381,10 @@ export class MessageHandler {
                     console.warn('❌ No current board available for undo state saving');
                 }
                 break;
+            case 'updateMarpGlobalSetting':
+                // Update Marp global setting in YAML frontmatter
+                await this.handleUpdateMarpGlobalSetting(message.key, message.value);
+                break;
             case 'pageHiddenWithUnsavedChanges':
                 // Handle page becoming hidden with unsaved changes
                 await this.handlePageHiddenWithUnsavedChanges();
@@ -1364,6 +1368,79 @@ export class MessageHandler {
             if (file) {
                 file.setEditMode(false);
             }
+        }
+    }
+
+    /**
+     * Handle updating a Marp global setting in the YAML frontmatter
+     * This updates the board's yamlHeader in memory and marks as unsaved
+     * The actual file write happens when user saves (Ctrl+S)
+     */
+    private async handleUpdateMarpGlobalSetting(key: string, value: string): Promise<void> {
+        try {
+            const board = this._getCurrentBoard();
+            if (!board) {
+                console.error('[MessageHandler] No board to update Marp setting');
+                return;
+            }
+
+            // Get current YAML header or create new one
+            let yamlHeader = board.yamlHeader || '';
+            const lines = yamlHeader.split('\n');
+
+            // Find YAML frontmatter boundaries (without the --- delimiters)
+            let keyFound = false;
+
+            // If empty, initialize with kanban-plugin marker
+            if (!yamlHeader || yamlHeader.trim() === '') {
+                yamlHeader = 'kanban-plugin: board';
+                lines.length = 0;
+                lines.push('kanban-plugin: board');
+            }
+
+            // Update or add the key
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*.*/);
+                if (keyMatch && keyMatch[2] === key) {
+                    // Update existing key or remove if empty
+                    if (value === '' || value === null || value === undefined) {
+                        lines.splice(i, 1);
+                    } else {
+                        lines[i] = `${keyMatch[1]}${key}: ${value}`;
+                    }
+                    keyFound = true;
+                    break;
+                }
+            }
+
+            // If key not found and value is not empty, add it
+            if (!keyFound && value !== '' && value !== null && value !== undefined) {
+                lines.push(`${key}: ${value}`);
+            }
+
+            // Update board's yamlHeader
+            board.yamlHeader = lines.filter(line => line.trim() !== '').join('\n');
+
+            // CRITICAL: Also update the frontmatter object that frontend reads from
+            if (!board.frontmatter) {
+                board.frontmatter = {};
+            }
+            if (value === '' || value === null || value === undefined) {
+                delete board.frontmatter[key];
+            } else {
+                board.frontmatter[key] = value;
+            }
+
+            // Mark as unsaved changes (will be written when user saves)
+            // Frontend already updated optimistically, so don't send board update back
+            this._markUnsavedChanges(true, board);
+
+            console.log(`[MessageHandler] Updated Marp global setting in memory: ${key} = ${value}`);
+
+        } catch (error) {
+            console.error('[MessageHandler] Error updating Marp global setting:', error);
+            vscode.window.showErrorMessage(`Failed to update Marp setting: ${error}`);
         }
     }
 

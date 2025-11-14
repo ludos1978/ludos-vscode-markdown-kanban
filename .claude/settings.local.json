@@ -83,7 +83,8 @@
       "Bash(/tmp/menuOperations_before.js)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:deepwiki.com)",
-      "Bash(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/webview.js)"
+      "Bash(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/webview.js)",
+      "Bash(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/webview.css)"
     ],
     "deny": [],
     "ask": []

@@ -36,6 +36,7 @@ export interface KanbanBoard {
   columns: KanbanColumn[];
   yamlHeader: string | null;
   kanbanFooter: string | null;
+  frontmatter?: Record<string, string>;
 }
 
 export class MarkdownKanbanParser {
@@ -299,7 +300,40 @@ export class MarkdownKanbanParser {
       // Detect regular includes in task descriptions (not handled by parser, but tracked for file watching)
       this.detectRegularIncludes(board, includedFiles);
 
+      // Parse Marp global settings from YAML frontmatter
+      board.frontmatter = this.parseMarpFrontmatter(board.yamlHeader || '');
+
       return { board, includedFiles, columnIncludeFiles, taskIncludeFiles };
+  }
+
+  /**
+   * Parse Marp global settings from YAML frontmatter
+   */
+  private static parseMarpFrontmatter(yamlHeader: string): Record<string, string> {
+    const frontmatter: Record<string, string> = {};
+
+    if (!yamlHeader) {
+      return frontmatter;
+    }
+
+    const lines = yamlHeader.split('\n');
+    const marpKeys = ['theme', 'style', 'headingDivider', 'size', 'math', 'title', 'author',
+                      'description', 'keywords', 'url', 'image', 'marp', 'paginate',
+                      'header', 'footer', 'class', 'backgroundColor', 'backgroundImage',
+                      'backgroundPosition', 'backgroundRepeat', 'backgroundSize', 'color'];
+
+    for (const line of lines) {
+      const match = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+      if (match) {
+        const key = match[1];
+        const value = match[2].trim();
+        if (marpKeys.includes(key)) {
+          frontmatter[key] = value;
+        }
+      }
+    }
+
+    return frontmatter;
   }
 
   private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[]): void {

@@ -1,4 +1,36 @@
-- Remove the "immediate" parameter from the boardUpdate function. 
+lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
+"""
+theme 	Set a theme name for the slide deck ▶️
+style 	Specify CSS for tweaking theme
+headingDivider 	Specify heading divider option ▶️
+size 	Choose the slide size preset provided by theme
+math 	Choose a library to render math typesetting ▶️
+title 	Set a title of the slide deck
+author 	Set an author of the slide deck
+description 	Set a description of the slide deck
+keywords 	Set comma-separated keywords for the slide deck
+url 	Set canonical URL for the slide deck (for HTML export)
+image 	Set Open Graph image URL (for HTML export)
+marp 	Set whether or not enable Marp feature in VS Code
+
+paginate 	Show page number on the slide if set to true ▶️
+header 	Specify the content of the slide header ▶️
+footer 	Specify the content of the slide footer ▶️
+class 	Set HTML class attribute for the slide element <section>
+backgroundColor 	Set background-color style of the slide
+backgroundImage 	Set background-image style of the slide
+backgroundPosition 	Set background-position style of the slide
+backgroundRepeat 	Set background-repeat style of the slide
+backgroundSize 	Set background-size style of the slide
+color 	Set color style of the slide
+"""
+they can be written to the yaml header and must also be read from there when loading the kanban!
+
+remove the marp theme and style from the column headers and task headers.
+
+
+
+- [ ] Remove the "immediate" parameter from the boardUpdate function. 
   We should never use the feature to mark something as unsaved, but use the hash to determine wether a file needs saving to file, because the file content is different to the saved content! Remove this feature and replace it by comparing the hashes from cache and files.
   saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
    So onWillSaveTextDocument is completely redundant and wrong! 

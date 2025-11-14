@@ -298,6 +298,17 @@
             <div class="file-info-left">
                 <span class="file-icon">📄</span>
                 <span id="file-name" class="file-name">No file loaded</span>
+                <!-- Marp Global Settings Burger Menu -->
+                <div class="marp-global-menu">
+                    <button class="marp-global-menu-btn" onclick="toggleMarpGlobalMenu(event, this)">
+                        <span class="menu-icon">☰</span>
+                    </button>
+                    <div class="marp-global-menu-dropdown">
+                        <div class="marp-global-settings-content" id="marp-global-settings-content">
+                            <!-- Content will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="file-info-center">
                 <div id="empty-card-source" class="empty-card-source" draggable="true" title="Drag to create empty card" ondragstart="handleEmptyCardDragStart(event)" ondragend="handleEmptyCardDragEnd(event)">
@@ -428,13 +439,6 @@
                             <span class="menu-icon">📍</span> Sticky Stack Mode
                             <div class="file-bar-menu-submenu" data-menu="stickyStackMode">
                                 <!-- Dynamic content populated by JavaScript -->
-                            </div>
-                        </div>
-                        <div class="file-bar-menu-divider"></div>
-                        <div class="file-bar-menu-item has-submenu">
-                            <span class="menu-icon">🎨</span> Marp Classes (Global)
-                            <div class="file-bar-menu-submenu" data-menu="marpClasses" data-scope="global">
-                                <!-- Populated by JavaScript -->
                             </div>
                         </div>
                         <div class="file-bar-menu-divider"></div>
