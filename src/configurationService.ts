@@ -246,9 +246,7 @@ export class ConfigurationService {
     // Tag category filtering for columns
     public getEnabledTagCategoriesColumn(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
-        const enabledArray = config.get<string[]>('enabledTagCategoriesColumn', [
-            'workflow', 'organization', 'importance', 'type', 'category', 'colors', 'positivity', 'content-type-teaching', 'complexity'
-        ]);
+        const enabledArray = config.get<string[]>('enabledTagCategoriesColumn', []);
 
         // Convert array to object format for backward compatibility
         const result: { [key: string]: boolean } = {};
@@ -263,10 +261,7 @@ export class ConfigurationService {
     // Tag category filtering for tasks
     public getEnabledTagCategoriesTask(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
-        const enabledArray = config.get<string[]>('enabledTagCategoriesTask', [
-            'positivity', 'status', 'importance', 
-            'colors', 'time-estimate', 'platform-teaching', 'impact'
-        ]);
+        const enabledArray = config.get<string[]>('enabledTagCategoriesTask', []);
 
         // Convert array to object format for backward compatibility
         const result: { [key: string]: boolean } = {};

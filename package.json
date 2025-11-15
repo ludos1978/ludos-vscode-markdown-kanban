@@ -3897,9 +3897,8 @@
           },
           "default": [
             "workflow",
-            "organization",
+            "positivity",
             "colors",
-            "content-type-teaching",
             "complexity"
           ],
           "uniqueItems": true,
@@ -3937,10 +3936,7 @@
           "default": [
             "positivity",
             "status",
-            "importance",
             "colors",
-            "time-estimate",
-            "platform-teaching",
             "impact"
           ],
           "uniqueItems": true,

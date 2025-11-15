@@ -1231,7 +1231,7 @@ function toggleFileBarMenu(event, button) {
                                 html += `
                                     <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
                                             onclick="toggleMarpClass('global', null, null, '${className}')"
-                                            style="padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: left;">
+                                            style="padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: left;">
                                         ${checkmark}${className}
                                     </button>
                                 `;
@@ -6680,7 +6680,7 @@ function populateMarpGlobalMenu() {
         html += `
             <button class="marp-class-chip ${isActive ? 'active' : ''}"
                     onclick="toggleMarpClass('global', null, null, '${className}'); event.stopPropagation();"
-                    style="padding: 6px 8px; font-size: 11px; border: 1px solid #555; border-radius: 4px; background: ${isActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                    style="padding: 6px 8px; font-size: 11px; border: 1px solid #555; border-radius: 4px; background: ${isActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: left; transition: all 0.2s;">
                 ${checkmark}${className}
             </button>
         `;
@@ -6727,7 +6727,7 @@ function createMarpInputField(key, label, value, placeholder) {
                     data-original-value="${escapeHtml(value)}"
                     onkeypress="if(event.key==='Enter'){updateMarpGlobalSetting(this.dataset.marpKey, this.value);}"
                     onblur="if(this.value !== this.dataset.originalValue){updateMarpGlobalSetting(this.dataset.marpKey, this.value); this.dataset.originalValue = this.value;}"
-                    style="width: 100%; padding: 4px; background: #2a2a2a; border: 1px solid #555; color: white; border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
+                    style="width: 100%; padding: 4px; background: var(--board-background); border: 1px solid #555; color: var(--vscode-foreground); border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
     html += '</div>';
 
     return html;

@@ -381,10 +381,10 @@ class SimpleMenuManager {
                     <div style="display: flex; gap: 8px; margin-bottom: 4px;">
                         <input type="text" placeholder="Local (this + following)"
                                onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
-                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #4a90e2; color: white; border-radius: 4px; font-size: 11px;">
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
                         <input type="text" placeholder="Scoped (this only)"
                                onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
-                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #ff9500; color: white; border-radius: 4px; font-size: 11px;">
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
                     </div>
                 </div>
             `;
@@ -424,10 +424,10 @@ class SimpleMenuManager {
                     <div style="display: flex; gap: 8px; margin-bottom: 4px;">
                         <input type="text" placeholder="Local (this + following)"
                                onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
-                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #4a90e2; color: white; border-radius: 4px; font-size: 11px;">
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
                         <input type="text" placeholder="Scoped (this only)"
                                onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
-                               style="flex: 1; padding: 6px; background: #2a2a2a; border: 1px solid #ff9500; color: white; border-radius: 4px; font-size: 11px;">
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
                     </div>
                 </div>
             `;
@@ -448,7 +448,7 @@ class SimpleMenuManager {
         html += `
             <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
                     onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #4a90e2; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #4a90e2; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
                 ${isLocalPaginateActive ? '✓ ' : ''}Local
             </button>
         `;
@@ -457,7 +457,7 @@ class SimpleMenuManager {
         html += `
             <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
                     onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
-                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #ff9500; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : '#2a2a2a'}; color: white; cursor: pointer; text-align: center;">
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #ff9500; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
                 ${isScopedPaginateActive ? '✓ ' : ''}Scoped
             </button>
         `;

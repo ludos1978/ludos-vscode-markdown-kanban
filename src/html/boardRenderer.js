@@ -269,16 +269,18 @@ function ensureTagStyleExists(tagName) {
     
     // Check if this tag's styles already exist
     const existingStyles = styleElement.textContent || '';
-    if (existingStyles.includes(`[data-column-tag="${tagName}"]`) || 
-        existingStyles.includes(`[data-task-tag="${tagName}"]`)) {
+    if (existingStyles.includes(`[data-column-bg-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-task-bg-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-column-border-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-task-border-tag="${tagName}"]`)) {
         return;
     }
-    
+
     // Generate styles for this specific tag
     const tagConfig = config;
     const editorBg = getEditorBackground();
     let newStyles = '';
-    
+
     // Generate column styles for this tag
     if (tagConfig.column) {
         const columnColors = tagConfig.column[themeKey] || tagConfig.column.light || {};
@@ -286,38 +288,31 @@ function ensureTagStyleExists(tagName) {
             const bgDark = columnColors.backgroundDark || columnColors.background;
             const columnBg = interpolateColor(editorBg, bgDark, 0.15);
             const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
-            
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-header {
+
+            newStyles += `.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-header {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-title,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-title {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-title {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-content {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-footer,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-footer {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-footer {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-header,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-header {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-header {
     background-color: ${columnCollapsedBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-title,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-title {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-title {
     background-color: ${columnCollapsedBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-footer,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-footer {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-footer {
     background-color: ${columnCollapsedBg} !important;
 }\n`;
         }
     }
-    
+
     // Generate card styles for this tag
     if (tagConfig.card) {
         const cardColors = tagConfig.card[themeKey] || tagConfig.card.light || {};
@@ -325,43 +320,41 @@ function ensureTagStyleExists(tagName) {
             const bgDark = cardColors.backgroundDark || cardColors.background;
             const cardBg = interpolateColor(editorBg, bgDark, 0.25);
             const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-            
-            newStyles += `.task-item[data-task-tag="${tagName}"],
-.task-item[data-all-tags~="${tagName}"] {
+
+            newStyles += `.task-item[data-task-bg-tag="${tagName}"] {
     background-color: ${cardBg} !important;
 }
-.task-item[data-task-tag="${tagName}"]:hover,
-.task-item[data-all-tags~="${tagName}"]:hover {
+.task-item[data-task-bg-tag="${tagName}"]:hover {
     background-color: ${cardHoverBg} !important;
 }\n`;
         }
     }
-    
+
     // Generate border styles for this tag
     if (tagConfig.border) {
         const borderColor = tagConfig.border.color || (tagConfig[themeKey]?.background || tagConfig.light?.background);
         const borderWidth = tagConfig.border.width || '2px';
         const borderStyle = tagConfig.border.style || 'solid';
-        
+
         if (tagConfig.border.position === 'left') {
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header {
+            newStyles += `.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-header {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-content {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.task-item[data-task-tag="${tagName}"] {
+.task-item[data-task-border-tag="${tagName}"] {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }\n`;
         } else {
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header {
+            newStyles += `.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-header {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-content {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                 border-top: none !important;
             }
-.task-item[data-task-tag="${tagName}"] {
+.task-item[data-task-border-tag="${tagName}"] {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }\n`;
         }
@@ -952,6 +945,44 @@ function getUserAddedTags() {
     return userAddedTags.sort(); // Sort alphabetically
 }
 
+/**
+ * Find first tag that has a specific styling property defined
+ * Purpose: Determines which tag should provide each type of styling (border, background, etc.)
+ * Used by: Column and task rendering to set styling attributes
+ * @param {string} text - Text containing tags
+ * @param {string} property - Property to check for ('border', 'background', 'headerBar', 'footerBar', 'cornerBadge')
+ * @returns {string|null} First tag with that property or null
+ */
+function getFirstTagWithProperty(text, property) {
+    const allTags = getActiveTagsInTitle(text);
+
+    for (const tagName of allTags) {
+        // Skip layout tags
+        if (tagName.startsWith('row') || tagName.startsWith('gather_') || tagName.startsWith('span') || tagName === 'stack') continue;
+
+        // Skip sticky tag
+        if (tagName === 'sticky') continue;
+
+        const config = getTagConfig(tagName);
+        if (!config) continue; // Skip tags with no configuration (like numeric tags #1, #2, etc.)
+
+        // Check if this tag has the requested property
+        if (property === 'background') {
+            // Check for background in light/dark themes or direct background
+            const hasBackground = (config.light?.background || config.dark?.background ||
+                                  config.column?.light?.background || config.column?.dark?.background ||
+                                  config.card?.light?.background || config.card?.dark?.background);
+            if (hasBackground) return tagName;
+        } else if (property === 'border') {
+            if (config.border) return tagName;
+        } else if (config[property]) {
+            return tagName;
+        }
+    }
+
+    return null;
+}
+
 // Helper function to generate tag menu items from configuration and user-added tags
 /**
  * Generate numeric badge HTML for columns and tasks
@@ -991,6 +1022,12 @@ function generateTagMenuItems(id, type, columnId = null) {
     const enabledCategories = type === 'column'
         ? (window.enabledTagCategoriesColumn || {})
         : (window.enabledTagCategoriesTask || {});
+
+    // Debug: Log enabled categories
+    if (type === 'column') {
+        console.log('[DEBUG] Enabled column tag categories:', enabledCategories);
+        console.log('[DEBUG] Is positivity enabled?', enabledCategories['positivity']);
+    }
 
     // Map group keys to config keys (kebab-case to camelCase)
     const groupKeyToConfigKey = (groupKey) => {
@@ -1816,20 +1853,23 @@ function createColumnElement(column, columnIndex) {
     // Extract ALL tags from column title for stacking features
     const allTags = getActiveTagsInTitle(column.title);
 
-    // Use first tag for background color (never stack backgrounds)
-    const columnTag = window.tagUtils ? window.tagUtils.extractFirstTag(column.title) : null;
-    
+    // Find first tag with border definition
+    const columnBorderTag = getFirstTagWithProperty(column.title, 'border');
+
+    // Find first tag with background definition
+    const columnBgTag = getFirstTagWithProperty(column.title, 'background');
+
     const columnDiv = document.createElement('div');
     const isCollapsed = window.collapsedColumns.has(column.id);
-    
+
     // Header/footer bars handled by immediate update system
     const headerBarsHtml = '';
     const footerBarsHtml = '';
-    
+
     // Determine classes
     let headerClasses = '';
     let footerClasses = '';
-    
+
     if (headerBarsHtml) {
         headerClasses = 'has-header-bar';
         if (headerBarsHtml.includes('label')) {headerClasses += ' has-header-label';}
@@ -1838,7 +1878,7 @@ function createColumnElement(column, columnIndex) {
         footerClasses = 'has-footer-bar';
         if (footerBarsHtml.includes('label')) {footerClasses += ' has-footer-label';}
     }
-    
+
     // Check for span tag to set column width (only blocked by viewport-based widths, not pixel widths)
     let spanClass = '';
     const spanMatch = column.title.match(/#span(\d+)\b/i);
@@ -1859,12 +1899,15 @@ function createColumnElement(column, columnIndex) {
     columnDiv.setAttribute('data-row', getColumnRow(column.title));
     columnDiv.setAttribute('data-column-sticky', hasStickyTag ? 'true' : 'false');
 
-    // Add primary tag for background color only (ignore row/gather/span)
-    if (columnTag && !columnTag.startsWith('row') && !columnTag.startsWith('gather_') && !columnTag.startsWith('span')) {
-        columnDiv.setAttribute('data-column-tag', columnTag);
+    // Add separate tag attributes for border and background (skips tags without those properties)
+    if (columnBorderTag) {
+        columnDiv.setAttribute('data-column-border-tag', columnBorderTag);
     }
-    
-    // Add all tags as a separate attribute for stacking features
+    if (columnBgTag) {
+        columnDiv.setAttribute('data-column-bg-tag', columnBgTag);
+    }
+
+    // Add all tags as a separate attribute for stacking features (header/footer bars, badges)
     if (allTags.length > 0) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
@@ -2070,13 +2113,17 @@ function createTaskElement(task, columnId, taskIndex) {
     // Extract ALL tags for stacking features (from the full title)
     const allTags = getActiveTagsInTitle(task.title);
 
-    // Extract primary tag for styling (first non-special tag)
-    const primaryTag = window.extractFirstTag ? window.extractFirstTag(task.title) : null;
-    const tagAttribute = (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span'))
-        ? ` data-task-tag="${primaryTag}"`
-        : '';
+    // Find first tag with border definition
+    const taskBorderTag = getFirstTagWithProperty(task.title, 'border');
 
-    // Add all tags attribute for stacking features
+    // Find first tag with background definition
+    const taskBgTag = getFirstTagWithProperty(task.title, 'background');
+
+    // Add separate tag attributes for border and background (skips tags without those properties)
+    const borderTagAttribute = taskBorderTag ? ` data-task-border-tag="${taskBorderTag}"` : '';
+    const bgTagAttribute = taskBgTag ? ` data-task-bg-tag="${taskBgTag}"` : '';
+
+    // Add all tags attribute for stacking features (header/footer bars, badges)
     const allTagsAttribute = allTags.length > 0 ? ` data-all-tags="${allTags.join(' ')}"` : '';
     
     // Corner badges and header/footer bars handled by immediate update system
@@ -2114,7 +2161,7 @@ function createTaskElement(task, columnId, taskIndex) {
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
-             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}${currentWeekAttribute}
+             data-task-index="${taskIndex}"${borderTagAttribute}${bgTagAttribute}${allTagsAttribute}${currentWeekAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
             ${loadingOverlay}
             ${headerBarsHtml}
@@ -3590,32 +3637,32 @@ function generateTagStyles() {
                     const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-header {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-header {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-title {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column title text color - higher specificity to override base CSS
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-title .column-title-text,
-.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text,
+.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
                     // Column content background
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-content {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-content {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column footer background and text
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-footer,
-.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer,
+.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
@@ -3627,90 +3674,90 @@ function generateTagStyles() {
                     const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-header {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-header {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-title {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
                     // Collapsed title text color - higher specificity
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-title .column-title-text,
-.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text,
+.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
 
                     // Collapsed column footer background and text
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-footer,
-.kanban-full-height-column.collapsed[data-column-tag="${attrTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer,
+.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
 
                     // Card background styles - only for primary tag
                     // Interpolate 25% towards the darker color
                     const cardBg = interpolateColor(editorBg, bgDark, 0.25);
-                    styles += `.task-item[data-task-tag="${attrTagName}"] {
+                    styles += `.task-item[data-task-bg-tag="${attrTagName}"] {
                         background-color: ${cardBg} !important;
                         position: relative;
                     }\n`;
 
                     // Card hover state - interpolate 35% towards the darker color
                     const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-                    styles += `.task-item[data-task-tag="${attrTagName}"]:hover {
+                    styles += `.task-item[data-task-bg-tag="${attrTagName}"]:hover {
                         background-color: ${cardHoverBg} !important;
                     }\n`;
                 }
 
-                // Stackable border styles using data-all-tags - works even without background colors
+                // Stackable border styles - works even without background colors
                 if (config.border) {
                         const borderColor = config.border.color || themeColors.background;
                         const borderWidth = config.border.width || '2px';
                         const borderStyle = config.border.style || 'solid';
-                        
+
                         if (config.border.position === 'left') {
-                            // Use data-column-tag for left border on all column parts
-                            styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-header {
+                            // Use data-column-border-tag for left border on all column parts
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-title {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-inner {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-footer {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${attrTagName}"] {
+                            styles += `.task-item[data-task-border-tag="${attrTagName}"] {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         } else {
                             // Full border split the border for top and bottom part
-                            styles += `.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-header {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-top: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-title {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-inner {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: none !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${attrTagName}"] .column-footer {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${attrTagName}"] {
+                            styles += `.task-item[data-task-border-tag="${attrTagName}"] {
                                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         }
