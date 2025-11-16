@@ -3946,6 +3946,47 @@ function injectStackableBars(targetElement = null) {
         const isCollapsed = isColumn && isColumnCollapsed(element);
         const isStacked = isColumn && element.closest('.kanban-column-stack');
 
+        // Update background and border tag attributes based on title tags
+        // Get the element's title to check which tags have background/border properties
+        let titleText = '';
+        if (isColumn) {
+            const columnId = element.getAttribute('data-column-id');
+            if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+                const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                titleText = column ? column.title : '';
+            }
+        } else {
+            const taskId = element.getAttribute('data-task-id');
+            if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+                // Find task across all columns
+                for (const column of window.cachedBoard.columns) {
+                    const task = column.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        titleText = task.title;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Update border tag attribute
+        const borderTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'border') : null;
+        const borderTagAttr = isColumn ? 'data-column-border-tag' : 'data-task-border-tag';
+        if (borderTag) {
+            element.setAttribute(borderTagAttr, borderTag);
+        } else {
+            element.removeAttribute(borderTagAttr);
+        }
+
+        // Update background tag attribute
+        const bgTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'background') : null;
+        const bgTagAttr = isColumn ? 'data-column-bg-tag' : 'data-task-bg-tag';
+        if (bgTag) {
+            element.setAttribute(bgTagAttr, bgTag);
+        } else {
+            element.removeAttribute(bgTagAttr);
+        }
+
         // Filter out tags that are ONLY in description (not in title) for task elements
         if (!isColumn) { // This is a task element
             const taskTitleDisplay = element.querySelector('.task-title-display');

@@ -4197,14 +4197,14 @@ window.handleSaveError = handleSaveError;
 window.applyPendingChangesLocally = applyPendingChangesLocally;
 // Update visual tag state - handles borders and other tag-based styling
 function updateVisualTagState(element, allTags, elementType, isCollapsed) {
-    
+
     // Update primary tag attribute (for primary styling like borders)
     const primaryTag = allTags.length > 0 ? allTags[0] : null;
     const tagAttribute = elementType === 'column' ? 'data-column-tag' : 'data-task-tag';
-    
+
     if (primaryTag) {
         element.setAttribute(tagAttribute, primaryTag);
-        
+
         // Ensure style exists for the primary tag
         if (window.ensureTagStyleExists) {
             window.ensureTagStyleExists(primaryTag);
@@ -4212,11 +4212,11 @@ function updateVisualTagState(element, allTags, elementType, isCollapsed) {
     } else {
         element.removeAttribute(tagAttribute);
     }
-    
+
     // Update all-tags attribute (for multi-tag styling)
     if (allTags.length > 0) {
         element.setAttribute('data-all-tags', allTags.join(' '));
-        
+
         // Ensure styles exist for all tags
         if (window.ensureTagStyleExists) {
             allTags.forEach(tag => {
@@ -4226,13 +4226,54 @@ function updateVisualTagState(element, allTags, elementType, isCollapsed) {
     } else {
         element.removeAttribute('data-all-tags');
     }
-    
+
+    // Update background and border tag attributes (needed for colors/borders to work dynamically)
+    // Get the element's title to check which tags have background/border properties
+    let titleText = '';
+    if (elementType === 'column') {
+        const columnId = element.getAttribute('data-column-id');
+        if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            titleText = column ? column.title : '';
+        }
+    } else {
+        const taskId = element.getAttribute('data-task-id');
+        if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+            // Find task across all columns
+            for (const column of window.cachedBoard.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    titleText = task.title;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Update border tag attribute
+    const borderTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'border') : null;
+    const borderTagAttr = elementType === 'column' ? 'data-column-border-tag' : 'data-task-border-tag';
+    if (borderTag) {
+        element.setAttribute(borderTagAttr, borderTag);
+    } else {
+        element.removeAttribute(borderTagAttr);
+    }
+
+    // Update background tag attribute
+    const bgTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'background') : null;
+    const bgTagAttr = elementType === 'column' ? 'data-column-bg-tag' : 'data-task-bg-tag';
+    if (bgTag) {
+        element.setAttribute(bgTagAttr, bgTag);
+    } else {
+        element.removeAttribute(bgTagAttr);
+    }
+
     // Update all visual tag elements immediately (headers, footers, borders, badges)
     updateAllVisualTagElements(element, allTags, elementType);
-    
+
     // Force a style recalculation to ensure CSS changes are applied immediately
     element.offsetHeight; // Trigger reflow
-    
+
 }
 
 // Comprehensive function to update ALL visual tag elements immediately

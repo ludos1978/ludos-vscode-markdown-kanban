@@ -889,6 +889,20 @@ class TaskEditor {
                                 title: newTitle
                             });
 
+                            // Update all visual tag state immediately (backgrounds, borders, badges)
+                            const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(newTitle) : [];
+                            const isCollapsed = columnElement.classList.contains('collapsed');
+                            if (window.updateVisualTagState) {
+                                window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
+                            }
+
+                            // Update corner badges immediately from the title (tags should be parsed now, not later)
+                            if (window.updateCornerBadgesImmediate) {
+                                // For columns, we need to pass a combined text that includes both title and description tags
+                                const combinedText = [column.title, column.description].filter(Boolean).join(' ');
+                                window.updateCornerBadgesImmediate(currentColumnId, 'column', combinedText);
+                            }
+
                             // Don't continue with regular updates - backend will handle the rest
                             return; // Skip the rest of the local updates for include changes
                         }
@@ -958,13 +972,6 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-column-tag');
                         }
 
-                        // Update all tags attribute for stacking features
-                        if (allTags.length > 0) {
-                            columnElement2.setAttribute('data-all-tags', allTags.join(' '));
-                        } else {
-                            columnElement2.removeAttribute('data-all-tags');
-                        }
-
                         // Update current week attribute
                         if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
                             columnElement2.setAttribute('data-current-week', 'true');
@@ -972,35 +979,17 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-current-week');
                         }
 
-                        // Force style recalculation and update header/footer bars
-                        if (allTags.length > 0) {
-                            // Gentle style refresh: toggle a temporary class to force re-evaluation
-                            columnElement2.classList.add('tag-update-trigger');
-                            requestAnimationFrame(() => {
-                                columnElement2.classList.remove('tag-update-trigger');
-
-                                // Update footer/header bars after DOM updates complete
-                                if (window.updateAllVisualTagElements) {
-                                    window.updateAllVisualTagElements(columnElement2, allTags, 'column');
-                                }
-                            });
-                        } else {
-                            // If no tags, still update header/footer bars to remove any existing ones
-                            if (window.injectStackableBars) {
-                                window.injectStackableBars(columnElement2);
-                            }
+                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        const isCollapsed = columnElement2.classList.contains('collapsed');
+                        if (window.updateVisualTagState) {
+                            window.updateVisualTagState(columnElement2, allTags, 'column', isCollapsed);
                         }
 
-                        // Update corner badges without re-render (numeric badges now handled as corner badges)
+                        // Update corner badges immediately (numeric badges now handled as corner badges)
                         if (window.updateCornerBadgesImmediate) {
                             // For columns, we need to pass a combined text that includes both title and description tags
                             const combinedText = [column.title, column.description].filter(Boolean).join(' ');
                             window.updateCornerBadgesImmediate(columnId, 'column', combinedText);
-                        }
-
-                        // Update tag counts in any open menus
-                        if (window.updateTagCategoryCounts) {
-                            window.updateTagCategoryCounts(columnId, 'column');
                         }
                     }
                     
@@ -1066,6 +1055,21 @@ class TaskEditor {
                                 columnId: columnId,
                                 taskData: { title: value }
                             });
+
+                            // Update all visual tag state immediately (backgrounds, borders, badges)
+                            const taskElement = element.closest('.task-item');
+                            const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(value) : [];
+                            const isCollapsed = taskElement?.classList.contains('collapsed');
+                            if (taskElement && window.updateVisualTagState) {
+                                window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
+                            }
+
+                            // Update corner badges immediately from the title (tags should be parsed now, not later)
+                            if (window.updateCornerBadgesImmediate) {
+                                // For tasks, we need to pass a combined text that includes both title and description tags
+                                const combinedText = [task.title, task.description].filter(Boolean).join(' ');
+                                window.updateCornerBadgesImmediate(taskId, 'task', combinedText);
+                            }
 
                             return; // Skip local updates, let backend handle
                         } else if (task.includeMode && oldIncludeMatches.length > 0) {
@@ -1202,42 +1206,17 @@ class TaskEditor {
                             taskElement.removeAttribute('data-task-tag');
                         }
 
-                        // Update all tags attribute for stacking features
-                        if (allTags.length > 0) {
-                            taskElement.setAttribute('data-all-tags', allTags.join(' '));
-                        } else {
-                            taskElement.removeAttribute('data-all-tags');
+                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        const isCollapsed = taskElement.classList.contains('collapsed');
+                        if (window.updateVisualTagState) {
+                            window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
                         }
 
-                        // Force style recalculation and update header/footer bars
-                        if (allTags.length > 0) {
-                            // Gentle style refresh: toggle a temporary class to force re-evaluation
-                            taskElement.classList.add('tag-update-trigger');
-                            requestAnimationFrame(() => {
-                                taskElement.classList.remove('tag-update-trigger');
-
-                                // Update footer/header bars after DOM updates complete
-                                if (window.injectStackableBars) {
-                                    window.injectStackableBars(taskElement);
-                                }
-                            });
-                        } else {
-                            // If no tags, still update header/footer bars to remove any existing ones
-                            if (window.injectStackableBars) {
-                                window.injectStackableBars(taskElement);
-                            }
-                        }
-
-                        // Update corner badges without re-render (numeric badges now handled as corner badges)
+                        // Update corner badges immediately (numeric badges now handled as corner badges)
                         if (window.updateCornerBadgesImmediate) {
                             // For tasks, we need to pass a combined text that includes both title and description tags
                             const combinedText = [task.title, task.description].filter(Boolean).join(' ');
                             window.updateCornerBadgesImmediate(taskId, 'task', combinedText);
-                        }
-
-                        // Update tag counts in any open menus
-                        if (window.updateTagCategoryCounts) {
-                            window.updateTagCategoryCounts(taskId, 'task', columnId);
                         }
                     }
                     
