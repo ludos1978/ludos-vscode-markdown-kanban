@@ -991,41 +991,7 @@ class TaskEditor {
                             }
                         }
 
-                        // Update numeric badge immediately
-                        const numericBadgeContainer = columnElement2.querySelector('.numeric-badge');
-                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-                            const numericTag = window.tagUtils.extractNumericTag(column.title);
-                            if (numericTag !== null) {
-                                // Format the badge display
-                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-                                if (numericBadgeContainer) {
-                                    // Update existing badge
-                                    numericBadgeContainer.textContent = displayValue;
-                                    numericBadgeContainer.title = `Index: ${displayValue}`;
-                                } else {
-                                    // Create new badge if it doesn't exist
-                                    const columnTitleElement = columnElement2.querySelector('.column-title');
-                                    if (columnTitleElement) {
-                                        const newBadge = document.createElement('div');
-                                        newBadge.className = 'numeric-badge';
-                                        newBadge.textContent = displayValue;
-                                        newBadge.title = `Index: ${displayValue}`;
-                                        // Insert before the corner badges or at the beginning
-                                        const cornerBadges = columnTitleElement.querySelector('.corner-badges');
-                                        if (cornerBadges) {
-                                            columnTitleElement.insertBefore(newBadge, cornerBadges);
-                                        } else {
-                                            columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
-                                        }
-                                    }
-                                }
-                            } else if (numericBadgeContainer) {
-                                // Remove badge if no numeric tag
-                                numericBadgeContainer.remove();
-                            }
-                        }
-
-                        // Update corner badges without re-render (uses title+description combined like tasks)
+                        // Update corner badges without re-render (numeric badges now handled as corner badges)
                         if (window.updateCornerBadgesImmediate) {
                             // For columns, we need to pass a combined text that includes both title and description tags
                             const combinedText = [column.title, column.description].filter(Boolean).join(' ');
@@ -1262,41 +1228,7 @@ class TaskEditor {
                             }
                         }
 
-                        // Update numeric badge immediately
-                        const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
-                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-                            const numericTag = window.tagUtils.extractNumericTag(task.title);
-                            if (numericTag !== null) {
-                                // Format the badge display
-                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-                                if (numericBadgeContainer) {
-                                    // Update existing badge
-                                    numericBadgeContainer.textContent = displayValue;
-                                    numericBadgeContainer.title = `Index: ${displayValue}`;
-                                } else {
-                                    // Create new badge if it doesn't exist
-                                    const taskHeaderElement = taskElement.querySelector('.task-header');
-                                    if (taskHeaderElement) {
-                                        const newBadge = document.createElement('div');
-                                        newBadge.className = 'numeric-badge';
-                                        newBadge.textContent = displayValue;
-                                        newBadge.title = `Index: ${displayValue}`;
-                                        // Insert before the corner badges or at the beginning
-                                        const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
-                                        if (cornerBadges) {
-                                            taskHeaderElement.insertBefore(newBadge, cornerBadges);
-                                        } else {
-                                            taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
-                                        }
-                                    }
-                                }
-                            } else if (numericBadgeContainer) {
-                                // Remove badge if no numeric tag
-                                numericBadgeContainer.remove();
-                            }
-                        }
-
-                        // Update corner badges without re-render (uses title+description combined)
+                        // Update corner badges without re-render (numeric badges now handled as corner badges)
                         if (window.updateCornerBadgesImmediate) {
                             // For tasks, we need to pass a combined text that includes both title and description tags
                             const combinedText = [task.title, task.description].filter(Boolean).join(' ');

@@ -3085,41 +3085,7 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
 
-    // Update numeric badge immediately
-    const numericBadgeContainer = columnElement.querySelector('.numeric-badge');
-    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-        const numericTag = window.tagUtils.extractNumericTag(newTitle);
-        if (numericTag !== null) {
-            // Format the badge display
-            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-            if (numericBadgeContainer) {
-                // Update existing badge
-                numericBadgeContainer.textContent = displayValue;
-                numericBadgeContainer.title = `Index: ${displayValue}`;
-            } else {
-                // Create new badge if it doesn't exist
-                const columnTitleElement = columnElement.querySelector('.column-title');
-                if (columnTitleElement) {
-                    const newBadge = document.createElement('div');
-                    newBadge.className = 'numeric-badge';
-                    newBadge.textContent = displayValue;
-                    newBadge.title = `Index: ${displayValue}`;
-                    // Insert before the corner badges or at the beginning
-                    const cornerBadges = columnTitleElement.querySelector('.corner-badges');
-                    if (cornerBadges) {
-                        columnTitleElement.insertBefore(newBadge, cornerBadges);
-                    } else {
-                        columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
-                    }
-                }
-            }
-        } else if (numericBadgeContainer) {
-            // Remove badge if no numeric tag
-            numericBadgeContainer.remove();
-        }
-    }
-
-    // Update corner badges immediately
+    // Update corner badges immediately (numeric badges now handled as corner badges)
     updateCornerBadgesImmediate(columnId, 'column', newTitle);
     
     // Update tag chip button state using unique identifiers
@@ -3193,41 +3159,7 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
 
-    // Update numeric badge immediately
-    const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
-    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-        const numericTag = window.tagUtils.extractNumericTag(newTitle);
-        if (numericTag !== null) {
-            // Format the badge display
-            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-            if (numericBadgeContainer) {
-                // Update existing badge
-                numericBadgeContainer.textContent = displayValue;
-                numericBadgeContainer.title = `Index: ${displayValue}`;
-            } else {
-                // Create new badge if it doesn't exist
-                const taskHeaderElement = taskElement.querySelector('.task-header');
-                if (taskHeaderElement) {
-                    const newBadge = document.createElement('div');
-                    newBadge.className = 'numeric-badge';
-                    newBadge.textContent = displayValue;
-                    newBadge.title = `Index: ${displayValue}`;
-                    // Insert before the corner badges or at the beginning
-                    const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
-                    if (cornerBadges) {
-                        taskHeaderElement.insertBefore(newBadge, cornerBadges);
-                    } else {
-                        taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
-                    }
-                }
-            }
-        } else if (numericBadgeContainer) {
-            // Remove badge if no numeric tag
-            numericBadgeContainer.remove();
-        }
-    }
-
-    // Update corner badges immediately
+    // Update corner badges immediately (numeric badges now handled as corner badges)
     updateCornerBadgesImmediate(taskId, 'task', newTitle);
     
     // Update tag chip button state using unique identifiers
@@ -3894,7 +3826,13 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 
     // Generate new badges HTML
     let newBadgesHtml = '';
-    if (window.tagColors && activeTags.length > 0) {
+
+    // Extract numeric tags first to check if we need to render badges
+    const numericTags = window.tagUtils ? window.tagUtils.extractNumericTag(newTitle) : null;
+    const hasNumericTags = numericTags && Array.isArray(numericTags) && numericTags.length > 0;
+
+    // Render badges if we have active tags OR numeric tags
+    if (window.tagColors && (activeTags.length > 0 || hasNumericTags)) {
         // Debug: Check if positivity group exists
         if (activeTags.some(tag => ['++', '+', '--', '-', 'ø'].includes(tag))) {
             console.log('[DEBUG] window.tagColors has positivity group:', !!window.tagColors.positivity);
@@ -3909,6 +3847,25 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
             'bottom-left': [],
             'bottom-right': []
         };
+
+        // Add numeric badges to positions (already extracted above)
+        console.log(`[NUMERIC BADGES] Extracted from "${newTitle}":`, numericTags);
+        if (numericTags && Array.isArray(numericTags)) {
+            numericTags.forEach(numericValue => {
+                const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
+                console.log(`[NUMERIC BADGES] Adding badge: ${displayValue} to top-left`);
+                // Add to top-left position using SAME system as other corner badges
+                positions['top-left'].push({
+                    tag: `numeric-${numericValue}`,
+                    badge: {
+                        label: displayValue,
+                        position: 'top-left',
+                        color: 'var(--vscode-badge-background, #4d4d4d)',
+                        labelColor: 'var(--vscode-badge-foreground, #ffffff)'
+                    }
+                });
+            });
+        }
 
         // Collect badges by position
         activeTags.forEach(tag => {
@@ -4333,15 +4290,59 @@ function updateAllVisualTagElements(element, allTags, elementType) {
     // 3. CORNER BADGES - Update badges immediately
     let badgesContainer = element.querySelector('.corner-badges-container');
     if (!badgesContainer && window.getTagConfig) {
-        // Generate badges HTML inline
+        // Extract numeric tags from element's title first
+        // Get title from cached board data using element ID
+        let titleText = '';
+        if (elementType === 'column') {
+            const columnId = element.getAttribute('data-column-id');
+            if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+                const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                titleText = column ? column.title : '';
+            }
+        } else {
+            const taskId = element.getAttribute('data-task-id');
+            if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+                // Find task across all columns
+                for (const column of window.cachedBoard.columns) {
+                    const task = column.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        titleText = task.title;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const numericTags = window.tagUtils && titleText ? window.tagUtils.extractNumericTag(titleText) : null;
+        const hasNumericTags = numericTags && Array.isArray(numericTags) && numericTags.length > 0;
+
+        // Generate badges HTML inline (if we have active tags OR numeric tags)
         let badgesHtml = '';
-        if (window.tagColors && allTags.length > 0) {
+        if (window.tagColors && (allTags.length > 0 || hasNumericTags)) {
             const positions = {
                 'top-left': [],
                 'top-right': [],
                 'bottom-left': [],
                 'bottom-right': []
             };
+
+            // Add numeric badges to positions (already extracted above)
+            console.log(`[UPDATE ALL VISUAL] Extracting numeric tags from "${titleText}":`, numericTags);
+            if (numericTags && Array.isArray(numericTags)) {
+                numericTags.forEach(numericValue => {
+                    const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
+                    console.log(`[UPDATE ALL VISUAL] Adding numeric badge: ${displayValue} to top-left`);
+                    positions['top-left'].push({
+                        tag: `numeric-${numericValue}`,
+                        badge: {
+                            label: displayValue,
+                            position: 'top-left',
+                            color: 'var(--vscode-badge-background, #4d4d4d)',
+                            labelColor: 'var(--vscode-badge-foreground, #ffffff)'
+                        }
+                    });
+                });
+            }
 
             // Collect badges by position
             allTags.forEach(tag => {

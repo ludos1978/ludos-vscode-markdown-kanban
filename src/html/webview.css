@@ -3942,32 +3942,10 @@ h6 .kanban-tag {
   left: -12px;
 }
 
-/* When a column has its own corner badges at top-left, shift its numeric badge down to avoid overlap */
-/* Badges are in .column-title, not .column-header. Use > to only match direct children, not badges in nested tasks */
-.kanban-full-height-column:has(> .column-title > .corner-badge[data-badge-position="top-left"]) > .column-title > .numeric-badge {
-  top: 20px; /* Move down below first corner badge */
-}
-
-.kanban-full-height-column:has(> .column-title > .corner-badge[data-badge-position="top-left"][data-badge-index="1"]) > .column-title > .numeric-badge {
-  top: 44px; /* Move below second corner badge (10 + 24 + 10) */
-}
-
-.kanban-full-height-column:has(> .column-title > .corner-badge[data-badge-position="top-left"][data-badge-index="2"]) > .column-title > .numeric-badge {
-  top: 68px; /* Move below third corner badge (10 + 24 + 24 + 10) */
-}
-
-/* When a task has corner badges at top-left, shift its numeric badge down to avoid overlap */
-.task-item:has(> .corner-badge[data-badge-position="top-left"]) > .numeric-badge {
-  top: 20px; /* Move down below first corner badge */
-}
-
-.task-item:has(> .corner-badge[data-badge-position="top-left"][data-badge-index="1"]) > .numeric-badge {
-  top: 44px; /* Move below second corner badge (10 + 24 + 10) */
-}
-
-.task-item:has(> .corner-badge[data-badge-position="top-left"][data-badge-index="2"]) > .numeric-badge {
-  top: 68px; /* Move below third corner badge (10 + 24 + 24 + 10) */
-}
+/* REMOVED: CSS positioning creates initial wrong position, then JavaScript corrects it later causing delay
+ * ONLY JavaScript dynamic positioning should be used (menuOperations.js)
+ * NO CSS :has() rules for numeric badge positioning
+ */
 
 /* Current week highlighting for columns and tasks */
 /* Border style (default) - apply to column elements, not container */

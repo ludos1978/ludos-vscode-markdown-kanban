@@ -181,12 +181,16 @@ class TagUtils {
     extractNumericTag(text) {
         if (!text) return null;
 
-        // Use a non-global version of the pattern to get capture groups
-        const match = text.match(/#(\d+(?:\.\d+)?)\b/);
-        if (match && match[1]) {
-            return parseFloat(match[1]);
+        // Extract ALL numeric tags and return as array
+        const pattern = /#(\d+(?:\.\d+)?)\b/g;
+        const tags = [];
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+            tags.push(parseFloat(match[1]));
         }
-        return null;
+
+        // Return array of all numeric tags, or null if none found
+        return tags.length > 0 ? tags : null;
     }
 
     /**
@@ -553,8 +557,12 @@ class TagUtils {
         if (!Array.isArray(columns)) return [];
 
         return [...columns].sort((a, b) => {
-            const numA = this.extractNumericTag(a.title);
-            const numB = this.extractNumericTag(b.title);
+            const tagsA = this.extractNumericTag(a.title);
+            const tagsB = this.extractNumericTag(b.title);
+
+            // Use first numeric tag for sorting
+            const numA = tagsA ? tagsA[0] : null;
+            const numB = tagsB ? tagsB[0] : null;
 
             // Columns without numeric tags go to the end
             if (numA === null && numB === null) return 0;
@@ -574,8 +582,12 @@ class TagUtils {
         if (!Array.isArray(tasks)) return [];
 
         return [...tasks].sort((a, b) => {
-            const numA = this.extractNumericTag(a.title);
-            const numB = this.extractNumericTag(b.title);
+            const tagsA = this.extractNumericTag(a.title);
+            const tagsB = this.extractNumericTag(b.title);
+
+            // Use first numeric tag for sorting
+            const numA = tagsA ? tagsA[0] : null;
+            const numB = tagsB ? tagsB[0] : null;
 
             // Tasks without numeric tags go to the end
             if (numA === null && numB === null) return 0;
