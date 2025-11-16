@@ -8,9 +8,12 @@ class TagUtils {
         // Centralized regex patterns for tag matching
         this.patterns = {
             // Basic tag patterns
-            // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
-            basicTags: /#([a-zA-Z0-9_][a-zA-Z0-9_-]*)/g,
-            atTags: /@([a-zA-Z0-9_&-]+)/g,
+            // Rule: Everything after # until space is a tag (includes numeric, positivity, gather, etc.)
+            // Supports: #tag, #1, #1.5, #++, #gather_reto|anita, #gather_bruno&karl, etc.
+            basicTags: /#([a-zA-Z0-9_\-&|=<>!+øØ.]+)/g,
+
+            // Rule: Each @ is one person/mention, ampersand is part of the name (@Johnson&johnson is ONE name)
+            atTags: /@([a-zA-Z0-9_\-&]+)/g,
 
             // Special positivity tags (#++, #+, #ø, #-, #--)
             // Use negative lookahead to ensure - doesn't match when it's part of --
