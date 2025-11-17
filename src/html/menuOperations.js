@@ -3882,25 +3882,31 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
             }
         });
 
-        // Generate HTML for each position with proper vertical stacking
+        // Generate HTML for each position with HORIZONTAL layout (left to right)
+        // Column badges: top -4px, Task badges: top 18px
+        const topValue = elementType === 'column' ? '-4px' : '18px';
         Object.entries(positions).forEach(([position, badgesAtPosition]) => {
             badgesAtPosition.forEach((item, index) => {
                 const badge = item.badge;
-                const offsetMultiplier = 24; // Space between stacked badges
+                const offsetMultiplier = 30; // Horizontal space between badges (increased for left-to-right)
                 let positionStyle = '';
 
                 switch (position) {
                     case 'top-left':
-                        positionStyle = `top: ${10 + (index * offsetMultiplier)}px; left: -8px;`;
+                        // Stack horizontally: keep top constant, increase left
+                        positionStyle = `top: ${topValue}; left: ${-8 + (index * offsetMultiplier)}px;`;
                         break;
                     case 'top-right':
-                        positionStyle = `top: ${10 + (index * offsetMultiplier)}px; right: -8px;`;
+                        // Stack horizontally leftward: keep top constant, decrease right
+                        positionStyle = `top: ${topValue}; right: ${-8 + (index * offsetMultiplier)}px;`;
                         break;
                     case 'bottom-left':
-                        positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; left: -8px;`;
+                        // Stack horizontally: keep bottom constant, increase left
+                        positionStyle = `bottom: -8px; left: ${-8 + (index * offsetMultiplier)}px;`;
                         break;
                     case 'bottom-right':
-                        positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; right: -8px;`;
+                        // Stack horizontally leftward: keep bottom constant, decrease right
+                        positionStyle = `bottom: -8px; right: ${-8 + (index * offsetMultiplier)}px;`;
                         break;
                 }
 
@@ -4439,27 +4445,33 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                 }
             });
 
-            // Generate HTML for each position with proper vertical stacking
+            // Generate HTML for each position with HORIZONTAL layout (left to right)
+            // Column badges: top -4px, Task badges: top 18px
+            const topValue = elementType === 'column' ? '-4px' : '18px';
             console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
                 console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
                 badgesAtPosition.forEach((item, index) => {
                     const badge = item.badge;
-                    const offsetMultiplier = 24; // Space between stacked badges
+                    const offsetMultiplier = 30; // Horizontal space between badges (increased for left-to-right)
                     let positionStyle = '';
 
                     switch (position) {
                         case 'top-left':
-                            positionStyle = `top: ${10 + (index * offsetMultiplier)}px; left: -8px;`;
+                            // Stack horizontally: keep top constant, increase left
+                            positionStyle = `top: ${topValue}; left: ${-8 + (index * offsetMultiplier)}px;`;
                             break;
                         case 'top-right':
-                            positionStyle = `top: ${10 + (index * offsetMultiplier)}px; right: -8px;`;
+                            // Stack horizontally leftward: keep top constant, decrease right
+                            positionStyle = `top: ${topValue}; right: ${-8 + (index * offsetMultiplier)}px;`;
                             break;
                         case 'bottom-left':
-                            positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; left: -8px;`;
+                            // Stack horizontally: keep bottom constant, increase left
+                            positionStyle = `bottom: -8px; left: ${-8 + (index * offsetMultiplier)}px;`;
                             break;
                         case 'bottom-right':
-                            positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; right: -8px;`;
+                            // Stack horizontally leftward: keep bottom constant, decrease right
+                            positionStyle = `bottom: -8px; right: ${-8 + (index * offsetMultiplier)}px;`;
                             break;
                     }
 
