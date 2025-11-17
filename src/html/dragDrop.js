@@ -2148,220 +2148,241 @@ function calculateColumnDropIndex(boardElement, draggedColumn) {
  * Used by: setupDragAndDrop() after board render
  * Side effects: Makes tasks draggable, adds drop zones
  */
-function setupTaskDragAndDrop() {
+/**
+ * Sets up task drag and drop for a single column
+ * Purpose: Enable task dropping into a specific column
+ * @param {HTMLElement} columnElement - The column element to setup
+ */
+function setupTaskDragAndDropForColumn(columnElement) {
+    if (!columnElement) return;
 
+    const columnId = columnElement.dataset.columnId;
+    const tasksContainer = columnElement.querySelector('.tasks-container');
+
+    if (!tasksContainer) {return;}
+
+    // Prevent duplicate event listeners
+    if (tasksContainer.dataset.taskDragSetup === 'true') {
+        return;
+    }
+    tasksContainer.dataset.taskDragSetup = 'true';
+
+    // Add dragover handler to the entire column for appending to end
+    columnElement.addEventListener('dragover', e => {
+        // Update Alt key state during drag (user might press/release Alt mid-drag)
+        if (dragState.isDragging) {
+            dragState.altKeyPressed = e.altKey;
+        }
+
+        // Only process if we have a dragged task
+        if (!dragState.draggedTask) {return;}
+
+        // Check if we're over the tasks container specifically
+        const isOverTasksContainer = tasksContainer.contains(e.target);
+
+        if (!isOverTasksContainer) {
+            // We're over the column but not the tasks container (e.g., header area)
+            e.preventDefault();
+
+            // Move task to the end of this column
+            const addButton = tasksContainer.querySelector('.add-task-btn');
+            if (addButton) {
+                tasksContainer.insertBefore(dragState.draggedTask, addButton);
+            } else {
+                tasksContainer.appendChild(dragState.draggedTask);
+            }
+
+            // Add visual feedback
+            columnElement.classList.add('drag-over-append');
+        }
+    });
+
+    // Add drop handler to entire column
+    columnElement.addEventListener('drop', e => {
+        if (!dragState.draggedTask) {return;}
+
+        const isOverTasksContainer = tasksContainer.contains(e.target);
+        if (!isOverTasksContainer) {
+            e.preventDefault();
+            columnElement.classList.remove('drag-over-append');
+        }
+    });
+
+    // Clean up visual feedback when leaving column
+    columnElement.addEventListener('dragleave', e => {
+        if (!columnElement.contains(e.relatedTarget)) {
+            columnElement.classList.remove('drag-over-append');
+        }
+    });
+
+    // PERFORMANCE-OPTIMIZED: Throttled dragover handler with cached positions
+    tasksContainer.addEventListener('dragover', e => {
+        e.preventDefault();
+
+        // Update Alt key state during drag (user might press/release Alt mid-drag)
+        if (dragState.isDragging) {
+            dragState.altKeyPressed = e.altKey;
+        }
+
+        // Only stop propagation for internal task drags, not external drops
+        if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
+            e.stopPropagation(); // Prevent column-level handler from interfering
+        }
+
+        if (!dragState.draggedTask) {
+            return;
+        }
+
+        // Add dragging class now (delayed from dragstart to avoid layout shift)
+        if (!dragState.draggedTask.classList.contains('dragging')) {
+            dragState.draggedTask.classList.add('dragging', 'drag-preview');
+        }
+
+        // Remove any column-level visual feedback when over tasks
+        columnElement.classList.remove('drag-over-append');
+
+        // PERFORMANCE: Track affected columns for targeted cleanup later
+        if (!dragState.affectedColumns) {
+            dragState.affectedColumns = new Set();
+        }
+        dragState.affectedColumns.add(tasksContainer);
+
+        // PERFORMANCE: Store latest mouse position (don't use stale position from closure!)
+        dragState.latestMouseY = e.clientY;
+
+        // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
+        // Skip if already scheduled - but we've stored the latest position above
+        if (dragState.dragoverThrottleId) {
+            return;
+        }
+
+        dragState.dragoverThrottleId = requestAnimationFrame(() => {
+            // PERFORMANCE: Check if we're in the same column as when drag started
+            const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
+            let afterElement;
+
+            // CRITICAL: Use latest mouse position, not stale closure variable!
+            const mouseY = dragState.latestMouseY;
+
+            if (isOriginalColumn) {
+                // Use cached positions for original column
+                afterElement = getDragAfterTaskElementCached(mouseY);
+            } else {
+                // PERFORMANCE: Cache positions for new columns too (TTL: 100ms)
+                const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
+                const now = Date.now();
+
+                if (!dragState.newColumnPositionCache ||
+                    dragState.newColumnPositionCacheKey !== cacheKey ||
+                    now - dragState.newColumnPositionCacheTime > 100) {
+
+                    // Recalculate and cache positions for this column
+                    const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
+                        .filter(el => el !== dragState.draggedTask);
+                    dragState.newColumnPositionCache = tasks.map(task => ({
+                        element: task,
+                        rect: task.getBoundingClientRect()
+                    }));
+                    dragState.newColumnPositionCacheKey = cacheKey;
+                    dragState.newColumnPositionCacheTime = now;
+
+                    // Cache add button position AND element for new column
+                    const addButton = tasksContainer.querySelector('.add-task-btn');
+                    dragState.newColumnAddButton = addButton; // Cache element
+                    dragState.newColumnAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
+                }
+
+                // Use cached positions to find drop location
+                afterElement = getDragAfterTaskElementFromCache(
+                    mouseY,
+                    dragState.newColumnPositionCache,
+                    dragState.newColumnAddButtonRect
+                );
+            }
+
+            // PERFORMANCE: Only update DOM if position actually changed
+            if (afterElement !== dragState.lastAfterElement) {
+                dragState.lastAfterElement = afterElement;
+
+                // Safety check: ensure draggedTask is still a valid DOM element
+                if (!dragState.draggedTask || !dragState.draggedTask.parentNode) {
+                    console.warn('[kanban.dragDrop] draggedTask is invalid or detached, skipping DOM update');
+                    return;
+                }
+
+                if (afterElement === null) {
+                    // Insert at the end, but before the add button if it exists
+                    // PERFORMANCE: Use cached add button (both original and new columns)
+                    const addButton = isOriginalColumn
+                        ? dragState.cachedAddButton
+                        : dragState.newColumnAddButton;
+                    if (addButton) {
+                        tasksContainer.insertBefore(dragState.draggedTask, addButton);
+                    } else {
+                        tasksContainer.appendChild(dragState.draggedTask);
+                    }
+                } else if (afterElement !== dragState.draggedTask) {
+                    // Insert before the after element
+                    tasksContainer.insertBefore(dragState.draggedTask, afterElement);
+                }
+
+                // Update transition classes for smooth animation
+                // Use cached positions for original column, query for new column
+                if (isOriginalColumn && dragState.cachedTaskPositions) {
+                    dragState.cachedTaskPositions.forEach(item => {
+                        item.element.classList.add('drag-transitioning');
+                    });
+                } else {
+                    // PERFORMANCE: Cache task queries for the new column to avoid repeated querySelectorAll
+                    const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
+                    if (!dragState.cachedNewColumnTasks || dragState.cachedNewColumnTasksKey !== cacheKey) {
+                        dragState.cachedNewColumnTasks = Array.from(tasksContainer.querySelectorAll('.task-item'));
+                        dragState.cachedNewColumnTasksKey = cacheKey;
+                    }
+                    dragState.cachedNewColumnTasks.forEach(task => {
+                        if (task !== dragState.draggedTask) {
+                            task.classList.add('drag-transitioning');
+                        }
+                    });
+                }
+            }
+
+            dragState.dragoverThrottleId = null;
+        });
+    });
+
+    tasksContainer.addEventListener('drop', e => {
+        e.preventDefault();
+
+        // Only stop propagation for internal task drags, let external drops bubble up
+        if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
+            e.stopPropagation(); // Prevent column-level handler for internal drags only
+        }
+
+        columnElement.classList.remove('drag-over');
+        columnElement.classList.remove('drag-over-append');
+
+        // The actual position change is handled in dragend
+    });
+
+    // Setup drag handles for all tasks in this column
+    columnElement.querySelectorAll('.task-drag-handle').forEach(handle => {
+        setupTaskDragHandle(handle);
+    });
+}
+
+/**
+ * Sets up task drag and drop for all columns on the board
+ * Purpose: Initialize task dropping for entire board
+ */
+function setupTaskDragAndDrop() {
     // Get all columns across all rows
     const boardElement = document.getElementById('kanban-board');
     const allColumns = boardElement.querySelectorAll('.kanban-full-height-column');
-    
+
+    // Setup drag & drop for each column using the per-column function
     allColumns.forEach(columnElement => {
-        const columnId = columnElement.dataset.columnId;
-        const tasksContainer = columnElement.querySelector('.tasks-container');
-
-        if (!tasksContainer) {return;}
-
-        // Add dragover handler to the entire column for appending to end
-        columnElement.addEventListener('dragover', e => {
-            // Update Alt key state during drag (user might press/release Alt mid-drag)
-            if (dragState.isDragging) {
-                dragState.altKeyPressed = e.altKey;
-            }
-
-            // Only process if we have a dragged task
-            if (!dragState.draggedTask) {return;}
-
-            // Check if we're over the tasks container specifically
-            const isOverTasksContainer = tasksContainer.contains(e.target);
-            
-            if (!isOverTasksContainer) {
-                // We're over the column but not the tasks container (e.g., header area)
-                e.preventDefault();
-                
-                // Move task to the end of this column
-                const addButton = tasksContainer.querySelector('.add-task-btn');
-                if (addButton) {
-                    tasksContainer.insertBefore(dragState.draggedTask, addButton);
-                } else {
-                    tasksContainer.appendChild(dragState.draggedTask);
-                }
-                
-                // Add visual feedback
-                columnElement.classList.add('drag-over-append');
-            }
-        });
-
-        // Add drop handler to entire column
-        columnElement.addEventListener('drop', e => {
-            if (!dragState.draggedTask) {return;}
-            
-            const isOverTasksContainer = tasksContainer.contains(e.target);
-            if (!isOverTasksContainer) {
-                e.preventDefault();
-                columnElement.classList.remove('drag-over-append');
-            }
-        });
-
-        // Clean up visual feedback when leaving column
-        columnElement.addEventListener('dragleave', e => {
-            if (!columnElement.contains(e.relatedTarget)) {
-                columnElement.classList.remove('drag-over-append');
-            }
-        });
-
-        // PERFORMANCE-OPTIMIZED: Throttled dragover handler with cached positions
-        tasksContainer.addEventListener('dragover', e => {
-            e.preventDefault();
-
-            // Update Alt key state during drag (user might press/release Alt mid-drag)
-            if (dragState.isDragging) {
-                dragState.altKeyPressed = e.altKey;
-            }
-
-            // Only stop propagation for internal task drags, not external drops
-            if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
-                e.stopPropagation(); // Prevent column-level handler from interfering
-            }
-
-            if (!dragState.draggedTask) {
-                return;
-            }
-
-            // Add dragging class now (delayed from dragstart to avoid layout shift)
-            if (!dragState.draggedTask.classList.contains('dragging')) {
-                dragState.draggedTask.classList.add('dragging', 'drag-preview');
-            }
-
-            // Remove any column-level visual feedback when over tasks
-            columnElement.classList.remove('drag-over-append');
-
-            // PERFORMANCE: Track affected columns for targeted cleanup later
-            if (!dragState.affectedColumns) {
-                dragState.affectedColumns = new Set();
-            }
-            dragState.affectedColumns.add(tasksContainer);
-
-            // PERFORMANCE: Store latest mouse position (don't use stale position from closure!)
-            dragState.latestMouseY = e.clientY;
-
-            // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
-            // Skip if already scheduled - but we've stored the latest position above
-            if (dragState.dragoverThrottleId) {
-                return;
-            }
-
-            dragState.dragoverThrottleId = requestAnimationFrame(() => {
-                // PERFORMANCE: Check if we're in the same column as when drag started
-                const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
-                let afterElement;
-
-                // CRITICAL: Use latest mouse position, not stale closure variable!
-                const mouseY = dragState.latestMouseY;
-
-                if (isOriginalColumn) {
-                    // Use cached positions for original column
-                    afterElement = getDragAfterTaskElementCached(mouseY);
-                } else {
-                    // PERFORMANCE: Cache positions for new columns too (TTL: 100ms)
-                    const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
-                    const now = Date.now();
-
-                    if (!dragState.newColumnPositionCache ||
-                        dragState.newColumnPositionCacheKey !== cacheKey ||
-                        now - dragState.newColumnPositionCacheTime > 100) {
-
-                        // Recalculate and cache positions for this column
-                        const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
-                            .filter(el => el !== dragState.draggedTask);
-                        dragState.newColumnPositionCache = tasks.map(task => ({
-                            element: task,
-                            rect: task.getBoundingClientRect()
-                        }));
-                        dragState.newColumnPositionCacheKey = cacheKey;
-                        dragState.newColumnPositionCacheTime = now;
-
-                        // Cache add button position AND element for new column
-                        const addButton = tasksContainer.querySelector('.add-task-btn');
-                        dragState.newColumnAddButton = addButton; // Cache element
-                        dragState.newColumnAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
-                    }
-
-                    // Use cached positions to find drop location
-                    afterElement = getDragAfterTaskElementFromCache(
-                        mouseY,
-                        dragState.newColumnPositionCache,
-                        dragState.newColumnAddButtonRect
-                    );
-                }
-
-                // PERFORMANCE: Only update DOM if position actually changed
-                if (afterElement !== dragState.lastAfterElement) {
-                    dragState.lastAfterElement = afterElement;
-
-                    // Safety check: ensure draggedTask is still a valid DOM element
-                    if (!dragState.draggedTask || !dragState.draggedTask.parentNode) {
-                        console.warn('[kanban.dragDrop] draggedTask is invalid or detached, skipping DOM update');
-                        return;
-                    }
-
-                    if (afterElement === null) {
-                        // Insert at the end, but before the add button if it exists
-                        // PERFORMANCE: Use cached add button (both original and new columns)
-                        const addButton = isOriginalColumn
-                            ? dragState.cachedAddButton
-                            : dragState.newColumnAddButton;
-                        if (addButton) {
-                            tasksContainer.insertBefore(dragState.draggedTask, addButton);
-                        } else {
-                            tasksContainer.appendChild(dragState.draggedTask);
-                        }
-                    } else if (afterElement !== dragState.draggedTask) {
-                        // Insert before the after element
-                        tasksContainer.insertBefore(dragState.draggedTask, afterElement);
-                    }
-
-                    // Update transition classes for smooth animation
-                    // Use cached positions for original column, query for new column
-                    if (isOriginalColumn && dragState.cachedTaskPositions) {
-                        dragState.cachedTaskPositions.forEach(item => {
-                            item.element.classList.add('drag-transitioning');
-                        });
-                    } else {
-                        // PERFORMANCE: Cache task queries for the new column to avoid repeated querySelectorAll
-                        const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
-                        if (!dragState.cachedNewColumnTasks || dragState.cachedNewColumnTasksKey !== cacheKey) {
-                            dragState.cachedNewColumnTasks = Array.from(tasksContainer.querySelectorAll('.task-item'));
-                            dragState.cachedNewColumnTasksKey = cacheKey;
-                        }
-                        dragState.cachedNewColumnTasks.forEach(task => {
-                            if (task !== dragState.draggedTask) {
-                                task.classList.add('drag-transitioning');
-                            }
-                        });
-                    }
-                }
-
-                dragState.dragoverThrottleId = null;
-            });
-        });
-
-        tasksContainer.addEventListener('drop', e => {
-            e.preventDefault();
-            
-            // Only stop propagation for internal task drags, let external drops bubble up
-            if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
-                e.stopPropagation(); // Prevent column-level handler for internal drags only
-            }
-            
-            columnElement.classList.remove('drag-over');
-            columnElement.classList.remove('drag-over-append');
-            
-            // The actual position change is handled in dragend
-        });
-
-        // Setup drag handles for all tasks in this column
-        columnElement.querySelectorAll('.task-drag-handle').forEach(handle => {
-            setupTaskDragHandle(handle);
-        });
+        setupTaskDragAndDropForColumn(columnElement);
     });
 }
 
@@ -2834,6 +2855,7 @@ function updateStackBottomDropZones() {
 // Make it globally accessible for layout updates
 window.updateStackBottomDropZones = updateStackBottomDropZones;
 window.cleanupAndRecreateDropZones = cleanupAndRecreateDropZones;
+window.setupTaskDragAndDropForColumn = setupTaskDragAndDropForColumn;
 
 /**
  * Updates the visual column title display in the DOM after modifying the data model

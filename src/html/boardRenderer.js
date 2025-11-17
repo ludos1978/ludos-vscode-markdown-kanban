@@ -4623,12 +4623,22 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
         setupColumnDragAndDrop();
     }
 
-    // Recreate drop zones for the row that was modified
+    // CRITICAL: Setup task drag & drop for this specific column (optimized)
+    if (typeof setupTaskDragAndDropForColumn === 'function') {
+        setupTaskDragAndDropForColumn(columnElement);
+    }
+
+    // Recreate drop zones for the row/board that was modified
     if (isMultiRow) {
         const columnRow = getColumnRow(column.title);
         const rowContainer = boardElement.querySelector(`.kanban-row[data-row-number="${columnRow}"]`);
         if (rowContainer && typeof window.cleanupAndRecreateDropZones === 'function') {
             window.cleanupAndRecreateDropZones(rowContainer);
+        }
+    } else {
+        // For single-row boards, recreate drop zones for the entire board
+        if (typeof window.cleanupAndRecreateDropZones === 'function') {
+            window.cleanupAndRecreateDropZones(boardElement);
         }
     }
 
