@@ -852,18 +852,27 @@ class TaskEditor {
                             if (this.currentEditor && this.currentEditor.displayElement) {
                                 let displayTitle = newTitle;
 
-                                // If has includes, replace !!!include(file)!!! with !(file)! badge
+                                // If has includes, replace !!!include(file)!!! with HTML badge
                                 if (hasIncludes) {
-                                    displayTitle = displayTitle.replace(/!!!include\(([^)]+)\)!!!/g, (match, filepath) => {
+                                    displayTitle = displayTitle.replace(/!!!include\(([^)]+)\)!!!/g, function(match, filepath) {
                                         // Extract just filename from path
                                         const parts = filepath.split('/').length > 1 ? filepath.split('/') : filepath.split('\\');
                                         const filename = parts[parts.length - 1];
-                                        return `!(${filename})!`;
+                                        // Create HTML badge (matching tagUtils.js line 816 format)
+                                        const escapeHtml = function(text) {
+                                            return text.replace(/[&<>"']/g, function(char) {
+                                                const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+                                                return map[char];
+                                            });
+                                        };
+                                        const escapedPath = escapeHtml(filepath);
+                                        const escapedFilename = escapeHtml(filename);
+                                        return '<span class="columninclude-link" data-file-path="' + escapedPath + '" title="Include: ' + escapedPath + '">!(' + escapedFilename + ')!</span>';
                                     });
                                 }
                                 // If removed includes, displayTitle is just newTitle (no include syntax)
 
-                                // Render the display title
+                                // Render the display title (with HTML badge already inserted)
                                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
                                 const renderedTitle = renderFn ? renderFn(displayTitle) : displayTitle;
                                 this.currentEditor.displayElement.innerHTML = renderedTitle;
@@ -875,7 +884,7 @@ class TaskEditor {
 
                             // STEP 3: Update badges (matching task pattern line 1043-1047)
                             if (columnElement && window.updateAllVisualTagElements) {
-                                const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(newTitle) : [];
+                                const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
                                 window.updateAllVisualTagElements(columnElement, allTags, 'column');
                             }
 
