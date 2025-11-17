@@ -3797,11 +3797,6 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
     // Get all active tags from the new title
     const activeTags = getActiveTagsInTitle(newTitle);
 
-    // Debug: Log what tags were found
-    if (activeTags.some(tag => ['++', '+', '--', '-', 'ø'].includes(tag))) {
-        console.log(`[DEBUG] Active positivity tags found in "${newTitle}":`, activeTags.filter(tag => ['++', '+', '--', '-', 'ø'].includes(tag)));
-    }
-
     // Update data-all-tags attribute
     if (activeTags.length > 0) {
         element.setAttribute('data-all-tags', activeTags.join(' '));
@@ -3833,14 +3828,6 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 
     // Render badges if we have active tags OR numeric tags
     if (window.tagColors && (activeTags.length > 0 || hasNumericTags)) {
-        // Debug: Check if positivity group exists
-        if (activeTags.some(tag => ['++', '+', '--', '-', 'ø'].includes(tag))) {
-            console.log('[DEBUG] window.tagColors has positivity group:', !!window.tagColors.positivity);
-            if (window.tagColors.positivity) {
-                console.log('[DEBUG] Positivity tags in config:', Object.keys(window.tagColors.positivity));
-            }
-        }
-
         const positions = {
             'top-left': [],
             'top-right': [],
@@ -3849,11 +3836,9 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         };
 
         // Add numeric badges to positions (already extracted above)
-        console.log(`[NUMERIC BADGES] Extracted from "${newTitle}":`, numericTags);
         if (numericTags && Array.isArray(numericTags)) {
             numericTags.forEach(numericValue => {
                 const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
-                console.log(`[NUMERIC BADGES] Adding badge: ${displayValue} to top-left`);
                 // Add to top-left position using SAME system as other corner badges
                 positions['top-left'].push({
                     tag: `numeric-${numericValue}`,
@@ -3870,14 +3855,6 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         // Collect badges by position
         activeTags.forEach(tag => {
             const config = getTagConfig(tag);
-
-            // Debug: Log positivity tag config lookup
-            if (['++', '+', '--', '-', 'ø'].includes(tag)) {
-                console.log(`[DEBUG] Looking up config for tag "${tag}":`, config ? 'Found' : 'NOT FOUND');
-                if (config) {
-                    console.log(`[DEBUG] Config for "${tag}":`, { hasCornerBadge: !!config.cornerBadge, cornerBadge: config.cornerBadge });
-                }
-            }
 
             if (config && config.cornerBadge) {
                 // Get theme colors for this tag
@@ -3942,18 +3919,11 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 
                 const badgeContent = badge.image ? '' : (badge.label || '');
 
-                // Debug: Log positivity badges being created
-                if (['plusplus', 'plus', 'minusminus', 'minus', 'oslash'].includes(cssClassName)) {
-                    console.log(`[DEBUG] Creating badge: tag="${item.tag}", cssClassName="${cssClassName}", badge.color="${badge.color}", badge.labelColor="${badge.labelColor}"`);
-                }
-
                 // Add inline styles for background and color to ensure they're always applied
                 // Fallback to red if color is missing to make it obvious
                 const bgColor = badge.color || '#FF0000';
                 const textColor = badge.labelColor || '#ffffff';
                 const inlineStyles = `${positionStyle}; background: ${bgColor} !important; color: ${textColor} !important;`;
-
-                console.log(`[DEBUG] Badge inline styles for "${item.tag}":`, inlineStyles);
 
                 newBadgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${inlineStyles}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
             });
@@ -4278,15 +4248,55 @@ function updateVisualTagState(element, allTags, elementType, isCollapsed) {
 
 // Comprehensive function to update ALL visual tag elements immediately
 function updateAllVisualTagElements(element, allTags, elementType) {
-    
+
+    // 0. UPDATE TITLE DISPLAY for elements with includes
+    if (elementType === 'column') {
+        const columnId = element.getAttribute('data-column-id');
+        if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (column) {
+                // Check if title has include syntax
+                const hasInclude = /!!!include\([^)]+\)!!!/.test(column.title);
+                if (hasInclude) {
+                    // Update the title display using the shared utility function
+                    const displayElement = element.querySelector('.column-title-text');
+                    if (displayElement && window.tagUtils) {
+                        const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        displayElement.innerHTML = renderedTitle;
+                    }
+                }
+            }
+        }
+    } else if (elementType === 'task') {
+        const taskId = element.getAttribute('data-task-id');
+        if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+            // Find task across all columns
+            for (const column of window.cachedBoard.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    // Check if task is in include mode or has include syntax
+                    if (task.includeMode || /!!!include\([^)]+\)!!!/.test(task.title)) {
+                        // Update the title display
+                        const displayElement = element.querySelector('.task-title-display');
+                        if (displayElement && window.renderMarkdownWithTags) {
+                            const renderedHtml = window.renderMarkdownWithTags(task.title);
+                            displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     // 1. CLEAN UP - Remove visual elements only from column-title and column-footer areas
     if (elementType === 'column') {
         // For columns: clean up only within column-header and column-footer (never column-inner)
 
         const columnHeader = element.querySelector('.column-header');
         if (columnHeader) {
-            // Remove all visual tag elements from column-header (including corner badges)
-            columnHeader.querySelectorAll('.header-bar, .header-bars-container, .corner-badges-container').forEach(el => el.remove());
+            // Remove visual tag elements from column-header (NOT corner badges - they're managed separately)
+            columnHeader.querySelectorAll('.header-bar, .header-bars-container').forEach(el => el.remove());
         }
 
         const columnTitle = element.querySelector('.column-title');
@@ -4368,11 +4378,9 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             };
 
             // Add numeric badges to positions (already extracted above)
-            console.log(`[UPDATE ALL VISUAL] Extracting numeric tags from "${titleText}":`, numericTags);
             if (numericTags && Array.isArray(numericTags)) {
                 numericTags.forEach(numericValue => {
                     const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
-                    console.log(`[UPDATE ALL VISUAL] Adding numeric badge: ${displayValue} to top-left`);
                     positions['top-left'].push({
                         tag: `numeric-${numericValue}`,
                         badge: {

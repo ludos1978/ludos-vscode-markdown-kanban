@@ -2361,6 +2361,16 @@ window.addEventListener('message', event => {
                 // Always update the cached board when receiving updates from backend
                 window.cachedBoard = JSON.parse(JSON.stringify(message.board));
 
+                // Re-apply pending column changes to preserve local edits
+                if (window.pendingColumnChanges && window.pendingColumnChanges.size > 0) {
+                    window.pendingColumnChanges.forEach((change, columnId) => {
+                        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                        if (column) {
+                            column.title = change.title;
+                        }
+                    });
+                }
+
                 // If this is a save confirmation (no unsaved changes), update the saved reference
                 if (!window.hasUnsavedChanges) {
                     window.savedBoardState = JSON.parse(JSON.stringify(message.board));

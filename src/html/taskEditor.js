@@ -802,7 +802,12 @@ class TaskEditor {
                     }
 
                     // Check if the title actually changed
+                    console.log('[TITLE CHANGE CHECK] OLD column.title:', column.title);
+                    console.log('[TITLE CHANGE CHECK] NEW title from editor:', newTitle);
+                    console.log('[TITLE CHANGE CHECK] Changed?', column.title !== newTitle);
+
                     if (column.title !== newTitle) {
+                        console.log('[TITLE CHANGE] Title changed! Proceeding with update...');
                         // Create context for this edit
                         const editContext = `column-title-${columnId}`;
 
@@ -889,18 +894,17 @@ class TaskEditor {
                                 title: newTitle
                             });
 
-                            // Update all visual tag state immediately (backgrounds, borders, badges)
-                            const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(newTitle) : [];
-                            const isCollapsed = columnElement.classList.contains('collapsed');
-                            if (window.updateVisualTagState) {
-                                window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
+                            // IMMEDIATELY update display - find element directly
+                            const displayElement = columnElement ? columnElement.querySelector('.column-title-text') : null;
+                            if (displayElement && window.tagUtils) {
+                                const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                                displayElement.innerHTML = renderedTitle;
                             }
 
-                            // Update corner badges immediately from the title (tags should be parsed now, not later)
-                            if (window.updateCornerBadgesImmediate) {
-                                // For columns, we need to pass a combined text that includes both title and description tags
-                                const combinedText = [column.title, column.description].filter(Boolean).join(' ');
-                                window.updateCornerBadgesImmediate(currentColumnId, 'column', combinedText);
+                            // Update all visual tag elements (badges, bars, backgrounds, borders)
+                            if (columnElement && window.updateAllVisualTagElements) {
+                                const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(newTitle) : [];
+                                window.updateAllVisualTagElements(columnElement, allTags, 'column');
                             }
 
                             // Don't continue with regular updates - backend will handle the rest
@@ -932,11 +936,38 @@ class TaskEditor {
                             markUnsavedChanges();
                         }
                     }
-                    
-                    if (this.currentEditor.displayElement) {
-                        // Get display title using shared utility function
-                        const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
-                        this.currentEditor.displayElement.innerHTML = renderedTitle;
+
+                    // Update display IMMEDIATELY while editor is still open (matching task edit pattern lines 1149-1178)
+                    console.log('[COLUMN IMMEDIATE UPDATE] Starting immediate update for column', columnId);
+                    console.log('[COLUMN IMMEDIATE UPDATE] OLD column.title:', column.title);
+                    console.log('[COLUMN IMMEDIATE UPDATE] NEW title that was just set:', newTitle);
+                    console.log('[COLUMN IMMEDIATE UPDATE] Titles are same?', column.title === newTitle);
+                    console.log('[COLUMN IMMEDIATE UPDATE] this.currentEditor exists?', !!this.currentEditor);
+                    console.log('[COLUMN IMMEDIATE UPDATE] displayElement exists?', !!this.currentEditor?.displayElement);
+
+                    if (this.currentEditor && this.currentEditor.displayElement) {
+                        console.log('[COLUMN IMMEDIATE UPDATE] Current display innerHTML (first 100 chars):', this.currentEditor.displayElement.innerHTML.substring(0, 100));
+                        console.log('[COLUMN IMMEDIATE UPDATE] Display element style.display BEFORE:', this.currentEditor.displayElement.style.display);
+                        console.log('[COLUMN IMMEDIATE UPDATE] Editor element style.display:', this.currentEditor.element.style.display);
+
+                        if (window.tagUtils) {
+                            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                            console.log('[COLUMN IMMEDIATE UPDATE] Rendered title (first 100 chars):', renderedTitle.substring(0, 100));
+                            this.currentEditor.displayElement.innerHTML = renderedTitle;
+                        } else {
+                            console.log('[COLUMN IMMEDIATE UPDATE] tagUtils not available, using plain title');
+                            this.currentEditor.displayElement.innerHTML = column.title || '';
+                        }
+
+                        // Make display visible AND hide editor immediately
+                        this.currentEditor.displayElement.style.removeProperty('display');
+                        this.currentEditor.element.style.display = 'none';
+                        console.log('[COLUMN IMMEDIATE UPDATE] Display element style.display AFTER removeProperty:', this.currentEditor.displayElement.style.display);
+                        console.log('[COLUMN IMMEDIATE UPDATE] Display element computed display:', window.getComputedStyle(this.currentEditor.displayElement).display);
+                        console.log('[COLUMN IMMEDIATE UPDATE] Editor hidden:', this.currentEditor.element.style.display);
+                        console.log('[COLUMN IMMEDIATE UPDATE] ========== UPDATE COMPLETE ==========');
+                    } else {
+                        console.error('[COLUMN IMMEDIATE UPDATE] FAILED - currentEditor or displayElement is null!');
                     }
 
                     // Update column CSS classes for span tags
@@ -980,16 +1011,10 @@ class TaskEditor {
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
                         const isCollapsed = columnElement2.classList.contains('collapsed');
                         if (window.updateVisualTagState) {
                             window.updateVisualTagState(columnElement2, allTags, 'column', isCollapsed);
-                        }
-
-                        // Update corner badges immediately (numeric badges now handled as corner badges)
-                        if (window.updateCornerBadgesImmediate) {
-                            // For columns, we need to pass a combined text that includes both title and description tags
-                            const combinedText = [column.title, column.description].filter(Boolean).join(' ');
-                            window.updateCornerBadgesImmediate(columnId, 'column', combinedText);
                         }
                     }
                     
@@ -1056,19 +1081,17 @@ class TaskEditor {
                                 taskData: { title: value }
                             });
 
-                            // Update all visual tag state immediately (backgrounds, borders, badges)
-                            const taskElement = element.closest('.task-item');
-                            const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(value) : [];
-                            const isCollapsed = taskElement?.classList.contains('collapsed');
-                            if (taskElement && window.updateVisualTagState) {
-                                window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
+                            // Update display immediately before backend processes
+                            if (this.currentEditor.displayElement && window.renderMarkdownWithTags) {
+                                const renderedHtml = window.renderMarkdownWithTags(value);
+                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
                             }
 
-                            // Update corner badges immediately from the title (tags should be parsed now, not later)
-                            if (window.updateCornerBadgesImmediate) {
-                                // For tasks, we need to pass a combined text that includes both title and description tags
-                                const combinedText = [task.title, task.description].filter(Boolean).join(' ');
-                                window.updateCornerBadgesImmediate(taskId, 'task', combinedText);
+                            // Update all visual tag elements (badges, bars, backgrounds, borders)
+                            const taskElement = element.closest('.task-item');
+                            if (taskElement && window.updateAllVisualTagElements) {
+                                const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(value) : [];
+                                window.updateAllVisualTagElements(taskElement, allTags, 'task');
                             }
 
                             return; // Skip local updates, let backend handle
@@ -1207,16 +1230,10 @@ class TaskEditor {
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
                         const isCollapsed = taskElement.classList.contains('collapsed');
                         if (window.updateVisualTagState) {
                             window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
-                        }
-
-                        // Update corner badges immediately (numeric badges now handled as corner badges)
-                        if (window.updateCornerBadgesImmediate) {
-                            // For tasks, we need to pass a combined text that includes both title and description tags
-                            const combinedText = [task.title, task.description].filter(Boolean).join(' ');
-                            window.updateCornerBadgesImmediate(taskId, 'task', combinedText);
                         }
                     }
                     

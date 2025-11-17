@@ -1825,12 +1825,30 @@ function updateFoldAllButton(columnId) {
  * @returns {string} Complete HTML for column
  */
 function createColumnElement(column, columnIndex) {
+    console.log('[CREATE COLUMN ENTRY] Called for column', column?.id);
+    console.log('[CREATE COLUMN ENTRY] Column title:', column?.title);
+    console.log('[CREATE COLUMN ENTRY] pendingColumnChanges exists?', !!window.pendingColumnChanges);
+    console.log('[CREATE COLUMN ENTRY] pendingColumnChanges size:', window.pendingColumnChanges?.size);
+    console.log('[CREATE COLUMN ENTRY] Has pending for this column?', window.pendingColumnChanges?.has(column?.id));
+
     if (!column) {
         return document.createElement('div');
     }
 
     if (!column.tasks) {
         column.tasks = [];
+    }
+
+    // CRITICAL: Check for pending local changes and use them instead of backend data
+    // This prevents backend updates from overwriting user's immediate edits
+    if (window.pendingColumnChanges && window.pendingColumnChanges.has(column.id)) {
+        const pendingChange = window.pendingColumnChanges.get(column.id);
+        console.log('[CREATE COLUMN] Using pending title for column', column.id);
+        console.log('[CREATE COLUMN] Backend title:', column.title);
+        console.log('[CREATE COLUMN] Pending title:', pendingChange.title);
+        column = { ...column, title: pendingChange.title };
+    } else {
+        console.log('[CREATE COLUMN] NO pending changes, using backend title');
     }
 
     // Extract ALL tags from column title for stacking features
@@ -3313,11 +3331,11 @@ function handleColumnTitleClick(event, columnId) {
         toggleColumnCollapse(columnId);
         // Use a short delay to allow the unfold animation to start, then enter edit mode
         setTimeout(() => {
-            editColumnTitle(columnId, columnElement);
+            window.editColumnTitle(columnId, columnElement);
         }, 50);
     } else {
         // Column is already unfolded, edit immediately
-        editColumnTitle(columnId, columnElement);
+        window.editColumnTitle(columnId, columnElement);
     }
 }
 
@@ -3333,10 +3351,10 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (typeof editTitle === 'function') {
-        editTitle(element, taskId, columnId);
+    if (typeof window.editTitle === 'function') {
+        window.editTitle(element, taskId, columnId);
     } else {
-        console.error('editTitle is not a function:', typeof editTitle);
+        console.error('editTitle is not a function:', typeof window.editTitle);
     }
 }
 
@@ -3352,14 +3370,14 @@ function handleDescriptionClick(event, element, taskId, columnId) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (typeof editDescription === 'function') {
+    if (typeof window.editDescription === 'function') {
         if (taskId && columnId) {
-            editDescription(element, taskId, columnId);
+            window.editDescription(element, taskId, columnId);
         } else {
-            editDescription(element);
+            window.editDescription(element);
         }
     } else {
-        console.error('editDescription is not a function:', typeof editDescription);
+        console.error('editDescription is not a function:', typeof window.editDescription);
     }
 }
 
