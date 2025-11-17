@@ -2252,11 +2252,11 @@ button.file-bar-menu-item {
 
 .kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(0.066px);
+	transform: translateZ(-0.133px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
-	transform: translateZ(0.1px);
+	transform: translateZ(-0.1px);
 }
 
 
@@ -3871,17 +3871,18 @@ h6 .kanban-tag {
   pointer-events: none;
   z-index: 10;
   gap: 16px;
+  translate: translateZ(1px);
 }
 
 /* Positioning for each corner - horizontal by default */
 .corner-badges-container.top-left {
-  top: 16px;
+  top: 0px;
   left: -8px;
   flex-direction: row;
 }
 
 .corner-badges-container.top-right {
-  top: 16px;
+  top: 0px;
   right: -8px;
   flex-direction: row;
 }

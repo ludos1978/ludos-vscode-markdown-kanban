@@ -3804,8 +3804,10 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         element.removeAttribute('data-all-tags');
     }
 
-    // For columns, append to column-title; for tasks, append to element
-    const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
+    // For columns, append to column-title; for tasks, append to task-header
+    const targetContainer = elementType === 'column'
+        ? element.querySelector('.column-title') || element
+        : element.querySelector('.task-header') || element;
 
     // Remove existing badge containers
     targetContainer.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
@@ -4300,8 +4302,12 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             }
         });
     } else {
-        // For tasks, safe to remove all visual elements directly
-        element.querySelectorAll('.header-bar, .footer-bar, .header-bars-container, .footer-bars-container, .corner-badges-container').forEach(el => el.remove());
+        // For tasks, remove visual elements from task-header and task element
+        const taskHeader = element.querySelector('.task-header');
+        if (taskHeader) {
+            taskHeader.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
+        }
+        element.querySelectorAll('.header-bar, .footer-bar, .header-bars-container, .footer-bars-container').forEach(el => el.remove());
     }
     element.classList.remove('has-header-bar', 'has-footer-bar', 'has-header-label', 'has-footer-label');
     
@@ -4455,8 +4461,10 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                     cornerContainer.appendChild(badgeElement);
                 });
 
-                // For columns, append to column-title; for tasks, append to element
-                const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
+                // For columns, append to column-title; for tasks, append to task-header
+                const targetContainer = elementType === 'column'
+                    ? element.querySelector('.column-title') || element
+                    : element.querySelector('.task-header') || element;
                 console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
                 targetContainer.appendChild(cornerContainer);
             });
