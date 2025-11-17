@@ -390,8 +390,7 @@ body {
 }
 
 /* Responsive file info header - collapse to icons when space is limited */
-@container (max-width: 320px) {
-  /* Hide text labels, show only icons for file info buttons */
+@container (max-width: 360px) {
   .global-fold-text,
   .sort-text,
   .font-size-text,
@@ -401,7 +400,7 @@ body {
   }
   
   /* Adjust button sizing for icon-only mode */
-  .file-info-right .global-fold-btn,
+  /* .file-info-right .global-fold-btn,
   .file-info-right .sort-btn,
   .file-info-right .font-size-btn,
   .file-info-right .refresh-btn,
@@ -409,33 +408,16 @@ body {
     min-width: 28px;
     padding: 4px;
     gap: 0;
-  }
+  } */
   
   /* Reduce gap between buttons */
-  .file-info-right {
+  /* .file-info-right {
     gap: 4px;
-  }
-}
-
-@container (max-width: 240px) {
-  /* Ultra-compact mode - minimal button sizes */
-  .file-info-right .global-fold-btn,
-  .file-info-right .sort-btn,
-  .file-info-right .font-size-btn,
-  .file-info-right .refresh-btn,
-  .file-info-right .layout-presets-btn {
-    min-width: 24px;
-    padding: 2px;
-  }
-  
-  /* Even smaller gaps */
-  .file-info-right {
-    gap: 2px;
-  }
+  } */
 }
 
 /* Fallback media queries for browsers without container query support */
-@media (max-width: 600px) {
+/* @media (max-width: 600px) {
   .global-fold-text,
   .sort-text,
   .font-size-text,
@@ -457,7 +439,7 @@ body {
   .file-info-right {
     gap: 4px;
   }
-}
+} */
 
 /* Small font mode for cards */
 body.small-card-fonts .task-item {
@@ -1594,7 +1576,7 @@ body.vscode-high-contrast-light .task-count {
   border-radius: 3px;
   transition: all 0.2s;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
 }
 
@@ -1721,8 +1703,24 @@ body.vscode-high-contrast-light .task-count {
 
 .fold-all-btn.fold-collapsed .fold-icon,
 .global-fold-btn.fold-collapsed .global-fold-icon {
-  color: var(--vscode-charts-blue);
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s;
+  user-select: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   transform: rotate(0deg);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* color: var(--vscode-button);
+  transform: rotate(0deg); */
 }
 
 .fold-all-btn.fold-mixed .fold-icon,

@@ -3882,32 +3882,52 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
             }
         });
 
-        // Generate HTML for each position with HORIZONTAL layout (left to right)
+        // Generate HTML for each position with HORIZONTAL or VERTICAL layout
         // Column badges: top -4px, Task badges: top 18px
         const topValue = elementType === 'column' ? '-4px' : '18px';
+
+        // Check if column is vertically folded (for vertical badge layout)
+        const isVerticallyFolded = elementType === 'column' && element.classList.contains('collapsed-vertical');
+
         Object.entries(positions).forEach(([position, badgesAtPosition]) => {
             badgesAtPosition.forEach((item, index) => {
                 const badge = item.badge;
-                const offsetMultiplier = 30; // Horizontal space between badges (increased for left-to-right)
                 let positionStyle = '';
 
-                switch (position) {
-                    case 'top-left':
-                        // Stack horizontally: keep top constant, increase left
-                        positionStyle = `top: ${topValue}; left: ${-8 + (index * offsetMultiplier)}px;`;
-                        break;
-                    case 'top-right':
-                        // Stack horizontally leftward: keep top constant, decrease right
-                        positionStyle = `top: ${topValue}; right: ${-8 + (index * offsetMultiplier)}px;`;
-                        break;
-                    case 'bottom-left':
-                        // Stack horizontally: keep bottom constant, increase left
-                        positionStyle = `bottom: -8px; left: ${-8 + (index * offsetMultiplier)}px;`;
-                        break;
-                    case 'bottom-right':
-                        // Stack horizontally leftward: keep bottom constant, decrease right
-                        positionStyle = `bottom: -8px; right: ${-8 + (index * offsetMultiplier)}px;`;
-                        break;
+                if (isVerticallyFolded) {
+                    // VERTICAL LAYOUT: Stack badges downward (or upward for bottom positions)
+                    const verticalOffsetMultiplier = 24; // Vertical space between badges
+                    switch (position) {
+                        case 'top-left':
+                            positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
+                            break;
+                        case 'top-right':
+                            positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
+                            break;
+                        case 'bottom-left':
+                            positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
+                            break;
+                        case 'bottom-right':
+                            positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
+                            break;
+                    }
+                } else {
+                    // HORIZONTAL LAYOUT: Stack badges left to right (or right to left)
+                    const horizontalOffsetMultiplier = 30; // Horizontal space between badges
+                    switch (position) {
+                        case 'top-left':
+                            positionStyle = `top: ${topValue}; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                            break;
+                        case 'top-right':
+                            positionStyle = `top: ${topValue}; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                            break;
+                        case 'bottom-left':
+                            positionStyle = `bottom: -8px; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                            break;
+                        case 'bottom-right':
+                            positionStyle = `bottom: -8px; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                            break;
+                    }
                 }
 
                 // Encode special characters for CSS class names to match boardRenderer.js encoding
@@ -4445,34 +4465,54 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                 }
             });
 
-            // Generate HTML for each position with HORIZONTAL layout (left to right)
+            // Generate HTML for each position with HORIZONTAL or VERTICAL layout
             // Column badges: top -4px, Task badges: top 18px
             const topValue = elementType === 'column' ? '-4px' : '18px';
+
+            // Check if column is vertically folded (for vertical badge layout)
+            const isVerticallyFolded = elementType === 'column' && element.classList.contains('collapsed-vertical');
+
             console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
                 console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
                 badgesAtPosition.forEach((item, index) => {
                     const badge = item.badge;
-                    const offsetMultiplier = 30; // Horizontal space between badges (increased for left-to-right)
                     let positionStyle = '';
 
-                    switch (position) {
-                        case 'top-left':
-                            // Stack horizontally: keep top constant, increase left
-                            positionStyle = `top: ${topValue}; left: ${-8 + (index * offsetMultiplier)}px;`;
-                            break;
-                        case 'top-right':
-                            // Stack horizontally leftward: keep top constant, decrease right
-                            positionStyle = `top: ${topValue}; right: ${-8 + (index * offsetMultiplier)}px;`;
-                            break;
-                        case 'bottom-left':
-                            // Stack horizontally: keep bottom constant, increase left
-                            positionStyle = `bottom: -8px; left: ${-8 + (index * offsetMultiplier)}px;`;
-                            break;
-                        case 'bottom-right':
-                            // Stack horizontally leftward: keep bottom constant, decrease right
-                            positionStyle = `bottom: -8px; right: ${-8 + (index * offsetMultiplier)}px;`;
-                            break;
+                    if (isVerticallyFolded) {
+                        // VERTICAL LAYOUT: Stack badges downward (or upward for bottom positions)
+                        const verticalOffsetMultiplier = 24; // Vertical space between badges
+                        switch (position) {
+                            case 'top-left':
+                                positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
+                                break;
+                            case 'top-right':
+                                positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
+                                break;
+                            case 'bottom-left':
+                                positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
+                                break;
+                            case 'bottom-right':
+                                positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
+                                break;
+                        }
+                    } else {
+                        // HORIZONTAL LAYOUT: Stack badges left to right (or right to left)
+                        const horizontalOffsetMultiplier = 30; // Horizontal space between badges
+                        switch (position) {
+                            case 'top-left':
+                                positionStyle = `top: ${topValue}; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                                break;
+                            case 'top-right':
+                                positionStyle = `top: ${topValue}; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                                break;
+                            case 'bottom-left':
+                                positionStyle = `bottom: -8px; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                                break;
+                            case 'bottom-right':
+                                positionStyle = `bottom: -8px; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
+                                break;
+                        }
                     }
 
                     // Encode special characters for CSS class names to match boardRenderer.js encoding
