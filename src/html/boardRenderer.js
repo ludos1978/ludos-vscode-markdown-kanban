@@ -1319,6 +1319,9 @@ function renderSingleColumn(columnId, columnData) {
         setupColumnDragAndDrop();
     }
 
+    // Note: Visual tag elements (badges, bars) are now created within createColumnElement
+    // before the element is inserted into the DOM, eliminating timing/race conditions
+
 }
 
 // Render Kanban board
@@ -1825,12 +1828,6 @@ function updateFoldAllButton(columnId) {
  * @returns {string} Complete HTML for column
  */
 function createColumnElement(column, columnIndex) {
-    console.log('[CREATE COLUMN ENTRY] Called for column', column?.id);
-    console.log('[CREATE COLUMN ENTRY] Column title:', column?.title);
-    console.log('[CREATE COLUMN ENTRY] pendingColumnChanges exists?', !!window.pendingColumnChanges);
-    console.log('[CREATE COLUMN ENTRY] pendingColumnChanges size:', window.pendingColumnChanges?.size);
-    console.log('[CREATE COLUMN ENTRY] Has pending for this column?', window.pendingColumnChanges?.has(column?.id));
-
     if (!column) {
         return document.createElement('div');
     }
@@ -1843,12 +1840,7 @@ function createColumnElement(column, columnIndex) {
     // This prevents backend updates from overwriting user's immediate edits
     if (window.pendingColumnChanges && window.pendingColumnChanges.has(column.id)) {
         const pendingChange = window.pendingColumnChanges.get(column.id);
-        console.log('[CREATE COLUMN] Using pending title for column', column.id);
-        console.log('[CREATE COLUMN] Backend title:', column.title);
-        console.log('[CREATE COLUMN] Pending title:', pendingChange.title);
         column = { ...column, title: pendingChange.title };
-    } else {
-        console.log('[CREATE COLUMN] NO pending changes, using backend title');
     }
 
     // Extract ALL tags from column title for stacking features
@@ -2035,6 +2027,22 @@ function createColumnElement(column, columnIndex) {
             ${footerBarsHtml || ''}
         </div>
     `;
+
+    // CRITICAL: Apply visual tag elements (badges, bars) BEFORE returning
+    // This ensures the element is fully constructed with all visual elements
+    // before being inserted into the DOM - prevents timing/race conditions
+    if (allTags.length > 0 && window.updateAllVisualTagElements) {
+        window.updateAllVisualTagElements(columnDiv, allTags, 'column');
+    }
+
+    // Apply visual elements to tasks as well
+    columnDiv.querySelectorAll('[data-task-id][data-all-tags]').forEach(taskElement => {
+        const taskTags = taskElement.getAttribute('data-all-tags');
+        if (taskTags && window.updateAllVisualTagElements) {
+            const taskTagArray = taskTags.split(' ').filter(tag => tag.trim());
+            window.updateAllVisualTagElements(taskElement, taskTagArray, 'task');
+        }
+    });
 
     return columnDiv;
 }
@@ -4426,9 +4434,13 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
     if (window.injectStackableBars) {
         window.injectStackableBars(taskElement);
     }
-    if (window.updateCornerBadgesImmediate) {
-        const combinedText = [task.title, task.description].filter(Boolean).join(' ');
-        window.updateCornerBadgesImmediate(task.id, 'task', combinedText);
+    // Use updateAllVisualTagElements instead of updateCornerBadgesImmediate for consistency
+    if (window.updateAllVisualTagElements) {
+        const tags = taskElement.getAttribute('data-all-tags');
+        if (tags) {
+            const tagArray = tags.split(' ').filter(tag => tag.trim());
+            window.updateAllVisualTagElements(taskElement, tagArray, 'task');
+        }
     }
 
     // Update column task count

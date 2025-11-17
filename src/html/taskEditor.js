@@ -802,12 +802,7 @@ class TaskEditor {
                     }
 
                     // Check if the title actually changed
-                    console.log('[TITLE CHANGE CHECK] OLD column.title:', column.title);
-                    console.log('[TITLE CHANGE CHECK] NEW title from editor:', newTitle);
-                    console.log('[TITLE CHANGE CHECK] Changed?', column.title !== newTitle);
-
                     if (column.title !== newTitle) {
-                        console.log('[TITLE CHANGE] Title changed! Proceeding with update...');
                         // Create context for this edit
                         const editContext = `column-title-${columnId}`;
 
@@ -894,12 +889,8 @@ class TaskEditor {
                                 title: newTitle
                             });
 
-                            // IMMEDIATELY update display - find element directly
-                            const displayElement = columnElement ? columnElement.querySelector('.column-title-text') : null;
-                            if (displayElement && window.tagUtils) {
-                                const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
-                                displayElement.innerHTML = renderedTitle;
-                            }
+                            // Note: Display was already updated at line 866 with temporary placeholder
+                            // Don't update it again here - would overwrite the loading indicator
 
                             // Update all visual tag elements (badges, bars, backgrounds, borders)
                             if (columnElement && window.updateAllVisualTagElements) {
@@ -938,36 +929,17 @@ class TaskEditor {
                     }
 
                     // Update display IMMEDIATELY while editor is still open (matching task edit pattern lines 1149-1178)
-                    console.log('[COLUMN IMMEDIATE UPDATE] Starting immediate update for column', columnId);
-                    console.log('[COLUMN IMMEDIATE UPDATE] OLD column.title:', column.title);
-                    console.log('[COLUMN IMMEDIATE UPDATE] NEW title that was just set:', newTitle);
-                    console.log('[COLUMN IMMEDIATE UPDATE] Titles are same?', column.title === newTitle);
-                    console.log('[COLUMN IMMEDIATE UPDATE] this.currentEditor exists?', !!this.currentEditor);
-                    console.log('[COLUMN IMMEDIATE UPDATE] displayElement exists?', !!this.currentEditor?.displayElement);
-
                     if (this.currentEditor && this.currentEditor.displayElement) {
-                        console.log('[COLUMN IMMEDIATE UPDATE] Current display innerHTML (first 100 chars):', this.currentEditor.displayElement.innerHTML.substring(0, 100));
-                        console.log('[COLUMN IMMEDIATE UPDATE] Display element style.display BEFORE:', this.currentEditor.displayElement.style.display);
-                        console.log('[COLUMN IMMEDIATE UPDATE] Editor element style.display:', this.currentEditor.element.style.display);
-
                         if (window.tagUtils) {
                             const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
-                            console.log('[COLUMN IMMEDIATE UPDATE] Rendered title (first 100 chars):', renderedTitle.substring(0, 100));
                             this.currentEditor.displayElement.innerHTML = renderedTitle;
                         } else {
-                            console.log('[COLUMN IMMEDIATE UPDATE] tagUtils not available, using plain title');
                             this.currentEditor.displayElement.innerHTML = column.title || '';
                         }
 
                         // Make display visible AND hide editor immediately
                         this.currentEditor.displayElement.style.removeProperty('display');
                         this.currentEditor.element.style.display = 'none';
-                        console.log('[COLUMN IMMEDIATE UPDATE] Display element style.display AFTER removeProperty:', this.currentEditor.displayElement.style.display);
-                        console.log('[COLUMN IMMEDIATE UPDATE] Display element computed display:', window.getComputedStyle(this.currentEditor.displayElement).display);
-                        console.log('[COLUMN IMMEDIATE UPDATE] Editor hidden:', this.currentEditor.element.style.display);
-                        console.log('[COLUMN IMMEDIATE UPDATE] ========== UPDATE COMPLETE ==========');
-                    } else {
-                        console.error('[COLUMN IMMEDIATE UPDATE] FAILED - currentEditor or displayElement is null!');
                     }
 
                     // Update column CSS classes for span tags

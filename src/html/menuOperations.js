@@ -2810,8 +2810,8 @@ function toggleColumnTag(columnId, tagName, event) {
     // Update tag category counts in menu
     updateTagCategoryCounts(columnId, 'column');
 
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(columnId, 'column', title);
+    // Note: updateColumnDisplayImmediate already calls updateVisualTagState which handles badges
+    // No need to call updateCornerBadgesImmediate separately
 
     // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
     // that change the column height
@@ -2993,8 +2993,8 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
     // Update tag category counts in menu
     updateTagCategoryCounts(taskId, 'task', columnId);
 
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(taskId, 'task', title);
+    // Note: updateTaskDisplayImmediate already calls updateVisualTagState which handles badges
+    // No need to call updateCornerBadgesImmediate separately
 
     // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
     // that change the task height
@@ -3085,8 +3085,8 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
 
-    // Update corner badges immediately (numeric badges now handled as corner badges)
-    updateCornerBadgesImmediate(columnId, 'column', newTitle);
+    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
+    // No need to call updateCornerBadgesImmediate separately
     
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${columnId}"][data-tag-name="${tagName}"]`);
@@ -3159,8 +3159,8 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
 
-    // Update corner badges immediately (numeric badges now handled as corner badges)
-    updateCornerBadgesImmediate(taskId, 'task', newTitle);
+    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
+    // No need to call updateCornerBadgesImmediate separately
     
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${taskId}"][data-tag-name="${tagName}"]`);
@@ -4301,8 +4301,9 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
         const columnTitle = element.querySelector('.column-title');
         if (columnTitle) {
-            // Column title no longer contains corner badges (moved to column-header)
-            // Keep this selector for backward compatibility if needed
+            // CRITICAL: Remove corner badges from column-title so they can be recreated
+            // This ensures badges update immediately when tags change
+            columnTitle.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
         }
 
         const columnFooter = element.querySelector('.column-footer');
@@ -4339,7 +4340,16 @@ function updateAllVisualTagElements(element, allTags, elementType) {
     });
     
     // 3. CORNER BADGES - Update badges immediately
-    let badgesContainer = element.querySelector('.corner-badges-container');
+    // CRITICAL: For columns, only check for badges in column-title (not in nested tasks)
+    // For tasks, check directly in the element
+    let badgesContainer;
+    if (elementType === 'column') {
+        const columnTitle = element.querySelector('.column-title');
+        badgesContainer = columnTitle ? columnTitle.querySelector('.corner-badges-container') : null;
+    } else {
+        badgesContainer = element.querySelector('.corner-badges-container');
+    }
+    console.log('[BADGE DEBUG] After cleanup - badgesContainer:', badgesContainer, 'getTagConfig:', !!window.getTagConfig, 'allTags:', allTags);
     if (!badgesContainer && window.getTagConfig) {
         // Extract numeric tags from element's title first
         // Get title from cached board data using element ID
@@ -4369,7 +4379,10 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
         // Generate badges HTML inline (if we have active tags OR numeric tags)
         let badgesHtml = '';
+        console.log('[BADGE DEBUG] tagColors:', !!window.tagColors, 'typeof:', typeof window.tagColors, 'allTags.length:', allTags.length, 'hasNumericTags:', hasNumericTags, 'numericTags:', numericTags);
+        console.log('[BADGE DEBUG] Check result:', !!(window.tagColors && (allTags.length > 0 || hasNumericTags)));
         if (window.tagColors && (allTags.length > 0 || hasNumericTags)) {
+            console.log('[BADGE DEBUG] INSIDE badge generation block');
             const positions = {
                 'top-left': [],
                 'top-right': [],
@@ -4378,7 +4391,9 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             };
 
             // Add numeric badges to positions (already extracted above)
+            console.log('[BADGE DEBUG] About to add numeric badges, numericTags:', numericTags, 'isArray:', Array.isArray(numericTags));
             if (numericTags && Array.isArray(numericTags)) {
+                console.log('[BADGE DEBUG] Adding', numericTags.length, 'numeric badges');
                 numericTags.forEach(numericValue => {
                     const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
                     positions['top-left'].push({
@@ -4394,8 +4409,10 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             }
 
             // Collect badges by position
+            console.log('[BADGE DEBUG] About to process allTags:', allTags);
             allTags.forEach(tag => {
                 const config = window.getTagConfig(tag);
+                console.log('[BADGE DEBUG] Tag:', tag, 'config:', config ? JSON.stringify(config).substring(0, 200) : 'null');
                 if (config && config.cornerBadge) {
                     // Get theme colors for this tag
                     const isDarkTheme = document.body.classList.contains('vscode-dark') ||
@@ -4423,7 +4440,9 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             });
 
             // Generate HTML for each position with proper vertical stacking
+            console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
+                console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
                 badgesAtPosition.forEach((item, index) => {
                     const badge = item.badge;
                     const offsetMultiplier = 24; // Space between stacked badges
@@ -4464,6 +4483,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             });
         }
 
+        console.log('[BADGE DEBUG] badgesHtml length:', badgesHtml.length, 'html:', badgesHtml.substring(0, 100));
         if (badgesHtml && badgesHtml.trim() !== '') {
             badgesContainer = document.createElement('div');
             badgesContainer.className = 'corner-badges-container';
@@ -4471,7 +4491,10 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             badgesContainer.innerHTML = badgesHtml;
             // For columns, append to column-title; for tasks, append to element
             const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
+            console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
             targetContainer.appendChild(badgesContainer);
+        } else {
+            console.log('[BADGE DEBUG] No badges HTML generated - skipping creation');
         }
     }
     

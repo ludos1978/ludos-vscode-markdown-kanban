@@ -4,6 +4,9 @@
 // Global variables
 let currentFileInfo = null;
 
+// Note: window.tagColors is set by backend in boardUpdate message
+// Do NOT initialize to {} here - it prevents actual config from loading!
+
 // MD5 hash generation function using Web Crypto API
 async function generateMD5Hash(arrayBuffer) {
     try {
@@ -2611,12 +2614,40 @@ window.addEventListener('message', event => {
             const shouldSkipRender = message.skipRender || message.board?.skipRender;
 
             // Store tag colors globally - THIS IS CRITICAL
+            // Set from backend message - this populates actual tag configurations
             if (message.tagColors) {
                 window.tagColors = message.tagColors;
+
+                // DIAGNOSTIC: Log what cornerBadge configs exist
+                console.log('[TAGCOLORS] Loaded keys:', Object.keys(window.tagColors));
+                let cornerBadgeCount = 0;
+                Object.keys(window.tagColors).forEach(key => {
+                    if (typeof window.tagColors[key] === 'object' && window.tagColors[key] !== null) {
+                        if (window.tagColors[key].cornerBadge) {
+                            console.log('[TAGCOLORS] Has cornerBadge:', key, window.tagColors[key].cornerBadge);
+                            cornerBadgeCount++;
+                        }
+                        // Check grouped structure too
+                        if (typeof window.tagColors[key] === 'object') {
+                            Object.keys(window.tagColors[key]).forEach(subkey => {
+                                if (window.tagColors[key][subkey]?.cornerBadge) {
+                                    console.log('[TAGCOLORS] Group', key, 'tag', subkey, 'has cornerBadge:', window.tagColors[key][subkey].cornerBadge);
+                                    cornerBadgeCount++;
+                                }
+                            });
+                        }
+                    }
+                });
+                console.log('[TAGCOLORS] Total tags with cornerBadge:', cornerBadgeCount);
+
                 // Only apply styles if not skipping render (prevents style spam during tag operations)
                 if (!shouldSkipRender && typeof applyTagStyles === 'function') {
                     applyTagStyles();
                 }
+            } else if (!window.tagColors) {
+                // Fallback: initialize to empty object only if backend didn't send it
+                console.log('[TAGCOLORS] WARNING: Backend did not send tagColors!');
+                window.tagColors = {};
             }
 
             // Store enabled tag categories for menu filtering
@@ -2846,7 +2877,15 @@ window.addEventListener('message', event => {
                 if (column) {
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
-                    column.title = message.columnTitle || column.title;
+
+                    // CRITICAL: Check for pending title changes - preserve user edits over backend data
+                    if (window.pendingColumnChanges && window.pendingColumnChanges.has(message.columnId)) {
+                        const pendingChange = window.pendingColumnChanges.get(message.columnId);
+                        column.title = pendingChange.title; // Use pending title, not backend title
+                    } else {
+                        column.title = message.columnTitle || column.title;
+                    }
+
                     column.displayTitle = message.displayTitle || column.displayTitle;
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
