@@ -3864,9 +3864,60 @@ h6 .kanban-tag {
   position: relative;
 } */
 
+/* Corner badge containers - flexbox based positioning */
+.corner-badges-container {
+  position: absolute;
+  display: flex;
+  pointer-events: none;
+  z-index: 10;
+  gap: 16px;
+}
+
+/* Positioning for each corner - horizontal by default */
+.corner-badges-container.top-left {
+  top: 16px;
+  left: -8px;
+  flex-direction: row;
+}
+
+.corner-badges-container.top-right {
+  top: 16px;
+  right: -8px;
+  flex-direction: row;
+}
+
+.corner-badges-container.bottom-left {
+  bottom: -8px;
+  left: -8px;
+  flex-direction: row;
+}
+
+.corner-badges-container.bottom-right {
+  bottom: -8px;
+  right: -8px;
+  flex-direction: row;
+}
+
+/* Vertical layout for vertically folded columns */
+.collapsed-vertical .corner-badges-container.top-left,
+.collapsed-vertical .corner-badges-container.top-right {
+  flex-direction: column;
+}
+
+.collapsed-vertical .corner-badges-container.bottom-left,
+.collapsed-vertical .corner-badges-container.bottom-right {
+  flex-direction: column;
+}
+
+/* Task badges have different top position */
+/* .task-item .corner-badges-container.top-left,
+.task-item .corner-badges-container.top-right {
+  top: 18px;
+} */
+
 /* Corner badges */
 .corner-badge {
-  position: absolute;
+  position: relative; /* Changed from absolute since container handles positioning */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3879,6 +3930,17 @@ h6 .kanban-tag {
   background: #666; /* Default background color as fallback */
   color: #fff; /* Default text color as fallback */
 }
+
+/* .corner-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 11px;
+    z-index: 50;
+    pointer-events: none;
+    transition: all 0.2s ease;
+} */
 
 /* Ensure corner badges for specific tags (like corner-badge-feature) appear above borders */
 [class*="corner-badge-"] {

@@ -3458,18 +3458,6 @@ function generateTagStyles() {
     let styles = '';
     
     // Add base styles for corner badges
-    styles += `.corner-badge {
-        position: absolute;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 11px;
-        z-index: 50;
-        pointer-events: none;
-        transition: all 0.2s ease;
-    }\n`;
-    
     // Add default styles for elements without tags only when explicitly enabled
     if (window.tagColors.default) {
         const defaultConfig = window.tagColors.default;

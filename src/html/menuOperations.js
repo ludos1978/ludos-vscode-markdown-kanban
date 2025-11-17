@@ -3804,23 +3804,11 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         element.removeAttribute('data-all-tags');
     }
 
-    // Find existing corner badges container or create one
-    // For columns, append to column-header; for tasks, append to element
-    const targetContainer = elementType === 'column' ? element.querySelector('.column-header') || element : element;
-    let badgesContainer = targetContainer.querySelector('.corner-badges-container');
-    if (!badgesContainer) {
-        badgesContainer = document.createElement('div');
-        badgesContainer.className = 'corner-badges-container';
-        badgesContainer.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9;';
-        targetContainer.appendChild(badgesContainer);
-        // Ensure parent has relative positioning
-        // if (!element.style.position || element.style.position === 'static') {
-        //     element.style.position = 'relative';
-        // }
-    }
+    // For columns, append to column-title; for tasks, append to element
+    const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
 
-    // Generate new badges HTML
-    let newBadgesHtml = '';
+    // Remove existing badge containers
+    targetContainer.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
 
     // Extract numeric tags first to check if we need to render badges
     const numericTags = window.tagUtils ? window.tagUtils.extractNumericTag(newTitle) : null;
@@ -3882,56 +3870,19 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
             }
         });
 
-        // Generate HTML for each position with HORIZONTAL or VERTICAL layout
-        // Column badges: top -4px, Task badges: top 18px
-        const topValue = elementType === 'column' ? '-4px' : '18px';
-
-        // Check if column is vertically folded (for vertical badge layout)
-        const isVerticallyFolded = elementType === 'column' && element.classList.contains('collapsed-vertical');
-
+        // Create separate flex containers for each corner position
         Object.entries(positions).forEach(([position, badgesAtPosition]) => {
+            if (badgesAtPosition.length === 0) return; // Skip empty positions
+
+            // Create container for this corner
+            const cornerContainer = document.createElement('div');
+            cornerContainer.className = `corner-badges-container ${position}`;
+
+            // Append badges to this corner's container
             badgesAtPosition.forEach((item, index) => {
                 const badge = item.badge;
-                let positionStyle = '';
 
-                if (isVerticallyFolded) {
-                    // VERTICAL LAYOUT: Stack badges downward (or upward for bottom positions)
-                    const verticalOffsetMultiplier = 24; // Vertical space between badges
-                    switch (position) {
-                        case 'top-left':
-                            positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
-                            break;
-                        case 'top-right':
-                            positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
-                            break;
-                        case 'bottom-left':
-                            positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
-                            break;
-                        case 'bottom-right':
-                            positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
-                            break;
-                    }
-                } else {
-                    // HORIZONTAL LAYOUT: Stack badges left to right (or right to left)
-                    const horizontalOffsetMultiplier = 30; // Horizontal space between badges
-                    switch (position) {
-                        case 'top-left':
-                            positionStyle = `top: ${topValue}; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                            break;
-                        case 'top-right':
-                            positionStyle = `top: ${topValue}; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                            break;
-                        case 'bottom-left':
-                            positionStyle = `bottom: -8px; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                            break;
-                        case 'bottom-right':
-                            positionStyle = `bottom: -8px; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                            break;
-                    }
-                }
-
-                // Encode special characters for CSS class names to match boardRenderer.js encoding
-                // E.g., ++ becomes plusplus, -- becomes minusminus, ø becomes oslash
+                // Encode special characters for CSS class names
                 let cssClassName = item.tag;
                 if (cssClassName === '++') cssClassName = 'plusplus';
                 else if (cssClassName === '+') cssClassName = 'plus';
@@ -3939,29 +3890,29 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
                 else if (cssClassName === '-') cssClassName = 'minus';
                 else if (cssClassName === 'ø') cssClassName = 'oslash';
                 else {
-                    // For other tags, just use as-is (they start with alphanumeric)
                     cssClassName = item.tag;
                 }
 
                 const badgeContent = badge.image ? '' : (badge.label || '');
 
-                // Add inline styles for background and color to ensure they're always applied
-                // Fallback to red if color is missing to make it obvious
+                // Only apply background and color styles - NO position calculations!
                 const bgColor = badge.color || '#FF0000';
                 const textColor = badge.labelColor || '#ffffff';
-                const inlineStyles = `${positionStyle}; background: ${bgColor} !important; color: ${textColor} !important;`;
+                const inlineStyles = `background: ${bgColor} !important; color: ${textColor} !important;`;
 
-                newBadgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${inlineStyles}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+                const badgeElement = document.createElement('div');
+                badgeElement.className = `corner-badge corner-badge-${cssClassName}`;
+                badgeElement.style.cssText = inlineStyles;
+                badgeElement.setAttribute('data-badge-position', position);
+                badgeElement.setAttribute('data-badge-index', index);
+                badgeElement.textContent = badgeContent;
+
+                cornerContainer.appendChild(badgeElement);
             });
+
+            // Append this corner's container to the target
+            targetContainer.appendChild(cornerContainer);
         });
-    }
-
-    // Clear and update badges
-    badgesContainer.innerHTML = newBadgesHtml;
-
-    // If no badges, remove container to prevent empty space
-    if (!newBadgesHtml || newBadgesHtml.trim() === '') {
-        badgesContainer.remove();
     }
 
 }
@@ -4465,57 +4416,21 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                 }
             });
 
-            // Generate HTML for each position with HORIZONTAL or VERTICAL layout
-            // Column badges: top -4px, Task badges: top 18px
-            const topValue = elementType === 'column' ? '-4px' : '18px';
-
-            // Check if column is vertically folded (for vertical badge layout)
-            const isVerticallyFolded = elementType === 'column' && element.classList.contains('collapsed-vertical');
-
+            // Create separate flex containers for each corner position
             console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
                 console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
+                if (badgesAtPosition.length === 0) return; // Skip empty positions
+
+                // Create container for this corner
+                const cornerContainer = document.createElement('div');
+                cornerContainer.className = `corner-badges-container ${position}`;
+
+                // Append badges to this corner's container
                 badgesAtPosition.forEach((item, index) => {
                     const badge = item.badge;
-                    let positionStyle = '';
 
-                    if (isVerticallyFolded) {
-                        // VERTICAL LAYOUT: Stack badges downward (or upward for bottom positions)
-                        const verticalOffsetMultiplier = 24; // Vertical space between badges
-                        switch (position) {
-                            case 'top-left':
-                                positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
-                                break;
-                            case 'top-right':
-                                positionStyle = `top: ${-4 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
-                                break;
-                            case 'bottom-left':
-                                positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; left: -8px;`;
-                                break;
-                            case 'bottom-right':
-                                positionStyle = `bottom: ${-8 + (index * verticalOffsetMultiplier)}px; right: -8px;`;
-                                break;
-                        }
-                    } else {
-                        // HORIZONTAL LAYOUT: Stack badges left to right (or right to left)
-                        const horizontalOffsetMultiplier = 30; // Horizontal space between badges
-                        switch (position) {
-                            case 'top-left':
-                                positionStyle = `top: ${topValue}; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                                break;
-                            case 'top-right':
-                                positionStyle = `top: ${topValue}; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                                break;
-                            case 'bottom-left':
-                                positionStyle = `bottom: -8px; left: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                                break;
-                            case 'bottom-right':
-                                positionStyle = `bottom: -8px; right: ${-8 + (index * horizontalOffsetMultiplier)}px;`;
-                                break;
-                        }
-                    }
-
-                    // Encode special characters for CSS class names to match boardRenderer.js encoding
+                    // Encode special characters for CSS class names
                     let cssClassName = item.tag;
                     if (cssClassName === '++') cssClassName = 'plusplus';
                     else if (cssClassName === '+') cssClassName = 'plus';
@@ -4525,28 +4440,26 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
                     const badgeContent = badge.image ? '' : (badge.label || '');
 
-                    // Add inline styles for background and color to ensure they're always applied
+                    // Only apply background and color styles - NO position calculations!
                     const bgColor = badge.color || '#FF0000';
                     const textColor = badge.labelColor || '#ffffff';
-                    const inlineStyles = `${positionStyle}; background: ${bgColor} !important; color: ${textColor} !important;`;
+                    const inlineStyles = `background: ${bgColor} !important; color: ${textColor} !important;`;
 
-                    badgesHtml += `<div class="corner-badge corner-badge-${cssClassName}" style="${inlineStyles}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+                    const badgeElement = document.createElement('div');
+                    badgeElement.className = `corner-badge corner-badge-${cssClassName}`;
+                    badgeElement.style.cssText = inlineStyles;
+                    badgeElement.setAttribute('data-badge-position', position);
+                    badgeElement.setAttribute('data-badge-index', index);
+                    badgeElement.textContent = badgeContent;
+
+                    cornerContainer.appendChild(badgeElement);
                 });
-            });
-        }
 
-        console.log('[BADGE DEBUG] badgesHtml length:', badgesHtml.length, 'html:', badgesHtml.substring(0, 100));
-        if (badgesHtml && badgesHtml.trim() !== '') {
-            badgesContainer = document.createElement('div');
-            badgesContainer.className = 'corner-badges-container';
-            badgesContainer.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10;';
-            badgesContainer.innerHTML = badgesHtml;
-            // For columns, append to column-title; for tasks, append to element
-            const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
-            console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
-            targetContainer.appendChild(badgesContainer);
-        } else {
-            console.log('[BADGE DEBUG] No badges HTML generated - skipping creation');
+                // For columns, append to column-title; for tasks, append to element
+                const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
+                console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
+                targetContainer.appendChild(cornerContainer);
+            });
         }
     }
     
