@@ -18,7 +18,7 @@ header 	Specify the content of the slide header ▶️
 footer 	Specify the content of the slide footer ▶️
 class 	Set HTML class attribute for the slide element <section>
 backgroundColor 	Set background-color style of the slide
-backgroundImage 	Set background-image style of the slide
+backgroundImage  Set background-image style of the slide
 backgroundPosition 	Set background-position style of the slide
 backgroundRepeat 	Set background-repeat style of the slide
 backgroundSize 	Set background-size style of the slide

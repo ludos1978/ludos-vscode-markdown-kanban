@@ -1146,10 +1146,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: var(--task-height) !important;
 }
 
-.task-item:not(:has(.footer-bars-container)) {
+/* .task-item:not(:has(.footer-bars-container)) {
 	padding-top: var(--whitespace-div4);
 	padding-bottom: var(--whitespace-div4);
-}
+} */
 
 .task-item:last-child {
   margin-bottom: 0;

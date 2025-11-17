@@ -811,7 +811,7 @@ class TaskEditor {
 
                         this.lastEditContext = editContext;
 
-                        // Check for include syntax changes in column header (location-based column include)
+                        // Check for include syntax in column header (location-based column include)
                         const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
                         const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
 
@@ -819,87 +819,68 @@ class TaskEditor {
                             oldIncludeMatches.length !== newIncludeMatches.length ||
                             oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
 
+                        // CRITICAL: Check if column HAS includes OR HAD includes (to handle removal!)
+                        const hasIncludes = newIncludeMatches.length > 0;
+                        const hadIncludes = oldIncludeMatches.length > 0;
+                        const hasOrHadIncludes = hasIncludes || hadIncludes;
 
                         column.title = newTitle;
 
-                        // If include syntax changed, send editColumnTitle message immediately for backend processing
-                        if (hasIncludeChanges) {
-                            // OPTIMISTIC UPDATE: Immediately generate temporary displayTitle
-                            // Strip !!!include()!!! syntax to prevent markdown-it from rendering it
-                            let tempDisplayTitle = newTitle;
-                            const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-                            let match;
-                            const filePaths = [];
-
-                            while ((match = includeRegex.exec(newTitle)) !== null) {
-                                filePaths.push(match[1]);
-                            }
-
-                            // Replace each !!!include()!!! with a placeholder badge
-                            filePaths.forEach((filePath, index) => {
-                                const fileName = filePath.split('/').pop() || filePath;
-                                const placeholder = `!(${fileName})!`;
-                                tempDisplayTitle = tempDisplayTitle.replace(/!!!include\s*\([^)]+\)\s*!!!/, placeholder);
-                            });
-
-                            // If nothing left after stripping, use filename
-                            if (!tempDisplayTitle.trim() && filePaths.length > 0) {
-                                const fileName = filePaths[0].split('/').pop() || filePaths[0];
-                                const baseName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension
-                                tempDisplayTitle = baseName;
-                            }
-
-                            // Update column state optimistically
-                            column.displayTitle = tempDisplayTitle;
-                            column.isLoadingContent = true;
-
-                            // Update the display immediately (close editor and show temporary title)
-                            this.closeEditor();
-
-                            // Re-render just this column's title to show the optimistic state with loading indicator
+                        // If column has/had includes, send to backend (add/change/remove)
+                        if (hasOrHadIncludes) {
+                            // Get column element first
                             const columnElement = element.closest('.kanban-full-height-column');
-                            if (columnElement) {
-                                const titleContainer = columnElement.querySelector('.column-title-text');
-                                if (titleContainer && window.renderMarkdown) {
-                                    // Add a subtle loading indicator next to the title
-                                    const loadingSpinner = '<span class="title-loading-spinner" style="margin-left: 8px; opacity: 0.5;">⟳</span>';
-                                    titleContainer.innerHTML = window.renderMarkdown(tempDisplayTitle) + loadingSpinner;
-                                }
-                            }
 
-                            // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
-                            // DOM might have stale IDs if a boardUpdate just arrived
-                            let currentColumnId = columnId; // Default to what we have
-
-                            // Find column's position in DOM to match with current board
+                            // CRITICAL: Get current column ID by POSITION
+                            let currentColumnId = columnId;
                             if (columnElement) {
                                 const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                                 const columnIndex = allColumns.indexOf(columnElement);
-
                                 if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
-                                    // Match by position - use current ID from board at this position
                                     currentColumnId = window.currentBoard.columns[columnIndex].id;
                                 }
                             }
 
-                            // Send editColumnTitle message to trigger proper include handling in backend
+                            // STEP 1: Send message with FULL include syntax for backend to process
                             vscode.postMessage({
                                 type: 'editColumnTitle',
-                                columnId: currentColumnId, // Use current ID from board
+                                columnId: currentColumnId,
                                 title: newTitle
                             });
 
-                            // Note: Display was already updated at line 866 with temporary placeholder
-                            // Don't update it again here - would overwrite the loading indicator
+                            // STEP 2: Update display immediately
+                            if (this.currentEditor && this.currentEditor.displayElement) {
+                                let displayTitle = newTitle;
 
-                            // Update all visual tag elements (badges, bars, backgrounds, borders)
+                                // If has includes, replace !!!include(file)!!! with !(file)! badge
+                                if (hasIncludes) {
+                                    displayTitle = displayTitle.replace(/!!!include\(([^)]+)\)!!!/g, (match, filepath) => {
+                                        // Extract just filename from path
+                                        const parts = filepath.split('/').length > 1 ? filepath.split('/') : filepath.split('\\');
+                                        const filename = parts[parts.length - 1];
+                                        return `!(${filename})!`;
+                                    });
+                                }
+                                // If removed includes, displayTitle is just newTitle (no include syntax)
+
+                                // Render the display title
+                                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+                                const renderedTitle = renderFn ? renderFn(displayTitle) : displayTitle;
+                                this.currentEditor.displayElement.innerHTML = renderedTitle;
+
+                                // Show display and hide editor
+                                this.currentEditor.displayElement.style.removeProperty('display');
+                                this.currentEditor.element.style.display = 'none';
+                            }
+
+                            // STEP 3: Update badges (matching task pattern line 1043-1047)
                             if (columnElement && window.updateAllVisualTagElements) {
                                 const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(newTitle) : [];
                                 window.updateAllVisualTagElements(columnElement, allTags, 'column');
                             }
 
-                            // Don't continue with regular updates - backend will handle the rest
-                            return; // Skip the rest of the local updates for include changes
+                            // STEP 4: Return (matching task pattern line 1049)
+                            return;
                         }
 
                         // Check if this edit affects layout and trigger board refresh if needed
