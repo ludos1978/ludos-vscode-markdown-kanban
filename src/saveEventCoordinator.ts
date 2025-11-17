@@ -55,31 +55,23 @@ export class SaveEventCoordinator implements vscode.Disposable {
      */
     private setupSaveListener(): void {
         this.saveListener = vscode.workspace.onDidSaveTextDocument(async (document) => {
-            console.log(`[SaveEventCoordinator] ========== DOCUMENT SAVED ==========`);
-            console.log(`[SaveEventCoordinator] File: ${document.uri.fsPath}`);
-            console.log(`[SaveEventCoordinator] Registered handlers: ${this.handlers.size}`);
 
             // Dispatch to all registered handlers
             for (const handler of this.handlers.values()) {
-                console.log(`[SaveEventCoordinator] Checking handler '${handler.id}'`);
 
                 // Skip if handler is disabled
                 if (handler.isEnabled && !handler.isEnabled()) {
-                    console.log(`[SaveEventCoordinator] Handler '${handler.id}' is DISABLED, skipping`);
                     continue;
                 }
 
                 try {
-                    console.log(`[SaveEventCoordinator] Calling handler '${handler.id}'`);
                     await handler.handleSave(document);
-                    console.log(`[SaveEventCoordinator] Handler '${handler.id}' completed successfully`);
                 } catch (error) {
                     console.error(`[SaveEventCoordinator] Handler '${handler.id}' failed:`, error);
                     // Continue to other handlers even if one fails
                 }
             }
 
-            console.log(`[SaveEventCoordinator] All handlers processed`);
         });
     }
 
@@ -92,7 +84,6 @@ export class SaveEventCoordinator implements vscode.Disposable {
             console.warn(`[SaveEventCoordinator] Handler '${handler.id}' already registered, replacing`);
         }
         this.handlers.set(handler.id, handler);
-        console.log(`[SaveEventCoordinator] Registered handler: ${handler.id}`);
     }
 
     /**
@@ -101,7 +92,6 @@ export class SaveEventCoordinator implements vscode.Disposable {
      */
     public unregisterHandler(id: string): void {
         if (this.handlers.delete(id)) {
-            console.log(`[SaveEventCoordinator] Unregistered handler: ${id}`);
         }
     }
 

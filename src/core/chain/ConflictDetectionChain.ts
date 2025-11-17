@@ -46,7 +46,6 @@ export abstract class AbstractConflictHandler implements IConflictDetectionHandl
  */
 export class ConcurrentModificationHandler extends AbstractConflictHandler {
     async handle(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[ConcurrentHandler] Checking for concurrent modifications`);
 
         const conflicts: Conflict[] = [];
 
@@ -86,7 +85,6 @@ export class ConcurrentModificationHandler extends AbstractConflictHandler {
                     ]
                 });
 
-                console.log(`[ConcurrentHandler] Detected concurrent modification conflict`);
                 return conflicts; // Stop chain - this is a critical conflict
             }
         }
@@ -108,7 +106,6 @@ export class ConcurrentModificationHandler extends AbstractConflictHandler {
  */
 export class FileLockHandler extends AbstractConflictHandler {
     async handle(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[FileLockHandler] Checking for file locks`);
 
         const conflicts: Conflict[] = [];
 
@@ -136,7 +133,6 @@ export class FileLockHandler extends AbstractConflictHandler {
                 ]
             });
 
-            console.log(`[FileLockHandler] Detected file lock conflict`);
             return conflicts; // Stop chain - cannot proceed
         }
 
@@ -156,7 +152,6 @@ export class FileLockHandler extends AbstractConflictHandler {
  */
 export class PermissionHandler extends AbstractConflictHandler {
     async handle(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[PermissionHandler] Checking file permissions`);
 
         const conflicts: Conflict[] = [];
 
@@ -184,7 +179,6 @@ export class PermissionHandler extends AbstractConflictHandler {
                 ]
             });
 
-            console.log(`[PermissionHandler] Detected permission conflict`);
             return conflicts; // Stop chain - cannot proceed
         }
 
@@ -204,7 +198,6 @@ export class PermissionHandler extends AbstractConflictHandler {
  */
 export class DiskSpaceHandler extends AbstractConflictHandler {
     async handle(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[DiskSpaceHandler] Checking available disk space`);
 
         const conflicts: Conflict[] = [];
 
@@ -232,7 +225,6 @@ export class DiskSpaceHandler extends AbstractConflictHandler {
                 ]
             });
 
-            console.log(`[DiskSpaceHandler] Detected disk space conflict`);
             return conflicts; // Stop chain - cannot proceed
         }
 
@@ -252,7 +244,6 @@ export class DiskSpaceHandler extends AbstractConflictHandler {
  */
 export class NetworkHandler extends AbstractConflictHandler {
     async handle(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[NetworkHandler] Checking network connectivity`);
 
         const conflicts: Conflict[] = [];
 
@@ -280,7 +271,6 @@ export class NetworkHandler extends AbstractConflictHandler {
                 ]
             });
 
-            console.log(`[NetworkHandler] Detected network conflict`);
             return conflicts; // Stop chain - cannot proceed
         }
 
@@ -352,11 +342,9 @@ export class ConflictDetectionChainManager {
      * Detect conflicts using the chain
      */
     async detectConflicts(context: ConflictContext): Promise<Conflict[]> {
-        console.log(`[ChainManager] Starting conflict detection chain for: ${context.filePath}`);
 
         const conflicts = await this.chain.handle(context);
 
-        console.log(`[ChainManager] Chain completed, found ${conflicts.length} conflicts`);
         return conflicts;
     }
 

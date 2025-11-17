@@ -4,6 +4,9 @@
 // Global variables
 let currentFileInfo = null;
 
+// Note: window.tagColors is set by backend in boardUpdate message
+// Do NOT initialize to {} here - it prevents actual config from loading!
+
 // MD5 hash generation function using Web Crypto API
 async function generateMD5Hash(arrayBuffer) {
     try {
@@ -50,9 +53,7 @@ let currentLayoutRows = 1;
  * Handle click on "Convert to SVG" button
  */
 async function handlePlantUMLConvert(button) {
-    console.log('[PlantUML] handlePlantUMLConvert called');
     const code = button.getAttribute('data-code');
-    console.log('[PlantUML] Code length:', code ? code.length : 'null');
 
     if (!code) {
         console.error('[PlantUML] No code found for conversion');
@@ -62,31 +63,25 @@ async function handlePlantUMLConvert(button) {
     // Disable button during processing
     button.disabled = true;
     button.textContent = '⏳ Converting...';
-    console.log('[PlantUML] Button updated to "Converting..."');
 
     try {
         // Get SVG from cache or render it
         let svg;
         if (plantumlRenderCache && plantumlRenderCache.has(code)) {
             svg = plantumlRenderCache.get(code);
-            console.log('[PlantUML] Got SVG from cache');
         } else {
             // This shouldn't happen (already rendered), but handle it
-            console.log('[PlantUML] Rendering SVG (not in cache)');
             svg = await renderPlantUML(code);
         }
-        console.log('[PlantUML] SVG length:', svg ? svg.length : 'null');
 
         // Get current board file path
         const currentFilePath = window.currentKanbanFilePath;
-        console.log('[PlantUML] Current file path:', currentFilePath);
 
         if (!currentFilePath) {
             throw new Error('No kanban file currently open');
         }
 
         // Send message to backend to save SVG and update markdown
-        console.log('[PlantUML] Sending convertPlantUMLToSVG message to backend');
         vscode.postMessage({
             type: 'convertPlantUMLToSVG',
             filePath: currentFilePath,
@@ -96,7 +91,6 @@ async function handlePlantUMLConvert(button) {
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
-        console.log('[PlantUML] Message sent, waiting for backend response');
     } catch (error) {
         console.error('[PlantUML] Conversion error:', error);
         button.disabled = false;
@@ -111,12 +105,10 @@ async function handlePlantUMLConvert(button) {
 // Event delegation for convert buttons
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('plantuml-convert-btn')) {
-        console.log('[PlantUML] Convert button clicked');
         handlePlantUMLConvert(e.target);
     }
 
     if (e.target.classList.contains('mermaid-convert-btn')) {
-        console.log('[Mermaid] Convert button clicked');
         handleMermaidConvert(e.target);
     }
 });
@@ -130,9 +122,7 @@ document.addEventListener('click', (e) => {
  * @param {HTMLElement} button - The clicked button element
  */
 async function handleMermaidConvert(button) {
-    console.log('[Mermaid] Convert button clicked');
     const code = button.getAttribute('data-code');
-    console.log('[Mermaid] Code:', code);
 
     if (!code) {
         console.error('[Mermaid] No code found in button data-code attribute');
@@ -142,31 +132,25 @@ async function handleMermaidConvert(button) {
     // Disable button during processing
     button.disabled = true;
     button.textContent = '⏳ Converting...';
-    console.log('[Mermaid] Button updated to "Converting..."');
 
     try {
         // Get SVG from cache or render it
         let svg;
         if (mermaidRenderCache && mermaidRenderCache.has(code)) {
             svg = mermaidRenderCache.get(code);
-            console.log('[Mermaid] Got SVG from cache');
         } else {
             // This shouldn't happen (already rendered), but handle it
-            console.log('[Mermaid] Rendering SVG (not in cache)');
             svg = await renderMermaid(code);
         }
-        console.log('[Mermaid] SVG length:', svg ? svg.length : 'null');
 
         // Get current board file path
         const currentFilePath = window.currentKanbanFilePath;
-        console.log('[Mermaid] Current file path:', currentFilePath);
 
         if (!currentFilePath) {
             throw new Error('No kanban file currently open');
         }
 
         // Send message to backend to save SVG and update markdown
-        console.log('[Mermaid] Sending convertMermaidToSVG message to backend');
         vscode.postMessage({
             type: 'convertMermaidToSVG',
             filePath: currentFilePath,
@@ -176,7 +160,6 @@ async function handleMermaidConvert(button) {
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
-        console.log('[Mermaid] Message sent, waiting for backend response');
     } catch (error) {
         console.error('[Mermaid] Conversion error:', error);
         button.disabled = false;
@@ -329,8 +312,7 @@ const baseOptions = {
     // Sticky stack mode options
     stickyStackMode: [
         { label: "Full Stack", value: "full", css: "full", description: "Header, title, footer & margin all sticky" },
-        { label: "Title Only", value: "titleonly", css: "titleonly", description: "Only title sticky (default)" },
-        { label: "None", value: "none", css: "none", description: "Nothing sticky in stacks" }
+        { label: "Title Only", value: "titleonly", css: "titleonly", description: "Only title sticky (default)" }
     ],
     // Tag visibility options
     tagVisibility: [
@@ -1235,9 +1217,35 @@ function toggleFileBarMenu(event, button) {
                     // Menu item hover tracking
                     menuItem.addEventListener('mouseenter', () => {
                         isMenuItemHovered = true;
+
+                        // Populate Marp Classes submenu if needed
+                        const scope = submenu.dataset.scope;
+                        const menu = submenu.dataset.menu;
+                        if (menu === 'marpClasses' && scope === 'global') {
+                            const availableClasses = window.marpAvailableClasses || [];
+                            const activeClasses = window.getMarpClassesForElement
+                                ? window.getMarpClassesForElement('global', null, null)
+                                : [];
+
+                            let html = '<div class="donut-menu-tags-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 8px; max-width: 350px;">';
+                            availableClasses.forEach(className => {
+                                const isActive = activeClasses.includes(className);
+                                const checkmark = isActive ? '✓ ' : '';
+                                html += `
+                                    <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                                            onclick="toggleMarpClass('global', null, null, '${className}')"
+                                            style="padding: 6px 8px; font-size: 11px; border: 1px solid #666; border-radius: 4px; background: ${isActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: left;">
+                                        ${checkmark}${className}
+                                    </button>
+                                `;
+                            });
+                            html += '</div>';
+                            submenu.innerHTML = html;
+                        }
+
                         // Position file bar submenu to the left (it's right-aligned)
                         const rect = menuItem.getBoundingClientRect();
-                        
+
                         // Temporarily show submenu to get its actual dimensions
                         submenu.style.visibility = 'hidden';
                         submenu.style.display = 'block';
@@ -1487,7 +1495,7 @@ function applyStickyStackMode(mode) {
     window.currentStickyStackMode = mode;
 
     // Remove all mode classes
-    document.body.classList.remove('sticky-stack-mode-full', 'sticky-stack-mode-titleonly', 'sticky-stack-mode-none');
+    document.body.classList.remove('sticky-stack-mode-full', 'sticky-stack-mode-titleonly');
 
     // Add the appropriate class
     document.body.classList.add(`sticky-stack-mode-${mode}`);
@@ -1811,12 +1819,10 @@ function updateColumnRowTag(columnId, newRow) {
         if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
             // Match by position - use current ID from board at this position
             currentColumnId = window.currentBoard.columns[columnIndex].id;
-            console.log(`[Frontend] Column position ${columnIndex}: DOM ID ${columnId}, currentBoard ID ${currentColumnId}`);
         }
     }
 
     // Send update to backend with the full title including row tag
-    console.log(`[Frontend] Sending editColumnTitle - columnId: ${currentColumnId}, title: ${column.title}`);
     vscode.postMessage({
         type: 'editColumnTitle',
         columnId: currentColumnId,
@@ -1971,6 +1977,11 @@ function updateDocumentUri(newUri) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Request available Marp classes on load
+    vscode.postMessage({
+        type: 'getMarpAvailableClasses'
+    });
+
     // Theme observer is set up later in the file
 
     // Initialize clipboard card source - handled by HTML ondragstart/ondragend attributes
@@ -1995,7 +2006,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // This prevents auto-save from setting skip flag when user switches to external editor,
         // which would cause external saves to be incorrectly treated as "our own save"
         if (window.taskEditor && window.taskEditor.currentEditor !== null) {
-            console.log('[webview] ⏸️ Skipping auto-save - user is actively editing');
             return;
         }
 
@@ -2354,6 +2364,16 @@ window.addEventListener('message', event => {
                 // Always update the cached board when receiving updates from backend
                 window.cachedBoard = JSON.parse(JSON.stringify(message.board));
 
+                // Re-apply pending column changes to preserve local edits
+                if (window.pendingColumnChanges && window.pendingColumnChanges.size > 0) {
+                    window.pendingColumnChanges.forEach((change, columnId) => {
+                        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                        if (column) {
+                            column.title = change.title;
+                        }
+                    });
+                }
+
                 // If this is a save confirmation (no unsaved changes), update the saved reference
                 if (!window.hasUnsavedChanges) {
                     window.savedBoardState = JSON.parse(JSON.stringify(message.board));
@@ -2482,12 +2502,10 @@ window.addEventListener('message', event => {
 
                 // Store border configuration from extension
                 if (message.columnBorder && message.taskBorder) {
-                    console.log('[Border-Debug] Received from extension - columnBorder:', message.columnBorder, 'taskBorder:', message.taskBorder);
                     window.borderConfig = {
                         columnBorder: message.columnBorder,
                         taskBorder: message.taskBorder
                     };
-                    console.log('[Border-Debug] Stored in window.borderConfig:', window.borderConfig);
                     updateBorderStyles();
                 }
 
@@ -2596,12 +2614,40 @@ window.addEventListener('message', event => {
             const shouldSkipRender = message.skipRender || message.board?.skipRender;
 
             // Store tag colors globally - THIS IS CRITICAL
+            // Set from backend message - this populates actual tag configurations
             if (message.tagColors) {
                 window.tagColors = message.tagColors;
+
+                // DIAGNOSTIC: Log what cornerBadge configs exist
+                console.log('[TAGCOLORS] Loaded keys:', Object.keys(window.tagColors));
+                let cornerBadgeCount = 0;
+                Object.keys(window.tagColors).forEach(key => {
+                    if (typeof window.tagColors[key] === 'object' && window.tagColors[key] !== null) {
+                        if (window.tagColors[key].cornerBadge) {
+                            console.log('[TAGCOLORS] Has cornerBadge:', key, window.tagColors[key].cornerBadge);
+                            cornerBadgeCount++;
+                        }
+                        // Check grouped structure too
+                        if (typeof window.tagColors[key] === 'object') {
+                            Object.keys(window.tagColors[key]).forEach(subkey => {
+                                if (window.tagColors[key][subkey]?.cornerBadge) {
+                                    console.log('[TAGCOLORS] Group', key, 'tag', subkey, 'has cornerBadge:', window.tagColors[key][subkey].cornerBadge);
+                                    cornerBadgeCount++;
+                                }
+                            });
+                        }
+                    }
+                });
+                console.log('[TAGCOLORS] Total tags with cornerBadge:', cornerBadgeCount);
+
                 // Only apply styles if not skipping render (prevents style spam during tag operations)
                 if (!shouldSkipRender && typeof applyTagStyles === 'function') {
                     applyTagStyles();
                 }
+            } else if (!window.tagColors) {
+                // Fallback: initialize to empty object only if backend didn't send it
+                console.log('[TAGCOLORS] WARNING: Backend did not send tagColors!');
+                window.tagColors = {};
             }
 
             // Store enabled tag categories for menu filtering
@@ -2662,7 +2708,6 @@ window.addEventListener('message', event => {
             break;
         case 'saveCompleted':
             // Backend has confirmed save is complete, update frontend UI
-            console.log('[FRONTEND] Received saveCompleted from backend');
             if (typeof markSavedChanges === 'function') {
                 markSavedChanges();
             }
@@ -2714,7 +2759,6 @@ window.addEventListener('message', event => {
         case 'updateShortcuts':
             // Cache shortcuts for taskEditor to use
             window.cachedShortcuts = message.shortcuts || {};
-            console.log('[webview] Updated shortcuts cache:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
             break;
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
@@ -2726,7 +2770,6 @@ window.addEventListener('message', event => {
 
             // Send confirmation back to backend
             if (message.requestId) {
-                console.log('[Frontend] Confirming columns unfolded:', message.requestId);
                 vscode.postMessage({
                     type: 'columnsUnfolded',
                     requestId: message.requestId
@@ -2738,10 +2781,20 @@ window.addEventListener('message', event => {
             window.pendingFocusTargets = message.focusTargets;
             break;
         case 'includeFileContent':
-        case 'updateIncludeContent':
-            // Update include file cache
+            // Handle include file content response from backend
             if (typeof window.updateIncludeFileCache === 'function') {
                 window.updateIncludeFileCache(message.filePath, message.content);
+            } else {
+                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
+            }
+            break;
+
+        case 'updateIncludeContent':
+            // Handle processed include content from backend
+            if (typeof window.updateIncludeFileCache === 'function') {
+                window.updateIncludeFileCache(message.filePath, message.content);
+            } else {
+                console.warn('[webview.js]   ❌ window.updateIncludeFileCache is NOT a function! Cannot update cache.');
             }
             break;
 
@@ -2803,12 +2856,7 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating include file
-            console.log('[FRONTEND proceedUpdateIncludeFile] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND proceedUpdateIncludeFile] columnId:', message.columnId);
-            console.log('[FRONTEND proceedUpdateIncludeFile] newFileName:', message.newFileName);
-            console.log('[FRONTEND proceedUpdateIncludeFile] currentFile:', message.currentFile);
             if (typeof updateColumnIncludeFile === 'function') {
-                console.log('[FRONTEND proceedUpdateIncludeFile] Calling updateColumnIncludeFile...');
                 updateColumnIncludeFile(message.columnId, message.newFileName, message.currentFile);
             } else {
                 console.error('[FRONTEND proceedUpdateIncludeFile] updateColumnIncludeFile function not found!');
@@ -2816,13 +2864,7 @@ window.addEventListener('message', event => {
             break;
         case 'proceedUpdateTaskIncludeFile':
             // User provided new file name in VS Code dialog - proceed with updating task include file
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] taskId:', message.taskId);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] columnId:', message.columnId);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] newFileName:', message.newFileName);
-            console.log('[FRONTEND proceedUpdateTaskIncludeFile] currentFile:', message.currentFile);
             if (typeof updateTaskIncludeFile === 'function') {
-                console.log('[FRONTEND proceedUpdateTaskIncludeFile] Calling updateTaskIncludeFile...');
                 updateTaskIncludeFile(message.taskId, message.columnId, message.newFileName, message.currentFile);
             } else {
                 console.error('[FRONTEND proceedUpdateTaskIncludeFile] updateTaskIncludeFile function not found!');
@@ -2835,7 +2877,15 @@ window.addEventListener('message', event => {
                 if (column) {
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
-                    column.title = message.columnTitle || column.title;
+
+                    // CRITICAL: Check for pending title changes - preserve user edits over backend data
+                    if (window.pendingColumnChanges && window.pendingColumnChanges.has(message.columnId)) {
+                        const pendingChange = window.pendingColumnChanges.get(message.columnId);
+                        column.title = pendingChange.title; // Use pending title, not backend title
+                    } else {
+                        column.title = message.columnTitle || column.title;
+                    }
+
                     column.displayTitle = message.displayTitle || column.displayTitle;
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
@@ -2885,7 +2935,6 @@ window.addEventListener('message', event => {
                             itemId: message.columnId
                         });
                     } else {
-                        console.log('[Frontend updateColumnContent] Skipping render - user is editing');
 
                         // OPTIMIZATION 1: Tell backend this render was skipped
                         vscode.postMessage({
@@ -2902,13 +2951,6 @@ window.addEventListener('message', event => {
             break;
         case 'updateTaskContent':
             // Handle targeted task content update for include file changes
-            console.log('[FRONTEND updateTaskContent] ===== RECEIVED FROM BACKEND =====');
-            console.log('[FRONTEND updateTaskContent] taskId:', message.taskId);
-            console.log('[FRONTEND updateTaskContent] New description (first 50):', message.description ? message.description.substring(0, 50) : '');
-            console.log('[FRONTEND updateTaskContent] New description length:', message.description ? message.description.length : 0);
-            console.log('[FRONTEND updateTaskContent] displayTitle:', message.displayTitle);
-            console.log('[FRONTEND updateTaskContent] taskTitle:', message.taskTitle);
-            console.log('[FRONTEND updateTaskContent] originalTitle:', message.originalTitle);
 
             // Update the task in cached board
             if (window.cachedBoard && window.cachedBoard.columns) {
@@ -2926,8 +2968,6 @@ window.addEventListener('message', event => {
                 }
 
                 if (foundTask && foundColumn) {
-                    console.log('[FRONTEND updateTaskContent] Found task in cachedBoard, updating...');
-                    console.log('[FRONTEND updateTaskContent] OLD description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
 
                     // Update task metadata
                     // CRITICAL FIX: Use !== undefined checks instead of || operator
@@ -2949,11 +2989,6 @@ window.addEventListener('message', event => {
                         foundTask.isLoadingContent = message.isLoadingContent;
                     }
 
-                    console.log('[FRONTEND updateTaskContent] NEW description (first 50):', foundTask.description ? foundTask.description.substring(0, 50) : '');
-                    console.log('[FRONTEND updateTaskContent] NEW title:', foundTask.title);
-                    console.log('[FRONTEND updateTaskContent] NEW displayTitle:', foundTask.displayTitle);
-                    console.log('[FRONTEND updateTaskContent] NEW originalTitle:', foundTask.originalTitle);
-                    console.log('[FRONTEND updateTaskContent] cachedBoard updated successfully');
 
                     // Check if user is currently editing - if so, handle carefully
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
@@ -2967,7 +3002,6 @@ window.addEventListener('message', event => {
                         if (editor.type === 'task-title') {
                             // Update the editor field value to match the backend's processed title
                             editor.element.value = message.taskTitle || '';
-                            console.log('[FRONTEND updateTaskContent] Updated editor value for include change:', message.taskTitle);
                         }
                     }
 
@@ -3002,7 +3036,6 @@ window.addEventListener('message', event => {
                             itemId: message.taskId
                         });
                     } else {
-                        console.log('[Frontend updateTaskContent] Skipping render - user is editing');
 
                         // OPTIMIZATION 1: Tell backend this render was skipped
                         vscode.postMessage({
@@ -3018,7 +3051,6 @@ window.addEventListener('message', event => {
         case 'syncDirtyItems':
             // OPTIMIZATION 2: Batch update multiple items with unrendered changes
             if (window.cachedBoard) {
-                console.log(`[Frontend syncDirtyItems] Syncing ${message.columns.length} columns, ${message.tasks.length} tasks`);
 
                 // Update columns
                 for (const colData of message.columns) {
@@ -3083,11 +3115,9 @@ window.addEventListener('message', event => {
             let capturedEdit = null;
 
             if (window.taskEditor && window.taskEditor.currentEditor) {
-                console.log('[Frontend] Stopping editing due to backend request');
 
                 if (message.captureValue) {
                     // CAPTURE mode: Extract edit value WITHOUT modifying board
-                    console.log('[Frontend] Capturing edit value without saving to board');
                     const editor = window.taskEditor.currentEditor;
                     capturedEdit = {
                         type: editor.type,
@@ -3096,7 +3126,6 @@ window.addEventListener('message', event => {
                         value: editor.element.value,
                         originalValue: editor.originalValue
                     };
-                    console.log('[Frontend] Captured edit:', capturedEdit);
                 } else {
                     // SAVE mode: Normal save (for backwards compatibility)
                     if (typeof window.taskEditor.saveCurrentField === 'function') {
@@ -3110,7 +3139,6 @@ window.addEventListener('message', event => {
 
             // Send confirmation back to backend with captured value
             if (message.requestId) {
-                console.log('[Frontend] Confirming editing stopped:', message.requestId);
                 vscode.postMessage({
                     type: 'editingStopped',
                     requestId: message.requestId,
@@ -3128,19 +3156,20 @@ window.addEventListener('message', event => {
             handleExportResult(message.result);
             break;
         case 'marpStatus':
-            console.log('[kanban.webview] Received marpStatus message:', message);
             handleMarpStatus(message);
             break;
         case 'marpThemesAvailable':
-            console.log('[kanban.webview] Received marpThemesAvailable message:', message);
-            
+
             // Clear the retry timeout
             if (window.marpThemesTimeout) {
                 clearTimeout(window.marpThemesTimeout);
                 window.marpThemesTimeout = null;
             }
-            
+
             handleMarpThemesAvailable(message.themes, message.error);
+            break;
+        case 'marpAvailableClasses':
+            handleMarpAvailableClasses(message.classes);
             break;
         case 'columnExportResult':
             handleColumnExportResult(message.result);
@@ -3221,18 +3250,11 @@ window.addEventListener('message', event => {
             break;
 
         case 'autoExportStopped':
-            // Hide the auto-export button and indicator when auto-export is stopped
-            console.log('[kanban.webview] Received autoExportStopped message - hiding button and indicator');
+            // Hide the auto-export button when auto-export is stopped
             const autoExportBtn = document.getElementById('auto-export-btn');
-            const activityIndicator = document.getElementById('export-activity-indicator');
-            console.log('[kanban.webview] Auto-export button element found:', !!autoExportBtn);
             if (autoExportBtn) {
                 autoExportBtn.style.display = 'none';
                 autoExportBtn.classList.remove('active');
-                console.log('[kanban.webview] Auto-export button hidden and deactivated');
-            }
-            if (activityIndicator) {
-                activityIndicator.style.display = 'none';
             }
             // Reset auto-export state - both local and window variables
             autoExportActive = false;
@@ -3248,20 +3270,14 @@ window.addEventListener('message', event => {
             // FORCE HIDE AGAIN after a short delay to ensure it's hidden
             setTimeout(() => {
                 const btn = document.getElementById('auto-export-btn');
-                const indicator = document.getElementById('export-activity-indicator');
                 if (btn) {
                     btn.style.display = 'none';
                     btn.classList.remove('active');
-                    console.log('[kanban.webview] Auto-export button force-hidden after timeout');
-                }
-                if (indicator) {
-                    indicator.style.display = 'none';
                 }
             }, 100);
             break;
 
         case 'plantUMLConvertSuccess':
-            console.log('[PlantUML] Conversion successful:', message.svgPath);
             // File will reload automatically, which will show the updated content
             break;
 
@@ -3272,12 +3288,10 @@ window.addEventListener('message', event => {
 
         // Mermaid export rendering (for PDF/Marp export)
         case 'renderMermaidForExport':
-            console.log('[Webview] Received Mermaid export render request:', message.requestId);
 
             // Use existing renderMermaid function to render the diagram
             renderMermaid(message.code)
                 .then(svg => {
-                    console.log('[Webview] Mermaid rendered successfully for export:', message.requestId);
 
                     // Send success response back to backend
                     vscode.postMessage({
@@ -4133,7 +4147,6 @@ function updateBorderStyles() {
     }
 
     const { columnBorder, taskBorder } = window.borderConfig;
-    console.log('[Border-Debug] Received from extension - columnBorder:', columnBorder, 'taskBorder:', taskBorder);
 
     // Apply CSS variables
     document.documentElement.style.setProperty('--column-border', columnBorder);
@@ -4585,6 +4598,9 @@ function applyLayoutPreset(presetKey) {
     const preset = layoutPresets[presetKey];
     if (!preset) { return; }
 
+    // Track if any height-related settings changed
+    let needsRecalculation = false;
+
     // Apply each setting in the preset
     Object.entries(preset.settings).forEach(([settingKey, value]) => {
         switch (settingKey) {
@@ -4593,12 +4609,15 @@ function applyLayoutPreset(presetKey) {
                 break;
             case 'cardHeight':
                 setTaskMinHeight(value);
+                needsRecalculation = true;
                 break;
             case 'sectionHeight':
                 setSectionHeight(value);
+                needsRecalculation = true;
                 break;
             case 'taskSectionHeight':
                 setTaskSectionHeight(value);
+                needsRecalculation = true;
                 break;
             case 'fontSize':
                 setFontSize(value);
@@ -4608,9 +4627,11 @@ function applyLayoutPreset(presetKey) {
                 break;
             case 'layoutRows':
                 setLayoutRows(value);
+                needsRecalculation = true; // layoutRows already triggers renderBoard internally
                 break;
             case 'rowHeight':
                 setRowHeight(value);
+                needsRecalculation = true;
                 break;
             case 'stickyStackMode':
                 setStickyStackMode(value);
@@ -4651,6 +4672,16 @@ function applyLayoutPreset(presetKey) {
     // Update all menu indicators
     updateAllMenuIndicators();
     updateLayoutPresetsActiveState();
+
+    // Recalculate board layout if any height-related settings changed
+    // Note: layoutRows already triggers renderBoard internally, but we need to ensure
+    // other height changes also trigger recalculation
+    if (needsRecalculation && currentBoard) {
+        // Use setTimeout to ensure all CSS changes are applied first
+        setTimeout(() => {
+            renderBoard(); // Full board re-render to recalculate positions
+        }, 50);
+    }
 }
 
 /**
@@ -4710,10 +4741,20 @@ function showExportDialogWithSelection(scope, index, id) {
     // Initialize export tree with pre-selection
     initializeExportTree(preSelectNodeId);
 
-    // Generate default export folder name
-    vscode.postMessage({
-        type: 'getExportDefaultFolder'
-    });
+    // Restore previous export settings if available
+    if (lastExportSettings && lastExportSettings.targetFolder) {
+        // Restore target folder from last export
+        const folderInput = document.getElementById('export-folder');
+        if (folderInput) {
+            folderInput.value = lastExportSettings.targetFolder;
+            exportDefaultFolder = lastExportSettings.targetFolder;
+        }
+    } else {
+        // Generate default export folder name only if no previous settings
+        vscode.postMessage({
+            type: 'getExportDefaultFolder'
+        });
+    }
 
     // Check Marp status when opening dialog
     checkMarpStatus();
@@ -4736,13 +4777,20 @@ function closeExportModal() {
 
 /**
  * Set the default export folder
+ * Only updates the input if it hasn't been manually changed by user/preset
  */
 function setExportDefaultFolder(folderPath) {
-    exportDefaultFolder = folderPath;
     const folderInput = document.getElementById('export-folder');
-    if (folderInput) {
+
+    // Only set the value if:
+    // 1. Input is empty, OR
+    // 2. Input still has the old default value (hasn't been manually changed)
+    if (folderInput && (!folderInput.value || folderInput.value === exportDefaultFolder)) {
         folderInput.value = folderPath;
     }
+
+    // Always update the default for future reference
+    exportDefaultFolder = folderPath;
 }
 
 /**
@@ -4905,19 +4953,12 @@ function updateLinkHandlingOptionsVisibility() {
 function executeUnifiedExport() {
     // Stop existing auto-export and Marp processes before starting new export
     if (autoExportActive || lastExportSettings) {
-        console.log('[kanban.webview.executeUnifiedExport] Stopping existing processes before new export');
 
         // Stop auto-export
         if (autoExportActive) {
             vscode.postMessage({
                 type: 'stopAutoExport'
             });
-        }
-
-        // Hide indicator
-        const indicator = document.getElementById('export-activity-indicator');
-        if (indicator) {
-            indicator.style.display = 'none';
         }
 
         // Reset state
@@ -4987,12 +5028,14 @@ function executeUnifiedExport() {
     let marpTheme = null;
     let marpBrowser = null;
     let marpPreview = false;
+    let marpPptxEditable = false;
 
     if (useMarp) {
         marpOutputFormat = document.getElementById('marp-output-format')?.value || 'html';
         marpTheme = document.getElementById('marp-theme')?.value || 'default';
         marpBrowser = document.getElementById('marp-browser')?.value || 'chrome';
         marpPreview = document.getElementById('marp-preview')?.checked || false;
+        marpPptxEditable = document.getElementById('marp-pptx-editable')?.checked || false;
     }
 
     // Close modal
@@ -5026,7 +5069,8 @@ function executeUnifiedExport() {
         // MARP SPECIFIC
         marpTheme: useMarp ? marpTheme : undefined,
         marpBrowser: useMarp ? marpBrowser : undefined,
-        marpWatch: useMarp && marpPreview ? true : undefined
+        marpWatch: useMarp && marpPreview ? true : undefined,
+        marpPptxEditable: useMarp && marpPptxEditable ? true : undefined
     };
 
     // Save last export settings for quick re-export
@@ -5163,10 +5207,33 @@ function handleUseMarpChange() {
             marpOptions.classList.remove('disabled-section');
             // Check Marp status when enabling Marp
             checkMarpStatus();
+            // Update editable checkbox state based on current format
+            handleMarpOutputFormatChange();
         } else {
             marpOptions.style.opacity = '0.5';
             marpOptions.style.pointerEvents = 'none';
             marpOptions.classList.add('disabled-section');
+        }
+    }
+}
+
+/**
+ * Handle Marp output format change - enable/disable pptx-editable checkbox
+ */
+function handleMarpOutputFormatChange() {
+    const outputFormatSelect = document.getElementById('marp-output-format');
+    const pptxEditableCheckbox = document.getElementById('marp-pptx-editable');
+
+    if (outputFormatSelect && pptxEditableCheckbox) {
+        const isPptx = outputFormatSelect.value === 'pptx';
+
+        if (isPptx) {
+            // Enable checkbox for PowerPoint format
+            pptxEditableCheckbox.disabled = false;
+        } else {
+            // Disable and uncheck for other formats
+            pptxEditableCheckbox.disabled = true;
+            pptxEditableCheckbox.checked = false;
         }
     }
 }
@@ -5190,7 +5257,6 @@ function applyExportPreset() {
         return; // Custom settings selected
     }
 
-    console.log('[kanban.webview] Applying export preset:', preset);
 
     // Get current filename for folder generation
     const currentFilename = window.currentKanbanFile ? 
@@ -5251,7 +5317,10 @@ function applyPresetMarpPresentation(currentFilename) {
     
     // Live Preview: On
     document.getElementById('marp-preview').checked = true;
-    
+
+    // Editable: Off
+    document.getElementById('marp-pptx-editable').checked = false;
+
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
@@ -5260,6 +5329,9 @@ function applyPresetMarpPresentation(currentFilename) {
     // Link & Asset Handling: Rewrite relative links (no packing)
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
+
+    // Update editable checkbox state based on format
+    handleMarpOutputFormatChange();
 }
 
 /**
@@ -5289,7 +5361,10 @@ function applyPresetMarpPdf(currentFilename) {
     
     // Live Preview: Off
     document.getElementById('marp-preview').checked = false;
-    
+
+    // Editable: Off
+    document.getElementById('marp-pptx-editable').checked = false;
+
     // Export folder: Absolute path to _Export/{originalfilename}-{selectedelements}
     const workspacePath = getWorkspacePath();
     const exportFolder = `${workspacePath}/_Export`;
@@ -5298,6 +5373,9 @@ function applyPresetMarpPdf(currentFilename) {
     // Link & Asset Handling: Rewrite relative links (no packing)
     document.getElementById('link-handling-mode').value = 'rewrite-only';
     updateLinkHandlingOptionsVisibility();
+
+    // Update editable checkbox state based on format
+    handleMarpOutputFormatChange();
 }
 
 /**
@@ -5395,11 +5473,11 @@ function saveLastExportSettings() {
         marpOutputFormat: document.getElementById('marp-output-format')?.value || 'html',
         marpTheme: document.getElementById('marp-theme')?.value || 'default',
         marpBrowser: document.getElementById('marp-browser')?.value || 'chrome',
-        marpPreview: document.getElementById('marp-preview')?.checked || false
+        marpPreview: document.getElementById('marp-preview')?.checked || false,
+        marpPptxEditable: document.getElementById('marp-pptx-editable')?.checked || false
     };
 
     window.lastExportSettings = lastExportSettings;
-    console.log('[kanban.webview] Saved last export settings:', lastExportSettings);
 }
 
 /**
@@ -5409,7 +5487,6 @@ function resetPresetToCustom() {
     const presetSelect = document.getElementById('export-preset');
     if (presetSelect && presetSelect.value !== '') {
         presetSelect.value = '';
-        console.log('[kanban.webview] Reset preset to Custom Settings due to manual change');
     }
 }
 
@@ -5420,7 +5497,7 @@ function addExportSettingChangeListeners() {
     const elements = [
         'export-format', 'export-tag-visibility', 'merge-includes',
         'auto-export-on-save', 'use-marp', 'link-handling-mode',
-        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview',
+        'marp-output-format', 'marp-theme', 'marp-browser', 'marp-preview', 'marp-pptx-editable',
         'include-files', 'include-images', 'include-videos',
         'include-other-media', 'include-documents', 'file-size-limit'
     ];
@@ -5442,61 +5519,511 @@ function addExportSettingChangeListeners() {
  * Check Marp CLI and extension status
  */
 function checkMarpStatus() {
-    console.log('[kanban.webview] Checking Marp status...');
     vscode.postMessage({
         type: 'checkMarpStatus'
     });
 }
 
 /**
+ * Get Marp classes for an element by parsing its title
+ * Format: <!-- class: font24 center --> or <!-- _class: font24 --> (scoped)
+ */
+function getMarpClassesForElement(scope, id, columnId) {
+    if (scope === 'global') {
+        // Get global classes from YAML frontmatter
+        const currentValue = window.cachedBoard?.frontmatter?.class || '';
+        const classes = currentValue.split(/\s+/).filter(c => c.trim() !== '');
+        return classes;
+    }
+
+    // Find the element (column or task)
+    let element = null;
+
+    if (scope === 'column') {
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element || !element.title) {
+        return [];
+    }
+
+    // Parse both <!-- class: ... --> and <!-- _class: ... --> from title
+    const title = element.title;
+    // Match both class: and _class: directives
+    const commentRegex = /<!--\s*(_?class):\s*([^>]+?)\s*-->/g;
+    const classes = [];
+    let match;
+
+    while ((match = commentRegex.exec(title)) !== null) {
+        // Split by whitespace to get individual classes
+        const classString = match[2].trim();
+        const classNames = classString.split(/\s+/).filter(c => c.length > 0);
+        classes.push(...classNames);
+    }
+
+    return classes;
+}
+
+/**
+ * Check if a Marp directive is active for an element
+ */
+function isMarpDirectiveActive(scope, id, columnId, directiveName) {
+    if (scope === 'global') {
+        return false;
+    }
+
+    // Find the element
+    let element = null;
+
+    if (scope === 'column') {
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element || !element.title) {
+        return false;
+    }
+
+    // Check if directive exists in title
+    const directiveRegex = new RegExp(`<!--\\s*${directiveName}:\\s*[^>]+\\s*-->`, 'g');
+    return directiveRegex.test(element.title);
+}
+
+// Make it available globally
+window.getMarpClassesForElement = getMarpClassesForElement;
+window.isMarpDirectiveActive = isMarpDirectiveActive;
+
+/**
+ * Set any Marp directive (color, backgroundColor, backgroundImage, header, footer, etc.)
+ * Format: <!-- directiveName: value --> (local) or <!-- _directiveName: value --> (scoped)
+ */
+function setMarpDirective(scope, id, columnId, directiveName, value, directiveScope) {
+    if (scope === 'global' || !value || !value.trim()) {
+        return;
+    }
+
+    // Find the element
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    let title = element.title || '';
+    const cleanValue = value.trim();
+
+    // Determine which directive to update based on directiveScope parameter (default: local)
+    const isScoped = directiveScope === 'scoped';
+    const finalDirectiveName = isScoped ? `_${directiveName}` : directiveName;
+
+    // Remove only the specific directive (local OR scoped, not both)
+    const targetRegex = new RegExp(`<!--\\s*${finalDirectiveName}:\\s*[^>]+\\s*-->`, 'g');
+    title = title.replace(targetRegex, '');
+
+    // Add new directive
+    const newDirective = `<!-- ${finalDirectiveName}: ${cleanValue} -->`;
+    title = `${title} ${newDirective}`.trim();
+
+    // Update element and save
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
+}
+
+/**
+ * Toggle a boolean Marp directive (paginate, etc.)
+ */
+function toggleMarpDirective(scope, id, columnId, directiveName, defaultValue, directiveScope) {
+    if (scope === 'global') {
+        return;
+    }
+
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    let title = element.title || '';
+
+    // Determine which directive to toggle based on directiveScope parameter (default: local)
+    const isScoped = directiveScope === 'scoped';
+    const finalDirectiveName = isScoped ? `_${directiveName}` : directiveName;
+
+    // Check for specific directive (local OR scoped, not both)
+    const targetRegex = new RegExp(`<!--\\s*${finalDirectiveName}:\\s*([^>]+)\\s*-->`, 'g');
+    const hasDirective = title.match(targetRegex);
+
+    if (hasDirective) {
+        // Remove directive (toggle off)
+        title = title.replace(targetRegex, '').replace(/\s+/g, ' ').trim();
+    } else {
+        // Add directive (toggle on)
+        const newDirective = `<!-- ${finalDirectiveName}: ${defaultValue} -->`;
+        title = `${title} ${newDirective}`.trim();
+    }
+
+    // Update element and save
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
+}
+
+/**
+ * Refresh the Marp Directives submenu to show current state
+ */
+function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
+    // Find the currently open submenu (could be any of the three Marp submenus)
+    const openSubmenu = document.querySelector('.donut-menu-submenu[data-submenu-type^="marp-"]');
+
+    // console.log('refreshMarpDirectivesSubmenu called:', {
+    //     scope, id, type, columnId,
+    //     openSubmenu: openSubmenu ? 'found' : 'not found',
+    //     submenuType: openSubmenu?.getAttribute('data-submenu-type')
+    // });
+
+    if (!openSubmenu) {
+        console.warn('No open Marp submenu found');
+        return;
+    }
+
+    const submenuType = openSubmenu.getAttribute('data-submenu-type');
+
+    // Use menuManager to regenerate content based on submenu type
+    if (window.menuManager) {
+        let newContent = '';
+
+        if (submenuType === 'marp-classes' && typeof window.menuManager.createMarpClassesContent === 'function') {
+            newContent = window.menuManager.createMarpClassesContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-colors' && typeof window.menuManager.createMarpColorsContent === 'function') {
+            newContent = window.menuManager.createMarpColorsContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-header-footer' && typeof window.menuManager.createMarpHeaderFooterContent === 'function') {
+            newContent = window.menuManager.createMarpHeaderFooterContent(scope, id, type, columnId);
+        } else if (submenuType === 'marp-theme' && typeof window.menuManager.createMarpThemeContent === 'function') {
+            newContent = window.menuManager.createMarpThemeContent(scope, id, type, columnId);
+        }
+
+        if (newContent) {
+            console.log('Refreshing submenu with new content');
+            openSubmenu.innerHTML = newContent;
+        } else {
+            console.warn('No new content generated for submenu type:', submenuType);
+        }
+    } else {
+        console.warn('window.menuManager not available');
+    }
+}
+
+// Make them globally available
+window.setMarpDirective = setMarpDirective;
+window.toggleMarpDirective = toggleMarpDirective;
+window.refreshMarpDirectivesSubmenu = refreshMarpDirectivesSubmenu;
+
+/**
+ * Toggle Marp class on column/task/global
+ * Format: <!-- class: font24 center --> (local) or <!-- _class: font24 center --> (scoped)
+ * All classes in one comment block, space-separated
+ */
+function toggleMarpClass(scope, id, columnId, className, classScope) {
+    if (scope === 'global') {
+        // Handle global Marp classes (saved to YAML frontmatter)
+        const currentValue = window.cachedBoard?.frontmatter?.class || '';
+        const classes = currentValue.split(/\s+/).filter(c => c.trim() !== '');
+
+        const index = classes.indexOf(className);
+        if (index > -1) {
+            // Remove class
+            classes.splice(index, 1);
+        } else {
+            // Add class
+            classes.push(className);
+        }
+
+        const newValue = classes.join(' ');
+        updateMarpGlobalSetting('class', newValue);
+
+        // Refresh the menu to show updated state
+        populateMarpGlobalMenu();
+        return;
+    }
+
+    // Find the element (column or task)
+    let element = null;
+    let type = '';
+
+    if (scope === 'column') {
+        type = 'column';
+        const column = window.cachedBoard?.columns?.find(c => c.id === id);
+        element = column;
+    } else if (scope === 'task' && columnId) {
+        type = 'task';
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const task = column?.tasks?.find(t => t.id === id);
+        element = task;
+    }
+
+    if (!element) {
+        return;
+    }
+
+    // Get current title
+    let title = element.title || '';
+
+    // Determine directive name based on classScope parameter (default: local)
+    const isScoped = classScope === 'scoped';
+    const directiveName = isScoped ? '_class' : 'class';
+
+    // Find existing directive for this specific scope
+    const commentRegex = new RegExp(`<!--\\s*${directiveName}:\\s*([^>]+?)\\s*-->`);
+    const match = title.match(commentRegex);
+
+    let classes = [];
+
+    if (match) {
+        // Parse existing classes
+        const classString = match[1].trim();
+        classes = classString.split(/\s+/).filter(c => c.length > 0);
+    }
+
+    // Toggle the class
+    const classIndex = classes.indexOf(className);
+    if (classIndex > -1) {
+        // Remove class
+        classes.splice(classIndex, 1);
+    } else {
+        // Add class
+        classes.push(className);
+    }
+
+    // Update or remove the comment
+    if (classes.length > 0) {
+        const newComment = `<!-- ${directiveName}: ${classes.join(' ')} -->`;
+        if (match) {
+            // Replace existing comment
+            title = title.replace(commentRegex, newComment);
+        } else {
+            // Add new comment at the end
+            title = `${title} ${newComment}`.trim();
+        }
+    } else {
+        // Remove comment if no classes left
+        if (match) {
+            title = title.replace(commentRegex, '').replace(/\s+/g, ' ').trim();
+        }
+    }
+
+    // Update the element
+    element.title = title;
+
+    // For columns in include mode, also update displayTitle
+    if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
+        // Replace !!!include()!!! with placeholder in displayTitle
+        let displayTitle = title;
+        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+        element.includeFiles.forEach((filePath, index) => {
+            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+            displayTitle = displayTitle.replace(includeRegex, placeholder);
+        });
+        element.displayTitle = displayTitle;
+    }
+
+    // Send to backend (same as tags)
+    if (type === 'column') {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(id, { title: title, columnId: id });
+
+        // Update display immediately
+        if (typeof updateColumnDisplayImmediate === 'function') {
+            updateColumnDisplayImmediate(id, title, false, '');
+        }
+    } else if (type === 'task') {
+        // Send editTask message immediately
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: id,
+            columnId: columnId,
+            taskData: element
+        });
+
+        // Update display immediately
+        if (typeof updateTaskDisplayImmediate === 'function') {
+            updateTaskDisplayImmediate(id, title, false, '');
+        }
+    }
+
+    // Update refresh button state
+    const totalPending = (window.pendingColumnChanges?.size || 0);
+    if (typeof updateRefreshButtonState === 'function') {
+        updateRefreshButtonState(totalPending > 0 ? 'unsaved' : 'default', totalPending);
+    }
+
+    // Refresh the submenu to show updated state
+    refreshMarpDirectivesSubmenu(scope, id, type, columnId);
+}
+
+/**
  * Handle Marp status response from backend
  */
 function handleMarpStatus(status) {
-    console.log('[kanban.webview] handleMarpStatus called with:', status);
     const statusText = document.getElementById('marp-status-text');
     if (!statusText) {
         console.error('[kanban.webview] marp-status-text element not found');
         return;
     }
 
-    console.log('[kanban.webview] Updating Marp status display');
     statusText.className = 'status-text';
 
     if (status.cliAvailable && status.extensionInstalled) {
         statusText.textContent = '✓ Ready';
         statusText.classList.add('status-success');
-        console.log('[kanban.webview] Marp status: Ready');
     } else if (!status.cliAvailable && !status.extensionInstalled) {
         statusText.textContent = '⚠ CLI & Extension Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: CLI & Extension Missing');
     } else if (!status.cliAvailable) {
         statusText.textContent = '⚠ CLI Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: CLI Missing');
     } else if (!status.extensionInstalled) {
         statusText.textContent = '⚠ Extension Missing';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: Extension Missing');
     } else {
         statusText.textContent = '⚠ Unknown Status';
         statusText.classList.add('status-warning');
-        console.log('[kanban.webview] Marp status: Unknown');
     }
 }
 
 /**
  * Handle Marp themes available response from backend
  */
+/**
+ * Handle Marp available classes response
+ */
+function handleMarpAvailableClasses(classes) {
+    // Store available classes globally for submenu access
+    window.marpAvailableClasses = classes;
+}
+
 function handleMarpThemesAvailable(themes, error) {
-    console.log('[kanban.webview] handleMarpThemesAvailable called with:', { themes, error });
     const themeSelect = document.getElementById('marp-theme');
     if (!themeSelect) {
         console.error('[kanban.webview] marp-theme select element not found');
         return;
     }
 
-    console.log('[kanban.webview] Clearing existing theme options...');
     // Clear existing options except the first one
     while (themeSelect.children.length > 1) {
         themeSelect.removeChild(themeSelect.lastChild);
@@ -5513,7 +6040,6 @@ function handleMarpThemesAvailable(themes, error) {
         return;
     }
 
-    console.log('[kanban.webview] Adding themes to dropdown:', themes);
     // Add available themes
     themes.forEach(theme => {
         const option = document.createElement('option');
@@ -5526,7 +6052,6 @@ function handleMarpThemesAvailable(themes, error) {
     const savedTheme = localStorage.getItem('kanban-marp-theme');
     if (savedTheme && themes.includes(savedTheme)) {
         themeSelect.value = savedTheme;
-        console.log('[kanban.webview] Restored saved theme:', savedTheme);
     }
 
     // Restore previously selected browser if available
@@ -5534,17 +6059,14 @@ function handleMarpThemesAvailable(themes, error) {
     const browserSelect = document.getElementById('marp-browser');
     if (savedBrowser && browserSelect) {
         browserSelect.value = savedBrowser;
-        console.log('[kanban.webview] Restored saved browser:', savedBrowser);
     }
 
-    console.log('[kanban.webview] Theme and browser dropdowns updated successfully');
 }
 
 /**
  * Load Marp themes from backend
  */
 function loadMarpThemes() {
-    console.log('[kanban.webview] Loading Marp themes...');
     vscode.postMessage({
         type: 'getMarpThemes'
     });
@@ -5591,16 +6113,11 @@ function toggleAutoExport() {
             message: 'Auto-export started. File will export automatically on save.'
         });
     } else {
-        // IMMEDIATELY hide the button and indicator when user clicks stop
+        // IMMEDIATELY hide the button when user clicks stop
         const autoExportBtn = document.getElementById('auto-export-btn');
-        const indicator = document.getElementById('export-activity-indicator');
         if (autoExportBtn) {
             autoExportBtn.style.display = 'none';
             autoExportBtn.classList.remove('active');
-            console.log('[kanban.webview] Auto-export button immediately hidden on user stop');
-        }
-        if (indicator) {
-            indicator.style.display = 'none';
         }
 
         // Reset state immediately
@@ -5634,21 +6151,18 @@ function toggleAutoExport() {
 function updateAutoExportButton() {
     const btn = document.getElementById('auto-export-btn');
     const icon = document.getElementById('auto-export-icon');
-    const indicator = document.getElementById('export-activity-indicator');
 
-    if (!btn || !icon || !indicator) {
+    if (!btn || !icon) {
         console.warn('[kanban.webview] updateAutoExportButton: Button elements not found');
         return;
     }
 
-    // Hide button and indicator if there are no export settings
+    // Hide button if there are no export settings
     if (!lastExportSettings) {
         btn.style.display = 'none';
         btn.classList.remove('active');
         icon.textContent = '▶';
         btn.title = 'Start auto-export with last settings';
-        if (indicator) indicator.style.display = 'none';
-        console.log('[kanban.webview] updateAutoExportButton: Button hidden - no export settings');
         return;
     }
 
@@ -5658,15 +6172,11 @@ function updateAutoExportButton() {
     if (autoExportActive) {
         btn.classList.add('active');
         icon.textContent = '■'; // Stop icon
-        if (indicator) indicator.style.display = 'inline-flex';
         btn.title = 'Stop auto-export';
-        console.log('[kanban.webview] updateAutoExportButton: Button shown in active state');
     } else {
         btn.classList.remove('active');
         icon.textContent = '▶'; // Play icon
         btn.title = 'Start auto-export with last settings';
-        if (indicator) indicator.style.display = 'none';
-        console.log('[kanban.webview] updateAutoExportButton: Button shown in inactive state');
     }
 }
 
@@ -5810,7 +6320,6 @@ function handleCopyContentResult(result) {
         // Copy to clipboard
         if (navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(result.content).then(() => {
-                console.log('[kanban.webview.handleCopyContentResult] Content copied to clipboard');
             }).catch(err => {
                 console.error('[kanban.webview.handleCopyContentResult] Failed to copy:', err);
                 vscode.postMessage({
@@ -5828,7 +6337,6 @@ function handleCopyContentResult(result) {
             textarea.select();
             try {
                 document.execCommand('copy');
-                console.log('[kanban.webview.handleCopyContentResult] Content copied to clipboard (fallback)');
             } catch (err) {
                 console.error('[kanban.webview.handleCopyContentResult] Fallback copy failed:', err);
                 vscode.postMessage({
@@ -6101,4 +6609,293 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
     };
     vscode.postMessage(message);
 }
+
+
+// Export scope toggle functions globally
+window.toggleMarpClassScope = toggleMarpClassScope;
+window.toggleMarpDirectiveScope = toggleMarpDirectiveScope;
+
+// =============================================================================
+// Marp Global Settings Functions
+// =============================================================================
+
+/**
+ * Toggle the Marp global settings burger menu
+ */
+function toggleMarpGlobalMenu(event, button) {
+    event.stopPropagation();
+    const menu = button.parentElement;
+    const dropdown = menu.querySelector('.marp-global-menu-dropdown');
+    const isActive = menu.classList.contains('active');
+
+    // Close all other menus
+    document.querySelectorAll('.marp-global-menu.active').forEach(m => {
+        if (m !== menu) m.classList.remove('active');
+    });
+
+    if (isActive) {
+        menu.classList.remove('active');
+    } else {
+        // Position the dropdown below the button
+        const rect = button.getBoundingClientRect();
+        dropdown.style.top = (rect.bottom + 2) + 'px';
+        dropdown.style.left = rect.left + 'px';
+
+        // Populate the menu content before showing
+        populateMarpGlobalMenu();
+        menu.classList.add('active');
+    }
+}
+
+/**
+ * Populate the Marp global settings menu with current values
+ */
+function populateMarpGlobalMenu() {
+    const content = document.getElementById('marp-global-settings-content');
+    if (!content) return;
+
+    const frontmatter = window.cachedBoard?.frontmatter || {};
+
+    let html = '<div style="padding: 8px; max-width: 400px; min-width: 300px;">';
+
+    // Marp Enable Toggle
+    const marpEnabled = frontmatter.marp === 'true' || frontmatter.marp === true;
+    html += '<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">';
+    html += '<label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1;">';
+    html += `<input type="checkbox" ${marpEnabled ? 'checked' : ''} onchange="updateMarpGlobalSetting('marp', this.checked ? 'true' : 'false')" style="cursor: pointer;">`;
+    html += '<span style="font-weight: bold; color: #ddd;">Enable Marp</span>';
+    html += '</label>';
+    html += '</div>';
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Presentation Settings
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Presentation</div>';
+
+    html += createMarpInputField('theme', '🎨 Theme', frontmatter.theme, 'e.g., default, gaia, uncover');
+    html += createMarpInputField('style', '✏️ Style', frontmatter.style, 'Custom CSS styles');
+    html += createMarpInputField('size', '📐 Size', frontmatter.size, 'e.g., 16:9, 4:3, 1920x1080');
+    html += createMarpInputField('headingDivider', '📑 Heading Divider', frontmatter.headingDivider, 'true/false or 1-6');
+    html += createMarpInputField('math', '∑ Math', frontmatter.math, 'mathjax or katex');
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Metadata
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Metadata</div>';
+
+    html += createMarpInputField('title', '📝 Title', frontmatter.title);
+    html += createMarpInputField('author', '👤 Author', frontmatter.author);
+    html += createMarpInputField('description', '📄 Description', frontmatter.description);
+    html += createMarpInputField('keywords', '🔑 Keywords', frontmatter.keywords);
+    html += createMarpInputField('url', '🔗 URL', frontmatter.url);
+    html += createMarpInputField('image', '🖼 Image', frontmatter.image);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Slide Settings
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Slide Settings</div>';
+
+    html += createMarpInputField('paginate', '📄 Paginate', frontmatter.paginate, 'true/false');
+    html += createMarpInputField('header', '⬆️ Header', frontmatter.header);
+    html += createMarpInputField('footer', '⬇️ Footer', frontmatter.footer);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Styling
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Styling</div>';
+
+    html += createMarpInputField('class', '🏷 Class', frontmatter.class);
+    html += createMarpInputField('color', '🎨 Color', frontmatter.color);
+    html += createMarpInputField('backgroundColor', '🎨 Background Color', frontmatter.backgroundColor);
+    html += createMarpInputField('backgroundImage', '🖼 Background Image', frontmatter.backgroundImage, 'URL');
+    html += createMarpInputField('backgroundPosition', '📍 BG Position', frontmatter.backgroundPosition);
+    html += createMarpInputField('backgroundRepeat', '🔄 BG Repeat', frontmatter.backgroundRepeat);
+    html += createMarpInputField('backgroundSize', '📏 BG Size', frontmatter.backgroundSize);
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // Marp Classes Section - title and content on same line
+    const availableClasses = window.marpAvailableClasses || [];
+    const activeClasses = window.getMarpClassesForElement
+        ? window.getMarpClassesForElement('global', null, null)
+        : [];
+
+    html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-direction: column;">';
+    html += '<div style="font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase; white-space: nowrap; flex-direction: column; align-items: flex-start; align-self: baseline; width: 120px;">Marp Classes</div>';
+
+    html += '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1;">';
+    availableClasses.forEach(className => {
+        const isActive = activeClasses.includes(className);
+        const checkmark = isActive ? '✓ ' : '';
+        html += `
+            <button class="marp-class-chip ${isActive ? 'active' : ''}"
+                    onclick="toggleMarpClass('global', null, null, '${className}'); event.stopPropagation();"
+                    style="padding: 6px 8px; font-size: 11px; border: 1px solid #555; border-radius: 4px; background: ${isActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: left; transition: all 0.2s;">
+                ${checkmark}${className}
+            </button>
+        `;
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="marp-global-menu-divider"></div>';
+
+    // YAML Preview Section
+    html += '<div style="margin-bottom: 8px; font-weight: bold; color: #888; font-size: 11px; text-transform: uppercase;">Current YAML Frontmatter</div>';
+
+    const yamlContent = window.cachedBoard?.yamlHeader || '';
+    // Remove leading/trailing --- delimiters from display
+    let displayYaml = yamlContent;
+    if (displayYaml) {
+        const lines = displayYaml.split('\n').filter(line => line.trim() !== '---');
+        displayYaml = lines.join('\n').trim();
+    }
+    displayYaml = displayYaml || '(No YAML frontmatter found)';
+
+    html += '<div style="margin-bottom: 10px;">';
+    html += '<pre style="background: #1e1e1e; border: 1px solid #555; padding: 8px; border-radius: 4px; font-size: 11px; color: #d4d4d4; overflow-x: auto; margin: 0; white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto;">';
+    html += escapeHtml(displayYaml);
+    html += '</pre>';
+    html += '</div>';
+
+    html += '</div>';
+
+    content.innerHTML = html;
+}
+
+/**
+ * Create an input field for a Marp setting
+ */
+function createMarpInputField(key, label, value, placeholder) {
+    value = value || '';
+    placeholder = placeholder || '';
+
+    let html = '<div style="margin-bottom: 4px; display: flex; align-items: baseline;">';
+    html += `<div style="font-size: 12px; margin-bottom: 4px; color: #ccc; width: 180px;">${label}</div>`;
+    html += `<input type="text" value="${escapeHtml(value)}" placeholder="${placeholder}"
+                    data-marp-key="${escapeHtml(key)}"
+                    data-original-value="${escapeHtml(value)}"
+                    onkeypress="if(event.key==='Enter'){updateMarpGlobalSetting(this.dataset.marpKey, this.value);}"
+                    onblur="if(this.value !== this.dataset.originalValue){updateMarpGlobalSetting(this.dataset.marpKey, this.value); this.dataset.originalValue = this.value;}"
+                    style="width: 100%; padding: 4px; background: var(--board-background); border: 1px solid #555; color: var(--vscode-foreground); border-radius: 4px; font-size: 12px; box-sizing: border-box;">`;
+    html += '</div>';
+
+    return html;
+}
+
+/**
+ * Escape HTML for use in attributes
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+
+
+/**
+ * Update a single Marp global setting in the YAML frontmatter
+ */
+function updateMarpGlobalSetting(key, value) {
+    // Send to backend to update YAML frontmatter
+    vscode.postMessage({
+        type: "updateMarpGlobalSetting",
+        key: key,
+        value: value
+    });
+
+    // Update cached board frontmatter
+    if (!window.cachedBoard.frontmatter) {
+        window.cachedBoard.frontmatter = {};
+    }
+    // Delete key if value is empty (match backend behavior)
+    if (value === '' || value === null || value === undefined) {
+        delete window.cachedBoard.frontmatter[key];
+    } else {
+        window.cachedBoard.frontmatter[key] = value;
+    }
+
+    // Update yamlHeader string to reflect the change
+    updateYamlHeaderString(key, value);
+
+    // Refresh the YAML preview section
+    refreshYamlPreview();
+}
+
+/**
+ * Update the yamlHeader string with a new key-value pair
+ */
+function updateYamlHeaderString(key, value) {
+    if (!window.cachedBoard) return;
+
+    let yamlHeader = window.cachedBoard.yamlHeader || '';
+    const lines = yamlHeader.split('\n');
+
+    // Find if the key already exists
+    let keyFound = false;
+    for (let i = 0; i < lines.length; i++) {
+        const match = lines[i].match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+        if (match && match[1] === key) {
+            // Update existing key
+            if (value === '' || value === null || value === undefined) {
+                // Remove the line if value is empty
+                lines.splice(i, 1);
+            } else {
+                lines[i] = `${key}: ${value}`;
+            }
+            keyFound = true;
+            break;
+        }
+    }
+
+    // If key not found and value is not empty, add it
+    if (!keyFound && value !== '' && value !== null && value !== undefined) {
+        if (yamlHeader === '') {
+            // Create new YAML header
+            lines.push('kanban-plugin: board');
+            lines.push(`${key}: ${value}`);
+        } else {
+            // Add to existing YAML
+            lines.push(`${key}: ${value}`);
+        }
+    }
+
+    // Reconstruct yamlHeader from lines
+    window.cachedBoard.yamlHeader = lines.filter(line => line.trim() !== '').join('\n');
+}
+
+/**
+ * Refresh just the YAML preview section without rebuilding the entire menu
+ */
+function refreshYamlPreview() {
+    const yamlContent = window.cachedBoard?.yamlHeader || '';
+    // Remove leading/trailing --- delimiters from display
+    let displayYaml = yamlContent;
+    if (displayYaml) {
+        const lines = displayYaml.split('\n').filter(line => line.trim() !== '---');
+        displayYaml = lines.join('\n').trim();
+    }
+    displayYaml = displayYaml || '(No YAML frontmatter found)';
+
+    // Find and update the preview element
+    const preElement = document.querySelector('#marp-global-settings-content pre');
+    if (preElement) {
+        preElement.textContent = displayYaml;
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener("click", function(event) {
+    const menus = document.querySelectorAll('.marp-global-menu');
+    menus.forEach(menu => {
+        if (!menu.contains(event.target)) {
+            menu.classList.remove('active');
+        }
+    });
+});
+
+// Make functions globally available
+window.toggleMarpGlobalMenu = toggleMarpGlobalMenu;
+window.promptMarpSetting = promptMarpSetting;
+window.toggleMarpEnabled = toggleMarpEnabled;
+window.updateMarpGlobalSetting = updateMarpGlobalSetting;
 

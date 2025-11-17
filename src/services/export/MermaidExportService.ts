@@ -29,9 +29,7 @@ export class MermaidExportService {
      * Set or update the webview panel
      */
     setWebviewPanel(panel: vscode.WebviewPanel): void {
-        console.log('[MermaidExportService] setWebviewPanel called, panel:', panel ? 'PROVIDED' : 'NULL');
         this.webviewPanel = panel;
-        console.log('[MermaidExportService] Service is now ready:', this.isReady());
     }
 
     /**
@@ -39,7 +37,6 @@ export class MermaidExportService {
      */
     isReady(): boolean {
         const ready = this.webviewPanel !== undefined;
-        console.log('[MermaidExportService] isReady check:', ready, 'webviewPanel:', this.webviewPanel ? 'SET' : 'UNDEFINED');
         return ready;
     }
 
@@ -71,15 +68,12 @@ export class MermaidExportService {
      * Render multiple Mermaid diagrams sequentially
      */
     async renderBatch(codes: string[]): Promise<Array<string | null>> {
-        console.log(`[MermaidExportService] Rendering batch of ${codes.length} diagrams...`);
         const results: Array<string | null> = [];
 
         for (let i = 0; i < codes.length; i++) {
             try {
-                console.log(`[MermaidExportService] Rendering diagram ${i + 1}/${codes.length}...`);
                 const svg = await this.renderToSVG(codes[i]);
                 results.push(svg);
-                console.log(`[MermaidExportService] ✅ Diagram ${i + 1} rendered`);
             } catch (error) {
                 console.error(`[MermaidExportService] ❌ Diagram ${i + 1} failed:`, error);
                 results.push(null);
@@ -120,7 +114,6 @@ export class MermaidExportService {
         return new Promise((resolve, reject) => {
             const requestId = `mermaid-export-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-            console.log(`[MermaidExportService] Sending render request: ${requestId}`);
 
             // Create timeout (30 seconds)
             const timeout = setTimeout(() => {
@@ -157,7 +150,6 @@ export class MermaidExportService {
         const request = this.pendingRequests.get(requestId);
 
         if (request) {
-            console.log(`[MermaidExportService] ✅ Received response: ${requestId}`);
             clearTimeout(request.timeout);
             request.resolve(svg);
             this.pendingRequests.delete(requestId);
@@ -184,7 +176,6 @@ export class MermaidExportService {
      * Cleanup all pending requests
      */
     cleanup(): void {
-        console.log('[MermaidExportService] Cleaning up pending requests...');
 
         // Reject all pending requests
         for (const [requestId, request] of this.pendingRequests.entries()) {

@@ -75,7 +75,16 @@
       "Bash(tee:*)",
       "Bash(timeout 30 npx tsc:*)",
       "Bash(python3:*)",
-      "Bash(/tmp/filtered-log.log)"
+      "Bash(/tmp/filtered-log.log)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx @marp-team/marp-cli:*)",
+      "Bash(git restore:*)",
+      "Bash(src/html/webview.css)",
+      "Bash(/tmp/menuOperations_before.js)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/webview.js)",
+      "Bash(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/webview.css)"
     ],
     "deny": [],
     "ask": []

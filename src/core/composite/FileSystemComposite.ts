@@ -182,12 +182,10 @@ export class SizeCalculatorVisitor implements IFileSystemVisitor {
     visitFile(file: FileLeaf): void {
         this.totalSize += file.getSize();
         this.fileCount++;
-        console.log(`[SizeCalculator] File: ${file.getName()} (${file.getSize()} bytes)`);
     }
 
     visitDirectory(directory: DirectoryComposite): void {
         this.directoryCount++;
-        console.log(`[SizeCalculator] Directory: ${directory.getName()} (${directory.getChildren().length} items)`);
 
         // Visit all children
         for (const child of directory.getChildren()) {
@@ -300,13 +298,11 @@ export class BackupVisitor implements IFileSystemVisitor {
 
     visitFile(file: FileLeaf): void {
         // Create backup of file
-        console.log(`[BackupVisitor] Backing up file: ${file.getName()}`);
         // Implementation would copy file to backup location
         this.backedUpFiles.push(file);
     }
 
     visitDirectory(directory: DirectoryComposite): void {
-        console.log(`[BackupVisitor] Backing up directory: ${directory.getName()}`);
         this.backedUpDirectories.push(directory);
 
         // Visit all children

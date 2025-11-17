@@ -8,8 +8,16 @@ class TagUtils {
         // Centralized regex patterns for tag matching
         this.patterns = {
             // Basic tag patterns
-            basicTags: /#([a-zA-Z0-9_-]+)/g,
-            atTags: /@([a-zA-Z0-9_&-]+)/g,
+            // Rule: Everything after # until space is a tag (includes numeric, positivity, gather, etc.)
+            // Supports: #tag, #1, #1.5, #++, #gather_reto|anita, #gather_bruno&karl, etc.
+            basicTags: /#([a-zA-Z0-9_\-&|=<>!+øØ.]+)/g,
+
+            // Rule: Each @ is one person/mention, ampersand is part of the name (@Johnson&johnson is ONE name)
+            atTags: /@([a-zA-Z0-9_\-&]+)/g,
+
+            // Special positivity tags (#++, #+, #ø, #-, #--)
+            // Use negative lookahead to ensure - doesn't match when it's part of --
+            positivityTags: /#(\+\+|--|\+|ø|Ø|-(?!-))/g,
 
             // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01)
             numericTag: /#(\d+(?:\.\d+)?)\b/g,
@@ -18,6 +26,7 @@ class TagUtils {
             rowTag: /#row(\d+)\b/gi,
             spanTag: /#span(\d+)\b/gi,
             stackTag: /#stack\b/gi,
+            stickyTag: /#sticky\b/gi,
             includeTag: /#include:([^\s]+)/i,
 
             // Special gather tags
@@ -40,7 +49,7 @@ class TagUtils {
         };
 
         // Layout tags that should not be displayed
-        this.layoutTags = ['row', 'span', 'stack', 'fold', 'archive', 'hidden', 'include'];
+        this.layoutTags = ['row', 'span', 'stack', 'sticky', 'fold', 'archive', 'hidden', 'include'];
 
         // Tags that should be excluded from menus
         this.excludedTags = ['gather_', 'ungathered', 'fold', 'archive', 'hidden'];
@@ -70,6 +79,13 @@ class TagUtils {
         if (includeHash !== false) {
             const hashMatches = text.matchAll(this.patterns.basicTags);
             for (const match of hashMatches) {
+                const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
+                tags.push(tag);
+            }
+
+            // Extract special positivity tags
+            const positivityMatches = text.matchAll(this.patterns.positivityTags);
+            for (const match of positivityMatches) {
                 const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
                 tags.push(tag);
             }
@@ -106,6 +122,14 @@ class TagUtils {
     extractFirstTag(text, excludeLayout = true) {
         if (!text) return null;
 
+        // First check for special positivity tags at the beginning
+        // Use negative lookahead to ensure - doesn't match when it's part of --
+        // Order matters: match longer patterns first
+        const positivityMatch = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/);
+        if (positivityMatch) {
+            return positivityMatch[1].toLowerCase();
+        }
+
         // Use boardRenderer.js compatible regex with exclusions (includes dots for numeric tags like #1.5)
         const re = /#(?!row\d+\b)(?!span\d+\b)([a-zA-Z0-9_.-]+(?:[=|><][a-zA-Z0-9_.-]+)*)/g;
         let m;
@@ -136,6 +160,15 @@ class TagUtils {
      */
     extractFirstTagSimple(text) {
         if (!text) return null;
+
+        // First check for special positivity tags
+        // Use negative lookahead to ensure - doesn't match when it's part of --
+        // Order matters: match longer patterns first
+        const positivityMatch = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/);
+        if (positivityMatch) {
+            return positivityMatch[1].toLowerCase();
+        }
+
         const tagMatch = text.match(/#([a-zA-Z0-9_.-]+)/);
         return tagMatch ? tagMatch[1].toLowerCase() : null;
     }
@@ -148,12 +181,16 @@ class TagUtils {
     extractNumericTag(text) {
         if (!text) return null;
 
-        // Use a non-global version of the pattern to get capture groups
-        const match = text.match(/#(\d+(?:\.\d+)?)\b/);
-        if (match && match[1]) {
-            return parseFloat(match[1]);
+        // Extract ALL numeric tags and return as array
+        const pattern = /#(\d+(?:\.\d+)?)\b/g;
+        const tags = [];
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+            tags.push(parseFloat(match[1]));
         }
-        return null;
+
+        // Return array of all numeric tags, or null if none found
+        return tags.length > 0 ? tags : null;
     }
 
     /**
@@ -520,8 +557,12 @@ class TagUtils {
         if (!Array.isArray(columns)) return [];
 
         return [...columns].sort((a, b) => {
-            const numA = this.extractNumericTag(a.title);
-            const numB = this.extractNumericTag(b.title);
+            const tagsA = this.extractNumericTag(a.title);
+            const tagsB = this.extractNumericTag(b.title);
+
+            // Use first numeric tag for sorting
+            const numA = tagsA ? tagsA[0] : null;
+            const numB = tagsB ? tagsB[0] : null;
 
             // Columns without numeric tags go to the end
             if (numA === null && numB === null) return 0;
@@ -541,8 +582,12 @@ class TagUtils {
         if (!Array.isArray(tasks)) return [];
 
         return [...tasks].sort((a, b) => {
-            const numA = this.extractNumericTag(a.title);
-            const numB = this.extractNumericTag(b.title);
+            const tagsA = this.extractNumericTag(a.title);
+            const tagsB = this.extractNumericTag(b.title);
+
+            // Use first numeric tag for sorting
+            const numA = tagsA ? tagsA[0] : null;
+            const numB = tagsB ? tagsB[0] : null;
 
             // Tasks without numeric tags go to the end
             if (numA === null && numB === null) return 0;
@@ -637,11 +682,12 @@ class TagUtils {
                 return text;
             case 'standard':
             case 'allexcludinglayout':
-                // Hide layout tags only (#span, #row, #stack) - direct replacement
+                // Hide layout tags only (#span, #row, #stack, #sticky) - direct replacement
                 return text
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
                     .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
                     .replace(/\s+/g, ' ')
                     .trim();
             case 'custom':
@@ -651,6 +697,7 @@ class TagUtils {
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
                     .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
                     .replace(/\s+/g, ' ')
                     .trim();
             case 'mentions':
@@ -688,11 +735,21 @@ class TagUtils {
                 // Export all tags - don't filter anything
                 return text;
             case 'allexcludinglayout':
-                // Export all except layout tags (#span, #row, #stack)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').trim();
+                // Export all except layout tags (#span, #row, #stack, #sticky)
+                return text
+                    .replace(this.patterns.rowTag, '')
+                    .replace(this.patterns.spanTag, '')
+                    .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
+                    .trim();
             case 'customonly':
                 // Export only custom tags and @ tags (remove standard layout tags)
-                return text.replace(this.patterns.rowTag, '').replace(this.patterns.spanTag, '').replace(this.patterns.stackTag, '').trim();
+                return text
+                    .replace(this.patterns.rowTag, '')
+                    .replace(this.patterns.spanTag, '')
+                    .replace(this.patterns.stackTag, '')
+                    .replace(this.patterns.stickyTag, '')
+                    .trim();
             case 'mentionsonly':
                 // Export only @ tags - remove all # tags
                 return this.removeTagsFromText(text, {
@@ -764,20 +821,15 @@ class TagUtils {
             if (additionalTitle) {
                 // Backend has already inserted %INCLUDE_BADGE:filepath% placeholder in displayTitle
                 // We just need to replace it with the badge HTML
-                // console.log('[tagUtils.getColumnDisplayTitle] additionalTitle:', additionalTitle);
-                // console.log('[tagUtils.getColumnDisplayTitle] fileName:', fileName);
 
                 // Render markdown first (with the placeholder still in place)
                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
                 const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
-                // console.log('[tagUtils.getColumnDisplayTitle] renderedTitle:', renderedTitle);
 
                 // Replace the backend-inserted placeholder with our badge HTML
                 // The placeholder format is: %INCLUDE_BADGE:filepath%
                 const placeholder = `%INCLUDE_BADGE:${fileName}%`;
-                // console.log('[tagUtils.getColumnDisplayTitle] looking for placeholder:', placeholder);
                 const result = renderedTitle.replace(placeholder, linkHtml);
-                // console.log('[tagUtils.getColumnDisplayTitle] result:', result);
                 return result;
             } else {
                 return linkHtml;

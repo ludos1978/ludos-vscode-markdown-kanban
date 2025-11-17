@@ -2,10 +2,50 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-11-04
+**Last Updated:** 2025-11-13
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Critical Fixes & New Functions (Phase 1-7)
+
+### Phase 7: Marp Style Template System (2025-11-13)
+
+#### MARP-STYLES: Configurable CSS Class Directives
+**Files:**
+- [src/services/export/PresentationGenerator.ts](src/services/export/PresentationGenerator.ts)
+- [src/configurationService.ts](src/configurationService.ts)
+- [package.json](package.json)
+
+**New Configuration Settings:**
+- `marp.availableClasses` - List of available CSS class names (default: font8-80, invert, center, highlight, etc.)
+- `marp.globalClasses` - Global CSS classes applied to all slides via YAML frontmatter (`class: ...`)
+- `marp.localClasses` - Local CSS classes applied to specific slides via scoped directive (`<!-- _class: ... -->`)
+
+**Modified Interfaces:**
+- `MarpOptions` - Extended to include:
+  - `globalClasses?: string[]` - Classes for all slides
+  - `localClasses?: string[]` - Classes for specific slides
+  - `perSlideClasses?: Map<number, string[]>` - Per-slide class overrides
+
+**Modified Functions:**
+- `PresentationGenerator.formatSlides()` - Now injects local class directives before slide content
+- `PresentationGenerator.buildYamlFrontmatter()` - Now adds global class directive to YAML
+- `ExportService` (lines 1057-1067, 1627-1638) - Reads config and passes classes to PresentationGenerator
+
+**How It Works:**
+1. User configures classes in VS Code settings
+2. During Marp export, global classes are added to YAML frontmatter: `class: "font24 center"`
+3. Local classes are injected as scoped directives: `<!-- _class: invert highlight -->`
+4. Per-slide overrides allow fine-grained control per slide index
+
+**Benefits:**
+- No manual directive editing required
+- Theme-aware with predefined classes from style-roboto-light.css
+- Supports both global (persistent) and local (scoped) directives
+- Extensible: users can add custom classes to availableClasses
 
 ---
 

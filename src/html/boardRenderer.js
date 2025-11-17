@@ -10,6 +10,75 @@ window.globalColumnFoldState = window.globalColumnFoldState || 'fold-mixed'; // 
 // let window.cachedBoard = null; // Removed to avoid conflicts
 let renderTimeout = null;
 
+/**
+ * Generate alternative title from task description when no title exists
+ *
+ * Format for images:
+ * ![alt text](path/to/screenshot.png "image description") => image description - alt text
+ * ![](path/to/screenshot.png "image description") => image description (screenshot.png)
+ * ![alt text](path/to/screenshot.png) => alt text (screenshot.png)
+ * ![](path/to/screenshot.png) => (screenshot.png)
+ *
+ * If no images: Use first 20 characters of text
+ */
+function generateAlternativeTitle(description) {
+    if (!description || typeof description !== 'string' || description.trim() === '') {
+        return undefined;
+    }
+
+    // Match markdown images: ![alt text](path "title")
+    const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]+)")?\)/;
+    const match = imageRegex.exec(description);
+
+    if (match) {
+        const altText = match[1] || '';  // Can be empty
+        const imagePath = match[2];
+        const imageDescription = match[3] || '';  // Title attribute
+
+        // Extract filename from path
+        const filename = imagePath.split('/').pop().split('\\').pop() || imagePath;
+
+        // Apply formatting rules
+        if (imageDescription && altText) {
+            // Rule 1: image description - alt text
+            return `${imageDescription} - ${altText}`;
+        } else if (imageDescription && !altText) {
+            // Rule 2: image description (filename)
+            return `${imageDescription} (${filename})`;
+        } else if (altText && !imageDescription) {
+            // Rule 3: alt text (filename)
+            return `${altText} (${filename})`;
+        } else {
+            // Rule 4: (filename)
+            return `(${filename})`;
+        }
+    }
+
+    // Fallback: First 20 characters of text content
+    // Remove all markdown syntax to get clean text
+    let cleanText = description
+        .replace(/^#+\s+/gm, '')           // Remove headers
+        .replace(/^\s*[-*+]\s+/gm, '')     // Remove list markers
+        .replace(/^\s*\d+\.\s+/gm, '')     // Remove numbered lists
+        .replace(/!\[.*?\]\(.*?\)/g, '')   // Remove images
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text
+        .replace(/\[\[([^\]]+)\]\]/g, '$1')      // Convert wiki links to text
+        .replace(/`{1,3}[^`]*`{1,3}/g, '')       // Remove code
+        .replace(/[*_~]{1,2}([^*_~]+)[*_~]{1,2}/g, '$1') // Remove bold/italic
+        .replace(/\n+/g, ' ')              // Replace newlines with spaces
+        .trim();
+
+    if (cleanText.length > 0) {
+        // Return first 60 characters (no ellipsis - CSS will handle overflow)
+        if (cleanText.length > 60) {
+            return cleanText.substring(0, 60);
+        }
+        return cleanText;
+    }
+
+    return undefined;
+}
+
 // Cache board element reference for performance
 let cachedBoardElement = null;
 function getBoardElement() {
@@ -149,6 +218,14 @@ function applyTagStyles() {
     const styles = generateTagStyles();
 
     if (styles) {
+        // Debug: Log positivity badge styles
+        const positivityBadgeStyles = styles.match(/\.corner-badge-(plusplus|plus|minusminus|minus|oslash)[^}]+}/g);
+        if (positivityBadgeStyles) {
+            console.log('[DEBUG] Positivity badge styles generated:', positivityBadgeStyles);
+        } else {
+            console.warn('[DEBUG] No positivity badge styles found in generated CSS');
+        }
+
         // Create and inject style element
         const styleElement = document.createElement('style');
         styleElement.id = 'dynamic-tag-styles';
@@ -192,16 +269,18 @@ function ensureTagStyleExists(tagName) {
     
     // Check if this tag's styles already exist
     const existingStyles = styleElement.textContent || '';
-    if (existingStyles.includes(`[data-column-tag="${tagName}"]`) || 
-        existingStyles.includes(`[data-task-tag="${tagName}"]`)) {
+    if (existingStyles.includes(`[data-column-bg-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-task-bg-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-column-border-tag="${tagName}"]`) ||
+        existingStyles.includes(`[data-task-border-tag="${tagName}"]`)) {
         return;
     }
-    
+
     // Generate styles for this specific tag
     const tagConfig = config;
     const editorBg = getEditorBackground();
     let newStyles = '';
-    
+
     // Generate column styles for this tag
     if (tagConfig.column) {
         const columnColors = tagConfig.column[themeKey] || tagConfig.column.light || {};
@@ -209,38 +288,31 @@ function ensureTagStyleExists(tagName) {
             const bgDark = columnColors.backgroundDark || columnColors.background;
             const columnBg = interpolateColor(editorBg, bgDark, 0.15);
             const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
-            
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-header {
+
+            newStyles += `.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-header {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-title,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-title {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-title {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-content {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-footer,
-.kanban-full-height-column[data-all-tags~="${tagName}"] .column-footer {
+.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-footer {
     background-color: ${columnBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-header,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-header {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-header {
     background-color: ${columnCollapsedBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-title,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-title {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-title {
     background-color: ${columnCollapsedBg} !important;
 }
-.kanban-full-height-column.collapsed[data-column-tag="${tagName}"] .column-footer,
-.kanban-full-height-column.collapsed[data-all-tags~="${tagName}"] .column-footer {
+.kanban-full-height-column.collapsed[data-column-bg-tag="${tagName}"] .column-footer {
     background-color: ${columnCollapsedBg} !important;
 }\n`;
         }
     }
-    
+
     // Generate card styles for this tag
     if (tagConfig.card) {
         const cardColors = tagConfig.card[themeKey] || tagConfig.card.light || {};
@@ -248,43 +320,41 @@ function ensureTagStyleExists(tagName) {
             const bgDark = cardColors.backgroundDark || cardColors.background;
             const cardBg = interpolateColor(editorBg, bgDark, 0.25);
             const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-            
-            newStyles += `.task-item[data-task-tag="${tagName}"],
-.task-item[data-all-tags~="${tagName}"] {
+
+            newStyles += `.task-item[data-task-bg-tag="${tagName}"] {
     background-color: ${cardBg} !important;
 }
-.task-item[data-task-tag="${tagName}"]:hover,
-.task-item[data-all-tags~="${tagName}"]:hover {
+.task-item[data-task-bg-tag="${tagName}"]:hover {
     background-color: ${cardHoverBg} !important;
 }\n`;
         }
     }
-    
+
     // Generate border styles for this tag
     if (tagConfig.border) {
         const borderColor = tagConfig.border.color || (tagConfig[themeKey]?.background || tagConfig.light?.background);
         const borderWidth = tagConfig.border.width || '2px';
         const borderStyle = tagConfig.border.style || 'solid';
-        
+
         if (tagConfig.border.position === 'left') {
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header {
+            newStyles += `.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-header {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-content {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.task-item[data-task-tag="${tagName}"] {
+.task-item[data-task-border-tag="${tagName}"] {
                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }\n`;
         } else {
-            newStyles += `.kanban-full-height-column[data-column-tag="${tagName}"] .column-header {
+            newStyles += `.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-header {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }
-.kanban-full-height-column[data-column-tag="${tagName}"] .column-content {
+.kanban-full-height-column[data-column-border-tag="${tagName}"] .column-content {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                 border-top: none !important;
             }
-.task-item[data-task-tag="${tagName}"] {
+.task-item[data-task-border-tag="${tagName}"] {
                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
             }\n`;
         }
@@ -725,19 +795,37 @@ function applyFoldingStates() {
  */
 function getActiveTagsInTitle(text) {
     if (!text || typeof text !== 'string') {return [];}
-    // Match all tags - for gather tags, include the full expression until next space
+
+    const tags = [];
+
+    // Match standard tags (alphanumeric, gather tags, etc.)
     // Skip layout tags: row, span, and stack
-    const matches = text.match(/#(?!row\d+\b)(?!span\d+\b)(?!stack\b)([a-zA-Z0-9_-]+(?:[&|=><][a-zA-Z0-9_-]+)*)/g) || [];
-    return matches.map(tag => {
+    // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
+    const standardMatches = text.match(/#(?!row\d+\b)(?!span\d+\b)(?!stack\b)([a-zA-Z0-9_][a-zA-Z0-9_-]*(?:[&|=><][a-zA-Z0-9_-]+)*)/g) || [];
+    standardMatches.forEach(tag => {
         const fullTag = tag.substring(1);
         // For gather tags, keep the full expression
         if (fullTag.startsWith('gather_')) {
-            return fullTag;
+            tags.push(fullTag);
+        } else {
+            // For other tags, extract base name
+            const baseMatch = fullTag.match(/^([a-zA-Z0-9_][a-zA-Z0-9_-]*)/);
+            if (baseMatch) {
+                tags.push(baseMatch[1].toLowerCase());
+            }
         }
-        // For other tags, extract base name
-        const baseMatch = fullTag.match(/^([a-zA-Z0-9_-]+)/);
-        return baseMatch ? baseMatch[1].toLowerCase() : fullTag.toLowerCase();
     });
+
+    // Match special positivity tags: #++, #+, #ø, #-, #--
+    // Use negative lookahead to ensure - doesn't match when it's part of --
+    // Order matters: match longer patterns first
+    const positivityMatches = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/g) || [];
+    positivityMatches.forEach(tag => {
+        const symbol = tag.substring(1).toLowerCase();
+        tags.push(symbol);
+    });
+
+    return tags;
 }
 
 // Add a new function to get full tag content (including operators)
@@ -750,9 +838,24 @@ function getActiveTagsInTitle(text) {
  */
 function getFullTagContent(text) {
     if (!text) {return [];}
-    // Match tags including full gather expressions
-    const matches = text.match(/#(?!row\d+\b)(gather_[a-zA-Z0-9_&|=><-]+|[a-zA-Z0-9_-]+)/g) || [];
-    return matches.map(tag => tag.substring(1));
+
+    const tags = [];
+
+    // Match standard tags including full gather expressions
+    // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
+    const standardMatches = text.match(/#(?!row\d+\b)(gather_[a-zA-Z0-9_&|=><-]+|[a-zA-Z0-9_][a-zA-Z0-9_-]*)/g) || [];
+    standardMatches.forEach(tag => {
+        tags.push(tag.substring(1));
+    });
+
+    // Match special positivity tags: #++, #+, #ø, #-, #--
+    // Use negative lookahead to ensure - doesn't match when it's part of --
+    const positivityMatches = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/g) || [];
+    positivityMatches.forEach(tag => {
+        tags.push(tag.substring(1));
+    });
+
+    return tags;
 }
 
 // Helper function to collect all tags currently in use across the board
@@ -842,24 +945,45 @@ function getUserAddedTags() {
     return userAddedTags.sort(); // Sort alphabetically
 }
 
-// Helper function to generate tag menu items from configuration and user-added tags
 /**
- * Generate numeric badge HTML for columns and tasks
- * @param {string} title - Column or task title
- * @returns {string} HTML string for numeric badge or empty string
+ * Find first tag that has a specific styling property defined
+ * Purpose: Determines which tag should provide each type of styling (border, background, etc.)
+ * Used by: Column and task rendering to set styling attributes
+ * @param {string} text - Text containing tags
+ * @param {string} property - Property to check for ('border', 'background', 'headerBar', 'footerBar', 'cornerBadge')
+ * @returns {string|null} First tag with that property or null
  */
-function generateNumericBadge(title) {
-    if (!title || !window.tagUtils) return '';
+function getFirstTagWithProperty(text, property) {
+    const allTags = getActiveTagsInTitle(text);
 
-    const numericTag = window.tagUtils.extractNumericTag(title);
-    if (numericTag === null) return '';
+    for (const tagName of allTags) {
+        // Skip layout tags
+        if (tagName.startsWith('row') || tagName.startsWith('gather_') || tagName.startsWith('span') || tagName === 'stack') continue;
 
-    // Format the badge display - show the numeric value
-    const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
+        // Skip sticky tag
+        if (tagName === 'sticky') continue;
 
-    return `<div class="numeric-badge" title="Index: ${displayValue}">${displayValue}</div>`;
+        const config = getTagConfig(tagName);
+        if (!config) continue; // Skip tags with no configuration (like numeric tags #1, #2, etc.)
+
+        // Check if this tag has the requested property
+        if (property === 'background') {
+            // Check for background in light/dark themes or direct background
+            const hasBackground = (config.light?.background || config.dark?.background ||
+                                  config.column?.light?.background || config.column?.dark?.background ||
+                                  config.card?.light?.background || config.card?.dark?.background);
+            if (hasBackground) return tagName;
+        } else if (property === 'border') {
+            if (config.border) return tagName;
+        } else if (config[property]) {
+            return tagName;
+        }
+    }
+
+    return null;
 }
 
+// Helper function to generate tag menu items from configuration and user-added tags
 /**
  * Generates complete HTML for tag selection menu
  * Purpose: Creates interactive tag toggle menu for columns/tasks
@@ -881,6 +1005,12 @@ function generateTagMenuItems(id, type, columnId = null) {
     const enabledCategories = type === 'column'
         ? (window.enabledTagCategoriesColumn || {})
         : (window.enabledTagCategoriesTask || {});
+
+    // Debug: Log enabled categories
+    if (type === 'column') {
+        console.log('[DEBUG] Enabled column tag categories:', enabledCategories);
+        console.log('[DEBUG] Is positivity enabled?', enabledCategories['positivity']);
+    }
 
     // Map group keys to config keys (kebab-case to camelCase)
     const groupKeyToConfigKey = (groupKey) => {
@@ -956,9 +1086,9 @@ function generateTagMenuItems(id, type, columnId = null) {
     
     // Note: "Remove all tags" option is added dynamically by updateTagCategoryCounts() when tags are active
 
-    // If no tags at all, show a message
+    // If no tags at all, show a message (but keep data attributes for updateTagCategoryCounts)
     if (!hasAnyTags) {
-        menuHtml = '<button class="donut-menu-item" disabled>No tags available</button>';
+        menuHtml = `<button class="donut-menu-item" disabled data-group="none" data-id="${id}" data-type="${type}" data-column-id="${columnId || ''}">No tags available</button>`;
     }
 
     return menuHtml;
@@ -988,9 +1118,16 @@ function generateGroupTagItems(tags, id, type, columnId = null, isConfigured = t
     const tagButtons = tags.map(tagName => {
         const isActive = activeTags.includes(tagName.toLowerCase());
         const checkbox = isActive ? '✓' : '';
-        
-        // Create unique ID for this button
-        const buttonId = `tag-chip-${type}-${id}-${tagName}`.replace(/[^a-zA-Z0-9-]/g, '-');
+
+        // Create unique ID for this button - encode special characters to avoid collisions
+        // E.g., ++ becomes plus-plus, -- becomes minus-minus, ø becomes o-slash
+        const encodedTag = tagName
+            .replace(/\+\+/g, 'plus-plus')
+            .replace(/\+/g, 'plus')
+            .replace(/--/g, 'minus-minus')
+            .replace(/-/g, 'minus')
+            .replace(/ø/gi, 'o-slash');
+        const buttonId = `tag-chip-${type}-${id}-${encodedTag}`.replace(/[^a-zA-Z0-9-]/g, '-');
 
         const displayName = isConfigured ? tagName : tagName;
         const title = isConfigured ? tagName : `Custom tag: ${tagName}`;
@@ -1181,6 +1318,9 @@ function renderSingleColumn(columnId, columnData) {
     if (typeof setupColumnDragAndDrop === 'function') {
         setupColumnDragAndDrop();
     }
+
+    // Note: Visual tag elements (badges, bars) are now created within createColumnElement
+    // before the element is inserted into the DOM, eliminating timing/race conditions
 
 }
 
@@ -1623,15 +1763,15 @@ function toggleAllTasksInColumn(columnId) {
     }
 
     // Apply the action to all tasks using existing toggleTaskCollapse function
+    // CRITICAL: Pass the task ELEMENT directly, not the ID, to avoid querySelector issues
     taskElements.forEach(taskElement => {
-        const taskId = taskElement.getAttribute('data-task-id');
         const isCollapsed = taskElement.classList.contains('collapsed');
 
         // Only toggle if state needs to change (skip recalculation for bulk operation)
         if (shouldCollapse && !isCollapsed) {
-            toggleTaskCollapse(taskId, true);
+            toggleTaskCollapse(taskElement, true); // Pass element directly!
         } else if (!shouldCollapse && isCollapsed) {
-            toggleTaskCollapse(taskId, true);
+            toggleTaskCollapse(taskElement, true); // Pass element directly!
         }
     });
 
@@ -1696,23 +1836,33 @@ function createColumnElement(column, columnIndex) {
         column.tasks = [];
     }
 
+    // CRITICAL: Check for pending local changes and use them instead of backend data
+    // This prevents backend updates from overwriting user's immediate edits
+    if (window.pendingColumnChanges && window.pendingColumnChanges.has(column.id)) {
+        const pendingChange = window.pendingColumnChanges.get(column.id);
+        column = { ...column, title: pendingChange.title };
+    }
+
     // Extract ALL tags from column title for stacking features
     const allTags = getActiveTagsInTitle(column.title);
 
-    // Use first tag for background color (never stack backgrounds)
-    const columnTag = window.tagUtils ? window.tagUtils.extractFirstTag(column.title) : null;
-    
+    // Find first tag with border definition
+    const columnBorderTag = getFirstTagWithProperty(column.title, 'border');
+
+    // Find first tag with background definition
+    const columnBgTag = getFirstTagWithProperty(column.title, 'background');
+
     const columnDiv = document.createElement('div');
     const isCollapsed = window.collapsedColumns.has(column.id);
-    
+
     // Header/footer bars handled by immediate update system
     const headerBarsHtml = '';
     const footerBarsHtml = '';
-    
+
     // Determine classes
     let headerClasses = '';
     let footerClasses = '';
-    
+
     if (headerBarsHtml) {
         headerClasses = 'has-header-bar';
         if (headerBarsHtml.includes('label')) {headerClasses += ' has-header-label';}
@@ -1721,7 +1871,7 @@ function createColumnElement(column, columnIndex) {
         footerClasses = 'has-footer-bar';
         if (footerBarsHtml.includes('label')) {footerClasses += ' has-footer-label';}
     }
-    
+
     // Check for span tag to set column width (only blocked by viewport-based widths, not pixel widths)
     let spanClass = '';
     const spanMatch = column.title.match(/#span(\d+)\b/i);
@@ -1733,17 +1883,24 @@ function createColumnElement(column, columnIndex) {
         }
     }
 
+    // Check for #sticky tag to determine sticky state (default: false = not sticky)
+    const hasStickyTag = /#sticky\b/i.test(column.title);
+
     columnDiv.className = `kanban-full-height-column ${isCollapsed ? 'collapsed' : ''} ${headerClasses} ${footerClasses} ${spanClass}`.trim();
     columnDiv.setAttribute('data-column-id', column.id);
     columnDiv.setAttribute('data-column-index', columnIndex);
     columnDiv.setAttribute('data-row', getColumnRow(column.title));
+    columnDiv.setAttribute('data-column-sticky', hasStickyTag ? 'true' : 'false');
 
-    // Add primary tag for background color only (ignore row/gather/span)
-    if (columnTag && !columnTag.startsWith('row') && !columnTag.startsWith('gather_') && !columnTag.startsWith('span')) {
-        columnDiv.setAttribute('data-column-tag', columnTag);
+    // Add separate tag attributes for border and background (skips tags without those properties)
+    if (columnBorderTag) {
+        columnDiv.setAttribute('data-column-border-tag', columnBorderTag);
     }
-    
-    // Add all tags as a separate attribute for stacking features
+    if (columnBgTag) {
+        columnDiv.setAttribute('data-column-bg-tag', columnBgTag);
+    }
+
+    // Add all tags as a separate attribute for stacking features (header/footer bars, badges)
     if (allTags.length > 0) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
@@ -1755,9 +1912,6 @@ function createColumnElement(column, columnIndex) {
 
     // Corner badges handled by immediate update system
     const cornerBadgesHtml = '';
-
-    // Generate numeric badge if present
-    const numericBadgeHtml = generateNumericBadge(column.title);
 
     // Get display title using shared utility function
     const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
@@ -1775,10 +1929,12 @@ function createColumnElement(column, columnIndex) {
 				</div>
 				<div class="column-title">
 						${cornerBadgesHtml}
-						${numericBadgeHtml}
 						<div class="column-title-section">
 								<span class="drag-handle column-drag-handle" draggable="true">⋮⋮</span>
 								<span class="collapse-toggle ${isCollapsed ? 'rotated' : ''}" data-column-id="${column.id}">▶</span>
+								<button class="pin-btn ${hasStickyTag ? 'pinned' : 'unpinned'}" onclick="toggleColumnSticky('${column.id}')" title="${hasStickyTag ? 'Unpin header (remove #sticky)' : 'Pin header (add #sticky)'}">
+										<span class="pin-icon">📌</span>
+								</button>
 								<div class="column-title-container">
 										<div class="column-title-text markdown-content" onclick="handleColumnTitleClick(event, '${column.id}')">${renderedTitle}</div>
 										<textarea class="column-title-edit"
@@ -1796,12 +1952,23 @@ function createColumnElement(column, columnIndex) {
 										<div class="donut-menu-dropdown">
 												<button class="donut-menu-item" onclick="insertColumnBefore('${column.id}')">Insert column before</button>
 												<button class="donut-menu-item" onclick="insertColumnAfter('${column.id}')">Insert column after</button>
-												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
-												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
+												<button class="donut-menu-item" onclick="duplicateColumn('${column.id}')">Duplicate column</button>
+												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 												<div class="donut-menu-divider"></div>
 												<button class="donut-menu-item" onclick="moveColumnLeft('${column.id}')">Move column left</button>
 												<button class="donut-menu-item" onclick="moveColumnRight('${column.id}')">Move column right</button>
+												<div class="donut-menu-divider"></div>
+												${generateTagMenuItems(column.id, 'column', null)}
+												<div class="donut-menu-divider"></div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="column" data-id="${column.id}">
+														Marp Classes
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="column" data-id="${column.id}">
+														Marp Colors
+												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="column" data-id="${column.id}">
+														Marp Header & Footer
+												</div>
 												<div class="donut-menu-divider"></div>
 												<div class="donut-menu-item span-width-control">
 													<span class="span-width-label">Width:</span>
@@ -1820,27 +1987,25 @@ function createColumnElement(column, columnIndex) {
 														${/#stack\b/i.test(column.title) ? 'On' : 'Off'}
 													</button>
 												</div>
+												<div class="donut-menu-item has-submenu" data-submenu-type="sort" data-id="${column.id}" data-type="column" data-column-id="${column.id}">
+														Sort by
+												</div>
+												<div class="donut-menu-divider"></div>
+												<button class="donut-menu-item" onclick="copyColumnAsMarkdown('${column.id}')">Copy as markdown</button>
+												<button class="donut-menu-item" onclick="exportColumn('${column.id}')">Export column</button>
 												<div class="donut-menu-divider"></div>
 												${column.includeMode ? `
-													<button class="donut-menu-item" onclick="editColumnIncludeFile('${column.id}')">
-														Edit include file
-													</button>
 													<button class="donut-menu-item" onclick="toggleColumnIncludeMode('${column.id}')">
 														Disable include mode
+													</button>
+													<button class="donut-menu-item" onclick="editColumnIncludeFile('${column.id}')">
+														Edit include file
 													</button>
 												` : `
 													<button class="donut-menu-item" onclick="toggleColumnIncludeMode('${column.id}')">
 														Enable include mode
 													</button>
 												`}
-												<div class="donut-menu-divider"></div>
-												<div class="donut-menu-item has-submenu" data-submenu-type="sort" data-id="${column.id}" data-type="column" data-column-id="${column.id}">
-														Sort by
-												</div>
-												<div class="donut-menu-divider"></div>
-												${generateTagMenuItems(column.id, 'column', null)}
-												<div class="donut-menu-divider"></div>
-												<button class="donut-menu-item danger" onclick="deleteColumn('${column.id}')">Delete column</button>
 										</div>
 								</div>
 						</div>
@@ -1862,6 +2027,22 @@ function createColumnElement(column, columnIndex) {
             ${footerBarsHtml || ''}
         </div>
     `;
+
+    // CRITICAL: Apply visual tag elements (badges, bars) BEFORE returning
+    // This ensures the element is fully constructed with all visual elements
+    // before being inserted into the DOM - prevents timing/race conditions
+    if (allTags.length > 0 && window.updateAllVisualTagElements) {
+        window.updateAllVisualTagElements(columnDiv, allTags, 'column');
+    }
+
+    // Apply visual elements to tasks as well
+    columnDiv.querySelectorAll('[data-task-id][data-all-tags]').forEach(taskElement => {
+        const taskTags = taskElement.getAttribute('data-all-tags');
+        if (taskTags && window.updateAllVisualTagElements) {
+            const taskTagArray = taskTags.split(' ').filter(tag => tag.trim());
+            window.updateAllVisualTagElements(taskElement, taskTagArray, 'task');
+        }
+    });
 
     return columnDiv;
 }
@@ -1903,32 +2084,55 @@ function createTaskElement(task, columnId, taskIndex) {
     // - displayTitle for display (content from file or filtered title)
     // - task.title for editing (includes the !!!taskinclude(...)!!! syntax)
     // Use getTaskDisplayTitle to handle taskinclude filepaths as clickable links
-    const renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
-        ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
-         typeof (task.displayTitle || task.title) === 'string' &&
-         (task.displayTitle || task.title).trim()) ?
-        renderMarkdown(task.displayTitle || task.title) : '';
+    const isCollapsed = window.collapsedTasks.has(task.id);
+
+    // Check if task has no meaningful title
+    const hasNoTitle = !task.title || !task.title.trim();
+
+    // DEBUG: Log ALL tasks to see what's happening
+
+    // Generate alternative title when task is folded and has no title
+    let renderedTitle;
+    if (hasNoTitle && isCollapsed && task.description) {
+        // Generate alternative title from description
+        const alternativeTitle = generateAlternativeTitle(task.description);
+        if (alternativeTitle) {
+            renderedTitle = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+        } else {
+            renderedTitle = '';
+        }
+    } else {
+        if (hasNoTitle && isCollapsed) {
+        }
+        // Normal title rendering
+        renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
+            ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
+             typeof (task.displayTitle || task.title) === 'string' &&
+             (task.displayTitle || task.title).trim()) ?
+            renderMarkdown(task.displayTitle || task.title) : '';
+    }
 
     // For editing, always use the full title including include syntax
     const editTitle = task.title || '';
 
-    const isCollapsed = window.collapsedTasks.has(task.id);
-
     // Extract ALL tags for stacking features (from the full title)
     const allTags = getActiveTagsInTitle(task.title);
 
-    // Extract primary tag for styling (first non-special tag)
-    const primaryTag = window.extractFirstTag ? window.extractFirstTag(task.title) : null;
-    const tagAttribute = (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span'))
-        ? ` data-task-tag="${primaryTag}"`
-        : '';
+    // Find first tag with border definition
+    const taskBorderTag = getFirstTagWithProperty(task.title, 'border');
 
-    // Add all tags attribute for stacking features
+    // Find first tag with background definition
+    const taskBgTag = getFirstTagWithProperty(task.title, 'background');
+
+    // Add separate tag attributes for border and background (skips tags without those properties)
+    const borderTagAttribute = taskBorderTag ? ` data-task-border-tag="${taskBorderTag}"` : '';
+    const bgTagAttribute = taskBgTag ? ` data-task-bg-tag="${taskBgTag}"` : '';
+
+    // Add all tags attribute for stacking features (header/footer bars, badges)
     const allTagsAttribute = allTags.length > 0 ? ` data-all-tags="${allTags.join(' ')}"` : '';
     
     // Corner badges and header/footer bars handled by immediate update system
     const cornerBadgesHtml = '';
-    const numericBadgeHtml = generateNumericBadge(task.title);
     const headerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     const footerBarsData = { html: '', totalHeight: 0, hasLabel: false };
     
@@ -1961,15 +2165,14 @@ function createTaskElement(task, columnId, taskIndex) {
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
-             data-task-index="${taskIndex}"${tagAttribute}${allTagsAttribute}${currentWeekAttribute}
+             data-task-index="${taskIndex}"${borderTagAttribute}${bgTagAttribute}${allTagsAttribute}${currentWeekAttribute}
              style="${paddingTopStyle} ${paddingBottomStyle}">
             ${loadingOverlay}
             ${headerBarsHtml}
             ${cornerBadgesHtml}
-            ${numericBadgeHtml}
             <div class="task-header">
                 <div class="task-drag-handle" title="Drag to move task">⋮⋮</div>
-                <span class="task-collapse-toggle ${isCollapsed ? 'rotated' : ''}" onclick="toggleTaskCollapse('${task.id}'); updateFoldAllButton('${columnId}')">▶</span>
+                <span class="task-collapse-toggle ${isCollapsed ? 'rotated' : ''}" onclick="toggleTaskCollapseById('${task.id}', '${columnId}'); updateFoldAllButton('${columnId}')">▶</span>
                 <div class="task-title-container" onclick="handleTaskTitleClick(event, this, '${task.id}', '${columnId}')">
                 <div class="task-title-display markdown-content">${renderedTitle}</div>
                     <textarea class="task-title-edit"
@@ -1984,8 +2187,7 @@ function createTaskElement(task, columnId, taskIndex) {
                             <button class="donut-menu-item" onclick="insertTaskBefore('${task.id}', '${columnId}')">Insert card before</button>
                             <button class="donut-menu-item" onclick="insertTaskAfter('${task.id}', '${columnId}')">Insert card after</button>
                             <button class="donut-menu-item" onclick="duplicateTask('${task.id}', '${columnId}')">Duplicate card</button>
-                            <div class="donut-menu-divider"></div>
-                            <button class="donut-menu-item" onclick="copyTaskAsMarkdown('${task.id}', '${columnId}')">Copy as markdown</button>
+                            <button class="donut-menu-item danger" onclick="deleteTask('${task.id}', '${columnId}')">Delete card</button>
                             <div class="donut-menu-divider"></div>
                             <div class="donut-menu-item has-submenu" data-submenu-type="move" data-id="${task.id}" data-type="task">
                                 Move
@@ -1996,13 +2198,23 @@ function createTaskElement(task, columnId, taskIndex) {
                             <div class="donut-menu-divider"></div>
                             ${generateTagMenuItems(task.id, 'task', columnId)}
                             <div class="donut-menu-divider"></div>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-classes" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Classes
+                            </div>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-colors" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Colors
+                            </div>
+                            <div class="donut-menu-item has-submenu" data-submenu-type="marp-header-footer" data-scope="task" data-id="${task.id}" data-column-id="${columnId}">
+                                Marp Header & Footer
+                            </div>
+                            <div class="donut-menu-divider"></div>
+                            <button class="donut-menu-item" onclick="copyTaskAsMarkdown('${task.id}', '${columnId}')">Copy as markdown</button>
+                            <div class="donut-menu-divider"></div>
                             ${task.includeMode ?
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Disable include mode</button>
                                 <button class="donut-menu-item" onclick="editTaskIncludeFile('${task.id}', '${columnId}')">Edit include file</button>` :
                                 `<button class="donut-menu-item" onclick="toggleTaskIncludeMode('${task.id}', '${columnId}')">Enable include mode</button>`
                             }
-                            <div class="donut-menu-divider"></div>
-                            <button class="donut-menu-item danger" onclick="deleteTask('${task.id}', '${columnId}')">Delete card</button>
                         </div>
                     </div>
                 </div>
@@ -2446,16 +2658,23 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // All columns (including both horizontally and vertically folded) are included in stacking calculations
             const expandedColumns = columnData;
 
-            // Get current sticky stack mode
-            const stickyMode = window.currentStickyStackMode || 'titleonly';
-            const isFullMode = stickyMode === 'full';
-            const isTitleOnlyMode = stickyMode === 'titleonly';
-            const isNoneMode = stickyMode === 'none';
+            // Get current sticky stack mode (only applies to columns with #sticky tag)
+            const globalStickyMode = window.currentStickyStackMode || 'titleonly';
 
-            // Third pass: Calculate all sticky positions based on mode
+            // Third pass: Calculate all sticky positions based on per-column sticky state and global mode
             // Note: HTML order is: margin, column-header, column-title, column-inner, column-footer
             let cumulativeStickyTop = 0;
             const positions = expandedColumns.map((data, expandedIdx) => {
+                // Check if this column has sticky enabled
+                const isColumnSticky = data.col.getAttribute('data-column-sticky') === 'true';
+
+                // Determine effective mode for this column:
+                // - If data-column-sticky="false" (no #sticky tag) → behave like old "none" mode (nothing sticky)
+                // - If data-column-sticky="true" (#sticky tag) → use global sticky stack mode (full or titleonly)
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isTitleOnlyMode = isColumnSticky && globalStickyMode === 'titleonly';
+                const isNoneMode = !isColumnSticky; // Column has no #sticky tag
+
                 // Margin comes first in HTML
                 const marginTop = cumulativeStickyTop;
                 if (isFullMode) {
@@ -2470,7 +2689,7 @@ function recalculateStackHeightsImmediate(stackElement = null) {
 
                 // Then column-title
                 const headerTop = cumulativeStickyTop;
-                if (!isNoneMode) {
+                if (!isNoneMode) { // Both full and titleonly modes have sticky title
                     cumulativeStickyTop += data.headerHeight;
                 }
 
@@ -2486,14 +2705,20 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     columnHeaderTop,
                     headerTop,
                     footerTop,
-                    zIndex: 1000000 + (expandedColumns.length - expandedIdx)
+                    zIndex: 1000000 + (expandedColumns.length - expandedIdx),
+                    isColumnSticky, // Store for bottom calculation
+                    effectiveMode: isNoneMode ? 'none' : globalStickyMode
                 };
             });
 
-            // Calculate bottom positions based on mode
+            // Calculate bottom positions based on per-column mode
             // Bottom to top order: footer, column-inner, column-title, column-header, margin
             let cumulativeFromBottom = 0;
             for (let i = expandedColumns.length - 1; i >= 0; i--) {
+                const isColumnSticky = positions[i].isColumnSticky;
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isNoneMode = !isColumnSticky;
+
                 // Footer is at the bottom
                 const footerBottom = cumulativeFromBottom;
                 if (isFullMode) {
@@ -2502,7 +2727,7 @@ function recalculateStackHeightsImmediate(stackElement = null) {
 
                 // Then column-title
                 const headerBottom = cumulativeFromBottom;
-                if (!isNoneMode) {
+                if (!isNoneMode) { // Both full and titleonly modes have sticky title
                     cumulativeFromBottom += positions[i].headerHeight;
                 }
 
@@ -2535,7 +2760,11 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // This ensures all style changes happen in a single rendering frame
             requestAnimationFrame(() => {
                 // Apply all calculated positions
-                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded }) => {
+                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded, isColumnSticky, effectiveMode }) => {
+                // Recalculate mode flags from stored values
+                const isFullMode = isColumnSticky && globalStickyMode === 'full';
+                const isNoneMode = !isColumnSticky;
+
                 col.dataset.columnHeaderTop = columnHeaderTop;
                 col.dataset.headerTop = headerTop;
                 col.dataset.footerTop = footerTop;
@@ -2555,67 +2784,68 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     col.dataset.contentAreaBottom = scrollY + footerRect.top;
                 }
 
-                // Only apply sticky positioning and values to elements that are sticky in this mode
+                // Apply inline styles only for elements that will be sticky
+                // - isNoneMode (no #sticky): No inline styles
+                // - isFullMode (#sticky + full): Margin, header, title, footer get inline styles
+                // - Title-only (#sticky + titleonly): Only title gets inline styles
+
+                // Column margin: only in full mode
+                const columnMargin = col.querySelector('.column-margin');
+                if (columnMargin) {
+                    if (isFullMode) {
+                        columnMargin.style.top = `${marginTop}px`;
+                        columnMargin.style.bottom = `${marginBottom}px`;
+                        columnMargin.style.zIndex = zIndex;
+                    } else {
+                        columnMargin.style.top = '';
+                        columnMargin.style.bottom = '';
+                        columnMargin.style.zIndex = '';
+                    }
+                }
+
+                // Column header: only in full mode
                 if (columnHeader) {
                     if (isFullMode) {
-                        columnHeader.style.position = 'sticky';
                         columnHeader.style.top = `${columnHeaderTop}px`;
                         columnHeader.style.bottom = `${columnHeaderBottom}px`;
                         columnHeader.style.zIndex = zIndex + 1;
                     } else {
-                        columnHeader.style.position = 'relative';
                         columnHeader.style.top = '';
                         columnHeader.style.bottom = '';
                         columnHeader.style.zIndex = '';
                     }
                 }
 
+                // Column title: in both full and title-only modes (not in none mode)
                 if (header) {
                     if (!isNoneMode) {
-                        header.style.position = 'sticky';
                         header.style.top = `${headerTop}px`;
                         header.style.bottom = `${headerBottom}px`;
                         header.style.zIndex = zIndex;
                     } else {
-                        header.style.position = '';
                         header.style.top = '';
                         header.style.bottom = '';
                         header.style.zIndex = '';
                     }
                 }
 
+                // Column footer: only in full mode
                 if (footer) {
                     if (isFullMode) {
-                        footer.style.position = 'sticky';
                         footer.style.top = `${footerTop}px`;
                         footer.style.bottom = `${footerBottom}px`;
                         footer.style.zIndex = zIndex;
                     } else {
-                        footer.style.position = '';
                         footer.style.top = '';
                         footer.style.bottom = '';
                         footer.style.zIndex = '';
                     }
                 }
 
+                // Column offset: always calculated for proper spacing
                 const columnOffset = col.querySelector('.column-offset');
                 if (columnOffset) {
                     columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
-                }
-
-                const columnMargin = col.querySelector('.column-margin');
-                if (columnMargin) {
-                    if (isFullMode) {
-                        columnMargin.style.position = 'sticky';
-                        columnMargin.style.top = `${marginTop}px`;
-                        columnMargin.style.bottom = `${marginBottom}px`;
-                        columnMargin.style.zIndex = zIndex;
-                    } else {
-                        columnMargin.style.position = '';
-                        columnMargin.style.top = '';
-                        columnMargin.style.bottom = '';
-                        columnMargin.style.zIndex = '';
-                    }
                 }
                 });
 
@@ -2854,21 +3084,93 @@ window.setupCompactViewHandler = setupCompactViewHandler;
  * @param {string} taskId - ID of task to toggle
  * Side effects: Updates collapsedTasks set, DOM classes
  */
-function toggleTaskCollapse(taskId, skipRecalculation = false) {
-    const task = document.querySelector(`[data-task-id="${taskId}"]`);
-    const toggle = task.querySelector('.task-collapse-toggle');
+/**
+ * Toggle task collapse by ID - scoped to specific column to avoid ambiguity
+ * CRITICAL: Always searches within the column context to prevent matching wrong task
+ * Used by: onclick handlers in HTML that pass task ID and column ID
+ * @param {string} taskId - Task ID to toggle
+ * @param {string} columnId - Column ID containing the task (for scoping)
+ */
+function toggleTaskCollapseById(taskId, columnId) {
+    // CRITICAL: Scope query to the specific column to ensure we get the RIGHT task
+    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    if (!columnElement) {
+        console.error(`[toggleTaskCollapseById] Column not found: ${columnId}`);
+        return;
+    }
 
-    task.classList.toggle('collapsed');
+    // Search for task ONLY within this column - prevents wrong task selection
+    const task = columnElement.querySelector(`[data-task-id="${taskId}"]`);
+    if (!task) {
+        console.error(`[toggleTaskCollapseById] Task ${taskId} not found in column ${columnId}`);
+        return;
+    }
+
+    // Call the element-based version
+    toggleTaskCollapse(task, false);
+}
+
+/**
+ * Toggle task collapse by element - direct DOM manipulation
+ * CRITICAL: Only accepts DOM elements, never searches by ID or title
+ * Used by: toggleAllTasksInColumn, direct element references
+ * @param {HTMLElement} taskElement - The task DOM element to toggle
+ * @param {boolean} skipRecalculation - Skip height recalculation for bulk operations
+ */
+function toggleTaskCollapse(taskElement, skipRecalculation = false) {
+    if (!taskElement || !taskElement.nodeType) {
+        console.error(`[toggleTaskCollapse] Invalid task element:`, taskElement);
+        return;
+    }
+
+    const taskId = taskElement.getAttribute('data-task-id');
+    if (!taskId) {
+        console.error(`[toggleTaskCollapse] Task element missing data-task-id attribute`);
+        return;
+    }
+
+
+    const toggle = taskElement.querySelector('.task-collapse-toggle');
+    if (!toggle) {
+        console.error(`[toggleTaskCollapse] Toggle button not found in task:`, taskId);
+        return;
+    }
+
+    taskElement.classList.toggle('collapsed');
     toggle.classList.toggle('rotated');
 
     // Ensure state variables are initialized
     if (!window.collapsedTasks) {window.collapsedTasks = new Set();}
 
+    const isNowCollapsed = taskElement.classList.contains('collapsed');
+
     // Store state
-    if (task.classList.contains('collapsed')) {
+    if (isNowCollapsed) {
         window.collapsedTasks.add(taskId);
     } else {
         window.collapsedTasks.delete(taskId);
+    }
+
+    // Update title for tasks with no title when folding/unfolding
+    const titleDisplay = taskElement.querySelector('.task-title-display');
+    if (titleDisplay) {
+        // Get task data from cached board
+        const task = findTaskById(taskId);
+        if (task) {
+            const hasNoTitle = !task.title || !task.title.trim();
+
+
+            // If task has no title and is now collapsed, show alternative title
+            if (hasNoTitle && isNowCollapsed && task.description) {
+                const alternativeTitle = generateAlternativeTitle(task.description);
+                if (alternativeTitle) {
+                    titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+                }
+            } else if (hasNoTitle && !isNowCollapsed) {
+                // When unfolding, clear the alternative title
+                titleDisplay.innerHTML = '';
+            }
+        }
     }
 
     // Recalculate stacked column heights after collapse/expand (unless skipped for bulk operations)
@@ -3037,11 +3339,11 @@ function handleColumnTitleClick(event, columnId) {
         toggleColumnCollapse(columnId);
         // Use a short delay to allow the unfold animation to start, then enter edit mode
         setTimeout(() => {
-            editColumnTitle(columnId, columnElement);
+            window.editColumnTitle(columnId, columnElement);
         }, 50);
     } else {
         // Column is already unfolded, edit immediately
-        editColumnTitle(columnId, columnElement);
+        window.editColumnTitle(columnId, columnElement);
     }
 }
 
@@ -3057,10 +3359,10 @@ function handleTaskTitleClick(event, element, taskId, columnId) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (typeof editTitle === 'function') {
-        editTitle(element, taskId, columnId);
+    if (typeof window.editTitle === 'function') {
+        window.editTitle(element, taskId, columnId);
     } else {
-        console.error('editTitle is not a function:', typeof editTitle);
+        console.error('editTitle is not a function:', typeof window.editTitle);
     }
 }
 
@@ -3076,14 +3378,14 @@ function handleDescriptionClick(event, element, taskId, columnId) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (typeof editDescription === 'function') {
+    if (typeof window.editDescription === 'function') {
         if (taskId && columnId) {
-            editDescription(element, taskId, columnId);
+            window.editDescription(element, taskId, columnId);
         } else {
-            editDescription(element);
+            window.editDescription(element);
         }
     } else {
-        console.error('editDescription is not a function:', typeof editDescription);
+        console.error('editDescription is not a function:', typeof window.editDescription);
     }
 }
 
@@ -3097,7 +3399,7 @@ function getTagConfig(tagName) {
     // Check grouped structure
     const groups = [
         'status', 'type', 'priority', 'category', 'colors', 'importance',
-        'workflow', 'organization',
+        'workflow', 'organization', 'positivity',
         'content-type-teaching', 'content-type-product',
         'complexity', 'review-status', 'time-estimate',
         'testing-status', 'platform-teaching', 'platform-product',
@@ -3125,8 +3427,9 @@ function getTagConfig(tagName) {
  */
 function escapeCSSAttributeValue(tagName) {
     if (!tagName) return '';
-    // Escape dots and other special CSS characters
-    return tagName.replace(/\./g, '\\.');
+    // Escape special CSS characters that need escaping in attribute selectors
+    // Characters: . + - ( ) [ ] { } * ^ $ | \ / : ; , = > < ~ ! @ # % & ' " ?
+    return tagName.replace(/([.+\-()[\]{}*^$|\\/:;,=><~!@#%&'"?øØ])/g, '\\$1');
 }
 
 // Generate dynamic CSS for tag colors and additional styles
@@ -3155,18 +3458,6 @@ function generateTagStyles() {
     let styles = '';
     
     // Add base styles for corner badges
-    styles += `.corner-badge {
-        position: absolute;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 11px;
-        z-index: 50;
-        pointer-events: none;
-        transition: all 0.2s ease;
-    }\n`;
-    
     // Add default styles for elements without tags only when explicitly enabled
     if (window.tagColors.default) {
         const defaultConfig = window.tagColors.default;
@@ -3292,6 +3583,9 @@ function generateTagStyles() {
                 const themeColors = config[themeKey] || config.light || {};
                 const lowerTagName = tagName.toLowerCase();
                 const escapedTagName = escapeCSSAttributeValue(lowerTagName);
+                // For attribute selectors: Use unescaped tag name (quoted values are literal)
+                // For class names: Use escaped tag name (special chars must be escaped in identifiers)
+                const attrTagName = lowerTagName;  // Use this in [data-tag="..."]
 
                 // Tag pill styles (the tag text itself) - only if background is configured
                 if (themeColors.background) {
@@ -3303,7 +3597,7 @@ function generateTagStyles() {
                     const tagTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBackground) : '#000000';
                     const tagTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(tagTextColor, opaqueBackground) : '';
 
-                    styles += `.kanban-tag[data-tag="${escapedTagName}"] {
+                    styles += `.kanban-tag[data-tag="${attrTagName}"] {
                         color: ${tagTextColor} !important;
                         background-color: ${themeColors.background} !important;
                         border: 1px solid ${themeColors.background};${tagTextShadow ? `\n                        text-shadow: ${tagTextShadow};` : ''}
@@ -3312,8 +3606,8 @@ function generateTagStyles() {
                     // Highlight lines/paragraphs containing this tag in descriptions
                     // Only p and li elements, not the task-section div wrappers
                     const lineBgAlpha = themeColors.background + '20'; // Add 20 for ~12% opacity
-                    styles += `.task-description-display p:has(.kanban-tag[data-tag="${escapedTagName}"]),
-.task-description-display li:has(.kanban-tag[data-tag="${escapedTagName}"]) {
+                    styles += `.task-description-display p:has(.kanban-tag[data-tag="${attrTagName}"]),
+.task-description-display li:has(.kanban-tag[data-tag="${attrTagName}"]) {
     background-color: ${lineBgAlpha} !important;
     border-left: 2px solid ${themeColors.background} !important;
     padding: 2px 4px !important;
@@ -3334,32 +3628,32 @@ function generateTagStyles() {
                     const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-header {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column title text color - higher specificity to override base CSS
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title .column-title-text,
-.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text,
+.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
                     // Column content background
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-content {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-content {
                         background-color: ${columnBg} !important;
                     }\n`;
 
                     // Column footer background and text
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer {
                         background-color: ${columnBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer,
-.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer,
+.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-footer * {
                         color: ${columnTextColor} !important;${columnTextShadow ? `\n                        text-shadow: ${columnTextShadow} !important;` : ''}
                     }\n`;
 
@@ -3371,90 +3665,90 @@ function generateTagStyles() {
                     const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-header {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-header {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
                     // Collapsed title text color - higher specificity
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title .column-title-text,
-.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-title .column-title-text * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text,
+.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-title .column-title-text * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
 
                     // Collapsed column footer background and text
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer {
                         background-color: ${columnCollapsedBg} !important;
                     }\n`;
 
-                    styles += `.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer,
-.kanban-full-height-column.collapsed[data-column-tag="${escapedTagName}"] .column-footer * {
+                    styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer,
+.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-footer * {
                         color: ${collapsedTextColor} !important;${collapsedTextShadow ? `\n                        text-shadow: ${collapsedTextShadow} !important;` : ''}
                     }\n`;
-                    
+
                     // Card background styles - only for primary tag
                     // Interpolate 25% towards the darker color
                     const cardBg = interpolateColor(editorBg, bgDark, 0.25);
-                    styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                    styles += `.task-item[data-task-bg-tag="${attrTagName}"] {
                         background-color: ${cardBg} !important;
                         position: relative;
                     }\n`;
-                    
+
                     // Card hover state - interpolate 35% towards the darker color
                     const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
-                    styles += `.task-item[data-task-tag="${escapedTagName}"]:hover {
+                    styles += `.task-item[data-task-bg-tag="${attrTagName}"]:hover {
                         background-color: ${cardHoverBg} !important;
                     }\n`;
                 }
 
-                // Stackable border styles using data-all-tags - works even without background colors
+                // Stackable border styles - works even without background colors
                 if (config.border) {
                         const borderColor = config.border.color || themeColors.background;
                         const borderWidth = config.border.width || '2px';
                         const borderStyle = config.border.style || 'solid';
-                        
+
                         if (config.border.position === 'left') {
-                            // Use data-column-tag for left border on all column parts
-                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
+                            // Use data-column-border-tag for left border on all column parts
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-inner {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                            styles += `.task-item[data-task-border-tag="${attrTagName}"] {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         } else {
                             // Full border split the border for top and bottom part
-                            styles += `.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-header {
+                            styles += `.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-header {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-top: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-title {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-title {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-inner {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-inner {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: none !important;
                             }\n
-														.kanban-full-height-column[data-column-tag="${escapedTagName}"] .column-footer {
+														.kanban-full-height-column[data-column-border-tag="${attrTagName}"] .column-footer {
                                 border-left: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-right: ${borderWidth} ${borderStyle} ${borderColor} !important;
                                 border-bottom: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
-                            styles += `.task-item[data-task-tag="${escapedTagName}"] {
+                            styles += `.task-item[data-task-border-tag="${attrTagName}"] {
                                 border: ${borderWidth} ${borderStyle} ${borderColor} !important;
                             }\n`;
                         }
@@ -3580,8 +3874,21 @@ function generateTagStyles() {
                                 shapeStyles = 'padding: 2px 8px; border-radius: 3px; min-width: 20px;';
                                 break;
                         }
-                        
-                        styles += `.corner-badge-${lowerTagName} {
+
+                        // Encode special characters for CSS class names to avoid invalid selectors
+                        // E.g., ++ becomes plusplus, -- becomes minusminus, ø becomes oslash
+                        let cssClassName = lowerTagName;
+                        if (cssClassName === '++') cssClassName = 'plusplus';
+                        else if (cssClassName === '+') cssClassName = 'plus';
+                        else if (cssClassName === '--') cssClassName = 'minusminus';
+                        else if (cssClassName === '-') cssClassName = 'minus';
+                        else if (cssClassName === 'ø') cssClassName = 'oslash';
+                        else {
+                            // For other tags, just use as-is (they start with alphanumeric)
+                            cssClassName = lowerTagName;
+                        }
+
+                        styles += `.corner-badge-${cssClassName} {
                             ${shapeStyles}
                             background: ${badgeColor} !important;
                             color: ${badgeTextColor} !important;
@@ -3604,6 +3911,7 @@ function generateTagStyles() {
                      window.tagColors['light-colors'] || window.tagColors['accessible-colors'] ||
                      window.tagColors.workflow ||
                      window.tagColors.organization || window.tagColors.importance ||
+                     window.tagColors.positivity ||
                      window.tagColors['content-type-teaching'] || window.tagColors['content-type-product'] ||
                      window.tagColors.complexity || window.tagColors['review-status'] ||
                      window.tagColors['time-estimate'] || window.tagColors['testing-status'] ||
@@ -3615,7 +3923,7 @@ function generateTagStyles() {
         const groups = [
             'status', 'type', 'priority', 'category',
             'colors', 'dark-colors', 'light-colors', 'accessible-colors',
-            'importance', 'workflow', 'organization',
+            'importance', 'workflow', 'organization', 'positivity',
             'content-type-teaching', 'content-type-product',
             'complexity', 'review-status', 'time-estimate',
             'testing-status', 'platform-teaching', 'platform-product',
@@ -3651,6 +3959,47 @@ function injectStackableBars(targetElement = null) {
         const isColumn = element.classList.contains('kanban-full-height-column');
         const isCollapsed = isColumn && isColumnCollapsed(element);
         const isStacked = isColumn && element.closest('.kanban-column-stack');
+
+        // Update background and border tag attributes based on title tags
+        // Get the element's title to check which tags have background/border properties
+        let titleText = '';
+        if (isColumn) {
+            const columnId = element.getAttribute('data-column-id');
+            if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+                const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                titleText = column ? column.title : '';
+            }
+        } else {
+            const taskId = element.getAttribute('data-task-id');
+            if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+                // Find task across all columns
+                for (const column of window.cachedBoard.columns) {
+                    const task = column.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        titleText = task.title;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Update border tag attribute
+        const borderTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'border') : null;
+        const borderTagAttr = isColumn ? 'data-column-border-tag' : 'data-task-border-tag';
+        if (borderTag) {
+            element.setAttribute(borderTagAttr, borderTag);
+        } else {
+            element.removeAttribute(borderTagAttr);
+        }
+
+        // Update background tag attribute
+        const bgTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'background') : null;
+        const bgTagAttr = isColumn ? 'data-column-bg-tag' : 'data-task-bg-tag';
+        if (bgTag) {
+            element.setAttribute(bgTagAttr, bgTag);
+        } else {
+            element.removeAttribute(bgTagAttr);
+        }
 
         // Filter out tags that are ONLY in description (not in title) for task elements
         if (!isColumn) { // This is a task element
@@ -3888,7 +4237,12 @@ function removeAllTags(id, type, columnId = null) {
     
     // Remove all tags from the title (keep everything except tags)
     // Tags are in format #tagname, but preserve #row tags and #span tags
-    const newTitle = currentTitle.replace(/#(?!row\d+\b)(?!span\d+\b)[a-zA-Z0-9_-]+(?:[&|=><][a-zA-Z0-9_-]+)*/g, '').trim();
+    // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
+    let newTitle = currentTitle.replace(/#(?!row\d+\b)(?!span\d+\b)[a-zA-Z0-9_][a-zA-Z0-9_-]*(?:[&|=><][a-zA-Z0-9_-]+)*/g, '').trim();
+
+    // Also remove special positivity tags: #++, #+, #ø, #-, #--
+    // Use negative lookahead to ensure - doesn't match when it's part of --
+    newTitle = newTitle.replace(/#(\+\+|--|\+|ø|Ø|-(?!-))/g, '').replace(/\s+/g, ' ').trim();
     
     // Update the element
     element.title = newTitle;
@@ -4023,31 +4377,10 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
         const addTaskBtn = tasksContainer.querySelector('.add-task-btn');
 
         // DEBUG: Log insertion details
-        console.log('[addSingleTaskToDOM] Inserting task:', {
-            taskId: task.id,
-            taskTitle: task.title,
-            insertIndex,
-            childrenLength: tasksContainer.children.length,
-            hasAddButton: !!addTaskBtn,
-            childrenTypes: Array.from(tasksContainer.children).map(c => ({
-                tag: c.tagName,
-                class: c.className,
-                id: c.id,
-                dataTaskId: c.getAttribute('data-task-id')
-            })),
-            columnTasksLength: column.tasks.length,
-            columnTaskIds: column.tasks.map(t => t.id)
-        });
 
         // Insert the task at the correct position
         if (insertIndex >= 0 && insertIndex < tasksContainer.children.length) {
             const referenceNode = tasksContainer.children[insertIndex];
-            console.log('[addSingleTaskToDOM] Inserting before element:', {
-                refNodeTag: referenceNode.tagName,
-                refNodeClass: referenceNode.className,
-                refNodeId: referenceNode.id,
-                refNodeTaskId: referenceNode.getAttribute('data-task-id')
-            });
             if (referenceNode && referenceNode.parentNode === tasksContainer) {
                 tasksContainer.insertBefore(taskElement, referenceNode);
             } else {
@@ -4089,9 +4422,13 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
     if (window.injectStackableBars) {
         window.injectStackableBars(taskElement);
     }
-    if (window.updateCornerBadgesImmediate) {
-        const combinedText = [task.title, task.description].filter(Boolean).join(' ');
-        window.updateCornerBadgesImmediate(task.id, 'task', combinedText);
+    // Use updateAllVisualTagElements instead of updateCornerBadgesImmediate for consistency
+    if (window.updateAllVisualTagElements) {
+        const tags = taskElement.getAttribute('data-all-tags');
+        if (tags) {
+            const tagArray = tags.split(' ').filter(tag => tag.trim());
+            window.updateAllVisualTagElements(taskElement, tagArray, 'task');
+        }
     }
 
     // Update column task count

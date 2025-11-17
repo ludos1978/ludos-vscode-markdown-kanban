@@ -96,12 +96,25 @@ function tagPlugin(md, options = {}) {
     
     function parseTag(state, silent) {
         let pos = state.pos;
-        
+
         // Check for # at word boundary
         if (state.src.charCodeAt(pos) !== 0x23 /* # */) {return false;}
-        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ && 
+        if (pos > 0 && state.src.charCodeAt(pos - 1) !== 0x20 /* space */ &&
             state.src.charCodeAt(pos - 1) !== 0x0A /* newline */ &&
             pos !== 0) {return false;}
+
+        // Exclude ATX headers: # followed by space or more # characters (##, ###, etc.)
+        // This prevents treating "# Header" as a tag
+        if (pos === 0 || state.src.charCodeAt(pos - 1) === 0x0A /* newline */) {
+            let headerCheckPos = pos + 1;
+            // Check if followed by space (single #) or more # chars (##, ###, etc.)
+            if (headerCheckPos < state.posMax) {
+                const nextChar = state.src.charCodeAt(headerCheckPos);
+                if (nextChar === 0x20 /* space */ || nextChar === 0x23 /* # */) {
+                    return false; // This is a header, not a tag
+                }
+            }
+        }
         
         pos++;
         if (pos >= state.posMax) {return false;}
@@ -109,9 +122,16 @@ function tagPlugin(md, options = {}) {
         // Parse tag content - for gather tags, include full expression
         let tagStart = pos;
         let tagContent = '';
-        
+
+        // Check for special positivity tags: ++, +, ø, Ø, --, -
+        const remaining = state.src.slice(pos);
+        const positivityMatch = remaining.match(/^(\+\+|\+|ø|Ø|--|-(?!-))/);
+        if (positivityMatch) {
+            tagContent = positivityMatch[1];
+            pos += tagContent.length;
+        }
         // Check if it's a gather tag
-        if (state.src.substr(pos, 7) === 'gather_') {
+        else if (state.src.substr(pos, 7) === 'gather_') {
             // For gather tags, capture everything until next space or end
             while (pos < state.posMax) {
                 const char = state.src.charCodeAt(pos);
@@ -158,16 +178,19 @@ function tagPlugin(md, options = {}) {
         const token = tokens[idx];
         const tagContent = token.content;
         const fullTag = '#' + token.content;
-        
+
         // Extract base tag name for styling (before any operators)
         let baseTagName = tagContent;
         if (tagContent.startsWith('gather_')) {
             baseTagName = 'gather'; // Use 'gather' as base for all gather tags
+        } else if (/^(\+\+|\+|ø|Ø|--|-(?!-))$/.test(tagContent)) {
+            // Positivity tags - use as-is but lowercase
+            baseTagName = tagContent.toLowerCase();
         } else {
             const baseMatch = tagContent.match(/^([a-zA-Z0-9_.-]+)/);
             baseTagName = baseMatch ? baseMatch[1].toLowerCase() : tagContent.toLowerCase();
         }
-        
+
         return `<span class="kanban-tag" data-tag="${escapeHtml(baseTagName)}">${escapeHtml(fullTag)}</span>`;
     };
 }
@@ -409,7 +432,6 @@ function htmlCommentPlugin(md, options = {}) {
 // PlantUML is now rendered in the extension backend (Node.js)
 // No initialization needed in webview
 window.plantumlReady = true; // Always ready - backend handles rendering
-console.log('[PlantUML] Using backend rendering (Java + node-plantuml)');
 
 // Queue for pending PlantUML diagrams
 const pendingPlantUMLQueue = [];
@@ -440,7 +462,6 @@ let plantUMLRequestId = 0;
 async function renderPlantUML(code) {
     // Check cache first
     if (plantumlRenderCache.has(code)) {
-        console.log('[PlantUML] Using cached SVG');
         return plantumlRenderCache.get(code);
     }
 
@@ -450,7 +471,6 @@ async function renderPlantUML(code) {
     return new Promise((resolve, reject) => {
         const requestId = `plantuml-${++plantUMLRequestId}`;
 
-        console.log('[PlantUML] Sending render request to backend:', requestId);
 
         // Store promise callbacks
         plantUMLRenderRequests.set(requestId, { resolve, reject, code });
@@ -484,7 +504,6 @@ window.addEventListener('message', event => {
         const request = plantUMLRenderRequests.get(requestId);
 
         if (request) {
-            console.log('[PlantUML] ✅ Diagram rendered successfully (backend)');
 
             // Cache the result
             plantumlRenderCache.set(request.code, svg);
@@ -515,7 +534,6 @@ async function processPlantUMLQueue() {
 
     plantumlQueueProcessing = true;
 
-    console.log(`[PlantUML] Processing ${pendingPlantUMLQueue.length} diagrams...`);
 
     while (pendingPlantUMLQueue.length > 0) {
         const item = pendingPlantUMLQueue.shift();
@@ -562,7 +580,6 @@ async function processPlantUMLQueue() {
     }
 
     plantumlQueueProcessing = false;
-    console.log('[PlantUML] Queue processing complete');
 }
 
 // ============================================================================
@@ -592,7 +609,6 @@ function initializeMermaid() {
         });
         mermaidReady = true;
         mermaidInitialized = true;
-        console.log('[Mermaid] Initialized successfully');
     } catch (error) {
         console.error('[Mermaid] Initialization error:', error);
     }
@@ -620,7 +636,6 @@ window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
  */
 function queueMermaidRender(id, code) {
     pendingMermaidQueue.push({ id, code });
-    console.log(`[Mermaid] Queued diagram: ${id}`);
 
     // Process queue after a short delay (allows multiple diagrams to queue)
     setTimeout(() => processMermaidQueue(), 10);
@@ -634,7 +649,6 @@ function queueMermaidRender(id, code) {
 async function renderMermaid(code) {
     // Check cache first
     if (mermaidRenderCache.has(code)) {
-        console.log('[Mermaid] Using cached SVG');
         return mermaidRenderCache.get(code);
     }
 
@@ -648,7 +662,6 @@ async function renderMermaid(code) {
         // Use mermaid.render() to generate SVG
         const { svg } = await mermaid.render(diagramId, code);
 
-        console.log('[Mermaid] ✅ Diagram rendered successfully');
 
         // Cache the result
         mermaidRenderCache.set(code, svg);
@@ -673,7 +686,6 @@ async function processMermaidQueue() {
 
     mermaidQueueProcessing = true;
 
-    console.log(`[Mermaid] Processing ${pendingMermaidQueue.length} diagrams...`);
 
     while (pendingMermaidQueue.length > 0) {
         const item = pendingMermaidQueue.shift();
@@ -720,7 +732,6 @@ async function processMermaidQueue() {
     }
 
     mermaidQueueProcessing = false;
-    console.log('[Mermaid] Queue processing complete');
 }
 
 /**
@@ -779,7 +790,6 @@ function renderMarkdown(text) {
     // Debug logging to trace include rendering
     const hasInclude = text.includes('!!!include(');
     if (hasInclude) {
-        console.log('[renderMarkdown] 🔍 Processing text with include directive:', text.substring(0, 100));
     }
 
     try {

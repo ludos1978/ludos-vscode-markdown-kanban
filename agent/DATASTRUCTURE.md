@@ -466,11 +466,19 @@ interface KanbanConfiguration {
         allowLocalFiles: boolean;
         browser: 'auto' | 'chrome' | 'edge' | 'firefox';
         themeFolders: string[];
+        availableClasses: string[];
+        globalClasses: string[];
+        localClasses: string[];
     };
 }
 ```
 
 **Purpose**: Type-safe access to all configuration values.
+
+**Marp Style Classes (2025-11-13):**
+- `availableClasses`: List of available CSS class names that can be used in Marp presentations (e.g., 'font24', 'invert', 'center')
+- `globalClasses`: CSS classes applied to all slides via global directive (`class:` in YAML frontmatter)
+- `localClasses`: CSS classes applied to specific slides via scoped directive (`<!-- _class: ... -->`)
 
 #### `ConfigurationDefaults`
 Default values for all configuration options.
@@ -506,6 +514,9 @@ interface ConfigurationDefaults {
         allowLocalFiles: boolean;
         browser: 'auto' | 'chrome' | 'edge' | 'firefox';
         themeFolders: string[];
+        availableClasses: string[];
+        globalClasses: string[];
+        localClasses: string[];
     };
 }
 ```

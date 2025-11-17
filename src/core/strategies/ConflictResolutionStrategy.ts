@@ -48,7 +48,6 @@ export class AutoMergeStrategy implements IConflictResolutionStrategy {
     }
 
     async resolve(conflict: Conflict, context: ConflictContext): Promise<ConflictResolution> {
-        console.log(`[AutoMergeStrategy] Attempting to auto-merge conflict: ${conflict.id}`);
 
         // Implement auto-merge logic
         const merged = await this.performAutoMerge(conflict, context);
@@ -97,7 +96,6 @@ export class UserChoiceStrategy implements IConflictResolutionStrategy {
     }
 
     async resolve(conflict: Conflict, context: ConflictContext): Promise<ConflictResolution> {
-        console.log(`[UserChoiceStrategy] Presenting conflict to user: ${conflict.id}`);
 
         // Show conflict dialog and get user choice
         const userChoice = await this.showConflictDialog(conflict, context);
@@ -108,7 +106,6 @@ export class UserChoiceStrategy implements IConflictResolutionStrategy {
     private async showConflictDialog(conflict: Conflict, context: ConflictContext): Promise<string> {
         // This would integrate with VSCode UI
         // For now, return default choice
-        console.log(`[UserChoiceStrategy] Would show dialog for conflict: ${conflict.description}`);
         return 'save'; // Default to save current changes
     }
 
@@ -181,7 +178,6 @@ export class BackupFirstStrategy implements IConflictResolutionStrategy {
     }
 
     async resolve(conflict: Conflict, context: ConflictContext): Promise<ConflictResolution> {
-        console.log(`[BackupFirstStrategy] Creating backup before resolution: ${conflict.id}`);
 
         // Create backup first
         await this.createBackup(context);
@@ -200,7 +196,6 @@ export class BackupFirstStrategy implements IConflictResolutionStrategy {
 
     private async createBackup(context: ConflictContext): Promise<void> {
         // Implement backup creation
-        console.log(`[BackupFirstStrategy] Creating backup for: ${context.filePath}`);
     }
 }
 
@@ -232,11 +227,9 @@ export class ConflictResolutionStrategyManager {
      * Resolve a conflict using the best available strategy
      */
     async resolveConflict(conflict: Conflict, context: ConflictContext): Promise<ConflictResolution> {
-        console.log(`[StrategyManager] Resolving conflict ${conflict.id} with ${this.strategies.length} strategies`);
 
         for (const strategy of this.strategies) {
             if (strategy.canHandle(conflict, context)) {
-                console.log(`[StrategyManager] Using strategy: ${strategy.getName()}`);
                 try {
                     return await strategy.resolve(conflict, context);
                 } catch (error) {

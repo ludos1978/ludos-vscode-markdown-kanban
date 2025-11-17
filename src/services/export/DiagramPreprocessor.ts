@@ -47,16 +47,12 @@ export class DiagramPreprocessor {
         outputFolder: string,
         baseFileName: string
     ): Promise<PreprocessResult> {
-        console.log('[DiagramPreprocessor] Starting preprocessing...');
-        console.log(`[DiagramPreprocessor] Source: ${sourceFilePath}`);
-        console.log(`[DiagramPreprocessor] Output: ${outputFolder}`);
 
         // Read source markdown
         const markdown = await fs.promises.readFile(sourceFilePath, 'utf8');
 
         // Extract all diagrams
         const diagrams = this.extractAllDiagrams(markdown);
-        console.log(`[DiagramPreprocessor] Found ${diagrams.length} diagrams`);
 
         if (diagrams.length === 0) {
             return { processedMarkdown: markdown, diagramFiles: [] };
@@ -65,8 +61,6 @@ export class DiagramPreprocessor {
         // Log diagram breakdown
         const plantUMLCount = diagrams.filter(d => d.type === 'plantuml').length;
         const mermaidCount = diagrams.filter(d => d.type === 'mermaid').length;
-        console.log(`[DiagramPreprocessor] - PlantUML: ${plantUMLCount}`);
-        console.log(`[DiagramPreprocessor] - Mermaid: ${mermaidCount}`);
 
         // Render all diagrams
         const rendered = await this.renderAllDiagrams(
@@ -75,14 +69,12 @@ export class DiagramPreprocessor {
             baseFileName
         );
 
-        console.log(`[DiagramPreprocessor] Successfully rendered ${rendered.length}/${diagrams.length} diagrams`);
 
         // Replace successfully rendered diagrams with image references
         let processedMarkdown = this.replaceAllDiagrams(markdown, rendered);
 
         // Remove unconverted diagrams (replace with warning notes)
         if (rendered.length < diagrams.length) {
-            console.log(`[DiagramPreprocessor] Removing ${diagrams.length - rendered.length} unconverted diagram(s)`);
             processedMarkdown = this.removeUnconvertedDiagrams(processedMarkdown, diagrams, rendered);
         }
 
@@ -174,11 +166,9 @@ export class DiagramPreprocessor {
         outputFolder: string,
         baseFileName: string
     ): Promise<RenderedDiagram[]> {
-        console.log(`[DiagramPreprocessor] Rendering ${diagrams.length} PlantUML diagrams in parallel...`);
 
         const renderPromises = diagrams.map(async (diagram) => {
             try {
-                console.log(`[DiagramPreprocessor] Rendering ${diagram.id}...`);
 
                 // Wrap code with PlantUML delimiters
                 const wrappedCode = `@startuml\n${diagram.code.trim()}\n@enduml`;
@@ -191,7 +181,6 @@ export class DiagramPreprocessor {
                 const filePath = path.join(outputFolder, fileName);
                 await fs.promises.writeFile(filePath, svg, 'utf8');
 
-                console.log(`[DiagramPreprocessor] ✅ ${diagram.id} saved to ${fileName}`);
 
                 return {
                     id: diagram.id,
@@ -218,7 +207,6 @@ export class DiagramPreprocessor {
         outputFolder: string,
         baseFileName: string
     ): Promise<RenderedDiagram[]> {
-        console.log(`[DiagramPreprocessor] Rendering ${diagrams.length} Mermaid diagrams via webview...`);
 
         // Check if service is ready
         if (!this.mermaidService.isReady()) {
@@ -253,7 +241,6 @@ export class DiagramPreprocessor {
                     originalBlock: diagram.fullMatch
                 });
 
-                console.log(`[DiagramPreprocessor] ✅ ${diagram.id} saved to ${fileName}`);
             } else {
                 console.error(`[DiagramPreprocessor] ❌ No SVG returned for ${diagram.id}`);
             }

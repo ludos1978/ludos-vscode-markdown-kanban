@@ -10,13 +10,10 @@ export function getOutputChannel(): vscode.OutputChannel | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	console.log('[Extension] Activation started');
-
 	// Create output channel for debugging
 	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
 	context.subscriptions.push(outputChannel);
 
-	console.log('[Extension] Activating markdown-kanban-obsidian extension');
 	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
 
 	let fileListenerEnabled = true;
@@ -39,35 +36,6 @@ export function activate(context: vscode.ExtensionContext) {
 		setStatus: setFileListenerStatus
 	};
 
-	// Register onWillSaveTextDocument to sync board changes before save
-	const willSaveListener = vscode.workspace.onWillSaveTextDocument(async (event) => {
-		const document = event.document;
-		console.log(`[Extension.onWillSave] Document about to save: ${document.uri.fsPath}`);
-
-		// Find panel for this document
-		const panel = KanbanWebviewPanel.getPanelForDocument(document.uri.toString());
-		if (!panel) {
-			console.log('[Extension.onWillSave] No panel found for document');
-			return; // No panel for this document
-		}
-
-		const hasUnsaved = panel.hasUnsavedChanges();
-		console.log(`[Extension.onWillSave] Panel found, hasUnsavedChanges: ${hasUnsaved}`);
-
-		// If there are unsaved changes in the UI, update the document before save
-		if (hasUnsaved) {
-			console.log('[Extension.onWillSave] Updating document with board changes before save');
-
-			// Use waitUntil to ensure the document is updated before the save proceeds
-			event.waitUntil(
-				panel.saveToMarkdown(false, false) // updateVersionTracking=false, triggerSave=false (save will happen automatically)
-			);
-		} else {
-			console.log('[Extension.onWillSave] No unsaved changes, allowing save to proceed normally');
-		}
-	});
-
-	context.subscriptions.push(willSaveListener);
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {
@@ -81,17 +49,14 @@ export function activate(context: vscode.ExtensionContext) {
 	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
 	const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
 	if (isDevelopment) {
-		console.log('[Kanban Extension] Development mode - refreshing all panels to load latest code');
 		const allPanels = KanbanWebviewPanel.getAllPanels();
 		Promise.all(allPanels.map(async (panel) => {
-			console.log('[Kanban Extension] Refreshing panel:', panel.getPanelId());
 			await panel.refreshWebviewContent();
 		})).catch(err => console.error('[Kanban Extension] Error refreshing panels:', err));
 	}
 
 	// Register command to open kanban panel
 	const openKanbanCommand = vscode.commands.registerCommand('markdown-kanban.openKanban', async (uri?: vscode.Uri) => {
-		console.log('[Kanban Extension] openKanban command executed!');
 		let targetUri = uri;
 
 		// If no URI provided, try to get from active editor

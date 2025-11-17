@@ -46,8 +46,12 @@ export class MarpExtensionService {
      * @returns Promise that resolves when preview is opened
      */
     static async openInMarpPreview(filePath: string): Promise<void> {
+
         // Ensure file exists
-        if (!fs.existsSync(filePath)) {
+        const fileExists = fs.existsSync(filePath);
+
+        if (!fileExists) {
+            console.error(`[kanban.MarpExtensionService.openInMarpPreview] ❌ File not found: ${filePath}`);
             throw new Error(`File not found: ${filePath}`);
         }
 
@@ -55,6 +59,7 @@ export class MarpExtensionService {
 
         // Open the document
         const doc = await vscode.workspace.openTextDocument(uri);
+
         await vscode.window.showTextDocument(doc, { preview: false });
 
         // Check if extension is installed

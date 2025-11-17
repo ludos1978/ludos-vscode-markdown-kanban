@@ -94,7 +94,6 @@ export class MainFileCoordinator {
             });
 
             if (this.config.enableLogging) {
-                console.log(`[MainFileCoordinator] Registered include: ${relativePath} (${fileType})`);
             }
         }
     }
@@ -120,7 +119,6 @@ export class MainFileCoordinator {
             this.includeFiles.delete(relativePath);
 
             if (this.config.enableLogging) {
-                console.log(`[MainFileCoordinator] Unregistered include: ${relativePath}`);
             }
         }
     }
@@ -156,7 +154,6 @@ export class MainFileCoordinator {
         // Queue if locked
         if (this.operationLock) {
             if (this.config.enableLogging) {
-                console.log(`[MainFileCoordinator] Operation locked, queueing change from ${params.source}`);
             }
 
             return new Promise((resolve, reject) => {
@@ -223,14 +220,6 @@ export class MainFileCoordinator {
             analysis = await params.onAnalyze();
 
             if (this.config.enableLogging) {
-                console.log('[MainFileCoordinator] Change analysis:', {
-                    mainContent: analysis.hasMainContentChange,
-                    mainStructure: analysis.hasMainStructureChange,
-                    includeContent: analysis.hasIncludeContentChange,
-                    switched: analysis.hasSwitchedIncludes,
-                    switchedFiles: analysis.switchedFiles.length,
-                    legitimateSave: analysis.isLegitimateSave
-                });
             }
 
             // Check for conflicts
@@ -318,10 +307,6 @@ export class MainFileCoordinator {
         this.context.state = newState;
 
         if (this.config.enableLogging) {
-            console.log(
-                `[MainFileCoordinator] ${oldState} → ${newState}`,
-                reason ? `(${reason})` : ''
-            );
         }
     }
 

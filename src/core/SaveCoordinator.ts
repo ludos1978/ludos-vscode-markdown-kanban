@@ -42,7 +42,6 @@ export class SaveCoordinator {
 
         // Prevent concurrent saves on the same file
         if (this.activeSaves.has(saveKey)) {
-            console.log(`[SaveCoordinator] Waiting for existing save: ${saveKey}`);
             await this.activeSaves.get(saveKey);
             return;
         }
@@ -64,7 +63,6 @@ export class SaveCoordinator {
         const filePath = file.getPath();
         const fileType = file.getFileType();
 
-        console.log(`[SaveCoordinator] Starting save: ${fileType} - ${filePath}`);
 
         try {
             // If content is provided, update file content first
@@ -83,12 +81,10 @@ export class SaveCoordinator {
                 skipValidation: options?.skipValidation ?? false
             };
 
-            console.log(`[SaveCoordinator] Calling file.save() with options:`, saveOptions);
 
             // Perform the save using the file's save method with SaveOptions
             await file.save(saveOptions);
 
-            console.log(`[SaveCoordinator] Save completed: ${fileType} - ${filePath}`);
 
         } catch (error) {
             console.error(`[SaveCoordinator] Save failed: ${fileType} - ${filePath}`, error);

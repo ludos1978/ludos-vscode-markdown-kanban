@@ -1,3 +1,70 @@
+lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
+"""
+theme 	Set a theme name for the slide deck ▶️
+style 	Specify CSS for tweaking theme
+headingDivider 	Specify heading divider option ▶️
+size 	Choose the slide size preset provided by theme
+math 	Choose a library to render math typesetting ▶️
+title 	Set a title of the slide deck
+author 	Set an author of the slide deck
+description 	Set a description of the slide deck
+keywords 	Set comma-separated keywords for the slide deck
+url 	Set canonical URL for the slide deck (for HTML export)
+image 	Set Open Graph image URL (for HTML export)
+marp 	Set whether or not enable Marp feature in VS Code
+
+paginate 	Show page number on the slide if set to true ▶️
+header 	Specify the content of the slide header ▶️
+footer 	Specify the content of the slide footer ▶️
+class 	Set HTML class attribute for the slide element <section>
+backgroundColor 	Set background-color style of the slide
+backgroundImage  Set background-image style of the slide
+backgroundPosition 	Set background-position style of the slide
+backgroundRepeat 	Set background-repeat style of the slide
+backgroundSize 	Set background-size style of the slide
+color 	Set color style of the slide
+"""
+they can be written to the yaml header and must also be read from there when loading the kanban!
+
+remove the marp theme and style from the column headers and task headers.
+
+
+
+- [ ] Remove the "immediate" parameter from the boardUpdate function. 
+  We should never use the feature to mark something as unsaved, but use the hash to determine wether a file needs saving to file, because the file content is different to the saved content! Remove this feature and replace it by comparing the hashes from cache and files.
+  saveBoardState should not need to update cache, but only save to the files. Because the cache must be kept actual all the time!
+   So onWillSaveTextDocument is completely redundant and wrong! 
+
+- [ ] The shortcuts dont work properly anymore. Also the complex feature for translation does not work properly. The complexity it adds is not feasable. We could try again with the paste version which just pastes the replaced content, but using new files is too much.
+
+
+- [ ] add a feature to add templates for marp styles. the user would be able to defined those, but a current list would be. Each can be toggled on or off. 
+  - _class stylings which are set as <!-- class: style --> . style can be
+    - fontXX : where XX is a number. the list of fonts tags are in the section.fontXX in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/marp-engine/themes/style-roboto-light.css
+    - invert 
+    - center
+    - no_wordbreak
+    - highlight
+    - column_spacing
+    - column_border
+    - fontbg
+    more elements should be addable by the user in the configuration. as a string list.
+  - check more styles from <https://github.com/marp-team/marp/blob/ffe6cd99/website/docs/guide/directives.md>
+  - and the website: <https://deepwiki.com/marp-team/marp/3.4-theming-and-styling> 
+  
+
+- [ ] Can we make the sticky setting for headers (which is currently modified by
+ the "sticky stack mode") individual for each column header, with a global 
+sticky flag in the "file info bar". so each column gets a sticky flag (a pin icon). when the sticky flag is active, the header will stay on the screeen using the current layout settings.analyze the influence of the "sticky stack mode" on the kanban board. check if we can make each column have it's individual sticky setting . we still want the "sticky stack mode settings, but only "Full stack" and "Title only", the none feature is after this modification modified trough the "sticky flag" 
+  -> the sticky state can be saved into the kanban as #sticky, it should be 
+considered a layout tag that is filtered when displaying depending on the 
+setting, also when exporting it might get filtered! the default state should be 
+not sticky. the global setting is overriding the setting if it's pressed 
+normally (and not saved as individual setting), if alt+pressed it toggles all 
+states of each column and is saved to the files. place the icon right of the 
+column folding. make sure it's applied after the rendering in the process where 
+all the tags are processed, as the user might add it by text. 
+
 - [ ] when adding multiple files using drag & drop it randomly places them over the board. why does that
   happen?
 

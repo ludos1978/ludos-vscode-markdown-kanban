@@ -133,7 +133,6 @@ class TaskEditor {
             // Shift+Cmd+V (Mac) or Shift+Ctrl+V (Windows) - URL encoding paste + image handling
             if ((isTitleField || isDescriptionField) &&
                 e.shiftKey && (e.metaKey || e.ctrlKey) && (e.key === 'v' || e.key === 'V')) {
-                console.log('[Kanban Paste] Shift+Cmd+V detected, checking clipboard');
                 e.preventDefault(); // Prevent default paste
 
                 try {
@@ -142,7 +141,6 @@ class TaskEditor {
                     try {
                         clipboardItems = await navigator.clipboard.read();
                     } catch (readError) {
-                        console.log('[Kanban Paste] Could not read clipboard items, trying text only');
                         clipboardItems = null;
                     }
 
@@ -151,7 +149,6 @@ class TaskEditor {
                         for (const item of clipboardItems) {
                             for (const type of item.types) {
                                 if (type.startsWith('image/')) {
-                                    console.log('[Kanban Paste] Found image in clipboard:', type);
 
                                     // Get the image blob
                                     const blob = await item.getType(type);
@@ -210,7 +207,6 @@ class TaskEditor {
                                                     self.autoResize(target);
                                                 }
 
-                                                console.log('[Kanban Paste] Image pasted successfully:', event.data.relativePath);
                                             } else {
                                                 console.error('[Kanban Paste] Failed to save image');
                                             }
@@ -236,7 +232,6 @@ class TaskEditor {
 
                     // No image found, process as text
                     const text = await navigator.clipboard.readText();
-                    console.log('[Kanban Paste] Clipboard text:', text);
 
                     // Use existing processClipboardText function to convert URLs and file paths
                     let cleanText;
@@ -244,7 +239,6 @@ class TaskEditor {
                         try {
                             const processed = await processClipboardText(text);
                             cleanText = processed ? processed.content : text;
-                            console.log('[Kanban Paste] Processed text:', cleanText);
                         } catch (error) {
                             console.error('[Kanban Paste] Error processing:', error);
                             cleanText = text;
@@ -286,7 +280,6 @@ class TaskEditor {
 
             // Debug: Log ALL keypresses with modifiers to diagnose Option key issue
             if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) {
-                console.log(`[TaskEditor] Keypress: key="${e.key}" code="${e.code}" keyCode=${e.keyCode} alt=${e.altKey} ctrl=${e.ctrlKey} meta=${e.metaKey} shift=${e.shiftKey}`);
             }
 
             // Check if this is a potential VS Code shortcut (any modifier + key)
@@ -325,7 +318,6 @@ class TaskEditor {
 
                 // Only process if we know this shortcut has a command
                 if (hasCommand) {
-                    console.log(`[TaskEditor] Executing known shortcut: ${shortcut}`);
                     e.preventDefault();
 
                     // Get current cursor position and text for context
@@ -819,7 +811,7 @@ class TaskEditor {
 
                         this.lastEditContext = editContext;
 
-                        // Check for include syntax changes in column header (location-based column include)
+                        // Check for include syntax in column header (location-based column include)
                         const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
                         const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
 
@@ -827,84 +819,77 @@ class TaskEditor {
                             oldIncludeMatches.length !== newIncludeMatches.length ||
                             oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
 
-                        console.log('[TaskEditor COLUMN] Old title:', column.title);
-                        console.log('[TaskEditor COLUMN] New title:', newTitle);
-                        console.log('[TaskEditor COLUMN] Old includes:', oldIncludeMatches);
-                        console.log('[TaskEditor COLUMN] New includes:', newIncludeMatches);
-                        console.log('[TaskEditor COLUMN] hasIncludeChanges:', hasIncludeChanges);
+                        // CRITICAL: Check if column HAS includes OR HAD includes (to handle removal!)
+                        const hasIncludes = newIncludeMatches.length > 0;
+                        const hadIncludes = oldIncludeMatches.length > 0;
+                        const hasOrHadIncludes = hasIncludes || hadIncludes;
 
                         column.title = newTitle;
 
-                        // If include syntax changed, send editColumnTitle message immediately for backend processing
-                        if (hasIncludeChanges) {
-                            // OPTIMISTIC UPDATE: Immediately generate temporary displayTitle
-                            // Strip !!!include()!!! syntax to prevent markdown-it from rendering it
-                            let tempDisplayTitle = newTitle;
-                            const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-                            let match;
-                            const filePaths = [];
-
-                            while ((match = includeRegex.exec(newTitle)) !== null) {
-                                filePaths.push(match[1]);
-                            }
-
-                            // Replace each !!!include()!!! with a placeholder badge
-                            filePaths.forEach((filePath, index) => {
-                                const fileName = filePath.split('/').pop() || filePath;
-                                const placeholder = `!(${fileName})!`;
-                                tempDisplayTitle = tempDisplayTitle.replace(/!!!include\s*\([^)]+\)\s*!!!/, placeholder);
-                            });
-
-                            // If nothing left after stripping, use filename
-                            if (!tempDisplayTitle.trim() && filePaths.length > 0) {
-                                const fileName = filePaths[0].split('/').pop() || filePaths[0];
-                                const baseName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension
-                                tempDisplayTitle = baseName;
-                            }
-
-                            // Update column state optimistically
-                            column.displayTitle = tempDisplayTitle;
-                            column.isLoadingContent = true;
-
-                            // Update the display immediately (close editor and show temporary title)
-                            this.closeEditor();
-
-                            // Re-render just this column's title to show the optimistic state with loading indicator
+                        // If column has/had includes, send to backend (add/change/remove)
+                        if (hasOrHadIncludes) {
+                            // Get column element first
                             const columnElement = element.closest('.kanban-full-height-column');
-                            if (columnElement) {
-                                const titleContainer = columnElement.querySelector('.column-title-text');
-                                if (titleContainer && window.renderMarkdown) {
-                                    // Add a subtle loading indicator next to the title
-                                    const loadingSpinner = '<span class="title-loading-spinner" style="margin-left: 8px; opacity: 0.5;">⟳</span>';
-                                    titleContainer.innerHTML = window.renderMarkdown(tempDisplayTitle) + loadingSpinner;
-                                }
-                            }
 
-                            // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
-                            // DOM might have stale IDs if a boardUpdate just arrived
-                            let currentColumnId = columnId; // Default to what we have
-
-                            // Find column's position in DOM to match with current board
+                            // CRITICAL: Get current column ID by POSITION
+                            let currentColumnId = columnId;
                             if (columnElement) {
                                 const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
                                 const columnIndex = allColumns.indexOf(columnElement);
-
                                 if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
-                                    // Match by position - use current ID from board at this position
                                     currentColumnId = window.currentBoard.columns[columnIndex].id;
-                                    console.log(`[TaskEditor] Column position ${columnIndex}: stored ID ${columnId}, current ID ${currentColumnId}`);
                                 }
                             }
 
-                            // Send editColumnTitle message to trigger proper include handling in backend
+                            // STEP 1: Send message with FULL include syntax for backend to process
                             vscode.postMessage({
                                 type: 'editColumnTitle',
-                                columnId: currentColumnId, // Use current ID from board
+                                columnId: currentColumnId,
                                 title: newTitle
                             });
 
-                            // Don't continue with regular updates - backend will handle the rest
-                            return; // Skip the rest of the local updates for include changes
+                            // STEP 2: Update display immediately
+                            if (this.currentEditor && this.currentEditor.displayElement) {
+                                let displayTitle = newTitle;
+
+                                // If has includes, replace !!!include(file)!!! with HTML badge
+                                if (hasIncludes) {
+                                    displayTitle = displayTitle.replace(/!!!include\(([^)]+)\)!!!/g, function(match, filepath) {
+                                        // Extract just filename from path
+                                        const parts = filepath.split('/').length > 1 ? filepath.split('/') : filepath.split('\\');
+                                        const filename = parts[parts.length - 1];
+                                        // Create HTML badge (matching tagUtils.js line 816 format)
+                                        const escapeHtml = function(text) {
+                                            return text.replace(/[&<>"']/g, function(char) {
+                                                const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+                                                return map[char];
+                                            });
+                                        };
+                                        const escapedPath = escapeHtml(filepath);
+                                        const escapedFilename = escapeHtml(filename);
+                                        return '<span class="columninclude-link" data-file-path="' + escapedPath + '" title="Include: ' + escapedPath + '">!(' + escapedFilename + ')!</span>';
+                                    });
+                                }
+                                // If removed includes, displayTitle is just newTitle (no include syntax)
+
+                                // Render the display title (with HTML badge already inserted)
+                                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+                                const renderedTitle = renderFn ? renderFn(displayTitle) : displayTitle;
+                                this.currentEditor.displayElement.innerHTML = renderedTitle;
+
+                                // Show display and hide editor
+                                this.currentEditor.displayElement.style.removeProperty('display');
+                                this.currentEditor.element.style.display = 'none';
+                            }
+
+                            // STEP 3: Update badges (matching task pattern line 1043-1047)
+                            if (columnElement && window.updateAllVisualTagElements) {
+                                const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
+                                window.updateAllVisualTagElements(columnElement, allTags, 'column');
+                            }
+
+                            // STEP 4: Return (matching task pattern line 1049)
+                            return;
                         }
 
                         // Check if this edit affects layout and trigger board refresh if needed
@@ -914,15 +899,15 @@ class TaskEditor {
                         if (layoutChanged) {
                             // Layout tags changed - refresh the board layout
                             if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                window.renderBoard(window.cachedBoard);
+                                window.renderBoard(); // Full re-render to recalculate positions
                             }
 
                             // CRITICAL: Recalculate stack positions after layout change
                             // This handles #stack tag additions/removals immediately
-                            // Only update the affected column's stack for efficiency
+                            // Recalculate all stacks since adding/removing #stack affects neighboring columns
                             if (typeof window.applyStackedColumnStyles === 'function') {
                                 requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles(columnId);
+                                    window.applyStackedColumnStyles(); // Recalculate all stacks
                                 });
                             }
                         }
@@ -932,11 +917,19 @@ class TaskEditor {
                             markUnsavedChanges();
                         }
                     }
-                    
-                    if (this.currentEditor.displayElement) {
-                        // Get display title using shared utility function
-                        const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
-                        this.currentEditor.displayElement.innerHTML = renderedTitle;
+
+                    // Update display IMMEDIATELY while editor is still open (matching task edit pattern lines 1149-1178)
+                    if (this.currentEditor && this.currentEditor.displayElement) {
+                        if (window.tagUtils) {
+                            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                            this.currentEditor.displayElement.innerHTML = renderedTitle;
+                        } else {
+                            this.currentEditor.displayElement.innerHTML = column.title || '';
+                        }
+
+                        // Make display visible AND hide editor immediately
+                        this.currentEditor.displayElement.style.removeProperty('display');
+                        this.currentEditor.element.style.display = 'none';
                     }
 
                     // Update column CSS classes for span tags
@@ -972,13 +965,6 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-column-tag');
                         }
 
-                        // Update all tags attribute for stacking features
-                        if (allTags.length > 0) {
-                            columnElement2.setAttribute('data-all-tags', allTags.join(' '));
-                        } else {
-                            columnElement2.removeAttribute('data-all-tags');
-                        }
-
                         // Update current week attribute
                         if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
                             columnElement2.setAttribute('data-current-week', 'true');
@@ -986,69 +972,11 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-current-week');
                         }
 
-                        // Force style recalculation and update header/footer bars
-                        if (allTags.length > 0) {
-                            // Gentle style refresh: toggle a temporary class to force re-evaluation
-                            columnElement2.classList.add('tag-update-trigger');
-                            requestAnimationFrame(() => {
-                                columnElement2.classList.remove('tag-update-trigger');
-
-                                // Update footer/header bars after DOM updates complete
-                                if (window.updateAllVisualTagElements) {
-                                    window.updateAllVisualTagElements(columnElement2, allTags, 'column');
-                                }
-                            });
-                        } else {
-                            // If no tags, still update header/footer bars to remove any existing ones
-                            if (window.injectStackableBars) {
-                                window.injectStackableBars(columnElement2);
-                            }
-                        }
-
-                        // Update numeric badge immediately
-                        const numericBadgeContainer = columnElement2.querySelector('.numeric-badge');
-                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-                            const numericTag = window.tagUtils.extractNumericTag(column.title);
-                            if (numericTag !== null) {
-                                // Format the badge display
-                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-                                if (numericBadgeContainer) {
-                                    // Update existing badge
-                                    numericBadgeContainer.textContent = displayValue;
-                                    numericBadgeContainer.title = `Index: ${displayValue}`;
-                                } else {
-                                    // Create new badge if it doesn't exist
-                                    const columnTitleElement = columnElement2.querySelector('.column-title');
-                                    if (columnTitleElement) {
-                                        const newBadge = document.createElement('div');
-                                        newBadge.className = 'numeric-badge';
-                                        newBadge.textContent = displayValue;
-                                        newBadge.title = `Index: ${displayValue}`;
-                                        // Insert before the corner badges or at the beginning
-                                        const cornerBadges = columnTitleElement.querySelector('.corner-badges');
-                                        if (cornerBadges) {
-                                            columnTitleElement.insertBefore(newBadge, cornerBadges);
-                                        } else {
-                                            columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
-                                        }
-                                    }
-                                }
-                            } else if (numericBadgeContainer) {
-                                // Remove badge if no numeric tag
-                                numericBadgeContainer.remove();
-                            }
-                        }
-
-                        // Update corner badges without re-render (uses title+description combined like tasks)
-                        if (window.updateCornerBadgesImmediate) {
-                            // For columns, we need to pass a combined text that includes both title and description tags
-                            const combinedText = [column.title, column.description].filter(Boolean).join(' ');
-                            window.updateCornerBadgesImmediate(columnId, 'column', combinedText);
-                        }
-
-                        // Update tag counts in any open menus
-                        if (window.updateTagCategoryCounts) {
-                            window.updateTagCategoryCounts(columnId, 'column');
+                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
+                        const isCollapsed = columnElement2.classList.contains('collapsed');
+                        if (window.updateVisualTagState) {
+                            window.updateVisualTagState(columnElement2, allTags, 'column', isCollapsed);
                         }
                     }
                     
@@ -1107,7 +1035,6 @@ class TaskEditor {
                             task.title = value;
 
                             // Use editTask message type for title changes
-                            console.log('[FRONTEND taskEditor] Sending editTask with title change');
 
                             vscode.postMessage({
                                 type: 'editTask',
@@ -1116,13 +1043,25 @@ class TaskEditor {
                                 taskData: { title: value }
                             });
 
+                            // Update display immediately before backend processes
+                            if (this.currentEditor.displayElement && window.renderMarkdownWithTags) {
+                                const renderedHtml = window.renderMarkdownWithTags(value);
+                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
+                            }
+
+                            // Update all visual tag elements (badges, bars, backgrounds, borders)
+                            const taskElement = element.closest('.task-item');
+                            if (taskElement && window.updateAllVisualTagElements) {
+                                const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(value) : [];
+                                window.updateAllVisualTagElements(taskElement, allTags, 'task');
+                            }
+
                             return; // Skip local updates, let backend handle
                         } else if (task.includeMode && oldIncludeMatches.length > 0) {
                             // FIX BUG #2: Don't update displayTitle for task includes
                             // If we reach here, the include syntax hasn't changed (caught by line 971)
                             // displayTitle should stay as "# include in path" (UI indicator only, read-only)
                             // Nothing to do - include syntax is unchanged
-                            console.log('[TaskEditor] Task include title unchanged, skipping');
                             return;
                         } else {
                             // Regular task title editing
@@ -1169,31 +1108,16 @@ class TaskEditor {
                         if (task.includeMode) {
                             // For include tasks, check if displayTitle changed
                             wasChanged = (task.displayTitle || '') !== originalDisplayTitle;
-                            console.log('[TaskEditor] Include task title edit:', {
-                                wasChanged,
-                                newDisplayTitle: task.displayTitle,
-                                originalDisplayTitle,
-                                includeMode: task.includeMode
-                            });
                         } else {
                             // For regular tasks, check if title changed
                             wasChanged = (task.title || '') !== originalTitle;
                         }
                     } else if (type === 'task-description') {
                         wasChanged = (task.description || '') !== originalDescription;
-                        console.log('[TaskEditor] Task description edit:', {
-                            wasChanged,
-                            type,
-                            includeMode: task.includeMode,
-                            newDescription: task.description ? task.description.substring(0, 50) : '',
-                            originalDescription: originalDescription ? originalDescription.substring(0, 50) : ''
-                        });
                     }
 
-                    console.log('[TaskEditor] After edit check - wasChanged:', wasChanged, 'type:', type);
 
                     if (wasChanged) {
-                        console.log('[TaskEditor] Change detected! Calling markUnsavedChanges()');
                         if (typeof markUnsavedChanges === 'function') {
                             markUnsavedChanges();
                         } else {
@@ -1204,7 +1128,6 @@ class TaskEditor {
                         // The markUnsavedChanges() call above already sends the complete
                         // updated board data via the cachedBoard parameter
                     } else {
-                        console.log('[TaskEditor] No change detected - NOT calling markUnsavedChanges()');
                     }
                     
                     if (this.currentEditor.displayElement) {
@@ -1268,76 +1191,11 @@ class TaskEditor {
                             taskElement.removeAttribute('data-task-tag');
                         }
 
-                        // Update all tags attribute for stacking features
-                        if (allTags.length > 0) {
-                            taskElement.setAttribute('data-all-tags', allTags.join(' '));
-                        } else {
-                            taskElement.removeAttribute('data-all-tags');
-                        }
-
-                        // Force style recalculation and update header/footer bars
-                        if (allTags.length > 0) {
-                            // Gentle style refresh: toggle a temporary class to force re-evaluation
-                            taskElement.classList.add('tag-update-trigger');
-                            requestAnimationFrame(() => {
-                                taskElement.classList.remove('tag-update-trigger');
-
-                                // Update footer/header bars after DOM updates complete
-                                if (window.injectStackableBars) {
-                                    window.injectStackableBars(taskElement);
-                                }
-                            });
-                        } else {
-                            // If no tags, still update header/footer bars to remove any existing ones
-                            if (window.injectStackableBars) {
-                                window.injectStackableBars(taskElement);
-                            }
-                        }
-
-                        // Update numeric badge immediately
-                        const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
-                        if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-                            const numericTag = window.tagUtils.extractNumericTag(task.title);
-                            if (numericTag !== null) {
-                                // Format the badge display
-                                const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-                                if (numericBadgeContainer) {
-                                    // Update existing badge
-                                    numericBadgeContainer.textContent = displayValue;
-                                    numericBadgeContainer.title = `Index: ${displayValue}`;
-                                } else {
-                                    // Create new badge if it doesn't exist
-                                    const taskHeaderElement = taskElement.querySelector('.task-header');
-                                    if (taskHeaderElement) {
-                                        const newBadge = document.createElement('div');
-                                        newBadge.className = 'numeric-badge';
-                                        newBadge.textContent = displayValue;
-                                        newBadge.title = `Index: ${displayValue}`;
-                                        // Insert before the corner badges or at the beginning
-                                        const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
-                                        if (cornerBadges) {
-                                            taskHeaderElement.insertBefore(newBadge, cornerBadges);
-                                        } else {
-                                            taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
-                                        }
-                                    }
-                                }
-                            } else if (numericBadgeContainer) {
-                                // Remove badge if no numeric tag
-                                numericBadgeContainer.remove();
-                            }
-                        }
-
-                        // Update corner badges without re-render (uses title+description combined)
-                        if (window.updateCornerBadgesImmediate) {
-                            // For tasks, we need to pass a combined text that includes both title and description tags
-                            const combinedText = [task.title, task.description].filter(Boolean).join(' ');
-                            window.updateCornerBadgesImmediate(taskId, 'task', combinedText);
-                        }
-
-                        // Update tag counts in any open menus
-                        if (window.updateTagCategoryCounts) {
-                            window.updateTagCategoryCounts(taskId, 'task', columnId);
+                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
+                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
+                        const isCollapsed = taskElement.classList.contains('collapsed');
+                        if (window.updateVisualTagState) {
+                            window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
                         }
                     }
                     
@@ -1425,6 +1283,36 @@ class TaskEditor {
             vscode.postMessage({
                 type: 'editingStoppedNormal'  // Different from 'editingStopped' (backend request response)
             });
+        }
+
+        // Update alternative title if task has no title and is collapsed
+        if (type === 'task-title' || type === 'task-description') {
+            const taskItem = element.closest('.task-item');
+            if (taskItem) {
+                const taskId = taskItem.getAttribute('data-task-id');
+                const isCollapsed = taskItem.classList.contains('collapsed');
+
+                if (taskId && isCollapsed) {
+                    // Get task data from cached board
+                    const task = findTaskById(taskId);
+                    if (task) {
+                        const hasNoTitle = !task.title || !task.title.trim();
+
+                        // Update title display if task has no title
+                        if (hasNoTitle && task.description) {
+                            const titleDisplay = taskItem.querySelector('.task-title-display');
+                            if (titleDisplay && typeof generateAlternativeTitle === 'function') {
+                                const alternativeTitle = generateAlternativeTitle(task.description);
+                                if (alternativeTitle) {
+                                    titleDisplay.innerHTML = `<span class="task-alternative-title">${escapeHtml(alternativeTitle)}</span>`;
+                                } else {
+                                    titleDisplay.innerHTML = '';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         this.currentEditor = null;
@@ -1593,7 +1481,6 @@ class TaskEditor {
      */
     replaceSelection(newText) {
         if (!this.currentEditor) {
-            console.log('[TaskEditor] No active editor for replaceSelection');
             return;
         }
 
@@ -1613,7 +1500,6 @@ class TaskEditor {
         // Focus the element
         element.focus();
 
-        console.log('[TaskEditor] Replaced selection with new text');
     }
 }
 

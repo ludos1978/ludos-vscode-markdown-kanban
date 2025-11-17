@@ -34,7 +34,6 @@ export class ServiceRegistry {
      */
     register<T>(name: string, service: T): void {
         this.services.set(name, service);
-        console.log(`[ServiceRegistry] Registered service: ${name}`);
     }
 
     /**
@@ -61,7 +60,6 @@ export class ServiceRegistry {
     unregister(name: string): boolean {
         const removed = this.services.delete(name);
         if (removed) {
-            console.log(`[ServiceRegistry] Unregistered service: ${name}`);
         }
         return removed;
     }
@@ -78,7 +76,6 @@ export class ServiceRegistry {
      */
     clear(): void {
         this.services.clear();
-        console.log(`[ServiceRegistry] Cleared all services`);
     }
 
     /**
@@ -96,7 +93,6 @@ export class ServiceRegistry {
         // Caching services
         this.register('metadataCache', new FileMetadataCache());
 
-        console.log(`[ServiceRegistry] Initialized ${this.services.size} core services`);
     }
 
     /**
@@ -107,23 +103,18 @@ export class ServiceRegistry {
         // For now, return a mock
         return {
             publish: async (event: any) => {
-                console.log(`[MockEventBus] Published event:`, event);
             },
             subscribe: (eventType: string, handler: any): Subscription => {
-                console.log(`[MockEventBus] Subscribed to: ${eventType}`);
                 return {
                     unsubscribe: () => {
-                        console.log(`[MockEventBus] Unsubscribed from: ${eventType}`);
                     },
                     isActive: () => true
                 };
             },
             unsubscribe: (eventType: string, handler: any) => {
-                console.log(`[MockEventBus] Unsubscribed from: ${eventType}`);
             },
             getSubscriberCount: (eventType: string) => 0,
             clear: () => {
-                console.log(`[MockEventBus] Cleared all subscribers`);
             }
         };
     }
@@ -211,7 +202,6 @@ export class DIContainer {
             dependencies,
             lifecycle
         });
-        console.log(`[DIContainer] Registered service: ${name} (${lifecycle})`);
     }
 
     /**
@@ -255,7 +245,6 @@ export class DIContainer {
     clear(): void {
         this.services.clear();
         this.singletons.clear();
-        console.log(`[DIContainer] Cleared all services`);
     }
 }
 
@@ -325,7 +314,6 @@ export class ServiceHealthMonitor {
      */
     registerHealthCheck(serviceName: string, check: () => Promise<boolean>): void {
         this.healthChecks.set(serviceName, check);
-        console.log(`[ServiceHealthMonitor] Registered health check for: ${serviceName}`);
     }
 
     /**

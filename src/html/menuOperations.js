@@ -29,12 +29,6 @@ function scrollToElementIfNeeded(element, type = 'element') {
         isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
     }
 
-    console.log(`[scrollToElementIfNeeded] ${type} visibility check:`, {
-        isVisible,
-        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right },
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-        willScroll: !isVisible
-    });
 
     if (!isVisible) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -231,10 +225,16 @@ class SimpleMenuManager {
 
         const submenu = document.createElement('div');
         submenu.className = 'donut-menu-submenu dynamic-submenu';
-        
+
+        // Store submenu type as data attribute for refresh functionality
+        const submenuType = menuItem.dataset.submenuType;
+        if (submenuType) {
+            submenu.setAttribute('data-submenu-type', submenuType);
+        }
+
         // Create content based on submenu type
         submenu.innerHTML = this.createSubmenuContent(menuItem, id, type, columnId);
-        
+
         // Style and position of tag submenus
         submenu.style.cssText = `
             position: fixed;
@@ -244,16 +244,16 @@ class SimpleMenuManager {
             display: flex;
 						flex-wrap: wrap;
         `;
-        
+
         // Append to body to escape any stacking contexts
         document.body.appendChild(submenu);
-        
+
         // Store reference to the menu item for positioning
         submenu._menuItem = menuItem;
-        
+
         this.setupSubmenuEvents(submenu);
         this.activeSubmenu = submenu;
-        
+
         return submenu;
     }
 
@@ -264,6 +264,8 @@ class SimpleMenuManager {
         switch (submenuType) {
             case 'tags':
                 return this.createTagContent(menuItem.dataset.group, id, type, columnId);
+            case 'marp-directives':
+                return this.createMarpDirectivesContent(menuItem.dataset.scope, id, type, columnId);
             case 'move':
                 return `
                     <button class="donut-menu-item" onclick="moveTaskToTop('${id}', '${columnId}')">Top</button>
@@ -279,10 +281,193 @@ class SimpleMenuManager {
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>
                     <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'numericTag')">Sort by index (#)</button>
                 `;
+            case 'marp-classes':
+                return this.createMarpClassesContent(menuItem.dataset.scope, id, type, columnId);
+            case 'marp-colors':
+                return this.createMarpColorsContent(menuItem.dataset.scope, id, type, columnId);
+            case 'marp-header-footer':
+                return this.createMarpHeaderFooterContent(menuItem.dataset.scope, id, type, columnId);
             default:
                 return '';
         }
     }
+
+    // Create Marp Classes submenu - includes class toggles and paginate
+    createMarpClassesContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 450px; min-width: 300px;">';
+
+        // Get current element to check scoped state
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Get both local and scoped classes
+        const localClassMatch = title.match(/<!--\s*class:\s*([^>]+?)\s*-->/);
+        const scopedClassMatch = title.match(/<!--\s*_class:\s*([^>]+?)\s*-->/);
+
+        const localClasses = localClassMatch ? localClassMatch[1].trim().split(/\s+/).filter(c => c.length > 0) : [];
+        const scopedClasses = scopedClassMatch ? scopedClassMatch[1].trim().split(/\s+/).filter(c => c.length > 0) : [];
+
+        // Classes grid - TWO sections: Local and Scoped
+        html += '<div style="margin-bottom: 12px;">';
+
+        const availableClasses = window.marpAvailableClasses || [];
+
+        // LOCAL classes section - title and content on same line
+        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
+        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">LOCAL</div>';
+        html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
+
+        availableClasses.forEach(className => {
+            const isActive = localClasses.includes(className);
+            html += `
+                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'local')"
+                        style="border-color: #4a90e2; background: ${isActive ? '#4a90e2' : 'var(--vscode-menu-background)'};">
+                    <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
+                    <span class="tag-chip-name">${className}</span>
+                </button>
+            `;
+        });
+        html += '</div></div>';
+
+        // SCOPED classes section - title and content on same line
+        html += '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-direction: column; align-items: baseline;">';
+        html += '<div style="font-weight: bold; color: #ddd; font-size: 10px; white-space: nowrap;">SCOPED</div>';
+        html += '<div class="donut-menu-tags-grid" style="flex: 1;">';
+
+        availableClasses.forEach(className => {
+            const isActive = scopedClasses.includes(className);
+            html += `
+                <button class="donut-menu-tag-chip ${isActive ? 'active' : ''}"
+                        onclick="toggleMarpClass('${scope}', '${id}', '${columnId || ''}', '${className}', 'scoped')"
+                        style="border-color: #ff9500; background: ${isActive ? '#ff9500' : 'var(--vscode-menu-background)'};">
+                    <span class="tag-chip-check">${isActive ? '✓' : ''}</span>
+                    <span class="tag-chip-name">${className}</span>
+                </button>
+            `;
+        });
+        html += '</div></div>';
+
+        html += '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    // Create Marp Colors submenu - includes color, backgroundColor, backgroundImage, and all background properties
+    createMarpColorsContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
+
+        // Get current element to check scoped states
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Helper function to create TWO directive inputs (local and scoped)
+        const createDirectiveInput = (directiveName, label, placeholder) => {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <input type="text" placeholder="Local (this + following)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
+                        <input type="text" placeholder="Scoped (this only)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
+                    </div>
+                </div>
+            `;
+        };
+
+        // Use helper to create all color directive inputs
+        html += createDirectiveInput('color', 'TEXT COLOR', 'e.g., red, #FF5733');
+        html += createDirectiveInput('backgroundColor', 'BACKGROUND COLOR', 'e.g., black, #333333');
+        html += createDirectiveInput('backgroundImage', 'BACKGROUND IMAGE', 'e.g., url(image.jpg)');
+        html += createDirectiveInput('backgroundPosition', 'BACKGROUND POSITION', 'e.g., center, top left');
+        html += createDirectiveInput('backgroundRepeat', 'BACKGROUND REPEAT', 'e.g., no-repeat, repeat-x');
+        html += createDirectiveInput('backgroundSize', 'BACKGROUND SIZE', 'e.g., cover, contain, 50%');
+
+        html += '</div>';
+        return html;
+    }
+
+    // Create Marp Header & Footer submenu
+    createMarpHeaderFooterContent(scope, id, type, columnId) {
+        let html = '<div style="padding: 8px; max-width: 350px; min-width: 250px;">';
+
+        // Get current element to check scoped states
+        let element = null;
+        if (scope === 'column') {
+            element = window.cachedBoard?.columns?.find(c => c.id === id);
+        } else if (scope === 'task' && columnId) {
+            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+            element = column?.tasks?.find(t => t.id === id);
+        }
+        const title = element?.title || '';
+
+        // Helper function to create TWO directive inputs (local and scoped)
+        const createDirectiveInput = (directiveName, label, placeholder) => {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">${label}</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 4px;">
+                        <input type="text" placeholder="Local (this + following)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'local');this.value='';}"
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #4a90e2; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
+                        <input type="text" placeholder="Scoped (this only)"
+                               onkeypress="if(event.key==='Enter'){setMarpDirective('${scope}','${id}','${columnId||''}','${directiveName}',this.value,'scoped');this.value='';}"
+                               style="flex: 1; padding: 6px; background: var(--board-background); border: 1px solid #ff9500; color: var(--vscode-foreground); border-radius: 4px; font-size: 11px;">
+                    </div>
+                </div>
+            `;
+        };
+
+        html += createDirectiveInput('header', 'HEADER TEXT', 'Header content');
+        html += createDirectiveInput('footer', 'FOOTER TEXT', 'Footer content');
+
+        // Paginate - TWO buttons: local and scoped
+        const isLocalPaginateActive = /<!--\s*paginate:\s*true\s*-->/.test(title);
+        const isScopedPaginateActive = /<!--\s*_paginate:\s*true\s*-->/.test(title);
+
+        html += '<div style="margin-bottom: 8px;">';
+        html += '<div style="font-weight: bold; margin-bottom: 6px; color: #ddd; font-size: 10px;">PAGE NUMBERING</div>';
+        html += '<div style="display: flex; gap: 8px;">';
+
+        // Local paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isLocalPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'local')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #4a90e2; border-radius: 4px; background: ${isLocalPaginateActive ? '#4a90e2' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
+                ${isLocalPaginateActive ? '✓ ' : ''}Local
+            </button>
+        `;
+
+        // Scoped paginate button
+        html += `
+            <button class="donut-menu-tag-chip ${isScopedPaginateActive ? 'active' : ''}"
+                    onclick="toggleMarpDirective('${scope}', '${id}', '${columnId || ''}', 'paginate', 'true', 'scoped')"
+                    style="flex: 1; padding: 6px 8px; font-size: 11px; border: 1px solid #ff9500; border-radius: 4px; background: ${isScopedPaginateActive ? '#ff9500' : 'var(--board-background)'}; color: var(--vscode-foreground); cursor: pointer; text-align: center;">
+                ${isScopedPaginateActive ? '✓ ' : ''}Scoped
+            </button>
+        `;
+
+        html += '</div></div>';
+
+        html += '</div>';
+        return html;
+    }
+
 
     // Create tag content - simplified
     createTagContent(group, id, type, columnId) {
@@ -448,36 +633,56 @@ class SimpleMenuManager {
     startHideTimer() {
         this.clearTimeout();
         this.hideTimeout = setTimeout(() => {
+            // RECHECK: Verify we're actually not hovering before closing
+            // This prevents menus from closing if mouse quickly re-enters
+            const isHoveringSubmenu = this.activeSubmenu && this.activeSubmenu.matches(':hover');
+            const isHoveringDropdown = Array.from(document.querySelectorAll('.donut-menu-dropdown, .file-bar-menu-dropdown'))
+                .some(el => el.matches(':hover'));
+
+            if (isHoveringSubmenu || isHoveringDropdown) {
+                // Mouse is back in menu, don't close
+                return;
+            }
+
             this.hideSubmenu();
-            
+
             // Also close parent menu if we're not hovering over it
             setTimeout(() => {
-                if (!window._inDropdown && !window._inSubmenu) {
-                    // CRITICAL: Don't close menu if a button inside a moved dropdown has focus
-                    // This prevents scroll issues when clicking tag buttons
-                    const activeElement = document.activeElement;
-                    const isInMovedDropdown = activeElement?.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+                // RECHECK again before closing parent menu
+                const isHoveringMenu = document.querySelector('.donut-menu.active:hover') !== null;
+                const isHoveringAnyDropdown = Array.from(document.querySelectorAll('.donut-menu-dropdown, .file-bar-menu-dropdown'))
+                    .some(el => el.matches(':hover'));
+                const isHoveringAnySubmenu = document.querySelector('.dynamic-submenu:hover') !== null;
 
-                    if (isInMovedDropdown) {
-                        return; // Don't close the menu
+                if (isHoveringMenu || isHoveringAnyDropdown || isHoveringAnySubmenu) {
+                    // Still hovering, don't close
+                    return;
+                }
+
+                // CRITICAL: Don't close menu if a button inside a moved dropdown has focus
+                // This prevents scroll issues when clicking tag buttons
+                const activeElement = document.activeElement;
+                const isInMovedDropdown = activeElement?.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+
+                if (isInMovedDropdown) {
+                    return; // Don't close the menu
+                }
+
+                document.querySelectorAll('.donut-menu.active').forEach(menu => {
+                    menu.classList.remove('active');
+
+                    // Clean up any moved dropdowns - check both in menu and moved to body
+                    let dropdown = menu.querySelector('.donut-menu-dropdown, .file-bar-menu-dropdown');
+                    if (!dropdown) {
+                        // Look for moved dropdowns in body that belong to this menu
+                        const movedDropdowns = document.body.querySelectorAll('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
+                        dropdown = Array.from(movedDropdowns).find(d => d._originalParent === menu);
                     }
 
-                    document.querySelectorAll('.donut-menu.active').forEach(menu => {
-                        menu.classList.remove('active');
-
-                        // Clean up any moved dropdowns - check both in menu and moved to body
-                        let dropdown = menu.querySelector('.donut-menu-dropdown, .file-bar-menu-dropdown');
-                        if (!dropdown) {
-                            // Look for moved dropdowns in body that belong to this menu
-                            const movedDropdowns = document.body.querySelectorAll('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
-                            dropdown = Array.from(movedDropdowns).find(d => d._originalParent === menu);
-                        }
-
-                        if (dropdown) {
-                            cleanupDropdown(dropdown);
-                        }
-                    });
-                }
+                    if (dropdown) {
+                        cleanupDropdown(dropdown);
+                    }
+                });
             }, 100);
         }, 300);
     }
@@ -574,14 +779,14 @@ function toggleDonutMenu(event, button) {
             positionDropdown(button, dropdown);
             setupMenuHoverHandlers(menu, dropdown);
             
-            // Update tag category counts (including "Remove all tags" button) when menu opens
-            // Use data-group selector to find tag menu items specifically (not Move/Move-to-list items)
-            const firstTagMenuItem = dropdown.querySelector('[data-group][data-id][data-type]');
-            if (firstTagMenuItem) {
-                const id = firstTagMenuItem.getAttribute('data-id');
-                const type = firstTagMenuItem.getAttribute('data-type');
-                const columnId = firstTagMenuItem.getAttribute('data-column-id');
-                updateTagCategoryCounts(id, type, columnId || null);
+            // Update tag category counts when menu opens
+            // Find tag menu items (including "No tags available" button which has data-group="none")
+            const tagMenuItem = dropdown.querySelector('[data-group][data-id][data-type]');
+            if (tagMenuItem) {
+                const id = tagMenuItem.getAttribute('data-id');
+                const type = tagMenuItem.getAttribute('data-type');
+                const columnId = tagMenuItem.getAttribute('data-column-id');
+                updateTagCategoryCounts(id, type, columnId);
             }
         }
     }
@@ -617,7 +822,14 @@ function setupMenuHoverHandlers(menu, dropdown) {
         window._inDropdown = false;
         window.menuManager.startHideTimer();
     });
-    
+
+    // Close submenu when hovering over items without submenus
+    dropdown.querySelectorAll('.donut-menu-item:not(.has-submenu)').forEach(menuItem => {
+        menuItem.addEventListener('mouseenter', () => {
+            window.menuManager.hideSubmenu();
+        });
+    });
+
     dropdown.querySelectorAll('.donut-menu-item.has-submenu').forEach(menuItem => {
         menuItem.addEventListener('mouseenter', () => {
             window.menuManager.clearTimeout();
@@ -851,6 +1063,42 @@ function insertColumnAfter(columnId) {
     // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
+function duplicateColumn(columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const originalIndex = window.cachedBoard.columns.findIndex(col => col.id === columnId);
+        if (originalIndex >= 0) {
+            const originalColumn = window.cachedBoard.columns[originalIndex];
+
+            // Deep copy the tasks array
+            const duplicatedTasks = originalColumn.tasks.map(task => ({
+                id: `temp-duplicate-task-${Date.now()}-${Math.random()}`,
+                title: task.title || '',
+                description: task.description || '',
+                includeMode: task.includeMode || false,
+                includeFile: task.includeFile || null
+            }));
+
+            // Create duplicated column
+            const duplicatedColumn = {
+                id: `temp-duplicate-column-${Date.now()}`,
+                title: originalColumn.title || '',
+                tasks: duplicatedTasks,
+                includeMode: originalColumn.includeMode || false,
+                includeFile: originalColumn.includeFile || null
+            };
+
+            // Insert after the original column
+            updateCacheForNewColumn(duplicatedColumn, originalIndex + 1, columnId);
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
 function moveColumnLeft(columnId) {
     if (!currentBoard?.columns) {return;}
 
@@ -1002,6 +1250,233 @@ function changeColumnSpan(columnId, delta) {
     updateRefreshButtonState('unsaved', 1);
 }
 
+/**
+ * Global sticky toggle with two modes:
+ * - Normal click: Temporarily override all columns (no save)
+ * - Alt+click: Toggle all columns and save #sticky tags
+ */
+function toggleGlobalSticky(event) {
+    if (!currentBoard?.columns) { return; }
+
+    const isAltClick = event.altKey;
+    const allColumns = document.querySelectorAll('.kanban-full-height-column');
+
+    if (isAltClick) {
+        // Alt+click: Toggle #sticky tag on all columns and save (clears global override)
+        const hasAnyStickyColumn = Array.from(allColumns).some(col =>
+            col.getAttribute('data-column-sticky') === 'true'
+        );
+
+        // Toggle opposite: if any are sticky, make all non-sticky; otherwise make all sticky
+        const targetState = !hasAnyStickyColumn;
+
+        currentBoard.columns.forEach(column => {
+            const hasStickyTag = /#sticky\b/i.test(column.title);
+
+            if (targetState && !hasStickyTag) {
+                // Add #sticky tag
+                column.title += ' #sticky';
+            } else if (!targetState && hasStickyTag) {
+                // Remove #sticky tag
+                column.title = column.title.replace(/#sticky\b/gi, '').trim();
+            }
+
+            // Update cachedBoard
+            if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
+                const cachedColumn = cachedBoard.columns.find(c => c.id === column.id);
+                if (cachedColumn) {
+                    cachedColumn.title = column.title;
+                }
+            }
+        });
+
+        // Clear global override since we're saving permanent state
+        window.globalStickyOverride = null;
+
+        // Mark as unsaved and re-render
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+        updateRefreshButtonState('unsaved', currentBoard.columns.length);
+
+        // Trigger full board re-render to update all UI elements
+        if (typeof window.renderBoard === 'function') {
+            window.renderBoard(currentBoard);
+        }
+
+        // CRITICAL: Recalculate stack positions after board re-render
+        // This ensures sticky headers update immediately with proper positioning
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            requestAnimationFrame(() => {
+                window.applyStackedColumnStyles(null); // Recalculate all stacks
+            });
+        }
+
+    } else {
+        // Normal click: Toggle between override active and override disabled
+        // If override is active, clicking disables it and restores actual #sticky tag states
+        // If override is not active, clicking enables it and forces all columns to same state
+
+        if (typeof window.globalStickyOverride !== 'undefined' && window.globalStickyOverride !== null) {
+            // Override is active - disable it and restore actual states
+            window.globalStickyOverride = null;
+
+            allColumns.forEach(columnElement => {
+                // Restore to actual #sticky tag state
+                const columnId = columnElement.getAttribute('data-column-id');
+                const column = currentBoard.columns.find(c => c.id === columnId);
+                const hasStickyTag = column && /#sticky\b/i.test(column.title);
+
+                columnElement.setAttribute('data-column-sticky', hasStickyTag ? 'true' : 'false');
+
+                // Update pin button
+                const pinBtn = columnElement.querySelector('.pin-btn');
+                if (pinBtn) {
+                    pinBtn.classList.toggle('pinned', hasStickyTag);
+                    pinBtn.classList.toggle('unpinned', !hasStickyTag);
+                    pinBtn.classList.remove('global-override');
+                }
+            });
+
+        } else {
+            // Override is not active - enable it (make all columns sticky)
+            window.globalStickyOverride = true;
+
+            allColumns.forEach(columnElement => {
+                // When global override is ON, all columns become sticky
+                columnElement.setAttribute('data-column-sticky', 'true');
+
+                // Keep pin button showing actual #sticky tag state, add outline when global override active
+                const pinBtn = columnElement.querySelector('.pin-btn');
+                if (pinBtn) {
+                    // Check actual #sticky tag in the model
+                    const columnId = columnElement.getAttribute('data-column-id');
+                    const column = currentBoard.columns.find(c => c.id === columnId);
+                    const hasStickyTag = column && /#sticky\b/i.test(column.title);
+
+                    // Pin button shows actual saved state
+                    pinBtn.classList.toggle('pinned', hasStickyTag);
+                    pinBtn.classList.toggle('unpinned', !hasStickyTag);
+
+                    // Add outline to all buttons when global override is active
+                    pinBtn.classList.add('global-override');
+                }
+            });
+        }
+
+        // Recalculate stack positions for all columns
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            window.applyStackedColumnStyles(null);
+        }
+    }
+
+    // Update global button appearance
+    updateGlobalStickyButton();
+}
+
+/**
+ * Update the global sticky button appearance based on current state
+ */
+function updateGlobalStickyButton() {
+    const btn = document.getElementById('global-sticky-btn');
+    if (!btn) { return; }
+
+    // Button state only reflects global override, not individual column states
+    const isOverrideActive = window.globalStickyOverride === true;
+    btn.classList.toggle('active', isOverrideActive);
+}
+
+/**
+ * Toggle #sticky tag on a column to control sticky header state
+ */
+function toggleColumnSticky(columnId) {
+    if (!currentBoard?.columns) { return; }
+
+    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    const column = currentBoard.columns[columnIndex];
+    if (!column || columnIndex === -1) { return; }
+
+    // Flush pending tag changes first
+    if ((window.pendingTaskChanges && window.pendingTaskChanges.size > 0) ||
+        (window.pendingColumnChanges && window.pendingColumnChanges.size > 0)) {
+        flushPendingTagChanges();
+    }
+
+    let newTitle = column.title;
+
+    // Check if #sticky tag exists
+    const hasStickyTag = /#sticky\b/i.test(newTitle);
+
+    if (hasStickyTag) {
+        // Remove #sticky tag
+        newTitle = newTitle.replace(/#sticky\b/gi, '').trim();
+    } else {
+        // Add #sticky tag at the end
+        newTitle += ' #sticky';
+    }
+
+    // Update the column in currentBoard and cachedBoard
+    column.title = newTitle;
+
+    if (typeof cachedBoard !== 'undefined' && cachedBoard?.columns) {
+        const cachedColumn = cachedBoard.columns.find(c => c.id === columnId);
+        if (cachedColumn) {
+            cachedColumn.title = newTitle;
+        }
+    }
+
+    // Update the column element immediately (no full re-render needed)
+    const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+    if (columnElement) {
+        // Update sticky data attribute
+        const newHasStickyTag = /#sticky\b/i.test(newTitle);
+        columnElement.setAttribute('data-column-sticky', newHasStickyTag ? 'true' : 'false');
+
+        // Update pin button state
+        const pinBtn = columnElement.querySelector('.pin-btn');
+        if (pinBtn) {
+            pinBtn.classList.toggle('pinned', newHasStickyTag);
+            pinBtn.classList.toggle('unpinned', !newHasStickyTag);
+            pinBtn.title = newHasStickyTag ? 'Unpin header (remove #sticky)' : 'Pin header (add #sticky)';
+
+            // ONLY OUTLINE CHANGE: show outline if global override is active
+            if (typeof window.globalStickyOverride !== 'undefined' && window.globalStickyOverride !== null) {
+                pinBtn.classList.add('global-override');
+            } else {
+                pinBtn.classList.remove('global-override');
+            }
+        }
+
+        // Update the title display to filter #sticky tag
+        const titleElement = columnElement.querySelector('.column-title-text');
+        if (titleElement && window.cachedBoard) {
+            const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (columnData) {
+                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
+                titleElement.innerHTML = renderedTitle;
+            }
+        }
+    }
+
+    // Recalculate ONLY this column's stack (row), not the whole board
+    if (typeof window.applyStackedColumnStyles === 'function') {
+        window.applyStackedColumnStyles(columnId);
+    }
+
+    // Mark as unsaved
+    if (typeof markUnsavedChanges === 'function') {
+        markUnsavedChanges();
+    }
+
+    // Update button state to show unsaved changes
+    updateRefreshButtonState('unsaved', 1);
+
+    // Update global sticky button appearance
+    if (typeof updateGlobalStickyButton === 'function') {
+        updateGlobalStickyButton();
+    }
+}
+
 function toggleColumnStack(columnId) {
     if (!currentBoard?.columns) {return;}
 
@@ -1105,17 +1580,25 @@ function toggleColumnStack(columnId) {
         }
     }
 
-    // Trigger board refresh for layout changes
-    if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-        window.renderBoard(window.cachedBoard);
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    // This breaks hover detection, so we must close menus first
+    if (typeof closeAllMenus === 'function') {
+        closeAllMenus();
     }
 
-    // CRITICAL: Recalculate stack positions after toggle
-    // This ensures columns stack/unstack immediately
-    // Only update this column's stack for efficiency
+    // Trigger full board re-render for layout changes
+    // This recalculates all column positions including stacks
+    if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+        window.renderBoard(); // Full re-render to recalculate positions
+    }
+
+    // CRITICAL: Recalculate stack positions after board re-render
+    // This ensures columns stack/unstack immediately with proper positioning
+    // Recalculate all stacks since adding/removing #stack affects neighboring columns
     if (typeof window.applyStackedColumnStyles === 'function') {
         requestAnimationFrame(() => {
-            window.applyStackedColumnStyles(columnId);
+            window.applyStackedColumnStyles(); // Recalculate all stacks, not just one
         });
     }
 
@@ -1325,7 +1808,6 @@ function editColumnIncludeFile(columnId) {
     // Get current include file path
     const currentFile = column.includeFiles[0]; // For now, handle single file includes
 
-    console.log('[editColumnIncludeFile] Sending requestEditIncludeFileName message:', { columnId, currentFile });
 
     // Request new file path via VS Code dialog
     vscode.postMessage({
@@ -1333,7 +1815,6 @@ function editColumnIncludeFile(columnId) {
         columnId: columnId,
         currentFile: currentFile
     });
-    console.log('[editColumnIncludeFile] Message sent');
     return; // Exit here, the backend will handle the input and response
 }
 
@@ -1723,14 +2204,6 @@ function insertTaskBefore(taskId, columnId) {
             const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
 
             // DEBUG: Log what we found
-            console.log('[insertTaskBefore] Found task:', {
-                taskId,
-                targetIndex,
-                columnId: actualColumnId,
-                targetTask: targetColumn.tasks[targetIndex],
-                allTaskIds: targetColumn.tasks.map(t => t.id),
-                allTaskTitles: targetColumn.tasks.map(t => t.title)
-            });
 
             if (targetIndex >= 0) {
                 const newTask = {
@@ -1774,6 +2247,10 @@ function insertTaskAfter(taskId, columnId) {
 
 function moveTaskToTop(taskId, columnId) {
 
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
+
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
@@ -1797,12 +2274,13 @@ function moveTaskToTop(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskToTop', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskUp(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1828,12 +2306,13 @@ function moveTaskUp(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskUp', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskDown(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1859,12 +2338,13 @@ function moveTaskDown(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskDown', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 function moveTaskToBottom(taskId, columnId) {
+
+    // Close all menus before full board re-render
+    // CRITICAL: renderBoard() destroys and recreates all DOM elements
+    closeAllMenus();
 
     // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
@@ -1889,9 +2369,6 @@ function moveTaskToBottom(taskId, columnId) {
     // Cache-first: No automatic save, UI updated via cache update above
     // vscode.postMessage({ type: 'moveTaskToBottom', taskId, columnId });
 
-    // Close all menus
-    closeAllMenus();
-
 }
 
 /**
@@ -1904,9 +2381,6 @@ function moveTaskToBottom(taskId, columnId) {
  * Side effects: Flushes pending changes, unfolds target
  */
 function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
-    console.log(`[moveTaskToColumn] Moving task ${taskId}`);
-    console.log(`[moveTaskToColumn]   FROM column: ${fromColumnId}`);
-    console.log(`[moveTaskToColumn]   TO column: ${toColumnId}`);
 
     // Unfold the destination column if it's collapsed BEFORE any DOM changes
     unfoldColumnIfCollapsed(toColumnId);
@@ -1916,8 +2390,6 @@ function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
         const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
         const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
 
-        console.log(`[moveTaskToColumn] Found FROM column:`, fromColumn ? fromColumn.title : 'NOT FOUND');
-        console.log(`[moveTaskToColumn] Found TO column:`, toColumn ? toColumn.title : 'NOT FOUND');
 
         if (fromColumn && toColumn) {
             const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
@@ -1925,7 +2397,6 @@ function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
                 const task = fromColumn.tasks.splice(taskIndex, 1)[0];
                 toColumn.tasks.push(task);
 
-                console.log(`[moveTaskToColumn] Task moved successfully, calling renderBoard()`);
 
                 // Re-render UI to reflect changes
                 if (typeof renderBoard === 'function') {
@@ -2270,15 +2741,24 @@ function toggleColumnTag(columnId, tagName, event) {
         return;
     }
 
-    
+
     const tagWithHash = `#${tagName}`;
     let title = column.title || '';
-    const wasActive = new RegExp(`#${tagName}\\b`, 'gi').test(title);
+
+    // Escape special regex characters in tag name
+    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
+    // Word boundary \b doesn't work with non-word characters
+    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
+    const pattern = isSpecialTag
+        ? `#${escapedTagName}(?=\\s|$)`
+        : `#${escapedTagName}\\b`;
+    const wasActive = new RegExp(pattern, 'gi').test(title);
 
 
     if (wasActive) {
-        const beforeRemoval = title;
-        title = title.replace(new RegExp(`#${tagName}\\b`, 'gi'), '').replace(/\s+/g, ' ').trim();
+        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
     } else {
         const rowMatch = title.match(/(#row\d+)$/i);
         if (rowMatch) {
@@ -2330,8 +2810,8 @@ function toggleColumnTag(columnId, tagName, event) {
     // Update tag category counts in menu
     updateTagCategoryCounts(columnId, 'column');
 
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(columnId, 'column', title);
+    // Note: updateColumnDisplayImmediate already calls updateVisualTagState which handles badges
+    // No need to call updateCornerBadgesImmediate separately
 
     // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
     // that change the column height
@@ -2453,11 +2933,21 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
 
     const tagWithHash = `#${tagName}`;
     let title = task.title || '';
-    const wasActive = new RegExp(`#${tagName}\\b`, 'gi').test(title);
+
+    // Escape special regex characters in tag name
+    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
+    // Word boundary \b doesn't work with non-word characters
+    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
+    const pattern = isSpecialTag
+        ? `#${escapedTagName}(?=\\s|$)`
+        : `#${escapedTagName}\\b`;
+    const wasActive = new RegExp(pattern, 'gi').test(title);
 
 
     if (wasActive) {
-        title = title.replace(new RegExp(`#${tagName}\\b`, 'gi'), '').replace(/\s+/g, ' ').trim();
+        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
     } else {
         title = `${title} ${tagWithHash}`.trim();
     }
@@ -2503,8 +2993,8 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
     // Update tag category counts in menu
     updateTagCategoryCounts(taskId, 'task', columnId);
 
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(taskId, 'task', title);
+    // Note: updateTaskDisplayImmediate already calls updateVisualTagState which handles badges
+    // No need to call updateCornerBadgesImmediate separately
 
     // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
     // that change the task height
@@ -2550,6 +3040,14 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         return;
     }
     
+    // Update cached board data first
+    if (window.cachedBoard) {
+        const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
+        if (columnData) {
+            columnData.title = newTitle;
+        }
+    }
+
     // Update title display using shared function
     const titleElement = columnElement.querySelector('.column-title-text');
     if (titleElement && window.cachedBoard) {
@@ -2587,42 +3085,8 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
 
-    // Update numeric badge immediately
-    const numericBadgeContainer = columnElement.querySelector('.numeric-badge');
-    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-        const numericTag = window.tagUtils.extractNumericTag(newTitle);
-        if (numericTag !== null) {
-            // Format the badge display
-            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-            if (numericBadgeContainer) {
-                // Update existing badge
-                numericBadgeContainer.textContent = displayValue;
-                numericBadgeContainer.title = `Index: ${displayValue}`;
-            } else {
-                // Create new badge if it doesn't exist
-                const columnTitleElement = columnElement.querySelector('.column-title');
-                if (columnTitleElement) {
-                    const newBadge = document.createElement('div');
-                    newBadge.className = 'numeric-badge';
-                    newBadge.textContent = displayValue;
-                    newBadge.title = `Index: ${displayValue}`;
-                    // Insert before the corner badges or at the beginning
-                    const cornerBadges = columnTitleElement.querySelector('.corner-badges');
-                    if (cornerBadges) {
-                        columnTitleElement.insertBefore(newBadge, cornerBadges);
-                    } else {
-                        columnTitleElement.insertBefore(newBadge, columnTitleElement.firstChild);
-                    }
-                }
-            }
-        } else if (numericBadgeContainer) {
-            // Remove badge if no numeric tag
-            numericBadgeContainer.remove();
-        }
-    }
-
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(columnId, 'column', newTitle);
+    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
+    // No need to call updateCornerBadgesImmediate separately
     
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${columnId}"][data-tag-name="${tagName}"]`);
@@ -2695,42 +3159,8 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
 
-    // Update numeric badge immediately
-    const numericBadgeContainer = taskElement.querySelector('.numeric-badge');
-    if (window.tagUtils && typeof window.tagUtils.extractNumericTag === 'function') {
-        const numericTag = window.tagUtils.extractNumericTag(newTitle);
-        if (numericTag !== null) {
-            // Format the badge display
-            const displayValue = numericTag % 1 === 0 ? numericTag.toString() : numericTag.toFixed(2).replace(/\.?0+$/, '');
-            if (numericBadgeContainer) {
-                // Update existing badge
-                numericBadgeContainer.textContent = displayValue;
-                numericBadgeContainer.title = `Index: ${displayValue}`;
-            } else {
-                // Create new badge if it doesn't exist
-                const taskHeaderElement = taskElement.querySelector('.task-header');
-                if (taskHeaderElement) {
-                    const newBadge = document.createElement('div');
-                    newBadge.className = 'numeric-badge';
-                    newBadge.textContent = displayValue;
-                    newBadge.title = `Index: ${displayValue}`;
-                    // Insert before the corner badges or at the beginning
-                    const cornerBadges = taskHeaderElement.querySelector('.corner-badges');
-                    if (cornerBadges) {
-                        taskHeaderElement.insertBefore(newBadge, cornerBadges);
-                    } else {
-                        taskHeaderElement.insertBefore(newBadge, taskHeaderElement.firstChild);
-                    }
-                }
-            }
-        } else if (numericBadgeContainer) {
-            // Remove badge if no numeric tag
-            numericBadgeContainer.remove();
-        }
-    }
-
-    // Update corner badges immediately
-    updateCornerBadgesImmediate(taskId, 'task', newTitle);
+    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
+    // No need to call updateCornerBadgesImmediate separately
     
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${taskId}"][data-tag-name="${tagName}"]`);
@@ -2803,10 +3233,7 @@ function markUnsavedChanges() {
     if (typeof vscode !== 'undefined') {
         const boardToSend = window.cachedBoard || window.cachedBoard;
 
-        console.log('[FRONTEND markUnsavedChanges] ===== SENDING TO BACKEND =====');
-        console.log('[FRONTEND markUnsavedChanges] boardToSend exists:', !!boardToSend);
         if (boardToSend && boardToSend.columns) {
-            console.log('[FRONTEND markUnsavedChanges] columns:', boardToSend.columns.length);
             // Log all include tasks
             let includeTaskCount = 0;
             boardToSend.columns.forEach((col, colIdx) => {
@@ -2814,18 +3241,10 @@ function markUnsavedChanges() {
                     col.tasks.forEach((task, taskIdx) => {
                         if (task.includeMode) {
                             includeTaskCount++;
-                            console.log(`[FRONTEND markUnsavedChanges] Column ${colIdx} Task ${taskIdx} (include):`, {
-                                title: task.title,
-                                displayTitle: task.displayTitle,
-                                descriptionLength: task.description ? task.description.length : 0,
-                                descriptionFirst50: task.description ? task.description.substring(0, 50) : '',
-                                includeFiles: task.includeFiles
-                            });
                         }
                     });
                 }
             });
-            console.log('[FRONTEND markUnsavedChanges] Total include tasks:', includeTaskCount);
         }
 
         vscode.postMessage({
@@ -2972,14 +3391,10 @@ function saveCachedBoard() {
         return;
     }
 
-    console.log('[FRONTEND saveCurrentBoard] ========================================');
-    console.log('[FRONTEND saveCurrentBoard] Preparing to save board');
-    console.log(`[FRONTEND saveCurrentBoard] cachedBoard has ${window.cachedBoard.columns?.length || 0} columns`);
 
     // Log each column's includeMode status
     if (window.cachedBoard.columns) {
         for (const col of window.cachedBoard.columns) {
-            console.log(`[FRONTEND saveCurrentBoard] Column "${col.title}": includeMode=${col.includeMode}, includeFiles=${col.includeFiles?.join(',') || 'none'}, tasks=${col.tasks?.length || 0}`);
         }
     }
 
@@ -2994,8 +3409,6 @@ function saveCachedBoard() {
         }
     }
 
-    console.log('[FRONTEND saveCurrentBoard] Sending board to backend');
-    console.log('[FRONTEND saveCurrentBoard] ========================================');
 
     // Send the complete board state to VS Code using a simple message
     // This avoids complex sequential processing that might cause issues
@@ -3288,9 +3701,16 @@ function updateRefreshButtonState(state, count = 0) {
 
 // Update tag button appearance immediately when toggled
 function updateTagButtonAppearance(id, type, tagName, isActive) {
-    
+
     // Find the tag button using the same ID pattern as in generateGroupTagItems
-    const buttonId = `tag-chip-${type}-${id}-${tagName}`.replace(/[^a-zA-Z0-9-]/g, '-');
+    // Encode special characters to match the encoding in generateGroupTagItems
+    const encodedTag = tagName
+        .replace(/\+\+/g, 'plus-plus')
+        .replace(/\+/g, 'plus')
+        .replace(/--/g, 'minus-minus')
+        .replace(/-/g, 'minus')
+        .replace(/ø/gi, 'o-slash');
+    const buttonId = `tag-chip-${type}-${id}-${encodedTag}`.replace(/[^a-zA-Z0-9-]/g, '-');
     const button = document.getElementById(buttonId);
     
     if (!button) {
@@ -3377,7 +3797,6 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
     // Get all active tags from the new title
     const activeTags = getActiveTagsInTitle(newTitle);
 
-
     // Update data-all-tags attribute
     if (activeTags.length > 0) {
         element.setAttribute('data-all-tags', activeTags.join(' '));
@@ -3385,24 +3804,20 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
         element.removeAttribute('data-all-tags');
     }
 
-    // Find existing corner badges container or create one
-    // For columns, append to column-header; for tasks, append to element
-    const targetContainer = elementType === 'column' ? element.querySelector('.column-header') || element : element;
-    let badgesContainer = targetContainer.querySelector('.corner-badges-container');
-    if (!badgesContainer) {
-        badgesContainer = document.createElement('div');
-        badgesContainer.className = 'corner-badges-container';
-        badgesContainer.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9;';
-        targetContainer.appendChild(badgesContainer);
-        // Ensure parent has relative positioning
-        // if (!element.style.position || element.style.position === 'static') {
-        //     element.style.position = 'relative';
-        // }
-    }
+    // For columns, append to column-title; for tasks, append to task-header
+    const targetContainer = elementType === 'column'
+        ? element.querySelector('.column-title') || element
+        : element.querySelector('.task-header') || element;
 
-    // Generate new badges HTML
-    let newBadgesHtml = '';
-    if (window.tagColors && activeTags.length > 0) {
+    // Remove existing badge containers
+    targetContainer.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
+
+    // Extract numeric tags first to check if we need to render badges
+    const numericTags = window.tagUtils ? window.tagUtils.extractNumericTag(newTitle) : null;
+    const hasNumericTags = numericTags && Array.isArray(numericTags) && numericTags.length > 0;
+
+    // Render badges if we have active tags OR numeric tags
+    if (window.tagColors && (activeTags.length > 0 || hasNumericTags)) {
         const positions = {
             'top-left': [],
             'top-right': [],
@@ -3410,52 +3825,96 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
             'bottom-right': []
         };
 
+        // Add numeric badges to positions (already extracted above)
+        if (numericTags && Array.isArray(numericTags)) {
+            numericTags.forEach(numericValue => {
+                const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
+                // Add to top-left position using SAME system as other corner badges
+                positions['top-left'].push({
+                    tag: `numeric-${numericValue}`,
+                    badge: {
+                        label: displayValue,
+                        position: 'top-left',
+                        color: 'var(--vscode-badge-background, #4d4d4d)',
+                        labelColor: 'var(--vscode-badge-foreground, #ffffff)'
+                    }
+                });
+            });
+        }
+
         // Collect badges by position
         activeTags.forEach(tag => {
             const config = getTagConfig(tag);
+
             if (config && config.cornerBadge) {
+                // Get theme colors for this tag
+                const isDarkTheme = document.body.classList.contains('vscode-dark') ||
+                                    document.body.classList.contains('vscode-high-contrast');
+                const themeKey = isDarkTheme ? 'dark' : 'light';
+                const themeColors = config[themeKey] || config.light || {};
+
+                // Fallback to themeColors.background if badge.color is not defined (like other tags)
+                const badgeColor = config.cornerBadge.color || themeColors.background;
+
+                // Calculate text color automatically (matching boardRenderer.js logic)
+                const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
+                const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+
                 const position = config.cornerBadge.position || 'top-right';
                 positions[position].push({
                     tag: tag,
-                    badge: config.cornerBadge
+                    badge: {
+                        ...config.cornerBadge,
+                        color: badgeColor,
+                        labelColor: badgeTextColor
+                    }
                 });
             }
         });
 
-        // Generate HTML for each position with proper vertical stacking
+        // Create separate flex containers for each corner position
         Object.entries(positions).forEach(([position, badgesAtPosition]) => {
+            if (badgesAtPosition.length === 0) return; // Skip empty positions
+
+            // Create container for this corner
+            const cornerContainer = document.createElement('div');
+            cornerContainer.className = `corner-badges-container ${position}`;
+
+            // Append badges to this corner's container
             badgesAtPosition.forEach((item, index) => {
                 const badge = item.badge;
-                const offsetMultiplier = 24; // Space between stacked badges
-                let positionStyle = '';
 
-                switch (position) {
-                    case 'top-left':
-                        positionStyle = `top: ${10 + (index * offsetMultiplier)}px; left: -8px;`;
-                        break;
-                    case 'top-right':
-                        positionStyle = `top: ${10 + (index * offsetMultiplier)}px; right: -8px;`;
-                        break;
-                    case 'bottom-left':
-                        positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; left: -8px;`;
-                        break;
-                    case 'bottom-right':
-                        positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; right: -8px;`;
-                        break;
+                // Encode special characters for CSS class names
+                let cssClassName = item.tag;
+                if (cssClassName === '++') cssClassName = 'plusplus';
+                else if (cssClassName === '+') cssClassName = 'plus';
+                else if (cssClassName === '--') cssClassName = 'minusminus';
+                else if (cssClassName === '-') cssClassName = 'minus';
+                else if (cssClassName === 'ø') cssClassName = 'oslash';
+                else {
+                    cssClassName = item.tag;
                 }
 
                 const badgeContent = badge.image ? '' : (badge.label || '');
-                newBadgesHtml += `<div class="corner-badge corner-badge-${item.tag}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
+
+                // Only apply background and color styles - NO position calculations!
+                const bgColor = badge.color || '#FF0000';
+                const textColor = badge.labelColor || '#ffffff';
+                const inlineStyles = `background: ${bgColor} !important; color: ${textColor} !important;`;
+
+                const badgeElement = document.createElement('div');
+                badgeElement.className = `corner-badge corner-badge-${cssClassName}`;
+                badgeElement.style.cssText = inlineStyles;
+                badgeElement.setAttribute('data-badge-position', position);
+                badgeElement.setAttribute('data-badge-index', index);
+                badgeElement.textContent = badgeContent;
+
+                cornerContainer.appendChild(badgeElement);
             });
+
+            // Append this corner's container to the target
+            targetContainer.appendChild(cornerContainer);
         });
-    }
-
-    // Clear and update badges
-    badgesContainer.innerHTML = newBadgesHtml;
-
-    // If no badges, remove container to prevent empty space
-    if (!newBadgesHtml || newBadgesHtml.trim() === '') {
-        badgesContainer.remove();
     }
 
 }
@@ -3470,15 +3929,18 @@ function updateTagCategoryCounts(id, type, columnId = null) {
     if (type === 'column') {
         const column = currentBoard?.columns?.find(c => c.id === id);
         currentTitle = column?.title || '';
-    } else if (type === 'task' && columnId) {
-        const column = currentBoard?.columns?.find(c => c.id === columnId);
-        const task = column?.tasks?.find(t => t.id === id);
-        currentTitle = task?.title || '';
+    } else if (type === 'task') {
+        // For tasks, columnId is required
+        if (columnId) {
+            const column = currentBoard?.columns?.find(c => c.id === columnId);
+            const task = column?.tasks?.find(t => t.id === id);
+            currentTitle = task?.title || '';
+        }
     }
 
     // Get active tags
     const activeTags = getActiveTagsInTitle(currentTitle);
-    
+
     // Find the active dropdown menu that contains category items for this element
     // First try to find it in the menu, then check if it's been moved to body
     const activeMenu = document.querySelector('.donut-menu.active');
@@ -3577,62 +4039,69 @@ function updateTagCategoryCounts(id, type, columnId = null) {
             }
         }
     }
-    
+
     // Show/hide "Remove all tags" option - ensure only one exists
     const existingRemoveAllButtons = activeDropdown.querySelectorAll('[data-action="remove-all-tags"]');
 
     if (activeTags.length > 0) {
         // Remove any existing "remove all tags" buttons first to prevent duplicates
         existingRemoveAllButtons.forEach(button => {
-            const divider = button.previousElementSibling;
-            if (divider && divider.classList.contains('donut-menu-divider')) {
-                divider.remove();
-            }
             button.remove();
         });
 
-        // Add single "Remove all tags" option before the last item (usually Delete)
+        // Add single "Remove all tags" option as the last item in the tags group
         const button = document.createElement('button');
         button.className = 'donut-menu-item';
-        button.setAttribute('data-action', 'remove-all-tags'); // Add identifier for reliable detection
+        button.setAttribute('data-action', 'remove-all-tags');
         button.onclick = () => removeAllTags(id, type, columnId);
         button.textContent = 'Remove all tags';
 
-        // Find the last menu item (usually "Delete card" or "Delete list")
-        const lastMenuItem = activeDropdown.querySelector('.donut-menu-item.danger:last-of-type');
+        // Find all tag category items (they have data-submenu-type="tags")
+        const tagItems = activeDropdown.querySelectorAll('[data-submenu-type="tags"]');
 
-        if (lastMenuItem) {
-            // Check if there's already a divider before the delete button
-            const existingDivider = lastMenuItem.previousElementSibling;
-            const hasExistingDivider = existingDivider && existingDivider.classList.contains('donut-menu-divider');
+        // Also check for the "No tags available" message
+        const noTagsMessage = activeDropdown.querySelector('.donut-menu-item[disabled][data-group="none"]');
 
-            // Insert the button before the delete button
-            activeDropdown.insertBefore(button, lastMenuItem);
+        if (tagItems.length > 0) {
+            // Get the last tag category item
+            const lastTagItem = tagItems[tagItems.length - 1];
 
-            // Add a divider after the "Remove all tags" button (before delete) if none exists
-            if (!hasExistingDivider) {
-                const dividerAfter = document.createElement('div');
-                dividerAfter.className = 'donut-menu-divider';
-                activeDropdown.insertBefore(dividerAfter, lastMenuItem);
+            // Find the next divider after the last tag item
+            let nextElement = lastTagItem.nextElementSibling;
+            while (nextElement && !nextElement.classList.contains('donut-menu-divider')) {
+                nextElement = nextElement.nextElementSibling;
             }
-        } else {
-            // Fallback: add at the end if no danger button found
-            const divider = document.createElement('div');
-            divider.className = 'donut-menu-divider';
-            activeDropdown.appendChild(divider);
-            activeDropdown.appendChild(button);
+
+            // Insert before the divider (at the end of tags group)
+            if (nextElement && nextElement.classList.contains('donut-menu-divider')) {
+                activeDropdown.insertBefore(button, nextElement);
+            } else {
+                // Fallback: insert after the last tag item
+                if (lastTagItem.nextSibling) {
+                    activeDropdown.insertBefore(button, lastTagItem.nextSibling);
+                } else {
+                    activeDropdown.appendChild(button);
+                }
+            }
+        } else if (noTagsMessage) {
+            // Find divider after "No tags available"
+            let nextElement = noTagsMessage.nextElementSibling;
+            while (nextElement && !nextElement.classList.contains('donut-menu-divider')) {
+                nextElement = nextElement.nextElementSibling;
+            }
+
+            if (nextElement && nextElement.classList.contains('donut-menu-divider')) {
+                activeDropdown.insertBefore(button, nextElement);
+            } else {
+                activeDropdown.appendChild(button);
+            }
         }
     } else {
         // Remove all "Remove all tags" options if no active tags
         existingRemoveAllButtons.forEach(button => {
-            const divider = button.previousElementSibling;
-            if (divider && divider.classList.contains('donut-menu-divider')) {
-                divider.remove();
-            }
             button.remove();
         });
     }
-    
 }
 
 // Make functions globally available
@@ -3677,14 +4146,14 @@ window.handleSaveError = handleSaveError;
 window.applyPendingChangesLocally = applyPendingChangesLocally;
 // Update visual tag state - handles borders and other tag-based styling
 function updateVisualTagState(element, allTags, elementType, isCollapsed) {
-    
+
     // Update primary tag attribute (for primary styling like borders)
     const primaryTag = allTags.length > 0 ? allTags[0] : null;
     const tagAttribute = elementType === 'column' ? 'data-column-tag' : 'data-task-tag';
-    
+
     if (primaryTag) {
         element.setAttribute(tagAttribute, primaryTag);
-        
+
         // Ensure style exists for the primary tag
         if (window.ensureTagStyleExists) {
             window.ensureTagStyleExists(primaryTag);
@@ -3692,11 +4161,11 @@ function updateVisualTagState(element, allTags, elementType, isCollapsed) {
     } else {
         element.removeAttribute(tagAttribute);
     }
-    
+
     // Update all-tags attribute (for multi-tag styling)
     if (allTags.length > 0) {
         element.setAttribute('data-all-tags', allTags.join(' '));
-        
+
         // Ensure styles exist for all tags
         if (window.ensureTagStyleExists) {
             allTags.forEach(tag => {
@@ -3706,32 +4175,114 @@ function updateVisualTagState(element, allTags, elementType, isCollapsed) {
     } else {
         element.removeAttribute('data-all-tags');
     }
-    
+
+    // Update background and border tag attributes (needed for colors/borders to work dynamically)
+    // Get the element's title to check which tags have background/border properties
+    let titleText = '';
+    if (elementType === 'column') {
+        const columnId = element.getAttribute('data-column-id');
+        if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            titleText = column ? column.title : '';
+        }
+    } else {
+        const taskId = element.getAttribute('data-task-id');
+        if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+            // Find task across all columns
+            for (const column of window.cachedBoard.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    titleText = task.title;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Update border tag attribute
+    const borderTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'border') : null;
+    const borderTagAttr = elementType === 'column' ? 'data-column-border-tag' : 'data-task-border-tag';
+    if (borderTag) {
+        element.setAttribute(borderTagAttr, borderTag);
+    } else {
+        element.removeAttribute(borderTagAttr);
+    }
+
+    // Update background tag attribute
+    const bgTag = window.getFirstTagWithProperty ? window.getFirstTagWithProperty(titleText, 'background') : null;
+    const bgTagAttr = elementType === 'column' ? 'data-column-bg-tag' : 'data-task-bg-tag';
+    if (bgTag) {
+        element.setAttribute(bgTagAttr, bgTag);
+    } else {
+        element.removeAttribute(bgTagAttr);
+    }
+
     // Update all visual tag elements immediately (headers, footers, borders, badges)
     updateAllVisualTagElements(element, allTags, elementType);
-    
+
     // Force a style recalculation to ensure CSS changes are applied immediately
     element.offsetHeight; // Trigger reflow
-    
+
 }
 
 // Comprehensive function to update ALL visual tag elements immediately
 function updateAllVisualTagElements(element, allTags, elementType) {
-    
+
+    // 0. UPDATE TITLE DISPLAY for elements with includes
+    if (elementType === 'column') {
+        const columnId = element.getAttribute('data-column-id');
+        if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (column) {
+                // Check if title has include syntax
+                const hasInclude = /!!!include\([^)]+\)!!!/.test(column.title);
+                if (hasInclude) {
+                    // Update the title display using the shared utility function
+                    const displayElement = element.querySelector('.column-title-text');
+                    if (displayElement && window.tagUtils) {
+                        const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+                        displayElement.innerHTML = renderedTitle;
+                    }
+                }
+            }
+        }
+    } else if (elementType === 'task') {
+        const taskId = element.getAttribute('data-task-id');
+        if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+            // Find task across all columns
+            for (const column of window.cachedBoard.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    // Check if task is in include mode or has include syntax
+                    if (task.includeMode || /!!!include\([^)]+\)!!!/.test(task.title)) {
+                        // Update the title display
+                        const displayElement = element.querySelector('.task-title-display');
+                        if (displayElement && window.renderMarkdownWithTags) {
+                            const renderedHtml = window.renderMarkdownWithTags(task.title);
+                            displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     // 1. CLEAN UP - Remove visual elements only from column-title and column-footer areas
     if (elementType === 'column') {
         // For columns: clean up only within column-header and column-footer (never column-inner)
 
         const columnHeader = element.querySelector('.column-header');
         if (columnHeader) {
-            // Remove all visual tag elements from column-header (including corner badges)
-            columnHeader.querySelectorAll('.header-bar, .header-bars-container, .corner-badges-container').forEach(el => el.remove());
+            // Remove visual tag elements from column-header (NOT corner badges - they're managed separately)
+            columnHeader.querySelectorAll('.header-bar, .header-bars-container').forEach(el => el.remove());
         }
 
         const columnTitle = element.querySelector('.column-title');
         if (columnTitle) {
-            // Column title no longer contains corner badges (moved to column-header)
-            // Keep this selector for backward compatibility if needed
+            // CRITICAL: Remove corner badges from column-title so they can be recreated
+            // This ensures badges update immediately when tags change
+            columnTitle.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
         }
 
         const columnFooter = element.querySelector('.column-footer');
@@ -3751,8 +4302,12 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             }
         });
     } else {
-        // For tasks, safe to remove all visual elements directly
-        element.querySelectorAll('.header-bar, .footer-bar, .header-bars-container, .footer-bars-container, .corner-badges-container').forEach(el => el.remove());
+        // For tasks, remove visual elements from task-header and task element
+        const taskHeader = element.querySelector('.task-header');
+        if (taskHeader) {
+            taskHeader.querySelectorAll('.corner-badges-container').forEach(el => el.remove());
+        }
+        element.querySelectorAll('.header-bar, .footer-bar, .header-bars-container, .footer-bars-container').forEach(el => el.remove());
     }
     element.classList.remove('has-header-bar', 'has-footer-bar', 'has-header-label', 'has-footer-label');
     
@@ -3768,11 +4323,49 @@ function updateAllVisualTagElements(element, allTags, elementType) {
     });
     
     // 3. CORNER BADGES - Update badges immediately
-    let badgesContainer = element.querySelector('.corner-badges-container');
+    // CRITICAL: For columns, only check for badges in column-title (not in nested tasks)
+    // For tasks, check directly in the element
+    let badgesContainer;
+    if (elementType === 'column') {
+        const columnTitle = element.querySelector('.column-title');
+        badgesContainer = columnTitle ? columnTitle.querySelector('.corner-badges-container') : null;
+    } else {
+        badgesContainer = element.querySelector('.corner-badges-container');
+    }
+    console.log('[BADGE DEBUG] After cleanup - badgesContainer:', badgesContainer, 'getTagConfig:', !!window.getTagConfig, 'allTags:', allTags);
     if (!badgesContainer && window.getTagConfig) {
-        // Generate badges HTML inline
+        // Extract numeric tags from element's title first
+        // Get title from cached board data using element ID
+        let titleText = '';
+        if (elementType === 'column') {
+            const columnId = element.getAttribute('data-column-id');
+            if (window.cachedBoard && window.cachedBoard.columns && columnId) {
+                const column = window.cachedBoard.columns.find(c => c.id === columnId);
+                titleText = column ? column.title : '';
+            }
+        } else {
+            const taskId = element.getAttribute('data-task-id');
+            if (window.cachedBoard && window.cachedBoard.columns && taskId) {
+                // Find task across all columns
+                for (const column of window.cachedBoard.columns) {
+                    const task = column.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        titleText = task.title;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const numericTags = window.tagUtils && titleText ? window.tagUtils.extractNumericTag(titleText) : null;
+        const hasNumericTags = numericTags && Array.isArray(numericTags) && numericTags.length > 0;
+
+        // Generate badges HTML inline (if we have active tags OR numeric tags)
         let badgesHtml = '';
-        if (window.tagColors && allTags.length > 0) {
+        console.log('[BADGE DEBUG] tagColors:', !!window.tagColors, 'typeof:', typeof window.tagColors, 'allTags.length:', allTags.length, 'hasNumericTags:', hasNumericTags, 'numericTags:', numericTags);
+        console.log('[BADGE DEBUG] Check result:', !!(window.tagColors && (allTags.length > 0 || hasNumericTags)));
+        if (window.tagColors && (allTags.length > 0 || hasNumericTags)) {
+            console.log('[BADGE DEBUG] INSIDE badge generation block');
             const positions = {
                 'top-left': [],
                 'top-right': [],
@@ -3780,54 +4373,101 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                 'bottom-right': []
             };
 
+            // Add numeric badges to positions (already extracted above)
+            console.log('[BADGE DEBUG] About to add numeric badges, numericTags:', numericTags, 'isArray:', Array.isArray(numericTags));
+            if (numericTags && Array.isArray(numericTags)) {
+                console.log('[BADGE DEBUG] Adding', numericTags.length, 'numeric badges');
+                numericTags.forEach(numericValue => {
+                    const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
+                    positions['top-left'].push({
+                        tag: `numeric-${numericValue}`,
+                        badge: {
+                            label: displayValue,
+                            position: 'top-left',
+                            color: 'var(--vscode-badge-background, #4d4d4d)',
+                            labelColor: 'var(--vscode-badge-foreground, #ffffff)'
+                        }
+                    });
+                });
+            }
+
             // Collect badges by position
+            console.log('[BADGE DEBUG] About to process allTags:', allTags);
             allTags.forEach(tag => {
                 const config = window.getTagConfig(tag);
+                console.log('[BADGE DEBUG] Tag:', tag, 'config:', config ? JSON.stringify(config).substring(0, 200) : 'null');
                 if (config && config.cornerBadge) {
+                    // Get theme colors for this tag
+                    const isDarkTheme = document.body.classList.contains('vscode-dark') ||
+                                        document.body.classList.contains('vscode-high-contrast');
+                    const themeKey = isDarkTheme ? 'dark' : 'light';
+                    const themeColors = config[themeKey] || config.light || {};
+
+                    // Fallback to themeColors.background if badge.color is not defined (like other tags)
+                    const badgeColor = config.cornerBadge.color || themeColors.background;
+
+                    // Calculate text color automatically (matching boardRenderer.js logic)
+                    const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
+                    const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+
                     const position = config.cornerBadge.position || 'top-right';
                     positions[position].push({
                         tag: tag,
-                        badge: config.cornerBadge
+                        badge: {
+                            ...config.cornerBadge,
+                            color: badgeColor,
+                            labelColor: badgeTextColor
+                        }
                     });
                 }
             });
 
-            // Generate HTML for each position with proper vertical stacking
+            // Create separate flex containers for each corner position
+            console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
+                console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
+                if (badgesAtPosition.length === 0) return; // Skip empty positions
+
+                // Create container for this corner
+                const cornerContainer = document.createElement('div');
+                cornerContainer.className = `corner-badges-container ${position}`;
+
+                // Append badges to this corner's container
                 badgesAtPosition.forEach((item, index) => {
                     const badge = item.badge;
-                    const offsetMultiplier = 24; // Space between stacked badges
-                    let positionStyle = '';
 
-                    switch (position) {
-                        case 'top-left':
-                            positionStyle = `top: ${10 + (index * offsetMultiplier)}px; left: -8px;`;
-                            break;
-                        case 'top-right':
-                            positionStyle = `top: ${10 + (index * offsetMultiplier)}px; right: -8px;`;
-                            break;
-                        case 'bottom-left':
-                            positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; left: -8px;`;
-                            break;
-                        case 'bottom-right':
-                            positionStyle = `bottom: ${-8 + (index * offsetMultiplier)}px; right: -8px;`;
-                            break;
-                    }
+                    // Encode special characters for CSS class names
+                    let cssClassName = item.tag;
+                    if (cssClassName === '++') cssClassName = 'plusplus';
+                    else if (cssClassName === '+') cssClassName = 'plus';
+                    else if (cssClassName === '--') cssClassName = 'minusminus';
+                    else if (cssClassName === '-') cssClassName = 'minus';
+                    else if (cssClassName === 'ø') cssClassName = 'oslash';
 
                     const badgeContent = badge.image ? '' : (badge.label || '');
-                    badgesHtml += `<div class="corner-badge corner-badge-${item.tag}" style="${positionStyle}" data-badge-position="${position}" data-badge-index="${index}">${badgeContent}</div>`;
-                });
-            });
-        }
 
-        if (badgesHtml && badgesHtml.trim() !== '') {
-            badgesContainer = document.createElement('div');
-            badgesContainer.className = 'corner-badges-container';
-            badgesContainer.style.cssText = 'position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 10;';
-            badgesContainer.innerHTML = badgesHtml;
-            // For columns, append to column-title; for tasks, append to element
-            const targetContainer = elementType === 'column' ? element.querySelector('.column-title') || element : element;
-            targetContainer.appendChild(badgesContainer);
+                    // Only apply background and color styles - NO position calculations!
+                    const bgColor = badge.color || '#FF0000';
+                    const textColor = badge.labelColor || '#ffffff';
+                    const inlineStyles = `background: ${bgColor} !important; color: ${textColor} !important;`;
+
+                    const badgeElement = document.createElement('div');
+                    badgeElement.className = `corner-badge corner-badge-${cssClassName}`;
+                    badgeElement.style.cssText = inlineStyles;
+                    badgeElement.setAttribute('data-badge-position', position);
+                    badgeElement.setAttribute('data-badge-index', index);
+                    badgeElement.textContent = badgeContent;
+
+                    cornerContainer.appendChild(badgeElement);
+                });
+
+                // For columns, append to column-title; for tasks, append to task-header
+                const targetContainer = elementType === 'column'
+                    ? element.querySelector('.column-title') || element
+                    : element.querySelector('.task-header') || element;
+                console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
+                targetContainer.appendChild(cornerContainer);
+            });
         }
     }
     

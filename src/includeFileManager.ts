@@ -46,7 +46,6 @@ export class IncludeFileManager {
     }
 
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard, documentGetter: any, filePathGetter: any): Promise<boolean> {
-        console.log('[trackIncludeFileUnsavedChanges] ===== TRACKING INCLUDE CHANGES =====');
 
         // Update ColumnIncludeFile instances with current task content (without saving to disk)
         for (const column of board.columns) {
@@ -60,11 +59,6 @@ export class IncludeFileManager {
                         const currentContent = file.getContent();
                         const hasUnsaved = file.hasUnsavedChanges();
 
-                        console.log(`[trackIncludeFileUnsavedChanges] Column include: ${relativePath}`);
-                        console.log(`  Generated content length: ${content.length}`);
-                        console.log(`  Current content length: ${currentContent.length}`);
-                        console.log(`  Content changed: ${content !== currentContent}`);
-                        console.log(`  Already has unsaved: ${hasUnsaved}`);
 
                         // CRITICAL PROTECTION: Never replace existing content with empty
                         if (!content.trim() && currentContent.trim()) {
@@ -77,15 +71,12 @@ export class IncludeFileManager {
 
                         // Only update if content actually changed to prevent infinite loop
                         if (content !== currentContent) {
-                            console.log(`  → Updating content (marking as unsaved)`);
                             file.setContent(content, false); // false = NOT saved yet
                         } else {
                             // Content is already correct, but column was edited - still mark as unsaved
-                            console.log(`  → Content already correct, but marking as unsaved (column was edited)`);
                             file.setContent(currentContent, false); // Force hasUnsavedChanges = true
                         }
                     } else {
-                        console.log(`[trackIncludeFileUnsavedChanges] ⚠️  File NOT found in registry: ${relativePath}`);
                     }
                 }
             }
@@ -110,14 +101,6 @@ export class IncludeFileManager {
                             const currentContent = file.getContent();
                             const hasUnsaved = file.hasUnsavedChanges();
 
-                            console.log(`[trackIncludeFileUnsavedChanges] Task include: ${relativePath}`);
-                            console.log(`  task.displayTitle: "${task.displayTitle}" (UI header only)`);
-                            console.log(`  task.description length: ${task.description?.length || 0}`);
-                            console.log(`  task.description (first 100 chars): "${task.description?.substring(0, 100)}"`);
-                            console.log(`  file.getContent() length: ${currentContent.length}`);
-                            console.log(`  file.getContent() (first 100 chars): "${currentContent.substring(0, 100)}"`);
-                            console.log(`  Content changed: ${fullContent !== currentContent}`);
-                            console.log(`  Already has unsaved: ${hasUnsaved}`);
 
                             // CRITICAL PROTECTION: Never replace existing content with empty
                             // This prevents content loss when include files aren't found during re-parse
@@ -132,12 +115,10 @@ export class IncludeFileManager {
                             }
 
                             if (fullContent !== currentContent) {
-                                console.log(`  → Updating content (marking as unsaved)`);
                                 // Update file content (marks as unsaved if changed)
                                 file.setTaskDescription(fullContent);
                             } else {
                                 // Content is already correct, but task was edited - still mark as unsaved
-                                console.log(`  → Content already correct, but marking as unsaved (task was edited)`);
                                 file.setContent(currentContent, false); // Force hasUnsavedChanges = true
                             }
                         }
@@ -146,7 +127,6 @@ export class IncludeFileManager {
             }
         }
 
-        console.log('[trackIncludeFileUnsavedChanges] ===== DONE =====');
 
         return false; // Return false = main file also needs saving
     }
@@ -180,10 +160,6 @@ export class IncludeFileManager {
                 // Just use task.description directly - it contains the full file content
                 const fullContent = task.description || '';
 
-                console.log(`[saveTaskIncludeChanges] Saving ${relativePath}`);
-                console.log(`  task.displayTitle: "${task.displayTitle}" (UI header only, not saved)`);
-                console.log(`  task.description length: ${fullContent.length}`);
-                console.log(`  task.description (first 100 chars): "${fullContent.substring(0, 100)}"`);
 
                 // Only save if there's content
                 if (fullContent.trim()) {
@@ -257,8 +233,6 @@ export class IncludeFileManager {
     }
 
     public ensureIncludeFileRegistered(relativePath: string, type: string, documentGetter: any): void {
-        console.log(`\n========== ensureIncludeFileRegistered ==========`);
-        console.log(`[IncludeFileManager] CALLED with: ${relativePath}, type: ${type}`);
 
         // BUGFIX: If an absolute path is passed, convert it to relative
         // This can happen during include switches when resolved paths are passed
@@ -270,30 +244,22 @@ export class IncludeFileManager {
             }
             const baseDir = path.dirname(mainFile.getPath());
             relativePath = path.relative(baseDir, relativePath);
-            console.log(`[IncludeFileManager] 🔄 Converted absolute to relative: ${relativePath}`);
         }
 
         // BUGFIX: Normalize ./ prefix to match registry format
         // Registry may store "root/file.md" but frontend sends "./root/file.md"
         if (relativePath.startsWith('./')) {
             relativePath = relativePath.substring(2);
-            console.log(`[IncludeFileManager] 🔄 Normalized path (removed ./): ${relativePath}`);
         }
 
         // PERFORMANCE: Fast check using registration cache
         if (this.fileRegistry.isBeingRegistered(relativePath)) {
-            console.debug(`[IncludeFileManager] ⏭️  Already being registered: ${relativePath}`);
-            console.log(`================================================\n`);
             return;
         }
 
         // Check if file is already registered
         if (this.fileRegistry.hasByRelativePath(relativePath)) {
-            console.log(`[IncludeFileManager] ✓ Already registered: ${relativePath}`);
             const file = this.fileRegistry.getByRelativePath(relativePath);
-            console.log(`[IncludeFileManager]   - File type: ${file?.getFileType()}`);
-            console.log(`[IncludeFileManager]   - Has watcher: ${file ? 'yes' : 'no'}`);
-            console.log(`================================================\n`);
             return;
         }
 
@@ -306,8 +272,6 @@ export class IncludeFileManager {
             this._performLazyRegistration(relativePath, type);
         }, 0);
 
-        console.log(`[IncludeFileManager] ⏰ Scheduled lazy registration: ${relativePath}`);
-        console.log(`================================================\n`);
     }
 
     /**
@@ -325,7 +289,6 @@ export class IncludeFileManager {
         try {
             // Double-check if file is still needed (might have been registered by another call)
             if (this.fileRegistry.hasByRelativePath(relativePath)) {
-                console.debug(`[IncludeFileManager] File already registered during lazy load: ${relativePath}`);
                 return;
             }
 
@@ -336,7 +299,6 @@ export class IncludeFileManager {
                 return;
             }
 
-            console.log(`[IncludeFileManager] → Creating ${type} include file (lazy): ${relativePath}`);
 
             // Create appropriate file type
             let includeFile;
@@ -353,12 +315,9 @@ export class IncludeFileManager {
 
             // Register and start watching
             this.fileRegistry.register(includeFile);
-            console.log(`[IncludeFileManager] ✓ Registered in file registry (lazy)`);
 
             includeFile.startWatching();
-            console.log(`[IncludeFileManager] ✓ Started file watcher (lazy)`);
 
-            console.log(`[IncludeFileManager] ✓✓✓ SUCCESS! Now tracking: ${relativePath} (lazy)`);
         } catch (error) {
             console.error(`[IncludeFileManager] ✗✗✗ ERROR during lazy registration:`, error);
         }

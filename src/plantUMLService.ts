@@ -19,7 +19,6 @@ export class PlantUMLService {
         // Try to execute 'dot -V' with default PATH
         try {
             execSync('dot -V', { stdio: 'pipe' });
-            console.log('[PlantUML Service] Graphviz found in PATH');
             return true;
         } catch (error) {
             // Not in PATH, check common installation locations
@@ -39,7 +38,6 @@ export class PlantUMLService {
                 if (fs.existsSync(dotPath)) {
                     // Verify it's executable by running it
                     execSync(`${dotPath} -V`, { stdio: 'pipe' });
-                    console.log(`[PlantUML Service] Graphviz found at: ${dotPath}`);
                     return true;
                 }
             } catch (error) {
@@ -79,8 +77,6 @@ export class PlantUMLService {
     async renderSVG(code: string): Promise<string> {
         return new Promise((resolve, reject) => {
             try {
-                console.log('[PlantUML Service] Starting SVG render (direct Java spawn)...');
-                console.log('[PlantUML Service] Code length:', code.length);
 
                 // Check if Graphviz is installed and warn user if not
                 if (!this.isGraphvizInstalled()) {
@@ -93,7 +89,6 @@ export class PlantUMLService {
                 const vendorPath = path.join(__dirname, '../node_modules/node-plantuml/vendor');
                 const plantumlJar = path.join(vendorPath, 'plantuml-modern.jar');  // Use modern v1.2024.7
 
-                console.log('[PlantUML Service] Using PlantUML JAR:', plantumlJar);
 
                 // Use Smetana layout engine (pure Java, no external dependencies)
                 // Smetana is a built-in Graphviz replacement that works offline
@@ -114,23 +109,19 @@ export class PlantUMLService {
 
                 // Collect stdout data
                 child.stdout.on('data', (chunk: Buffer) => {
-                    console.log('[PlantUML Service] Received stdout chunk, length:', chunk.length);
                     chunks.push(chunk);
                 });
 
                 child.stdout.on('end', () => {
-                    console.log('[PlantUML Service] stdout ended. Total chunks:', chunks.length);
                 });
 
                 // Collect stderr for errors
                 child.stderr.on('data', (chunk: Buffer) => {
                     stderrData += chunk.toString();
-                    console.log('[PlantUML Service] stderr:', chunk.toString().trim());
                 });
 
                 // Handle process exit
                 child.on('close', (exitCode) => {
-                    console.log('[PlantUML Service] Process exited with code:', exitCode);
 
                     if (exitCode !== 0) {
                         reject(new Error(`PlantUML process failed with exit code ${exitCode}: ${stderrData}`));
@@ -148,7 +139,6 @@ export class PlantUMLService {
                     }
 
                     const svg = Buffer.concat(chunks).toString('utf8');
-                    console.log('[PlantUML Service] ✅ SVG rendered successfully, length:', svg.length);
                     resolve(svg);
                 });
 
@@ -158,10 +148,8 @@ export class PlantUMLService {
                 });
 
                 // Write PlantUML code to stdin
-                console.log('[PlantUML Service] Writing code to stdin...');
                 child.stdin.write(code);
                 child.stdin.end();
-                console.log('[PlantUML Service] stdin closed, waiting for output...');
 
                 // Timeout after 30 seconds
                 setTimeout(() => {

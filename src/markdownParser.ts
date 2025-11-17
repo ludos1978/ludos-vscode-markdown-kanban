@@ -12,7 +12,8 @@ export interface KanbanTask {
   title: string;
   description?: string;
   includeMode?: boolean;  // When true, content is generated from included files
-  includeFiles?: string[]; // Paths to included files
+  includeFiles?: string[]; // Paths to included files (for task includes - includeMode=true)
+  regularIncludeFiles?: string[]; // Paths to regular includes (!!!include()!!! in description)
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
@@ -35,6 +36,7 @@ export interface KanbanBoard {
   columns: KanbanColumn[];
   yamlHeader: string | null;
   kanbanFooter: string | null;
+  frontmatter?: Record<string, string>;
 }
 
 export class MarkdownKanbanParser {
@@ -44,63 +46,21 @@ export class MarkdownKanbanParser {
    * Find existing column by position with content verification
    * Backend markdown is source of truth - preserve IDs only when content matches
    */
+  /**
+   * Find existing column by POSITION ONLY
+   * CRITICAL: NEVER match by title - position determines identity
+   * Titles can be duplicated, changed, or empty
+   */
   private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number, newTasks?: KanbanTask[]): KanbanColumn | undefined {
     if (!existingBoard) return undefined;
 
-    // Try to match by position first
+    // ONLY match by position - title/content matching is FORBIDDEN
     if (columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
-      const candidateColumn = existingBoard.columns[columnIndex];
-
-      // CRITICAL VERIFICATION: For columns, verify task composition hasn't changed
-      // If we're checking a column with tasks, verify all task IDs are present
-      if (newTasks && newTasks.length > 0) {
-        const newTaskIds = new Set(newTasks.map(t => t.id));
-        const oldTaskIds = new Set(candidateColumn.tasks.map(t => t.id));
-
-        // If task IDs match, it's the same column (even if title changed)
-        const sameTaskIds =
-          newTaskIds.size === oldTaskIds.size &&
-          [...newTaskIds].every(id => oldTaskIds.has(id));
-
-        if (sameTaskIds) {
-          return candidateColumn;
-        }
-        // Task composition changed - this is a DIFFERENT column, don't preserve ID
-        return undefined;
-      }
-
-      // For include columns, match by position only (title changes when switching files)
-      const isIncludeColumn = title.includes('!!!include(') || candidateColumn.includeMode;
-      if (isIncludeColumn) {
-        return candidateColumn; // Same position = same column, even if title/content changed
-      }
-
-      // For regular columns without tasks, match by title
-      if (candidateColumn.title === title) {
-        return candidateColumn;
-      }
-
-      return undefined;
+      return existingBoard.columns[columnIndex];
     }
 
-    // Fallback: match by title
-    return existingBoard.columns.find(col => col.title === title);
-  }
-
-  /**
-   * Find existing task by CONTENT (title + description)
-   * Backend markdown is source of truth - match by complete content, not position
-   * Position can change when tasks are reordered, but content is the identifier
-   */
-  private static findExistingTask(existingColumn: KanbanColumn | undefined, title: string, description?: string): KanbanTask | undefined {
-    if (!existingColumn) return undefined;
-
-    // CRITICAL: Match by CONTENT (title + description), not position
-    // If both title AND description match exactly, it's the same task
-    return existingColumn.tasks.find(task =>
-      task.title === title &&
-      task.description === (description || '')
-    );
+    // No position provided or out of bounds - this is a NEW column
+    return undefined;
   }
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
@@ -340,7 +300,40 @@ export class MarkdownKanbanParser {
       // Detect regular includes in task descriptions (not handled by parser, but tracked for file watching)
       this.detectRegularIncludes(board, includedFiles);
 
+      // Parse Marp global settings from YAML frontmatter
+      board.frontmatter = this.parseMarpFrontmatter(board.yamlHeader || '');
+
       return { board, includedFiles, columnIncludeFiles, taskIncludeFiles };
+  }
+
+  /**
+   * Parse Marp global settings from YAML frontmatter
+   */
+  private static parseMarpFrontmatter(yamlHeader: string): Record<string, string> {
+    const frontmatter: Record<string, string> = {};
+
+    if (!yamlHeader) {
+      return frontmatter;
+    }
+
+    const lines = yamlHeader.split('\n');
+    const marpKeys = ['theme', 'style', 'headingDivider', 'size', 'math', 'title', 'author',
+                      'description', 'keywords', 'url', 'image', 'marp', 'paginate',
+                      'header', 'footer', 'class', 'backgroundColor', 'backgroundImage',
+                      'backgroundPosition', 'backgroundRepeat', 'backgroundSize', 'color'];
+
+    for (const line of lines) {
+      const match = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+      if (match) {
+        const key = match[1];
+        const value = match[2].trim();
+        if (marpKeys.includes(key)) {
+          frontmatter[key] = value;
+        }
+      }
+    }
+
+    return frontmatter;
   }
 
   private static processTaskIncludes(board: KanbanBoard, basePath?: string, taskIncludeFiles?: string[]): void {
@@ -422,14 +415,29 @@ export class MarkdownKanbanParser {
         }
 
         if (task.description) {
+          // Track which regular includes this task uses
+          const taskIncludes: string[] = [];
+
           let match;
           // Reset regex state
           includeRegex.lastIndex = 0;
           while ((match = includeRegex.exec(task.description)) !== null) {
             const includeFile = match[1].trim();
+
+            // Add to global list if not already present
             if (!includedFiles.includes(includeFile)) {
               includedFiles.push(includeFile);
             }
+
+            // Track this include for this specific task
+            if (!taskIncludes.includes(includeFile)) {
+              taskIncludes.push(includeFile);
+            }
+          }
+
+          // Store the list of regular includes for this task
+          if (taskIncludes.length > 0) {
+            task.regularIncludeFiles = taskIncludes;
           }
         }
       }
@@ -447,20 +455,24 @@ export class MarkdownKanbanParser {
       // DO NOT trim whitespace - preserve user's formatting including trailing newlines
     }
 
-    // CRITICAL: Match by content to preserve ID (Backend is source of truth)
-    // Find existing column by POSITION (title may have changed with include switch!)
+    // CRITICAL: Match by POSITION to preserve ID (Backend is source of truth)
+    // Content matching alone is WRONG - empty tasks would all share the same ID!
     let existingCol: KanbanColumn | undefined;
     if (existingBoard && columnIndex !== undefined && columnIndex >= 0 && columnIndex < existingBoard.columns.length) {
       existingCol = existingBoard.columns[columnIndex];
     }
 
     if (existingCol) {
-      // Try to find matching task by complete content (title + description)
-      const existingTask = this.findExistingTask(existingCol, task.title, task.description);
+      // CRITICAL FIX: Match by POSITION in array, not content
+      // Position determines identity - content can be duplicated (e.g., multiple empty tasks)
+      const taskPosition = column.tasks.length; // Current position being added
+      const existingTask = existingCol.tasks[taskPosition];
+
       if (existingTask) {
-        // Content matches - preserve the existing ID
+        // Position matches - preserve the existing ID
         task.id = existingTask.id;
       }
+      // else: New task at this position - keep the generated UUID
     }
 
     column.tasks.push(task);

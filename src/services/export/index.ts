@@ -4,6 +4,6 @@
  */
 
 export { MarpExportService, MarpExportOptions, MarpOutputFormat } from './MarpExportService';
-export { MarpConverter, MarpConversionOptions } from './MarpConverter';
 export { MarpExtensionService } from './MarpExtensionService';
 export { FormatConverter } from './FormatConverter';
+export { PresentationGenerator, PresentationOptions, MarpOptions } from './PresentationGenerator';

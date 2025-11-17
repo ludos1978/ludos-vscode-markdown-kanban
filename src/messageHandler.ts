@@ -4,7 +4,7 @@ import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
-import { configService } from './configurationService';
+import { configService, ConfigurationService } from './configurationService';
 import { ExportService, NewExportOptions } from './exportService';
 import { PathResolver } from './services/PathResolver';
 import { MarpExtensionService } from './services/export/MarpExtensionService';
@@ -380,6 +380,10 @@ export class MessageHandler {
                 } else {
                     console.warn('❌ No current board available for undo state saving');
                 }
+                break;
+            case 'updateMarpGlobalSetting':
+                // Update Marp global setting in YAML frontmatter
+                await this.handleUpdateMarpGlobalSetting(message.key, message.value);
                 break;
             case 'pageHiddenWithUnsavedChanges':
                 // Handle page becoming hidden with unsaved changes
@@ -1034,6 +1038,10 @@ export class MessageHandler {
                 await this.handleCheckMarpStatus();
                 break;
 
+            case 'getMarpAvailableClasses':
+                await this.handleGetMarpAvailableClasses();
+                break;
+
             case 'showError':
                 vscode.window.showErrorMessage(message.message);
                 break;
@@ -1364,6 +1372,79 @@ export class MessageHandler {
     }
 
     /**
+     * Handle updating a Marp global setting in the YAML frontmatter
+     * This updates the board's yamlHeader in memory and marks as unsaved
+     * The actual file write happens when user saves (Ctrl+S)
+     */
+    private async handleUpdateMarpGlobalSetting(key: string, value: string): Promise<void> {
+        try {
+            const board = this._getCurrentBoard();
+            if (!board) {
+                console.error('[MessageHandler] No board to update Marp setting');
+                return;
+            }
+
+            // Get current YAML header or create new one
+            let yamlHeader = board.yamlHeader || '';
+            const lines = yamlHeader.split('\n');
+
+            // Find YAML frontmatter boundaries (without the --- delimiters)
+            let keyFound = false;
+
+            // If empty, initialize with kanban-plugin marker
+            if (!yamlHeader || yamlHeader.trim() === '') {
+                yamlHeader = 'kanban-plugin: board';
+                lines.length = 0;
+                lines.push('kanban-plugin: board');
+            }
+
+            // Update or add the key
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*.*/);
+                if (keyMatch && keyMatch[2] === key) {
+                    // Update existing key or remove if empty
+                    if (value === '' || value === null || value === undefined) {
+                        lines.splice(i, 1);
+                    } else {
+                        lines[i] = `${keyMatch[1]}${key}: ${value}`;
+                    }
+                    keyFound = true;
+                    break;
+                }
+            }
+
+            // If key not found and value is not empty, add it
+            if (!keyFound && value !== '' && value !== null && value !== undefined) {
+                lines.push(`${key}: ${value}`);
+            }
+
+            // Update board's yamlHeader
+            board.yamlHeader = lines.filter(line => line.trim() !== '').join('\n');
+
+            // CRITICAL: Also update the frontmatter object that frontend reads from
+            if (!board.frontmatter) {
+                board.frontmatter = {};
+            }
+            if (value === '' || value === null || value === undefined) {
+                delete board.frontmatter[key];
+            } else {
+                board.frontmatter[key] = value;
+            }
+
+            // Mark as unsaved changes (will be written when user saves)
+            // Frontend already updated optimistically, so don't send board update back
+            this._markUnsavedChanges(true, board);
+
+            console.log(`[MessageHandler] Updated Marp global setting in memory: ${key} = ${value}`);
+
+        } catch (error) {
+            console.error('[MessageHandler] Error updating Marp global setting:', error);
+            vscode.window.showErrorMessage(`Failed to update Marp setting: ${error}`);
+        }
+    }
+
+    /**
      * Handle opening a file in VS Code
      */
     private async handleOpenFile(filePath: string): Promise<void> {
@@ -1453,6 +1534,32 @@ export class MessageHandler {
         // The webview already has the correct state (it sent us this board)
         // Triggering _onBoardUpdate() would cause folding state to be lost
         await this._onSaveToMarkdown();
+
+        // Trigger marpWatch export if active
+        if (this._autoExportSettings?.marpWatch) {
+            // Get document from fileManager, or reopen from file path if needed
+            let document = this._fileManager.getDocument();
+            const filePath = this._fileManager.getFilePath();
+
+            // If document is closed but we have a file path, reopen it
+            if (!document && filePath) {
+                const vscode = require('vscode');
+                try {
+                    document = await vscode.workspace.openTextDocument(filePath);
+                } catch (error) {
+                    console.error(`[MessageHandler.saveBoardState] Failed to reopen document:`, error);
+                }
+            }
+
+            if (document) {
+                const ExportService = require('./exportService').ExportService;
+                try {
+                    await ExportService.export(document, this._autoExportSettings, board);
+                } catch (error) {
+                    console.error('[MessageHandler.saveBoardState] MarpWatch export failed:', error);
+                }
+            }
+        }
 
         // No board update needed - webview state is already correct
     }
@@ -1589,7 +1696,6 @@ export class MessageHandler {
 
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
-            console.log(`[MessageHandler] Handling shortcut: ${message.shortcut}, selected text: "${message.selectedText}"`);
 
             // First, check user keybindings
             let userCommand = await this.getCommandForShortcut(message.shortcut);
@@ -1600,13 +1706,11 @@ export class MessageHandler {
             }
 
             if (userCommand) {
-                console.log(`[MessageHandler] Found command: ${userCommand}`);
 
                 try {
                     // For commands that work on text selection (like translators):
                     // Create a temp document, execute the command, capture result, close document
                     if (message.selectedText && message.selectedText.length > 0) {
-                        console.log(`[MessageHandler] Creating temp document for command execution`);
 
                         // Create temp document with selected text
                         const tempDoc = await vscode.workspace.openTextDocument({
@@ -1628,7 +1732,6 @@ export class MessageHandler {
                             new vscode.Position(tempDoc.lineCount - 1, lastLine.text.length)
                         );
 
-                        console.log(`[MessageHandler] Executing command: ${userCommand}`);
                         // Execute the command (e.g., DeepL translate)
                         await vscode.commands.executeCommand(userCommand);
 
@@ -1637,7 +1740,6 @@ export class MessageHandler {
 
                         // Get the result
                         const resultText = tempDoc.getText();
-                        console.log(`[MessageHandler] Command executed, result length: ${resultText.length}`);
 
                         // Send the result back to the webview first
                         const panel = this._getWebviewPanel();
@@ -1669,7 +1771,6 @@ export class MessageHandler {
                     } else {
                         // No selection - execute normally
                         await vscode.commands.executeCommand(userCommand);
-                        console.log(`[MessageHandler] Command executed (no selection)`);
                     }
 
                     return;
@@ -1678,7 +1779,6 @@ export class MessageHandler {
                 }
             }
 
-            console.log(`[MessageHandler] Shortcut not found. Add to keybindings.json to use in kanban editor.`);
 
         } catch (error) {
             console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
@@ -1712,7 +1812,6 @@ export class MessageHandler {
             const extensionShortcuts = await this.getExtensionShortcuts();
             Object.assign(shortcutMap, extensionShortcuts);
 
-            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} shortcuts for webview`);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
@@ -1743,17 +1842,14 @@ export class MessageHandler {
     }
 
     private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
-        console.log(`[MessageHandler] Checking extension shortcuts for: ${shortcut}`);
 
         const extensionShortcuts = await this.getExtensionShortcuts();
         const command = extensionShortcuts[shortcut];
 
         if (command) {
-            console.log(`[MessageHandler] Found extension command: ${command} for shortcut ${shortcut}`);
             return command;
         }
 
-        console.log(`[MessageHandler] No extension shortcut mapped for ${shortcut}`);
         return null;
     }
 
@@ -1762,31 +1858,25 @@ export class MessageHandler {
             // Read VS Code's keybindings configuration
             const keybindings = await this.loadVSCodeKeybindings();
 
-            console.log(`[MessageHandler] Looking for command for shortcut: ${shortcut}`);
-            console.log(`[MessageHandler] Loaded ${keybindings.length} keybindings`);
 
             // Debug: Show all keybindings that contain 'alt' or match the letter
             const shortcutLetter = shortcut.split('+').pop();
             const relevantBindings = keybindings.filter(b =>
                 b.key && (b.key.includes('alt') || b.key.includes(shortcutLetter || ''))
             );
-            console.log(`[MessageHandler] Relevant bindings:`, relevantBindings.slice(0, 10));
 
             // Find keybinding that matches our shortcut
             for (const binding of keybindings) {
                 if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
                     // Skip negative bindings (commands starting with -)
                     if (binding.command.startsWith('-')) {
-                        console.log(`[MessageHandler] Skipping negative binding: ${binding.command}`);
                         continue;
                     }
 
-                    console.log(`[MessageHandler] Found matching command: ${binding.command}`);
                     return binding.command;
                 }
             }
 
-            console.log(`[MessageHandler] No command found for shortcut ${shortcut}`);
             return null;
 
         } catch (error) {
@@ -2399,18 +2489,8 @@ export class MessageHandler {
                 panel.syncIncludeFilesWithBoard(board);
             }
 
-            // If this is an immediate update (like column include changes), trigger a save and reload
-            if (message.immediate) {
-
-                // Save the changes to markdown
-                await this._onSaveToMarkdown();
-
-                // Trigger a board update to reload with new include files
-                await this._onBoardUpdate();
-            } else {
-                // Regular update - just mark as unsaved
-                this._markUnsavedChanges(true, board);
-            }
+            // Mark as unsaved - user must explicitly save via Cmd+S or debug overlay
+            this._markUnsavedChanges(true, board);
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);
@@ -2997,7 +3077,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log(`[MessageHandler] Saving individual file ${filePath} (forceSave: ${forceSave})`);
 
             if (isMainFile) {
                 // Save ONLY the main kanban file (not includes)
@@ -3025,10 +3104,36 @@ export class MessageHandler {
                 await saveCoordinator.saveFile(mainFile, markdown);
 
                 // Update main file state after save
-                mainFile.updateFromBoard(board);
-                mainFile.setContent(markdown, true); // true = update baseline
+                // CRITICAL: Pass updateBaseline=true since we just saved to disk
+                mainFile.updateFromBoard(board, true, true);
+                // NOTE: No need for second setContent call - updateFromBoard already updated baseline
 
-                console.log(`[MessageHandler] Successfully saved ${filePath}`);
+
+                // Trigger marpWatch export if active
+                if (this._autoExportSettings?.marpWatch) {
+                    // Get document from fileManager, or reopen from file path if needed
+                    let document = this._fileManager.getDocument();
+                    const filePathForReopen = this._fileManager.getFilePath();
+
+                    // If document is closed but we have a file path, reopen it
+                    if (!document && filePathForReopen) {
+                        const vscode = require('vscode');
+                        try {
+                            document = await vscode.workspace.openTextDocument(filePathForReopen);
+                        } catch (error) {
+                            console.error(`[MessageHandler.saveIndividualFile] Failed to reopen document:`, error);
+                        }
+                    }
+
+                    if (document) {
+                        const ExportService = require('./exportService').ExportService;
+                        try {
+                            await ExportService.export(document, this._autoExportSettings, board);
+                        } catch (error) {
+                            console.error('[MessageHandler.saveIndividualFile] MarpWatch export failed:', error);
+                        }
+                    }
+                }
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileSaved',
@@ -3050,14 +3155,42 @@ export class MessageHandler {
                 }
 
                 // Save the file (force save always writes to disk)
-                console.log(`[MessageHandler] Saving ${filePath} (forceSave: ${forceSave})`);
                 await file.save({
                     skipReloadDetection: true,
                     source: 'ui-edit',
                     skipValidation: false
                 });
 
-                console.log(`[MessageHandler] Successfully saved ${filePath}`);
+
+                // Trigger marpWatch export if active (include file change requires re-export)
+                if (this._autoExportSettings?.marpWatch) {
+                    // Get document from fileManager, or reopen from file path if needed
+                    let document = this._fileManager.getDocument();
+                    const filePathForReopen = this._fileManager.getFilePath();
+
+                    // If document is closed but we have a file path, reopen it
+                    if (!document && filePathForReopen) {
+                        const vscode = require('vscode');
+                        try {
+                            document = await vscode.workspace.openTextDocument(filePathForReopen);
+                        } catch (error) {
+                            console.error(`[MessageHandler.saveIndividualFile] Failed to reopen document:`, error);
+                        }
+                    }
+
+                    if (document) {
+                        const ExportService = require('./exportService').ExportService;
+                        // Get current board state for export
+                        const fileService = (panel as any)._fileService;
+                        const board = fileService?.board();
+
+                        try {
+                            await ExportService.export(document, this._autoExportSettings, board);
+                        } catch (error) {
+                            console.error('[MessageHandler.saveIndividualFile] MarpWatch export failed:', error);
+                        }
+                    }
+                }
 
                 // Send success message to frontend
                 panel._panel.webview.postMessage({
@@ -3099,7 +3232,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log(`[MessageHandler] Reloading individual file ${filePath} (isMainFile: ${isMainFile})`);
 
             if (isMainFile) {
                 // Reload ONLY the main kanban file (not includes)
@@ -3111,11 +3243,9 @@ export class MessageHandler {
                 }
 
                 // Force reload the file from disk (bypass mtime check AND open document)
-                console.log(`[MessageHandler] Force reloading ${filePath} from ACTUAL disk file (not open document)`);
                 const fs = require('fs').promises;
                 const freshContent = await fs.readFile(filePath, 'utf-8');
                 mainFile.setContent(freshContent, true); // true = update baseline
-                console.log(`[MessageHandler] Successfully force reloaded ${filePath} (${freshContent.length} chars) from disk`);
 
                 // Re-parse the board from the fresh content
                 (mainFile as any).parseToBoard();
@@ -3129,12 +3259,10 @@ export class MessageHandler {
 
                     // Send the fresh board to frontend
                     await fileService.sendBoardUpdate(false, false); // don't preserve selection, don't force reload
-                    console.log(`[MessageHandler] Sent fresh board to frontend after reload`);
                 } else {
                     console.warn(`[MessageHandler] Board invalid after parsing reloaded content`);
                 }
 
-                console.log(`[MessageHandler] Successfully reloaded ${filePath}`);
 
                 panel._panel.webview.postMessage({
                     type: 'individualFileReloaded',
@@ -3162,11 +3290,9 @@ export class MessageHandler {
                 }
 
                 // Force reload the file from disk (bypass mtime check)
-                console.log(`[MessageHandler] Force reloading ${absolutePath} from ACTUAL disk file`);
                 const fs = require('fs').promises;
                 const freshContent = await fs.readFile(absolutePath, 'utf-8');
                 file.setContent(freshContent, true); // true = update baseline
-                console.log(`[MessageHandler] Successfully force reloaded ${absolutePath} (${freshContent.length} chars) from disk`);
 
                 // Trigger board regeneration from main file (which includes this include file)
                 const fileService = (panel as any)._fileService;
@@ -3178,11 +3304,9 @@ export class MessageHandler {
                     if (freshBoard && freshBoard.valid) {
                         fileService.setBoard(freshBoard);
                         await fileService.sendBoardUpdate(false, false);
-                        console.log(`[MessageHandler] Sent fresh board to frontend after include file reload`);
                     }
                 }
 
-                console.log(`[MessageHandler] Successfully reloaded ${absolutePath}`);
 
                 // Send success message to frontend
                 panel._panel.webview.postMessage({
@@ -3238,7 +3362,6 @@ export class MessageHandler {
             // Force write ALL files
             const result = await fileRegistry.forceWriteAll();
 
-            console.log(`[MessageHandler] Force write completed: ${result.filesWritten} files written, ${result.errors.length} errors`);
 
             // Send success response to frontend
             panel._panel.webview.postMessage({
@@ -3290,7 +3413,6 @@ export class MessageHandler {
                 true  // forceCreate
             );
 
-            console.log(`[MessageHandler] Created backup before force write: ${backupPath}`);
             return backupPath;
 
         } catch (error) {
@@ -3310,7 +3432,6 @@ export class MessageHandler {
                 return;
             }
 
-            console.log('[MessageHandler] Starting content synchronization verification');
 
             if (!frontendBoard) {
                 throw new Error('Frontend board data not provided');
@@ -3345,13 +3466,7 @@ export class MessageHandler {
                 }
 
                 // DEBUG: Log file details
-                console.log(`[MessageHandler] Verifying file: ${file.getRelativePath()}`);
-                console.log(`  File type: ${file.getFileType()}`);
-                console.log(`  Backend content length: ${backendContent.length}`);
-                console.log(`  Backend content preview: ${backendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
                 if (savedFileContent !== null) {
-                    console.log(`  Saved file content length: ${savedFileContent.length}`);
-                    console.log(`  Saved file content preview: ${savedFileContent.substring(0, 100).replace(/\n/g, '\\n')}`);
                 }
 
                 // For main file, regenerate markdown from frontend board
@@ -3359,9 +3474,6 @@ export class MessageHandler {
                     frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
 
                     // DEBUG: Log regenerated content details
-                    console.log(`  Frontend content length: ${frontendContent.length}`);
-                    console.log(`  Frontend content preview: ${frontendContent.substring(0, 100).replace(/\n/g, '\\n')}`);
-                    console.log(`  Length difference: ${frontendContent.length - backendContent.length}`);
 
                     // If there's a difference, show where they diverge
                     if (frontendContent !== backendContent) {
@@ -3376,13 +3488,7 @@ export class MessageHandler {
                         if (firstDiff >= 0) {
                             const start = Math.max(0, firstDiff - 20);
                             const end = Math.min(minLen, firstDiff + 80);
-                            console.log(`  First difference at character ${firstDiff}:`);
-                            console.log(`    Backend: ${JSON.stringify(backendContent.substring(start, end))}`);
-                            console.log(`    Frontend: ${JSON.stringify(frontendContent.substring(start, end))}`);
                         } else if (frontendContent.length !== backendContent.length) {
-                            console.log(`  Content matches up to character ${minLen}, but lengths differ`);
-                            console.log(`    Backend end: ${JSON.stringify(backendContent.substring(minLen - 20))}`);
-                            console.log(`    Frontend end: ${JSON.stringify(frontendContent.substring(minLen - 20))}`);
                         }
                     }
                 } else {
@@ -3397,15 +3503,9 @@ export class MessageHandler {
                 const savedHash = savedFileContent !== null ? this._computeHash(savedFileContent) : null;
 
                 // DEBUG: Log hash calculation
-                console.log(`  Backend hash: ${backendHash.substring(0, 8)}`);
-                console.log(`  Frontend hash: ${frontendHash.substring(0, 8)}`);
                 if (savedHash) {
-                    console.log(`  Saved file hash: ${savedHash.substring(0, 8)}`);
                 }
-                console.log(`  Frontend vs Backend match: ${backendHash === frontendHash}`);
                 if (savedHash) {
-                    console.log(`  Backend vs Saved match: ${backendHash === savedHash}`);
-                    console.log(`  Frontend vs Saved match: ${frontendHash === savedHash}`);
                 }
 
                 const frontendBackendMatch = backendHash === frontendHash;
@@ -3452,7 +3552,6 @@ export class MessageHandler {
                 summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
             });
 
-            console.log(`[MessageHandler] Verification complete: ${matchingFiles} match, ${mismatchedFiles} differ`);
 
         } catch (error) {
             console.error('[MessageHandler] Error during content verification:', error);
@@ -3802,10 +3901,13 @@ export class MessageHandler {
      * Open a markdown file in Marp preview
      */
     private async handleOpenInMarpPreview(filePath: string): Promise<void> {
+
         try {
             await MarpExtensionService.openInMarpPreview(filePath);
         } catch (error) {
-            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error:', error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] ❌ Error:', error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error type:', typeof error);
+            console.error('[kanban.messageHandler.handleOpenInMarpPreview] Error stack:', error instanceof Error ? error.stack : 'N/A');
             const errorMessage = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
         }
@@ -3834,6 +3936,238 @@ export class MessageHandler {
             }
         } catch (error) {
             console.error('[kanban.messageHandler.handleCheckMarpStatus] Error:', error);
+        }
+    }
+
+    /**
+     * Get available Marp CSS classes
+     */
+    private async handleGetMarpAvailableClasses(): Promise<void> {
+        try {
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
+            const availableClasses = marpConfig.availableClasses || [];
+
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpAvailableClasses',
+                    classes: availableClasses
+                });
+            }
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleGetMarpAvailableClasses] Error:', error);
+        }
+    }
+
+    /**
+     * Save Marp CSS classes as HTML comment directives in markdown
+     * Format: <!-- _class: font24 center -->
+     */
+    private async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
+        try {
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Called with:', { scope, columnId, taskId, classes });
+
+            // Create HTML comment directive
+            const classString = classes.join(' ');
+            const directive = classes.length > 0 ? `<!-- _class: ${classString} -->\n` : '';
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Directive:', directive);
+
+            // Get panel to access board
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No panel found');
+                return;
+            }
+
+            // Get current board
+            const board = panel.getBoard();
+            if (!board) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No board found');
+                return;
+            }
+
+            // Get current markdown content from main file
+            const mainFile = panel._fileRegistry.getMainFile();
+            if (!mainFile) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No main file found');
+                return;
+            }
+
+            let markdown = mainFile.getContent();
+            if (!markdown) {
+                console.error('[kanban.messageHandler.handleSaveMarpClasses] No markdown content found');
+                return;
+            }
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Got markdown, length:', markdown.length);
+
+            if (scope === 'global') {
+                // For global scope, add directive at the very beginning (or after YAML)
+                const yamlMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+                const afterYaml = yamlMatch ? yamlMatch[0].length : 0;
+                const beforeFirstColumn = markdown.indexOf('\n## ', afterYaml);
+                const globalEnd = beforeFirstColumn > 0 ? beforeFirstColumn : markdown.length;
+
+                // Remove existing global marp directive (only in global section)
+                const beforeGlobal = markdown.slice(0, afterYaml);
+                let globalSection = markdown.slice(afterYaml, globalEnd);
+                const afterGlobal = markdown.slice(globalEnd);
+
+                // Remove directive from global section only
+                globalSection = globalSection.replace(/<!-- _class: [^>]+ -->\n?/g, '');
+
+                // Insert new directive at start of global section
+                markdown = beforeGlobal + directive + globalSection + afterGlobal;
+            } else if (scope === 'column' && columnId) {
+                // Find column in board
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (!column) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found:', columnId);
+                    return;
+                }
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found column:', column.title);
+
+                // Find column header and add directive BEFORE it
+                const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const columnRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(## ${titleClean})`, 'm');
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex:', columnRegex);
+
+                const originalMarkdown = markdown;
+                markdown = markdown.replace(columnRegex, (match: string, existingDirective: string, header: string) => {
+                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex matched:', { match, existingDirective, header });
+                    // Replace or add directive before column header
+                    return directive + header;
+                });
+                if (markdown === originalMarkdown) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column regex did not match anything!');
+                }
+            } else if (scope === 'task' && columnId && taskId) {
+                // Find task in board
+                const column = board.columns.find((c: any) => c.id === columnId);
+                if (!column) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found for task:', columnId);
+                    return;
+                }
+                const task = column.tasks.find((t: any) => t.id === taskId);
+                if (!task) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task not found:', taskId);
+                    return;
+                }
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found task:', task.title);
+
+                // Find task line and add directive BEFORE it
+                const titleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const taskRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(- \\[[ x]\\] ${titleClean})`, 'm');
+                console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex:', taskRegex);
+
+                const originalMarkdown = markdown;
+                markdown = markdown.replace(taskRegex, (match: string, existingDirective: string, taskLine: string) => {
+                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex matched:', { match, existingDirective, taskLine });
+                    // Replace or add directive before task
+                    return directive + taskLine;
+                });
+                if (markdown === originalMarkdown) {
+                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task regex did not match anything!');
+                }
+            }
+
+            // Update file content (marks as unsaved)
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Setting content, changed:', markdown.length);
+            mainFile.setContent(markdown, false);
+            console.log('[kanban.messageHandler.handleSaveMarpClasses] Content set successfully');
+
+            // After saving, send updated directives to frontend
+            await this.sendMarpDirectivesToFrontend();
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.handleSaveMarpClasses] Error:', error);
+        }
+    }
+
+    /**
+     * Parse HTML comment directives from markdown and send to frontend
+     */
+    private async sendMarpDirectivesToFrontend(): Promise<void> {
+        try {
+            const panel = this._getWebviewPanel();
+            if (!panel) {
+                return;
+            }
+
+            const board = panel.getBoard();
+            if (!board) {
+                return;
+            }
+
+            const mainFile = panel._fileRegistry.getMainFile();
+            if (!mainFile) {
+                return;
+            }
+
+            const markdown = mainFile.getContent();
+            if (!markdown) {
+                return;
+            }
+
+            // Parse directives from markdown
+            const directives: any = {
+                global: [],
+                columns: {},
+                tasks: {}
+            };
+
+            // Extract global directive (after YAML frontmatter, before first column)
+            const yamlMatch = markdown.match(/^---\n[\s\S]*?\n---\n/);
+            const afterYaml = yamlMatch ? yamlMatch[0].length : 0;
+            const beforeFirstColumn = markdown.indexOf('\n## ', afterYaml);
+            const globalSection = beforeFirstColumn > 0
+                ? markdown.slice(afterYaml, beforeFirstColumn)
+                : markdown.slice(afterYaml, Math.min(afterYaml + 500, markdown.length));
+
+            const globalDirectiveMatch = globalSection.match(/<!-- _class: ([^>]+) -->/);
+            if (globalDirectiveMatch) {
+                directives.global = globalDirectiveMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+            }
+
+            // Extract column and task directives
+            if (board.columns) {
+                for (const column of board.columns) {
+                    // Find directive before column header
+                    const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const columnRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*## ${titleClean}`, 'm');
+                    const columnMatch = markdown.match(columnRegex);
+
+                    if (columnMatch) {
+                        const classes = columnMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+                        directives.columns[column.id] = classes;
+                    }
+
+                    // Extract from tasks
+                    if (column.tasks) {
+                        for (const task of column.tasks) {
+                            const taskTitleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const taskRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*- \\[[ x]\\] ${taskTitleClean}`, 'm');
+                            const taskMatch = markdown.match(taskRegex);
+
+                            if (taskMatch) {
+                                const classes = taskMatch[1].split(/\s+/).filter((c: string) => c.length > 0);
+                                directives.tasks[task.id] = classes;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Send to frontend
+            if (panel._panel && panel._panel.webview) {
+                panel._panel.webview.postMessage({
+                    type: 'marpClassDirectives',
+                    directives: directives
+                });
+            }
+
+        } catch (error) {
+            console.error('[kanban.messageHandler.sendMarpDirectivesToFrontend] Error:', error);
         }
     }
 
@@ -3988,7 +4322,7 @@ export class MessageHandler {
             // Handle SAVE / PREVIEW modes (with progress bar)
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `Exporting ${options.scope}...`,
+                title: `Exporting...`,
                 cancellable: false
             }, async (progress) => {
 
@@ -4013,16 +4347,9 @@ export class MessageHandler {
                     });
                 }
 
-                // Open in browser if requested
-                if (result.success && options.openAfterExport && result.exportedPath) {
-                    const uri = vscode.Uri.file(result.exportedPath);
-
-                    if (result.exportedPath.endsWith('.html')) {
-                        await vscode.env.openExternal(vscode.Uri.parse(uri.toString()));
-                    } else {
-                        await vscode.env.openExternal(uri);
-                    }
-                }
+                // Note: When marpWatch is enabled (Live Preview mode), Marp CLI handles
+                // opening the browser automatically with --watch --preview flags.
+                // We don't need to call MarpExtensionService.openInMarpPreview() here.
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 100);

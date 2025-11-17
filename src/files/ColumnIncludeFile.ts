@@ -70,22 +70,12 @@ export class ColumnIncludeFile extends IncludeFile {
     // ============= PARSING =============
 
     /**
-     * Find existing task by title to preserve ID during re-parse
-     */
-    private findExistingTask(existingTasks: KanbanTask[] | undefined, title: string): KanbanTask | undefined {
-        if (!existingTasks) {
-            return undefined;
-        }
-        return existingTasks.find(task => task.title === title);
-    }
-
-    /**
      * Parse presentation format into tasks, preserving IDs for existing tasks
+     * CRITICAL: Match by POSITION only, never by title/content
      * @param existingTasks Optional array of existing tasks to preserve IDs from
      * @param columnId Optional columnId to use for task ID generation (supports file reuse across columns)
      */
     public parseToTasks(existingTasks?: KanbanTask[], columnId?: string): KanbanTask[] {
-        console.log(`[ColumnIncludeFile] Parsing presentation to tasks: ${this._relativePath}`);
 
         // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
@@ -94,10 +84,10 @@ export class ColumnIncludeFile extends IncludeFile {
         // Use provided columnId if available, otherwise fall back to stored _columnId
         const effectiveColumnId = columnId || this._columnId;
 
-        // Update task IDs, preserving existing IDs when task titles match
+        // CRITICAL: Match by POSITION, not title - tasks identified by position
         return tasks.map((task, index) => {
-            // Try to find existing task with same title to preserve ID
-            const existingTask = this.findExistingTask(existingTasks, task.title);
+            // Get existing task at SAME POSITION to preserve ID
+            const existingTask = existingTasks?.[index];
 
             return {
                 ...task,
@@ -112,10 +102,13 @@ export class ColumnIncludeFile extends IncludeFile {
      * Generate presentation format from tasks
      */
     public generateFromTasks(tasks: KanbanTask[]): string {
-        console.log(`[ColumnIncludeFile] Generating presentation from ${tasks.length} tasks: ${this._relativePath}`);
 
-        // Use PresentationParser to convert tasks back to presentation format
-        return PresentationParser.tasksToPresentation(tasks);
+        // Use unified presentation generator (no YAML for copying)
+        const { PresentationGenerator } = require('../services/export/PresentationGenerator');
+        return PresentationGenerator.fromTasks(tasks, {
+            filterIncludes: true
+            // Note: includeMarpDirectives defaults to false (no YAML when copying)
+        });
     }
 
     /**

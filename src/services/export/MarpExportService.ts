@@ -20,6 +20,8 @@ export interface MarpExportOptions {
     theme?: string;
     /** Watch mode: runs Marp with --watch and --preview, stores PID */
     watchMode?: boolean;
+    /** Editable mode: adds --pptx-editable flag for PowerPoint exports */
+    pptxEditable?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
 }
@@ -55,7 +57,6 @@ export class MarpExportService {
         if (pid) {
             try {
                 process.kill(pid);
-                console.log(`[kanban.MarpExportService] Killed Marp process ${pid} for ${filePath}`);
             } catch (error) {
                 console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
             }
@@ -67,7 +68,6 @@ export class MarpExportService {
                 try {
                     if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
-                        console.log(`[kanban.MarpExportService] Cleaned up preprocessed file: ${filePath}`);
                     }
                 } catch (error) {
                     console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
@@ -87,13 +87,11 @@ export class MarpExportService {
      * Stop all Marp watch processes
      */
     public static stopAllMarpWatches(): void {
-        console.log(`[kanban.MarpExportService] Stopping all Marp watch processes (${this.marpProcessPids.size} processes)`);
         const fs = require('fs');
 
         for (const [filePath, pid] of this.marpProcessPids.entries()) {
             try {
                 process.kill(pid);
-                console.log(`[kanban.MarpExportService] Killed Marp process ${pid} for ${filePath}`);
             } catch (error) {
                 console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
             }
@@ -103,7 +101,6 @@ export class MarpExportService {
                 try {
                     if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
-                        console.log(`[kanban.MarpExportService] Cleaned up preprocessed file: ${filePath}`);
                     }
                 } catch (error) {
                     console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
@@ -119,11 +116,11 @@ export class MarpExportService {
      * @returns Promise that resolves when export is complete
      */
     static async export(options: MarpExportOptions): Promise<void> {
+
         // Check if a Marp process is already running for this file (watch mode only)
         if (options.watchMode) {
             const existingPid = this.getMarpPid(options.inputFilePath);
             if (existingPid) {
-                console.log(`[kanban.MarpExportService] Marp process already running for ${options.inputFilePath} (PID: ${existingPid}), skipping new process`);
                 return;
             }
         }
@@ -142,40 +139,57 @@ export class MarpExportService {
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
 
             // Log for debugging
-            console.log(`[kanban.MarpExportService] Exporting with Marp CLI: ${args.join(' ')}`);
-            console.log(`[kanban.MarpExportService] Full args array:`, args);
-            console.log(`[kanban.MarpExportService] Export options:`, JSON.stringify(options, null, 2));
-            console.log(`[kanban.MarpExportService] Marp CLI command: npx @marp-team/marp-cli ${args.join(' ')}`);
 
             // Execute Marp CLI with proper working directory
             const workspaceFolders = vscode.workspace.workspaceFolders;
 
             // if (options.watchMode) {
             // WATCH MODE: Run Marp as detached background process
-            console.log(`[kanban.MarpExportService] Starting Marp in watch mode (detached process)`);
 
-            const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
-                ? workspaceFolders[0].uri.fsPath
-                : process.cwd();
+            // IMPORTANT: Use the directory of the input file as CWD
+            // This ensures markdown-it-include resolves paths relative to the markdown file location
+            const inputFileDir = path.dirname(options.inputFilePath);
 
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
             // Spawn Marp as a detached background process
+            // Use 'pipe' for stdio to capture errors for debugging
             const marpProcess = spawn(command, commandArgs, {
-                cwd: workspaceRoot,
+                cwd: inputFileDir,  // Use input file directory, not workspace root
                 detached: true,
-                stdio: 'ignore'
+                stdio: ['ignore', 'pipe', 'pipe'] // stdin: ignore, stdout: pipe, stderr: pipe
+            });
+
+            // Log any output or errors from the Marp process
+            if (marpProcess.stdout) {
+                marpProcess.stdout.on('data', (data) => {
+                });
+            }
+
+            if (marpProcess.stderr) {
+                marpProcess.stderr.on('data', (data) => {
+                    console.error(`[kanban.MarpExportService.stderr] ${data.toString()}`);
+                });
+            }
+
+            // Handle process errors
+            marpProcess.on('error', (error) => {
+                console.error(`[kanban.MarpExportService] Process error:`, error);
+            });
+
+            marpProcess.on('exit', (code, signal) => {
+                if (options.inputFilePath) {
+                    this.marpProcessPids.delete(options.inputFilePath);
+                }
             });
 
             // Detach from parent process to allow it to run independently
             marpProcess.unref();
 
-            console.log(`[kanban.MarpExportService] Marp watch process started with PID: ${marpProcess.pid}`);
 
             // Store the PID in MarpExportService for later termination
             if (options.inputFilePath && marpProcess.pid) {
-                console.log(`[kanban.MarpExportService] Storing PID ${marpProcess.pid} for file ${options.inputFilePath}`);
                 this.storeMarpPid(options.inputFilePath, marpProcess.pid);
             } else {
                 console.warn(`[kanban.MarpExportService] Could not store PID - inputFilePath: ${options.inputFilePath}, pid: ${marpProcess.pid}`);
@@ -183,7 +197,6 @@ export class MarpExportService {
             // } 
             // else {
             //     // NORMAL MODE: Run Marp synchronously and wait for completion
-            //     console.log(`[kanban.MarpExportService] Starting Marp in normal mode (synchronous)`);
 
             //     let exitCode: number;
 
@@ -205,7 +218,6 @@ export class MarpExportService {
             //         throw new Error(`Marp export failed with exit code ${exitCode}`);
             //     }
 
-            //     console.log(`[kanban.MarpExportService] Marp conversion completed successfully`);
             // }
 
         } catch (error) {
@@ -223,12 +235,18 @@ export class MarpExportService {
     private static buildMarpCliArgs(inputPath: string, options: MarpExportOptions): string[] {
         const args: string[] = [inputPath];
 
-        // Output format
+        // Output format - must be html, pdf, or pptx
+        // Format comes from UI dropdown, so should always be valid
         if (options.format === 'pdf') {
             args.push('--pdf');
         } else if (options.format === 'pptx') {
             args.push('--pptx');
-        } else if (options.format === 'html') {
+            // Add --pptx-editable flag if pptxEditable mode is enabled
+            if (options.pptxEditable) {
+                args.push('--pptx-editable');
+            }
+        } else {
+            // Default to HTML (covers 'html' and any legacy 'markdown' from old saved settings)
             args.push('--html');
         }
 
@@ -276,7 +294,6 @@ export class MarpExportService {
                 }
                 
                 if (fs.existsSync(resolvedPath)) {
-                    console.log(`[kanban.MarpExportService] Adding configured theme set directory: ${resolvedPath}`);
                     args.push('--theme-set', resolvedPath);
                 } else {
                     console.warn(`[kanban.MarpExportService] Configured theme directory not found: ${resolvedPath}`);
@@ -298,7 +315,6 @@ export class MarpExportService {
 
             for (const themePath of themePaths) {
                 if (fs.existsSync(themePath)) {
-                    console.log(`[kanban.MarpExportService] Adding fallback theme set directory: ${themePath}`);
                     args.push('--theme-set', themePath);
                     break; // Only add the first found theme directory
                 }
@@ -311,7 +327,6 @@ export class MarpExportService {
         // Watch mode: add --watch flag
         // if (options.watchMode) {
         //     args.push('--watch');
-        //     console.log(`[kanban.MarpExportService] Adding --watch flag for watch mode`);
         // }
 
         // Browser setting - prioritize options.additionalArgs, then config
@@ -324,7 +339,6 @@ export class MarpExportService {
                 browser = options.additionalArgs[browserIndex + 1];
                 // Remove from additionalArgs to avoid duplication
                 options.additionalArgs.splice(browserIndex, 2);
-                console.log(`[kanban.MarpExportService] Using browser from additionalArgs: ${browser}`);
             }
         }
 
@@ -332,15 +346,12 @@ export class MarpExportService {
         if (!browser) {
             const configService = ConfigurationService.getInstance();
             browser = configService.getNestedConfig('marp.browser', 'chrome');
-            console.log(`[kanban.MarpExportService] Using browser from config: ${browser}`);
-            console.log(`[kanban.MarpExportService] Config service instance:`, !!configService);
         }
 
         if (browser && browser !== 'auto') {
             // Add browser option for all formats that can use it
             // HTML export uses browser for preview, PDF/PPTX for rendering
             args.push('--browser', browser);
-            console.log(`[kanban.MarpExportService] Using browser for ${options.format}: ${browser}`);
         }
 
         // Additional args
@@ -349,8 +360,6 @@ export class MarpExportService {
         }
 
         // Final log of all arguments
-        console.log(`[kanban.MarpExportService.buildMarpCliArgs] Final arguments:`, args);
-        console.log(`[kanban.MarpExportService.buildMarpCliArgs] Arguments count: ${args.length}`);
 
         return args;
     }
@@ -396,7 +405,6 @@ export class MarpExportService {
                 outputPath,
                 enginePath
             });
-            console.log('[kanban.MarpExportService] PDF test export successful');
         } catch (error) {
             console.error('[kanban.MarpExportService] PDF test export failed:', error);
             throw error;
@@ -466,7 +474,6 @@ export class MarpExportService {
                 try {
                     // Copy file from root to dist
                     fs.copyFileSync(srcFilePath, distFilePath);
-                    console.log(`[kanban.MarpExportService] Copied ${file} to dist directory`);
                 } catch (err) {
                     console.warn(`[kanban.MarpExportService] Failed to copy ${file} to dist:`, err);
                 }
@@ -525,13 +532,10 @@ export class MarpExportService {
      * @returns Promise that resolves to an array of available theme names
      */
     static async getAvailableThemes(): Promise<string[]> {
-        console.log('[kanban.MarpExportService.getAvailableThemes] Starting to get available themes...');
         try {
             // Check if Marp CLI is available first
             const isAvailable = await this.isMarpCliAvailable();
-            console.log('[kanban.MarpExportService.getAvailableThemes] Marp CLI available:', isAvailable);
             if (!isAvailable) {
-                console.log('[kanban.MarpExportService.getAvailableThemes] Using fallback themes');
                 return ['default']; // Fallback to default theme
             }
 
@@ -546,8 +550,6 @@ export class MarpExportService {
             const configService = ConfigurationService.getInstance();
             const configuredThemeFolders = configService.getNestedConfig('marp.themeFolders', []) as string[];
             const workspaceFolders = vscode.workspace.workspaceFolders;
-            console.log('[kanban.MarpExportService.getAvailableThemes] Workspace folders:', workspaceFolders);
-            console.log('[kanban.MarpExportService.getAvailableThemes] Configured theme folders:', configuredThemeFolders);
             
             // Check configured theme folders first
             if (configuredThemeFolders.length > 0 && workspaceFolders && workspaceFolders.length > 0) {
@@ -564,14 +566,12 @@ export class MarpExportService {
                     }
                     
                     if (fs.existsSync(resolvedPath)) {
-                        console.log('[kanban.MarpExportService.getAvailableThemes] Found configured theme directory:', resolvedPath);
                         const files = fs.readdirSync(resolvedPath);
                         const cssFiles = files.filter((file: string) => file.endsWith('.css') || file.endsWith('.marp.css'));
                         cssFiles.forEach((file: string) => {
                             const themeName = file.replace(/\.(css|marp\.css)$/, '');
                             if (!themes.includes(themeName)) {
                                 themes.push(themeName);
-                                console.log('[kanban.MarpExportService.getAvailableThemes] Found custom theme:', themeName);
                             }
                         });
                     } else {
@@ -594,14 +594,12 @@ export class MarpExportService {
 
                 for (const themePath of themePaths) {
                     if (fs.existsSync(themePath)) {
-                        console.log('[kanban.MarpExportService.getAvailableThemes] Found fallback theme directory:', themePath);
                         const files = fs.readdirSync(themePath);
                         const cssFiles = files.filter((file: string) => file.endsWith('.css') || file.endsWith('.marp.css'));
                         cssFiles.forEach((file: string) => {
                             const themeName = file.replace(/\.(css|marp\.css)$/, '');
                             if (!themes.includes(themeName)) {
                                 themes.push(themeName);
-                                console.log('[kanban.MarpExportService.getAvailableThemes] Found fallback custom theme:', themeName);
                             }
                         });
                     }
@@ -609,7 +607,6 @@ export class MarpExportService {
             }
 
             const sortedThemes = themes.sort();
-            console.log('[kanban.MarpExportService.getAvailableThemes] Final themes list:', sortedThemes);
             return sortedThemes;
         } catch (err) {
             console.error('[kanban.MarpExportService.getAvailableThemes] Failed to get available themes:', err);

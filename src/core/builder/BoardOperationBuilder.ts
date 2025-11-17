@@ -157,7 +157,6 @@ class CreateColumnOperation implements IBoardOperation {
         }
 
         this.createdColumnId = newColumn.id;
-        console.log(`[CreateColumnOperation] Created column: ${newColumn.id}`);
     }
 
     async undo(): Promise<void> {
@@ -165,7 +164,6 @@ class CreateColumnOperation implements IBoardOperation {
             const index = this.board.columns.findIndex(col => col.id === this.createdColumnId);
             if (index >= 0) {
                 this.board.columns.splice(index, 1);
-                console.log(`[CreateColumnOperation] Undid creation of column: ${this.createdColumnId}`);
             }
         }
     }
@@ -190,14 +188,12 @@ class DeleteColumnOperation implements IBoardOperation {
             this.deletedColumn = { ...this.board.columns[index] };
             this.deletedIndex = index;
             this.board.columns.splice(index, 1);
-            console.log(`[DeleteColumnOperation] Deleted column: ${this.columnId}`);
         }
     }
 
     async undo(): Promise<void> {
         if (this.deletedColumn && this.deletedIndex >= 0) {
             this.board.columns.splice(this.deletedIndex, 0, this.deletedColumn);
-            console.log(`[DeleteColumnOperation] Restored column: ${this.deletedColumn.id}`);
         }
     }
 
@@ -220,7 +216,6 @@ class UpdateColumnOperation implements IBoardOperation {
         if (column) {
             this.originalColumn = { ...column };
             Object.assign(column, this.updates);
-            console.log(`[UpdateColumnOperation] Updated column: ${this.columnId}`);
         }
     }
 
@@ -229,7 +224,6 @@ class UpdateColumnOperation implements IBoardOperation {
             const column = this.board.columns.find(col => col.id === this.columnId);
             if (column) {
                 Object.assign(column, this.originalColumn);
-                console.log(`[UpdateColumnOperation] Reverted column: ${this.columnId}`);
             }
         }
     }
@@ -258,7 +252,6 @@ class CreateTaskOperation implements IBoardOperation {
 
             column.tasks.push(newTask);
             this.createdTaskId = newTask.id;
-            console.log(`[CreateTaskOperation] Created task: ${newTask.id} in column: ${this.columnId}`);
         }
     }
 
@@ -269,7 +262,6 @@ class CreateTaskOperation implements IBoardOperation {
                 const index = column.tasks.findIndex(task => task.id === this.createdTaskId);
                 if (index >= 0) {
                     column.tasks.splice(index, 1);
-                    console.log(`[CreateTaskOperation] Undid creation of task: ${this.createdTaskId}`);
                 }
             }
         }
@@ -298,7 +290,6 @@ class DeleteTaskOperation implements IBoardOperation {
                 this.deletedTask = { ...column.tasks[index] };
                 this.deletedIndex = index;
                 column.tasks.splice(index, 1);
-                console.log(`[DeleteTaskOperation] Deleted task: ${this.taskId}`);
             }
         }
     }
@@ -308,7 +299,6 @@ class DeleteTaskOperation implements IBoardOperation {
             const column = this.board.columns.find(col => col.id === this.columnId);
             if (column) {
                 column.tasks.splice(this.deletedIndex, 0, this.deletedTask);
-                console.log(`[DeleteTaskOperation] Restored task: ${this.deletedTask.id}`);
             }
         }
     }
@@ -335,7 +325,6 @@ class UpdateTaskOperation implements IBoardOperation {
             if (task) {
                 this.originalTask = { ...task };
                 Object.assign(task, this.updates);
-                console.log(`[UpdateTaskOperation] Updated task: ${this.taskId}`);
             }
         }
     }
@@ -347,7 +336,6 @@ class UpdateTaskOperation implements IBoardOperation {
                 const task = column.tasks.find(t => t.id === this.taskId);
                 if (task) {
                     Object.assign(task, this.originalTask);
-                    console.log(`[UpdateTaskOperation] Reverted task: ${this.taskId}`);
                 }
             }
         }
@@ -392,7 +380,6 @@ class MoveTaskOperation implements IBoardOperation {
                     toColumn.tasks.push(this.movedTask);
                 }
 
-                console.log(`[MoveTaskOperation] Moved task ${this.taskId} from ${this.fromColumnId} to ${this.toColumnId}`);
             }
         }
     }
@@ -411,7 +398,6 @@ class MoveTaskOperation implements IBoardOperation {
 
                 // Restore to original column and position
                 originalColumn.tasks.splice(this.originalIndex, 0, this.movedTask);
-                console.log(`[MoveTaskOperation] Moved task ${this.taskId} back to ${this.originalColumnId}`);
             }
         }
     }
@@ -432,12 +418,10 @@ class AddIncludeOperation implements IBoardOperation {
 
     async execute(): Promise<void> {
         // Implementation would add include file to column/task
-        console.log(`[AddIncludeOperation] Added ${this.type} include ${this.relativePath} to ${this.columnId}`);
     }
 
     async undo(): Promise<void> {
         // Implementation would remove include file from column/task
-        console.log(`[AddIncludeOperation] Removed ${this.type} include ${this.relativePath} from ${this.columnId}`);
     }
 
     getDescription(): string {
@@ -450,7 +434,6 @@ class BatchSaveOperation implements IBoardOperation {
 
     async execute(): Promise<void> {
         const filesToSave = this.registry.getFilesWithUnsavedChanges();
-        console.log(`[BatchSaveOperation] Saving ${filesToSave.length} files`);
 
         for (const file of filesToSave) {
             await file.save();
@@ -459,7 +442,6 @@ class BatchSaveOperation implements IBoardOperation {
 
     async undo(): Promise<void> {
         // Batch save operations are typically not undone
-        console.log(`[BatchSaveOperation] Undo not supported for batch save`);
     }
 
     getDescription(): string {
@@ -474,7 +456,6 @@ class CompositeBoardOperation implements IBoardOperation {
     constructor(private operations: IBoardOperation[]) {}
 
     async execute(): Promise<void> {
-        console.log(`[CompositeBoardOperation] Executing ${this.operations.length} operations`);
 
         for (const operation of this.operations) {
             await operation.execute();
@@ -482,7 +463,6 @@ class CompositeBoardOperation implements IBoardOperation {
     }
 
     async undo(): Promise<void> {
-        console.log(`[CompositeBoardOperation] Undoing ${this.operations.length} operations`);
 
         // Undo in reverse order
         for (let i = this.operations.length - 1; i >= 0; i--) {

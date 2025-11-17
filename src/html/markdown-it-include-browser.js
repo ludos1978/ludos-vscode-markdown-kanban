@@ -23,7 +23,33 @@
 
     options = { ...defaultOptions, ...options };
 
-    // Inline rule for include processing
+    // Block-level rule for include processing (handles includes on their own line)
+    md.block.ruler.before('paragraph', 'include_block', function(state, startLine, endLine, silent) {
+      const pos = state.bMarks[startLine] + state.tShift[startLine];
+      const max = state.eMarks[startLine];
+      const lineText = state.src.slice(pos, max).trim();
+
+      // Check if this line is ONLY an include statement
+      const match = lineText.match(options.includeRe);
+      if (!match || match.index !== 0 || match[0] !== lineText) {
+        return false;
+      }
+
+      if (silent) { return true; }
+
+      const filePath = match[1].trim();
+      let content = getFileContent(filePath);
+
+      const token = state.push('include_block', 'div', 0);
+      token.content = content;
+      token.filePath = filePath;
+      token.map = [startLine, startLine + 1];
+
+      state.line = startLine + 1;
+      return true;
+    });
+
+    // Inline rule for include processing (handles includes within text)
     md.inline.ruler.before('text', 'include_inline', function(state, silent) {
       const start = state.pos;
       const max = state.posMax;
@@ -34,7 +60,6 @@
       if (!match || match.index !== 0) {
         return false;
       }
-
 
       if (silent) {return true;}
 
@@ -61,17 +86,57 @@
       return true;
     });
 
-    // Renderer for include content
+    // Renderer for block-level include content
+    md.renderer.rules.include_block = function(tokens, idx, options, env, renderer) {
+      const token = tokens[idx];
+      const content = token.content;
+      const filePath = token.filePath || '';
+
+      // If content is null (not loaded yet), show placeholder
+      if (content === null) {
+        return `<div class="include-placeholder-block" title="Loading include file: ${escapeHtml(filePath)}">` +
+               `📄⏳ Loading: ${escapeHtml(filePath)}` +
+               `</div>`;
+      }
+
+      // Render the content as markdown
+      try {
+        // Render as inline content to avoid nested block issues
+        const rendered = md.renderInline(content);
+
+        // Create filename display (show just the basename)
+        const fileName = filePath.split('/').pop() || filePath;
+
+        // Build bordered container with title bar
+        return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
+          <div class="include-title-bar">
+            <span class="include-filename-link"
+                  data-file-path="${escapeHtml(filePath)}"
+                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
+                  title="Alt+click to open file: ${escapeHtml(filePath)}">
+              include(${escapeHtml(fileName)})
+            </span>
+          </div>
+          <div class="include-content-area">
+            ${rendered}
+          </div>
+        </div>`;
+      } catch (error) {
+        console.error('Error rendering included content:', error);
+        return `<div class="include-error" title="Error rendering included content">Error including: ${escapeHtml(filePath)}</div>`;
+      }
+    };
+
+    // Renderer for inline include content
     md.renderer.rules.include_content = function(tokens, idx, options, env, renderer) {
       const token = tokens[idx];
       const content = token.content;
       const filePath = token.attrGet('data-include-file') || '';
-      const isBlock = token.attrGet('data-include-block') === 'true';
 
       // Render the content as markdown
       try {
-        // Always render as block content for regular includes
-        const rendered = md.render(content);
+        // Render as inline content - markdown-it will handle block/inline context automatically
+        const rendered = md.renderInline(content);
 
         // Create filename display (show just the basename)
         const fileName = filePath.split('/').pop() || filePath;
@@ -134,10 +199,44 @@
     return null;
   }
 
+  // Track if we've received includes for debouncing
+  let includeRenderTimer = null;
+  let pendingBoardUpdate = false; // Prevent infinite loop
+
   // Function to update cache when file content is received
   function updateFileCache(filePath, content) {
+
+    // Remove from pending requests
     pendingRequests.delete(filePath);
+
+    // Check if content actually changed
+    const oldContent = fileCache.get(filePath);
+    const contentChanged = oldContent !== content;
+
+    // Update cache
     fileCache.set(filePath, content);
+
+    // Register this inline include in the backend's unified system for conflict resolution
+    if (typeof vscode !== 'undefined') {
+      try {
+        vscode.postMessage({
+          type: 'registerInlineInclude',
+          filePath: filePath,
+          content: content
+        });
+      } catch (error) {
+        console.error('Error registering inline include:', error);
+      }
+    }
+
+    // Trigger re-render if board already exists
+    // On initial load, board renders first (with null includes), then includes arrive
+    // We need to re-render to show the includes
+
+    // DON'T trigger re-render here - the backend already sends a boardUpdate message
+    // when a regular include file changes. Calling renderBoard() here causes a race
+    // condition where the frontend render might use stale data before the backend
+    // update arrives.
   }
 
   // Helper function for HTML escaping - now using global ValidationUtils.escapeHtml
