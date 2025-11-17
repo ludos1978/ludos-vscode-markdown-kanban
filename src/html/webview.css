@@ -1147,6 +1147,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-header {
+  position: relative; /* Needed for absolutely positioned badge containers */
   display: flex;
   align-items: center;
   gap: var(--whitespace-div4);
