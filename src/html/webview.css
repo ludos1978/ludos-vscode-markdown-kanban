@@ -2248,7 +2248,7 @@ button.file-bar-menu-item {
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  transform: translateZ(-0.08px);
+  transform: translateZ(-0.11px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-header,
@@ -2257,7 +2257,7 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
-	transform: translateZ(-0.1px);
+	transform: translateZ(0.0px);
 }
 
 
