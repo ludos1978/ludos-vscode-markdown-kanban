@@ -2243,12 +2243,12 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack .kanban-full-height-column .column-inner {
-	transform: translateZ(0.05px);
+	transform: translateZ(-0.08px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  transform: translateZ(0.05px);
+  transform: translateZ(-0.08px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-header,
