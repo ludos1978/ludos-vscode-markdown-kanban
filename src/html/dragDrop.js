@@ -343,18 +343,29 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // Drop at END: Need LIVE position (not cached) because viewport may have scrolled
-                const liveRect = lastCol.element.getBoundingClientRect();
-                stackLeft = liveRect.left;
-                stackWidth = liveRect.width;
-                insertionY = liveRect.bottom + 5;
-
-                console.log('[ColumnIndicator] Drop at end (LIVE position):', {
-                    columnId: lastCol.columnId,
-                    liveBottom: liveRect.bottom,
-                    cachedBottom: lastCol.rect.bottom,
-                    insertionY: insertionY
-                });
+                // Drop at END: Position at top of stack-bottom-drop-zone if it exists
+                const bottomDropZone = targetStack.querySelector('.stack-bottom-drop-zone');
+                if (bottomDropZone) {
+                    const zoneRect = bottomDropZone.getBoundingClientRect();
+                    stackLeft = zoneRect.left;
+                    stackWidth = zoneRect.width;
+                    insertionY = zoneRect.top;
+                    console.log('[ColumnIndicator] Drop at end (bottom drop zone):', {
+                        zoneTop: zoneRect.top,
+                        insertionY: insertionY
+                    });
+                } else {
+                    // Fallback: position after last column
+                    const liveRect = lastCol.element.getBoundingClientRect();
+                    stackLeft = liveRect.left;
+                    stackWidth = liveRect.width;
+                    insertionY = liveRect.bottom + 5;
+                    console.log('[ColumnIndicator] Drop at end (after last column):', {
+                        columnId: lastCol.columnId,
+                        columnBottom: liveRect.bottom,
+                        insertionY: insertionY
+                    });
+                }
             } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
                 // No OTHER columns in stack, but dragged column IS in this stack
                 // Use dragged column's position for indicator
@@ -3336,13 +3347,22 @@ function setupColumnDragAndDrop() {
                 beforeColumn = column.nextSibling;
             }
 
+            // Check if hovering in margin area
+            const marginElement = column.querySelector('.column-margin');
+            const marginRect = marginElement ? marginElement.getBoundingClientRect() : null;
+            const isInMargin = marginRect && e.clientY >= marginRect.top && e.clientY <= marginRect.bottom;
+
             console.log('[ColumnDragover] Midpoint calculation', {
                 columnId: column.dataset.columnId,
                 rectTop: rect.top,
                 rectHeight: rect.height,
                 midpoint: midpoint,
                 clientY: e.clientY,
-                isBeforeColumn: e.clientY < midpoint
+                isBeforeColumn: e.clientY < midpoint,
+                isInMargin: isInMargin,
+                marginTop: marginRect?.top,
+                marginBottom: marginRect?.bottom,
+                hasNextSibling: !!column.nextSibling
             });
 
             console.log('[ColumnDragover] Showing indicator', {
