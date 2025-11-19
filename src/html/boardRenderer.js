@@ -66,6 +66,18 @@ function initializeTaskElement(taskElement) {
             console.warn('[TaskInit] Re-attaching missing description click handler for task:', taskId);
             descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
         }
+
+        // Verify collapse toggle click handler
+        const collapseToggle = taskElement.querySelector('.task-collapse-toggle');
+        if (collapseToggle && !collapseToggle.onclick) {
+            console.warn('[TaskInit] Re-attaching missing collapse toggle handler for task:', taskId);
+            collapseToggle.onclick = () => {
+                toggleTaskCollapseById(taskId, columnId);
+                if (typeof updateFoldAllButton === 'function') {
+                    updateFoldAllButton(columnId);
+                }
+            };
+        }
     }
 
     // 3. VISUAL ELEMENTS SETUP

@@ -1087,6 +1087,19 @@ function setupGlobalDragAndDrop() {
                                         descContainer.setAttribute('onclick', newOnclick);
                                     }
                                 }
+
+                                // Update task-collapse-toggle onclick
+                                const collapseToggle = taskItemEl.querySelector('.task-collapse-toggle');
+                                if (collapseToggle) {
+                                    const oldOnclick = collapseToggle.getAttribute('onclick');
+                                    if (oldOnclick) {
+                                        const newOnclick = oldOnclick.replace(
+                                            `'${originalColumnId}'`,
+                                            `'${finalColumnId}'`
+                                        );
+                                        collapseToggle.setAttribute('onclick', newOnclick);
+                                    }
+                                }
                             }
                         }
                     }
