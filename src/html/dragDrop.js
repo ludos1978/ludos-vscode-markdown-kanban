@@ -348,22 +348,12 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     stackLeft = lastCol.columnTitleRect.left;
                     stackWidth = lastCol.columnTitleRect.width;
                     insertionY = lastCol.columnTitleRect.bottom;
-                    console.log('[ColumnIndicator] Sticky - drop at end using title bottom:', {
-                        columnId: lastCol.columnId,
-                        titleBottom: lastCol.columnTitleRect.bottom,
-                        insertionY: insertionY
-                    });
                 }
                 // NORMAL MODE: Use bottom margin
                 else if (lastCol.bottomMarginRect) {
                     stackLeft = lastCol.bottomMarginRect.left;
                     stackWidth = lastCol.bottomMarginRect.width;
                     insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
-                    console.log('[ColumnIndicator] Normal - drop at end using bottom margin:', {
-                        columnId: lastCol.columnId,
-                        marginTop: lastCol.bottomMarginRect.top,
-                        insertionY: insertionY
-                    });
                 }
                 // FALLBACK: Use column bottom
                 else {
@@ -371,10 +361,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     stackLeft = liveRect.left;
                     stackWidth = liveRect.width;
                     insertionY = liveRect.bottom;
-                    console.log('[ColumnIndicator] Fallback - using column bottom:', {
-                        columnId: lastCol.columnId,
-                        insertionY: insertionY
-                    });
                 }
             } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
                 // No OTHER columns in stack, but dragged column IS in this stack
@@ -383,10 +369,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                 stackLeft = draggedRect.left;
                 stackWidth = draggedRect.width;
                 insertionY = draggedRect.bottom + 5;
-                console.log('[ColumnIndicator] Drop at end (only dragged column in stack):', {
-                    draggedColumnId: dragState.draggedColumnId,
-                    insertionY: insertionY
-                });
             } else if (targetStack.classList.contains('column-drop-zone-stack')) {
                 // Empty drop zone stack (horizontal drop area) - show vertical indicator in the zone
                 const dropZone = targetStack.querySelector('.column-drop-zone');
@@ -396,10 +378,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     stackWidth = dropZoneRect.width;
                     // Position indicator vertically in the middle of the drop zone
                     insertionY = dropZoneRect.top + (dropZoneRect.height / 2);
-                    console.log('[ColumnIndicator] Drop zone (horizontal drop):', {
-                        dropZoneRect: dropZoneRect,
-                        insertionY: insertionY
-                    });
                 } else {
                     indicator.style.display = 'none';
                     return;
@@ -418,32 +396,18 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     stackLeft = colData.columnTitleRect.left;
                     stackWidth = colData.columnTitleRect.width;
                     insertionY = colData.columnTitleRect.top;
-                    console.log('[ColumnIndicator] Sticky - using title top:', {
-                        columnId: colData.columnId,
-                        titleTop: colData.columnTitleRect.top,
-                        insertionY: insertionY
-                    });
                 }
                 // NORMAL MODE: Use top margin
                 else if (colData.topMarginRect) {
                     stackLeft = colData.topMarginRect.left;
                     stackWidth = colData.topMarginRect.width;
                     insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
-                    console.log('[ColumnIndicator] Normal - using top margin:', {
-                        columnId: colData.columnId,
-                        marginTop: colData.topMarginRect.top,
-                        insertionY: insertionY
-                    });
                 }
                 // FALLBACK: Use column edge
                 else {
                     stackLeft = colData.rect.left;
                     stackWidth = colData.rect.width;
                     insertionY = colData.rect.top;
-                    console.log('[ColumnIndicator] Fallback - using column edge:', {
-                        columnId: colData.columnId,
-                        insertionY: insertionY
-                    });
                 }
             } else {
                 // Fallback: not in cache
@@ -469,13 +433,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         indicator.style.height = '3px';
         indicator.style.display = 'block';
         indicator.classList.add('active');
-
-        console.log('[ColumnIndicator] Positioned:', {
-            left: stackLeft + 10,
-            width: stackWidth - 20,
-            top: insertionY,
-            beforeColumn: beforeColumn?.dataset?.columnId || 'end'
-        });
     }
 
     // CRITICAL: Always store drop target, even if indicator can't be shown!
@@ -1205,13 +1162,6 @@ function setupGlobalDragAndDrop() {
         if (dragState.dropTargetStack && dragState.dropTargetBeforeColumn !== undefined) {
             const targetStack = dragState.dropTargetStack;
             const beforeColumn = dragState.dropTargetBeforeColumn;
-
-            console.log('[ColumnDrop] Moving column', {
-                columnId: columnId,
-                targetStack: targetStack,
-                beforeColumn: beforeColumn,
-                beforeColumnId: beforeColumn?.dataset?.columnId
-            });
 
             // Move column from its current position to target position
             if (beforeColumn) {
@@ -3254,14 +3204,6 @@ function setupColumnDragAndDrop() {
                     // Cache column title (used when sticky)
                     const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
 
-                    console.log('[ColumnDragstart] Caching column positions:', {
-                        columnId: colId,
-                        isSticky: isSticky,
-                        hasTopMargin: !!topMargin,
-                        hasBottomMargin: !!bottomMargin,
-                        hasTitle: !!columnTitle
-                    });
-
                     return {
                         element: col,
                         rect: col.getBoundingClientRect(),
@@ -3377,11 +3319,10 @@ function setupColumnDragAndDrop() {
             }
 
             // STICKY MODE: Use column-title boundaries for drop detection
-            let midpoint, isInTopMargin, isInBottomMargin;
+            let midpoint, isInTopMargin;
             if (colData.isSticky && colData.columnTitleRect) {
                 midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
                 isInTopMargin = e.clientY <= midpoint;
-                isInBottomMargin = e.clientY > midpoint;
             }
             // NORMAL MODE: Use margins for drop detection
             else {
@@ -3392,9 +3333,6 @@ function setupColumnDragAndDrop() {
                 isInTopMargin = colData.topMarginRect &&
                     e.clientY >= colData.topMarginRect.top &&
                     e.clientY <= colData.topMarginRect.bottom;
-                isInBottomMargin = colData.bottomMarginRect &&
-                    e.clientY >= colData.bottomMarginRect.top &&
-                    e.clientY <= colData.bottomMarginRect.bottom;
             }
 
             // Determine drop position based on mouse Y
@@ -3406,16 +3344,6 @@ function setupColumnDragAndDrop() {
                 // Drop after this column
                 beforeColumn = column.nextSibling;
             }
-
-            console.log('[ColumnDragover] Cached position used', {
-                columnId: column.dataset.columnId,
-                isSticky: colData.isSticky,
-                clientY: e.clientY,
-                midpoint: midpoint,
-                isInTopMargin: isInTopMargin,
-                isInBottomMargin: isInBottomMargin,
-                dropPosition: beforeColumn === column ? 'before' : 'after'
-            });
 
             // Show indicator, DON'T move actual column!
             showInternalColumnDropIndicator(targetStack, beforeColumn);
