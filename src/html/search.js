@@ -183,9 +183,10 @@ class KanbanSearch {
                 taskElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
         } else if (result.type === 'column') {
-            // Scroll to column
+            // Scroll to column title (not the full column)
+            const columnTitle = columnElement?.querySelector('.column-title');
             setTimeout(() => {
-                columnElement?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                columnTitle?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
             }, 100);
         }
         
