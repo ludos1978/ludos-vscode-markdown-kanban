@@ -347,13 +347,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
-                // Position in the margin BELOW the last column
-                const lastColElement = lastCol.element;
-                const marginBelow = lastColElement.querySelector('.column-margin:last-child') ||
-                                   lastColElement.nextElementSibling?.querySelector?.('.column-margin');
-                if (marginBelow) {
-                    const marginRect = marginBelow.getBoundingClientRect();
-                    insertionY = marginRect.top + (marginRect.height / 2);
+                // PERFORMANCE: Use cached margin position (no DOM queries!)
+                if (lastCol.bottomMarginRect) {
+                    insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
                 } else {
                     insertionY = lastCol.rect.bottom + 5;
                 }
@@ -364,11 +360,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             // Drop before specific column - position in the margin ABOVE it
             const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
             if (colData) {
-                // Find the column-margin at the top of this column
-                const marginAbove = beforeColumn.querySelector('.column-margin:first-child');
-                if (marginAbove) {
-                    const marginRect = marginAbove.getBoundingClientRect();
-                    insertionY = marginRect.top + (marginRect.height / 2);
+                // PERFORMANCE: Use cached margin position (no DOM queries!)
+                if (colData.topMarginRect) {
+                    insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
                 } else {
                     insertionY = colData.rect.top - 2;
                 }
@@ -396,6 +390,13 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         indicator.style.height = '3px';
         indicator.style.display = 'block';
         indicator.classList.add('active');
+
+        console.log('[ColumnIndicator] Positioned:', {
+            left: stackLeft + 10,
+            width: stackWidth - 20,
+            top: insertionY,
+            beforeColumn: beforeColumn?.dataset?.columnId || 'end'
+        });
     }
 
     // CRITICAL: Always store drop target, even if indicator can't be shown!
@@ -3155,15 +3156,21 @@ function setupColumnDragAndDrop() {
             dragState.lastDropTarget = null;  // Track last drop position
             dragState.styleUpdatePending = false;  // Track if style update is needed
 
-            // PERFORMANCE: Cache column positions for fast lookup during drag
+            // PERFORMANCE: Cache column AND margin positions for fast lookup during drag
             const allColumns = document.querySelectorAll('.kanban-full-height-column');
             dragState.cachedColumnPositions = Array.from(allColumns)
                 .filter(col => col !== columnElement)
-                .map(col => ({
-                    element: col,
-                    rect: col.getBoundingClientRect(),
-                    columnId: col.getAttribute('data-column-id')
-                }));
+                .map(col => {
+                    const topMargin = col.querySelector('.column-margin:first-child');
+                    const bottomMargin = col.querySelector('.column-margin:last-child');
+                    return {
+                        element: col,
+                        rect: col.getBoundingClientRect(),
+                        columnId: col.getAttribute('data-column-id'),
+                        topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
+                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null
+                    };
+                });
 
             // Track throttling for column dragover
             dragState.columnDragoverThrottleId = null;
