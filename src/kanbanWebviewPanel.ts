@@ -86,6 +86,7 @@ export class KanbanWebviewPanel {
     private _isUndoRedoOperation: boolean = false;  // Track undo/redo operations
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
     private _isClosingPrevented: boolean = false;  // Flag to prevent recursive closing attempts
+    private _isDisposed: boolean = false;  // Flag to prevent operations on disposed panel
     private _lastDocumentUri?: string;  // Track current document for serialization
     private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
     private _unsavedFilesToPrompt: string[] = [];  // Files with unsaved changes that need user prompt
@@ -2715,6 +2716,25 @@ export class KanbanWebviewPanel {
     }
 
     public async dispose() {
+        // Prevent double disposal
+        if (this._isDisposed) {
+            return;
+        }
+        this._isDisposed = true;
+
+        // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse of disposing panel
+        // This must happen BEFORE any async operations or cleanup
+        if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
+            KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
+        }
+
+        // Also check all entries as a fallback in case tracking failed
+        for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
+            if (panel === this) {
+                KanbanWebviewPanel.panels.delete(uri);
+            }
+        }
+
         // Clear unsaved changes flag and prevent closing flags
         const mainFile = this._getMainFile();
         if (mainFile) {
@@ -2730,16 +2750,10 @@ export class KanbanWebviewPanel {
             this._unsavedChangesCheckInterval = undefined;
         }
 
-        // Remove from panels map using the tracked URI (which persists even after document is closed)
-        if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
-            KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
-        }
-
-        // Also check all entries as a fallback in case tracking failed
-        for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
-            if (panel === this) {
-                KanbanWebviewPanel.panels.delete(uri);
-            }
+        // Clear message timer to prevent flush attempts after disposal
+        if (this._messageTimer) {
+            clearTimeout(this._messageTimer);
+            this._messageTimer = null;
         }
 
         // Clear panel state
@@ -3123,6 +3137,13 @@ export class KanbanWebviewPanel {
      * PERFORMANCE: Flush queued messages to webview
      */
     private flushMessages(): void {
+        // Don't try to flush messages if panel is disposed
+        if (this._isDisposed) {
+            this._messageQueue = [];
+            this._messageTimer = null;
+            return;
+        }
+
         if (this._messageQueue.length > 0) {
             // Send batched messages
             if (this._panel) {
