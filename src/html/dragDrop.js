@@ -814,6 +814,15 @@ function setupGlobalDragAndDrop() {
                             }
                         }
                     }
+
+                    // HYBRID APPROACH: Re-initialize the task element after move
+                    // This ensures drag handlers are properly re-attached
+                    if (typeof window.initializeTaskElement === 'function') {
+                        const movedTaskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+                        if (movedTaskElement) {
+                            window.initializeTaskElement(movedTaskElement);
+                        }
+                    }
                 }
             }
         }

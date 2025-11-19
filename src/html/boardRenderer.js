@@ -11,6 +11,89 @@ window.globalColumnFoldState = window.globalColumnFoldState || 'fold-mixed'; // 
 let renderTimeout = null;
 
 /**
+ * HYBRID TASK INITIALIZATION SYSTEM
+ *
+ * Centralized function to initialize task elements with all required event handlers.
+ * This ensures tasks are always properly initialized regardless of creation path.
+ * Works in conjunction with taskInitializer.js MutationObserver as a safety net.
+ *
+ * @param {HTMLElement} taskElement - The task DOM element to initialize
+ * @returns {boolean} - True if initialization succeeded, false otherwise
+ */
+function initializeTaskElement(taskElement) {
+    if (!taskElement) {
+        console.warn('[TaskInit] initializeTaskElement: No task element provided');
+        return false;
+    }
+
+    // Check if already initialized (idempotent - safe to call multiple times)
+    if (taskElement.dataset.taskInitialized === 'true') {
+        return true; // Already initialized, nothing to do
+    }
+
+    const taskId = taskElement.dataset.taskId;
+
+    // 1. DRAG HANDLER SETUP
+    const dragHandle = taskElement.querySelector('.task-drag-handle');
+    if (dragHandle) {
+        // Clear any stale setup marker to force re-setup
+        delete dragHandle.dataset.dragSetup;
+
+        // Setup drag handler using existing function from dragDrop.js
+        if (typeof setupTaskDragHandle === 'function') {
+            setupTaskDragHandle(dragHandle);
+        } else {
+            console.warn('[TaskInit] setupTaskDragHandle function not available');
+        }
+    }
+
+    // 2. EDIT HANDLER VERIFICATION (defensive check)
+    // Edit handlers are normally attached via inline onclick attributes in HTML,
+    // but we verify they exist and re-attach if missing
+    const columnEl = taskElement.closest('[data-column-id]');
+    if (columnEl) {
+        const columnId = columnEl.dataset.columnId;
+
+        // Verify title click handler
+        const titleEl = taskElement.querySelector('.task-title-display');
+        if (titleEl && !titleEl.onclick) {
+            console.warn('[TaskInit] Re-attaching missing title click handler for task:', taskId);
+            titleEl.onclick = (e) => handleTaskTitleClick(e, titleEl, taskId, columnId);
+        }
+
+        // Verify description click handler
+        const descEl = taskElement.querySelector('.task-description-display');
+        if (descEl && !descEl.onclick) {
+            console.warn('[TaskInit] Re-attaching missing description click handler for task:', taskId);
+            descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
+        }
+    }
+
+    // 3. VISUAL ELEMENTS SETUP
+    // Inject stackable bars (headers/footers) for this specific task
+    if (window.injectStackableBars) {
+        window.injectStackableBars(taskElement);
+    }
+
+    // Update visual tag elements (badges) for this specific task
+    if (window.updateAllVisualTagElements) {
+        const tags = taskElement.getAttribute('data-all-tags');
+        if (tags) {
+            const tagArray = tags.split(' ').filter(tag => tag.trim());
+            window.updateAllVisualTagElements(taskElement, tagArray, 'task');
+        }
+    }
+
+    // Mark as initialized
+    taskElement.dataset.taskInitialized = 'true';
+
+    return true;
+}
+
+// Make globally accessible
+window.initializeTaskElement = initializeTaskElement;
+
+/**
  * Generate alternative title from task description when no title exists
  *
  * Format for images:
@@ -1302,11 +1385,9 @@ function renderSingleColumn(columnId, columnData) {
     // Since we replaced the entire column DOM element, we need to re-setup all drag & drop
     // handlers that were attached to the old element and its children
 
-    // Setup drag handles for tasks in this column
-    newColumnElement.querySelectorAll('.task-drag-handle').forEach(handle => {
-        if (typeof setupTaskDragHandle === 'function') {
-            setupTaskDragHandle(handle);
-        }
+    // HYBRID APPROACH: Initialize all tasks in the new column with centralized function
+    newColumnElement.querySelectorAll('.task-item').forEach(taskElement => {
+        initializeTaskElement(taskElement);
     });
 
     // Re-setup drag & drop for all columns and tasks to ensure event handlers are properly attached
@@ -4412,24 +4493,9 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
         updateImageSources();
     }
 
-    // Setup drag & drop for the new task
-    const dragHandle = taskElement.querySelector('.task-drag-handle');
-    if (dragHandle && typeof setupTaskDragHandle === 'function') {
-        setupTaskDragHandle(dragHandle);
-    }
-
-    // Update visual tag elements (headers/footers/badges)
-    if (window.injectStackableBars) {
-        window.injectStackableBars(taskElement);
-    }
-    // Use updateAllVisualTagElements instead of updateCornerBadgesImmediate for consistency
-    if (window.updateAllVisualTagElements) {
-        const tags = taskElement.getAttribute('data-all-tags');
-        if (tags) {
-            const tagArray = tags.split(' ').filter(tag => tag.trim());
-            window.updateAllVisualTagElements(taskElement, tagArray, 'task');
-        }
-    }
+    // HYBRID APPROACH: Initialize task with centralized function
+    // This sets up drag handlers, verifies edit handlers, and applies visual elements
+    initializeTaskElement(taskElement);
 
     // Update column task count
     updateColumnTaskCount(columnId);
