@@ -366,6 +366,23 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     draggedColumnId: dragState.draggedColumnId,
                     insertionY: insertionY
                 });
+            } else if (targetStack.classList.contains('column-drop-zone-stack')) {
+                // Empty drop zone stack (horizontal drop area) - show vertical indicator in the zone
+                const dropZone = targetStack.querySelector('.column-drop-zone');
+                if (dropZone) {
+                    const dropZoneRect = dropZone.getBoundingClientRect();
+                    stackLeft = dropZoneRect.left;
+                    stackWidth = dropZoneRect.width;
+                    // Position indicator vertically in the middle of the drop zone
+                    insertionY = dropZoneRect.top + (dropZoneRect.height / 2);
+                    console.log('[ColumnIndicator] Drop zone (horizontal drop):', {
+                        dropZoneRect: dropZoneRect,
+                        insertionY: insertionY
+                    });
+                } else {
+                    indicator.style.display = 'none';
+                    return;
+                }
             } else {
                 // Truly empty stack - hide indicator
                 indicator.style.display = 'none';
@@ -3434,6 +3451,14 @@ function setupColumnDragAndDrop() {
             if (dz !== dropZone) {dz.classList.remove('drag-over');}
         });
         dropZone.classList.add('drag-over');
+
+        // Show indicator in the drop zone
+        const dropZoneStack = dropZone.parentNode;
+        if (dropZoneStack && dropZoneStack.classList.contains('column-drop-zone-stack')) {
+            console.log('[DropZoneDragover] Showing indicator in horizontal drop zone');
+            // Show indicator at the drop zone (null = drop at end, which positions it in the zone)
+            showInternalColumnDropIndicator(dropZoneStack, null);
+        }
 
         // Store the drop zone for processing on dragend
         dragState.pendingDropZone = dropZone;
