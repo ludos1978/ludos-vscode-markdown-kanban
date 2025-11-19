@@ -420,6 +420,33 @@ window.menuConfig = menuConfig;
 window.getCSS = getCSS;
 window.getValue = getValue;
 
+/**
+ * SINGLE SOURCE OF TRUTH (Frontend): Creates display title with include badge placeholders
+ *
+ * This is the FRONTEND mirror of the backend createDisplayTitleWithPlaceholders() function.
+ * Both must use the same placeholder format: %INCLUDE_BADGE:filepath%
+ *
+ * @param {string} title - Raw title containing !!!include(filepath)!!! directives
+ * @param {string[]} resolvedFiles - Array of resolved file paths
+ * @returns {string} Display title with placeholders
+ */
+window.createDisplayTitleWithPlaceholders = function(title, resolvedFiles) {
+    if (!resolvedFiles || resolvedFiles.length === 0) {
+        return title;
+    }
+
+    let displayTitle = title;
+    const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+
+    resolvedFiles.forEach((filePath, index) => {
+        // CRITICAL: This format must match backend IncludeConstants.ts
+        const placeholder = `%INCLUDE_BADGE:${filePath}%`;
+        displayTitle = displayTitle.replace(includeRegex, placeholder);
+    });
+
+    return displayTitle;
+};
+
 // Layout Presets Configuration (will be loaded from backend)
 let layoutPresets = {};
 
@@ -5650,14 +5677,8 @@ function setMarpDirective(scope, id, columnId, directiveName, value, directiveSc
 
     // For columns in include mode, also update displayTitle
     if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
-        // Replace !!!include()!!! with placeholder in displayTitle
-        let displayTitle = title;
-        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-        element.includeFiles.forEach((filePath, index) => {
-            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-            displayTitle = displayTitle.replace(includeRegex, placeholder);
-        });
-        element.displayTitle = displayTitle;
+        // SINGLE SOURCE OF TRUTH: Use shared utility function
+        element.displayTitle = window.createDisplayTitleWithPlaceholders(title, element.includeFiles);
     }
 
     if (type === 'column') {
@@ -5741,14 +5762,8 @@ function toggleMarpDirective(scope, id, columnId, directiveName, defaultValue, d
 
     // For columns in include mode, also update displayTitle
     if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
-        // Replace !!!include()!!! with placeholder in displayTitle
-        let displayTitle = title;
-        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-        element.includeFiles.forEach((filePath, index) => {
-            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-            displayTitle = displayTitle.replace(includeRegex, placeholder);
-        });
-        element.displayTitle = displayTitle;
+        // SINGLE SOURCE OF TRUTH: Use shared utility function
+        element.displayTitle = window.createDisplayTitleWithPlaceholders(title, element.includeFiles);
     }
 
     if (type === 'column') {
@@ -5930,14 +5945,8 @@ function toggleMarpClass(scope, id, columnId, className, classScope) {
 
     // For columns in include mode, also update displayTitle
     if (type === 'column' && element.includeMode && element.includeFiles && element.includeFiles.length > 0) {
-        // Replace !!!include()!!! with placeholder in displayTitle
-        let displayTitle = title;
-        const includeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-        element.includeFiles.forEach((filePath, index) => {
-            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-            displayTitle = displayTitle.replace(includeRegex, placeholder);
-        });
-        element.displayTitle = displayTitle;
+        // SINGLE SOURCE OF TRUTH: Use shared utility function
+        element.displayTitle = window.createDisplayTitleWithPlaceholders(title, element.includeFiles);
     }
 
     // Send to backend (same as tags)
