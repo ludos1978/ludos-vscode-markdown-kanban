@@ -36,10 +36,9 @@ function initializeTaskElement(taskElement) {
     // 1. DRAG HANDLER SETUP
     const dragHandle = taskElement.querySelector('.task-drag-handle');
     if (dragHandle) {
-        // Clear any stale setup marker to force re-setup
-        delete dragHandle.dataset.dragSetup;
-
         // Setup drag handler using existing function from dragDrop.js
+        // Note: setupTaskDragHandle has its own duplicate prevention via dataset.dragSetup
+        // We rely on that instead of clearing the marker ourselves
         if (typeof setupTaskDragHandle === 'function') {
             setupTaskDragHandle(dragHandle);
         } else {
