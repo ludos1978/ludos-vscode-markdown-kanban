@@ -343,23 +343,35 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // Drop at END: Position in the bottom margin of last column
-                if (lastCol.bottomMarginRect) {
+                // STICKY MODE: Use column-title bottom boundary
+                if (lastCol.isSticky && lastCol.columnTitleRect) {
+                    stackLeft = lastCol.columnTitleRect.left;
+                    stackWidth = lastCol.columnTitleRect.width;
+                    insertionY = lastCol.columnTitleRect.bottom;
+                    console.log('[ColumnIndicator] Sticky - drop at end using title bottom:', {
+                        columnId: lastCol.columnId,
+                        titleBottom: lastCol.columnTitleRect.bottom,
+                        insertionY: insertionY
+                    });
+                }
+                // NORMAL MODE: Use bottom margin
+                else if (lastCol.bottomMarginRect) {
                     stackLeft = lastCol.bottomMarginRect.left;
                     stackWidth = lastCol.bottomMarginRect.width;
                     insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
-                    console.log('[ColumnIndicator] Drop at end (bottom margin):', {
+                    console.log('[ColumnIndicator] Normal - drop at end using bottom margin:', {
                         columnId: lastCol.columnId,
                         marginTop: lastCol.bottomMarginRect.top,
                         insertionY: insertionY
                     });
-                } else {
-                    // Fallback: no bottom margin, position after column
+                }
+                // FALLBACK: Use column bottom
+                else {
                     const liveRect = lastCol.element.getBoundingClientRect();
                     stackLeft = liveRect.left;
                     stackWidth = liveRect.width;
                     insertionY = liveRect.bottom;
-                    console.log('[ColumnIndicator] Drop at end (no margin, using column bottom):', {
+                    console.log('[ColumnIndicator] Fallback - using column bottom:', {
                         columnId: lastCol.columnId,
                         insertionY: insertionY
                     });
@@ -398,28 +410,38 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                 return;
             }
         } else {
-            // Drop before specific column - position in that column's TOP margin
+            // Drop before specific column - use title top if sticky, margin otherwise
             const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
             if (colData) {
-                // PERFORMANCE: Use cached top margin position (no DOM queries!)
-                if (colData.topMarginRect) {
+                // STICKY MODE: Use column-title top boundary
+                if (colData.isSticky && colData.columnTitleRect) {
+                    stackLeft = colData.columnTitleRect.left;
+                    stackWidth = colData.columnTitleRect.width;
+                    insertionY = colData.columnTitleRect.top;
+                    console.log('[ColumnIndicator] Sticky - using title top:', {
+                        columnId: colData.columnId,
+                        titleTop: colData.columnTitleRect.top,
+                        insertionY: insertionY
+                    });
+                }
+                // NORMAL MODE: Use top margin
+                else if (colData.topMarginRect) {
                     stackLeft = colData.topMarginRect.left;
                     stackWidth = colData.topMarginRect.width;
                     insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
-                    console.log('[ColumnIndicator] Using top margin:', {
+                    console.log('[ColumnIndicator] Normal - using top margin:', {
                         columnId: colData.columnId,
                         marginTop: colData.topMarginRect.top,
-                        marginHeight: colData.topMarginRect.height,
                         insertionY: insertionY
                     });
-                } else {
-                    // Fallback: no margin, use column edge
+                }
+                // FALLBACK: Use column edge
+                else {
                     stackLeft = colData.rect.left;
                     stackWidth = colData.rect.width;
                     insertionY = colData.rect.top;
-                    console.log('[ColumnIndicator] NO top margin, using column edge:', {
+                    console.log('[ColumnIndicator] Fallback - using column edge:', {
                         columnId: colData.columnId,
-                        columnTop: colData.rect.top,
                         insertionY: insertionY
                     });
                 }
@@ -3213,30 +3235,40 @@ function setupColumnDragAndDrop() {
             dragState.lastDropTarget = null;  // Track last drop position
             dragState.styleUpdatePending = false;  // Track if style update is needed
 
-            // PERFORMANCE: Cache column AND margin positions for fast lookup during drag
+            // PERFORMANCE: Cache column AND margin/title positions for fast lookup during drag
             const allColumns = document.querySelectorAll('.kanban-full-height-column');
             dragState.cachedColumnPositions = Array.from(allColumns)
                 .filter(col => col !== columnElement)
                 .map(col => {
-                    // Each column has margins: top (always) and bottom (if last in stack)
+                    const colId = col.getAttribute('data-column-id');
+                    const columnTitle = col.querySelector('.column-title');
+
+                    // Check if column is using sticky positioning (collapsed/stacked)
+                    const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
+
+                    // Cache margins (used when NOT sticky)
                     const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
                     const bottomMargin = col.querySelector('.column-margin-bottom');
-                    const colId = col.getAttribute('data-column-id');
 
-                    console.log('[ColumnDragstart] Caching column margins:', {
+                    // Cache column title (used when sticky)
+                    const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
+
+                    console.log('[ColumnDragstart] Caching column positions:', {
                         columnId: colId,
+                        isSticky: isSticky,
                         hasTopMargin: !!topMargin,
                         hasBottomMargin: !!bottomMargin,
-                        topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
-                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null
+                        hasTitle: !!columnTitle
                     });
 
                     return {
                         element: col,
                         rect: col.getBoundingClientRect(),
                         columnId: colId,
+                        isSticky: isSticky,
                         topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
-                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null
+                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
+                        columnTitleRect: columnTitleRect
                     };
                 });
 
