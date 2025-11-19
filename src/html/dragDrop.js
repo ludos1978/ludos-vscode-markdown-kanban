@@ -343,8 +343,8 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // STICKY MODE: Use column-title bottom boundary (LIVE position)
-                if (lastCol.isSticky && lastCol.columnTitleRect) {
+                // FOLDED MODE: Use column-title bottom boundary (content not visible)
+                if (lastCol.isFolded && lastCol.columnTitleRect) {
                     // Use LIVE position for sticky columns since they can move visually
                     const liveColumnTitle = lastCol.element.querySelector('.column-title');
                     const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
@@ -354,8 +354,8 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                         stackWidth = liveTitleRect.width;
                         insertionY = liveTitleRect.bottom;
 
-                        // DEBUG: Log indicator positioning for sticky column
-                        console.log('[StickyDrop] Indicator at title bottom (LIVE)', {
+                        // DEBUG: Log indicator positioning for folded column
+                        console.log('[StickyDrop] Indicator at title bottom - FOLDED (LIVE)', {
                             columnId: lastCol.columnId,
                             insertionY: insertionY,
                             liveTitleBottom: liveTitleRect.bottom,
@@ -366,6 +366,38 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                         stackLeft = lastCol.columnTitleRect.left;
                         stackWidth = lastCol.columnTitleRect.width;
                         insertionY = lastCol.columnTitleRect.bottom;
+                    }
+                }
+                // UNFOLDED STICKY MODE: Content visible, use content bottom
+                else if (lastCol.isSticky && lastCol.isContentVisible && lastCol.contentRect) {
+                    // Use LIVE content position
+                    const liveColumnContent = lastCol.element.querySelector('.column-content');
+                    const liveContentRect = liveColumnContent?.getBoundingClientRect();
+
+                    if (liveContentRect) {
+                        const viewportBottom = window.innerHeight;
+                        // Position at content bottom or viewport bottom (whichever is smaller)
+                        const effectiveBottom = Math.min(liveContentRect.bottom, viewportBottom);
+
+                        stackLeft = liveContentRect.left;
+                        stackWidth = liveContentRect.width;
+                        insertionY = effectiveBottom;
+
+                        // DEBUG: Log indicator positioning for unfolded column
+                        console.log('[StickyDrop] Indicator at content bottom - UNFOLDED (LIVE)', {
+                            columnId: lastCol.columnId,
+                            insertionY: insertionY,
+                            contentBottom: liveContentRect.bottom,
+                            viewportBottom: viewportBottom,
+                            effectiveBottom: effectiveBottom
+                        });
+                    } else {
+                        // Fallback to cached content rect
+                        const viewportBottom = window.innerHeight;
+                        const effectiveBottom = Math.min(lastCol.contentRect.bottom, viewportBottom);
+                        stackLeft = lastCol.contentRect.left;
+                        stackWidth = lastCol.contentRect.width;
+                        insertionY = effectiveBottom;
                     }
                 }
                 // NORMAL MODE: Use bottom margin
@@ -3227,11 +3259,26 @@ function setupColumnDragAndDrop() {
                     // Cache column title (used when sticky)
                     const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
 
+                    // CRITICAL: Check if column-content is visible in viewport (determines folded state)
+                    const columnContent = col.querySelector('.column-content');
+                    const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
+                    const viewportHeight = window.innerHeight;
+
+                    // Column is "folded" only if content is NOT visible in viewport
+                    // If any part of content is visible, it's NOT folded
+                    const isContentVisible = contentRect &&
+                        contentRect.bottom > 0 &&
+                        contentRect.top < viewportHeight;
+                    const isFolded = isSticky && !isContentVisible;
+
                     return {
                         element: col,
                         rect: col.getBoundingClientRect(),
                         columnId: colId,
                         isSticky: isSticky,
+                        isFolded: isFolded,  // NEW: True folded detection
+                        isContentVisible: isContentVisible,
+                        contentRect: contentRect,  // Cache content rect
                         topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
                         bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
                         columnTitleRect: columnTitleRect
@@ -3345,9 +3392,9 @@ function setupColumnDragAndDrop() {
             const stackColumns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'));
             const isLastColumnInStack = stackColumns[stackColumns.length - 1] === column;
 
-            // STICKY MODE: Use column-title boundaries for drop detection
+            // FOLDED MODE: Use column-title boundaries (content not visible)
             let midpoint, isInTopMargin, isBelowColumnTitle;
-            if (colData.isSticky && colData.columnTitleRect) {
+            if (colData.isFolded && colData.columnTitleRect) {
                 // For sticky columns, use LIVE position since sticky elements can move visually
                 const liveColumnTitle = column.querySelector('.column-title');
                 const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
@@ -3358,14 +3405,15 @@ function setupColumnDragAndDrop() {
                     // Check if hovering below column-title (extended drop zone for last column)
                     isBelowColumnTitle = isLastColumnInStack && e.clientY > liveTitleRect.bottom;
 
-                    // DEBUG: Log sticky column detection
+                    // DEBUG: Log folded column detection
                     if (isLastColumnInStack) {
-                        console.log('[StickyDrop] Per-column handler (LIVE)', {
+                        console.log('[StickyDrop] Per-column handler - FOLDED (LIVE)', {
                             columnId: column.dataset.columnId,
                             clientY: e.clientY,
                             liveTitleBottom: liveTitleRect.bottom,
                             cachedTitleBottom: colData.columnTitleRect.bottom,
-                            isBelowTitle: isBelowColumnTitle
+                            isBelowTitle: isBelowColumnTitle,
+                            isFolded: true
                         });
                     }
                 } else {
@@ -3373,6 +3421,43 @@ function setupColumnDragAndDrop() {
                     midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
                     isInTopMargin = e.clientY <= midpoint;
                     isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
+                }
+            }
+            // UNFOLDED STICKY MODE: Content is visible, use content boundaries
+            else if (colData.isSticky && colData.isContentVisible && colData.contentRect) {
+                // For unfolded columns, use LIVE content position
+                const liveColumnContent = column.querySelector('.column-content');
+                const liveContentRect = liveColumnContent?.getBoundingClientRect();
+
+                if (liveContentRect) {
+                    const viewportBottom = window.innerHeight;
+                    // Use content bottom or viewport bottom (whichever is smaller)
+                    const effectiveBottom = Math.min(liveContentRect.bottom, viewportBottom);
+
+                    midpoint = liveContentRect.top + (liveContentRect.height / 2);
+                    isInTopMargin = e.clientY <= midpoint;
+                    // Check if hovering below visible content
+                    isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
+
+                    // DEBUG: Log unfolded column detection
+                    if (isLastColumnInStack) {
+                        console.log('[StickyDrop] Per-column handler - UNFOLDED (LIVE)', {
+                            columnId: column.dataset.columnId,
+                            clientY: e.clientY,
+                            contentBottom: liveContentRect.bottom,
+                            effectiveBottom: effectiveBottom,
+                            viewportBottom: viewportBottom,
+                            isBelowContent: isBelowColumnTitle,
+                            isFolded: false
+                        });
+                    }
+                } else {
+                    // Fallback to cached content rect
+                    const viewportBottom = window.innerHeight;
+                    const effectiveBottom = Math.min(colData.contentRect.bottom, viewportBottom);
+                    midpoint = colData.contentRect.top + (colData.contentRect.height / 2);
+                    isInTopMargin = e.clientY <= midpoint;
+                    isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
                 }
             }
             // NORMAL MODE: Use margins for drop detection
@@ -3438,8 +3523,8 @@ function setupColumnDragAndDrop() {
             let lastBottom, stackLeft, stackRight;
 
             if (cachedCol) {
-                // STICKY MODE: Use column-title bottom (LIVE position since sticky can move)
-                if (cachedCol.isSticky && cachedCol.columnTitleRect) {
+                // FOLDED MODE: Use column-title bottom (content not visible)
+                if (cachedCol.isFolded && cachedCol.columnTitleRect) {
                     const liveColumnTitle = lastColumn.querySelector('.column-title');
                     const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
 
@@ -3452,6 +3537,24 @@ function setupColumnDragAndDrop() {
                         lastBottom = cachedCol.columnTitleRect.bottom;
                         stackLeft = cachedCol.columnTitleRect.left;
                         stackRight = cachedCol.columnTitleRect.right;
+                    }
+                }
+                // UNFOLDED STICKY MODE: Content visible, use content bottom
+                else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
+                    const liveColumnContent = lastColumn.querySelector('.column-content');
+                    const liveContentRect = liveColumnContent?.getBoundingClientRect();
+
+                    if (liveContentRect) {
+                        const viewportBottom = window.innerHeight;
+                        lastBottom = Math.min(liveContentRect.bottom, viewportBottom);
+                        stackLeft = liveContentRect.left;
+                        stackRight = liveContentRect.right;
+                    } else {
+                        // Fallback to cached
+                        const viewportBottom = window.innerHeight;
+                        lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
+                        stackLeft = cachedCol.contentRect.left;
+                        stackRight = cachedCol.contentRect.right;
                     }
                 }
                 // NORMAL MODE: Use full column bottom
@@ -3493,11 +3596,23 @@ function setupColumnDragAndDrop() {
 
         let lastBottom;
         if (cachedCol) {
-            // STICKY MODE: Use column-title bottom (LIVE position since sticky can move)
-            if (cachedCol.isSticky && cachedCol.columnTitleRect) {
+            // FOLDED MODE: Use column-title bottom (content not visible)
+            if (cachedCol.isFolded && cachedCol.columnTitleRect) {
                 const liveColumnTitle = lastColumn.querySelector('.column-title');
                 const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
                 lastBottom = liveTitleRect ? liveTitleRect.bottom : cachedCol.columnTitleRect.bottom;
+            }
+            // UNFOLDED STICKY MODE: Content visible, use content bottom
+            else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
+                const liveColumnContent = lastColumn.querySelector('.column-content');
+                const liveContentRect = liveColumnContent?.getBoundingClientRect();
+                if (liveContentRect) {
+                    const viewportBottom = window.innerHeight;
+                    lastBottom = Math.min(liveContentRect.bottom, viewportBottom);
+                } else {
+                    const viewportBottom = window.innerHeight;
+                    lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
+                }
             }
             // NORMAL MODE: Use full column bottom
             else {
@@ -3508,7 +3623,7 @@ function setupColumnDragAndDrop() {
             lastBottom = lastColumn.getBoundingClientRect().bottom;
         }
 
-        // Only handle vertical drops below the last column/title
+        // Only handle vertical drops below the last column/title/content
         if (e.clientY > lastBottom) {
             // DEBUG: Log document handler detection
             console.log('[StickyDrop] Document handler (LIVE)', {
@@ -3517,7 +3632,8 @@ function setupColumnDragAndDrop() {
                 clientY: e.clientY,
                 lastBottom: lastBottom,
                 isSticky: cachedCol?.isSticky,
-                usedLive: cachedCol?.isSticky
+                isFolded: cachedCol?.isFolded,
+                isContentVisible: cachedCol?.isContentVisible
             });
 
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
