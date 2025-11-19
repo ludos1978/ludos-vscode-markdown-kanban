@@ -3,7 +3,7 @@ import { PresentationParser } from './presentationParser';
 import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
-import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
+import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from './constants/IncludeConstants';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -187,19 +187,8 @@ export class MarkdownKanbanParser {
 
             // Replace !!!include()!!! with placeholder for frontend badge rendering
             // This preserves the position of the include in the title
-            let displayTitle = columnTitle;
-            columnIncludeMatches.forEach((match, index) => {
-              // Extract the file path from the match: !!!include(path)!!!
-              const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
-              if (pathMatch && includeFiles[index]) {
-                // Use the resolved file path as a unique identifier
-                const filePath = includeFiles[index];
-                const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-                displayTitle = displayTitle.replace(match, placeholder);
-              } else {
-                displayTitle = displayTitle.replace(match, '').trim();
-              }
-            });
+            // SINGLE SOURCE OF TRUTH: Use shared utility function
+            let displayTitle = createDisplayTitleWithPlaceholders(columnTitle, includeFiles);
 
             // Use filename as title if no display title provided
             if (!displayTitle && includeFiles.length > 0) {
@@ -373,19 +362,9 @@ export class MarkdownKanbanParser {
           }
 
           // Create placeholder for frontend badge rendering
-          // Extract any text before the !!!include()!!! and use that as displayTitle with placeholder
-          let displayTitle = task.title;
-          const taskIncludeRegex = /!!!include\s*\(([^)]+)\)\s*!!!/g;
-          let match;
-          let index = 0;
-          while ((match = taskIncludeRegex.exec(task.title)) !== null) {
-            if (includeFiles[index]) {
-              const filePath = includeFiles[index];
-              const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-              displayTitle = displayTitle.replace(match[0], placeholder);
-              index++;
-            }
-          }
+          // SINGLE SOURCE OF TRUTH: Use shared utility function
+          let displayTitle = createDisplayTitleWithPlaceholders(task.title, includeFiles);
+
           // Remove checkbox prefix from displayTitle for cleaner display
           displayTitle = displayTitle.replace(/^- \[ \]\s*/, '').trim();
 

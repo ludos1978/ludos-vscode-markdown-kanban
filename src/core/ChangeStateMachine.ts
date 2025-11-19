@@ -1,6 +1,6 @@
 import { MarkdownFile } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
-import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 
 /**
  * Unified Change State Machine
@@ -860,19 +860,10 @@ export class ChangeStateMachine {
                         targetColumn.originalTitle = event.newTitle;
 
                         // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
+                        // SINGLE SOURCE OF TRUTH: Use shared utility function
                         const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
                         if (includeMatches && includeMatches.length > 0) {
-                            let displayTitle = event.newTitle;
-                            includeMatches.forEach((match: string, index: number) => {
-                                const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
-                                if (pathMatch && newFiles[index]) {
-                                    const filePath = newFiles[index];
-                                    const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-                                    displayTitle = displayTitle.replace(match, placeholder);
-                                } else {
-                                    displayTitle = displayTitle.replace(match, '').trim();
-                                }
-                            });
+                            let displayTitle = createDisplayTitleWithPlaceholders(event.newTitle, newFiles);
 
                             if (!displayTitle && newFiles.length > 0) {
                                 const path = require('path');
@@ -923,21 +914,10 @@ export class ChangeStateMachine {
                 targetColumn.originalTitle = event.newTitle;
 
                 // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
-                // This matches the behavior in markdownParser.ts:228-242
+                // SINGLE SOURCE OF TRUTH: Use shared utility function
                 const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
                 if (includeMatches && includeMatches.length > 0) {
-                    let displayTitle = event.newTitle;
-                    includeMatches.forEach((match: string, index: number) => {
-                        // Extract the file path from the match: !!!include(path)!!!
-                        const pathMatch = match.match(/!!!include\s*\(([^)]+)\)\s*!!!/);
-                        if (pathMatch && loadingFiles[index]) {
-                            const filePath = loadingFiles[index];
-                            const placeholder = `%INCLUDE_BADGE:${filePath}%`;
-                            displayTitle = displayTitle.replace(match, placeholder);
-                        } else {
-                            displayTitle = displayTitle.replace(match, '').trim();
-                        }
-                    });
+                    let displayTitle = createDisplayTitleWithPlaceholders(event.newTitle, loadingFiles);
 
                     // If no display title after stripping, use filename as title
                     if (!displayTitle && loadingFiles.length > 0) {
