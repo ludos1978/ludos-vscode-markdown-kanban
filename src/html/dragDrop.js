@@ -2350,62 +2350,24 @@ function setupTaskDragAndDropForColumn(columnElement) {
         // Remove any column-level visual feedback when over tasks
         columnElement.classList.remove('drag-over-append');
 
-        // PERFORMANCE: Throttle calculations using requestAnimationFrame
-        // Store latest mouse position but skip calculation if already scheduled
-        dragState.latestMouseY = e.clientY;
-        dragState.latestTasksContainer = tasksContainer;
+        // PERFORMANCE: Use pre-cached positions from dragstart - ZERO recalculation during drag!
+        const containerKey = tasksContainer.id || tasksContainer.dataset.columnId || tasksContainer;
+        const cachedData = dragState.allColumnPositions?.get(containerKey);
 
-        if (dragState.indicatorUpdateScheduled) {
-            return; // Skip - update already scheduled with latest position
+        if (!cachedData) {
+            // Fallback: no cached data for this container
+            return;
         }
 
-        dragState.indicatorUpdateScheduled = true;
+        // Use cached positions to find drop location (no DOM queries!)
+        const afterElement = getDragAfterTaskElementFromCache(
+            e.clientY,
+            cachedData.tasks,
+            cachedData.addButtonRect
+        );
 
-        requestAnimationFrame(() => {
-            // Use latest mouse position (not stale from closure)
-            const mouseY = dragState.latestMouseY;
-            const container = dragState.latestTasksContainer;
-
-            // PERFORMANCE: Only calculate positions if container changed or cache expired
-            const now = Date.now();
-            const cacheKey = container.id || container.dataset.columnId;
-            const cacheValid = dragState.positionCacheKey === cacheKey &&
-                               (now - dragState.positionCacheTime) < 100; // 100ms TTL
-
-            let afterElement;
-
-            if (cacheValid && dragState.cachedPositions) {
-                // Use cached positions (fast!)
-                afterElement = getDragAfterTaskElementFromCache(
-                    mouseY,
-                    dragState.cachedPositions,
-                    dragState.cachedAddButtonRect
-                );
-            } else {
-                // Recalculate and cache positions (only when needed)
-                const tasks = Array.from(container.querySelectorAll('.task-item'))
-                    .filter(el => el !== dragState.draggedTask);
-                dragState.cachedPositions = tasks.map(task => ({
-                    element: task,
-                    rect: task.getBoundingClientRect()
-                }));
-                const addButton = container.querySelector('.add-task-btn');
-                dragState.cachedAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
-                dragState.positionCacheKey = cacheKey;
-                dragState.positionCacheTime = now;
-
-                afterElement = getDragAfterTaskElementFromCache(
-                    mouseY,
-                    dragState.cachedPositions,
-                    dragState.cachedAddButtonRect
-                );
-            }
-
-            // Show drop indicator at calculated position
-            showInternalTaskDropIndicator(container, afterElement);
-
-            dragState.indicatorUpdateScheduled = false;
-        });
+        // Show drop indicator at calculated position
+        showInternalTaskDropIndicator(tasksContainer, afterElement);
     });
 
     tasksContainer.addEventListener('drop', e => {
@@ -2480,21 +2442,26 @@ function setupTaskDragHandle(handle) {
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
             dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
 
-            // PERFORMANCE: Cache task positions for all tasks in the column
-            // This eliminates repeated querySelectorAll and getBoundingClientRect during drag
-            const tasksContainer = taskItem.parentNode;
-            dragState.cachedTaskPositions = Array.from(tasksContainer.querySelectorAll('.task-item'))
-                .filter(task => task !== taskItem)
-                .map(task => ({
-                    element: task,
-                    rect: task.getBoundingClientRect()
-                }));
-            dragState.cachedAddButton = tasksContainer.querySelector('.add-task-btn');
-            dragState.cachedAddButtonRect = dragState.cachedAddButton ? dragState.cachedAddButton.getBoundingClientRect() : null;
+            // PERFORMANCE: Cache task positions for ALL columns at dragstart
+            // This eliminates ALL querySelectorAll and getBoundingClientRect calls during drag
+            dragState.allColumnPositions = new Map();
+            document.querySelectorAll('.column-tasks-container').forEach(container => {
+                const containerKey = container.id || container.dataset.columnId || container;
+                const tasks = Array.from(container.querySelectorAll('.task-item'))
+                    .filter(task => task !== taskItem)
+                    .map(task => ({
+                        element: task,
+                        rect: task.getBoundingClientRect()
+                    }));
+                const addButton = container.querySelector('.add-task-btn');
+                const addButtonRect = addButton ? addButton.getBoundingClientRect() : null;
 
-            // Track last position to prevent redundant DOM updates
-            dragState.lastAfterElement = undefined;
-            dragState.dragoverThrottleId = null;
+                dragState.allColumnPositions.set(containerKey, {
+                    tasks: tasks,
+                    addButton: addButton,
+                    addButtonRect: addButtonRect
+                });
+            });
 
             // Set multiple data formats
             e.dataTransfer.effectAllowed = 'move';
