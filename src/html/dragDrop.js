@@ -3022,23 +3022,9 @@ function updateStackBottomDropZones() {
             if (!dragState.draggedColumn) {return;}
             e.preventDefault();
 
-            // Place dragged column at the end of this stack
-            if (dragState.draggedColumn !== stack.lastElementChild ||
-                dragState.draggedColumn.previousElementSibling !== columns[columns.length - 1]) {
-
-                // Insert before the drop zone (which is last)
-                stack.insertBefore(dragState.draggedColumn, dropZone);
-
-                // Update styles
-                if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                    dragState.styleUpdatePending = true;
-                    requestAnimationFrame(() => {
-                        window.applyStackedColumnStyles();
-                        updateStackBottomDropZones();
-                        dragState.styleUpdatePending = false;
-                    });
-                }
-            }
+            // PERFORMANCE: Just show indicator, DON'T move column!
+            // Drop at end of stack (before drop zone)
+            showInternalColumnDropIndicator(stack, null);
         });
 
         // Append to stack
@@ -3326,23 +3312,8 @@ function setupColumnDragAndDrop() {
 
         // Only handle vertical drops below the last column
         if (e.clientY > lastRect.bottom) {
-            const targetKey = 'stack-bottom-' + Array.from(stack.children).indexOf(dragState.draggedColumn);
-            if (dragState.lastDropTarget !== targetKey) {
-                dragState.lastDropTarget = targetKey;
-
-                if (dragState.draggedColumn !== stack.lastElementChild) {
-                    stack.appendChild(dragState.draggedColumn);
-
-                    // Schedule style update if not already pending
-                    if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                        dragState.styleUpdatePending = true;
-                        requestAnimationFrame(() => {
-                            window.applyStackedColumnStyles();
-                            dragState.styleUpdatePending = false;
-                        });
-                    }
-                }
-            }
+            // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
+            showInternalColumnDropIndicator(stack, null);
         }
     });
 
