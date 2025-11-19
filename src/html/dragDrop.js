@@ -343,18 +343,30 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // STICKY MODE: Use column-title bottom boundary
+                // STICKY MODE: Use column-title bottom boundary (LIVE position)
                 if (lastCol.isSticky && lastCol.columnTitleRect) {
-                    stackLeft = lastCol.columnTitleRect.left;
-                    stackWidth = lastCol.columnTitleRect.width;
-                    insertionY = lastCol.columnTitleRect.bottom;
+                    // Use LIVE position for sticky columns since they can move visually
+                    const liveColumnTitle = lastCol.element.querySelector('.column-title');
+                    const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
 
-                    // DEBUG: Log indicator positioning for sticky column
-                    console.log('[StickyDrop] Indicator at title bottom', {
-                        columnId: lastCol.columnId,
-                        insertionY: insertionY,
-                        titleBottom: lastCol.columnTitleRect.bottom
-                    });
+                    if (liveTitleRect) {
+                        stackLeft = liveTitleRect.left;
+                        stackWidth = liveTitleRect.width;
+                        insertionY = liveTitleRect.bottom;
+
+                        // DEBUG: Log indicator positioning for sticky column
+                        console.log('[StickyDrop] Indicator at title bottom (LIVE)', {
+                            columnId: lastCol.columnId,
+                            insertionY: insertionY,
+                            liveTitleBottom: liveTitleRect.bottom,
+                            cachedTitleBottom: lastCol.columnTitleRect.bottom
+                        });
+                    } else {
+                        // Fallback to cached position
+                        stackLeft = lastCol.columnTitleRect.left;
+                        stackWidth = lastCol.columnTitleRect.width;
+                        insertionY = lastCol.columnTitleRect.bottom;
+                    }
                 }
                 // NORMAL MODE: Use bottom margin
                 else if (lastCol.bottomMarginRect) {
@@ -3336,19 +3348,31 @@ function setupColumnDragAndDrop() {
             // STICKY MODE: Use column-title boundaries for drop detection
             let midpoint, isInTopMargin, isBelowColumnTitle;
             if (colData.isSticky && colData.columnTitleRect) {
-                midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
-                isInTopMargin = e.clientY <= midpoint;
-                // Check if hovering below column-title (extended drop zone for last column)
-                isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
+                // For sticky columns, use LIVE position since sticky elements can move visually
+                const liveColumnTitle = column.querySelector('.column-title');
+                const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
 
-                // DEBUG: Log sticky column detection
-                if (isLastColumnInStack) {
-                    console.log('[StickyDrop] Per-column handler', {
-                        columnId: column.dataset.columnId,
-                        clientY: e.clientY,
-                        titleBottom: colData.columnTitleRect.bottom,
-                        isBelowTitle: isBelowColumnTitle
-                    });
+                if (liveTitleRect) {
+                    midpoint = liveTitleRect.top + liveTitleRect.height / 2;
+                    isInTopMargin = e.clientY <= midpoint;
+                    // Check if hovering below column-title (extended drop zone for last column)
+                    isBelowColumnTitle = isLastColumnInStack && e.clientY > liveTitleRect.bottom;
+
+                    // DEBUG: Log sticky column detection
+                    if (isLastColumnInStack) {
+                        console.log('[StickyDrop] Per-column handler (LIVE)', {
+                            columnId: column.dataset.columnId,
+                            clientY: e.clientY,
+                            liveTitleBottom: liveTitleRect.bottom,
+                            cachedTitleBottom: colData.columnTitleRect.bottom,
+                            isBelowTitle: isBelowColumnTitle
+                        });
+                    }
+                } else {
+                    // Fallback to cached if live query fails
+                    midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
+                    isInTopMargin = e.clientY <= midpoint;
+                    isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
                 }
             }
             // NORMAL MODE: Use margins for drop detection
@@ -3414,11 +3438,21 @@ function setupColumnDragAndDrop() {
             let lastBottom, stackLeft, stackRight;
 
             if (cachedCol) {
-                // STICKY MODE: Use column-title bottom (visible part)
+                // STICKY MODE: Use column-title bottom (LIVE position since sticky can move)
                 if (cachedCol.isSticky && cachedCol.columnTitleRect) {
-                    lastBottom = cachedCol.columnTitleRect.bottom;
-                    stackLeft = cachedCol.columnTitleRect.left;
-                    stackRight = cachedCol.columnTitleRect.right;
+                    const liveColumnTitle = lastColumn.querySelector('.column-title');
+                    const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
+
+                    if (liveTitleRect) {
+                        lastBottom = liveTitleRect.bottom;
+                        stackLeft = liveTitleRect.left;
+                        stackRight = liveTitleRect.right;
+                    } else {
+                        // Fallback to cached
+                        lastBottom = cachedCol.columnTitleRect.bottom;
+                        stackLeft = cachedCol.columnTitleRect.left;
+                        stackRight = cachedCol.columnTitleRect.right;
+                    }
                 }
                 // NORMAL MODE: Use full column bottom
                 else {
@@ -3459,9 +3493,11 @@ function setupColumnDragAndDrop() {
 
         let lastBottom;
         if (cachedCol) {
-            // STICKY MODE: Use column-title bottom (only visible part)
+            // STICKY MODE: Use column-title bottom (LIVE position since sticky can move)
             if (cachedCol.isSticky && cachedCol.columnTitleRect) {
-                lastBottom = cachedCol.columnTitleRect.bottom;
+                const liveColumnTitle = lastColumn.querySelector('.column-title');
+                const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
+                lastBottom = liveTitleRect ? liveTitleRect.bottom : cachedCol.columnTitleRect.bottom;
             }
             // NORMAL MODE: Use full column bottom
             else {
@@ -3475,12 +3511,13 @@ function setupColumnDragAndDrop() {
         // Only handle vertical drops below the last column/title
         if (e.clientY > lastBottom) {
             // DEBUG: Log document handler detection
-            console.log('[StickyDrop] Document handler', {
+            console.log('[StickyDrop] Document handler (LIVE)', {
                 stackHasColumns: columns.length,
                 lastColumnId: lastColumn.dataset.columnId,
                 clientY: e.clientY,
                 lastBottom: lastBottom,
-                isSticky: cachedCol?.isSticky
+                isSticky: cachedCol?.isSticky,
+                usedLive: cachedCol?.isSticky
             });
 
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
