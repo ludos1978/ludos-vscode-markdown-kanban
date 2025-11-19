@@ -2,7 +2,7 @@
 - [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
 Pressing enter should start editing the task.
 
-- [ ] i still see %INCLUDE_BADGE:path/to/filename.md% in the column titles, THIS SHOULD NOT HAPPEN. We solved this problem before!!! make sure there is only one codepath that handles include columninclude and taskinclude (in column and task headers) . the include in the task content is implemented only in the frontend. But make sure it never passes any !!!include()!!! in a task or column header into the markdown renderer!!! . i think the %INCLUDE appears when the path starts with "../path/to/something", so a relative path in a folder above.
+- [x] i still see %INCLUDE_BADGE:path/to/filename.md% in the column titles, THIS SHOULD NOT HAPPEN. We solved this problem before!!! make sure there is only one codepath that handles include columninclude and taskinclude (in column and task headers) . the include in the task content is implemented only in the frontend. But make sure it never passes any !!!include()!!! in a task or column header into the markdown renderer!!! . i think the %INCLUDE appears when the path starts with "../path/to/something", so a relative path in a folder above.
 
 - [x] view focus should do some things which are currently only done when the kanban is opened.
   - reload all configuration and update menus. for example the active tag groups. or when default changes have been modified.
