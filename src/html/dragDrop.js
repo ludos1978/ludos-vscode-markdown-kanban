@@ -3318,11 +3318,17 @@ function setupColumnDragAndDrop() {
                 return;
             }
 
+            // Check if this is the last column in the stack
+            const stackColumns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'));
+            const isLastColumnInStack = stackColumns[stackColumns.length - 1] === column;
+
             // STICKY MODE: Use column-title boundaries for drop detection
-            let midpoint, isInTopMargin;
+            let midpoint, isInTopMargin, isBelowColumnTitle;
             if (colData.isSticky && colData.columnTitleRect) {
                 midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
                 isInTopMargin = e.clientY <= midpoint;
+                // Check if hovering below column-title (extended drop zone for last column)
+                isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
             }
             // NORMAL MODE: Use margins for drop detection
             else {
@@ -3333,11 +3339,19 @@ function setupColumnDragAndDrop() {
                 isInTopMargin = colData.topMarginRect &&
                     e.clientY >= colData.topMarginRect.top &&
                     e.clientY <= colData.topMarginRect.bottom;
+
+                // Check if hovering in bottom margin (for last column)
+                isBelowColumnTitle = isLastColumnInStack && colData.bottomMarginRect &&
+                    e.clientY >= colData.bottomMarginRect.top &&
+                    e.clientY <= colData.bottomMarginRect.bottom;
             }
 
             // Determine drop position based on mouse Y
             let beforeColumn;
-            if (e.clientY < midpoint || isInTopMargin) {
+            if (isBelowColumnTitle) {
+                // Drop at END of stack (after last column)
+                beforeColumn = null;
+            } else if (e.clientY < midpoint || isInTopMargin) {
                 // Drop before this column
                 beforeColumn = column;
             } else {
@@ -3355,14 +3369,12 @@ function setupColumnDragAndDrop() {
     document.addEventListener('dragover', e => {
         if (!dragState.draggedColumn) {return;}
 
-        // Don't interfere if directly over a column or drop zone
-        if (e.target.classList.contains('kanban-full-height-column') ||
-            e.target.closest('.kanban-full-height-column') ||
-            e.target.classList.contains('column-drop-zone')) {
+        // Don't interfere if over a drop zone
+        if (e.target.classList.contains('column-drop-zone')) {
             return;
         }
 
-        // First try to find stack directly
+        // First try to find stack directly (including hovering over a column within stack)
         let stack = e.target.closest('.kanban-column-stack');
 
         // If not hovering over stack, check if hovering over row below a stack
