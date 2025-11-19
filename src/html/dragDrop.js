@@ -353,14 +353,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                         stackLeft = liveTitleRect.left;
                         stackWidth = liveTitleRect.width;
                         insertionY = liveTitleRect.bottom;
-
-                        // DEBUG: Log indicator positioning for folded column
-                        console.log('[StickyDrop] Indicator at title bottom - FOLDED (LIVE)', {
-                            columnId: lastCol.columnId,
-                            insertionY: insertionY,
-                            liveTitleBottom: liveTitleRect.bottom,
-                            cachedTitleBottom: lastCol.columnTitleRect.bottom
-                        });
                     } else {
                         // Fallback to cached position
                         stackLeft = lastCol.columnTitleRect.left;
@@ -382,15 +374,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                         stackLeft = liveContentRect.left;
                         stackWidth = liveContentRect.width;
                         insertionY = effectiveBottom;
-
-                        // DEBUG: Log indicator positioning for unfolded column
-                        console.log('[StickyDrop] Indicator at content bottom - UNFOLDED (LIVE)', {
-                            columnId: lastCol.columnId,
-                            insertionY: insertionY,
-                            contentBottom: liveContentRect.bottom,
-                            viewportBottom: viewportBottom,
-                            effectiveBottom: effectiveBottom
-                        });
                     } else {
                         // Fallback to cached content rect
                         const viewportBottom = window.innerHeight;
@@ -3404,18 +3387,6 @@ function setupColumnDragAndDrop() {
                     isInTopMargin = e.clientY <= midpoint;
                     // Check if hovering below column-title (extended drop zone for last column)
                     isBelowColumnTitle = isLastColumnInStack && e.clientY > liveTitleRect.bottom;
-
-                    // DEBUG: Log folded column detection
-                    if (isLastColumnInStack) {
-                        console.log('[StickyDrop] Per-column handler - FOLDED (LIVE)', {
-                            columnId: column.dataset.columnId,
-                            clientY: e.clientY,
-                            liveTitleBottom: liveTitleRect.bottom,
-                            cachedTitleBottom: colData.columnTitleRect.bottom,
-                            isBelowTitle: isBelowColumnTitle,
-                            isFolded: true
-                        });
-                    }
                 } else {
                     // Fallback to cached if live query fails
                     midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
@@ -3438,19 +3409,6 @@ function setupColumnDragAndDrop() {
                     isInTopMargin = e.clientY <= midpoint;
                     // Check if hovering below visible content
                     isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
-
-                    // DEBUG: Log unfolded column detection
-                    if (isLastColumnInStack) {
-                        console.log('[StickyDrop] Per-column handler - UNFOLDED (LIVE)', {
-                            columnId: column.dataset.columnId,
-                            clientY: e.clientY,
-                            contentBottom: liveContentRect.bottom,
-                            effectiveBottom: effectiveBottom,
-                            viewportBottom: viewportBottom,
-                            isBelowContent: isBelowColumnTitle,
-                            isFolded: false
-                        });
-                    }
                 } else {
                     // Fallback to cached content rect
                     const viewportBottom = window.innerHeight;
@@ -3625,17 +3583,6 @@ function setupColumnDragAndDrop() {
 
         // Only handle vertical drops below the last column/title/content
         if (e.clientY > lastBottom) {
-            // DEBUG: Log document handler detection
-            console.log('[StickyDrop] Document handler (LIVE)', {
-                stackHasColumns: columns.length,
-                lastColumnId: lastColumn.dataset.columnId,
-                clientY: e.clientY,
-                lastBottom: lastBottom,
-                isSticky: cachedCol?.isSticky,
-                isFolded: cachedCol?.isFolded,
-                isContentVisible: cachedCol?.isContentVisible
-            });
-
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
             showInternalColumnDropIndicator(stack, null);
         }
