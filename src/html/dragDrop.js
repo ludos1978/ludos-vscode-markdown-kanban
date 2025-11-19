@@ -334,11 +334,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     let insertionY, stackLeft, stackWidth;
 
     if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
-        // Estimate stack bounds from column positions
-        const firstCol = dragState.cachedColumnPositions[0];
-        stackLeft = firstCol.rect.left;
-        stackWidth = firstCol.rect.width;
-
         if (!beforeColumn) {
             // Drop at end of stack (after last column)
             const stackColumns = dragState.cachedColumnPositions.filter(
@@ -347,6 +342,10 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
+                // Use last column's dimensions for indicator width/left
+                stackLeft = lastCol.rect.left;
+                stackWidth = lastCol.rect.width;
+
                 // PERFORMANCE: Use cached margin position (no DOM queries!)
                 if (lastCol.bottomMarginRect) {
                     insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
@@ -354,12 +353,18 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     insertionY = lastCol.rect.bottom + 5;
                 }
             } else {
-                insertionY = firstCol.rect.top + 5;
+                // No columns in target stack - hide indicator
+                indicator.style.display = 'none';
+                return;
             }
         } else {
             // Drop before specific column - position in the margin ABOVE it
             const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
             if (colData) {
+                // Use this column's dimensions for indicator width/left
+                stackLeft = colData.rect.left;
+                stackWidth = colData.rect.width;
+
                 // PERFORMANCE: Use cached margin position (no DOM queries!)
                 if (colData.topMarginRect) {
                     insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
