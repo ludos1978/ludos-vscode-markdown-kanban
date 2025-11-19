@@ -1,8 +1,17 @@
 
+- [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
+Pressing enter should start editing the task.
 
-- [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the current task. it must not 
+- [x] view focus should do some things which are currently only done when the kanban is opened.
+  - reload all configuration and update menus. for example the active tag groups. or when default changes have been modified.
+  - the keyboard shortcuts.
+  all these configurations should not be loaded at any other time. verify this by checking the complete code for configuration or setting loading or api access.
 
-- [ ] the column header is still broken when it contains an !!!include(filename.md)!!! there seem to be interfering system in the code. for example it does different displays on initial load and on updating the colums. maybe because the backend does something with the !!!include()!!! title as well? 
+- [x] we have additional shortcuts defined. which seem to open a buffer (a new view). which it closes automatically. we need to remove this feature and try to implement it using the default process, as it sometimes closes the wrong view. eighter it works with the default pasting or not. 
+
+- [x] the keyboard shortcuts that edit insert content using the vscode default shortcuts dont work anymore. can you verify the process that is currently running and suggest 3 solutions on solving it with a quality measurement. improve until you have 100% quality or near.
+
+- [x] the column header is still broken when it contains an !!!include(filename.md)!!! there seem to be interfering system in the code. for example it does different displays on initial load and on updating the colums. maybe because the backend does something with the !!!include()!!! title as well? 
 
 - [x] when creating or editing tasks or after moving them sometimes the tasks cannot be edited again or the drag button doesnt work. we need to verify and unify how tasks are created, i assume we have multiple codepaths that create tasks in different was. for example the are quite reliable after unfolding. ultrathink . create 3 suggested solutions and rate theyr quality
 

@@ -1660,21 +1660,27 @@ export class MessageHandler {
 
     private async handleVSCodeSnippet(message: any): Promise<void> {
         try {
+            console.log(`[MessageHandler] Getting snippet name for shortcut: ${message.shortcut}`);
+
             // Use VS Code's snippet resolution to get the actual snippet content
             // This leverages VS Code's built-in snippet system
             const snippetName = await this.getSnippetNameForShortcut(message.shortcut);
 
             if (!snippetName) {
+                console.warn(`[MessageHandler] No snippet name found for ${message.shortcut}`);
                 vscode.window.showInformationMessage(
                     `No snippet configured for ${message.shortcut}. Add a keybinding with "editor.action.insertSnippet" command.`
                 );
                 return;
             }
 
+            console.log(`[MessageHandler] Snippet name: ${snippetName}, resolving content...`);
+
             // Resolve the snippet content from VS Code's markdown snippet configuration
             const resolvedContent = await this.resolveSnippetContent(snippetName);
 
             if (resolvedContent) {
+                console.log(`[MessageHandler] Snippet resolved, length: ${resolvedContent.length}, sending to webview`);
                 const panel = this._getWebviewPanel();
                 if (panel) {
                     panel._panel.webview.postMessage({
@@ -1683,11 +1689,16 @@ export class MessageHandler {
                         fieldType: message.fieldType,
                         taskId: message.taskId
                     });
+                    console.log(`[MessageHandler] Snippet content sent to webview`);
+                } else {
+                    console.warn(`[MessageHandler] No webview panel found`);
                 }
+            } else {
+                console.warn(`[MessageHandler] Snippet content is empty for: ${snippetName}`);
             }
 
         } catch (error) {
-            console.error('Failed to handle VS Code snippet:', error);
+            console.error('[MessageHandler] Failed to handle VS Code snippet:', error);
             vscode.window.showInformationMessage(
                 `Use Ctrl+Space in the kanban editor for snippet picker.`
             );
@@ -1697,81 +1708,27 @@ export class MessageHandler {
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
 
-            // First, check user keybindings
-            let userCommand = await this.getCommandForShortcut(message.shortcut);
+            // Use the same shortcut mapping that was sent to the frontend
+            // This ensures consistency and proper priority (extension shortcuts over user)
+            const allShortcuts = await this.getAllShortcuts();
+            const userCommand = allShortcuts[message.shortcut];
 
-            // If not in user keybindings, check for common extension commands
-            if (!userCommand) {
-                userCommand = await this.getExtensionCommandForShortcut(message.shortcut);
+            console.log(`[MessageHandler] handleEditorShortcut - shortcut: ${message.shortcut}, command: ${userCommand}, type: ${typeof userCommand}`);
+
+            // If it's a snippet command, handle it specially
+            if (userCommand === 'editor.action.insertSnippet') {
+                console.log(`[MessageHandler] Handling snippet shortcut: ${message.shortcut}`);
+                await this.handleVSCodeSnippet(message);
+                return;
             }
 
             if (userCommand) {
 
                 try {
-                    // For commands that work on text selection (like translators):
-                    // Create a temp document, execute the command, capture result, close document
-                    if (message.selectedText && message.selectedText.length > 0) {
-
-                        // Create temp document with selected text
-                        const tempDoc = await vscode.workspace.openTextDocument({
-                            content: message.selectedText,
-                            language: 'markdown'
-                        });
-
-                        // Show the temp document in a split view
-                        const tempEditor = await vscode.window.showTextDocument(tempDoc, {
-                            preview: true,
-                            preserveFocus: false, // Give focus to temp doc so command works
-                            viewColumn: vscode.ViewColumn.Beside
-                        });
-
-                        // Select all text in the temp document
-                        const lastLine = tempDoc.lineAt(tempDoc.lineCount - 1);
-                        tempEditor.selection = new vscode.Selection(
-                            new vscode.Position(0, 0),
-                            new vscode.Position(tempDoc.lineCount - 1, lastLine.text.length)
-                        );
-
-                        // Execute the command (e.g., DeepL translate)
-                        await vscode.commands.executeCommand(userCommand);
-
-                        // Wait a bit for the command to complete and modify the document
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                        // Get the result
-                        const resultText = tempDoc.getText();
-
-                        // Send the result back to the webview first
-                        const panel = this._getWebviewPanel();
-                        if (panel) {
-                            panel._panel.webview.postMessage({
-                                type: 'replaceSelection',
-                                text: resultText,
-                                cursorLine: message.cursorLine,
-                                cursorColumn: message.cursorColumn,
-                                selectionStart: message.selectionStart,
-                                selectionEnd: message.selectionEnd
-                            });
-                        }
-
-                        // Close the temp document by focusing it first, then closing without saving
-                        await vscode.window.showTextDocument(tempDoc, {
-                            preview: false,
-                            preserveFocus: false,
-                            viewColumn: vscode.ViewColumn.Beside
-                        });
-
-                        // Close this editor without saving
-                        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-
-                        // Return focus to kanban
-                        if (panel) {
-                            panel._panel.reveal(vscode.ViewColumn.One, false);
-                        }
-                    } else {
-                        // No selection - execute normally
-                        await vscode.commands.executeCommand(userCommand);
-                    }
+                    // Simply execute the command - let VSCode handle it with default behavior
+                    // This avoids issues with temp documents closing the wrong view
+                    console.log(`[MessageHandler] Executing command: ${userCommand}`);
+                    await vscode.commands.executeCommand(userCommand);
 
                     return;
                 } catch (err) {
@@ -1793,10 +1750,11 @@ export class MessageHandler {
         const shortcutMap: Record<string, string> = {};
 
         try {
-            // Load keybindings from VS Code
+            // 1. Load user keybindings first (lowest priority)
             const keybindings = await this.loadVSCodeKeybindings();
 
             // Build shortcut map from user keybindings
+            // Include ALL commands (including snippets - they're handled by handleVSCodeSnippet)
             for (const binding of keybindings) {
                 if (binding.key && binding.command && !binding.command.startsWith('-')) {
                     // Normalize the key format
@@ -1808,10 +1766,13 @@ export class MessageHandler {
                 }
             }
 
-            // Add extension shortcuts
+            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} user keybindings`);
+
+            // 2. Add VSCode default shortcuts (highest priority - overrides user keybindings)
             const extensionShortcuts = await this.getExtensionShortcuts();
             Object.assign(shortcutMap, extensionShortcuts);
 
+            console.log(`[MessageHandler] Total shortcuts loaded: ${Object.keys(shortcutMap).length}`);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
@@ -1821,21 +1782,58 @@ export class MessageHandler {
     }
 
     private async getExtensionShortcuts(): Promise<Record<string, string>> {
-        // Map of common extension shortcuts to their commands
+        const isMac = process.platform === 'darwin';
+        const mod = isMac ? 'meta' : 'ctrl';
+
+        // VSCode commands that need backend processing
+        // Since VSCode doesn't expose a keybindings API, we maintain this list
+        //
+        // IMPORTANT: Only include commands that actually need VSCode backend processing.
+        // Clipboard, selection, and basic editing should be handled by the browser.
         const extensionShortcuts: Record<string, string> = {
+            // Text transformation commands (these need VSCode backend)
+            [`${mod}+/`]: 'editor.action.commentLine',
+            [`${mod}+[`]: 'editor.action.outdentLines',
+            [`${mod}+]`]: 'editor.action.indentLines',
+
+            // Text formatting (markdown extensions)
+            [`${mod}+b`]: 'editor.action.fontBold',
+            [`${mod}+i`]: 'editor.action.fontItalic',
+
+            // Line manipulation (these modify text in complex ways)
+            'alt+up': 'editor.action.moveLinesUpAction',
+            'alt+down': 'editor.action.moveLinesDownAction',
+            [`${mod}+shift+d`]: 'editor.action.copyLinesDownAction',
+            [`${mod}+shift+k`]: 'editor.action.deleteLines',
+
+            // Translation extensions (need backend to call extension)
             'alt+t': 'deepl.translate',
             'shift+alt+t': 'deepl.translateTo',
-            // Add more common extension shortcuts here as needed
+
+            // NOTE: The following are NOT included because they should work natively:
+            // - Clipboard (Cmd+V, Cmd+C, Cmd+X) - browser handles these
+            // - Select All (Cmd+A) - browser selection works fine
+            // - Undo/Redo (Cmd+Z, Cmd+Y) - Kanban has its own undo system
+            // - Cursor/word navigation - browser handles these
+            // - Multi-cursor - doesn't work well in single-line inputs
         };
 
         // Verify commands actually exist
         const allCommands = await vscode.commands.getCommands();
         const validShortcuts: Record<string, string> = {};
+        const rejectedShortcuts: string[] = [];
 
         for (const [shortcut, command] of Object.entries(extensionShortcuts)) {
             if (allCommands.includes(command)) {
                 validShortcuts[shortcut] = command;
+            } else {
+                rejectedShortcuts.push(`${shortcut} → ${command}`);
             }
+        }
+
+        console.log(`[MessageHandler] Loaded ${Object.keys(validShortcuts).length} VSCode shortcuts (${Object.keys(extensionShortcuts).length} checked)`);
+        if (rejectedShortcuts.length > 0) {
+            console.log(`[MessageHandler] Rejected shortcuts (command not found):`, rejectedShortcuts);
         }
 
         return validShortcuts;

@@ -2786,6 +2786,8 @@ window.addEventListener('message', event => {
         case 'updateShortcuts':
             // Cache shortcuts for taskEditor to use
             window.cachedShortcuts = message.shortcuts || {};
+            console.log('[Kanban Webview] Received shortcuts:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
+            console.log('[Kanban Webview] Shortcuts:', window.cachedShortcuts);
             break;
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
@@ -3345,32 +3347,50 @@ window.addEventListener('message', event => {
  * Insert VS Code snippet content into the active editor
  */
 function insertVSCodeSnippetContent(content, fieldType, taskId) {
-    // Find the currently active editor
-    const activeEditor = document.querySelector('.task-title-edit:focus, .task-description-edit:focus');
+    console.log('[Webview] insertVSCodeSnippetContent called - content:', content, 'fieldType:', fieldType, 'taskId:', taskId);
 
-    if (activeEditor && window.taskEditor && window.taskEditor.currentEditor) {
-        // Insert the snippet content at cursor position
-        const cursorPosition = activeEditor.selectionStart || 0;
-        const textBefore = activeEditor.value.substring(0, cursorPosition);
-        const textAfter = activeEditor.value.substring(activeEditor.selectionEnd || cursorPosition);
+    // Use the current editor from taskEditor instead of searching for focused element
+    // This fixes the timing issue where focus might be lost by the time the snippet arrives
+    if (window.taskEditor && window.taskEditor.currentEditor) {
+        const activeEditor = window.taskEditor.currentEditor.element;
 
-        // Insert the snippet
-        activeEditor.value = textBefore + content + textAfter;
+        console.log('[Webview] Using currentEditor.element:', activeEditor);
 
-        // Position cursor after the snippet
-        const newCursorPosition = cursorPosition + content.length;
-        activeEditor.setSelectionRange(newCursorPosition, newCursorPosition);
+        if (activeEditor) {
+            console.log('[Webview] Inserting snippet content at cursor position');
 
-        // Focus back to the editor
-        activeEditor.focus();
+            // Insert the snippet content at cursor position
+            const cursorPosition = activeEditor.selectionStart || 0;
+            const textBefore = activeEditor.value.substring(0, cursorPosition);
+            const textAfter = activeEditor.value.substring(activeEditor.selectionEnd || cursorPosition);
 
-        // Trigger input event to ensure the change is registered
-        activeEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            // Insert the snippet
+            activeEditor.value = textBefore + content + textAfter;
 
-        // Auto-resize if needed
-        if (typeof autoResize === 'function') {
-            autoResize(activeEditor);
+            // Position cursor after the snippet
+            const newCursorPosition = cursorPosition + content.length;
+            activeEditor.setSelectionRange(newCursorPosition, newCursorPosition);
+
+            // Focus back to the editor
+            activeEditor.focus();
+
+            // Trigger input event to ensure the change is registered
+            activeEditor.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // Auto-resize if needed
+            if (typeof autoResize === 'function') {
+                autoResize(activeEditor);
+            }
+
+            console.log('[Webview] Snippet inserted successfully');
+        } else {
+            console.warn('[Webview] currentEditor.element is null');
         }
+    } else {
+        console.warn('[Webview] Cannot insert snippet - no currentEditor:', {
+            hasTaskEditor: !!window.taskEditor,
+            hasCurrentEditor: !!(window.taskEditor && window.taskEditor.currentEditor)
+        });
     }
 }
 
@@ -3861,7 +3881,7 @@ document.addEventListener('keydown', (e) => {
         }
     }
     
-    // Original undo/redo shortcuts (keep these)
+    // Kanban-specific shortcuts (only when NOT editing)
     if (!isEditing && !isInSearchInput) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
             e.preventDefault();
