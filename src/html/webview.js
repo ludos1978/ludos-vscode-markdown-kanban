@@ -2789,6 +2789,25 @@ window.addEventListener('message', event => {
             console.log('[Kanban Webview] Received shortcuts:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
             console.log('[Kanban Webview] Shortcuts:', window.cachedShortcuts);
             break;
+
+        case 'configurationUpdate':
+            // ⚠️ CONFIGURATION REFRESH - Cache all workspace settings
+            // This is called on view focus and initial load to ensure fresh configuration
+            console.log('[Kanban Webview] 🔄 Refreshing all configuration...');
+
+            // Store all configuration in window.cachedConfig for global access
+            window.cachedConfig = message.config || {};
+
+            // Apply configuration immediately (re-render with new settings)
+            if (window.cachedBoard) {
+                console.log('[Kanban Webview] ✅ Configuration updated - applying to current board');
+                // Trigger re-render with new configuration
+                // The board renderer will use window.cachedConfig for layout/styling
+                renderBoard(window.cachedBoard);
+            } else {
+                console.log('[Kanban Webview] ℹ️ Configuration cached (board not loaded yet)');
+            }
+            break;
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
             if (typeof unfoldColumnIfCollapsed === 'function') {

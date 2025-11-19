@@ -846,8 +846,9 @@ export class KanbanWebviewPanel {
                     // Sync any pending DOM updates (items with unrendered changes)
                     this.syncDirtyItems();
 
-                    // Send updated shortcuts to webview
-                    await this._sendShortcutsToWebview();
+                    // ⚠️ REFRESH ALL CONFIGURATION when view gains focus
+                    // This ensures settings (shortcuts, tag colors, layout, etc.) are always up-to-date
+                    await this._refreshAllViewConfiguration();
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
@@ -947,8 +948,9 @@ export class KanbanWebviewPanel {
         const packageJson = require('../package.json');
         const version = packageJson.version || 'Unknown';
 
-        // Send shortcuts to webview (especially important on initial load)
-        await this._sendShortcutsToWebview();
+        // ⚠️ REFRESH ALL CONFIGURATION on initial load
+        // This loads shortcuts, tag settings, layout settings, etc.
+        await this._refreshAllViewConfiguration();
 
         // Send boardUpdate immediately - no delay needed
         this._sendBoardUpdate(board, {
@@ -2113,6 +2115,95 @@ export class KanbanWebviewPanel {
         }
     }
 
+    /**
+     * ⚠️ CENTRAL CONFIGURATION REFRESH POINT ⚠️
+     *
+     * This method is THE SINGLE SOURCE OF TRUTH for refreshing all view configuration.
+     * It should be called ONLY in these scenarios:
+     *
+     * 1. When the webview panel gains focus (user switches to Kanban view)
+     * 2. When the webview panel is first created/initialized
+     * 3. When VSCode workspace configuration changes (via onDidChangeConfiguration)
+     *
+     * DO NOT call this method from anywhere else! If you think you need to refresh
+     * configuration, you probably want to trigger one of the above events instead.
+     *
+     * What this method does:
+     * - Loads keyboard shortcuts from VSCode
+     * - Loads ALL workspace settings (layout, tags, rendering, etc.)
+     * - Sends everything to the webview in a single "configurationUpdate" message
+     *
+     * Why this matters:
+     * - Ensures configuration is always fresh when user focuses the view
+     * - Avoids stale configuration (e.g., changing tag colors and not seeing updates)
+     * - Centralizes configuration loading logic in ONE place
+     * - Makes it obvious what gets loaded and when
+     *
+     * @private
+     */
+    private async _refreshAllViewConfiguration(): Promise<void> {
+        if (!this._panel) {
+            console.warn('[KanbanWebviewPanel] Cannot refresh configuration - panel is null');
+            return;
+        }
+
+        try {
+            console.log('[KanbanWebviewPanel] Refreshing all view configuration...');
+
+            // 1. Load keyboard shortcuts
+            await this._sendShortcutsToWebview();
+
+            // 2. Load all workspace settings and send to webview
+            const config = {
+                // Layout settings
+                columnWidth: configService.getConfig('columnWidth', '350px'),
+                columnBorder: configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)'),
+                taskBorder: configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)'),
+                layoutRows: configService.getConfig('layoutRows'),
+                rowHeight: configService.getConfig('rowHeight'),
+                layoutPreset: configService.getConfig('layoutPreset', 'normal'),
+                layoutPresets: this._getLayoutPresetsConfiguration(),
+                maxRowHeight: configService.getConfig('maxRowHeight', 0),
+
+                // Task/Content settings
+                taskMinHeight: configService.getConfig('taskMinHeight'),
+                sectionHeight: configService.getConfig('sectionHeight'),
+                taskSectionHeight: configService.getConfig('taskSectionHeight'),
+                fontSize: configService.getConfig('fontSize'),
+                fontFamily: configService.getConfig('fontFamily'),
+                whitespace: configService.getConfig('whitespace', '8px'),
+
+                // Rendering settings
+                htmlCommentRenderMode: configService.getConfig('htmlCommentRenderMode', 'hidden'),
+                htmlContentRenderMode: configService.getConfig('htmlContentRenderMode', 'html'),
+
+                // Tag settings (CRITICAL: These change frequently!)
+                tagColors: configService.getConfig('tagColors', {}),
+                enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
+                enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
+                customTagCategories: configService.getCustomTagCategories(),
+                tagVisibility: configService.getConfig('tagVisibility'),
+                exportTagVisibility: configService.getConfig('exportTagVisibility'),
+
+                // Other settings
+                arrowKeyFocusScroll: configService.getConfig('arrowKeyFocusScroll'),
+                openLinksInNewTab: configService.getConfig('openLinksInNewTab'),
+                pathGeneration: configService.getConfig('pathGeneration')
+            };
+
+            // Send configuration to webview
+            this._panel.webview.postMessage({
+                type: 'configurationUpdate',
+                config: config
+            });
+
+            console.log('[KanbanWebviewPanel] ✅ Configuration refresh complete');
+
+        } catch (error) {
+            console.error('[KanbanWebviewPanel] ❌ Failed to refresh view configuration:', error);
+        }
+    }
+
     private _sendBoardUpdate(board: KanbanBoard, options: {
         imageMappings?: Record<string, string>;
         isFullRefresh?: boolean;
@@ -2545,6 +2636,82 @@ export class KanbanWebviewPanel {
 
         // No markdown documents available - panel will remain empty
         // User can manually select a file to load
+    }
+
+    /**
+     * Check if this panel has unsaved changes
+     * Used by extension deactivate() to prompt before VSCode closes
+     */
+    public async checkUnsavedChanges(): Promise<boolean> {
+        const mainFile = this._getMainFile();
+        const hasMainFileChanges = mainFile?.hasUnsavedChanges() || false;
+
+        const includeStatus = this._getIncludeFilesUnsavedStatus();
+        const hasIncludeChanges = includeStatus.hasChanges;
+
+        return hasMainFileChanges || hasIncludeChanges;
+    }
+
+    /**
+     * Save unsaved changes to backup files with "-unsavedchanges" suffix
+     * Called when VSCode closes with unsaved changes
+     * This creates a safety backup before prompting the user
+     */
+    public async saveUnsavedChangesBackup(): Promise<void> {
+        try {
+            console.log('[KanbanWebviewPanel] Creating unsaved changes backup...');
+
+            // Save main file backup
+            const mainFile = this._getMainFile();
+            if (mainFile && mainFile.hasUnsavedChanges()) {
+                const uri = this.getCurrentDocumentUri();
+                if (uri) {
+                    const filePath = uri.fsPath;
+                    const content = mainFile.getContent();
+
+                    // Create backup filename: "file.md" -> "file-unsavedchanges.md"
+                    const ext = path.extname(filePath);
+                    const baseName = path.basename(filePath, ext);
+                    const dirName = path.dirname(filePath);
+                    const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
+
+                    fs.writeFileSync(backupPath, content, 'utf8');
+                    console.log(`[KanbanWebviewPanel] ✅ Main file backup saved: ${backupPath}`);
+                }
+            }
+
+            // Save include files backups
+            const includeStatus = this._getIncludeFilesUnsavedStatus();
+            if (includeStatus.hasChanges) {
+                for (const fileWithChanges of includeStatus.changedFiles) {
+                    const includeFile = this._fileRegistry.getByRelativePath(fileWithChanges);
+                    if (includeFile && includeFile.hasUnsavedChanges()) {
+                        const fileManager = (includeFile as any)._fileManager;
+                        if (fileManager) {
+                            const document = fileManager.getDocument();
+                            if (document) {
+                                const filePath = document.uri.fsPath;
+                                const content = includeFile.getContent();
+
+                                // Create backup filename: "include.md" -> "include-unsavedchanges.md"
+                                const ext = path.extname(filePath);
+                                const baseName = path.basename(filePath, ext);
+                                const dirName = path.dirname(filePath);
+                                const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
+
+                                fs.writeFileSync(backupPath, content, 'utf8');
+                                console.log(`[KanbanWebviewPanel] ✅ Include file backup saved: ${backupPath}`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            console.log('[KanbanWebviewPanel] ✅ Unsaved changes backup complete');
+        } catch (error) {
+            console.error('[KanbanWebviewPanel] ❌ Failed to save unsaved changes backup:', error);
+            // Don't throw - we want to continue with the close process even if backup fails
+        }
     }
 
     public async dispose() {

@@ -305,11 +305,68 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 }
 
-export function deactivate() {
-	// Clean up context
-	vscode.commands.executeCommand('setContext', 'markdownKanbanActive', false);
+/**
+ * Called when VSCode is closing or extension is being deactivated
+ * ⚠️ CRITICAL: This must check for unsaved changes and prompt user BEFORE allowing close!
+ */
+export async function deactivate(): Promise<void> {
+	console.log('[Extension] Deactivating - checking for unsaved changes...');
 
-	// Note: VS Code will automatically dispose all webview panels and their disposables
-	// when the extension deactivates, which will trigger the unsaved changes handling
-	// in each panel's _handlePanelClose() method via the onDidDispose event.
+	// Get all open Kanban panels
+	const panels = KanbanWebviewPanel.getAllPanels();
+
+	// Check each panel for unsaved changes and save if needed
+	for (const panel of panels) {
+		const hasUnsaved = await panel.checkUnsavedChanges();
+
+		if (hasUnsaved) {
+			console.log('[Extension] Panel has unsaved changes - creating backup...');
+
+			// First, save a backup file with "-unsavedchanges" suffix
+			// This ensures we don't lose data regardless of user's choice
+			await panel.saveUnsavedChangesBackup();
+
+			console.log('[Extension] Backup created - prompting user...');
+
+			// Show prompt directly here (webview will be disposed soon, can't use panel's method)
+			const saveAndClose = 'Save and close';
+			const closeWithoutSaving = 'Close without saving';
+			const cancel = 'Cancel (Esc)';
+
+			const choice = await vscode.window.showWarningMessage(
+				'You have unsaved changes in your Kanban board. Do you want to save before closing?',
+				{ modal: true },
+				saveAndClose,
+				closeWithoutSaving,
+				cancel
+			);
+
+			if (!choice || choice === cancel) {
+				// User cancelled - we can't actually prevent VSCode from closing here
+				// But we can at least try to give them a warning
+				console.log('[Extension] User cancelled close - but VSCode will close anyway');
+				// Note: VSCode doesn't support preventing close from deactivate()
+				return;
+			}
+
+			if (choice === saveAndClose) {
+				// Save changes before closing
+				try {
+					console.log('[Extension] Saving changes before close...');
+					await panel.saveToMarkdown(true, true);
+					console.log('[Extension] ✅ Save succeeded');
+				} catch (error) {
+					console.error('[Extension] ❌ Save failed:', error);
+					// Continue anyway - VSCode is closing
+				}
+			} else {
+				console.log('[Extension] User chose to discard changes');
+			}
+		}
+	}
+
+	// Clean up context
+	await vscode.commands.executeCommand('setContext', 'markdownKanbanActive', false);
+
+	console.log('[Extension] Deactivation complete');
 }

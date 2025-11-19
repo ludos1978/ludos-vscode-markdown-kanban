@@ -273,6 +273,7 @@ class TaskEditor {
         }, true); // Use capture phase to catch before other handlers
 
         // Single global keydown handler
+        // IMPORTANT: Use capture phase (true) to intercept events BEFORE VSCode handlers
         document.addEventListener('keydown', (e) => {
             if (!this.currentEditor) {return;}
 
@@ -321,7 +322,13 @@ class TaskEditor {
 
                 // Only process if we know this shortcut has a command
                 if (hasCommand) {
+                    // ⚠️ CRITICAL: Prevent VSCode from handling this shortcut!
+                    // preventDefault() stops default browser behavior
+                    // stopPropagation() prevents event from bubbling to VSCode handlers
+                    // stopImmediatePropagation() stops other handlers on same element
                     e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
 
                     // Get current cursor position and text for context
                     const cursorPos = element.selectionStart;
@@ -400,7 +407,7 @@ class TaskEditor {
                 e.preventDefault();
                 this.save();
             }
-        });
+        }, true); // ⚠️ CAPTURE PHASE: Intercept events BEFORE VSCode handlers run!
 
         // Add window focus handler to restore editor focus after system shortcuts
         window.addEventListener('focus', () => {
