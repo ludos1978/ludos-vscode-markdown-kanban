@@ -826,10 +826,42 @@ class TagUtils {
                 const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
                 const renderedTitle = renderFn ? renderFn(additionalTitle) : additionalTitle;
 
-                // Replace the backend-inserted placeholder with our badge HTML
-                // The placeholder format is: %INCLUDE_BADGE:filepath%
-                const placeholder = `%INCLUDE_BADGE:${fileName}%`;
-                const result = renderedTitle.replace(placeholder, linkHtml);
+                // Replace ALL %INCLUDE_BADGE:filepath% placeholders with badge HTML using regex
+                // This handles cases where backend path != frontend path (e.g., ../relative/paths)
+                const placeholderRegex = /%INCLUDE_BADGE:([^%]+)%/g;
+                const result = renderedTitle.replace(placeholderRegex, (match, filePath) => {
+                    // Generate badge for this file path (may be different from fileName if path normalized)
+                    const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
+                    const baseFileName = parts[parts.length - 1];
+
+                    // Truncate filename if longer than 12 characters
+                    let displayFileName = baseFileName;
+                    if (baseFileName.length > 12) {
+                        const lastDotIndex = baseFileName.lastIndexOf('.');
+                        const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
+                        const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
+                        const first12 = nameWithoutExt.substring(0, 12);
+                        const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
+                        displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+                    }
+
+                    // Get path (everything except filename), limit to 4 characters
+                    let pathPart = '';
+                    if (parts.length > 1) {
+                        const fullPath = parts.slice(0, -1).join('/');
+                        if (fullPath.length > 4) {
+                            pathPart = '...' + fullPath.slice(-4);
+                        } else {
+                            pathPart = fullPath;
+                        }
+                    }
+
+                    const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
+                    const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+                    return `<span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="handleColumnIncludeClick(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>`;
+                });
+
                 return result;
             } else {
                 return linkHtml;
