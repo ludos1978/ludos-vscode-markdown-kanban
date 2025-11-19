@@ -2293,13 +2293,13 @@ function setupTaskDragAndDropForColumn(columnElement) {
             // We're over the column but not the tasks container (e.g., header area)
             e.preventDefault();
 
-            // Move task to the end of this column
-            const addButton = tasksContainer.querySelector('.add-task-btn');
-            if (addButton) {
-                tasksContainer.insertBefore(dragState.draggedTask, addButton);
-            } else {
-                tasksContainer.appendChild(dragState.draggedTask);
-            }
+            // PERFORMANCE: Just show indicator at end, DON'T move actual element!
+            // Store target for dragend to perform actual move
+            dragState.dropTargetContainer = tasksContainer;
+            dragState.dropTargetAfterElement = null; // null = append at end
+
+            // Show drop indicator at end of column
+            showInternalTaskDropIndicator(tasksContainer, null);
 
             // Add visual feedback
             columnElement.classList.add('drag-over-append');
