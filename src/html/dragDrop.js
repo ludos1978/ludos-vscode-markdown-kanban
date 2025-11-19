@@ -1018,6 +1018,26 @@ function setupGlobalDragAndDrop() {
 
         // dragLogger.always('[processColumnDrop] Processing column drop');
 
+        // PERFORMANCE: Move column to drop target NOW (was stored during dragover)
+        if (dragState.dropTargetStack && dragState.dropTargetBeforeColumn !== undefined) {
+            const targetStack = dragState.dropTargetStack;
+            const beforeColumn = dragState.dropTargetBeforeColumn;
+
+            // Move column from its current position to target position
+            if (beforeColumn) {
+                targetStack.insertBefore(columnElement, beforeColumn);
+            } else {
+                // Append at end of stack
+                targetStack.appendChild(columnElement);
+            }
+
+            // Clean up empty source stack if needed
+            const sourceStack = dragState.originalColumnParent;
+            if (sourceStack && sourceStack !== targetStack && sourceStack.classList.contains('kanban-column-stack')) {
+                cleanupEmptyStack(sourceStack);
+            }
+        }
+
         // Process pending drop zone if hovering over one
         if (dragState.pendingDropZone) {
             const dropZone = dragState.pendingDropZone;
