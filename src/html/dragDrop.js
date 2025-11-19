@@ -222,30 +222,63 @@ function createInternalDropIndicator() {
 
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     const indicator = createInternalDropIndicator();
-    const containerRect = tasksContainer.getBoundingClientRect();
+
+    // PERFORMANCE: Look up cached data instead of querying DOM!
+    const containerKey = tasksContainer.id || tasksContainer.dataset.columnId || tasksContainer;
+    const cachedData = dragState.allColumnPositions?.get(containerKey);
+
+    if (!cachedData) {
+        // Fallback if no cache (shouldn't happen)
+        indicator.style.display = 'none';
+        return;
+    }
 
     let insertionY;
+    let containerLeft, containerWidth;
+
+    // Use cached container dimensions
+    if (cachedData.tasks.length > 0) {
+        // Estimate container bounds from task positions
+        const firstTask = cachedData.tasks[0];
+        containerLeft = firstTask.rect.left;
+        containerWidth = firstTask.rect.width;
+    } else if (cachedData.addButtonRect) {
+        containerLeft = cachedData.addButtonRect.left;
+        containerWidth = cachedData.addButtonRect.width;
+    } else {
+        // Can't position indicator without any reference
+        indicator.style.display = 'none';
+        return;
+    }
 
     if (!afterElement) {
         // Drop at end (before add button if exists)
-        const addButton = tasksContainer.querySelector('.add-task-btn');
-        if (addButton) {
-            const btnRect = addButton.getBoundingClientRect();
-            insertionY = btnRect.top - 2;
+        if (cachedData.addButtonRect) {
+            insertionY = cachedData.addButtonRect.top - 2;
+        } else if (cachedData.tasks.length > 0) {
+            // After last task
+            const lastTask = cachedData.tasks[cachedData.tasks.length - 1];
+            insertionY = lastTask.rect.bottom + 2;
         } else {
-            // At very bottom of container
-            insertionY = containerRect.bottom - 2;
+            indicator.style.display = 'none';
+            return;
         }
     } else {
-        // Drop before afterElement
-        const elementRect = afterElement.getBoundingClientRect();
-        insertionY = elementRect.top - 2;
+        // Drop before afterElement - find it in cached positions
+        const taskData = cachedData.tasks.find(t => t.element === afterElement);
+        if (taskData) {
+            insertionY = taskData.rect.top - 2;
+        } else {
+            // Fallback: element not in cache
+            indicator.style.display = 'none';
+            return;
+        }
     }
 
-    // Position the indicator
+    // Position the indicator using CACHED dimensions
     indicator.style.position = 'fixed';
-    indicator.style.left = (containerRect.left + 10) + 'px';
-    indicator.style.width = (containerRect.width - 20) + 'px';
+    indicator.style.left = (containerLeft + 10) + 'px';
+    indicator.style.width = (containerWidth - 20) + 'px';
     indicator.style.top = insertionY + 'px';
     indicator.style.display = 'block';
     indicator.classList.add('active');
@@ -258,43 +291,53 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
 function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     const indicator = createInternalDropIndicator();
 
-    if (!beforeColumn) {
-        // Drop at end of stack (after last column)
-        const stackRect = targetStack.getBoundingClientRect();
-        const columns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'))
-            .filter(col => col !== dragState.draggedColumn);
+    // PERFORMANCE: Use cached column positions instead of querying DOM!
+    let insertionY, stackLeft, stackWidth;
 
-        let insertionY;
-        if (columns.length > 0) {
-            const lastColumn = columns[columns.length - 1];
-            const lastRect = lastColumn.getBoundingClientRect();
-            insertionY = lastRect.bottom + 5;
+    if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
+        // Estimate stack bounds from column positions
+        const firstCol = dragState.cachedColumnPositions[0];
+        stackLeft = firstCol.rect.left;
+        stackWidth = firstCol.rect.width;
+
+        if (!beforeColumn) {
+            // Drop at end of stack (after last column)
+            const stackColumns = dragState.cachedColumnPositions.filter(
+                pos => pos.element.parentNode === targetStack
+            );
+
+            if (stackColumns.length > 0) {
+                const lastCol = stackColumns[stackColumns.length - 1];
+                insertionY = lastCol.rect.bottom + 5;
+            } else {
+                // Use first column's top as reference
+                insertionY = firstCol.rect.top + 5;
+            }
         } else {
-            insertionY = stackRect.top + 5;
+            // Drop before specific column - find it in cache
+            const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
+            if (colData) {
+                insertionY = colData.rect.top - 2;
+            } else {
+                // Fallback: not in cache
+                indicator.style.display = 'none';
+                return;
+            }
         }
-
-        // Horizontal indicator for column stacking
-        indicator.style.position = 'fixed';
-        indicator.style.left = (stackRect.left + 10) + 'px';
-        indicator.style.width = (stackRect.width - 20) + 'px';
-        indicator.style.top = insertionY + 'px';
-        indicator.style.height = '3px';
-        indicator.style.display = 'block';
-        indicator.classList.add('active');
     } else {
-        // Drop before specific column
-        const columnRect = beforeColumn.getBoundingClientRect();
-        const stackRect = targetStack.getBoundingClientRect();
-
-        // Horizontal indicator above target column
-        indicator.style.position = 'fixed';
-        indicator.style.left = (stackRect.left + 10) + 'px';
-        indicator.style.width = (stackRect.width - 20) + 'px';
-        indicator.style.top = (columnRect.top - 2) + 'px';
-        indicator.style.height = '3px';
-        indicator.style.display = 'block';
-        indicator.classList.add('active');
+        // No cache available - can't position indicator
+        indicator.style.display = 'none';
+        return;
     }
+
+    // Horizontal indicator for column stacking
+    indicator.style.position = 'fixed';
+    indicator.style.left = (stackLeft + 10) + 'px';
+    indicator.style.width = (stackWidth - 20) + 'px';
+    indicator.style.top = insertionY + 'px';
+    indicator.style.height = '3px';
+    indicator.style.display = 'block';
+    indicator.classList.add('active');
 
     // Store target position in dragState for dragend
     dragState.dropTargetStack = targetStack;
