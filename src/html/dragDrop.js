@@ -348,13 +348,24 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 
                 // Drop at END of stack: position after last column (no next column's margin)
                 insertionY = lastCol.rect.bottom + 5;
-                console.log('[ColumnIndicator] Drop at end, using column bottom:', {
+                console.log('[ColumnIndicator] Drop at end (cached columns):', {
                     columnId: lastCol.columnId,
                     columnBottom: lastCol.rect.bottom,
                     insertionY: insertionY
                 });
+            } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
+                // No OTHER columns in stack, but dragged column IS in this stack
+                // Use dragged column's position for indicator
+                const draggedRect = dragState.draggedColumn.getBoundingClientRect();
+                stackLeft = draggedRect.left;
+                stackWidth = draggedRect.width;
+                insertionY = draggedRect.bottom + 5;
+                console.log('[ColumnIndicator] Drop at end (only dragged column in stack):', {
+                    draggedColumnId: dragState.draggedColumnId,
+                    insertionY: insertionY
+                });
             } else {
-                // No columns in target stack - hide indicator
+                // Truly empty stack - hide indicator
                 indicator.style.display = 'none';
                 return;
             }
