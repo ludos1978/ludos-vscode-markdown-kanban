@@ -347,16 +347,31 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
-                insertionY = lastCol.rect.bottom + 5;
+                // Position in the margin BELOW the last column
+                const lastColElement = lastCol.element;
+                const marginBelow = lastColElement.querySelector('.column-margin:last-child') ||
+                                   lastColElement.nextElementSibling?.querySelector?.('.column-margin');
+                if (marginBelow) {
+                    const marginRect = marginBelow.getBoundingClientRect();
+                    insertionY = marginRect.top + (marginRect.height / 2);
+                } else {
+                    insertionY = lastCol.rect.bottom + 5;
+                }
             } else {
-                // Use first column's top as reference
                 insertionY = firstCol.rect.top + 5;
             }
         } else {
-            // Drop before specific column - find it in cache
+            // Drop before specific column - position in the margin ABOVE it
             const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
             if (colData) {
-                insertionY = colData.rect.top - 2;
+                // Find the column-margin at the top of this column
+                const marginAbove = beforeColumn.querySelector('.column-margin:first-child');
+                if (marginAbove) {
+                    const marginRect = marginAbove.getBoundingClientRect();
+                    insertionY = marginRect.top + (marginRect.height / 2);
+                } else {
+                    insertionY = colData.rect.top - 2;
+                }
             } else {
                 // Fallback: not in cache
                 indicator.style.display = 'none';
