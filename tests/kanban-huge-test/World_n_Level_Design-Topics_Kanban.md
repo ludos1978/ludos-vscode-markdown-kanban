@@ -2,7 +2,37 @@
 kanban-plugin: board
 ---
 
-## # To Organize #Todo
+## Day 3 - W&L-D Structure & Orientation #green
+- [ ] #### Homework
+  - make visual maps of the level
+    - mission
+    - space (bubble diagram)
+- [ ] # DEADLINE
+  - bubble diagram & room, events, emotions
+- [ ] ### W&L-D Structure
+- [ ] ## the door problem of combat level design
+  [[/Volumes/Macintosh HD/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/the_door_problem_of_combat_design_andrew_yoder.md]]
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/doorproblem_03.gif)
+- [ ] ## ProBuilder Level Design & Greyboxing in Unity @Dragica
+  ![](/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Devlog-ProBuilder_Level_Design_n-[OGWVdERa69U]-1080p.mp4 "<https://www.youtube.com/watch?v=OGWVdERa69U> Devlog: ProBuilder Level Design & Greyboxing in Unity ") [^yt_OGWVdERa69U]
+  
+  [^yt_OGWVdERa69U]: youtube OGWVdERa69U
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+## # To Organize #Todo #stack
 - [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png
   ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png)
 - [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:20.png
@@ -760,6 +790,67 @@ kanban-plugin: board
   ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:16:24.png)
 - [ ] # The End
 
+## Day 2 - Removed #stack
+- [ ] ## Walking distance #low
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312156499.png)
+  
+  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf]]
+  
+  Note: Allways be aware of the time it takes a player to move from A to B. Is it still within the planned of the Graph?
+- [ ] Level Design - Processes and Experiences #low
+  [Level_Design-Processes_and_Experiences--Christopher_W_Totten--2017--Taylor_n_Francis_Group--2635de519fd8783d487faf9faf6171c3.epub](World_n_Level_Design-Topics_Kanban-Media/Level_Design-Processes_and_Experiences--Christopher_W_Totten--2017--Taylor_n_Francis_Group--2635de519fd8783d487faf9faf6171c3.epub)
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/fig3_6.jpg)
+- [ ] p132-75.jpg #low
+  ![](World_n_Level_Design-Topics_Kanban-Media/p132-75.jpg)
+- [ ] ## process #low
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step1_ideation_219691288067363929.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step2_reference_gathering_347973508727414457.jpg)
+  
+  :---
+  
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step3_rough_overview_347973508727414458.jpg)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step4_overview_347973508727414459.jpg)
+  
+  :---
+- [ ] ## bubble diagrams, planning for level design #low
+  - [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/___VIDEOS/Bubble_Diagrams-Planning_for_Level_Design.h-r6RFK8I7k.mp4|Bubble_Diagrams-Planning_for_Level_Design.h-r6RFK8I7k]]
+  - ~~[[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.78]]~~ [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.78]]
+  - Bubble Diagrams - Planning for Level Design
+    - <https://www.youtube.com/watch?v=h-r6RFK8I7k>
+- [ ] Level Design Workflow #todo
+  -  [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.115]]
+- [ ] ## Open-World Level Design (Workflows & Pipelines) Til Nord #todo
+  <https://www.youtube.com/watch?v=QNjm9Ahedho>
+- [ ] Spatial Communication in Level Design : explaining a level design by an example, viewed by a first person controller #todo
+  <https://www.youtube.com/watch?v=AKeUZVikPV8>
+- [ ] ## Top Down Layout of Layout - Blockout Workflow
+  - ~~[[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/csgo_from_top_down_layout_to_bsp_block-in_workflow|csgo_from_top_down_layout_to_bsp_block-in_workflow]]~~ [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/csgo_from_top_down_layout_to_bsp_block-in_workflow.md|csgo_from_top_down_layout_to_bsp_block-in_workflow]]
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
 ## # Reading List #orange #stack
 - [ ] BBB
   ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A16%3A47.png)
@@ -1049,6 +1140,8 @@ kanban-plugin: board
   ==Space==
   
   :---
+- [ ] p80-34.jpg
+   ![p80-34](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/World_n_Level_Design-Topics_Kanban-Media/p80-34.jpg)
 - [ ] ## Setting the Stage
   * Boundaries
   * Utility / Denial
@@ -1109,6 +1202,46 @@ kanban-plugin: board
   ![](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video04-still-000315.png)
   :--:
   :---
+- [ ] # Game level types
+  ---
+  
+  ## Pong
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p80-33.jpg)
+  
+  ---
+  
+  ## Spacewar!
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p80-34.jpg)
+  
+  ---
+  
+  ## Continuous scroll & Individual, one at a time
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p81-35.jpg "architectural approach to level design" )
+  
+  ---
+  
+  ## Connected rooms
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p82-36.jpg)
+  
+  ---
+  
+  ## First person
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p83-37.jpg)
+  
+  ---
+  
+  ## What changed over time?
+  
+  - Spaces got bigger
+  - Connectivity between spaces increases
+  - Less gameplay interruptions
+  
+  > [An Architectural Approach to Level Design, CSC Press 2019](/Users/rspoerri/_SYNC/Sammelsurium/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf)
 - [ ] ## Defining a Language
   Players learn
   - How to move
@@ -1532,48 +1665,6 @@ kanban-plugin: board
   
 
 ## Day 2 - W&L-D Process #yellow
-- [ ] p80-34.jpg
-   ![p80-34](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/World_n_Level_Design-Topics_Kanban-Media/p80-34.jpg)
-- [ ] # Game level types
-  ---
-  
-  ## Pong
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p80-33.jpg)
-  
-  ---
-  
-  ## Spacewar!
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p80-34.jpg)
-  
-  ---
-  
-  ## Continuous scroll & Individual, one at a time
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p81-35.jpg "architectural approach to level design" )
-  
-  ---
-  
-  ## Connected rooms
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p82-36.jpg)
-  
-  ---
-  
-  ## First person
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p83-37.jpg)
-  
-  ---
-  
-  ## What changed over time?
-  
-  - Spaces got bigger
-  - Connectivity between spaces increases
-  - Less gameplay interruptions
-  
-  > [An Architectural Approach to Level Design, CSC Press 2019](/Users/rspoerri/_SYNC/Sammelsurium/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf)
 - [ ] ## Many approaches
   <!-- _class: font20 -->
   
@@ -2078,7 +2169,592 @@ kanban-plugin: board
   
   
 
-## Day 2 - Void, Mass, Positiv & Negative Space
+## # Day 3 - World Scale 7
+- [ ] # header 1
+  <https://file+.vscode-resource.vscode-cdn.net/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/#>
+- [ ] #### Scale of Worlds
+  <https://tvtropes.org/pmwiki/pmwiki.php/Main/SlidingScaleOfVideoGameWorldSizeAndScale>
+  
+   [[/Users/rspoerri/_SYNC/Sammelsurium/.smart-env/multi/_Game-Asset_Design___World_n_Level_Design_sliding_scale_of_video_game_world_size_and_scale_-_tv_tropes_md.ajson|sliding_scale_of_video_game_world_size_and_scale_-_tv_tropes]]
+  
+  - Realistic Scale, enterable Bulidings
+  - Realistic Scale, mostly Background non enterable
+  
+  ---
+  
+  Biggest open world games
+  
+  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/biggest_open_world_games_based_on_the_size_of_their_maps.md|biggest_open_world_games_based_on_the_size_of_their_maps]]
+  - <https://gamerant.com/open-world-games-biggest-maps/>
+  
+  ---
+  
+  Game World Dimensionsality, Time, Boundaries etc.
+  
+  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium.md|game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium]]
+  - <https://medium.com/narrative-and-new-media/game-worlds-dimensionality-time-d6924bae7f95>
+- [ ] ## World Scale in Games
+  Video game scale is weirdo
+  
+  The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
+  
+  ## h2
+  
+  
+  <https://book.leveldesignbook.com/process/blockout/metrics#scale>
+- [ ] 
+- [ ] World Scale and Areas #high
+  > <https://medium.com/narrative-and-new-media/game-worlds-dimensionality-time-d6924bae7f95>
+  > [game_worlds_dimensionality_n_time](World_n_Level_Design-Topics_Kanban-Media/game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium.md)
+  
+  ---
+  
+  ## Realistic scale
+  
+  - In some games, designers will aim for a sense of realism by using scale that is similar to the real world. For example, if the game takes place in a city, the buildings and vehicles might be the same size as they are in real life.
+  
+  ---
+  
+  ## Exaggerated scale
+  
+  In other games, designers might exaggerate the scale of certain objects or characters to create a sense of awe or to make gameplay more interesting. For example, a game might feature giant robots or monsters that are much larger than they would be in real life.
+  
+  ---
+  
+  ## Miniature scale
+  
+  In some games, designers might use a miniature scale to create a sense of intimacy or to make the game world feel more manageable. For example, a game might take place in a small village or on a tiny planet, with everything in the game world being smaller than it would be in real life.
+  
+  ---
+  
+  ## Variable scale
+  
+  Some games might use a combination of different scales within the same game world. For example, a game might have a city that is built to realistic scale, but also feature giant robots that are much larger than they would be in real life.
+  
+  and more...
+- [ ] ## Size scale @Dragica
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281062.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281064.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281145.png)
+  
+  :---
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+## ## Day 3 - Interesting Structures / Cover #stack
+- [ ] ## Interesting Structures hide aspects
+  ---:
+  ![tommy_norberg_structure_occluders_p1_0_MZkyff7E9_FsdP7_](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p1_0_MZkyff7E9_FsdP7_.webp)
+  :--:
+  ![tommy_norberg_structure_occluders_p2_0_bVdoYlHLEuGbPHQ-](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p2_0_bVdoYlHLEuGbPHQ-.webp)
+  :---
+  
+  ---:
+  ![tommy_norberg_structure_occluders_p3_0__JHhd1B07CHm9O4l](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p3_0__JHhd1B07CHm9O4l.webp)
+  :--:
+  ![tommy_norberg_structure_occluders_p4_0_K0cLc3niWe3I9w18](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p4_0_K0cLc3niWe3I9w18.webp)
+  :---
+- [ ] ## Judge a map by it's cover (cover as in defence agains attacks), analysis of counter strike maps using the covers given to players.
+  [judge_a_map_by_its_cover\_\_andrew_yoder.md](_Sammelsurium_World_n_Level_Design/judge_a_map_by_its_cover__andrew_yoder.md)
+- [ ] ## 3th dimension - Cover
+  ![](World_n_Level_Design-Topics_Kanban-Media/5d2cbb0e3b382-widen_1840x0.jpg)
+  
+  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/defining_environment_language_for_video_games.md]]
+  <https://80.lv/articles/defining-environment-language-for-video-games/>
+- [ ] ## Creating Paths with Refuges, Prospects and Secondary Refuges
+  -  [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.267]]
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/p312-206.jpg)
+- [ ] ## Tactical Level Design
+  - <https://www.gamedeveloper.com/design/the-metrics-of-space-tactical-level-design>
+- [ ] ## Vertical layout
+  ![](World_n_Level_Design-Topics_Kanban-Media/16044142418008612.jpg)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+## ## Day 3 - Explicit / Implicit Informations #stack
+- [ ] ## AFFORDANCES : Defining Environment Language for Video Games
+  > <https://80.lv/articles/defining-environment-language-for-video-games/>
+  
+  <!-- [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/defining_environment_language_for_video_games.md]] -->
+  
+  ## Summary:
+  
+  ## Key Ideas
+  - Goal: Make environments *playable* and *understandable* so players intuitively know what actions are possible.  
+  - Environments should clearly communicate affordances to avoid breaking immersion.  
+  
+  ---
+  
+  ## Concepts of Affordance
+  > ==Affordances== actions possible in an environment, based on object design.  
+  Four types:  
+  
+  ---:
+  1. **Explicit** — plainly indicated (e.g., glowing items, UI prompts)
+  :--:
+  2. **Defined** — arbitrary but consistent visuals (e.g., color coding  for climbable walls)
+  :---
+  
+  ---:
+  3. **Cultural** — real-world/genre conventions (e.g., ladders, doors, torches)
+  :--:
+  4. **Inferred** — deduced from consistent rules and prior experience in the application or the system (OS, Device)
+  :---
+  
+  ---
+  
+  ## Practical Guidelines
+  
+  ---:
+  - **Catalog Mechanics:** List all player actions (move, climb, jump, cover, etc.).  
+  - **Allow vs. Deny:** For each mechanic, define what allows or denies it (climbable ledge vs. flat wall).  
+  - **Buffer Metrics:** Avoid ambiguity with clear thresholds (jump height, slope angle, cover height).  
+  - **Buffer Placement:** Place affordance objects in clear space to avoid visual confusion.  
+  :--:
+  - **Silhouette & Shapes:**  
+    - Keep affordance-object outlines clean.  
+    - Use primitive shapes purposefully:  
+      - Rectangles → strength/use  
+      - Circles → safety  
+      - Diagonals/triangles → danger/denial  
+  :---
+  
+  ---
+  
+  ---:
+  
+  ## Cultural & Contextual Usage
+  - Use cultural affordances to reduce explicit cues when possible.  
+  - Reinforce with explicit cues if visibility/readability demands it.  
+  
+  :--:
+  
+  ## Common Pitfalls
+  - Avoid misleading affordances—don’t suggest actions that aren’t allowed.  
+  - When denying affordances, make it believable: change shape, reduce contrast, break silhouette.  
+  
+  :---
+  
+  ---
+  
+  ## Testing & Iteration[^80lv]
+  
+  - Playtest thoroughly, including “wrong” paths, to catch miscommunication.  
+  - Iterate often—what’s obvious to a designer may not be obvious to players.
+  
+  [^80lv]: [https://80.lv/articles/defining-environment-language-for-video-games/]
+- [ ] ## implicit & explicit information
+  [tommy_norberg_structure_implicit](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit.webloc)
+  
+  ---:
+  
+  ![tommy_norberg_structure_implicit_n_explicit_information_16044142418016461](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_n_explicit_information_16044142418016461.jpg)
+  
+  
+  :--:
+  
+  ![tommy_norberg_structure_implicit_knowledge_p2_media_EeaacjkXgAA3S_K](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_knowledge_p2_media_EeaacjkXgAA3S_K.jpg)
+  
+  
+  :--:
+  
+  ![tommy_norberg_structure_implicit_knowledge_media_EeiDGfMVAAA8Kz_](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_knowledge_media_EeiDGfMVAAA8Kz_.jpg)
+  
+  
+  :---
+- [ ] ## How Maps in Games are used
+  - <https://www.youtube.com/watch?v=wBone57nrls>
+    - Kingdom Come Deliverance (style, fast travelling)
+    - Far Cry (Open World)
+    - Firewatch / Matro 2033 (in hand map, interactive and story dependant map)
+    - Interactive Maps, Maps with Note system
+    - Maps can show where you are or must be self determined (ARMA 3)
+    - Maps placed in the world
+    - Maps of a whole universe (Elite Universe) Everything you see can be travelled to.
+  - fog of war
+  - informations
+- [ ] ## Puzzle Collection
+  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/simon_tathams_portable_puzzle_collection.md|simon_tathams_portable_puzzle_collection]]
+  
+  <https://www.chiark.greenend.org.uk/~sgtatham/puzzles/>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+## ## Day 3 - Visual Composition #stack #red
+- [ ] ## Order - Chaos - Symmetry
+  ---:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281184.png)
+  :--:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281183.png)
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281249.png)
+  :---
+- [ ] ## Composition #low
+  ---:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281375.png)
+  :--:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281322.jpg "Composition in Level Design")
+  :--:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281354.png)
+  :--:
+  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312280956.png)
+  :---
+- [ ] ## Visual Composition of a Level
+  > <https://level-design.org/?page_id=2274>
+  
+  - Foreground, Middle and Background
+  - Visual Composition
+  
+  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
+  
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5A0BAB733.png)
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E59F0AAF8B.png)
+  
+  :---
+  
+  ---
+  
+  ## only/mostly/dominant foreground
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5EBF970F7.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001939A8D7882.png)
+  :---
+  
+  ---
+  
+  ## Dominant middle
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E570950DAF.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/10000001000002860000016B5345A0C4.png)
+  :---
+  
+  ---
+  
+  ## Dominant back
+  
+  ---:
+  
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/Compo_3_background-550x413.jpg)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/Background_rage_1-550x352.jpg)
+  
+  :---
+- [ ] Compo_3_background-550x413.jpg
+  ![Compo_3_background-550x413](World_n_Level_Design-Topics_Kanban-Media/Compo_3_background-550x413.jpg)
+- [ ] ## Composition Angle
+  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
+  
+  Angle in which the observer sees the composition layers. By changing this angle you're able to adjust
+  the perspective and depth of the scene.
+  
+  ---
+  
+  ---:
+  
+  - Front Angle - This angle performs really good when composition layers are far from the observer, for instance hills on the horizon running straight up to the line of sight. When the layers differ from themselves it draws a nice depth. Compositions that are close to the observer can get flat and monotonous because of barely seen perspective.
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E58FE36822.png)
+  
+  :---
+  
+  
+  ---
+  
+  ---:
+  
+  - Half-Front Angle - Angle on which perspective starts to be visible. Great angle to use in narrow spaces.
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5B109D6B4.png)
+  
+  :---
+  
+  
+  ---
+  
+  ---:
+  
+  - Half-Side Angle - Angle on which perspective performs its best. Most commonly used angle.
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E500D5E8D7.png)
+  
+  :---
+  
+  
+  ---
+  
+  ---:
+  
+  Side Angle - This angle perfectly shows the pattern running along with the distance.
+  However, without a strong dominant and pattern this type of composition angle can be
+  monotonous.
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5D6A3A0BB.png)
+  
+  :---
+- [ ] ## Gestalt laws
+  ---:
+  ![tommy_norberg_structure_gestalt_laws_proximity_media_FTNlPOvX0AcCvlR](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_media_FTNlPOvX0AcCvlR.jpg)
+  :--:
+  ![tommy_norberg_structure_gestalt_laws_proximity_28358672648760690](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_28358672648760690.jpg)
+  :---
+  
+  ---
+  
+  ---:
+  ![tommy_norberg_structure_gestalt_laws_proximity_4_614600680415969662](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_4_614600680415969662.jpg)
+  :--:
+  ![tommy_norberg_structure_gestalt_laws_proximity_3_614600680415969658](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_3_614600680415969658.jpg)
+  
+  
+  :---
+  
+  ---:
+  ![tommy_norberg_structure_gestalt_laws_proximity_2_614600680415969655](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_2_614600680415969655.jpg)
+  
+  :--:
+  
+  ![tommy_norberg_structure_gestalt_laws_proximity_1_411868328443739290](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_1_411868328443739290.jpg)
+  
+  :---
+  
+  ---
+  
+  
+  ---:
+  ![tommy_norberg_structure_gates_n_gatling_EaD55hWWkAg9I8l](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gates_n_gatling_EaD55hWWkAg9I8l.jpg)
+  
+  :--:
+  
+  ![tommy_norberg_structure_funnel_before_reveal_media_Ebvf-0WXsAIHCe6](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_funnel_before_reveal_media_Ebvf-0WXsAIHCe6.jpg)
+  
+  :---
+  
+  ---:
+  
+  ![tommy_norberg_structure_findability_discoverability_16044142418010864](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_findability_discoverability_16044142418010864.jpg)
+  
+  :--:
+  
+  ![tommy_norberg_structure_denial_and_reward_16044142418016465](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_denial_and_reward_16044142418016465.jpg)
+  
+  :---
+- [ ] ## Composition Elements' Positioning #high
+  #TODO : Analze the pdf for the titles below and create summary
+  
+  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
+  
+  ## Static (Symmetric) Composition
+  
+  #TODO
+  
+  ## Dynamic (assymmetric) Composition
+  
+  #TODO
+  
+  ## Balance
+  
+  ### Heavy visual weight
+  ### Light visual weight
+  
+  #TODO
+  
+  ## Eye Catchers
+  
+  ## Lines
+- [ ] ## Composition in Level Design
+  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
+  
+  Observation Spots
+  Building the composition is very simple when the observer is not able to move and he's watching the composition elements that we want to show to him. Things are getting complicated when the observer can freely traverse through the scene. Compositions in video games can be watched from arbitrary angles and positions. You have to make sure that the player is able to reach the composition from places you've arranged.
+  To guide the player you can use choke point or funnel methods. Both are the types of corridor-like spaces where actually nothing special happens. Thanks to that boring tunnels we can be sure that the player is not focused on gameplay events or details. In such spaces player will just traverse along the path looking for interesting things. If you caught the player in such a corridor you can smoothly change its angle to guide the player to the composition's dominant. This method works perfectly on linear
+  levels, you're able to design the composition's frame and make sure that the player will see your composition as you wanted to. The place where player has to stand to see the composition is called
+  the observation spot.
+  
+  
+  
+  ---:
+  
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5FB8EDF30.png)
+  
+  Funnel and observation spot
+  Red cube - Dominant; Green circle - Observation spot; Green cube - Observer; White
+  cone - Observer's eye sight; Gray plane - Terrain
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001936B8EAC71.png)
+  
+  Monument with the screen and a skyscraper in the background - Half-Life 2
+  
+  :---
+  
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E57C5F600F.png)
+  
+  Funnels and three observation spots
+  Red cube - Dominant; Green circle - Observation spots; Green cube - Observer; White
+  cone - Observer's eye sight; Gray plane - Terrain
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/10000001000002860000016B50A2BA2F.png)
+  
+  Village composition in open world game -
+  Skyrim
+  
+  :---
+- [ ] ## Sight Angle
+  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
+  
+  This angle defines how player will be able to observe the dominant. You can change the sight angle to
+  achieve bigger impact by modifying the dominant's size, height or placement.
+  - Low Angle - Dominant is seen from above. The image can show depth and perspective. This angle gives the player a great visibility on the composition layers. You can use it as the player's advantage and allow him to plan his tactics or exploration route.
+  - Flat Angle - Dominant is seen from the ground level. Scene feels flat and boring. Mostly used with strong dominants and high composition angles. You can fake the perspective and
+  depth by smoothly lowering the height of the terrain between player and the dominant.
+  - High Angle - Dominant is seen from the bottom and is literally dominating the composition. It gives impression of being small when compared with the dominant.
+  
+  <br>
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5FF8D3057.png)
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E51E14EC06.png)
+  
+  :--:
+  
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E512D5B5EF.png)
+  
+  :---
+- [ ] ## Negative Space
+  ---:
+  
+  ![tommy_norberg_structure_negative_space_media_Eb0_-i_X0AEsFwE](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_negative_space_media_Eb0_-i_X0AEsFwE.jpg)
+  
+  :--:
+  
+  ![tommy_norberg_structure_negative_space_570901690285228393](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_negative_space_570901690285228393.jpg)
+  
+  :---
+- [ ] ## Occlusion
+  > https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals#Occlusion
+  
+  Positive space in the form of solid shapes are often used to obscure sight lines in a level. This is called occlusion. Shapes project a shadow that obscures what is behind them, such as when the player uses cover or when a hill is used to setup the reveal of a location.
+  
+  Level designers use occlusion to do the following:
+  
+  - Foliage can be used to hide or blur the path the player is taking to the goal
+  - Occlusion can be used to deemphasize parts of the level that are unimportant
+  - Overlapping shapes can give an area a sense of depth
+  - Overlap also emphasizes the differences in parts of the level and creates contrast.
+  
+  <br>
+  
+  ---:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/cd51ce6206c26126.png) 
+  
+  
+  :--:
+  
+  ![](World_n_Level_Design-Topics_Kanban-Media/5da1fd8151a69351.png)
+  
+  :---
+- [ ] Composition Video
+  - <https://www.youtube.com/watch?v=RIsLDFD8E7s>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+## Day 2 - Void, Mass, Positiv & Negative Space #stack
 - [ ] # Emilia Schatz Level Design p.2
 - [ ] ## Space Theory
 - [ ] <!-- empty slide -->
@@ -2737,682 +3413,6 @@ kanban-plugin: board
   ![](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_week_2-3-still-000734.png)
   
   on top of each other instead of side by side you can clearly see the contrast and comparisons between these objects
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## Day 2 - Removed
-- [ ] ## Walking distance #low
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312156499.png)
-  
-  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf]]
-  
-  Note: Allways be aware of the time it takes a player to move from A to B. Is it still within the planned of the Graph?
-- [ ] Level Design - Processes and Experiences #low
-  [Level_Design-Processes_and_Experiences--Christopher_W_Totten--2017--Taylor_n_Francis_Group--2635de519fd8783d487faf9faf6171c3.epub](World_n_Level_Design-Topics_Kanban-Media/Level_Design-Processes_and_Experiences--Christopher_W_Totten--2017--Taylor_n_Francis_Group--2635de519fd8783d487faf9faf6171c3.epub)
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/fig3_6.jpg)
-- [ ] p132-75.jpg #low
-  ![](World_n_Level_Design-Topics_Kanban-Media/p132-75.jpg)
-- [ ] ## process #low
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step1_ideation_219691288067363929.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step2_reference_gathering_347973508727414457.jpg)
-  
-  :---
-  
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step3_rough_overview_347973508727414458.jpg)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_step4_overview_347973508727414459.jpg)
-  
-  :---
-- [ ] ## bubble diagrams, planning for level design #low
-  - [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/___VIDEOS/Bubble_Diagrams-Planning_for_Level_Design.h-r6RFK8I7k.mp4|Bubble_Diagrams-Planning_for_Level_Design.h-r6RFK8I7k]]
-  - ~~[[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.78]]~~ [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.78]]
-  - Bubble Diagrams - Planning for Level Design
-    - <https://www.youtube.com/watch?v=h-r6RFK8I7k>
-- [ ] Level Design Workflow #todo
-  -  [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.115]]
-- [ ] ## Open-World Level Design (Workflows & Pipelines) Til Nord #todo
-  <https://www.youtube.com/watch?v=QNjm9Ahedho>
-- [ ] Spatial Communication in Level Design : explaining a level design by an example, viewed by a first person controller #todo
-  <https://www.youtube.com/watch?v=AKeUZVikPV8>
-- [ ] ## Top Down Layout of Layout - Blockout Workflow
-  - ~~[[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/csgo_from_top_down_layout_to_bsp_block-in_workflow|csgo_from_top_down_layout_to_bsp_block-in_workflow]]~~ [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/csgo_from_top_down_layout_to_bsp_block-in_workflow.md|csgo_from_top_down_layout_to_bsp_block-in_workflow]]
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## Day 3 - W&L-D Structure & Orientation #green
-- [ ] #### Homework
-  - make visual maps of the level
-    - mission
-    - space (bubble diagram)
-- [ ] # DEADLINE
-  - bubble diagram & room, events, emotions
-- [ ] ### W&L-D Structure
-- [ ] ## the door problem of combat level design
-  [[/Volumes/Macintosh HD/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/the_door_problem_of_combat_design_andrew_yoder.md]]
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/doorproblem_03.gif)
-- [ ] ## ProBuilder Level Design & Greyboxing in Unity @Dragica
-  ![](/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Devlog-ProBuilder_Level_Design_n-[OGWVdERa69U]-1080p.mp4 "<https://www.youtube.com/watch?v=OGWVdERa69U> Devlog: ProBuilder Level Design & Greyboxing in Unity ") [^yt_OGWVdERa69U]
-  
-  [^yt_OGWVdERa69U]: youtube OGWVdERa69U
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## # Day 3 - World Scale 7
-- [ ] # header 1
-  <https://file+.vscode-resource.vscode-cdn.net/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/#>
-- [ ] #### Scale of Worlds
-  <https://tvtropes.org/pmwiki/pmwiki.php/Main/SlidingScaleOfVideoGameWorldSizeAndScale>
-  
-   [[/Users/rspoerri/_SYNC/Sammelsurium/.smart-env/multi/_Game-Asset_Design___World_n_Level_Design_sliding_scale_of_video_game_world_size_and_scale_-_tv_tropes_md.ajson|sliding_scale_of_video_game_world_size_and_scale_-_tv_tropes]]
-  
-  - Realistic Scale, enterable Bulidings
-  - Realistic Scale, mostly Background non enterable
-  
-  ---
-  
-  Biggest open world games
-  
-  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/biggest_open_world_games_based_on_the_size_of_their_maps.md|biggest_open_world_games_based_on_the_size_of_their_maps]]
-  - <https://gamerant.com/open-world-games-biggest-maps/>
-  
-  ---
-  
-  Game World Dimensionsality, Time, Boundaries etc.
-  
-  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium.md|game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium]]
-  - <https://medium.com/narrative-and-new-media/game-worlds-dimensionality-time-d6924bae7f95>
-- [ ] ## World Scale in Games
-  Video game scale is weirdo
-  
-  The human scale is helpful, but video game spaces are not human. Video games often rely on an exaggerated sense of scale that does not correspond to any consistent real world measure. 
-  
-  ## h2
-  
-  
-  <https://book.leveldesignbook.com/process/blockout/metrics#scale>
-- [ ] 
-- [ ] World Scale and Areas #high
-  > <https://medium.com/narrative-and-new-media/game-worlds-dimensionality-time-d6924bae7f95>
-  > [game_worlds_dimensionality_n_time](World_n_Level_Design-Topics_Kanban-Media/game_worlds_dimensionality_n_time_by_michael_filimowicz_phd_narrative_and_new_media_medium.md)
-  
-  ---
-  
-  ## Realistic scale
-  
-  - In some games, designers will aim for a sense of realism by using scale that is similar to the real world. For example, if the game takes place in a city, the buildings and vehicles might be the same size as they are in real life.
-  
-  ---
-  
-  ## Exaggerated scale
-  
-  In other games, designers might exaggerate the scale of certain objects or characters to create a sense of awe or to make gameplay more interesting. For example, a game might feature giant robots or monsters that are much larger than they would be in real life.
-  
-  ---
-  
-  ## Miniature scale
-  
-  In some games, designers might use a miniature scale to create a sense of intimacy or to make the game world feel more manageable. For example, a game might take place in a small village or on a tiny planet, with everything in the game world being smaller than it would be in real life.
-  
-  ---
-  
-  ## Variable scale
-  
-  Some games might use a combination of different scales within the same game world. For example, a game might have a city that is built to realistic scale, but also feature giant robots that are much larger than they would be in real life.
-  
-  and more...
-- [ ] ## Size scale @Dragica
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281062.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281064.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281145.png)
-  
-  :---
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## ## Day 3 - Interesting Structures / Cover #stack
-- [ ] ## Interesting Structures hide aspects
-  ---:
-  ![tommy_norberg_structure_occluders_p1_0_MZkyff7E9_FsdP7_](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p1_0_MZkyff7E9_FsdP7_.webp)
-  :--:
-  ![tommy_norberg_structure_occluders_p2_0_bVdoYlHLEuGbPHQ-](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p2_0_bVdoYlHLEuGbPHQ-.webp)
-  :---
-  
-  ---:
-  ![tommy_norberg_structure_occluders_p3_0__JHhd1B07CHm9O4l](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p3_0__JHhd1B07CHm9O4l.webp)
-  :--:
-  ![tommy_norberg_structure_occluders_p4_0_K0cLc3niWe3I9w18](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_occluders_p4_0_K0cLc3niWe3I9w18.webp)
-  :---
-- [ ] ## Judge a map by it's cover (cover as in defence agains attacks), analysis of counter strike maps using the covers given to players.
-  [judge_a_map_by_its_cover\_\_andrew_yoder.md](_Sammelsurium_World_n_Level_Design/judge_a_map_by_its_cover__andrew_yoder.md)
-- [ ] ## 3th dimension - Cover
-  ![](World_n_Level_Design-Topics_Kanban-Media/5d2cbb0e3b382-widen_1840x0.jpg)
-  
-  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/defining_environment_language_for_video_games.md]]
-  <https://80.lv/articles/defining-environment-language-for-video-games/>
-- [ ] ## Creating Paths with Refuges, Prospects and Secondary Refuges
-  -  [[../../../../../Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/___BOOKS/Christopher_W_Totten-An_Architectural_Approach_to_Level_Design-CRC_Press.2019.pdf|Christopher_W.Totten-Architectural_Approach_to_Level_Design-CRC_Press.2019, p.267]]
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/p312-206.jpg)
-- [ ] ## Tactical Level Design
-  - <https://www.gamedeveloper.com/design/the-metrics-of-space-tactical-level-design>
-- [ ] ## Vertical layout
-  ![](World_n_Level_Design-Topics_Kanban-Media/16044142418008612.jpg)
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## ## Day 3 - Explicit / Implicit Informations #stack
-- [ ] ## AFFORDANCES : Defining Environment Language for Video Games
-  > <https://80.lv/articles/defining-environment-language-for-video-games/>
-  
-  <!-- [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/defining_environment_language_for_video_games.md]] -->
-  
-  ## Summary:
-  
-  ## Key Ideas
-  - Goal: Make environments *playable* and *understandable* so players intuitively know what actions are possible.  
-  - Environments should clearly communicate affordances to avoid breaking immersion.  
-  
-  ---
-  
-  ## Concepts of Affordance
-  > ==Affordances== actions possible in an environment, based on object design.  
-  Four types:  
-  
-  ---:
-  1. **Explicit** — plainly indicated (e.g., glowing items, UI prompts)
-  :--:
-  2. **Defined** — arbitrary but consistent visuals (e.g., color coding  for climbable walls)
-  :---
-  
-  ---:
-  3. **Cultural** — real-world/genre conventions (e.g., ladders, doors, torches)
-  :--:
-  4. **Inferred** — deduced from consistent rules and prior experience in the application or the system (OS, Device)
-  :---
-  
-  ---
-  
-  ## Practical Guidelines
-  
-  ---:
-  - **Catalog Mechanics:** List all player actions (move, climb, jump, cover, etc.).  
-  - **Allow vs. Deny:** For each mechanic, define what allows or denies it (climbable ledge vs. flat wall).  
-  - **Buffer Metrics:** Avoid ambiguity with clear thresholds (jump height, slope angle, cover height).  
-  - **Buffer Placement:** Place affordance objects in clear space to avoid visual confusion.  
-  :--:
-  - **Silhouette & Shapes:**  
-    - Keep affordance-object outlines clean.  
-    - Use primitive shapes purposefully:  
-      - Rectangles → strength/use  
-      - Circles → safety  
-      - Diagonals/triangles → danger/denial  
-  :---
-  
-  ---
-  
-  ---:
-  
-  ## Cultural & Contextual Usage
-  - Use cultural affordances to reduce explicit cues when possible.  
-  - Reinforce with explicit cues if visibility/readability demands it.  
-  
-  :--:
-  
-  ## Common Pitfalls
-  - Avoid misleading affordances—don’t suggest actions that aren’t allowed.  
-  - When denying affordances, make it believable: change shape, reduce contrast, break silhouette.  
-  
-  :---
-  
-  ---
-  
-  ## Testing & Iteration[^80lv]
-  
-  - Playtest thoroughly, including “wrong” paths, to catch miscommunication.  
-  - Iterate often—what’s obvious to a designer may not be obvious to players.
-  
-  [^80lv]: [https://80.lv/articles/defining-environment-language-for-video-games/]
-- [ ] ## implicit & explicit information
-  [tommy_norberg_structure_implicit](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit.webloc)
-  
-  ---:
-  
-  ![tommy_norberg_structure_implicit_n_explicit_information_16044142418016461](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_n_explicit_information_16044142418016461.jpg)
-  
-  
-  :--:
-  
-  ![tommy_norberg_structure_implicit_knowledge_p2_media_EeaacjkXgAA3S_K](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_knowledge_p2_media_EeaacjkXgAA3S_K.jpg)
-  
-  
-  :--:
-  
-  ![tommy_norberg_structure_implicit_knowledge_media_EeiDGfMVAAA8Kz_](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_implicit_knowledge_media_EeiDGfMVAAA8Kz_.jpg)
-  
-  
-  :---
-- [ ] ## How Maps in Games are used
-  - <https://www.youtube.com/watch?v=wBone57nrls>
-    - Kingdom Come Deliverance (style, fast travelling)
-    - Far Cry (Open World)
-    - Firewatch / Matro 2033 (in hand map, interactive and story dependant map)
-    - Interactive Maps, Maps with Note system
-    - Maps can show where you are or must be self determined (ARMA 3)
-    - Maps placed in the world
-    - Maps of a whole universe (Elite Universe) Everything you see can be travelled to.
-  - fog of war
-  - informations
-- [ ] ## Puzzle Collection
-  -  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/simon_tathams_portable_puzzle_collection.md|simon_tathams_portable_puzzle_collection]]
-  
-  <https://www.chiark.greenend.org.uk/~sgtatham/puzzles/>
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-## ## Day 3 - Visual Composition #stack #red
-- [ ] ## Order - Chaos - Symmetry
-  ---:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281184.png)
-  :--:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281183.png)
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281249.png)
-  :---
-- [ ] ## Composition #low
-  ---:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281375.png)
-  :--:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281322.jpg "Composition in Level Design")
-  :--:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312281354.png)
-  :--:
-  ![](World_n_Level_Design-Topics_Kanban-Media/3458764514312280956.png)
-  :---
-- [ ] ## Visual Composition of a Level
-  > <https://level-design.org/?page_id=2274>
-  
-  - Foreground, Middle and Background
-  - Visual Composition
-  
-  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
-  
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5A0BAB733.png)
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E59F0AAF8B.png)
-  
-  :---
-  
-  ---
-  
-  ## only/mostly/dominant foreground
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5EBF970F7.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001939A8D7882.png)
-  :---
-  
-  ---
-  
-  ## Dominant middle
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E570950DAF.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/10000001000002860000016B5345A0C4.png)
-  :---
-  
-  ---
-  
-  ## Dominant back
-  
-  ---:
-  
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/Compo_3_background-550x413.jpg)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/Background_rage_1-550x352.jpg)
-  
-  :---
-- [ ] Compo_3_background-550x413.jpg
-  ![Compo_3_background-550x413](World_n_Level_Design-Topics_Kanban-Media/Compo_3_background-550x413.jpg)
-- [ ] ## Composition Angle
-  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
-  
-  Angle in which the observer sees the composition layers. By changing this angle you're able to adjust
-  the perspective and depth of the scene.
-  
-  ---
-  
-  ---:
-  
-  - Front Angle - This angle performs really good when composition layers are far from the observer, for instance hills on the horizon running straight up to the line of sight. When the layers differ from themselves it draws a nice depth. Compositions that are close to the observer can get flat and monotonous because of barely seen perspective.
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E58FE36822.png)
-  
-  :---
-  
-  
-  ---
-  
-  ---:
-  
-  - Half-Front Angle - Angle on which perspective starts to be visible. Great angle to use in narrow spaces.
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5B109D6B4.png)
-  
-  :---
-  
-  
-  ---
-  
-  ---:
-  
-  - Half-Side Angle - Angle on which perspective performs its best. Most commonly used angle.
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E500D5E8D7.png)
-  
-  :---
-  
-  
-  ---
-  
-  ---:
-  
-  Side Angle - This angle perfectly shows the pattern running along with the distance.
-  However, without a strong dominant and pattern this type of composition angle can be
-  monotonous.
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5D6A3A0BB.png)
-  
-  :---
-- [ ] ## Gestalt laws
-  ---:
-  ![tommy_norberg_structure_gestalt_laws_proximity_media_FTNlPOvX0AcCvlR](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_media_FTNlPOvX0AcCvlR.jpg)
-  :--:
-  ![tommy_norberg_structure_gestalt_laws_proximity_28358672648760690](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_28358672648760690.jpg)
-  :---
-  
-  ---
-  
-  ---:
-  ![tommy_norberg_structure_gestalt_laws_proximity_4_614600680415969662](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_4_614600680415969662.jpg)
-  :--:
-  ![tommy_norberg_structure_gestalt_laws_proximity_3_614600680415969658](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_3_614600680415969658.jpg)
-  
-  
-  :---
-  
-  ---:
-  ![tommy_norberg_structure_gestalt_laws_proximity_2_614600680415969655](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_2_614600680415969655.jpg)
-  
-  :--:
-  
-  ![tommy_norberg_structure_gestalt_laws_proximity_1_411868328443739290](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gestalt_laws_proximity_1_411868328443739290.jpg)
-  
-  :---
-  
-  ---
-  
-  
-  ---:
-  ![tommy_norberg_structure_gates_n_gatling_EaD55hWWkAg9I8l](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_gates_n_gatling_EaD55hWWkAg9I8l.jpg)
-  
-  :--:
-  
-  ![tommy_norberg_structure_funnel_before_reveal_media_Ebvf-0WXsAIHCe6](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_funnel_before_reveal_media_Ebvf-0WXsAIHCe6.jpg)
-  
-  :---
-  
-  ---:
-  
-  ![tommy_norberg_structure_findability_discoverability_16044142418010864](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_findability_discoverability_16044142418010864.jpg)
-  
-  :--:
-  
-  ![tommy_norberg_structure_denial_and_reward_16044142418016465](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_denial_and_reward_16044142418016465.jpg)
-  
-  :---
-- [ ] ## Composition Elements' Positioning #high
-  #TODO : Analze the pdf for the titles below and create summary
-  
-  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
-  
-  ## Static (Symmetric) Composition
-  
-  #TODO
-  
-  ## Dynamic (assymmetric) Composition
-  
-  #TODO
-  
-  ## Balance
-  
-  ### Heavy visual weight
-  ### Light visual weight
-  
-  #TODO
-  
-  ## Eye Catchers
-  
-  ## Lines
-- [ ] ## Composition in Level Design
-  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
-  
-  Observation Spots
-  Building the composition is very simple when the observer is not able to move and he's watching the composition elements that we want to show to him. Things are getting complicated when the observer can freely traverse through the scene. Compositions in video games can be watched from arbitrary angles and positions. You have to make sure that the player is able to reach the composition from places you've arranged.
-  To guide the player you can use choke point or funnel methods. Both are the types of corridor-like spaces where actually nothing special happens. Thanks to that boring tunnels we can be sure that the player is not focused on gameplay events or details. In such spaces player will just traverse along the path looking for interesting things. If you caught the player in such a corridor you can smoothly change its angle to guide the player to the composition's dominant. This method works perfectly on linear
-  levels, you're able to design the composition's frame and make sure that the player will see your composition as you wanted to. The place where player has to stand to see the composition is called
-  the observation spot.
-  
-  
-  
-  ---:
-  
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5FB8EDF30.png)
-  
-  Funnel and observation spot
-  Red cube - Dominant; Green circle - Observation spot; Green cube - Observer; White
-  cone - Observer's eye sight; Gray plane - Terrain
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001936B8EAC71.png)
-  
-  Monument with the screen and a skyscraper in the background - Half-Life 2
-  
-  :---
-  
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E57C5F600F.png)
-  
-  Funnels and three observation spots
-  Red cube - Dominant; Green circle - Observation spots; Green cube - Observer; White
-  cone - Observer's eye sight; Gray plane - Terrain
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/10000001000002860000016B50A2BA2F.png)
-  
-  Village composition in open world game -
-  Skyrim
-  
-  :---
-- [ ] ## Sight Angle
-  -> [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/Composition_in_Level_Design.pdf]]
-  
-  This angle defines how player will be able to observe the dominant. You can change the sight angle to
-  achieve bigger impact by modifying the dominant's size, height or placement.
-  - Low Angle - Dominant is seen from above. The image can show depth and perspective. This angle gives the player a great visibility on the composition layers. You can use it as the player's advantage and allow him to plan his tactics or exploration route.
-  - Flat Angle - Dominant is seen from the ground level. Scene feels flat and boring. Mostly used with strong dominants and high composition angles. You can fake the perspective and
-  depth by smoothly lowering the height of the terrain between player and the dominant.
-  - High Angle - Dominant is seen from the bottom and is literally dominating the composition. It gives impression of being small when compared with the dominant.
-  
-  <br>
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E5FF8D3057.png)
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E51E14EC06.png)
-  
-  :--:
-  
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/1000000100000286000001E512D5B5EF.png)
-  
-  :---
-- [ ] ## Negative Space
-  ---:
-  
-  ![tommy_norberg_structure_negative_space_media_Eb0_-i_X0AEsFwE](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_negative_space_media_Eb0_-i_X0AEsFwE.jpg)
-  
-  :--:
-  
-  ![tommy_norberg_structure_negative_space_570901690285228393](World_n_Level_Design-Topics_Kanban-Media/tommy_norberg_structure_negative_space_570901690285228393.jpg)
-  
-  :---
-- [ ] ## Occlusion
-  > https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals#Occlusion
-  
-  Positive space in the form of solid shapes are often used to obscure sight lines in a level. This is called occlusion. Shapes project a shadow that obscures what is behind them, such as when the player uses cover or when a hill is used to setup the reveal of a location.
-  
-  Level designers use occlusion to do the following:
-  
-  - Foliage can be used to hide or blur the path the player is taking to the goal
-  - Occlusion can be used to deemphasize parts of the level that are unimportant
-  - Overlapping shapes can give an area a sense of depth
-  - Overlap also emphasizes the differences in parts of the level and creates contrast.
-  
-  <br>
-  
-  ---:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/cd51ce6206c26126.png) 
-  
-  
-  :--:
-  
-  ![](World_n_Level_Design-Topics_Kanban-Media/5da1fd8151a69351.png)
-  
-  :---
-- [ ] Composition Video
-  - <https://www.youtube.com/watch?v=RIsLDFD8E7s>
   
   
   

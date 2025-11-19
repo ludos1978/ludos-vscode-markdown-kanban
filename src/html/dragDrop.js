@@ -348,6 +348,13 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     stackLeft = lastCol.columnTitleRect.left;
                     stackWidth = lastCol.columnTitleRect.width;
                     insertionY = lastCol.columnTitleRect.bottom;
+
+                    // DEBUG: Log indicator positioning for sticky column
+                    console.log('[StickyDrop] Indicator at title bottom', {
+                        columnId: lastCol.columnId,
+                        insertionY: insertionY,
+                        titleBottom: lastCol.columnTitleRect.bottom
+                    });
                 }
                 // NORMAL MODE: Use bottom margin
                 else if (lastCol.bottomMarginRect) {
@@ -3333,6 +3340,16 @@ function setupColumnDragAndDrop() {
                 isInTopMargin = e.clientY <= midpoint;
                 // Check if hovering below column-title (extended drop zone for last column)
                 isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
+
+                // DEBUG: Log sticky column detection
+                if (isLastColumnInStack) {
+                    console.log('[StickyDrop] Per-column handler', {
+                        columnId: column.dataset.columnId,
+                        clientY: e.clientY,
+                        titleBottom: colData.columnTitleRect.bottom,
+                        isBelowTitle: isBelowColumnTitle
+                    });
+                }
             }
             // NORMAL MODE: Use margins for drop detection
             else {
@@ -3457,6 +3474,15 @@ function setupColumnDragAndDrop() {
 
         // Only handle vertical drops below the last column/title
         if (e.clientY > lastBottom) {
+            // DEBUG: Log document handler detection
+            console.log('[StickyDrop] Document handler', {
+                stackHasColumns: columns.length,
+                lastColumnId: lastColumn.dataset.columnId,
+                clientY: e.clientY,
+                lastBottom: lastBottom,
+                isSticky: cachedCol?.isSticky
+            });
+
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
             showInternalColumnDropIndicator(stack, null);
         }

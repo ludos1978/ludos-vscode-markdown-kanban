@@ -1,4 +1,3 @@
-
 # How Level Design Can Tell a Story
 
 <https://www.youtube.com/watch?v=RwlnCn2EB9o>
@@ -7,11 +6,10 @@
 
 ---
 
-
-
 - Introduction (presentation, videos, tutorial)
 - Ingame elements (audio diaries, cutscenes)
 - Surroundings
+
 ---
 
 some title
@@ -25,6 +23,7 @@ some content
 - Introduction (presentation, videos, tutorial)
 - Ingame elements (audio diaries, cutscenes)
 - Surroundings
+
 ---
 
 ---:
@@ -62,6 +61,7 @@ some content
 :---
 
 <br>
+
 ---
 
 ## 3 ways for storytelling
@@ -74,8 +74,6 @@ some content
 
 ---
 
-
-
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:01:39.png)
 
 there should be no title
@@ -87,6 +85,7 @@ there should be no title
 ---
 
 ## bioshock
+
 ---:
 
 - signs 
@@ -104,6 +103,7 @@ there should be no title
 ---
 
 ## Set dressing
+
 ---:
 
 ![alt text h:220px](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:01:56.png "humorous or melanchonic ways people have died")
@@ -121,6 +121,7 @@ there should be no title
 ---
 
 ## Environmental Storytelling
+
 ---:
 
 Term first used in 2000's by Don Carson:
@@ -140,6 +141,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Makes us an active participant in the story
+
 ---:
 
 + ![alt text h:250px](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:02:36.png)
@@ -163,6 +165,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Can be ignored if not interested
+
 ---:
 
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:02:54.png)
@@ -172,6 +175,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Text
+
 ---:
 
 ![alt text h:170px](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:03:02.png "Static objects")
@@ -222,6 +226,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Can tell mechanics & methods
+
 ---:
 
 
@@ -240,6 +245,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Signposts
+
 ---:
 
 ## help navigate
@@ -263,6 +269,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Individual Places - Level Design
+
 ---:2
 
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:04:41.png)
@@ -284,6 +291,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## Level Design
+
 ---:
 
 > Also tells narrative about the people who use it.
@@ -325,6 +333,7 @@ Term first used in 2000's by Don Carson:
 ---
 
 ## World Building
+
 ---:
 
 - Factions
@@ -491,6 +500,7 @@ Graffiti shows hate
 ---
 
 ## Portal
+
 ---:
 
 > first half is in test chambers
@@ -508,6 +518,7 @@ Graffiti shows hate
 ---
 
 ## Portal
+
 ---:
 
 > Second part, escape evil ai trough maintenance area
@@ -525,6 +536,7 @@ Graffiti shows hate
 ---
 
 ## Tomb Raider
+
 ---:
 
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:09:55.png)
@@ -546,6 +558,7 @@ Graffiti shows hate
 ---
 
 ## Tomb Raider
+
 ---:
 
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:10:04.png)
@@ -627,6 +640,7 @@ Graffiti shows hate
 ---
 
 ## Other Games
+
 ---:
 
 ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:12:13.png)
@@ -648,6 +662,7 @@ Graffiti shows hate
 ---
 
 ## Game Mechanics change emotion towards Design Aspects.
+
 ---:
 
 > In Horror Games: Darkness evokes fear.
@@ -665,6 +680,7 @@ Graffiti shows hate
 ---
 
 ## Intensity Charts
+
 ---:
 
 > Low moments for story beats
@@ -683,6 +699,7 @@ Graffiti shows hate
 ---
 
 ## Environments influence our identity
+
 ---:3
 
 > What sort of person are we?
@@ -718,6 +735,7 @@ Graffiti shows hate
 ---
 
 ## Bioshock
+
 ---:
 
 > 1: is a destroyed society. Murdering psychopaths is easy.
@@ -735,6 +753,7 @@ Graffiti shows hate
 ---
 
 ## Hitman
+
 ---:
 
 > Real world social behaviour and rules help understanding what is allowed an whats not.
@@ -772,5 +791,3 @@ Graffiti shows hate
 ---
 
 # The End
-
-
