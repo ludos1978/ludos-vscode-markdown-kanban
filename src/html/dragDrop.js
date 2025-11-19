@@ -2588,7 +2588,7 @@ function setupTaskDragAndDropForColumn(columnElement) {
         }
     });
 
-    // PERFORMANCE-OPTIMIZED: Throttled dragover handler with cached positions
+    // PERFORMANCE-OPTIMIZED: Zero-recalc dragover handler using cached positions from dragstart
     tasksContainer.addEventListener('dragover', e => {
         e.preventDefault();
 
@@ -3123,6 +3123,7 @@ function updateStackBottomDropZones() {
             bottom: 0;
             pointer-events: auto;
             z-index: 1;
+            transform: translateZ(-1px);
         `;
 
         // Add dragover handler for this drop zone
@@ -3344,7 +3345,7 @@ function setupColumnDragAndDrop() {
         // NOTE: Column dragend handler removed - now handled by unified global dragend handler
 
 
-        // PERFORMANCE-OPTIMIZED: Show indicator only, NO DOM moves during drag
+        // PERFORMANCE-OPTIMIZED: Zero-recalc dragover using cached positions from dragstart
         column.addEventListener('dragover', e => {
             if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
@@ -3368,13 +3369,37 @@ function setupColumnDragAndDrop() {
                 return;
             }
 
-            // Use LIVE rect for accurate midpoint calculation (viewport may have scrolled)
-            const rect = column.getBoundingClientRect();
-            const midpoint = rect.top + rect.height / 2;
+            // PERFORMANCE: Use cached column position - ZERO DOM queries!
+            const colData = dragState.cachedColumnPositions?.find(pos => pos.element === column);
+            if (!colData) {
+                console.warn('[ColumnDragPerf] Cache miss for column', column.dataset.columnId);
+                return;
+            }
+
+            // STICKY MODE: Use column-title boundaries for drop detection
+            let midpoint, isInTopMargin, isInBottomMargin;
+            if (colData.isSticky && colData.columnTitleRect) {
+                midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
+                isInTopMargin = e.clientY <= midpoint;
+                isInBottomMargin = e.clientY > midpoint;
+            }
+            // NORMAL MODE: Use margins for drop detection
+            else {
+                const rect = colData.rect;
+                midpoint = rect.top + rect.height / 2;
+
+                // Check if hovering in margin areas using cached positions
+                isInTopMargin = colData.topMarginRect &&
+                    e.clientY >= colData.topMarginRect.top &&
+                    e.clientY <= colData.topMarginRect.bottom;
+                isInBottomMargin = colData.bottomMarginRect &&
+                    e.clientY >= colData.bottomMarginRect.top &&
+                    e.clientY <= colData.bottomMarginRect.bottom;
+            }
 
             // Determine drop position based on mouse Y
             let beforeColumn;
-            if (e.clientY < midpoint) {
+            if (e.clientY < midpoint || isInTopMargin) {
                 // Drop before this column
                 beforeColumn = column;
             } else {
@@ -3382,30 +3407,14 @@ function setupColumnDragAndDrop() {
                 beforeColumn = column.nextSibling;
             }
 
-            // Check if hovering in margin area
-            const marginElement = column.querySelector('.column-margin');
-            const marginRect = marginElement ? marginElement.getBoundingClientRect() : null;
-            const isInMargin = marginRect && e.clientY >= marginRect.top && e.clientY <= marginRect.bottom;
-
-            console.log('[ColumnDragover] Midpoint calculation', {
+            console.log('[ColumnDragover] Cached position used', {
                 columnId: column.dataset.columnId,
-                rectTop: rect.top,
-                rectHeight: rect.height,
-                midpoint: midpoint,
-                clientY: e.clientY,
-                isBeforeColumn: e.clientY < midpoint,
-                isInMargin: isInMargin,
-                marginTop: marginRect?.top,
-                marginBottom: marginRect?.bottom,
-                hasNextSibling: !!column.nextSibling
-            });
-
-            console.log('[ColumnDragover] Showing indicator', {
-                targetColumnId: column.dataset.columnId,
-                beforeColumnId: beforeColumn?.dataset?.columnId,
+                isSticky: colData.isSticky,
                 clientY: e.clientY,
                 midpoint: midpoint,
-                dropPosition: e.clientY < midpoint ? 'before' : 'after'
+                isInTopMargin: isInTopMargin,
+                isInBottomMargin: isInBottomMargin,
+                dropPosition: beforeColumn === column ? 'before' : 'after'
             });
 
             // Show indicator, DON'T move actual column!
