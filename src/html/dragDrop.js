@@ -343,26 +343,24 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // Drop at END: Position at top of stack-bottom-drop-zone if it exists
-                const bottomDropZone = targetStack.querySelector('.stack-bottom-drop-zone');
-                if (bottomDropZone) {
-                    const zoneRect = bottomDropZone.getBoundingClientRect();
-                    stackLeft = zoneRect.left;
-                    stackWidth = zoneRect.width;
-                    insertionY = zoneRect.top;
-                    console.log('[ColumnIndicator] Drop at end (bottom drop zone):', {
-                        zoneTop: zoneRect.top,
+                // Drop at END: Position in the bottom margin of last column
+                if (lastCol.bottomMarginRect) {
+                    stackLeft = lastCol.bottomMarginRect.left;
+                    stackWidth = lastCol.bottomMarginRect.width;
+                    insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
+                    console.log('[ColumnIndicator] Drop at end (bottom margin):', {
+                        columnId: lastCol.columnId,
+                        marginTop: lastCol.bottomMarginRect.top,
                         insertionY: insertionY
                     });
                 } else {
-                    // Fallback: position after last column
+                    // Fallback: no bottom margin, position after column
                     const liveRect = lastCol.element.getBoundingClientRect();
                     stackLeft = liveRect.left;
                     stackWidth = liveRect.width;
-                    insertionY = liveRect.bottom + 5;
-                    console.log('[ColumnIndicator] Drop at end (after last column):', {
+                    insertionY = liveRect.bottom;
+                    console.log('[ColumnIndicator] Drop at end (no margin, using column bottom):', {
                         columnId: lastCol.columnId,
-                        columnBottom: liveRect.bottom,
                         insertionY: insertionY
                     });
                 }
@@ -400,25 +398,26 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                 return;
             }
         } else {
-            // Drop before specific column - position in that column's margin
+            // Drop before specific column - position in that column's TOP margin
             const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
             if (colData) {
-                // Use this column's dimensions for indicator width/left
-                stackLeft = colData.rect.left;
-                stackWidth = colData.rect.width;
-
-                // PERFORMANCE: Use cached margin position (no DOM queries!)
-                if (colData.marginRect) {
-                    insertionY = colData.marginRect.top + (colData.marginRect.height / 2);
-                    console.log('[ColumnIndicator] Using margin:', {
+                // PERFORMANCE: Use cached top margin position (no DOM queries!)
+                if (colData.topMarginRect) {
+                    stackLeft = colData.topMarginRect.left;
+                    stackWidth = colData.topMarginRect.width;
+                    insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
+                    console.log('[ColumnIndicator] Using top margin:', {
                         columnId: colData.columnId,
-                        marginTop: colData.marginRect.top,
-                        marginHeight: colData.marginRect.height,
+                        marginTop: colData.topMarginRect.top,
+                        marginHeight: colData.topMarginRect.height,
                         insertionY: insertionY
                     });
                 } else {
-                    insertionY = colData.rect.top - 2;
-                    console.log('[ColumnIndicator] NO margin, using column edge:', {
+                    // Fallback: no margin, use column edge
+                    stackLeft = colData.rect.left;
+                    stackWidth = colData.rect.width;
+                    insertionY = colData.rect.top;
+                    console.log('[ColumnIndicator] NO top margin, using column edge:', {
                         columnId: colData.columnId,
                         columnTop: colData.rect.top,
                         insertionY: insertionY
@@ -3219,21 +3218,25 @@ function setupColumnDragAndDrop() {
             dragState.cachedColumnPositions = Array.from(allColumns)
                 .filter(col => col !== columnElement)
                 .map(col => {
-                    // Each column has ONE .column-margin at the top
-                    const margin = col.querySelector('.column-margin');
+                    // Each column has margins: top (always) and bottom (if last in stack)
+                    const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+                    const bottomMargin = col.querySelector('.column-margin-bottom');
                     const colId = col.getAttribute('data-column-id');
 
-                    console.log('[ColumnDragstart] Caching column margin:', {
+                    console.log('[ColumnDragstart] Caching column margins:', {
                         columnId: colId,
-                        hasMargin: !!margin,
-                        marginRect: margin ? margin.getBoundingClientRect() : null
+                        hasTopMargin: !!topMargin,
+                        hasBottomMargin: !!bottomMargin,
+                        topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
+                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null
                     });
 
                     return {
                         element: col,
                         rect: col.getBoundingClientRect(),
                         columnId: colId,
-                        marginRect: margin ? margin.getBoundingClientRect() : null
+                        topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
+                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null
                     };
                 });
 

@@ -1513,6 +1513,26 @@ function renderBoard(options = null) {
     }
 
     /**
+     * Adds a margin element after the last column in a stack (for drop target)
+     */
+    function addMarginAfterLastColumn(stack, columns) {
+        const lastColumn = columns[columns.length - 1];
+
+        // Check if margin already exists
+        const existingMargin = lastColumn.querySelector('.column-margin-bottom');
+        if (existingMargin) {
+            return; // Already has margin
+        }
+
+        // Create margin element
+        const margin = document.createElement('div');
+        margin.className = 'column-margin column-margin-bottom';
+
+        // Append to last column
+        lastColumn.appendChild(margin);
+    }
+
+    /**
      * Removes empty kanban-column-stack containers and adds drop zones between remaining stacks/columns
      */
     function cleanupStacksAndAddDropZones(rowContainer) {
@@ -1522,6 +1542,9 @@ function renderBoard(options = null) {
             const columns = stack.querySelectorAll('.kanban-full-height-column');
             if (columns.length === 0) {
                 stack.remove();
+            } else {
+                // Add margin after last column in stack (for drop target)
+                addMarginAfterLastColumn(stack, columns);
             }
         });
 
