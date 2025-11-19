@@ -334,6 +334,7 @@ class TaskEditor {
                         vscode.postMessage({
                             type: 'handleEditorShortcut',
                             shortcut: shortcut,
+                            command: cachedShortcuts[shortcut], // Send the command name so backend doesn't need to reload
                             key: e.key,
                             ctrlKey: e.ctrlKey,
                             metaKey: e.metaKey,

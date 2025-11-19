@@ -1708,10 +1708,9 @@ export class MessageHandler {
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
 
-            // Use the same shortcut mapping that was sent to the frontend
-            // This ensures consistency and proper priority (extension shortcuts over user)
-            const allShortcuts = await this.getAllShortcuts();
-            const userCommand = allShortcuts[message.shortcut];
+            // Use the command sent from frontend (already loaded on view focus)
+            // This avoids reloading shortcuts on every keypress
+            const userCommand = message.command;
 
             console.log(`[MessageHandler] handleEditorShortcut - shortcut: ${message.shortcut}, command: ${userCommand}, type: ${typeof userCommand}`);
 
