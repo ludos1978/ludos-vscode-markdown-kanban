@@ -3305,14 +3305,8 @@ function setupColumnDragAndDrop() {
                 return;
             }
 
-            // PERFORMANCE: Use cached rect from dragstart (no recalculation!)
-            let rect;
-            if (dragState.cachedColumnPositions) {
-                const cached = dragState.cachedColumnPositions.find(pos => pos.element === column);
-                rect = cached ? cached.rect : column.getBoundingClientRect();
-            } else {
-                rect = column.getBoundingClientRect();
-            }
+            // Use LIVE rect for accurate midpoint calculation (viewport may have scrolled)
+            const rect = column.getBoundingClientRect();
             const midpoint = rect.top + rect.height / 2;
 
             // Determine drop position based on mouse Y
@@ -3324,6 +3318,15 @@ function setupColumnDragAndDrop() {
                 // Drop after this column
                 beforeColumn = column.nextSibling;
             }
+
+            console.log('[ColumnDragover] Midpoint calculation', {
+                columnId: column.dataset.columnId,
+                rectTop: rect.top,
+                rectHeight: rect.height,
+                midpoint: midpoint,
+                clientY: e.clientY,
+                isBeforeColumn: e.clientY < midpoint
+            });
 
             console.log('[ColumnDragover] Showing indicator', {
                 targetColumnId: column.dataset.columnId,
