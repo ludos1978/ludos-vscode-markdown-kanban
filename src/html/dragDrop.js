@@ -370,18 +370,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                 stackWidth = draggedRect.width;
                 insertionY = draggedRect.bottom + 5;
             } else if (targetStack.classList.contains('column-drop-zone-stack')) {
-                // Empty drop zone stack (horizontal drop area) - show vertical indicator in the zone
-                const dropZone = targetStack.querySelector('.column-drop-zone');
-                if (dropZone) {
-                    const dropZoneRect = dropZone.getBoundingClientRect();
-                    stackLeft = dropZoneRect.left;
-                    stackWidth = dropZoneRect.width;
-                    // Position indicator vertically in the middle of the drop zone
-                    insertionY = dropZoneRect.top + (dropZoneRect.height / 2);
-                } else {
-                    indicator.style.display = 'none';
-                    return;
-                }
+                // Horizontal drop zone - don't show indicator (drop zone itself provides visual feedback)
+                indicator.style.display = 'none';
+                return;
             } else {
                 // Truly empty stack - hide indicator
                 indicator.style.display = 'none';
