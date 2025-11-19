@@ -3351,7 +3351,7 @@ function setupColumnDragAndDrop() {
     });
 
     // Add dragover handler to allow dropping below the last column in a stack
-    // Use event delegation on document to handle dynamically created stacks
+    // STICKY-AWARE: Uses column-title bottom when sticky, column bottom when normal
     document.addEventListener('dragover', e => {
         if (!dragState.draggedColumn) {return;}
 
@@ -3370,7 +3370,7 @@ function setupColumnDragAndDrop() {
             const row = e.target.closest('.kanban-row');
             if (!row) {return;}
 
-            // Find all stacks in this row and check if mouse is below any of them
+            // PERFORMANCE: Use cached positions to find stack below mouse
             const stacks = Array.from(row.querySelectorAll('.kanban-column-stack'));
 
             for (const candidateStack of stacks) {
@@ -3380,13 +3380,37 @@ function setupColumnDragAndDrop() {
                 if (columns.length === 0) {continue;}
 
                 const lastColumn = columns[columns.length - 1];
-                const lastRect = lastColumn.getBoundingClientRect();
-                const stackRect = candidateStack.getBoundingClientRect();
 
-                // Check if mouse is horizontally within stack bounds and vertically below last column
-                if (e.clientX >= stackRect.left &&
-                    e.clientX <= stackRect.right &&
-                    e.clientY > lastRect.bottom) {
+                // PERFORMANCE: Use cached position if available
+                const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+                let lastBottom, stackLeft, stackRight;
+
+                if (cachedCol) {
+                    // STICKY MODE: Use column-title bottom (visible part)
+                    if (cachedCol.isSticky && cachedCol.columnTitleRect) {
+                        lastBottom = cachedCol.columnTitleRect.bottom;
+                        stackLeft = cachedCol.columnTitleRect.left;
+                        stackRight = cachedCol.columnTitleRect.right;
+                    }
+                    // NORMAL MODE: Use full column bottom
+                    else {
+                        lastBottom = cachedCol.rect.bottom;
+                        stackLeft = cachedCol.rect.left;
+                        stackRight = cachedCol.rect.right;
+                    }
+                } else {
+                    // Fallback: use live positions
+                    const lastRect = lastColumn.getBoundingClientRect();
+                    const stackRect = candidateStack.getBoundingClientRect();
+                    lastBottom = lastRect.bottom;
+                    stackLeft = stackRect.left;
+                    stackRight = stackRect.right;
+                }
+
+                // Check if mouse is horizontally within stack bounds and vertically below last column/title
+                if (e.clientX >= stackLeft &&
+                    e.clientX <= stackRight &&
+                    e.clientY > lastBottom) {
                     stack = candidateStack;
                     break;
                 }
@@ -3399,20 +3423,30 @@ function setupColumnDragAndDrop() {
 
         e.preventDefault();
 
-        // Check if mouse is below all columns (vertical stacking)
+        // PERFORMANCE: Use cached positions to check if below last column
         const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
         if (columns.length === 0) {return;}
 
         const lastColumn = columns[columns.length - 1];
-        const lastRect = lastColumn.getBoundingClientRect();
+        const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
 
-        // Only handle vertical drops below the last column
-        if (e.clientY > lastRect.bottom) {
-            console.log('[DocumentDragover] Below last column, showing end indicator:', {
-                clientY: e.clientY,
-                lastColumnBottom: lastRect.bottom,
-                stackColumns: columns.length
-            });
+        let lastBottom;
+        if (cachedCol) {
+            // STICKY MODE: Use column-title bottom (only visible part)
+            if (cachedCol.isSticky && cachedCol.columnTitleRect) {
+                lastBottom = cachedCol.columnTitleRect.bottom;
+            }
+            // NORMAL MODE: Use full column bottom
+            else {
+                lastBottom = cachedCol.rect.bottom;
+            }
+        } else {
+            // Fallback: use live position
+            lastBottom = lastColumn.getBoundingClientRect().bottom;
+        }
+
+        // Only handle vertical drops below the last column/title
+        if (e.clientY > lastBottom) {
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
             showInternalColumnDropIndicator(stack, null);
         }
