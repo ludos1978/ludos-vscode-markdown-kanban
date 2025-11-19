@@ -1,4 +1,7 @@
-lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
+- when creating or editing tasks or after moving them sometimes the tasks cannot be edited again or the drag button doesnt work. we need to verify and unify how tasks are created, i assume we have multiple codepaths that create tasks in different was. for example the are quite reliable after unfolding. 
+
+
+- lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
 """
 theme 	Set a theme name for the slide deck ▶️
 style 	Specify CSS for tweaking theme
