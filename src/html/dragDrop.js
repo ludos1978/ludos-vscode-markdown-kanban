@@ -2350,13 +2350,62 @@ function setupTaskDragAndDropForColumn(columnElement) {
         // Remove any column-level visual feedback when over tasks
         columnElement.classList.remove('drag-over-append');
 
-        // PERFORMANCE OPTIMIZATION: Calculate drop position and show indicator
-        // NO DOM MANIPULATION during drag - massive performance gain!
-        const mouseY = e.clientY;
-        const afterElement = getDragAfterTaskElement(tasksContainer, mouseY);
+        // PERFORMANCE: Throttle calculations using requestAnimationFrame
+        // Store latest mouse position but skip calculation if already scheduled
+        dragState.latestMouseY = e.clientY;
+        dragState.latestTasksContainer = tasksContainer;
 
-        // Show drop indicator at calculated position
-        showInternalTaskDropIndicator(tasksContainer, afterElement);
+        if (dragState.indicatorUpdateScheduled) {
+            return; // Skip - update already scheduled with latest position
+        }
+
+        dragState.indicatorUpdateScheduled = true;
+
+        requestAnimationFrame(() => {
+            // Use latest mouse position (not stale from closure)
+            const mouseY = dragState.latestMouseY;
+            const container = dragState.latestTasksContainer;
+
+            // PERFORMANCE: Only calculate positions if container changed or cache expired
+            const now = Date.now();
+            const cacheKey = container.id || container.dataset.columnId;
+            const cacheValid = dragState.positionCacheKey === cacheKey &&
+                               (now - dragState.positionCacheTime) < 100; // 100ms TTL
+
+            let afterElement;
+
+            if (cacheValid && dragState.cachedPositions) {
+                // Use cached positions (fast!)
+                afterElement = getDragAfterTaskElementFromCache(
+                    mouseY,
+                    dragState.cachedPositions,
+                    dragState.cachedAddButtonRect
+                );
+            } else {
+                // Recalculate and cache positions (only when needed)
+                const tasks = Array.from(container.querySelectorAll('.task-item'))
+                    .filter(el => el !== dragState.draggedTask);
+                dragState.cachedPositions = tasks.map(task => ({
+                    element: task,
+                    rect: task.getBoundingClientRect()
+                }));
+                const addButton = container.querySelector('.add-task-btn');
+                dragState.cachedAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
+                dragState.positionCacheKey = cacheKey;
+                dragState.positionCacheTime = now;
+
+                afterElement = getDragAfterTaskElementFromCache(
+                    mouseY,
+                    dragState.cachedPositions,
+                    dragState.cachedAddButtonRect
+                );
+            }
+
+            // Show drop indicator at calculated position
+            showInternalTaskDropIndicator(container, afterElement);
+
+            dragState.indicatorUpdateScheduled = false;
+        });
     });
 
     tasksContainer.addEventListener('drop', e => {
