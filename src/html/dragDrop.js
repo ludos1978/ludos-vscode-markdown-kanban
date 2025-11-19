@@ -257,18 +257,24 @@ function showInternalTaskDropIndicatorFallback(tasksContainer, afterElement) {
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     const indicator = createInternalDropIndicator();
 
+    // CRITICAL: Always store drop target FIRST, even if indicator can't be shown!
+    // Otherwise processTaskDrop() won't know where to drop
+    dragState.dropTargetContainer = tasksContainer;
+    dragState.dropTargetAfterElement = afterElement;
+
     // PERFORMANCE: Look up cached data instead of querying DOM!
     const containerKey = tasksContainer.id || tasksContainer.dataset.columnId || tasksContainer;
     const cachedData = dragState.allColumnPositions?.get(containerKey);
 
     if (!cachedData) {
-        // Fallback if no cache (shouldn't happen)
+        // Can't show indicator, but drop target is already stored
         indicator.style.display = 'none';
         return;
     }
 
     let insertionY;
     let containerLeft, containerWidth;
+    let canShowIndicator = false;
 
     // Use cached container dimensions
     if (cachedData.tasks.length > 0) {
@@ -276,11 +282,14 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
         const firstTask = cachedData.tasks[0];
         containerLeft = firstTask.rect.left;
         containerWidth = firstTask.rect.width;
+        canShowIndicator = true;
     } else if (cachedData.addButtonRect) {
         containerLeft = cachedData.addButtonRect.left;
         containerWidth = cachedData.addButtonRect.width;
-    } else {
-        // Can't position indicator without any reference
+        canShowIndicator = true;
+    }
+
+    if (!canShowIndicator) {
         indicator.style.display = 'none';
         return;
     }
@@ -303,7 +312,7 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
         if (taskData) {
             insertionY = taskData.rect.top - 2;
         } else {
-            // Fallback: element not in cache
+            // Can't find in cache - hide indicator but drop target already stored
             indicator.style.display = 'none';
             return;
         }
@@ -316,10 +325,6 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     indicator.style.top = insertionY + 'px';
     indicator.style.display = 'block';
     indicator.classList.add('active');
-
-    // Store target position in dragState for dragend
-    dragState.dropTargetContainer = tasksContainer;
-    dragState.dropTargetAfterElement = afterElement;
 }
 
 function showInternalColumnDropIndicator(targetStack, beforeColumn) {
@@ -359,21 +364,27 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             }
         }
     } else {
-        // No cache available - can't position indicator
+        // No cache available - can't position indicator precisely
+        // But STILL store drop target so drop works!
         indicator.style.display = 'none';
-        return;
+        stackLeft = 0;
+        stackWidth = 200; // Fallback width
+        insertionY = 0;
     }
 
-    // Horizontal indicator for column stacking
-    indicator.style.position = 'fixed';
-    indicator.style.left = (stackLeft + 10) + 'px';
-    indicator.style.width = (stackWidth - 20) + 'px';
-    indicator.style.top = insertionY + 'px';
-    indicator.style.height = '3px';
-    indicator.style.display = 'block';
-    indicator.classList.add('active');
+    // Show horizontal indicator for column stacking (if cache available)
+    if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
+        indicator.style.position = 'fixed';
+        indicator.style.left = (stackLeft + 10) + 'px';
+        indicator.style.width = (stackWidth - 20) + 'px';
+        indicator.style.top = insertionY + 'px';
+        indicator.style.height = '3px';
+        indicator.style.display = 'block';
+        indicator.classList.add('active');
+    }
 
-    // Store target position in dragState for dragend
+    // CRITICAL: Always store drop target, even if indicator can't be shown!
+    // Otherwise processColumnDrop() won't know where to drop
     dragState.dropTargetStack = targetStack;
     dragState.dropTargetBeforeColumn = beforeColumn;
 }
