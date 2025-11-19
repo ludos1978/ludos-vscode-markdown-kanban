@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(also add a column-margin after the last kanban-full-height-column\"\n\nCHANGES:\n1. boardRenderer.js:\n   - Added addMarginAfterLastColumn() function\n   - Creates .column-margin-bottom element after last column in each stack\n   - Called during cleanupStacksAndAddDropZones()\n\n2. dragDrop.js:\n   - Cache both topMarginRect and bottomMarginRect at dragstart\n   - Drop before column: Use topMarginRect for indicator\n   - Drop after last column: Use bottomMarginRect for indicator\n   - All margins now valid drop targets\n\nIMPLEMENTATION:\n- Top margins (between columns): Always exist\n- Bottom margin (after last column): Created dynamically\n- Indicators positioned in middle of margins\n- Cached positions for zero-recalc performance\n\nIMPACT:\n- All column gaps in stacks now valid drop targets\n- Visual consistency with margin-based indicators\n- Last column position fully supported\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(npm run compile:*)"
     ],
     "deny": [],
     "ask": []

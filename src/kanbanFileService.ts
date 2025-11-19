@@ -487,7 +487,22 @@ export class KanbanFileService {
         // Save include files that have unsaved changes
         const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
         if (unsavedIncludes.length > 0) {
-            await Promise.all(unsavedIncludes.map(f => this._saveCoordinator.saveFile(f)));
+            // Save each include file individually, handling validation errors gracefully
+            const saveResults = await Promise.allSettled(
+                unsavedIncludes.map(f => this._saveCoordinator.saveFile(f))
+            );
+
+            // Log any files that failed to save due to validation
+            const failures = saveResults
+                .map((result, index) => ({ result, file: unsavedIncludes[index] }))
+                .filter(({ result }) => result.status === 'rejected');
+
+            if (failures.length > 0) {
+                failures.forEach(({ result, file }) => {
+                    const error = (result as PromiseRejectedResult).reason;
+                    console.warn(`[KanbanFileService] Skipping save for ${file.getPath()}: ${error.message || error}`);
+                });
+            }
         }
 
         // Update state after successful save (reuse mainFile from line 482)
