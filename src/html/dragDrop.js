@@ -1111,6 +1111,13 @@ function setupGlobalDragAndDrop() {
             const targetStack = dragState.dropTargetStack;
             const beforeColumn = dragState.dropTargetBeforeColumn;
 
+            console.log('[ColumnDrop] Moving column', {
+                columnId: columnId,
+                targetStack: targetStack,
+                beforeColumn: beforeColumn,
+                beforeColumnId: beforeColumn?.dataset?.columnId
+            });
+
             // Move column from its current position to target position
             if (beforeColumn) {
                 targetStack.insertBefore(columnElement, beforeColumn);
@@ -1124,6 +1131,12 @@ function setupGlobalDragAndDrop() {
             if (sourceStack && sourceStack !== targetStack && sourceStack.classList.contains('kanban-column-stack')) {
                 cleanupEmptyStack(sourceStack);
             }
+        } else {
+            console.warn('[ColumnDrop] No drop target stored!', {
+                hasStack: !!dragState.dropTargetStack,
+                beforeColumn: dragState.dropTargetBeforeColumn,
+                pendingDropZone: !!dragState.pendingDropZone
+            });
         }
 
         // Process pending drop zone if hovering over one
@@ -3226,6 +3239,10 @@ function setupColumnDragAndDrop() {
             if (!draggedStack || !targetStack ||
                 !draggedStack.classList.contains('kanban-column-stack') ||
                 !targetStack.classList.contains('kanban-column-stack')) {
+                console.warn('[ColumnDragover] Not in stacks', {
+                    draggedStack: draggedStack?.className,
+                    targetStack: targetStack?.className
+                });
                 return;
             }
 
@@ -3248,6 +3265,14 @@ function setupColumnDragAndDrop() {
                 // Drop after this column
                 beforeColumn = column.nextSibling;
             }
+
+            console.log('[ColumnDragover] Showing indicator', {
+                targetColumnId: column.dataset.columnId,
+                beforeColumnId: beforeColumn?.dataset?.columnId,
+                clientY: e.clientY,
+                midpoint: midpoint,
+                dropPosition: e.clientY < midpoint ? 'before' : 'after'
+            });
 
             // Show indicator, DON'T move actual column!
             showInternalColumnDropIndicator(targetStack, beforeColumn);
