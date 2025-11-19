@@ -21,6 +21,9 @@ let externalDropIndicator = null;
 // Track recently created tasks to prevent duplicates
 let recentlyCreatedTasks = new Set();
 
+// PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag)
+let internalDropIndicator = null;
+
 // Use centralized DragStateManager instead of local state
 // The dragStateManager is already available globally as window.dragState
 // for backward compatibility
@@ -193,6 +196,81 @@ function cleanupExternalDropIndicators() {
     if (externalDropIndicator) {
         externalDropIndicator.remove();
         externalDropIndicator = null;
+    }
+}
+
+// ============================================================================
+// PERFORMANCE OPTIMIZATION: Internal Drop Indicator (Tasks & Columns)
+// ============================================================================
+// Shows where task/column will be dropped WITHOUT moving it during drag
+// Eliminates DOM reflows and layout thrashing for massive performance gains
+
+function createInternalDropIndicator() {
+    if (internalDropIndicator) {
+        return internalDropIndicator;
+    }
+
+    const indicator = document.createElement('div');
+    indicator.className = 'internal-drop-indicator';
+    indicator.style.display = 'none';
+    indicator.style.pointerEvents = 'none';
+    document.body.appendChild(indicator);
+    internalDropIndicator = indicator;
+
+    return indicator;
+}
+
+function showInternalTaskDropIndicator(tasksContainer, afterElement) {
+    const indicator = createInternalDropIndicator();
+    const containerRect = tasksContainer.getBoundingClientRect();
+
+    let insertionY;
+
+    if (!afterElement) {
+        // Drop at end (before add button if exists)
+        const addButton = tasksContainer.querySelector('.add-task-btn');
+        if (addButton) {
+            const btnRect = addButton.getBoundingClientRect();
+            insertionY = btnRect.top - 2;
+        } else {
+            // At very bottom of container
+            insertionY = containerRect.bottom - 2;
+        }
+    } else {
+        // Drop before afterElement
+        const elementRect = afterElement.getBoundingClientRect();
+        insertionY = elementRect.top - 2;
+    }
+
+    // Position the indicator
+    indicator.style.position = 'fixed';
+    indicator.style.left = (containerRect.left + 10) + 'px';
+    indicator.style.width = (containerRect.width - 20) + 'px';
+    indicator.style.top = insertionY + 'px';
+    indicator.style.display = 'block';
+    indicator.classList.add('active');
+
+    // Store target position in dragState for dragend
+    dragState.dropTargetContainer = tasksContainer;
+    dragState.dropTargetAfterElement = afterElement;
+}
+
+function hideInternalDropIndicator() {
+    if (internalDropIndicator) {
+        internalDropIndicator.classList.remove('active');
+        internalDropIndicator.style.display = 'none';
+    }
+
+    // Clear stored drop target
+    dragState.dropTargetContainer = null;
+    dragState.dropTargetAfterElement = null;
+}
+
+function cleanupInternalDropIndicator() {
+    hideInternalDropIndicator();
+    if (internalDropIndicator) {
+        internalDropIndicator.remove();
+        internalDropIndicator = null;
     }
 }
 
@@ -704,8 +782,27 @@ function setupGlobalDragAndDrop() {
             return;
         }
 
-        // Get the final position
-        const finalParent = taskItem.parentNode;
+        // PERFORMANCE: Use stored drop target from indicator (not current DOM position)
+        const finalParent = dragState.dropTargetContainer || taskItem.parentNode;
+        const afterElement = dragState.dropTargetAfterElement;
+
+        // Now perform the ACTUAL DOM move (only happens once on drop, not during drag!)
+        if (afterElement) {
+            finalParent.insertBefore(taskItem, afterElement);
+        } else {
+            // Drop at end
+            const addButton = finalParent.querySelector('.add-task-btn');
+            if (addButton) {
+                finalParent.insertBefore(taskItem, addButton);
+            } else {
+                finalParent.appendChild(taskItem);
+            }
+        }
+
+        // Remove drag-source class
+        taskItem.classList.remove('drag-source');
+
+        // Get final position after move
         const finalColumnElement = finalParent?.closest('.kanban-full-height-column');
         const finalColumnId = finalColumnElement?.dataset.columnId;
 
@@ -1019,14 +1116,17 @@ function setupGlobalDragAndDrop() {
     }
 
     function cleanupDragVisuals() {
+        // PERFORMANCE: Hide internal drop indicator
+        hideInternalDropIndicator();
+
         // Remove visual feedback from tasks
         if (dragState.draggedTask) {
-            dragState.draggedTask.classList.remove('dragging', 'drag-preview');
+            dragState.draggedTask.classList.remove('dragging', 'drag-preview', 'drag-source');
         }
 
         // Remove visual feedback from columns
         if (dragState.draggedColumn) {
-            dragState.draggedColumn.classList.remove('dragging', 'drag-preview');
+            dragState.draggedColumn.classList.remove('dragging', 'drag-preview', 'drag-source');
         }
 
         const boardElement = document.getElementById('kanban-board');
@@ -2242,122 +2342,21 @@ function setupTaskDragAndDropForColumn(columnElement) {
             return;
         }
 
-        // Add dragging class now (delayed from dragstart to avoid layout shift)
-        if (!dragState.draggedTask.classList.contains('dragging')) {
-            dragState.draggedTask.classList.add('dragging', 'drag-preview');
+        // PERFORMANCE: Add drag-source class to dim the task (stays in original position)
+        if (!dragState.draggedTask.classList.contains('drag-source')) {
+            dragState.draggedTask.classList.add('drag-source');
         }
 
         // Remove any column-level visual feedback when over tasks
         columnElement.classList.remove('drag-over-append');
 
-        // PERFORMANCE: Track affected columns for targeted cleanup later
-        if (!dragState.affectedColumns) {
-            dragState.affectedColumns = new Set();
-        }
-        dragState.affectedColumns.add(tasksContainer);
+        // PERFORMANCE OPTIMIZATION: Calculate drop position and show indicator
+        // NO DOM MANIPULATION during drag - massive performance gain!
+        const mouseY = e.clientY;
+        const afterElement = getDragAfterTaskElement(tasksContainer, mouseY);
 
-        // PERFORMANCE: Store latest mouse position (don't use stale position from closure!)
-        dragState.latestMouseY = e.clientY;
-
-        // PERFORMANCE: Throttle ALL expensive operations using requestAnimationFrame
-        // Skip if already scheduled - but we've stored the latest position above
-        if (dragState.dragoverThrottleId) {
-            return;
-        }
-
-        dragState.dragoverThrottleId = requestAnimationFrame(() => {
-            // PERFORMANCE: Check if we're in the same column as when drag started
-            const isOriginalColumn = tasksContainer === dragState.originalTaskParent;
-            let afterElement;
-
-            // CRITICAL: Use latest mouse position, not stale closure variable!
-            const mouseY = dragState.latestMouseY;
-
-            if (isOriginalColumn) {
-                // Use cached positions for original column
-                afterElement = getDragAfterTaskElementCached(mouseY);
-            } else {
-                // PERFORMANCE: Cache positions for new columns too (TTL: 100ms)
-                const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
-                const now = Date.now();
-
-                if (!dragState.newColumnPositionCache ||
-                    dragState.newColumnPositionCacheKey !== cacheKey ||
-                    now - dragState.newColumnPositionCacheTime > 100) {
-
-                    // Recalculate and cache positions for this column
-                    const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
-                        .filter(el => el !== dragState.draggedTask);
-                    dragState.newColumnPositionCache = tasks.map(task => ({
-                        element: task,
-                        rect: task.getBoundingClientRect()
-                    }));
-                    dragState.newColumnPositionCacheKey = cacheKey;
-                    dragState.newColumnPositionCacheTime = now;
-
-                    // Cache add button position AND element for new column
-                    const addButton = tasksContainer.querySelector('.add-task-btn');
-                    dragState.newColumnAddButton = addButton; // Cache element
-                    dragState.newColumnAddButtonRect = addButton ? addButton.getBoundingClientRect() : null;
-                }
-
-                // Use cached positions to find drop location
-                afterElement = getDragAfterTaskElementFromCache(
-                    mouseY,
-                    dragState.newColumnPositionCache,
-                    dragState.newColumnAddButtonRect
-                );
-            }
-
-            // PERFORMANCE: Only update DOM if position actually changed
-            if (afterElement !== dragState.lastAfterElement) {
-                dragState.lastAfterElement = afterElement;
-
-                // Safety check: ensure draggedTask is still a valid DOM element
-                if (!dragState.draggedTask || !dragState.draggedTask.parentNode) {
-                    console.warn('[kanban.dragDrop] draggedTask is invalid or detached, skipping DOM update');
-                    return;
-                }
-
-                if (afterElement === null) {
-                    // Insert at the end, but before the add button if it exists
-                    // PERFORMANCE: Use cached add button (both original and new columns)
-                    const addButton = isOriginalColumn
-                        ? dragState.cachedAddButton
-                        : dragState.newColumnAddButton;
-                    if (addButton) {
-                        tasksContainer.insertBefore(dragState.draggedTask, addButton);
-                    } else {
-                        tasksContainer.appendChild(dragState.draggedTask);
-                    }
-                } else if (afterElement !== dragState.draggedTask) {
-                    // Insert before the after element
-                    tasksContainer.insertBefore(dragState.draggedTask, afterElement);
-                }
-
-                // Update transition classes for smooth animation
-                // Use cached positions for original column, query for new column
-                if (isOriginalColumn && dragState.cachedTaskPositions) {
-                    dragState.cachedTaskPositions.forEach(item => {
-                        item.element.classList.add('drag-transitioning');
-                    });
-                } else {
-                    // PERFORMANCE: Cache task queries for the new column to avoid repeated querySelectorAll
-                    const cacheKey = tasksContainer.id || tasksContainer.dataset.columnId;
-                    if (!dragState.cachedNewColumnTasks || dragState.cachedNewColumnTasksKey !== cacheKey) {
-                        dragState.cachedNewColumnTasks = Array.from(tasksContainer.querySelectorAll('.task-item'));
-                        dragState.cachedNewColumnTasksKey = cacheKey;
-                    }
-                    dragState.cachedNewColumnTasks.forEach(task => {
-                        if (task !== dragState.draggedTask) {
-                            task.classList.add('drag-transitioning');
-                        }
-                    });
-                }
-            }
-
-            dragState.dragoverThrottleId = null;
-        });
+        // Show drop indicator at calculated position
+        showInternalTaskDropIndicator(tasksContainer, afterElement);
     });
 
     tasksContainer.addEventListener('drop', e => {

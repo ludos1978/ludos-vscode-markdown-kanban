@@ -3462,6 +3462,34 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border: 1px solid var(--vscode-charts-blue);
 }
 
+/* PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag) */
+.internal-drop-indicator {
+  position: fixed;
+  height: 3px;
+  background-color: var(--vscode-focusBorder);
+  border-radius: 2px;
+  z-index: 10000; /* Above everything */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, top 0.1s ease-out;
+  box-shadow: 0 0 6px var(--vscode-focusBorder);
+}
+
+.internal-drop-indicator.active {
+  opacity: 1;
+}
+
+/* Dim the dragged task during drag (stays in original position) */
+.task-item.drag-source {
+  opacity: 0.3;
+  filter: grayscale(50%);
+}
+
+.kanban-full-height-column.drag-source {
+  opacity: 0.3;
+  filter: grayscale(50%);
+}
+
 .drop-zone-feedback {
   display: none !important;
   pointer-events: none !important;
