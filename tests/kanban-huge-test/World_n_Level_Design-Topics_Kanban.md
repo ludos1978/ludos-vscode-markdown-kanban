@@ -2,7 +2,175 @@
 kanban-plugin: board
 ---
 
-## # some title #1 @w1 !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-summary.md)!!!
+## # To Organize #Todo
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:20.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A20.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:25.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A25.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:01:00.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A01%3A00.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:55.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A55.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:52.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A52.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:48.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A48.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:44.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A44.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:40.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A40.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:36.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A36.png)
+- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:30.png
+  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A30.png)
+- [ ] ## Game
+  ---
+  
+  # W&L-D Basics
+  
+  ---
+  
+  ## Game
+  
+  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
+  
+  ---
+  
+  ## Players
+  
+  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000335_(1).png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000335.png)
+  
+  ---
+  
+  ## Mechancis
+  
+  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000405.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
+  
+  ---
+  
+  ## Space
+  
+  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000420.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
+- [ ] Pre-Production #todo
+  X
+  
+  - <https://book.leveldesignbook.com/process/preproduction>
+- [ ] some title
+  and some description
+  
+  <http://with_a_link>
+- [ ] 10 principles of good level design #todo
+  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/10_principles_for_game_level_design__by_moon__medium.md]]
+  
+  -> [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_1|gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_1]]
+  -> [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_2|gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_2]]
+  
+  > <https://www.youtube.com/watch?v=iNEe3KhMvXM&t=182s>
+  
+  - 04:23 : Good level design is fun to navigate.
+  - 06:47 : Good level design does not rely on words to tell the story.
+  - 10:46 : Good level design tells the player what to do, but not how to do it.
+  - 13:35 : Good level design constantly teaches the player something new.
+  - 16:06 : Good level design is surprising.
+  - 21:07 : Good level design allows the player to control the difficulty / empowers the player.
+  - 25:16 : Good level design is easy, medium, and hard.
+  - 28:13 : Good level design is efficient. > modular level parts
+  - 32:55 : Good level design creates emotion.
+  - 37:26 : Good level design is driven by your game’s mechanics.
+  - 41:50 Recap
+- [ ] ## Orthagonal Design #high
+  Every game designer should understand Orthogonal Design <https://www.youtube.com/watch?v=hW5s5Wb5vo4>
+- [ ] level_design_fundamentals_epic_developer_community.pdf
+  [level_design_fundamentals_epic_developer_community](World_n_Level_Design-Topics_Kanban-Media/level_design_fundamentals_epic_developer_community.pdf)
+  
+  ## Unreal Engine: Fortnite Level Design Fundamentals – Key Aspects
+  
+  ### 1. Purpose & Scope
+  - Explains basic techniques and theory behind *effective level design* in Fortnite via UEFN.  
+  - Includes *functional examples* using Unreal Engine for Fortnite.  
+  
+  ---
+  
+  ### 2. Core Concepts in Level Design
+  - Think about **overall game design**: how the level ties into gameplay goals, tone, and narrative.  
+  - Ensure levels are **readable**: players should quickly grasp layout, purpose, and flow.  
+  - Balance **aesthetic and functional design**: visuals and theme matter, but gameplay comes first.  
+  
+  ---
+  
+  ### 3. Design Goals & Player Experience
+  - **Guide players** with layout, structure, and visual cues.  
+  - Manage **pacing and flow**: spacing of interest points, challenge pacing, transitions.  
+  - Provide **clear objectives**: make the player’s goals obvious.  
+  
+  ---
+  
+  ### 4. Design Constraints & Practical Considerations
+  - Work within **tool limitations** (UEFN, navigation mesh, player scale, etc.).  
+  - Consider **performance and optimization**.  
+  
+  ---
+  
+  ### 5. Iteration & Prototyping
+  - Use **block-outs/greyboxing** to prototype level shapes and flow before full detail.  
+  
+  ![](https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals/_images/blockout-example.jpg)  
+  *A simple blockout layout with white boxes for testing flow and scale.*  
+  
+  - Playtest player movement, then adjust layout based on feedback.  
+  
+  ---
+  
+  ### 6. Storytelling & Theme
+  - Integrate **narrative and thematic elements** to give personality to areas.  
+  - Use environment details, props, and visual design to support **immersion**.  
+  
+  ---
+  
+  ### 7. Visual Readability
+  - Ensure players can **understand spatial relationships, paths, and obstacles** at a glance.  
+  - Use **lighting, landmarks, and contrast** for orientation.  
+  
+  ---
+  
+  ### 8. Points of Interest & Flow of Movement
+  - Design **connections between major areas** so players naturally move between them.  
+  
+  ![](https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals/_images/spatial-cluster-diagram.jpg)  
+  *Diagram showing clusters, decision points, and flow between areas.*  
+  
+  - Avoid dead ends, confusing routes, or places where players get stuck.
+- [ ] ## CS:GO From Top Down Layout to BSP Block-In Workflow
+  <https://www.worldofleveldesign.com/categories/csgo-tutorials/csgo-from-top-down-layout-to-bsp-block-in-workflow.php>
+- [ ] ## Ben’s small bible of realistic multiplayer leveldesign
+  - <https://www.farcry2.cz/czech_menu/ke_stazeni/mapy-download/Benova-bible-mapy.pdf>
+  
+  - [Benova-bible-mapy.pdf](World_n_Level_Design-Topics_Kanban-Media/Benova-bible-mapy.pdf)
+- [ ] p124_p124-67.jpg
+  ![](World_n_Level_Design-Topics_Kanban-Media/p124_p124-67.jpg)
+- [ ] Combat and Maps Layout, Combat World and Enemies, Combat Encounter Design, Combat Map Balance
+- [ ] ## Node Diagram - Facade
+  ![facade-storydynamic](World_n_Level_Design-Topics_Kanban-Media/facade-storydynamic.webp "")[^canvas_net]
+  
+  [^canvas_net]: <https://learn.canvas.net/courses/3/pages/level-10-dot-0-kinds-of-stories?module_item_id=44589>
+- [ ] ## Blockout in Games
+  ![](World_n_Level_Design-Topics_Kanban-Media/cc78a7e5814b9b73.png)
+  
+  > https://medium.com/my-games-company/level-design-101-the-language-of-location-development-6d940a01b949
+- [ ] How Level Design Can Tell a Story by Game Maker's Toolkit #high
+  <https://www.youtube.com/watch?v=RwlnCn2EB9o>
+  
+  Summary: [[/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-summary.md]]
+- [ ] ## Awesome Level  Design - Link List
+   [/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/AWESOME-LEVEL-DESIGN.md](World_n_Level_Design-Topics_Kanban-Media/AWESOME-LEVEL-DESIGN.md)
+- [ ] Folder: [\_Sammelsurium_Game-Visual_Design](_Sammelsurium_Game-Visual_Design)
+- [ ] Continue to Analyze  #TODO #Review
+  <https://miro.com/app/board/uXjVPTX_MfU=/?moveToWidget=3458764534568972602&cot=14>
+- [ ] # W&L-D Basics
+
+## # some title #1 @w1 !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-summary.md)!!! #stack
 
 ## AVERYLONGTEXTWITHOUTANYSPACESTHATSURELYOVERFLOWSTHEFULLWIDTHOFTHETITLESPACE #stack
 - [ ] ## Telling story using
@@ -592,7 +760,7 @@ kanban-plugin: board
   ![alt text](/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:16:24.png)
 - [ ] # The End
 
-## # Reading List #orange
+## # Reading List #orange #stack
 - [ ] BBB
   ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A16%3A47.png)
   
@@ -859,174 +1027,6 @@ kanban-plugin: board
   
   
   
-
-## # To Organize #Todo
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00-11-15.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:20.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A20.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:25.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A25.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:01:00.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A01%3A00.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:55.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A55.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:52.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A52.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:48.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A48.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:44.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A44.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:40.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A40.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:36.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A36.png)
-- [ ] How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00:00:30.png
-  ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-huge-test/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-still-00%3A00%3A30.png)
-- [ ] ## Game
-  ---
-  
-  # W&L-D Basics
-  
-  ---
-  
-  ## Game
-  
-  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
-  
-  ---
-  
-  ## Players
-  
-  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000335_(1).png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000335.png)
-  
-  ---
-  
-  ## Mechancis
-  
-  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000405.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
-  
-  ---
-  
-  ## Space
-  
-  ![EmiliaSchatz_LevelDesign_wk1_video03-still-000420.png](World_n_Level_Design-Topics_Kanban-Media/EmiliaSchatz_LevelDesign_wk1_video03-still-000315.png)
-- [ ] Pre-Production #todo
-  X
-  
-  - <https://book.leveldesignbook.com/process/preproduction>
-- [ ] some title
-  and some description
-  
-  <http://with_a_link>
-- [ ] 10 principles of good level design #todo
-  [[/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/10_principles_for_game_level_design__by_moon__medium.md]]
-  
-  -> [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_1|gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_1]]
-  -> [[_PRESENTATIONS/_2026_World_n_Level_Design/Presentations/_TODO/_Sammelsurium_World_n_Level_Design/gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_2|gamasutra_dan_taylors_blog-ten_principles_of_good_level_design.part_2]]
-  
-  > <https://www.youtube.com/watch?v=iNEe3KhMvXM&t=182s>
-  
-  - 04:23 : Good level design is fun to navigate.
-  - 06:47 : Good level design does not rely on words to tell the story.
-  - 10:46 : Good level design tells the player what to do, but not how to do it.
-  - 13:35 : Good level design constantly teaches the player something new.
-  - 16:06 : Good level design is surprising.
-  - 21:07 : Good level design allows the player to control the difficulty / empowers the player.
-  - 25:16 : Good level design is easy, medium, and hard.
-  - 28:13 : Good level design is efficient. > modular level parts
-  - 32:55 : Good level design creates emotion.
-  - 37:26 : Good level design is driven by your game’s mechanics.
-  - 41:50 Recap
-- [ ] ## Orthagonal Design #high
-  Every game designer should understand Orthogonal Design <https://www.youtube.com/watch?v=hW5s5Wb5vo4>
-- [ ] level_design_fundamentals_epic_developer_community.pdf
-  [level_design_fundamentals_epic_developer_community](World_n_Level_Design-Topics_Kanban-Media/level_design_fundamentals_epic_developer_community.pdf)
-  
-  ## Unreal Engine: Fortnite Level Design Fundamentals – Key Aspects
-  
-  ### 1. Purpose & Scope
-  - Explains basic techniques and theory behind *effective level design* in Fortnite via UEFN.  
-  - Includes *functional examples* using Unreal Engine for Fortnite.  
-  
-  ---
-  
-  ### 2. Core Concepts in Level Design
-  - Think about **overall game design**: how the level ties into gameplay goals, tone, and narrative.  
-  - Ensure levels are **readable**: players should quickly grasp layout, purpose, and flow.  
-  - Balance **aesthetic and functional design**: visuals and theme matter, but gameplay comes first.  
-  
-  ---
-  
-  ### 3. Design Goals & Player Experience
-  - **Guide players** with layout, structure, and visual cues.  
-  - Manage **pacing and flow**: spacing of interest points, challenge pacing, transitions.  
-  - Provide **clear objectives**: make the player’s goals obvious.  
-  
-  ---
-  
-  ### 4. Design Constraints & Practical Considerations
-  - Work within **tool limitations** (UEFN, navigation mesh, player scale, etc.).  
-  - Consider **performance and optimization**.  
-  
-  ---
-  
-  ### 5. Iteration & Prototyping
-  - Use **block-outs/greyboxing** to prototype level shapes and flow before full detail.  
-  
-  ![](https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals/_images/blockout-example.jpg)  
-  *A simple blockout layout with white boxes for testing flow and scale.*  
-  
-  - Playtest player movement, then adjust layout based on feedback.  
-  
-  ---
-  
-  ### 6. Storytelling & Theme
-  - Integrate **narrative and thematic elements** to give personality to areas.  
-  - Use environment details, props, and visual design to support **immersion**.  
-  
-  ---
-  
-  ### 7. Visual Readability
-  - Ensure players can **understand spatial relationships, paths, and obstacles** at a glance.  
-  - Use **lighting, landmarks, and contrast** for orientation.  
-  
-  ---
-  
-  ### 8. Points of Interest & Flow of Movement
-  - Design **connections between major areas** so players naturally move between them.  
-  
-  ![](https://dev.epicgames.com/community/learning/tutorials/3VKJ/unreal-engine-fortnite-level-design-fundamentals/_images/spatial-cluster-diagram.jpg)  
-  *Diagram showing clusters, decision points, and flow between areas.*  
-  
-  - Avoid dead ends, confusing routes, or places where players get stuck.
-- [ ] ## CS:GO From Top Down Layout to BSP Block-In Workflow
-  <https://www.worldofleveldesign.com/categories/csgo-tutorials/csgo-from-top-down-layout-to-bsp-block-in-workflow.php>
-- [ ] ## Ben’s small bible of realistic multiplayer leveldesign
-  - <https://www.farcry2.cz/czech_menu/ke_stazeni/mapy-download/Benova-bible-mapy.pdf>
-  
-  - [Benova-bible-mapy.pdf](World_n_Level_Design-Topics_Kanban-Media/Benova-bible-mapy.pdf)
-- [ ] p124_p124-67.jpg
-  ![](World_n_Level_Design-Topics_Kanban-Media/p124_p124-67.jpg)
-- [ ] Combat and Maps Layout, Combat World and Enemies, Combat Encounter Design, Combat Map Balance
-- [ ] ## Node Diagram - Facade
-  ![facade-storydynamic](World_n_Level_Design-Topics_Kanban-Media/facade-storydynamic.webp "")[^canvas_net]
-  
-  [^canvas_net]: <https://learn.canvas.net/courses/3/pages/level-10-dot-0-kinds-of-stories?module_item_id=44589>
-- [ ] ## Blockout in Games
-  ![](World_n_Level_Design-Topics_Kanban-Media/cc78a7e5814b9b73.png)
-  
-  > https://medium.com/my-games-company/level-design-101-the-language-of-location-development-6d940a01b949
-- [ ] How Level Design Can Tell a Story by Game Maker's Toolkit #high
-  <https://www.youtube.com/watch?v=RwlnCn2EB9o>
-  
-  Summary: [[/Users/rspoerri/_SYNC/Hochschulen/_PRESENTATIONS/_2026_World_n_Level_Design/_LWD-Presentations/_TOPICs_RESEARCH/_Sammelsurium_World_n_Level_Design/___VIDEOS/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p/How_Level_Design_Can_Tell_a_Stor.RwlnCn2EB9o.1080p-summary.md]]
-- [ ] ## Awesome Level  Design - Link List
-   [/Users/rspoerri/_SYNC/Sammelsurium/_Game-Asset_Design/__World_n_Level_Design/AWESOME-LEVEL-DESIGN.md](World_n_Level_Design-Topics_Kanban-Media/AWESOME-LEVEL-DESIGN.md)
-- [ ] Folder: [\_Sammelsurium_Game-Visual_Design](_Sammelsurium_Game-Visual_Design)
-- [ ] Continue to Analyze  #TODO #Review
-  <https://miro.com/app/board/uXjVPTX_MfU=/?moveToWidget=3458764534568972602&cot=14>
-- [ ] # W&L-D Basics
 
 ## # Day 1 - W&L-D Basics #red
 - [ ] YT Channel : Level Design Lobby

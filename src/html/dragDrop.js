@@ -342,15 +342,17 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
-                // Use last column's dimensions for indicator width/left
-                stackLeft = lastCol.rect.left;
-                stackWidth = lastCol.rect.width;
 
-                // Drop at END of stack: position after last column (no next column's margin)
-                insertionY = lastCol.rect.bottom + 5;
-                console.log('[ColumnIndicator] Drop at end (cached columns):', {
+                // Drop at END: Need LIVE position (not cached) because viewport may have scrolled
+                const liveRect = lastCol.element.getBoundingClientRect();
+                stackLeft = liveRect.left;
+                stackWidth = liveRect.width;
+                insertionY = liveRect.bottom + 5;
+
+                console.log('[ColumnIndicator] Drop at end (LIVE position):', {
                     columnId: lastCol.columnId,
-                    columnBottom: lastCol.rect.bottom,
+                    liveBottom: liveRect.bottom,
+                    cachedBottom: lastCol.rect.bottom,
                     insertionY: insertionY
                 });
             } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
@@ -3394,6 +3396,11 @@ function setupColumnDragAndDrop() {
 
         // Only handle vertical drops below the last column
         if (e.clientY > lastRect.bottom) {
+            console.log('[DocumentDragover] Below last column, showing end indicator:', {
+                clientY: e.clientY,
+                lastColumnBottom: lastRect.bottom,
+                stackColumns: columns.length
+            });
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
             showInternalColumnDropIndicator(stack, null);
         }
