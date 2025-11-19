@@ -220,6 +220,40 @@ function createInternalDropIndicator() {
     return indicator;
 }
 
+function showInternalTaskDropIndicatorFallback(tasksContainer, afterElement) {
+    const indicator = createInternalDropIndicator();
+    const containerRect = tasksContainer.getBoundingClientRect();
+
+    let insertionY;
+
+    if (!afterElement) {
+        // Drop at end (before add button if exists)
+        const addButton = tasksContainer.querySelector('.add-task-btn');
+        if (addButton) {
+            const btnRect = addButton.getBoundingClientRect();
+            insertionY = btnRect.top - 2;
+        } else {
+            insertionY = containerRect.bottom - 2;
+        }
+    } else {
+        // Drop before afterElement
+        const elementRect = afterElement.getBoundingClientRect();
+        insertionY = elementRect.top - 2;
+    }
+
+    // Position the indicator
+    indicator.style.position = 'fixed';
+    indicator.style.left = (containerRect.left + 10) + 'px';
+    indicator.style.width = (containerRect.width - 20) + 'px';
+    indicator.style.top = insertionY + 'px';
+    indicator.style.display = 'block';
+    indicator.classList.add('active');
+
+    // Store target position in dragState for dragend
+    dragState.dropTargetContainer = tasksContainer;
+    dragState.dropTargetAfterElement = afterElement;
+}
+
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     const indicator = createInternalDropIndicator();
 
@@ -2466,7 +2500,21 @@ function setupTaskDragAndDropForColumn(columnElement) {
         const cachedData = dragState.allColumnPositions?.get(containerKey);
 
         if (!cachedData) {
-            // Fallback: no cached data for this container
+            // DEBUG: Log cache miss to help diagnose
+            console.warn('[DragPerf] Cache miss for container', {
+                hasMap: !!dragState.allColumnPositions,
+                mapSize: dragState.allColumnPositions?.size,
+                containerKey: containerKey,
+                keys: dragState.allColumnPositions ? Array.from(dragState.allColumnPositions.keys()) : []
+            });
+
+            // FALLBACK: Calculate positions on-the-fly (slower but functional)
+            const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
+                .filter(task => task !== dragState.draggedTask);
+            const afterElement = getDragAfterTaskElement(tasksContainer, e.clientY);
+
+            // Show indicator with fallback positioning
+            showInternalTaskDropIndicatorFallback(tasksContainer, afterElement);
             return;
         }
 
