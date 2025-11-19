@@ -1,14 +1,16 @@
-- when creating or editing tasks or after moving them sometimes the tasks cannot be edited again or the drag button doesnt work. we need to verify and unify how tasks are created, i assume we have multiple codepaths that create tasks in different was. for example the are quite reliable after unfolding. ultrathink . create 3 suggested solutions and rate theyr quality
 
-- pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the current task. it must not 
 
-- if search finds the result in a column title, it should focus the column title, not the full column.
+- [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the current task. it must not 
 
-- dragging is still sometimes extremely slow, how about we just   display the position it's dropped and dont preview the change with the actualy column or task moved? we can remove all height recalculation during drag events.
+- [ ] the column header is still broken when it contains an !!!include(filename.md)!!! there seem to be interfering system in the code. for example it does different displays on initial load and on updating the colums. maybe because the backend does something with the !!!include()!!! title as well? 
 
-- the column header is still broken when it contains an !!!include(filename.md)!!! there seem to be interfering system in the code. for example it does different displays on initial load and on updating the colums. maybe because the backend does something with the !!!include()!!! title as well? 
+- [x] when creating or editing tasks or after moving them sometimes the tasks cannot be edited again or the drag button doesnt work. we need to verify and unify how tasks are created, i assume we have multiple codepaths that create tasks in different was. for example the are quite reliable after unfolding. ultrathink . create 3 suggested solutions and rate theyr quality
 
-- lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
+- [x] if search finds the result in a column title, it should focus the column title, not the full column.
+
+- [x] dragging is still sometimes extremely slow, how about we just   display the position it's dropped and dont preview the change with the actualy column or task moved? we can remove all height recalculation during drag events.
+
+- [x] lets modify some of the directives. these settings should go into a burger menu, next to the filename in the file-info-header.
 """
 theme 	Set a theme name for the slide deck ▶️
 style 	Specify CSS for tweaking theme
