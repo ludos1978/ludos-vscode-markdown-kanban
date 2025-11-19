@@ -2554,6 +2554,19 @@ export class KanbanWebviewPanel {
     // ============= END FILE REGISTRY HELPER METHODS =============
 
     private async _handlePanelClose() {
+        // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse during disposal
+        // Panel is already disposed by VS Code when onDidDispose fires
+        // Must remove before showing any dialogs (which await user input)
+        if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
+            KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
+        }
+        // Also check all entries as a fallback
+        for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
+            if (panel === this) {
+                KanbanWebviewPanel.panels.delete(uri);
+            }
+        }
+
         // Query current unsaved changes state from MarkdownFile
         const mainFile = this._getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
@@ -2590,8 +2603,13 @@ export class KanbanWebviewPanel {
         );
 
         if (!choice || choice === cancel) {
-            // User cancelled - prevent close
-            this._isClosingPrevented = true;
+            // User cancelled, but panel is already disposed by VS Code
+            // Still need to run our cleanup
+            console.warn('[PanelClose] User cancelled, but panel already disposed - discarding unsaved changes');
+            if (mainFile) {
+                mainFile.discardChanges();
+            }
+            this.dispose();
             return;
         }
 
@@ -2599,12 +2617,14 @@ export class KanbanWebviewPanel {
             // Save all changes and then close
             try {
                 await this.saveToMarkdown(true, true); // Save with version tracking and trigger save
-                this.dispose();
             } catch (error) {
                 console.error('[PanelClose] Save failed:', error);
-                // Don't close if save failed
-                this._isClosingPrevented = true;
+                // Panel is already disposed by VS Code, but still run our cleanup
+                vscode.window.showErrorMessage(`Failed to save: ${error instanceof Error ? error.message : String(error)}`);
             }
+            // CRITICAL: Always call dispose() to clean up, even if save failed
+            // We're in onDidDispose handler - panel is already disposed by VS Code
+            this.dispose();
         } else if (choice === closeWithoutSaving) {
             // Discard changes and close
             if (mainFile) {
