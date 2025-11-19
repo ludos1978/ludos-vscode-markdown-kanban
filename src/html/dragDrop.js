@@ -3378,58 +3378,52 @@ function setupColumnDragAndDrop() {
             return;
         }
 
-        // First try to find stack directly (including hovering over a column within stack)
-        let stack = e.target.closest('.kanban-column-stack');
+        // ROBUST: Always check ALL stacks in visible area, don't rely on e.target
+        // This handles sticky columns where stack element might not extend to visible area
+        let stack = null;
+        const board = document.getElementById('kanban-board');
+        if (!board) {return;}
 
-        // If not hovering over stack, check if hovering over row below a stack
-        if (!stack) {
-            const row = e.target.closest('.kanban-row');
-            if (!row) {return;}
+        const allStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)'));
 
-            // PERFORMANCE: Use cached positions to find stack below mouse
-            const stacks = Array.from(row.querySelectorAll('.kanban-column-stack'));
+        for (const candidateStack of allStacks) {
+            const columns = Array.from(candidateStack.querySelectorAll('.kanban-full-height-column'));
+            if (columns.length === 0) {continue;}
 
-            for (const candidateStack of stacks) {
-                if (candidateStack.classList.contains('column-drop-zone-stack')) {continue;}
+            const lastColumn = columns[columns.length - 1];
 
-                const columns = Array.from(candidateStack.querySelectorAll('.kanban-full-height-column'));
-                if (columns.length === 0) {continue;}
+            // PERFORMANCE: Use cached position if available
+            const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+            let lastBottom, stackLeft, stackRight;
 
-                const lastColumn = columns[columns.length - 1];
-
-                // PERFORMANCE: Use cached position if available
-                const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
-                let lastBottom, stackLeft, stackRight;
-
-                if (cachedCol) {
-                    // STICKY MODE: Use column-title bottom (visible part)
-                    if (cachedCol.isSticky && cachedCol.columnTitleRect) {
-                        lastBottom = cachedCol.columnTitleRect.bottom;
-                        stackLeft = cachedCol.columnTitleRect.left;
-                        stackRight = cachedCol.columnTitleRect.right;
-                    }
-                    // NORMAL MODE: Use full column bottom
-                    else {
-                        lastBottom = cachedCol.rect.bottom;
-                        stackLeft = cachedCol.rect.left;
-                        stackRight = cachedCol.rect.right;
-                    }
-                } else {
-                    // Fallback: use live positions
-                    const lastRect = lastColumn.getBoundingClientRect();
-                    const stackRect = candidateStack.getBoundingClientRect();
-                    lastBottom = lastRect.bottom;
-                    stackLeft = stackRect.left;
-                    stackRight = stackRect.right;
+            if (cachedCol) {
+                // STICKY MODE: Use column-title bottom (visible part)
+                if (cachedCol.isSticky && cachedCol.columnTitleRect) {
+                    lastBottom = cachedCol.columnTitleRect.bottom;
+                    stackLeft = cachedCol.columnTitleRect.left;
+                    stackRight = cachedCol.columnTitleRect.right;
                 }
-
-                // Check if mouse is horizontally within stack bounds and vertically below last column/title
-                if (e.clientX >= stackLeft &&
-                    e.clientX <= stackRight &&
-                    e.clientY > lastBottom) {
-                    stack = candidateStack;
-                    break;
+                // NORMAL MODE: Use full column bottom
+                else {
+                    lastBottom = cachedCol.rect.bottom;
+                    stackLeft = cachedCol.rect.left;
+                    stackRight = cachedCol.rect.right;
                 }
+            } else {
+                // Fallback: use live positions
+                const lastRect = lastColumn.getBoundingClientRect();
+                const stackRect = candidateStack.getBoundingClientRect();
+                lastBottom = lastRect.bottom;
+                stackLeft = stackRect.left;
+                stackRight = stackRect.right;
+            }
+
+            // Check if mouse is horizontally within column bounds and vertically below last visible part
+            if (e.clientX >= stackLeft &&
+                e.clientX <= stackRight &&
+                e.clientY > lastBottom) {
+                stack = candidateStack;
+                break;
             }
         }
 
