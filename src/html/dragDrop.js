@@ -255,15 +255,63 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     dragState.dropTargetAfterElement = afterElement;
 }
 
+function showInternalColumnDropIndicator(targetStack, beforeColumn) {
+    const indicator = createInternalDropIndicator();
+
+    if (!beforeColumn) {
+        // Drop at end of stack (after last column)
+        const stackRect = targetStack.getBoundingClientRect();
+        const columns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'))
+            .filter(col => col !== dragState.draggedColumn);
+
+        let insertionY;
+        if (columns.length > 0) {
+            const lastColumn = columns[columns.length - 1];
+            const lastRect = lastColumn.getBoundingClientRect();
+            insertionY = lastRect.bottom + 5;
+        } else {
+            insertionY = stackRect.top + 5;
+        }
+
+        // Horizontal indicator for column stacking
+        indicator.style.position = 'fixed';
+        indicator.style.left = (stackRect.left + 10) + 'px';
+        indicator.style.width = (stackRect.width - 20) + 'px';
+        indicator.style.top = insertionY + 'px';
+        indicator.style.height = '3px';
+        indicator.style.display = 'block';
+        indicator.classList.add('active');
+    } else {
+        // Drop before specific column
+        const columnRect = beforeColumn.getBoundingClientRect();
+        const stackRect = targetStack.getBoundingClientRect();
+
+        // Horizontal indicator above target column
+        indicator.style.position = 'fixed';
+        indicator.style.left = (stackRect.left + 10) + 'px';
+        indicator.style.width = (stackRect.width - 20) + 'px';
+        indicator.style.top = (columnRect.top - 2) + 'px';
+        indicator.style.height = '3px';
+        indicator.style.display = 'block';
+        indicator.classList.add('active');
+    }
+
+    // Store target position in dragState for dragend
+    dragState.dropTargetStack = targetStack;
+    dragState.dropTargetBeforeColumn = beforeColumn;
+}
+
 function hideInternalDropIndicator() {
     if (internalDropIndicator) {
         internalDropIndicator.classList.remove('active');
         internalDropIndicator.style.display = 'none';
     }
 
-    // Clear stored drop target
+    // Clear stored drop targets
     dragState.dropTargetContainer = null;
     dragState.dropTargetAfterElement = null;
+    dragState.dropTargetStack = null;
+    dragState.dropTargetBeforeColumn = null;
 }
 
 function cleanupInternalDropIndicator() {
@@ -2988,8 +3036,8 @@ function setupColumnDragAndDrop() {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', `kanban-full-height-column:${columnId}`);
 
-            // Visual feedback
-            columnElement.classList.add('dragging', 'drag-preview');
+            // PERFORMANCE: Visual feedback - dim the source column (no DOM movement)
+            columnElement.classList.add('drag-source');
 
             // DON'T add column-drag-active here - it causes layout shift that cancels drag
             // It will be added on first dragover event instead
@@ -3303,7 +3351,7 @@ function setupColumnDragAndDrop() {
             dragState.lastDropTarget = null;
         });
 
-        // PERFORMANCE-OPTIMIZED: Throttled column dragover with position change detection
+        // PERFORMANCE-OPTIMIZED: Show indicator only, NO DOM moves during drag
         column.addEventListener('dragover', e => {
             if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
@@ -3314,107 +3362,37 @@ function setupColumnDragAndDrop() {
 
             e.preventDefault();
 
-            // PERFORMANCE: Skip if already scheduled
-            if (dragState.columnDragoverThrottleId) {
+            const draggedStack = dragState.draggedColumn.parentNode;
+            const targetStack = column.parentNode;
+
+            if (!draggedStack || !targetStack ||
+                !draggedStack.classList.contains('kanban-column-stack') ||
+                !targetStack.classList.contains('kanban-column-stack')) {
                 return;
             }
 
-            dragState.columnDragoverThrottleId = requestAnimationFrame(() => {
-                const draggedStack = dragState.draggedColumn.parentNode;
-                const targetStack = column.parentNode;
+            // PERFORMANCE: Use cached rect from dragstart (no recalculation!)
+            let rect;
+            if (dragState.cachedColumnPositions) {
+                const cached = dragState.cachedColumnPositions.find(pos => pos.element === column);
+                rect = cached ? cached.rect : column.getBoundingClientRect();
+            } else {
+                rect = column.getBoundingClientRect();
+            }
+            const midpoint = rect.top + rect.height / 2;
 
-                if (!draggedStack || !targetStack ||
-                    !draggedStack.classList.contains('kanban-column-stack') ||
-                    !targetStack.classList.contains('kanban-column-stack')) {
-                    dragState.columnDragoverThrottleId = null;
-                    return;
-                }
+            // Determine drop position based on mouse Y
+            let beforeColumn;
+            if (e.clientY < midpoint) {
+                // Drop before this column
+                beforeColumn = column;
+            } else {
+                // Drop after this column
+                beforeColumn = column.nextSibling;
+            }
 
-                // PERFORMANCE: Use cached rect if available
-                let rect;
-                if (dragState.cachedColumnPositions) {
-                    const cached = dragState.cachedColumnPositions.find(pos => pos.element === column);
-                    rect = cached ? cached.rect : column.getBoundingClientRect();
-                } else {
-                    rect = column.getBoundingClientRect();
-                }
-                const midpoint = rect.top + rect.height / 2;
-
-                // Determine target position (vertical)
-                let targetElement;
-                let insertBefore = false;
-
-                if (e.clientY < midpoint) {
-                    // Insert before this column
-                    targetElement = column;
-                    insertBefore = true;
-                } else {
-                    // Insert after this column
-                    targetElement = column.nextSibling;
-                    insertBefore = false;
-                }
-
-                // PERFORMANCE: Only move if it's a different position than last time
-                const targetKey = 'column-' + column.getAttribute('data-column-id') + '-' + insertBefore;
-                if (dragState.lastDropTarget !== targetKey) {
-                    dragState.lastDropTarget = targetKey;
-
-                    if (insertBefore) {
-                        // Only move if not already there
-                        if (dragState.draggedColumn.nextSibling !== column) {
-                            const oldStack = dragState.draggedColumn.parentNode;
-                            targetStack.insertBefore(dragState.draggedColumn, column);
-
-                            // Clean up empty stack and its drop zone
-                            cleanupEmptyStack(oldStack);
-
-                            // Schedule style update if not already pending
-                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                                dragState.styleUpdatePending = true;
-                                requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles();
-                                    dragState.styleUpdatePending = false;
-                                });
-                            }
-                        }
-                    } else {
-                        // Only move if not already there
-                        if (targetElement && dragState.draggedColumn.nextSibling !== targetElement) {
-                            const oldStack = dragState.draggedColumn.parentNode;
-                            targetStack.insertBefore(dragState.draggedColumn, targetElement);
-
-                            // Clean up empty stack and its drop zone
-                            cleanupEmptyStack(oldStack);
-
-                            // Schedule style update if not already pending
-                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                                dragState.styleUpdatePending = true;
-                                requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles();
-                                    dragState.styleUpdatePending = false;
-                                });
-                            }
-                        } else if (!targetElement && dragState.draggedColumn !== targetStack.lastElementChild) {
-                            const oldStack = dragState.draggedColumn.parentNode;
-                            targetStack.appendChild(dragState.draggedColumn);
-
-                            // Clean up empty stack and its drop zone
-                            cleanupEmptyStack(oldStack);
-
-                            // Schedule style update if not already pending
-                            if (!dragState.styleUpdatePending && typeof window.applyStackedColumnStyles === 'function') {
-                                dragState.styleUpdatePending = true;
-                                requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles();
-                                    dragState.styleUpdatePending = false;
-                                });
-                            }
-                        }
-                    }
-                }
-
-                dragState.columnDragoverThrottleId = null;
-            });
+            // Show indicator, DON'T move actual column!
+            showInternalColumnDropIndicator(targetStack, beforeColumn);
         });
     });
 
