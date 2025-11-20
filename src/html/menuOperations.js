@@ -1754,31 +1754,20 @@ function enableColumnIncludeMode(columnId, fileName) {
         return;
     }
 
-		// Update column title to include the syntax (location-based column include)
-		const currentTitle = column.title || '';
-		const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
+    // Update column title to include the syntax (location-based column include)
+    const currentTitle = column.title || '';
+    const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
-		// Update the cached board
-		column.originalTitle = currentTitle;
-		column.title = newTitle;
+    // UNIFIED PATH: Use editColumnTitle message (same as updateColumnIncludeFile)
+    // Backend's handleEditColumnTitleUnified() will detect include syntax and route to state machine
+    vscode.postMessage({
+        type: 'editColumnTitle',
+        columnId: columnId,
+        title: newTitle
+    });
 
-		// Also update currentBoard for compatibility
-		if (window.cachedBoard !== window.cachedBoard) {
-				const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-				if (currentColumn) {
-						currentColumn.originalTitle = currentTitle;
-						currentColumn.title = newTitle;
-				}
-		}
-
-		// Send update to backend
-		vscode.postMessage({
-				type: 'boardUpdate',
-				board: window.cachedBoard
-		});
-
-		// Update button state to show unsaved changes
-		updateRefreshButtonState('unsaved', 1);
+    // Update button state to show unsaved changes
+    updateRefreshButtonState('unsaved', 1);
 }
 
 // Edit column include file

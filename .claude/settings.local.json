@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm run compile:*)",
-      "Bash(git stash show:*)"
+      "Bash(git stash show:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

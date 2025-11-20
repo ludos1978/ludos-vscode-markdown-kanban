@@ -2923,18 +2923,21 @@ window.addEventListener('message', event => {
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
+                    console.log('[DEBUG updateColumnContent] Backend sent - columnTitle:', message.columnTitle, 'displayTitle:', message.displayTitle, 'includeMode:', message.includeMode);
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
 
-                    // CRITICAL: Check for pending title changes - preserve user edits over backend data
-                    if (window.pendingColumnChanges && window.pendingColumnChanges.has(message.columnId)) {
-                        const pendingChange = window.pendingColumnChanges.get(message.columnId);
-                        column.title = pendingChange.title; // Use pending title, not backend title
-                    } else {
-                        column.title = message.columnTitle || column.title;
-                    }
-
+                    // Update column title and displayTitle from backend
+                    // Backend is source of truth after processing
+                    column.title = message.columnTitle || column.title;
                     column.displayTitle = message.displayTitle || column.displayTitle;
+                    console.log('[DEBUG updateColumnContent] Updated cache - column.title:', column.title, 'column.displayTitle:', column.displayTitle);
+
+                    // Clear any pending changes - backend has authoritative data
+                    // This prevents stale pending changes from overriding backend updates
+                    if (window.pendingColumnChanges && window.pendingColumnChanges.has(message.columnId)) {
+                        window.pendingColumnChanges.delete(message.columnId);
+                    }
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
                     if (message.includeMode !== undefined) {
