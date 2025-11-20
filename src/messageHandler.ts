@@ -544,7 +544,8 @@ export class MessageHandler {
                 await this.handleUpdateTaskFromStrikethroughDeletion(message);
                 break;
             case 'updateColumnTitleFromStrikethroughDeletion':
-                await this.handleUpdateColumnTitleFromStrikethroughDeletion(message);
+                // UNIFIED: Route through same handler as editColumnTitle
+                await this.handleEditColumnTitleUnified(message.columnId, message.newTitle);
                 break;
             case 'moveTask':
                 await this.performBoardAction(() => 
@@ -756,105 +757,7 @@ export class MessageHandler {
 
             case 'editColumnTitle':
                 // SWITCH-2: Route through unified column include switch function
-                const currentBoard = this._getCurrentBoard();
-                log(`[SWITCH-2] editColumnTitle - Board has ${currentBoard?.columns?.length || 0} columns`);
-                log(`[SWITCH-2] Looking for column ID: ${message.columnId}`);
-                log(`[SWITCH-2] New title: ${message.title}`);
-
-                if (!currentBoard) {
-                    log(`[SWITCH-2] No board loaded`);
-                    break;
-                }
-
-                const column = currentBoard.columns.find(col => col.id === message.columnId);
-                if (!column) {
-                    log(`[SWITCH-2] Column ${message.columnId} not found`);
-                    break;
-                }
-
-                // Check if the new title contains include syntax (location-based: column include)
-                const hasColumnIncludeMatches = message.title.match(INCLUDE_SYNTAX.REGEX);
-                
-                // BUGFIX: Also check if old title had includes that are being removed
-                const oldIncludeMatches = (column.title || '').match(INCLUDE_SYNTAX.REGEX);
-                const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
-
-                if (hasIncludeChanges) {
-                    // Column include switch - route through state machine
-                    log(`[SWITCH-2] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
-
-                    // Extract the include files from the new title
-                    const newIncludeFiles: string[] = [];
-                    if (hasColumnIncludeMatches) {
-                        hasColumnIncludeMatches.forEach((match: string) => {
-                            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                            console.log(`[SWITCH-2] DEBUG: Extracted file path from match "${match}": "${filePath}"`);
-                            newIncludeFiles.push(filePath);
-                        });
-                    }
-
-                    // Get old include files for cleanup
-                    const oldIncludeFiles = column.includeFiles || [];
-                    console.log(`[SWITCH-2] DEBUG: New title received:`, message.title);
-                    console.log(`[SWITCH-2] DEBUG: Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
-                    console.log(`[SWITCH-2] DEBUG: New include files from title:`, newIncludeFiles);
-                    log(`[SWITCH-2] Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
-                    log(`[SWITCH-2] New include files from title:`, newIncludeFiles);
-                    log(`[SWITCH-2] Column title in board:`, column.title);
-
-                    // Route through unified state machine via handleIncludeSwitch
-                    const panel = this._getWebviewPanel();
-
-                    // Clear dirty flag BEFORE stopping editing
-                    // This prevents RACE-2 handler from sending stale updateColumnContent
-                    if (panel.clearColumnDirty) {
-                        panel.clearColumnDirty(message.columnId);
-                        log(`[SWITCH-2] Cleared dirty flag for column ${message.columnId} before switch`);
-                    }
-
-                    // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
-                    // This ensures user can't edit while content is loading
-                    await this.requestStopEditing();
-
-                    try {
-                        // Call new state machine-based handler
-                        await panel.handleIncludeSwitch({
-                            columnId: message.columnId,
-                            oldFiles: oldIncludeFiles,
-                            newFiles: newIncludeFiles,
-                            newTitle: message.title
-                        });
-
-                        log(`[SWITCH-2] Column include switch completed successfully`);
-
-                        // State machine already updated all column properties (title, includeFiles, tasks)
-                        // No need to update board here - would cause stale data issues
-
-                        // Clear editing flag after completion
-                        log(`[SWITCH-2] Edit completed - allowing board regenerations`);
-                        this._getWebviewPanel().setEditingInProgress(false);
-                    } catch (error: any) {
-                        // RACE-1: On error, still clear editing flag
-                        this._getWebviewPanel().setEditingInProgress(false);
-
-                        if (error.message === 'USER_CANCELLED') {
-                            log(`[SWITCH-2] User cancelled switch, no changes made`);
-                        } else {
-                            log(`[SWITCH-2] Error during column include switch:`, error);
-                            vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
-                        }
-                    }
-                } else {
-                    // Regular title edit without include syntax
-                    // STATE-3: Frontend already updated title, don't echo back
-                    await this.performBoardAction(() =>
-                        this._boardOperations.editColumnTitle(currentBoard, message.columnId, message.title),
-                        { sendUpdate: false }
-                    );
-
-                    // RACE-1: Clear editing flag after regular title edit
-                    this._getWebviewPanel().setEditingInProgress(false);
-                }
+                await this.handleEditColumnTitleUnified(message.columnId, message.title);
                 break;
             case 'editTaskTitle':
 
@@ -3788,37 +3691,114 @@ export class MessageHandler {
     }
 
     /**
-     * Handle updating column title after strikethrough deletion
+     * Unified handler for column title edits (handles both normal edits and strikethrough deletions)
+     * Detects include syntax and routes through state machine or regular edit
      */
-    private async handleUpdateColumnTitleFromStrikethroughDeletion(message: any): Promise<void> {
-        const { columnId, newTitle } = message;
+    private async handleEditColumnTitleUnified(columnId: string, newTitle: string): Promise<void> {
+        const currentBoard = this._getCurrentBoard();
+        log(`[editColumnTitle] Board has ${currentBoard?.columns?.length || 0} columns`);
+        log(`[editColumnTitle] Looking for column ID: ${columnId}`);
+        log(`[editColumnTitle] New title: ${newTitle}`);
 
-        try {
-            const board = this._getCurrentBoard();
-            if (!board) {
-                console.error('🗑️ Backend: No current board available for strikethrough deletion');
-                return;
+        if (!currentBoard) {
+            log(`[editColumnTitle] No board loaded`);
+            return;
+        }
+
+        const column = currentBoard.columns.find(col => col.id === columnId);
+        if (!column) {
+            log(`[editColumnTitle] Column ${columnId} not found`);
+            return;
+        }
+
+        // Check if the new title contains include syntax (location-based: column include)
+        const hasColumnIncludeMatches = newTitle.match(INCLUDE_SYNTAX.REGEX);
+
+        // BUGFIX: Also check if old title had includes that are being removed
+        const oldIncludeMatches = (column.title || '').match(INCLUDE_SYNTAX.REGEX);
+        const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
+
+        if (hasIncludeChanges) {
+            // Column include switch - route through state machine
+            log(`[editColumnTitle] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
+
+            // Extract the include files from the new title
+            const newIncludeFiles: string[] = [];
+            if (hasColumnIncludeMatches) {
+                hasColumnIncludeMatches.forEach((match: string) => {
+                    const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                    console.log(`[editColumnTitle] DEBUG: Extracted file path from match "${match}": "${filePath}"`);
+                    newIncludeFiles.push(filePath);
+                });
             }
 
+            // Get old include files for cleanup
+            const oldIncludeFiles = column.includeFiles || [];
+            console.log(`[editColumnTitle] DEBUG: New title received:`, newTitle);
+            console.log(`[editColumnTitle] DEBUG: Column ${columnId} current includeFiles:`, oldIncludeFiles);
+            console.log(`[editColumnTitle] DEBUG: New include files from title:`, newIncludeFiles);
+            log(`[editColumnTitle] Column ${columnId} current includeFiles:`, oldIncludeFiles);
+            log(`[editColumnTitle] New include files from title:`, newIncludeFiles);
+            log(`[editColumnTitle] Column title in board:`, column.title);
 
-            // Content is already in markdown format from frontend
-            const markdownTitle = newTitle;
+            // Route through unified state machine via handleIncludeSwitch
+            const panel = this._getWebviewPanel();
 
-            // Update the column title
+            // Clear dirty flag BEFORE stopping editing
+            // This prevents RACE-2 handler from sending stale updateColumnContent
+            if (panel.clearColumnDirty) {
+                panel.clearColumnDirty(columnId);
+                log(`[editColumnTitle] Cleared dirty flag for column ${columnId} before switch`);
+            }
+
+            // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
+            // This ensures user can't edit while content is loading
+            await this.requestStopEditing();
+
+            try {
+                // Call new state machine-based handler
+                await panel.handleIncludeSwitch({
+                    columnId: columnId,
+                    oldFiles: oldIncludeFiles,
+                    newFiles: newIncludeFiles,
+                    newTitle: newTitle
+                });
+
+                log(`[editColumnTitle] Column include switch completed successfully`);
+
+                // State machine already updated all column properties (title, includeFiles, tasks)
+                // No need to update board here - would cause stale data issues
+
+                // Clear editing flag after completion
+                log(`[editColumnTitle] Edit completed - allowing board regenerations`);
+                this._getWebviewPanel().setEditingInProgress(false);
+            } catch (error: any) {
+                // RACE-1: On error, still clear editing flag
+                this._getWebviewPanel().setEditingInProgress(false);
+
+                if (error.message === 'USER_CANCELLED') {
+                    log(`[editColumnTitle] User cancelled switch, no changes made`);
+                } else {
+                    log(`[editColumnTitle] Error during column include switch:`, error);
+                    vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
+                }
+            }
+        } else {
+            // Regular title edit without include syntax
+            // STATE-3: Frontend already updated title, don't echo back
             await this.performBoardAction(() =>
-                this._boardOperations.editColumnTitle(board, columnId, markdownTitle)
+                this._boardOperations.editColumnTitle(currentBoard, columnId, newTitle),
+                { sendUpdate: false }
             );
 
-
-        } catch (error) {
-            console.error('🗑️ Backend: Error updating column title from strikethrough deletion:', error);
-            vscode.window.showErrorMessage('Failed to update column title');
+            // RACE-1: Clear editing flag after regular title edit
+            this._getWebviewPanel().setEditingInProgress(false);
         }
     }
 
-    
 
-    
+
+
 
     /**
      * Handle Marp export

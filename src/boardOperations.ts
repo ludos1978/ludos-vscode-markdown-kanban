@@ -314,46 +314,10 @@ export class BoardOperations {
         const column = this.findColumn(board, columnId);
         if (!column) {return false;}
 
-        // Simply save the title as provided - all tag handling is done in frontend
+        // Simply update the title
+        // NOTE: Include detection/handling is done in messageHandler before calling this
+        // This method is ONLY called for non-include title edits (see messageHandler.ts:851)
         column.title = title;
-
-        // Check for column include syntax changes (position-based: column header uses !!!include()!!!)
-        const columnIncludeMatches = column.title.match(INCLUDE_SYNTAX.REGEX);
-
-        if (columnIncludeMatches && columnIncludeMatches.length > 0) {
-            // Extract new include files from the title
-            const newIncludeFiles: string[] = [];
-            columnIncludeMatches.forEach(match => {
-                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                newIncludeFiles.push(filePath);
-            });
-
-            // Update include mode properties
-            column.includeMode = true;
-            column.includeFiles = newIncludeFiles;
-            column.originalTitle = column.title;
-
-            // Generate display title without include syntax
-            let displayTitle = column.title;
-            columnIncludeMatches.forEach(match => {
-                displayTitle = displayTitle.replace(match, '').trim();
-            });
-
-            // If no display title provided, use filename as title
-            if (!displayTitle && newIncludeFiles.length > 0) {
-                const path = require('path');
-                displayTitle = path.basename(newIncludeFiles[0], path.extname(newIncludeFiles[0]));
-            }
-
-            column.displayTitle = displayTitle || 'Included Column';
-
-        } else if (column.includeMode) {
-            // Title no longer contains include syntax - disable include mode
-            column.includeMode = false;
-            column.includeFiles = undefined;
-            column.originalTitle = undefined;
-            column.displayTitle = undefined;
-        }
 
         return true;
     }

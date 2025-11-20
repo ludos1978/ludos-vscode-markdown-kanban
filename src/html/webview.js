@@ -2948,10 +2948,25 @@ window.addEventListener('message', event => {
                         column.isLoadingContent = message.isLoadingContent;
                     }
 
-                    // Check if user is currently editing - if so, skip rendering to prevent DOM disruption
+                    // Check if user is currently editing
                     const isEditing = window.taskEditor && window.taskEditor.currentEditor;
 
-                    if (!isEditing) {
+                    // CRITICAL: Always render when receiving include content or tasks
+                    // Even if user is editing, new include content MUST be shown
+                    const hasIncludeContent = message.includeMode || message.includeFiles;
+                    const hasNewTasks = message.tasks && message.tasks.length > 0;
+                    const forceRender = hasIncludeContent || hasNewTasks;
+
+                    if (!isEditing || forceRender) {
+                        // If forcing render while editing, save current editor state
+                        if (isEditing && forceRender) {
+                            console.log('[updateColumnContent] Force rendering include content - saving editor state');
+                            // Save and close current editor to prevent conflicts
+                            if (window.taskEditor && window.taskEditor.saveAndClose) {
+                                window.taskEditor.saveAndClose();
+                            }
+                        }
+
                         // Re-render just this column
                         if (typeof window.renderSingleColumn === 'function') {
                             window.renderSingleColumn(message.columnId, column);
