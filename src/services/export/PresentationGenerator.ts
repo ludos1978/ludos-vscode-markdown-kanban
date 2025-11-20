@@ -42,6 +42,7 @@ interface Slide {
     content: string;
     level: 'column' | 'task';
     yaml?: string;  // YAML frontmatter (only attached to first slide)
+    hasTitle: boolean;  // Whether this slide has a title (affects blank line count)
 }
 
 /**
@@ -139,12 +140,24 @@ export class PresentationGenerator {
             }
 
             if (columnTitle) {
-                slides.push({ content: columnTitle, level: 'column' });
+                slides.push({
+                    content: columnTitle,
+                    level: 'column',
+                    hasTitle: true // Column title IS the slide title
+                });
             }
 
             // Task slides
             for (const task of column.tasks) {
                 let taskTitle = task.displayTitle || task.title;
+
+                // Track if we have a title (before any replacements)
+                const hasTitle = !!(taskTitle && taskTitle.trim());
+
+                // replace an empty title with
+                if (!hasTitle) {
+                    taskTitle = '\n';
+                }
 
                 if (options.stripIncludes) {
                     taskTitle = taskTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
@@ -152,11 +165,15 @@ export class PresentationGenerator {
 
                 let slideContent = taskTitle;
                 if (task.description && task.description.trim()) {
-                    slideContent += '\n\n' + task.description.trim();
+                    slideContent += '\n\n' + task.description;
                 }
 
                 if (slideContent) {
-                    slides.push({ content: slideContent, level: 'task' });
+                    slides.push({
+                        content: slideContent,
+                        level: 'task',
+                        hasTitle
+                    });
                 }
             }
         }
@@ -190,12 +207,13 @@ export class PresentationGenerator {
 
             // Column header: ## Title (non-indented only)
             if (line.startsWith('## ') && !line.startsWith(' ')) {
-                const columnTitle = line.substring(3).trim();
+                const columnTitle = line.substring(3);
                 if (columnTitle) {
                     slides.push({
                         content: columnTitle,
                         level: 'column',
-                        yaml: yaml // Attach YAML to first slide
+                        yaml: yaml, // Attach YAML to first slide
+                        hasTitle: true // Column title IS the slide title
                     });
                     yaml = ''; // Only attach once
                 }
@@ -205,7 +223,7 @@ export class PresentationGenerator {
 
             // Task: - [ ] or - [x] (non-indented only)
             if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
-                const taskTitle = line.replace(/^- \[[x ]\] /, '').trim();
+                const taskTitle = line.replace(/^- \[[x ]\] /, '');
 
                 // Collect description (indented lines)
                 const descriptionLines: string[] = [];
@@ -232,13 +250,17 @@ export class PresentationGenerator {
                 // Build slide content
                 let slideContent = taskTitle;
                 if (descriptionLines.length > 0) {
-                    const description = descriptionLines.join('\n').trim();
+                    const description = descriptionLines.join('\n');
                     if (description) {
                         slideContent += '\n\n' + description;
                     }
                 }
 
-                slides.push({ content: slideContent, level: 'task' });
+                slides.push({
+                    content: slideContent,
+                    level: 'task',
+                    hasTitle: !!(taskTitle && taskTitle.trim()) // Has title if taskTitle is non-empty
+                });
                 continue;
             }
 
@@ -264,8 +286,9 @@ export class PresentationGenerator {
         return filteredTasks
             .map(task => {
                 let content = '';
+                const hasTitle = !!(task.title && task.title.trim());
 
-                if (task.title && task.title.trim()) {
+                if (hasTitle) {
                     content = task.title.trim();
                 }
 
@@ -277,7 +300,7 @@ export class PresentationGenerator {
                     }
                 }
 
-                return content ? { content, level: 'task' } : null;
+                return content ? { content, level: 'task', hasTitle } : null;
             })
             .filter((slide): slide is Slide => slide !== null);
     }
@@ -295,7 +318,7 @@ export class PresentationGenerator {
             yaml = this.buildYamlFrontmatter(filteredSlides, options);
         }
 
-        // Build slide content with local class directives
+        // Build slide content with proper formatting
         const slideContents = filteredSlides.map((slide, index) => {
             let content = slide.content;
 
@@ -316,7 +339,31 @@ export class PresentationGenerator {
 
             return content;
         });
-        const content = slideContents.join('\n\n---\n\n');
+
+        // CRITICAL: Format slides according to specification
+        // WITH title:    [1 blank] Title [1 blank] Description [1 blank] ---
+        // WITHOUT title: [3 blanks] Description [1 blank] ---
+        const formattedSlides = filteredSlides.map((slide, i) => {
+            const slideContent = slideContents[i];
+
+            // Add leading blank lines based on whether slide has title
+            let formatted = '';
+            if (slide.hasTitle) {
+                // 1 blank line before title
+                formatted = '\n' + slideContent;
+            } else {
+                // 3 blank lines before content (no title)
+                formatted = '\n\n\n' + slideContent;
+            }
+
+            // Add 1 blank line after content (before ---)
+            formatted += '\n';
+
+            return formatted;
+        });
+
+        // Join slides with --- separator (which has newline after it by default)
+        const content = formattedSlides.join('\n---\n');
 
         // Combine YAML and content
         if (yaml) {

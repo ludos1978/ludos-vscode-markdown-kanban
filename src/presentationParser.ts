@@ -37,9 +37,20 @@ export class PresentationParser {
       return [];
     }
 
-    // Split by slide separators including the newline after ---
+    // CRITICAL: Temporarily replace HTML comments with placeholders
+    // This prevents '---' inside comments from being treated as slide separators
+    // while preserving the comments in the output
+    const comments: string[] = [];
+    const contentWithPlaceholders = content.replace(/<!--[\s\S]*?-->/g, (match) => {
+      const index = comments.length;
+      comments.push(match);
+      return `__COMMENT_PLACEHOLDER_${index}__`;
+    });
+
+    // Split by slide separators ONLY (not column markers like ---:, :--:, :---)
+    // CRITICAL: Only plain --- is a separator, others are Marp column layout markers
     // This prevents an extra leading empty line in each slide
-    const rawSlides = content.split(/^---[ \t]*\n/gm);
+    const rawSlides = contentWithPlaceholders.split(/^---[ \t]*\n/gm);
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
@@ -78,16 +89,32 @@ export class PresentationParser {
         // Check empty line count: 0-1 empty lines = has title, 2+ = no title
         if (emptyLineCount < 2) {
           // 0 or 1 empty lines => first content is title
-          titleLine = contentLines[0];
+          const firstContentLine = lines[contentLines[0]];
 
-          if (contentLines.length === 2) {
-            // Have a second content line - description starts after title
-            // Take the line after the title, or at max one empty line after that
-            const gap = contentLines[1] - contentLines[0];
-            descriptionStartLine = Math.min(contentLines[0] + Math.max(gap, 1), contentLines[0] + 3);
+          // ERROR CORRECTION: Check if first line contains patterns that indicate
+          // it's part of structured content that should NOT be split
+          // Patterns: Marp column markers (---:, :--:, :---), HTML comments (<!--),
+          // Markdown tables (|...|), or list items (- text)
+          const hasStructuredContentPattern =
+            /---:|:--:|:---|<!--|\|.*\||^-\s/.test(firstContentLine);
+
+          if (hasStructuredContentPattern) {
+            // Treat as no title - all content should stay together
+            titleLine = -1;
+            descriptionStartLine = Math.min(contentLines[0], 3);
           } else {
-            // Only one content line (the title) - no description
-            descriptionStartLine = lines.length; // Beyond end = no description
+            // Normal case: first content is title
+            titleLine = contentLines[0];
+
+            if (contentLines.length === 2) {
+              // Have a second content line - description starts after title
+              // Take the line after the title, or at max one empty line after that
+              const gap = contentLines[1] - contentLines[0];
+              descriptionStartLine = Math.min(contentLines[0] + Math.max(gap, 1), contentLines[0] + 3);
+            } else {
+              // Only one content line (the title) - no description
+              descriptionStartLine = lines.length; // Beyond end = no description
+            }
           }
         } else {
           // 2+ empty lines => no title, all is description
@@ -125,6 +152,17 @@ export class PresentationParser {
       } else {
         description = '';
       }
+
+      // Restore HTML comments from placeholders
+      // CRITICAL: ALL content including comments must be preserved
+      if (title) {
+        title = title.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (match, index) => {
+          return comments[parseInt(index)] || match;
+        });
+      }
+      description = description.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (match, index) => {
+        return comments[parseInt(index)] || match;
+      });
 
       slides.push({
         title,
