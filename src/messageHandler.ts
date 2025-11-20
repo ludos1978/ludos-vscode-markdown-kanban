@@ -788,12 +788,16 @@ export class MessageHandler {
                     if (hasColumnIncludeMatches) {
                         hasColumnIncludeMatches.forEach((match: string) => {
                             const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                            console.log(`[SWITCH-2] DEBUG: Extracted file path from match "${match}": "${filePath}"`);
                             newIncludeFiles.push(filePath);
                         });
                     }
 
                     // Get old include files for cleanup
                     const oldIncludeFiles = column.includeFiles || [];
+                    console.log(`[SWITCH-2] DEBUG: New title received:`, message.title);
+                    console.log(`[SWITCH-2] DEBUG: Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
+                    console.log(`[SWITCH-2] DEBUG: New include files from title:`, newIncludeFiles);
                     log(`[SWITCH-2] Column ${message.columnId} current includeFiles:`, oldIncludeFiles);
                     log(`[SWITCH-2] New include files from title:`, newIncludeFiles);
                     log(`[SWITCH-2] Column title in board:`, column.title);

@@ -935,27 +935,62 @@ export class ChangeStateMachine {
             // Create/register file instances and load content
             const tasks: any[] = [];
 
+            console.log(`[State:LOADING_NEW] Column ${targetColumn.id} loading files:`, loadingFiles);
+            console.log(`[State:LOADING_NEW] Column title:`, targetColumn.title);
+            console.log(`[State:LOADING_NEW] Column displayTitle (before):`, targetColumn.displayTitle);
+
             for (const relativePath of loadingFiles) {
-                // Create file instance if not exists
-                if (!this._fileRegistry.hasByRelativePath(relativePath)) {
+                console.log(`[State:LOADING_NEW] Processing file: "${relativePath}"`);
+
+                // Check if file exists and verify it's the correct type
+                const existingFile = this._fileRegistry.getByRelativePath(relativePath);
+                const isCorrectType = existingFile?.getFileType() === 'include-column';
+
+                console.log(`[State:LOADING_NEW] File exists in registry: ${!!existingFile}`);
+                if (existingFile) {
+                    console.log(`[State:LOADING_NEW] Existing file type: ${existingFile.getFileType()}`);
+                }
+
+                // Create/recreate file instance if not exists or wrong type
+                if (!existingFile || !isCorrectType) {
+                    if (existingFile && !isCorrectType) {
+                        console.log(`[State:LOADING_NEW] Wrong file type (${existingFile.getFileType()}), recreating as column include`);
+                        // Unregister old file
+                        existingFile.stopWatching();
+                        this._fileRegistry.unregister(existingFile);
+                    }
+
+                    console.log(`[State:LOADING_NEW] Creating new column include file instance for: "${relativePath}"`);
                     const columnInclude = fileFactory.createColumnInclude(relativePath, mainFile, false);
                     columnInclude.setColumnId(targetColumn.id);
                     columnInclude.setColumnTitle(targetColumn.title);
                     this._fileRegistry.register(columnInclude);
                     columnInclude.startWatching();
+                    console.log(`[State:LOADING_NEW] File registered successfully`);
                 }
 
                 // Load content
                 const file = this._fileRegistry.getByRelativePath(relativePath);
+                console.log(`[State:LOADING_NEW] Retrieved file from registry:`, file ? 'found' : 'NOT FOUND');
+
                 if (file) {
                     // ALWAYS reload from disk when switching includes to ensure fresh content
+                    console.log(`[State:LOADING_NEW] Reloading file from disk...`);
                     await file.reload();
+
+                    const fileContent = file.getContent();
+                    console.log(`[State:LOADING_NEW] File content length:`, fileContent?.length || 0);
 
                     // Parse tasks from file content
                     if (file.parseToTasks) {
                         const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id);
+                        console.log(`[State:LOADING_NEW] Parsed ${fileTasks.length} tasks from file`);
                         tasks.push(...fileTasks);
+                    } else {
+                        console.error(`[State:LOADING_NEW] File has no parseToTasks method!`);
                     }
+                } else {
+                    console.error(`[State:LOADING_NEW] CRITICAL: File not found in registry after creation attempt!`);
                 }
             }
 
@@ -967,18 +1002,40 @@ export class ChangeStateMachine {
             // Task include switch - load raw content
             const relativePath = loadingFiles[0]; // Task includes are single file
 
-            // Create file instance if not exists
-            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
+            console.log(`[State:LOADING_NEW] Processing task include file: "${relativePath}"`);
+
+            // Check if file exists and verify it's the correct type
+            const existingFile = this._fileRegistry.getByRelativePath(relativePath);
+            const isCorrectType = existingFile?.getFileType() === 'include-task';
+
+            console.log(`[State:LOADING_NEW] Task include file exists in registry: ${!!existingFile}`);
+            if (existingFile) {
+                console.log(`[State:LOADING_NEW] Existing file type: ${existingFile.getFileType()}`);
+            }
+
+            // Create/recreate file instance if not exists or wrong type
+            if (!existingFile || !isCorrectType) {
+                if (existingFile && !isCorrectType) {
+                    console.log(`[State:LOADING_NEW] Wrong file type (${existingFile.getFileType()}), recreating as task include`);
+                    // Unregister old file
+                    existingFile.stopWatching();
+                    this._fileRegistry.unregister(existingFile);
+                }
+
+                console.log(`[State:LOADING_NEW] Creating new task include file instance for: "${relativePath}"`);
                 const taskInclude = fileFactory.createTaskInclude(relativePath, mainFile, false);
                 taskInclude.setTaskId(targetTask.id);
                 taskInclude.setTaskTitle(targetTask.title);
                 taskInclude.setColumnId(targetColumn.id);
                 this._fileRegistry.register(taskInclude);
                 taskInclude.startWatching();
+                console.log(`[State:LOADING_NEW] Task include file registered successfully`);
             }
 
             // Load content
             const file = this._fileRegistry.getByRelativePath(relativePath);
+            console.log(`[State:LOADING_NEW] Retrieved task include file from registry:`, file ? 'found' : 'NOT FOUND');
+
             if (file) {
                 // ALWAYS reload from disk when switching includes to ensure fresh content
                 await file.reload();
@@ -1107,6 +1164,13 @@ export class ChangeStateMachine {
                     // Column include switch
                     const column = board.columns.find((c: any) => c.id === event.targetId);
                     if (column) {
+                        console.log(`[State:SYNCING_FRONTEND] Sending updateColumnContent for column ${column.id}`);
+                        console.log(`[State:SYNCING_FRONTEND] Column title: "${column.title}"`);
+                        console.log(`[State:SYNCING_FRONTEND] Display title: "${column.displayTitle}"`);
+                        console.log(`[State:SYNCING_FRONTEND] Include mode: ${column.includeMode}`);
+                        console.log(`[State:SYNCING_FRONTEND] Include files:`, column.includeFiles);
+                        console.log(`[State:SYNCING_FRONTEND] Tasks count: ${column.tasks?.length || 0}`);
+
                         panel.webview.postMessage({
                             type: 'updateColumnContent',
                             columnId: column.id,
