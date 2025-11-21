@@ -478,6 +478,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
 
         // Step 3: Load content for column includes
+        const mainFilePath = mainFile.getPath();
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
 
@@ -485,7 +486,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                     const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
                     if (file && file.getFileType() === 'include-column') {
                         // Parse tasks from include file, preserving existing task IDs
-                        const tasks = file.parseToTasks(column.tasks, column.id);
+                        const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
                         column.tasks = tasks;
                     } else {
                         console.warn(`[MarkdownFileRegistry] generateBoard() - Column include not found: ${relativePath}`);

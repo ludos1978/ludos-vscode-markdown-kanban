@@ -784,8 +784,11 @@ function addPlantUMLRenderer(md) {
     };
 }
 
-function renderMarkdown(text) {
+function renderMarkdown(text, includeContext) {
     if (!text) {return '';}
+
+    // Store includeContext for use by image renderer
+    window.currentTaskIncludeContext = includeContext;
 
     // Debug logging to trace include rendering
     const hasInclude = text.includes('!!!include(');
@@ -886,65 +889,132 @@ function renderMarkdown(text) {
             }); // Custom media plugin for video/audio
         }
         
-        // Add custom renderer for video and audio to handle path mapping
+        // Add custom renderer for video and audio to handle dynamic path resolution
         const originalVideoRenderer = md.renderer.rules.video;
         const originalAudioRenderer = md.renderer.rules.audio;
-        
+
+        // Helper function to resolve media paths dynamically
+        function resolveMediaPath(originalSrc) {
+            const includeContext = window.currentTaskIncludeContext;
+            const isRelativePath = originalSrc &&
+                                   !originalSrc.startsWith('/') &&
+                                   !originalSrc.startsWith('http://') &&
+                                   !originalSrc.startsWith('https://') &&
+                                   !originalSrc.startsWith('vscode-webview://');
+
+            if (includeContext && isRelativePath) {
+                const dirSegments = includeContext.includeDir.split('/').filter(s => s);
+                const relSegments = originalSrc.split('/').filter(s => s);
+
+                for (const segment of relSegments) {
+                    if (segment === '..') {
+                        dirSegments.pop();
+                    } else if (segment === '.') {
+                        // Stay in current directory
+                    } else {
+                        dirSegments.push(segment);
+                    }
+                }
+
+                const resolvedPath = '/' + dirSegments.join('/');
+                const encodedPath = encodeURI(resolvedPath);
+                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            }
+            return originalSrc;
+        }
+
         md.renderer.rules.video = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
-            
-            // Process source children to map paths
+
+            // Process source children to dynamically resolve paths
             if (token.children) {
                 token.children.forEach(child => {
                     if (child.type === 'source' && child.attrGet) {
                         const originalSrc = child.attrGet('src');
                         if (originalSrc) {
-                            // Use mapped path if available, otherwise use original
-                            const displaySrc = (window.currentImageMappings && window.currentImageMappings[originalSrc]) || originalSrc;
+                            const displaySrc = resolveMediaPath(originalSrc);
                             child.attrSet('src', displaySrc);
                         }
                     }
                 });
             }
-            
+
             return originalVideoRenderer ? originalVideoRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
         };
-        
+
         md.renderer.rules.audio = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
-            
-            // Process source children to map paths
+
+            // Process source children to dynamically resolve paths
             if (token.children) {
                 token.children.forEach(child => {
                     if (child.type === 'source' && child.attrGet) {
                         const originalSrc = child.attrGet('src');
                         if (originalSrc) {
-                            // Use mapped path if available, otherwise use original
-                            const displaySrc = (window.currentImageMappings && window.currentImageMappings[originalSrc]) || originalSrc;
+                            const displaySrc = resolveMediaPath(originalSrc);
                             child.attrSet('src', displaySrc);
                         }
                     }
                 });
             }
-            
+
             return originalAudioRenderer ? originalAudioRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
         };
 
         // Rest of the function remains the same...
-        // Enhanced image renderer - uses mappings for display but preserves original paths
+        // Enhanced image renderer - dynamically resolves relative paths using includeContext
         md.renderer.rules.image = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
             const originalSrc = token.attrGet('src') || '';
             const title = token.attrGet('title') || '';
             const alt = token.content || '';
-            
-            // Use mapped path if available, otherwise use original
-            const displaySrc = (window.currentImageMappings && window.currentImageMappings[originalSrc]) || originalSrc;
-            
+
+            let displaySrc = originalSrc;
+
+            // Check if we have includeContext and the path is relative
+            const includeContext = window.currentTaskIncludeContext;
+            const isRelativePath = originalSrc &&
+                                   !originalSrc.startsWith('/') &&
+                                   !originalSrc.startsWith('http://') &&
+                                   !originalSrc.startsWith('https://') &&
+                                   !originalSrc.startsWith('vscode-webview://');
+
+            if (includeContext && isRelativePath) {
+                // Dynamically resolve the relative path from the include file's directory
+                // Properly handle ../ and ./ in paths
+
+                // Split the include directory path into segments
+                const dirSegments = includeContext.includeDir.split('/').filter(s => s);
+
+                // Split the relative path into segments
+                const relSegments = originalSrc.split('/').filter(s => s);
+
+                // Process each segment
+                for (const segment of relSegments) {
+                    if (segment === '..') {
+                        // Go up one directory
+                        dirSegments.pop();
+                    } else if (segment === '.') {
+                        // Stay in current directory (do nothing)
+                    } else {
+                        // Add the segment
+                        dirSegments.push(segment);
+                    }
+                }
+
+                // Reconstruct the absolute path
+                let resolvedPath = '/' + dirSegments.join('/');
+
+                // Convert to webview URL format
+                // Format: https://file%2B.vscode-resource.vscode-cdn.net/absolute/path
+                const encodedPath = encodeURI(resolvedPath);
+                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            }
+
             // Store original src for click handling
             const originalSrcAttr = ` data-original-src="${escapeHtml(originalSrc)}"`;
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
-            
+
             return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" />`;
         };
         

@@ -17,6 +17,12 @@ export interface KanbanTask {
   originalTitle?: string;  // Original title before include processing
   displayTitle?: string;   // Cleaned title for display (without include syntax)
   isLoadingContent?: boolean;  // When true, frontend shows loading indicator while include content loads
+  includeContext?: {  // Context for dynamic image path resolution in include files
+    includeFilePath: string;  // Absolute path to the include file
+    includeDir: string;       // Directory of the include file
+    mainFilePath: string;     // Absolute path to the main kanban file
+    mainDir: string;          // Directory of the main kanban file
+  };
 }
 
 export interface KanbanColumn {
@@ -63,7 +69,7 @@ export class MarkdownKanbanParser {
     return undefined;
   }
 
-  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
+  static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
       // First parse with original content to preserve raw descriptions
       const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
@@ -175,7 +181,7 @@ export class MarkdownKanbanParser {
               try {
                 if (fs.existsSync(resolvedPath)) {
                   const fileContent = fs.readFileSync(resolvedPath, 'utf8');
-                  const slideTasks = PresentationParser.parseMarkdownToTasks(fileContent);
+                  const slideTasks = PresentationParser.parseMarkdownToTasks(fileContent, resolvedPath, mainFilePath);
                   includeTasks.push(...slideTasks);
                 } else {
                   console.warn(`[Parser] Column include file not found: ${resolvedPath}`);
@@ -351,7 +357,8 @@ export class MarkdownKanbanParser {
             const resolvedPath = basePath ? PathResolver.resolve(basePath, filePath) : filePath;
             try {
               if (fs.existsSync(resolvedPath)) {
-                // Read COMPLETE file content
+                // Read COMPLETE file content WITHOUT modification
+                // Image paths will be rewritten at render time by markdown-it plugin
                 fullFileContent = fs.readFileSync(resolvedPath, 'utf8');
               } else {
                 console.warn(`[Parser] Task include file not found: ${resolvedPath}`);

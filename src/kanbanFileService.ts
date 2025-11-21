@@ -199,7 +199,7 @@ export class KanbanFileService {
                 } else {
                     // Only re-parse from document if no unsaved changes
                     const basePath = path.dirname(document.uri.fsPath);
-                    const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath);
+                    const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
                     this.setBoard(parseResult.board);
                     // Update the unified include system
                     this.includeFileManager._updateUnifiedIncludeSystem(parseResult.board, () => this.fileManager.getDocument());
@@ -356,7 +356,7 @@ export class KanbanFileService {
         try {
             // ALLOWED: Loading board (initial load, different document, or force reload)
             const basePath = path.dirname(document.uri.fsPath);
-            const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath);
+            const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
 
             // Update version tracking
             this._lastDocumentVersion = document.version;

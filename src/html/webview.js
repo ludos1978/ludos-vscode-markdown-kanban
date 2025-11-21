@@ -2376,10 +2376,10 @@ window.addEventListener('message', event => {
             break;
         case 'boardUpdate':
             const previousBoard = window.cachedBoard;
-            
+
             // Clear card focus when board is updated
             focusCard(null);
-            
+
             // Initialize cache system - this is the SINGLE source of truth
             const isInitialLoad = !window.cachedBoard;
             const isFullRefresh = message.isFullRefresh;
@@ -2439,10 +2439,6 @@ window.addEventListener('message', event => {
             if (detectedRows !== currentLayoutRows) {
                 setLayoutRows(detectedRows);
             }
-            
-            if (message.imageMappings) {
-                window.currentImageMappings = message.imageMappings;
-            }            
 
             // Only apply configuration settings on initial load, not on content updates
             if (isInitialLoad) {

@@ -2189,7 +2189,7 @@ function createTaskElement(task, columnId, taskIndex) {
         return '';
     }
 
-    let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description) : '';
+    let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description, task.includeContext) : '';
 
     // Always wrap description in task sections for keyboard navigation
     // Even empty tasks need at least one section to be focusable
@@ -2224,7 +2224,7 @@ function createTaskElement(task, columnId, taskIndex) {
             ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
              typeof (task.displayTitle || task.title) === 'string' &&
              (task.displayTitle || task.title).trim()) ?
-            renderMarkdown(task.displayTitle || task.title) : '';
+            renderMarkdown(task.displayTitle || task.title, task.includeContext) : '';
     }
 
     // For editing, always use the full title including include syntax

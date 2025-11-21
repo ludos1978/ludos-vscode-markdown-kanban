@@ -86,7 +86,7 @@ export class MainKanbanFile extends MarkdownFile {
 
         // CRITICAL FIX: Pass basePath for resolving relative include paths
         const basePath = path.dirname(this._path);
-        const parseResult = this._parser.parseMarkdown(this._content, basePath, boardForIdPreservation);
+        const parseResult = this._parser.parseMarkdown(this._content, basePath, boardForIdPreservation, this._path);
         this._board = parseResult.board;
         this._includedFiles = parseResult.includedFiles || [];
 
@@ -403,7 +403,7 @@ export class MainKanbanFile extends MarkdownFile {
         try {
             // CRITICAL FIX: Pass basePath for resolving relative include paths
             const basePath = path.dirname(this._path);
-            const parseResult = this._parser.parseMarkdown(content, basePath);
+            const parseResult = this._parser.parseMarkdown(content, basePath, undefined, this._path);
             const board = parseResult.board;
 
             if (!board.valid) {

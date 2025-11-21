@@ -1161,7 +1161,7 @@ class TaskEditor {
                                 displayValue = task.displayTitle || '';
                             }
 
-                            let renderedHtml = renderMarkdown(displayValue);
+                            let renderedHtml = renderMarkdown(displayValue, task.includeContext);
                             // Wrap in sections for keyboard navigation if this is a task description
                             if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
                                 renderedHtml = window.wrapTaskSections(renderedHtml);
@@ -1187,7 +1187,7 @@ class TaskEditor {
                                 const titleDisplayElement = taskElement.querySelector('.task-title-display');
                                 if (titleDisplayElement) {
                                     // Use getTaskDisplayTitle to maintain link format
-                                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '');
+                                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '', task.includeContext);
                                     titleDisplayElement.innerHTML = displayHtml;
                                 }
                             }

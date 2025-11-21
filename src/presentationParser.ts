@@ -177,7 +177,7 @@ export class PresentationParser {
   /**
    * Convert presentation slides to kanban tasks
    */
-  static slidesToTasks(slides: PresentationSlide[]): KanbanTask[] {
+  static slidesToTasks(slides: PresentationSlide[], includeFilePath?: string, mainFilePath?: string): KanbanTask[] {
     return slides.map(slide => {
       const task: KanbanTask = {
         id: IdGenerator.generateTaskId(),
@@ -188,6 +188,17 @@ export class PresentationParser {
       // NO TRIMMING - preserve exact content including whitespace
       if (slide.content !== undefined && slide.content !== '') {
         task.description = slide.content;
+      }
+
+      // Add includeContext for dynamic image path resolution
+      if (includeFilePath && mainFilePath) {
+        const path = require('path');
+        task.includeContext = {
+          includeFilePath: includeFilePath,
+          includeDir: path.dirname(includeFilePath),
+          mainFilePath: mainFilePath,
+          mainDir: path.dirname(mainFilePath)
+        };
       }
 
       return task;
@@ -224,8 +235,8 @@ export class PresentationParser {
    * Parse a markdown file and convert to kanban tasks
    * This is the main entry point for column includes
    */
-  static parseMarkdownToTasks(content: string): KanbanTask[] {
+  static parseMarkdownToTasks(content: string, includeFilePath?: string, mainFilePath?: string): KanbanTask[] {
     const slides = this.parsePresentation(content);
-    return this.slidesToTasks(slides);
+    return this.slidesToTasks(slides, includeFilePath, mainFilePath);
   }
 }
