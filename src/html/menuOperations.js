@@ -4274,7 +4274,6 @@ function updateAllVisualTagElements(element, allTags, elementType) {
     } else {
         badgesContainer = element.querySelector('.corner-badges-container');
     }
-    console.log('[BADGE DEBUG] After cleanup - badgesContainer:', badgesContainer, 'getTagConfig:', !!window.getTagConfig, 'allTags:', allTags);
     if (!badgesContainer && window.getTagConfig) {
         // Extract numeric tags from element's title first
         // Get title from cached board data using element ID
@@ -4304,10 +4303,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
         // Generate badges HTML inline (if we have active tags OR numeric tags)
         let badgesHtml = '';
-        console.log('[BADGE DEBUG] tagColors:', !!window.tagColors, 'typeof:', typeof window.tagColors, 'allTags.length:', allTags.length, 'hasNumericTags:', hasNumericTags, 'numericTags:', numericTags);
-        console.log('[BADGE DEBUG] Check result:', !!(window.tagColors && (allTags.length > 0 || hasNumericTags)));
         if (window.tagColors && (allTags.length > 0 || hasNumericTags)) {
-            console.log('[BADGE DEBUG] INSIDE badge generation block');
             const positions = {
                 'top-left': [],
                 'top-right': [],
@@ -4316,9 +4312,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             };
 
             // Add numeric badges to positions (already extracted above)
-            console.log('[BADGE DEBUG] About to add numeric badges, numericTags:', numericTags, 'isArray:', Array.isArray(numericTags));
             if (numericTags && Array.isArray(numericTags)) {
-                console.log('[BADGE DEBUG] Adding', numericTags.length, 'numeric badges');
                 numericTags.forEach(numericValue => {
                     const displayValue = numericValue % 1 === 0 ? numericValue.toString() : numericValue.toFixed(2).replace(/\.?0+$/, '');
                     positions['top-left'].push({
@@ -4334,10 +4328,8 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             }
 
             // Collect badges by position
-            console.log('[BADGE DEBUG] About to process allTags:', allTags);
             allTags.forEach(tag => {
                 const config = window.getTagConfig(tag);
-                console.log('[BADGE DEBUG] Tag:', tag, 'config:', config ? JSON.stringify(config).substring(0, 200) : 'null');
                 if (config && config.cornerBadge) {
                     // Get theme colors for this tag
                     const isDarkTheme = document.body.classList.contains('vscode-dark') ||
@@ -4365,9 +4357,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
             });
 
             // Create separate flex containers for each corner position
-            console.log('[BADGE DEBUG] Positions:', JSON.stringify(Object.keys(positions).map(k => [k, positions[k].length])));
             Object.entries(positions).forEach(([position, badgesAtPosition]) => {
-                console.log('[BADGE DEBUG] Processing position:', position, 'badges:', badgesAtPosition.length);
                 if (badgesAtPosition.length === 0) return; // Skip empty positions
 
                 // Create container for this corner
@@ -4407,7 +4397,6 @@ function updateAllVisualTagElements(element, allTags, elementType) {
                 const targetContainer = elementType === 'column'
                     ? element.querySelector('.column-title') || element
                     : element.querySelector('.task-header') || element;
-                console.log('[BADGE DEBUG] Appending to:', targetContainer.className, 'elementType:', elementType);
                 targetContainer.appendChild(cornerContainer);
             });
         }

@@ -26,19 +26,15 @@ class TaskInitializer {
      */
     startObserving() {
         if (this.isObserving) {
-            console.log('[TaskInit Observer] Already observing');
             return;
         }
 
         const boardElement = document.getElementById('kanban-board');
         if (!boardElement) {
-            console.warn('[TaskInit Observer] Board element not found, will retry...');
             // Retry after a short delay
             setTimeout(() => this.startObserving(), 500);
             return;
         }
-
-        console.log('[TaskInit Observer] Starting observation');
 
         this.observer = new MutationObserver((mutations) => {
             // Collect all task elements that were added
@@ -67,9 +63,7 @@ class TaskInitializer {
 
             // Initialize all collected tasks
             if (tasksToInitialize.size > 0) {
-                console.warn(`[TaskInit Observer] Safety net caught ${tasksToInitialize.size} uninitialized task(s)`);
                 tasksToInitialize.forEach(task => {
-                    console.warn(`[TaskInit Observer]  - Initializing task: ${task.dataset.taskId}`);
                     if (typeof window.initializeTaskElement === 'function') {
                         window.initializeTaskElement(task);
                     } else {
@@ -85,7 +79,6 @@ class TaskInitializer {
         });
 
         this.isObserving = true;
-        console.log('[TaskInit Observer] Observation started successfully');
 
         // Initialize any existing tasks that weren't initialized
         this.initializeAllExisting();
@@ -102,14 +95,11 @@ class TaskInitializer {
         );
 
         if (uninitializedTasks.length > 0) {
-            console.log(`[TaskInit Observer] Initializing ${uninitializedTasks.length} existing task(s)`);
             uninitializedTasks.forEach(task => {
                 if (typeof window.initializeTaskElement === 'function') {
                     window.initializeTaskElement(task);
                 }
             });
-        } else {
-            console.log(`[TaskInit Observer] All ${tasks.length} existing tasks already initialized`);
         }
     }
 
@@ -121,7 +111,6 @@ class TaskInitializer {
             this.observer.disconnect();
             this.observer = null;
             this.isObserving = false;
-            console.log('[TaskInit Observer] Observation stopped');
         }
     }
 
@@ -143,7 +132,6 @@ class TaskInitializer {
             });
             return false;
         } else {
-            console.log(`[TaskInit Observer] VERIFICATION PASSED: All ${allTasks.length} tasks initialized`);
             return true;
         }
     }
@@ -164,5 +152,3 @@ if (document.readyState === 'loading') {
 
 // Expose verification function for debugging
 window.verifyAllTasksInitialized = () => window.taskInitializer.verifyAllInitialized();
-
-console.log('[TaskInit Observer] Module loaded, observer will start when DOM is ready');

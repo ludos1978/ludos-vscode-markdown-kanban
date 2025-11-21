@@ -940,14 +940,7 @@ function renderMarkdown(text, includeContext) {
                     if (child.type === 'source' && child.attrGet) {
                         const originalSrc = child.attrGet('src');
                         if (originalSrc) {
-                            // DEBUG: Log what we receive from markdown-it
-                            if (originalSrc.includes('%')) {
-                                console.log('[Video Renderer DEBUG] originalSrc (from markdown-it):', originalSrc);
-                            }
                             const displaySrc = resolveMediaPath(originalSrc);
-                            if (originalSrc.includes('%')) {
-                                console.log('[Video Renderer DEBUG] displaySrc (after resolve):', displaySrc);
-                            }
                             child.attrSet('src', displaySrc);
                         }
                     }
@@ -1041,20 +1034,66 @@ function renderMarkdown(text, includeContext) {
             return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" />`;
         };
         
-        // Enhanced link renderer
+        // Enhanced link renderer with path resolution for file links
         md.renderer.rules.link_open = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
-            const href = token.attrGet('href') || '';
+            let href = token.attrGet('href') || '';
             const title = token.attrGet('title') || '';
-            
+
             // Don't make webview URIs clickable (they're for display only)
             if (href.startsWith('vscode-webview://')) {
                 return '<span class="webview-uri-text">';
             }
-            
+
+            // Check if this is a relative file path (not HTTP/HTTPS, and has a file extension)
+            // This handles autolinks like <../video.mp4> from include files
+            const isRelativePath = href &&
+                                   !href.startsWith('/') &&
+                                   !href.startsWith('http://') &&
+                                   !href.startsWith('https://') &&
+                                   !href.startsWith('#');
+
+            // Only apply path resolution if it's a file (has extension) not HTML tag like <br>, <hr>
+            // File extensions: .mp4, .png, .md, etc. (must have a dot followed by 2-5 alphanumeric chars)
+            const hasFileExtension = /\.[a-zA-Z0-9]{2,5}(\?|#|$)/.test(href);
+
+            if (includeContext && isRelativePath && hasFileExtension) {
+                // Decode first to handle already-encoded paths
+                let decodedHref = href;
+                try {
+                    decodedHref = decodeURIComponent(href);
+                } catch (e) {
+                    // Use original if decode fails
+                }
+
+                // Split the include directory path into segments
+                const dirSegments = includeContext.includeDir.split('/').filter(s => s);
+
+                // Split the relative path into segments
+                const relSegments = decodedHref.split('/').filter(s => s);
+
+                // Process each segment
+                for (const segment of relSegments) {
+                    if (segment === '..') {
+                        dirSegments.pop();  // Go up one directory
+                    } else if (segment === '.') {
+                        // Stay in current directory
+                    } else {
+                        dirSegments.push(segment);
+                    }
+                }
+
+                // Reconstruct the absolute path
+                const resolvedPath = '/' + dirSegments.join('/');
+
+                // Convert to webview URL format
+                const encodedPath = encodeURI(resolvedPath);
+                href = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            }
+
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
             const targetAttr = (href.startsWith('http://') || href.startsWith('https://')) ? ` target="_blank"` : '';
-            
+
             return `<a href="#" data-original-href="${escapeHtml(href)}"${titleAttr}${targetAttr} class="markdown-link">`;
         };
         

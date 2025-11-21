@@ -312,14 +312,6 @@ function applyTagStyles() {
     const styles = generateTagStyles();
 
     if (styles) {
-        // Debug: Log positivity badge styles
-        const positivityBadgeStyles = styles.match(/\.corner-badge-(plusplus|plus|minusminus|minus|oslash)[^}]+}/g);
-        if (positivityBadgeStyles) {
-            console.log('[DEBUG] Positivity badge styles generated:', positivityBadgeStyles);
-        } else {
-            console.warn('[DEBUG] No positivity badge styles found in generated CSS');
-        }
-
         // Create and inject style element
         const styleElement = document.createElement('style');
         styleElement.id = 'dynamic-tag-styles';
@@ -1099,12 +1091,6 @@ function generateTagMenuItems(id, type, columnId = null) {
     const enabledCategories = type === 'column'
         ? (window.enabledTagCategoriesColumn || {})
         : (window.enabledTagCategoriesTask || {});
-
-    // Debug: Log enabled categories
-    if (type === 'column') {
-        console.log('[DEBUG] Enabled column tag categories:', enabledCategories);
-        console.log('[DEBUG] Is positivity enabled?', enabledCategories['positivity']);
-    }
 
     // Map group keys to config keys (kebab-case to camelCase)
     const groupKeyToConfigKey = (groupKey) => {

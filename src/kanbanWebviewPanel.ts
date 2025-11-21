@@ -677,16 +677,12 @@ export class KanbanWebviewPanel {
     private _updateWebviewPermissionsForAssets() {
         const localResourceRoots = this._buildLocalResourceRoots(true);
 
-        console.log(`[DEBUG] _updateWebviewPermissionsForAssets: Setting ${localResourceRoots.length} resource roots`);
-
         // Update webview options
         this._panel.webview.options = {
             enableScripts: true,
             localResourceRoots: localResourceRoots,
             enableCommandUris: true
         };
-
-        console.log(`[DEBUG] Webview permissions updated successfully`);
     }
 
     /**
@@ -719,9 +715,6 @@ export class KanbanWebviewPanel {
             // Scan board for asset directories if requested
             if (includeAssets) {
                 const assetDirs = this._collectAssetDirectories();
-                let addedCount = 0;
-                console.log(`[DEBUG] _buildLocalResourceRoots: Processing ${assetDirs.length} asset directories`);
-                console.log(`[DEBUG] Existing roots before adding assets:`, localResourceRoots.map(r => r.fsPath));
                 for (const dir of assetDirs) {
                     const dirUri = vscode.Uri.file(dir);
                     // Check if this exact directory is not already included
@@ -729,15 +722,9 @@ export class KanbanWebviewPanel {
                         root.fsPath === dir
                     );
                     if (!alreadyIncluded) {
-                        console.log(`[DEBUG] Adding asset dir: ${dir}`);
                         localResourceRoots.push(dirUri);
-                        addedCount++;
-                    } else {
-                        console.log(`[DEBUG] Skipping (exact duplicate): ${dir}`);
                     }
                 }
-                console.log(`[DEBUG] Added ${addedCount} new asset directories`);
-                console.log(`[DEBUG] Final localResourceRoots:`, localResourceRoots.map(r => r.fsPath));
             }
         }
 
@@ -1192,9 +1179,7 @@ export class KanbanWebviewPanel {
             }
         }
 
-        const assetDirsArray = Array.from(assetDirs);
-        console.log(`[DEBUG] Collected ${assetDirsArray.length} asset directories:`, assetDirsArray);
-        return assetDirsArray;
+        return Array.from(assetDirs);
     }
 
     /**
@@ -1249,14 +1234,7 @@ export class KanbanWebviewPanel {
                     // Check if file exists
                     if (fs.existsSync(absolutePath)) {
                         const dir = path.dirname(absolutePath);
-                        if (absolutePath.endsWith('.mp4') || absolutePath.endsWith('.webm')) {
-                            console.log(`[DEBUG] Found video: ${absolutePath}, dir: ${dir}`);
-                        }
                         assetDirs.add(dir);
-                    } else {
-                        if (assetPath.endsWith('.mp4') || assetPath.endsWith('.webm')) {
-                            console.log(`[DEBUG] Video NOT FOUND: ${assetPath}, resolved to: ${absolutePath}, basePath: ${basePath}`);
-                        }
                     }
                 } catch (error) {
                 }

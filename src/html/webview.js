@@ -2641,35 +2641,12 @@ window.addEventListener('message', event => {
             if (message.tagColors) {
                 window.tagColors = message.tagColors;
 
-                // DIAGNOSTIC: Log what cornerBadge configs exist
-                console.log('[TAGCOLORS] Loaded keys:', Object.keys(window.tagColors));
-                let cornerBadgeCount = 0;
-                Object.keys(window.tagColors).forEach(key => {
-                    if (typeof window.tagColors[key] === 'object' && window.tagColors[key] !== null) {
-                        if (window.tagColors[key].cornerBadge) {
-                            console.log('[TAGCOLORS] Has cornerBadge:', key, window.tagColors[key].cornerBadge);
-                            cornerBadgeCount++;
-                        }
-                        // Check grouped structure too
-                        if (typeof window.tagColors[key] === 'object') {
-                            Object.keys(window.tagColors[key]).forEach(subkey => {
-                                if (window.tagColors[key][subkey]?.cornerBadge) {
-                                    console.log('[TAGCOLORS] Group', key, 'tag', subkey, 'has cornerBadge:', window.tagColors[key][subkey].cornerBadge);
-                                    cornerBadgeCount++;
-                                }
-                            });
-                        }
-                    }
-                });
-                console.log('[TAGCOLORS] Total tags with cornerBadge:', cornerBadgeCount);
-
                 // Only apply styles if not skipping render (prevents style spam during tag operations)
                 if (!shouldSkipRender && typeof applyTagStyles === 'function') {
                     applyTagStyles();
                 }
             } else if (!window.tagColors) {
                 // Fallback: initialize to empty object only if backend didn't send it
-                console.log('[TAGCOLORS] WARNING: Backend did not send tagColors!');
                 window.tagColors = {};
             }
 
@@ -2782,26 +2759,20 @@ window.addEventListener('message', event => {
         case 'updateShortcuts':
             // Cache shortcuts for taskEditor to use
             window.cachedShortcuts = message.shortcuts || {};
-            console.log('[Kanban Webview] Received shortcuts:', Object.keys(window.cachedShortcuts).length, 'shortcuts');
-            console.log('[Kanban Webview] Shortcuts:', window.cachedShortcuts);
             break;
 
         case 'configurationUpdate':
             // ⚠️ CONFIGURATION REFRESH - Cache all workspace settings
             // This is called on view focus and initial load to ensure fresh configuration
-            console.log('[Kanban Webview] 🔄 Refreshing all configuration...');
 
             // Store all configuration in window.cachedConfig for global access
             window.cachedConfig = message.config || {};
 
             // Apply configuration immediately (re-render with new settings)
             if (window.cachedBoard) {
-                console.log('[Kanban Webview] ✅ Configuration updated - applying to current board');
                 // Trigger re-render with new configuration
                 // The board renderer will use window.cachedConfig for layout/styling
                 renderBoard(window.cachedBoard);
-            } else {
-                console.log('[Kanban Webview] ℹ️ Configuration cached (board not loaded yet)');
             }
             break;
         case 'unfoldColumnsBeforeUpdate':
