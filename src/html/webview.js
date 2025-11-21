@@ -2923,7 +2923,6 @@ window.addEventListener('message', event => {
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
-                    console.log('[DEBUG updateColumnContent] Backend sent - columnTitle:', message.columnTitle, 'displayTitle:', message.displayTitle, 'includeMode:', message.includeMode);
                     // Update tasks and column metadata
                     column.tasks = message.tasks || [];
 
@@ -2931,7 +2930,6 @@ window.addEventListener('message', event => {
                     // Backend is source of truth after processing
                     column.title = message.columnTitle || column.title;
                     column.displayTitle = message.displayTitle || column.displayTitle;
-                    console.log('[DEBUG updateColumnContent] Updated cache - column.title:', column.title, 'column.displayTitle:', column.displayTitle);
 
                     // Clear any pending changes - backend has authoritative data
                     // This prevents stale pending changes from overriding backend updates

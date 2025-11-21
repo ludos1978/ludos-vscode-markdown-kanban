@@ -1866,27 +1866,13 @@ function disableColumnIncludeMode(columnId) {
         cleanTitle = fileName;
     }
 
-    // Update the column to regular mode
-    column.title = cleanTitle || 'Untitled Column';
-    column.includeMode = false;
-    delete column.includeFiles;
-    delete column.originalTitle;
+    const finalTitle = cleanTitle || 'Untitled Column';
 
-    // Also update currentBoard for compatibility
-    if (window.cachedBoard !== window.cachedBoard) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            currentColumn.title = cleanTitle || 'Untitled Column';
-            currentColumn.includeMode = false;
-            delete currentColumn.includeFiles;
-            delete currentColumn.originalTitle;
-        }
-    }
-
-    // Send update to backend
+    // UNIFIED PATH: Removing include is just editing title without include syntax
     vscode.postMessage({
-        type: 'boardUpdate',
-        board: window.cachedBoard
+        type: 'editColumnTitle',
+        columnId: columnId,
+        title: finalTitle
     });
 
     // Update button state to show unsaved changes
@@ -1921,26 +1907,13 @@ function enableTaskIncludeMode(taskId, columnId, fileName) {
     const currentTitle = task.title || '';
     const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
 
-    // Update the cached board
-    task.originalTitle = currentTitle;
-    task.title = newTitle;
-
-    // Also update currentBoard for compatibility
-    if (window.cachedBoard !== window.cachedBoard) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-            if (currentTask) {
-                currentTask.originalTitle = currentTitle;
-                currentTask.title = newTitle;
-            }
-        }
-    }
-
-    // Send update to backend
+    // UNIFIED PATH: Use editTask message (same as updateTaskIncludeFile)
+    // Backend will detect include syntax and route to appropriate handler
     vscode.postMessage({
-        type: 'boardUpdate',
-        board: window.cachedBoard
+        type: 'editTask',
+        taskId: taskId,
+        columnId: columnId,
+        taskData: { title: newTitle }
     });
 
     // Update button state to show unsaved changes
@@ -2059,32 +2032,12 @@ function disableTaskIncludeMode(taskId, columnId) {
     let cleanTitle = task.title || '';
     cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
 
-    // Update cached board
-    task.title = cleanTitle;
-    task.includeMode = false;
-    task.includeFiles = undefined;
-    task.originalTitle = undefined;
-    task.displayTitle = undefined;
-
-    // Also update currentBoard for compatibility
-    if (window.cachedBoard !== window.cachedBoard) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-            if (currentTask) {
-                currentTask.title = cleanTitle;
-                currentTask.includeMode = false;
-                delete currentTask.includeFiles;
-                delete currentTask.originalTitle;
-                delete currentTask.displayTitle;
-            }
-        }
-    }
-
-    // Send update to backend
+    // UNIFIED PATH: Removing include is just editing title without include syntax
     vscode.postMessage({
-        type: 'boardUpdate',
-        board: window.cachedBoard
+        type: 'editTask',
+        taskId: taskId,
+        columnId: columnId,
+        taskData: { title: cleanTitle }
     });
 
     // Update button state to show unsaved changes

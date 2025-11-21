@@ -559,12 +559,10 @@ class TaskEditor {
         if (type === 'column-title' && columnId) {
             const column = window.cachedBoard?.columns.find(col => col.id === columnId);
             if (column && column.title) {
-                console.log('[DEBUG openEditor] Opening editor for column:', columnId, 'title:', column.title, 'displayTitle:', column.displayTitle);
                 // Always show full title in editor so users can see and edit tags
                 editElement.value = column.title;
                 // Store the original full title so we can reconstruct it properly when saving
                 editElement.setAttribute('data-original-title', column.title);
-                console.log('[DEBUG openEditor] Set editElement.value to:', editElement.value);
             }
         }
 
@@ -798,11 +796,6 @@ class TaskEditor {
         let columnId = this.currentEditor.columnId; // Don't destructure - we may need to update this
         const value = element.value;
 
-        // DEBUG: Log the raw value from editor
-        if (type === 'column-title') {
-            console.log('[DEBUG saveCurrentField] Raw element.value:', value);
-        }
-
         // Update local state for immediate feedback
         if (window.cachedBoard && window.cachedBoard.columns) {
             if (type === 'column-title') {
@@ -813,12 +806,9 @@ class TaskEditor {
                     let newTitle;
                     const hasIncludes = /!!!include\([^)]+\)!!!/.test(value);
 
-                    console.log('[DEBUG saveCurrentField] hasIncludes test:', hasIncludes, 'value:', value);
-
                     if (hasIncludes) {
                         // Includes: Use exactly what user typed (predictable, no hidden tags)
                         newTitle = value.trim();
-                        console.log('[DEBUG saveCurrentField] Using direct value (has includes):', newTitle);
                     } else {
                         // No includes: Reconstruct to merge user input with preserved hidden tags
                         try {
@@ -843,9 +833,6 @@ class TaskEditor {
                         // Check for include syntax in column header (location-based column include)
                         const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
                         const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
-
-                        console.log('[DEBUG saveCurrentField] oldIncludeMatches:', oldIncludeMatches);
-                        console.log('[DEBUG saveCurrentField] newIncludeMatches:', newIncludeMatches);
 
                         const hasIncludeChanges =
                             oldIncludeMatches.length !== newIncludeMatches.length ||
@@ -874,7 +861,6 @@ class TaskEditor {
                             }
 
                             // STEP 1: Send message with FULL include syntax for backend to process
-                            console.log('[DEBUG saveCurrentField] Sending to backend - columnId:', currentColumnId, 'title:', newTitle);
                             vscode.postMessage({
                                 type: 'editColumnTitle',
                                 columnId: currentColumnId,

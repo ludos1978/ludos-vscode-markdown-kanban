@@ -783,18 +783,17 @@ class TagUtils {
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Truncate filename if longer than 12 characters
+            // Truncate filename if longer than 20 characters
             let displayFileName = baseFileName;
-            if (baseFileName.length > 12) {
-                // Extract extension
+            if (baseFileName.length > 20) {
                 const lastDotIndex = baseFileName.lastIndexOf('.');
                 const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
                 const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
 
-                // Create truncated version: first 12 chars...last 4 chars before extension
-                const first12 = nameWithoutExt.substring(0, 12);
-                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
-                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+                // Calculate max length for first part: 20 total - 3 (for ...) - ext.length
+                const maxFirstChars = Math.max(1, 20 - 3 - ext.length);
+                const truncated = nameWithoutExt.substring(0, maxFirstChars);
+                displayFileName = `${truncated}...${ext}`;
             }
 
             // Get path (everything except filename), limit to 4 characters
@@ -834,15 +833,17 @@ class TagUtils {
                     const parts = filePath.split('/').length > 1 ? filePath.split('/') : filePath.split('\\');
                     const baseFileName = parts[parts.length - 1];
 
-                    // Truncate filename if longer than 12 characters
+                    // Truncate filename if longer than 20 characters
                     let displayFileName = baseFileName;
-                    if (baseFileName.length > 12) {
+                    if (baseFileName.length > 20) {
                         const lastDotIndex = baseFileName.lastIndexOf('.');
                         const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
                         const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
-                        const first12 = nameWithoutExt.substring(0, 12);
-                        const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
-                        displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+
+                        // Calculate max length for first part: 20 total - 3 (for ...) - ext.length
+                        const maxFirstChars = Math.max(1, 20 - 3 - ext.length);
+                        const truncated = nameWithoutExt.substring(0, maxFirstChars);
+                        displayFileName = `${truncated}...${ext}`;
                     }
 
                     // Get path (everything except filename), limit to 4 characters
@@ -887,18 +888,17 @@ class TagUtils {
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
             const baseFileName = parts[parts.length - 1];
 
-            // Truncate filename if longer than 12 characters
+            // Truncate filename if longer than 20 characters
             let displayFileName = baseFileName;
-            if (baseFileName.length > 12) {
-                // Extract extension
+            if (baseFileName.length > 20) {
                 const lastDotIndex = baseFileName.lastIndexOf('.');
                 const ext = lastDotIndex !== -1 ? baseFileName.substring(lastDotIndex) : '';
                 const nameWithoutExt = lastDotIndex !== -1 ? baseFileName.substring(0, lastDotIndex) : baseFileName;
 
-                // Create truncated version: first 12 chars...last 4 chars before extension
-                const first12 = nameWithoutExt.substring(0, 12);
-                const last4 = nameWithoutExt.length > 16 ? nameWithoutExt.substring(nameWithoutExt.length - 4) : '';
-                displayFileName = last4 ? `${first12}...${last4}${ext}` : `${first12}${ext}`;
+                // Calculate max length for first part: 20 total - 3 (for ...) - ext.length
+                const maxFirstChars = Math.max(1, 20 - 3 - ext.length);
+                const truncated = nameWithoutExt.substring(0, maxFirstChars);
+                displayFileName = `${truncated}...${ext}`;
             }
 
             // Get path (everything except filename), limit to 4 characters

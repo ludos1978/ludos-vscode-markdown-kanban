@@ -2524,13 +2524,14 @@ export class MessageHandler {
     private async handleRequestIncludeFileName(message: any): Promise<void> {
         try {
             // Use file picker dialog for better UX
-            const currentDocument = this._fileManager.getDocument();
-            if (!currentDocument) {
-                vscode.window.showErrorMessage('No active document');
+            // Use getFilePath() which persists even when document is closed
+            const currentFilePath = this._fileManager.getFilePath();
+            if (!currentFilePath) {
+                vscode.window.showErrorMessage('No active kanban file');
                 return;
             }
 
-            const currentDir = path.dirname(currentDocument.uri.fsPath);
+            const currentDir = path.dirname(currentFilePath);
 
             const fileUris = await vscode.window.showOpenDialog({
                 canSelectFiles: true,
@@ -2597,13 +2598,13 @@ export class MessageHandler {
 
             // Now show the file picker dialog
 
-            const currentDocument = this._fileManager.getDocument();
-            if (!currentDocument) {
-                vscode.window.showErrorMessage('No active document');
+            const currentFilePath = this._fileManager.getFilePath();
+            if (!currentFilePath) {
+                vscode.window.showErrorMessage('No active kanban file');
                 return;
             }
 
-            const currentDir = path.dirname(currentDocument.uri.fsPath);
+            const currentDir = path.dirname(currentFilePath);
 
             // Set default URI to current file if it exists
             let defaultUri = vscode.Uri.file(currentDir);
@@ -2687,13 +2688,13 @@ export class MessageHandler {
             }
 
             // Now show the file picker dialog
-            const currentDocument = this._fileManager.getDocument();
-            if (!currentDocument) {
-                vscode.window.showErrorMessage('No active document');
+            const currentFilePath = this._fileManager.getFilePath();
+            if (!currentFilePath) {
+                vscode.window.showErrorMessage('No active kanban file');
                 return;
             }
 
-            const currentDir = path.dirname(currentDocument.uri.fsPath);
+            const currentDir = path.dirname(currentFilePath);
 
             // Set default URI to current file if it exists
             let defaultUri = vscode.Uri.file(currentDir);
@@ -2748,13 +2749,13 @@ export class MessageHandler {
     private async handleRequestTaskIncludeFileName(taskId: string, columnId: string): Promise<void> {
         try {
             // Use file picker dialog for better UX
-            const currentDocument = this._fileManager.getDocument();
-            if (!currentDocument) {
-                vscode.window.showErrorMessage('No active document');
+            const currentFilePath = this._fileManager.getFilePath();
+            if (!currentFilePath) {
+                vscode.window.showErrorMessage('No active kanban file');
                 return;
             }
 
-            const currentDir = path.dirname(currentDocument.uri.fsPath);
+            const currentDir = path.dirname(currentFilePath);
 
             const fileUris = await vscode.window.showOpenDialog({
                 canSelectFiles: true,
