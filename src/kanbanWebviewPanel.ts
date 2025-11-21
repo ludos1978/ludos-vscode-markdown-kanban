@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import { getOutputChannel } from './extension';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
-import { FileManager, ImagePathMapping } from './fileManager';
+import { FileManager } from './fileManager';
 import { UndoRedoManager } from './undoRedoManager';
 import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
@@ -677,12 +677,16 @@ export class KanbanWebviewPanel {
     private _updateWebviewPermissionsForAssets() {
         const localResourceRoots = this._buildLocalResourceRoots(true);
 
+        console.log(`[DEBUG] _updateWebviewPermissionsForAssets: Setting ${localResourceRoots.length} resource roots`);
+
         // Update webview options
         this._panel.webview.options = {
             enableScripts: true,
             localResourceRoots: localResourceRoots,
             enableCommandUris: true
         };
+
+        console.log(`[DEBUG] Webview permissions updated successfully`);
     }
 
     /**
@@ -716,17 +720,24 @@ export class KanbanWebviewPanel {
             if (includeAssets) {
                 const assetDirs = this._collectAssetDirectories();
                 let addedCount = 0;
+                console.log(`[DEBUG] _buildLocalResourceRoots: Processing ${assetDirs.length} asset directories`);
+                console.log(`[DEBUG] Existing roots before adding assets:`, localResourceRoots.map(r => r.fsPath));
                 for (const dir of assetDirs) {
                     const dirUri = vscode.Uri.file(dir);
-                    // Check if not already included
+                    // Check if this exact directory is not already included
                     const alreadyIncluded = localResourceRoots.some(root =>
-                        dir.startsWith(root.fsPath)
+                        root.fsPath === dir
                     );
                     if (!alreadyIncluded) {
+                        console.log(`[DEBUG] Adding asset dir: ${dir}`);
                         localResourceRoots.push(dirUri);
                         addedCount++;
+                    } else {
+                        console.log(`[DEBUG] Skipping (exact duplicate): ${dir}`);
                     }
                 }
+                console.log(`[DEBUG] Added ${addedCount} new asset directories`);
+                console.log(`[DEBUG] Final localResourceRoots:`, localResourceRoots.map(r => r.fsPath));
             }
         }
 
@@ -980,154 +991,6 @@ export class KanbanWebviewPanel {
         }
     }
 
-    private async _generateImageMappings(board: KanbanBoard): Promise<ImagePathMapping> {
-        const mappings: ImagePathMapping = {};
-
-        if (!board.valid || !this._fileManager.getDocument()) {
-            return mappings;
-        }
-
-        const mainFilePath = this._fileManager.getFilePath();
-        if (!mainFilePath) {
-            return mappings;
-        }
-
-        const mainDir = path.dirname(mainFilePath);
-
-        // Collect all content that might contain images
-        for (const column of board.columns) {
-            if (column.title) {
-                const titleMappings = await this._fileManager.generateImagePathMappings(column.title);
-                Object.assign(mappings, titleMappings);
-            }
-
-            // Determine if this column is from an include file
-            const columnIncludeFile = (column.includeMode && column.includeFiles && column.includeFiles.length > 0)
-                ? column.includeFiles[0]
-                : null;
-
-            for (const task of column.tasks) {
-                if (task.title) {
-                    const titleMappings = await this._fileManager.generateImagePathMappings(task.title);
-                    Object.assign(mappings, titleMappings);
-                }
-
-                if (task.description) {
-                    // Check if this task is from an include file (either directly or via column)
-                    let includeFile = null;
-
-                    if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-                        // Task has its own include file
-                        includeFile = task.includeFiles[0];
-                    } else if (columnIncludeFile) {
-                        // Task inherits include from parent column
-                        includeFile = columnIncludeFile;
-                    }
-
-                    if (includeFile) {
-                        // Task from include file - generate mappings with include file context
-                        const includeFilePath = path.isAbsolute(includeFile)
-                            ? includeFile
-                            : path.resolve(mainDir, includeFile);
-
-                        const includeMappings = await this._generateIncludeImageMappings(
-                            task.description,
-                            includeFilePath,
-                            mainFilePath
-                        );
-                        Object.assign(mappings, includeMappings);
-                    } else {
-                        // Regular task - use normal mapping
-                        const descMappings = await this._fileManager.generateImagePathMappings(task.description);
-                        Object.assign(mappings, descMappings);
-                    }
-                }
-            }
-        }
-
-        return mappings;
-    }
-
-    /**
-     * Generate image mappings for content from an include file
-     * Resolves image paths relative to the include file first, then falls back to main file
-     */
-    private async _generateIncludeImageMappings(
-        content: string,
-        includeFilePath: string,
-        mainFilePath: string
-    ): Promise<ImagePathMapping> {
-        const mappings: ImagePathMapping = {};
-        if (!content) { return mappings; }
-
-        const includeDir = path.dirname(includeFilePath);
-        const mainDir = path.dirname(mainFilePath);
-
-        console.log(`\n[IncludeImageMappings] ===== PROCESSING INCLUDE FILE =====`);
-        console.log(`[IncludeImageMappings] Include file: ${includeFilePath}`);
-        console.log(`[IncludeImageMappings] Include dir: ${includeDir}`);
-        console.log(`[IncludeImageMappings] Main dir: ${mainDir}`);
-
-        // Find all image references
-        const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-        let match;
-
-        while ((match = imageRegex.exec(content)) !== null) {
-            const originalPath = match[2];
-            console.log(`\n[IncludeImageMappings] --- Processing image: "${originalPath}" ---`);
-
-            // Skip if already processed or special URIs
-            if (mappings[originalPath] ||
-                originalPath.startsWith('vscode-webview://') ||
-                originalPath.startsWith('data:') ||
-                originalPath.startsWith('http://') ||
-                originalPath.startsWith('https://') ||
-                path.isAbsolute(originalPath)) {
-                continue;
-            }
-
-            // Priority 1: Try relative to include file (handles ../ correctly via path.resolve)
-            const imageAbsolutePath = path.resolve(includeDir, originalPath);
-            console.log(`[IncludeImageMappings]   Priority 1 - Include-relative path: ${imageAbsolutePath}`);
-            console.log(`[IncludeImageMappings]   File exists: ${fs.existsSync(imageAbsolutePath)}`);
-
-            if (fs.existsSync(imageAbsolutePath)) {
-                try {
-                    const imageUri = vscode.Uri.file(imageAbsolutePath);
-                    const webviewUri = this._panel.webview.asWebviewUri(imageUri);
-                    const webviewUriString = webviewUri.toString().replace(/\+/g, '%2B');
-                    mappings[originalPath] = webviewUriString;
-                    console.log(`[IncludeImageMappings]   ✓ SUCCESS! Mapped to: ${webviewUriString}`);
-                    continue;
-                } catch (error) {
-                    console.error(`[IncludeImageMappings]   ✗ ERROR converting to webview URI:`, error);
-                }
-            }
-
-            // Priority 2: Try relative to main file
-            const imageRelativeToMain = path.resolve(mainDir, originalPath);
-            console.log(`[IncludeImageMappings]   Priority 2 - Main-relative path: ${imageRelativeToMain}`);
-            console.log(`[IncludeImageMappings]   File exists: ${fs.existsSync(imageRelativeToMain)}`);
-
-            if (fs.existsSync(imageRelativeToMain)) {
-                try {
-                    const imageUri = vscode.Uri.file(imageRelativeToMain);
-                    const webviewUri = this._panel.webview.asWebviewUri(imageUri);
-                    const webviewUriString = webviewUri.toString().replace(/\+/g, '%2B');
-                    mappings[originalPath] = webviewUriString;
-                    console.log(`[IncludeImageMappings]   ✓ SUCCESS! Mapped to: ${webviewUriString}`);
-                } catch (error) {
-                    console.error(`[IncludeImageMappings]   ✗ ERROR converting to webview URI:`, error);
-                }
-            } else {
-                console.error(`[IncludeImageMappings]   ✗ FAILED - Image not found in either location!`);
-            }
-        }
-
-        console.log(`\n[IncludeImageMappings] ===== SUMMARY: Generated ${Object.keys(mappings).length} mappings =====\n`);
-        return mappings;
-    }
-
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
         await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
         // Sync state back from file service
@@ -1281,7 +1144,6 @@ export class KanbanWebviewPanel {
         }
 
         const documentDir = path.dirname(document.uri.fsPath);
-        console.log(`[CollectAssetDirs] Document dir: ${documentDir}`);
 
         // Pattern to match markdown images: ![alt](path)
         // Use lazy matching to handle brackets in alt text
@@ -1299,8 +1161,6 @@ export class KanbanWebviewPanel {
                     ? includeFile
                     : path.resolve(documentDir, includeFile);
                 columnBaseDir = path.dirname(includeFilePath);
-                console.log(`[CollectAssetDirs] Column "${column.title}" is include: ${includeFile}`);
-                console.log(`[CollectAssetDirs] Column base dir: ${columnBaseDir}`);
             }
 
             // Check column title with appropriate base directory
@@ -1310,14 +1170,18 @@ export class KanbanWebviewPanel {
             for (const task of column.tasks) {
                 // Determine base directory for task content
                 let taskBaseDir = documentDir;
-                if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
+
+                // First check if task has includeContext (for tasks from column includes)
+                if (task.includeContext && task.includeContext.includeDir) {
+                    taskBaseDir = task.includeContext.includeDir;
+                }
+                // Otherwise check if it's a task include file
+                else if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
                     const includeFile = task.includeFiles[0];
                     const includeFilePath = path.isAbsolute(includeFile)
                         ? includeFile
                         : path.resolve(documentDir, includeFile);
                     taskBaseDir = path.dirname(includeFilePath);
-                    console.log(`[CollectAssetDirs] Task "${task.title}" is include: ${includeFile}`);
-                    console.log(`[CollectAssetDirs] Task base dir: ${taskBaseDir}`);
                 }
 
                 // Extract assets with appropriate base directory
@@ -1329,7 +1193,7 @@ export class KanbanWebviewPanel {
         }
 
         const assetDirsArray = Array.from(assetDirs);
-        console.log(`[CollectAssetDirs] Collected ${assetDirsArray.length} asset directories:`, assetDirsArray);
+        console.log(`[DEBUG] Collected ${assetDirsArray.length} asset directories:`, assetDirsArray);
         return assetDirsArray;
     }
 
@@ -1385,8 +1249,14 @@ export class KanbanWebviewPanel {
                     // Check if file exists
                     if (fs.existsSync(absolutePath)) {
                         const dir = path.dirname(absolutePath);
+                        if (absolutePath.endsWith('.mp4') || absolutePath.endsWith('.webm')) {
+                            console.log(`[DEBUG] Found video: ${absolutePath}, dir: ${dir}`);
+                        }
                         assetDirs.add(dir);
                     } else {
+                        if (assetPath.endsWith('.mp4') || assetPath.endsWith('.webm')) {
+                            console.log(`[DEBUG] Video NOT FOUND: ${assetPath}, resolved to: ${absolutePath}, basePath: ${basePath}`);
+                        }
                     }
                 } catch (error) {
                 }

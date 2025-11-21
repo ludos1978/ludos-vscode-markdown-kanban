@@ -903,8 +903,16 @@ function renderMarkdown(text, includeContext) {
                                    !originalSrc.startsWith('vscode-webview://');
 
             if (includeContext && isRelativePath) {
+                // Decode first to handle already-encoded paths
+                let decodedSrc = originalSrc;
+                try {
+                    decodedSrc = decodeURIComponent(originalSrc);
+                } catch (e) {
+                    // Use original if decode fails
+                }
+
                 const dirSegments = includeContext.includeDir.split('/').filter(s => s);
-                const relSegments = originalSrc.split('/').filter(s => s);
+                const relSegments = decodedSrc.split('/').filter(s => s);
 
                 for (const segment of relSegments) {
                     if (segment === '..') {
@@ -932,7 +940,14 @@ function renderMarkdown(text, includeContext) {
                     if (child.type === 'source' && child.attrGet) {
                         const originalSrc = child.attrGet('src');
                         if (originalSrc) {
+                            // DEBUG: Log what we receive from markdown-it
+                            if (originalSrc.includes('%')) {
+                                console.log('[Video Renderer DEBUG] originalSrc (from markdown-it):', originalSrc);
+                            }
                             const displaySrc = resolveMediaPath(originalSrc);
+                            if (originalSrc.includes('%')) {
+                                console.log('[Video Renderer DEBUG] displaySrc (after resolve):', displaySrc);
+                            }
                             child.attrSet('src', displaySrc);
                         }
                     }
@@ -980,6 +995,14 @@ function renderMarkdown(text, includeContext) {
                                    !originalSrc.startsWith('vscode-webview://');
 
             if (includeContext && isRelativePath) {
+                // Decode first to handle already-encoded paths
+                let decodedSrc = originalSrc;
+                try {
+                    decodedSrc = decodeURIComponent(originalSrc);
+                } catch (e) {
+                    // Use original if decode fails
+                }
+
                 // Dynamically resolve the relative path from the include file's directory
                 // Properly handle ../ and ./ in paths
 
@@ -987,7 +1010,7 @@ function renderMarkdown(text, includeContext) {
                 const dirSegments = includeContext.includeDir.split('/').filter(s => s);
 
                 // Split the relative path into segments
-                const relSegments = originalSrc.split('/').filter(s => s);
+                const relSegments = decodedSrc.split('/').filter(s => s);
 
                 // Process each segment
                 for (const segment of relSegments) {

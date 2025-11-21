@@ -19,7 +19,7 @@ absolute paths start with:
 - C:
 
 
-- the image include function should be updated so it can also include files relative to an included files path, not only relative to the main markdown file. 
+- the image include function should be updated so it can also include files relative to an included files path as priority, if the image is not found it should search for the images relative to the main markdown file. can this be included into the include handling process, so it rewrites the paths if an image is found relative to the include file, rather then the main file? it should allways write relative paths!
 
 - [x] i still see %INCLUDE_BADGE:path/to/filename.md% in the column titles, THIS SHOULD NOT HAPPEN. We solved this problem before!!! make sure there is only one codepath that handles include columninclude and taskinclude (in column and task headers) . the include in the task content is implemented only in the frontend. But make sure it never passes any !!!include()!!! in a task or column header into the markdown renderer!!! . i think the %INCLUDE appears when the path starts with "../path/to/something", so a relative path in a folder above.
 
