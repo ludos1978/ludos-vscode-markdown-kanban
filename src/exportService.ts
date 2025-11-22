@@ -760,32 +760,17 @@ export class ExportService {
             return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
         });
 
-        // CRITICAL: Protect HTML tags and comments from being treated as file links
-        // Pattern matches: <br>, <hr>, <br/>, <hr/>, <!-- comments -->, and other HTML tags WITHOUT file extensions
-        // But allows file links like <../video.mp4> or <image.png>
-        const htmlTagPattern = /<(?:(?!http)[^<>]*?)>(?![\w./-])/g;
-        const htmlCommentPattern = /<!--[\s\S]*?-->/g;
-
-        // Protect HTML comments first (highest priority)
-        modifiedContent = modifiedContent.replace(htmlCommentPattern, (match) => {
-            codeBlocks.push(match);
-            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
-        });
-
-        // Protect HTML tags that don't have file extensions
-        // This protects <br>, <hr>, <div>, <span>, etc. but NOT <../video.mp4>, <image.png>
-        modifiedContent = modifiedContent.replace(/<(br|hr|div|span|p|a|b|i|u|strong|em|ul|ol|li|table|tr|td|th|thead|tbody|img|video|audio|source|iframe|script|style|link|meta|title|head|body|html)(\s[^>]*)?\/?>/gi, (match) => {
-            codeBlocks.push(match);
-            return `${codeBlockPlaceholder}${codeBlocks.length - 1}${codeBlockPlaceholder}`;
-        });
-
         // Pattern to match all types of links
         // 1. Markdown images: ![alt](path)
         // 2. Markdown links: [text](path)
         // 3. HTML img/video/audio tags with src attribute
         // 4. Wiki-style links: [[path]] or [[path|text]]
-        // 5. Angle bracket links: <path>
-        const linkPattern = /(!\[[^\]]*\]\([^)]+\))|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])|(<[^>]+>)/g;
+        // NOTE: Angle brackets <...> are NOT included because they are ONLY for:
+        //       - URL autolinks: <http://example.com>
+        //       - Email autolinks: <user@example.com>
+        //       - HTML tags: <br>, <hr>, etc.
+        //       They are NEVER used for file paths in markdown!
+        const linkPattern = /(!\[[^\]]*\]\([^)]+\))|((?<!!)\[[^\]]*\]\([^)]+\))|(<(?:img|video|audio)[^>]+src=["'][^"']+["'][^>]*>)|(\[\[[^\]]+\]\])/g;
 
         modifiedContent = modifiedContent.replace(linkPattern, (match) => {
             return this.processLink(match, sourceDir, exportFolder, fileBasename);
@@ -847,31 +832,9 @@ export class ExportService {
                 linkStart = '[[';
                 linkEnd = ']]';
             }
-        } else if (link.startsWith('<') && link.endsWith('>')) {
-            // Angle bracket link: <path>
-            // Validate that it's an actual FILE link, not an HTML tag like <hr>, <br>, or <!-- -->
-            const content = link.slice(1, -1);
-
-            // Skip HTTP/HTTPS URLs - they should not be modified
-            const isHttpUrl = /^https?:\/\//i.test(content);
-            if (isHttpUrl) {
-                return link; // Don't modify HTTP/HTTPS URLs
-            }
-
-            // Only treat as file link if it has a file extension (e.g., .mp4, .png, .md)
-            // This ensures <br>, <hr>, and other HTML tags are NOT treated as links
-            // File extensions: must have a dot followed by 2-5 alphanumeric chars (before any query/anchor)
-            const hasFileExtension = /\.[a-zA-Z0-9]{2,5}(\?|#|$)/.test(content);
-
-            if (hasFileExtension) {
-                filePath = content;
-                linkStart = '<';
-                linkEnd = '>';
-            } else {
-                // It's an HTML tag like <hr>, <br>, etc. - don't treat as link
-                return link;
-            }
         }
+        // NOTE: Angle bracket links <...> are intentionally NOT processed here
+        // They are only for URL/email autolinks or HTML tags, never file paths
 
         if (!filePath) {
             return link; // No path found, return original

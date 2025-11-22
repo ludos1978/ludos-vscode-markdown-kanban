@@ -1034,61 +1034,19 @@ function renderMarkdown(text, includeContext) {
             return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" />`;
         };
         
-        // Enhanced link renderer with path resolution for file links
+        // Enhanced link renderer
+        // NOTE: Angle bracket autolinks <...> are NOT processed for path resolution because:
+        //       - They are ONLY for URL autolinks (<http://...>) or email (<user@example.com>)
+        //       - They are NEVER used for file paths in markdown
+        //       - File paths use [text](path) or ![alt](path) syntax
         md.renderer.rules.link_open = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
-            let href = token.attrGet('href') || '';
+            const href = token.attrGet('href') || '';
             const title = token.attrGet('title') || '';
 
             // Don't make webview URIs clickable (they're for display only)
             if (href.startsWith('vscode-webview://')) {
                 return '<span class="webview-uri-text">';
-            }
-
-            // Check if this is a relative file path (not HTTP/HTTPS, and has a file extension)
-            // This handles autolinks like <../video.mp4> from include files
-            const isRelativePath = href &&
-                                   !href.startsWith('/') &&
-                                   !href.startsWith('http://') &&
-                                   !href.startsWith('https://') &&
-                                   !href.startsWith('#');
-
-            // Only apply path resolution if it's a file (has extension) not HTML tag like <br>, <hr>
-            // File extensions: .mp4, .png, .md, etc. (must have a dot followed by 2-5 alphanumeric chars)
-            const hasFileExtension = /\.[a-zA-Z0-9]{2,5}(\?|#|$)/.test(href);
-
-            if (includeContext && isRelativePath && hasFileExtension) {
-                // Decode first to handle already-encoded paths
-                let decodedHref = href;
-                try {
-                    decodedHref = decodeURIComponent(href);
-                } catch (e) {
-                    // Use original if decode fails
-                }
-
-                // Split the include directory path into segments
-                const dirSegments = includeContext.includeDir.split('/').filter(s => s);
-
-                // Split the relative path into segments
-                const relSegments = decodedHref.split('/').filter(s => s);
-
-                // Process each segment
-                for (const segment of relSegments) {
-                    if (segment === '..') {
-                        dirSegments.pop();  // Go up one directory
-                    } else if (segment === '.') {
-                        // Stay in current directory
-                    } else {
-                        dirSegments.push(segment);
-                    }
-                }
-
-                // Reconstruct the absolute path
-                const resolvedPath = '/' + dirSegments.join('/');
-
-                // Convert to webview URL format
-                const encodedPath = encodeURI(resolvedPath);
-                href = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
 
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
