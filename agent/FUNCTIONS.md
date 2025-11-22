@@ -924,3 +924,11 @@ Total functions documented: **523**
 - src/html/debugOverlay-verifyContentSync - (NEW) Request content synchronization verification between frontend and backend, compares actual content
 - src/html/debugOverlay-showVerificationResults - (NEW) Display verification results in modal overlay showing which files match/differ
 - src/html/debugOverlay-showForceWriteConfirmation - (NEW) Show confirmation dialog before force write operation with affected files list
+
+---
+
+## src/html/boardRenderer.js - Board Rendering and Layout System
+
+### New Functions (2025-11-22):
+- src/html/boardRenderer-waitForColumnImagesAndRecalculateStack - Wait for all images in a specific column to load, then recalculate its stack heights to ensure accurate layout
+- src/html/boardRenderer-setupImageLoadingWatchers - Set up image loading watchers for all non-collapsed columns; each column recalculates its stack independently when images finish loading

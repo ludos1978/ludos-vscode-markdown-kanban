@@ -1709,7 +1709,12 @@ function renderBoard(options = null) {
         
         // Update image sources after rendering
         updateImageSources();
-        
+
+        // Wait for images to load in each column and recalculate their stacks
+        if (typeof setupImageLoadingWatchers === 'function') {
+            setupImageLoadingWatchers();
+        }
+
         // Notify that rendering is complete (for focus functionality)
         if (window.onBoardRenderingComplete) {
             window.onBoardRenderingComplete();
@@ -1781,6 +1786,88 @@ function renderBoard(options = null) {
     // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
     // Recommendation: Remove entirely OR wait for user request before reimplementing
     // setupCompactViewHandler();
+}
+
+/**
+ * Wait for all images in a specific column to load, then recalculate its stack heights.
+ * This ensures column heights are accurate after images have fully rendered.
+ *
+ * @param {HTMLElement} columnElement - The column element to watch for image loading
+ */
+function waitForColumnImagesAndRecalculateStack(columnElement) {
+    if (!columnElement) return;
+
+    // Get all images in this specific column
+    const columnImages = Array.from(columnElement.querySelectorAll('.task-description img'));
+
+    if (columnImages.length === 0) {
+        // No images in this column, nothing to wait for
+        return;
+    }
+
+    // Filter to only images that haven't loaded yet
+    const unloadedImages = columnImages.filter(img => !img.complete);
+
+    if (unloadedImages.length === 0) {
+        // All images already cached/loaded - recalculate immediately
+        const stack = columnElement.closest('.kanban-column-stack');
+        if (stack && typeof recalculateStackHeightsImmediate === 'function') {
+            recalculateStackHeightsImmediate(stack);
+        }
+        return;
+    }
+
+    // Create promises for each unloaded image with timeout
+    const imagePromises = unloadedImages.map(img => {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve('timeout'); // Don't block on failed images
+            }, 5000); // 5 second max wait per image
+
+            const cleanup = () => {
+                clearTimeout(timeout);
+                img.removeEventListener('load', onLoad);
+                img.removeEventListener('error', onError);
+            };
+
+            const onLoad = () => {
+                cleanup();
+                resolve('loaded');
+            };
+
+            const onError = () => {
+                cleanup();
+                resolve('error');
+            };
+
+            img.addEventListener('load', onLoad, { once: true });
+            img.addEventListener('error', onError, { once: true });
+        });
+    });
+
+    // Wait for all images in THIS column (or timeout)
+    Promise.all(imagePromises).then(() => {
+        // Recalculate only this column's stack (not the entire board)
+        const stack = columnElement.closest('.kanban-column-stack');
+        if (stack && typeof recalculateStackHeightsImmediate === 'function') {
+            recalculateStackHeightsImmediate(stack);
+        }
+    });
+}
+
+/**
+ * Set up image loading watchers for all columns in the board.
+ * Each column recalculates its stack independently when its images finish loading.
+ */
+function setupImageLoadingWatchers() {
+    const allColumns = document.querySelectorAll('.kanban-full-height-column');
+
+    allColumns.forEach(column => {
+        // Only watch non-collapsed columns (collapsed columns don't show images)
+        if (!column.classList.contains('collapsed')) {
+            waitForColumnImagesAndRecalculateStack(column);
+        }
+    });
 }
 
 function getFoldAllButtonState(columnId) {
