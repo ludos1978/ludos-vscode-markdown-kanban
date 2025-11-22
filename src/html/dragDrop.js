@@ -1963,16 +1963,12 @@ function handleVSCodeFileDrop(e, files) {
     const isImage = file.type.startsWith('image/');
 
     if (isImage) {
-        console.log('[Image-Drop] Dropped external image file:', fileName, 'type:', file.type);
-
         // Read image file contents and save to MEDIA folder
         // This works for external drops (Finder/Explorer) where we don't have the path
         const reader = new FileReader();
         reader.onload = function(event) {
             try {
                 const base64Data = event.target.result.split(',')[1];
-
-                console.log('[Image-Drop] Image read successfully, sending to backend');
 
                 // Send to backend to save (reuse clipboard image infrastructure)
                 vscode.postMessage({
@@ -2045,7 +2041,6 @@ function handleVSCodeUriDrop(e, uriData) {
                 : uri;
             const filename = fullPath.split('/').pop() || uri;
 
-            console.log('[Image-Drop] VS Code image URI:', filename);
 
             // Ask backend to copy from source path to MEDIA
             vscode.postMessage({
@@ -3694,7 +3689,6 @@ function setupColumnDragAndDrop() {
         // Show indicator in the drop zone
         const dropZoneStack = dropZone.parentNode;
         if (dropZoneStack && dropZoneStack.classList.contains('column-drop-zone-stack')) {
-            console.log('[DropZoneDragover] Showing indicator in horizontal drop zone');
             // Show indicator at the drop zone (null = drop at end, which positions it in the zone)
             showInternalColumnDropIndicator(dropZoneStack, null);
         }

@@ -1798,59 +1798,36 @@ function renderBoard(options = null) {
  */
 function waitForStackImagesAndRecalculate(stackElement) {
     if (!stackElement) {
-        console.log('[Image-Load] Stack element is null');
         return;
     }
 
-    // Get all non-collapsed columns in this stack
     const columns = stackElement.querySelectorAll('.kanban-full-height-column:not(.collapsed)');
     if (columns.length === 0) {
-        console.log('[Image-Load] No columns in stack');
         return;
     }
 
-    // Collect all images from all columns in this stack
     const allImages = [];
-    columns.forEach((col, colIdx) => {
-        // First check what's actually in the column
-        const taskItems = col.querySelectorAll('.task-item');
-        const allImgsInCol = col.querySelectorAll('img');
-        const taskImgs = col.querySelectorAll('.task-item img');
-        const markdownImgs = col.querySelectorAll('.markdown-content img');
-
-        console.log(`[Image-Load]   Column ${colIdx + 1}: ${taskItems.length} tasks, ${allImgsInCol.length} total imgs, ${taskImgs.length} task imgs, ${markdownImgs.length} markdown imgs`);
-
-        // Select ALL images in the column (most comprehensive)
+    columns.forEach((col) => {
         const images = col.querySelectorAll('img');
         allImages.push(...Array.from(images));
     });
 
-    console.log(`[Image-Load] Stack has ${allImages.length} total images`);
-
-    // If no images, nothing to wait for
     if (allImages.length === 0) {
         return;
     }
 
-    // Filter to only images that haven't loaded yet
     const unloadedImages = allImages.filter(img => !img.complete);
 
-    console.log(`[Image-Load] Stack has ${unloadedImages.length} unloaded images`);
-
-    // If all images already loaded, recalculate immediately
     if (unloadedImages.length === 0) {
-        console.log('[Image-Load] All images already cached, recalculating immediately');
         if (typeof recalculateStackHeightsImmediate === 'function') {
             recalculateStackHeightsImmediate(stackElement);
         }
         return;
     }
 
-    // Wait for ALL images to load (or timeout)
-    const imagePromises = unloadedImages.map((img, idx) => {
+    const imagePromises = unloadedImages.map((img) => {
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
-                console.log(`[Image-Load] Image ${idx + 1}/${unloadedImages.length} timed out`);
                 resolve('timeout');
             }, 5000);
 
@@ -1862,13 +1839,11 @@ function waitForStackImagesAndRecalculate(stackElement) {
 
             const onLoad = () => {
                 cleanup();
-                console.log(`[Image-Load] Image ${idx + 1}/${unloadedImages.length} loaded`);
                 resolve('loaded');
             };
 
             const onError = () => {
                 cleanup();
-                console.log(`[Image-Load] Image ${idx + 1}/${unloadedImages.length} failed to load`);
                 resolve('error');
             };
 
@@ -1877,14 +1852,9 @@ function waitForStackImagesAndRecalculate(stackElement) {
         });
     });
 
-    // Recalculate ONCE after ALL images have loaded
-    Promise.all(imagePromises).then((results) => {
-        console.log(`[Image-Load] ALL images finished loading, recalculating stack. Results:`, results);
+    Promise.all(imagePromises).then(() => {
         if (typeof recalculateStackHeightsImmediate === 'function') {
             recalculateStackHeightsImmediate(stackElement);
-            console.log('[Image-Load] Stack heights recalculated');
-        } else {
-            console.error('[Image-Load] recalculateStackHeightsImmediate is not a function!');
         }
     });
 }
@@ -1895,11 +1865,7 @@ function waitForStackImagesAndRecalculate(stackElement) {
  */
 function setupImageLoadingWatchers() {
     const allStacks = document.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
-
-    console.log(`[Image-Load] Setting up watchers for ${allStacks.length} stacks`);
-
-    allStacks.forEach((stack, idx) => {
-        console.log(`[Image-Load] Processing stack ${idx + 1}/${allStacks.length}`);
+    allStacks.forEach((stack) => {
         waitForStackImagesAndRecalculate(stack);
     });
 }

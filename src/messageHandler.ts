@@ -2119,8 +2119,6 @@ export class MessageHandler {
                     dropPosition: dropPosition
                 };
                 panel._panel.webview.postMessage(message);
-            } else {
-                console.error('[DEBUG] Cannot send clipboardImageSaved message - no webview panel available');
             }
 
         } catch (error) {
@@ -3978,16 +3976,12 @@ export class MessageHandler {
             if (hasColumnIncludeMatches) {
                 hasColumnIncludeMatches.forEach((match: string) => {
                     const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
-                    console.log(`[editColumnTitle] DEBUG: Extracted file path from match "${match}": "${filePath}"`);
                     newIncludeFiles.push(filePath);
                 });
             }
 
             // Get old include files for cleanup
             const oldIncludeFiles = column.includeFiles || [];
-            console.log(`[editColumnTitle] DEBUG: New title received:`, newTitle);
-            console.log(`[editColumnTitle] DEBUG: Column ${columnId} current includeFiles:`, oldIncludeFiles);
-            console.log(`[editColumnTitle] DEBUG: New include files from title:`, newIncludeFiles);
             log(`[editColumnTitle] Column ${columnId} current includeFiles:`, oldIncludeFiles);
             log(`[editColumnTitle] New include files from title:`, newIncludeFiles);
             log(`[editColumnTitle] Column title in board:`, column.title);

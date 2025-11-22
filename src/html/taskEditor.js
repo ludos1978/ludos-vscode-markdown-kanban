@@ -317,9 +317,6 @@ class TaskEditor {
                 const cachedShortcuts = window.cachedShortcuts || {};
                 const hasCommand = !!cachedShortcuts[shortcut];
 
-                // Debug logging
-                console.log('[Kanban Editor] Shortcut detected:', shortcut, 'hasCommand:', hasCommand, 'command:', cachedShortcuts[shortcut]);
-
                 // Only process if we know this shortcut has a command
                 if (hasCommand) {
                     // ⚠️ CRITICAL: Prevent VSCode from handling this shortcut!

@@ -2403,7 +2403,6 @@ function deleteTask(taskId, columnId) {
                 if (columnElement) {
                     const stack = columnElement.closest('.kanban-column-stack');
                     if (stack && typeof recalculateStackHeightsImmediate === 'function') {
-                        console.log('[Task-Delete] Recalculating stack heights after task deletion');
                         recalculateStackHeightsImmediate(stack);
                     }
                 }

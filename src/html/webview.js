@@ -2851,8 +2851,6 @@ window.addEventListener('message', event => {
         case 'droppedImageSaved':
             // Handle dropped image save response from backend
             if (message.success) {
-                console.log('[Image-Drop] Image saved successfully:', message.relativePath);
-
                 // Create task with original filename (without timestamp) as title
                 const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
                 const safePath = escapeFilePath(message.relativePath);
@@ -2976,7 +2974,6 @@ window.addEventListener('message', event => {
                     if (!isEditing || forceRender) {
                         // If forcing render while editing, save current editor state
                         if (isEditing && forceRender) {
-                            console.log('[updateColumnContent] Force rendering include content - saving editor state');
                             // Save and close current editor to prevent conflicts
                             if (window.taskEditor && window.taskEditor.saveAndClose) {
                                 window.taskEditor.saveAndClose();
@@ -3397,18 +3394,12 @@ window.addEventListener('message', event => {
  * Insert VS Code snippet content into the active editor
  */
 function insertVSCodeSnippetContent(content, fieldType, taskId) {
-    console.log('[Webview] insertVSCodeSnippetContent called - content:', content, 'fieldType:', fieldType, 'taskId:', taskId);
-
     // Use the current editor from taskEditor instead of searching for focused element
     // This fixes the timing issue where focus might be lost by the time the snippet arrives
     if (window.taskEditor && window.taskEditor.currentEditor) {
         const activeEditor = window.taskEditor.currentEditor.element;
 
-        console.log('[Webview] Using currentEditor.element:', activeEditor);
-
         if (activeEditor) {
-            console.log('[Webview] Inserting snippet content at cursor position');
-
             // Insert the snippet content at cursor position
             const cursorPosition = activeEditor.selectionStart || 0;
             const textBefore = activeEditor.value.substring(0, cursorPosition);
@@ -3431,8 +3422,6 @@ function insertVSCodeSnippetContent(content, fieldType, taskId) {
             if (typeof autoResize === 'function') {
                 autoResize(activeEditor);
             }
-
-            console.log('[Webview] Snippet inserted successfully');
         } else {
             console.warn('[Webview] currentEditor.element is null');
         }
@@ -5902,7 +5891,6 @@ function refreshMarpDirectivesSubmenu(scope, id, type, columnId) {
         }
 
         if (newContent) {
-            console.log('Refreshing submenu with new content');
             openSubmenu.innerHTML = newContent;
         } else {
             console.warn('No new content generated for submenu type:', submenuType);
@@ -6688,11 +6676,6 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
     };
     vscode.postMessage(message);
 }
-
-
-// Export scope toggle functions globally
-window.toggleMarpClassScope = toggleMarpClassScope;
-window.toggleMarpDirectiveScope = toggleMarpDirectiveScope;
 
 // =============================================================================
 // Marp Global Settings Functions
