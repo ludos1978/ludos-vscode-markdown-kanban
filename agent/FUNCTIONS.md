@@ -444,8 +444,89 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ## src/extension.ts
 
-- src/extension-activate - Extension activation entry point
+- src/extension-activate - Extension activation entry point, registers kanban sidebar and all commands
 - src/extension-deactivate - Extension deactivation entry point
+
+## src/kanbanSidebarProvider.ts - KanbanSidebarProvider (NEW 2025-11-22)
+
+### Overview
+Sidebar TreeView for listing and managing kanban boards in workspace. Supports auto-discovery, manual additions, drag & drop, and persistent storage.
+
+### Classes
+
+**KanbanBoardItem** - TreeItem representing a kanban board in sidebar
+- Properties: uri, label, isValid (shows warning icon if not a kanban file)
+- Command: Opens kanban board when clicked
+
+**KanbanDragAndDropController** - Handles drag & drop of markdown files into sidebar
+- dropMimeTypes: ['text/uri-list']
+- handleDrop: Validates .md files and adds to sidebar
+
+**KanbanSidebarProvider** - Main TreeDataProvider for sidebar
+- Implements: vscode.TreeDataProvider<KanbanBoardItem>
+- Features: Auto-scan, manual discovery, file watching, workspace state persistence
+
+### Enums & Utilities
+
+**FileCategory** - Enum for file type categories
+- All, Regular, Backups, Conflicts, Autosaves, UnsavedChanges
+
+**FileTypeDetector** - Static utility class for file categorization
+- detectCategory(filePath) - Detect category from filename patterns (.{name}-autosave.md, .{name}-backup-{timestamp}.md, etc.)
+- getCategoryLabel(category) - Get display label for category
+- getCategoryIcon(category) - Get VS Code icon name for category
+
+### Methods
+
+- src/kanbanSidebarProvider-KanbanSidebarProvider_constructor - Initialize sidebar with context and auto-scan setting
+- src/kanbanSidebarProvider-KanbanSidebarProvider_hasScannedBefore - Check if workspace has been scanned before (first-time auto-scan)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_markAsScanned - Mark workspace as scanned to prevent repeated auto-scans
+- src/kanbanSidebarProvider-KanbanSidebarProvider_loadFromWorkspaceState - Load kanban file list from workspaceState on activation
+- src/kanbanSidebarProvider-KanbanSidebarProvider_saveToWorkspaceState - Save kanban file list to workspaceState for persistence
+- src/kanbanSidebarProvider-KanbanSidebarProvider_getTreeItem - Get TreeItem for display (required by TreeDataProvider)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_getChildren - Get children items for tree (kanban file list with filter applied)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_refresh - Refresh tree view display
+- src/kanbanSidebarProvider-KanbanSidebarProvider_scanWorkspace - Scan workspace for markdown files with kanban-plugin: board header (max 500 files)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_isKanbanFile - Validate if file is kanban board by checking YAML header (with 24h cache)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_addFile - Add kanban file manually to sidebar (validates header, prompts if invalid)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_removeFile - Remove kanban file from sidebar and stop watching
+- src/kanbanSidebarProvider-KanbanSidebarProvider_watchFile - Start FileSystemWatcher for file (onDidChange, onDidDelete)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_unwatchFile - Stop FileSystemWatcher and dispose
+- src/kanbanSidebarProvider-KanbanSidebarProvider_handleWorkspaceFolderChanges - Handle workspace folder add/remove events
+- src/kanbanSidebarProvider-KanbanSidebarProvider_clear - Clear all kanban files from sidebar (with confirmation)
+- src/kanbanSidebarProvider-KanbanSidebarProvider_setFilter - (NEW 2025-11-22) Set active filter category and refresh display
+- src/kanbanSidebarProvider-KanbanSidebarProvider_showFilterMenu - (NEW 2025-11-22) Show quick pick menu with all filter categories and counts
+- src/kanbanSidebarProvider-KanbanSidebarProvider_getActiveFilter - (NEW 2025-11-22) Get current active filter category
+- src/kanbanSidebarProvider-KanbanSidebarProvider_getCategoryCounts - (NEW 2025-11-22) Get map of category counts
+- src/kanbanSidebarProvider-KanbanSidebarProvider_dispose - Dispose all file watchers and resources
+
+### Features
+- **Auto-discovery**: Optional one-time workspace scan on first activation (configurable via markdown-kanban.sidebar.autoScan)
+- **Manual additions**: Drag & drop or "Add File" button
+- **YAML validation**: Checks for "kanban-plugin: board" in frontmatter
+- **Validation caching**: 24-hour TTL cache to avoid repeated file reads
+- **File watching**: Monitors added files for changes/deletion
+- **Workspace awareness**: Handles multi-root workspaces and folder changes
+- **Persistence**: Stores file list in workspaceState (survives VS Code restart)
+- **Filtering**: (NEW 2025-11-22) Filter boards by category: All, Regular, Backups, Conflicts, Autosaves, Unsaved Changes
+  - Real-time category counts
+  - Persistent filter state per session
+  - Quick pick menu with icons and descriptions
+
+### File Categories (NEW 2025-11-22)
+- **Regular**: Normal kanban files (e.g., `myboard.md`)
+- **Backups**: `.{filename}-backup-{timestamp}.md` (e.g., `.myboard-backup-20251122T143055.md`)
+- **Conflicts**: `{filename}-conflict-{timestamp}.md` (e.g., `myboard-conflict-20251122T143055.md`)
+- **Autosaves**: `.{filename}-autosave.md` (e.g., `.myboard-autosave.md`)
+- **Unsaved Changes**: `{filename}-unsavedchanges.md` (e.g., `myboard-unsavedchanges.md`)
+
+### Commands
+- markdown-kanban.sidebar.filter - (NEW 2025-11-22) Show filter menu to select category (toolbar button)
+- markdown-kanban.sidebar.scanWorkspace - Scan workspace for kanban boards (toolbar button)
+- markdown-kanban.sidebar.addFile - Add files via file picker (toolbar button)
+- markdown-kanban.sidebar.removeFile - Remove file from sidebar (context menu)
+- markdown-kanban.sidebar.clear - Clear all files from sidebar (overflow menu)
+- markdown-kanban.sidebar.refresh - Refresh sidebar display (toolbar button)
 
 ## src/boardOperations.ts - BoardOperations
 

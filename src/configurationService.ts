@@ -43,6 +43,10 @@ export interface KanbanConfiguration {
         globalClasses: string[];
         localClasses: string[];
     };
+    // Sidebar configuration
+    sidebar: {
+        autoScan: boolean;
+    };
 }
 
 export interface ConfigurationDefaults {
@@ -80,6 +84,10 @@ export interface ConfigurationDefaults {
         availableClasses: string[];
         globalClasses: string[];
         localClasses: string[];
+    };
+    // Sidebar configuration defaults
+    sidebar: {
+        autoScan: boolean;
     };
 }
 
@@ -130,6 +138,10 @@ export class ConfigurationService {
             ],
             globalClasses: [],
             localClasses: []
+        },
+        // Sidebar defaults
+        sidebar: {
+            autoScan: true
         }
     };
 

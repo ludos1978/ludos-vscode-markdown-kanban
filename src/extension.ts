@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './configurationService';
+import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 
 // Global output channel for extension logging
 let outputChannel: vscode.OutputChannel | undefined;
@@ -15,6 +16,18 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(outputChannel);
 
 	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
+
+	// Initialize kanban sidebar
+	const config = configService.getAllConfig();
+	const autoScanEnabled = config.sidebar?.autoScan ?? true;
+	const sidebarProvider = new KanbanSidebarProvider(context, autoScanEnabled);
+	const treeView = vscode.window.createTreeView('kanbanBoardsSidebar', {
+		treeDataProvider: sidebarProvider,
+		dragAndDropController: sidebarProvider.dragAndDropController,
+		showCollapseAll: false
+	});
+	context.subscriptions.push(treeView);
+	context.subscriptions.push(sidebarProvider);
 
 	let fileListenerEnabled = true;
 
@@ -237,6 +250,46 @@ export function activate(context: vscode.ExtensionContext) {
 		activePanel.triggerSnippetInsertion();
 	});
 
+	// Sidebar commands
+	const scanWorkspaceCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.scanWorkspace', async () => {
+		await sidebarProvider.scanWorkspace();
+	});
+
+	const addFileToSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.addFile', async () => {
+		const fileUris = await vscode.window.showOpenDialog({
+			canSelectFiles: true,
+			canSelectFolders: false,
+			canSelectMany: true,
+			filters: {
+				'Markdown files': ['md']
+			}
+		});
+
+		if (fileUris && fileUris.length > 0) {
+			for (const uri of fileUris) {
+				await sidebarProvider.addFile(uri);
+			}
+		}
+	});
+
+	const removeFileFromSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.removeFile', async (item) => {
+		if (item) {
+			await sidebarProvider.removeFile(item);
+		}
+	});
+
+	const clearSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.clear', async () => {
+		await sidebarProvider.clear();
+	});
+
+	const refreshSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.refresh', () => {
+		sidebarProvider.refresh();
+	});
+
+	const filterSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.filter', async () => {
+		await sidebarProvider.showFilterMenu();
+	});
+
 	// Note: External file change detection is handled by MarkdownFile instances via their built-in watchers
 
 	// Listen for active editor changes
@@ -263,6 +316,12 @@ export function activate(context: vscode.ExtensionContext) {
 		switchFileCommand,
 		insertSnippetCommand,
 		debugPermissionsCommand,
+		scanWorkspaceCommand,
+		addFileToSidebarCommand,
+		removeFileFromSidebarCommand,
+		clearSidebarCommand,
+		refreshSidebarCommand,
+		filterSidebarCommand,
 		activeEditorChangeListener,
 	);
 

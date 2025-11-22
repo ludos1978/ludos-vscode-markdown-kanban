@@ -4120,7 +4120,29 @@
             "description": "CSS class name from availableClasses"
           }
         }
+      },
+      "markdown-kanban.sidebar.autoScan": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically scan workspace for kanban boards on first activation"
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kanbanBoards",
+          "title": "Kanban Boards",
+          "icon": "$(notebook)"
+        }
+      ]
+    },
+    "views": {
+      "kanbanBoards": [
+        {
+          "id": "kanbanBoardsSidebar",
+          "name": "Kanban Boards"
+        }
+      ]
     },
     "commands": [
       {
@@ -4151,9 +4173,73 @@
       {
         "command": "markdown-kanban.insertSnippet",
         "title": "Insert Snippet in Kanban"
+      },
+      {
+        "command": "markdown-kanban.sidebar.scanWorkspace",
+        "title": "Scan Workspace for Kanban Boards",
+        "icon": "$(search)"
+      },
+      {
+        "command": "markdown-kanban.sidebar.addFile",
+        "title": "Add Kanban Board to Sidebar",
+        "icon": "$(add)"
+      },
+      {
+        "command": "markdown-kanban.sidebar.removeFile",
+        "title": "Remove from Sidebar",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "markdown-kanban.sidebar.clear",
+        "title": "Clear All Kanban Boards",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "markdown-kanban.sidebar.refresh",
+        "title": "Refresh Kanban Sidebar",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "markdown-kanban.sidebar.filter",
+        "title": "Filter Kanban Boards",
+        "icon": "$(filter)"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "markdown-kanban.sidebar.filter",
+          "when": "view == kanbanBoardsSidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "markdown-kanban.sidebar.scanWorkspace",
+          "when": "view == kanbanBoardsSidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "markdown-kanban.sidebar.addFile",
+          "when": "view == kanbanBoardsSidebar",
+          "group": "navigation@3"
+        },
+        {
+          "command": "markdown-kanban.sidebar.refresh",
+          "when": "view == kanbanBoardsSidebar",
+          "group": "navigation@4"
+        },
+        {
+          "command": "markdown-kanban.sidebar.clear",
+          "when": "view == kanbanBoardsSidebar",
+          "group": "overflow"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "markdown-kanban.sidebar.removeFile",
+          "when": "view == kanbanBoardsSidebar && viewItem == kanbanBoard",
+          "group": "inline"
+        }
+      ],
       "explorer/context": [
         {
           "command": "markdown-kanban.openKanban",
