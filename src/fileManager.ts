@@ -280,7 +280,7 @@ export class FileManager {
     /**
      * Enhanced file path resolution that handles workspace-relative paths
      */
-    public async resolveFilePath(href: string): Promise<FileResolutionResult | null> {
+    public async resolveFilePath(href: string, includeContext?: any): Promise<FileResolutionResult | null> {
         const attemptedPaths: string[] = [];
 
         // Decode URL-encoded paths (e.g., %20 -> space)
@@ -320,6 +320,13 @@ export class FileManager {
         const candidates: string[] = [];
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
+        // If we have includeContext, try resolving relative to the include file's directory first
+        if (includeContext && includeContext.includeDir) {
+            const candidate = path.resolve(includeContext.includeDir, decodedHref);
+            candidates.push(candidate);
+            attemptedPaths.push(candidate);
+        }
+
         // Check if path starts with a workspace folder name
         let isWorkspaceRelative = false;
         if (workspaceFolders && workspaceFolders.length > 0) {
@@ -339,12 +346,21 @@ export class FileManager {
 
         // If not workspace-relative, use standard resolution strategy
         if (!isWorkspaceRelative) {
-            // First: Check relative to current document directory (only if we have a document)
-            if (this._document) {
-                const currentDir = path.dirname(this._document.uri.fsPath);
+            // First: Check relative to current document directory
+            // Use _filePath as fallback if document is not available (e.g., during webview message handling)
+            const documentPath = this._document?.uri.fsPath || this._filePath;
+
+            if (documentPath) {
+                const currentDir = path.dirname(documentPath);
+                console.log('[resolveFilePath] Document path:', documentPath);
+                console.log('[resolveFilePath] Document dir:', currentDir);
+                console.log('[resolveFilePath] Resolving:', decodedHref, 'from', currentDir);
                 const candidate = path.resolve(currentDir, decodedHref);
+                console.log('[resolveFilePath] Candidate:', candidate);
                 candidates.push(candidate);
                 attemptedPaths.push(candidate);
+            } else {
+                console.log('[resolveFilePath] No document or file path available');
             }
 
             // Second: Check in all workspace folders

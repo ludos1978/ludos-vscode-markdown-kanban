@@ -3437,12 +3437,24 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
     // Find the task or column container to scope the search
     let containerElement = null;
     let linkIndex = 0;
+    let includeContext = null;
 
     if (taskId) {
         // Look for task container
         containerElement = target.closest(`[data-task-id="${taskId}"]`);
         if (!containerElement) {
             containerElement = target.closest('.task-item');
+        }
+
+        // Get includeContext from the task if it exists
+        if (window.cachedBoard && taskId && columnId) {
+            const column = window.cachedBoard.columns.find(c => c.id === columnId);
+            if (column) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task && task.includeContext) {
+                    includeContext = task.includeContext;
+                }
+            }
         }
     } else if (columnId) {
         // Look for column container
@@ -3498,7 +3510,8 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
                     href: href,
                     linkIndex: linkIndex,
                     taskId: taskId,
-                    columnId: columnId
+                    columnId: columnId,
+                    includeContext: includeContext
                 });
             }
         }
@@ -3510,7 +3523,15 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         event.preventDefault();
         event.stopPropagation();
         const originalSrc = img.getAttribute('data-original-src') || img.getAttribute('src');
-        if (originalSrc && !originalSrc.startsWith('data:')) {
+        const actualSrc = img.getAttribute('src');
+
+        console.log('[Image-Click] data-original-src:', img.getAttribute('data-original-src'));
+        console.log('[Image-Click] src:', actualSrc);
+        console.log('[Image-Click] Using:', originalSrc);
+        console.log('[Image-Click] taskId:', taskId, 'columnId:', columnId);
+        console.log('[Image-Click] includeContext:', includeContext);
+
+        if (originalSrc && !originalSrc.startsWith('data:') && !originalSrc.startsWith('vscode-webview://')) {
             // Calculate index for images using the src attribute
             const srcAttr = img.getAttribute('data-original-src') ? 'data-original-src' : 'src';
             linkIndex = findElementIndex(img, containerElement, srcAttr);
@@ -3521,8 +3542,11 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
                 href: originalSrc,
                 linkIndex: linkIndex,
                 taskId: taskId,
-                columnId: columnId
+                columnId: columnId,
+                includeContext: includeContext
             });
+        } else {
+            console.log('[Image-Click] Skipped - originalSrc is data: or vscode-webview:// URI');
         }
         return true;
     }

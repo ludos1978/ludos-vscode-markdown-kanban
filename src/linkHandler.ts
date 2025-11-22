@@ -25,24 +25,31 @@ export class LinkHandler {
     /**
      * Enhanced file link handler with workspace-relative path support
      */
-    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number) {
+    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: any) {
         try {
+            console.log('[handleFileLink] href:', href);
+            console.log('[handleFileLink] taskId:', taskId, 'columnId:', columnId);
+            console.log('[handleFileLink] includeContext:', includeContext ? `includeDir: ${includeContext.includeDir}` : 'none');
+
             if (href.startsWith('file://')) {
                 href = vscode.Uri.parse(href).fsPath;
             }
 
             if (href.startsWith('vscode-webview://')) {
+                console.log('[handleFileLink] Skipping vscode-webview:// URI');
                 return;
             }
 
-            const resolution = await this._fileManager.resolveFilePath(href);
-            
+            const resolution = await this._fileManager.resolveFilePath(href, includeContext);
+            console.log('[handleFileLink] Resolution result:', JSON.stringify(resolution, null, 2));
+
             if (!resolution) {
                 vscode.window.showErrorMessage(`Could not resolve file path: ${href}`);
                 return;
             }
 
             const { resolvedPath, exists, isAbsolute, attemptedPaths } = resolution;
+            console.log('[handleFileLink] exists:', exists, 'resolvedPath:', resolvedPath);
 
             if (!exists) {
                 // Unified behavior: Open an incremental QuickPick and stream results.
