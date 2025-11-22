@@ -3523,19 +3523,11 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         event.preventDefault();
         event.stopPropagation();
         const originalSrc = img.getAttribute('data-original-src') || img.getAttribute('src');
-        const actualSrc = img.getAttribute('src');
-
-        console.log('[Image-Click] data-original-src:', img.getAttribute('data-original-src'));
-        console.log('[Image-Click] src:', actualSrc);
-        console.log('[Image-Click] Using:', originalSrc);
-        console.log('[Image-Click] taskId:', taskId, 'columnId:', columnId);
-        console.log('[Image-Click] includeContext:', includeContext);
 
         if (originalSrc && !originalSrc.startsWith('data:') && !originalSrc.startsWith('vscode-webview://')) {
             // Calculate index for images using the src attribute
             const srcAttr = img.getAttribute('data-original-src') ? 'data-original-src' : 'src';
             linkIndex = findElementIndex(img, containerElement, srcAttr);
-
 
             vscode.postMessage({
                 type: 'openFileLink',
@@ -3545,8 +3537,6 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
                 columnId: columnId,
                 includeContext: includeContext
             });
-        } else {
-            console.log('[Image-Click] Skipped - originalSrc is data: or vscode-webview:// URI');
         }
         return true;
     }

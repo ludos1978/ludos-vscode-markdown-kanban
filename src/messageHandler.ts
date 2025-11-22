@@ -18,6 +18,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as crypto from 'crypto';
 
 // Helper function to log to both console and output channel
 function log(...args: any[]) {
@@ -2223,6 +2224,61 @@ export class MessageHandler {
         }
     }
 
+    /**
+     * Helper: Generate SHA256 hash from buffer
+     */
+    private _generateHash(buffer: Buffer): string {
+        return crypto.createHash('sha256').update(buffer).digest('hex').substring(0, 12);
+    }
+
+    /**
+     * Helper: Format image path according to pathGeneration config
+     */
+    private _formatImagePath(absolutePath: string, kanbanDir: string): string {
+        const pathMode = configService.getPathGenerationMode();
+        if (pathMode === 'absolute') {
+            return absolutePath;
+        }
+        const relativePath = path.relative(kanbanDir, absolutePath);
+        return `./${relativePath.replace(/\\/g, '/')}`;
+    }
+
+    /**
+     * Helper: Generate unique filename with hash, handling collisions
+     */
+    private _generateUniqueImageFilename(
+        mediaFolderPath: string,
+        originalFileName: string,
+        fileBuffer: Buffer
+    ): string {
+        const extension = path.extname(originalFileName) || '.png';
+        const baseName = path.basename(originalFileName, extension);
+        const hash = this._generateHash(fileBuffer);
+
+        // Try hash-based filename first
+        let candidateFilename = `${baseName}-${hash}${extension}`;
+        let candidatePath = path.join(mediaFolderPath, candidateFilename);
+
+        // Check if file exists with same name
+        if (fs.existsSync(candidatePath)) {
+            const existingBuffer = fs.readFileSync(candidatePath);
+            const existingHash = this._generateHash(existingBuffer);
+
+            // Same hash = same file, reuse it
+            if (existingHash === hash) {
+                console.log('[IMAGE-DROP] File with same hash already exists, reusing:', candidateFilename);
+                return candidateFilename;
+            }
+
+            // Different hash = collision, add timestamp
+            console.log('[IMAGE-DROP] Hash collision detected, adding timestamp');
+            const timestamp = Date.now();
+            candidateFilename = `${baseName}-${hash}-${timestamp}${extension}`;
+        }
+
+        return candidateFilename;
+    }
+
     private async handleSaveDroppedImageFromContents(
         imageData: string,
         originalFileName: string,
@@ -2244,16 +2300,9 @@ export class MessageHandler {
             const fileName = path.basename(currentFilePath);
             const baseFileName = fileName.replace(/\.[^/.]+$/, '');
 
-            // Generate unique filename
-            const extension = path.extname(originalFileName) || '.png';
-            const baseName = path.basename(originalFileName, extension);
-            const timestamp = Date.now();
-            const imageFileName = `${baseName}-${timestamp}${extension}`;
-
             // Create media folder path
             const mediaFolderName = `${baseFileName}-MEDIA`;
             const mediaFolderPath = path.join(directory, mediaFolderName);
-            const imagePath = path.join(mediaFolderPath, imageFileName);
 
             // Ensure media folder exists
             if (!fs.existsSync(mediaFolderPath)) {
@@ -2264,10 +2313,20 @@ export class MessageHandler {
             const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
             const buffer = Buffer.from(base64Only, 'base64');
 
-            // Write image file
-            fs.writeFileSync(imagePath, buffer);
+            // Generate unique filename with hash-based collision detection
+            const imageFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, buffer);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
 
-            console.log('[IMAGE-DROP] Saved dropped image:', imageFileName);
+            // Write image file (unless it already exists with same hash)
+            if (!fs.existsSync(imagePath)) {
+                fs.writeFileSync(imagePath, buffer);
+                console.log('[IMAGE-DROP] Saved dropped image:', imageFileName);
+            } else {
+                console.log('[IMAGE-DROP] Reusing existing image:', imageFileName);
+            }
+
+            // Format path according to pathGeneration config
+            const formattedPath = this._formatImagePath(imagePath, directory);
 
             // Notify frontend
             const panel = this._getWebviewPanel();
@@ -2275,7 +2334,7 @@ export class MessageHandler {
                 panel._panel.webview.postMessage({
                     type: 'droppedImageSaved',
                     success: true,
-                    relativePath: `./${mediaFolderName}/${imageFileName}`,
+                    relativePath: formattedPath,
                     originalFileName: originalFileName,
                     dropPosition: dropPosition
                 });
@@ -2315,17 +2374,17 @@ export class MessageHandler {
             const isInKanbanDir = sourceDirResolved.startsWith(kanbanDirResolved);
 
             if (isInKanbanDir) {
-                // File is already in workspace - create relative link without copying
-                const relativePath = path.relative(directory, sourcePath).replace(/\\/g, '/');
+                // File is already in workspace - create link without copying
+                const formattedPath = this._formatImagePath(sourcePath, directory);
 
-                console.log('[IMAGE-DROP] Image already in workspace, linking directly:', relativePath);
+                console.log('[IMAGE-DROP] Image already in workspace, linking directly:', formattedPath);
 
                 const panel = this._getWebviewPanel();
                 if (panel && panel._panel) {
                     panel._panel.webview.postMessage({
                         type: 'droppedImageSaved',
                         success: true,
-                        relativePath: `./${relativePath}`,
+                        relativePath: formattedPath,
                         originalFileName: originalFileName,
                         dropPosition: dropPosition,
                         wasLinked: true // Flag to show notification
@@ -2335,28 +2394,36 @@ export class MessageHandler {
             }
 
             // File is outside workspace - copy to MEDIA folder
-            const extension = path.extname(originalFileName);
-            const baseName = path.basename(originalFileName, extension);
-            const timestamp = Date.now();
-            const imageFileName = `${baseName}-${timestamp}${extension}`;
-
             const mediaFolderName = `${baseFileName}-MEDIA`;
             const mediaFolderPath = path.join(directory, mediaFolderName);
-            const imagePath = path.join(mediaFolderPath, imageFileName);
 
             // Ensure media folder exists
             if (!fs.existsSync(mediaFolderPath)) {
                 fs.mkdirSync(mediaFolderPath, { recursive: true });
             }
 
-            // Copy file from source to media folder
+            // Check if source file exists
             if (!fs.existsSync(sourcePath)) {
                 throw new Error(`Source file not found: ${sourcePath}`);
             }
 
-            fs.copyFileSync(sourcePath, imagePath);
+            // Read source file to generate hash
+            const sourceBuffer = fs.readFileSync(sourcePath);
 
-            console.log('[IMAGE-DROP] Copied image from:', sourcePath, 'to:', imagePath);
+            // Generate unique filename with hash-based collision detection
+            const imageFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, sourceBuffer);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
+
+            // Copy file (unless it already exists with same hash)
+            if (!fs.existsSync(imagePath)) {
+                fs.copyFileSync(sourcePath, imagePath);
+                console.log('[IMAGE-DROP] Copied image from:', sourcePath, 'to:', imagePath);
+            } else {
+                console.log('[IMAGE-DROP] Reusing existing image:', imageFileName);
+            }
+
+            // Format path according to pathGeneration config
+            const formattedPath = this._formatImagePath(imagePath, directory);
 
             // Notify frontend
             const panel = this._getWebviewPanel();
@@ -2364,7 +2431,7 @@ export class MessageHandler {
                 panel._panel.webview.postMessage({
                     type: 'droppedImageSaved',
                     success: true,
-                    relativePath: `./${mediaFolderName}/${imageFileName}`,
+                    relativePath: formattedPath,
                     originalFileName: originalFileName,
                     dropPosition: dropPosition,
                     wasCopied: true // Flag to show notification

@@ -352,15 +352,9 @@ export class FileManager {
 
             if (documentPath) {
                 const currentDir = path.dirname(documentPath);
-                console.log('[resolveFilePath] Document path:', documentPath);
-                console.log('[resolveFilePath] Document dir:', currentDir);
-                console.log('[resolveFilePath] Resolving:', decodedHref, 'from', currentDir);
                 const candidate = path.resolve(currentDir, decodedHref);
-                console.log('[resolveFilePath] Candidate:', candidate);
                 candidates.push(candidate);
                 attemptedPaths.push(candidate);
-            } else {
-                console.log('[resolveFilePath] No document or file path available');
             }
 
             // Second: Check in all workspace folders
