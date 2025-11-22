@@ -2863,6 +2863,28 @@ window.addEventListener('message', event => {
                     message.dropPosition,
                     markdownLink
                 );
+
+                // Show notification based on what happened
+                if (message.wasCopied && window.activityManager) {
+                    // Image was copied from outside workspace
+                    const operationId = `image-copy-${Date.now()}`;
+                    window.activityManager.startOperation(
+                        operationId,
+                        'info',
+                        `Image copied to MEDIA folder`
+                    );
+                    window.activityManager.updateProgress(operationId, 100);
+                } else if (message.wasLinked && window.activityManager) {
+                    // Image was already in workspace, just linked
+                    const operationId = `image-link-${Date.now()}`;
+                    window.activityManager.startOperation(
+                        operationId,
+                        'info',
+                        `Image linked (already in workspace)`
+                    );
+                    window.activityManager.updateProgress(operationId, 100);
+                }
+                // If neither flag, it's from external drop (always copied, no notification needed)
             } else {
                 console.error('[Image-Drop] Failed to save image:', message.error);
                 // Create error task if save failed

@@ -2307,13 +2307,39 @@ export class MessageHandler {
             const fileName = path.basename(currentFilePath);
             const baseFileName = fileName.replace(/\.[^/.]+$/, '');
 
-            // Generate unique filename
+            // Check if file is already in the kanban directory or subdirectories
+            const sourceDirResolved = path.resolve(path.dirname(sourcePath));
+            const kanbanDirResolved = path.resolve(directory);
+
+            // Check if source is in kanban directory or its subdirectories
+            const isInKanbanDir = sourceDirResolved.startsWith(kanbanDirResolved);
+
+            if (isInKanbanDir) {
+                // File is already in workspace - create relative link without copying
+                const relativePath = path.relative(directory, sourcePath).replace(/\\/g, '/');
+
+                console.log('[IMAGE-DROP] Image already in workspace, linking directly:', relativePath);
+
+                const panel = this._getWebviewPanel();
+                if (panel && panel._panel) {
+                    panel._panel.webview.postMessage({
+                        type: 'droppedImageSaved',
+                        success: true,
+                        relativePath: `./${relativePath}`,
+                        originalFileName: originalFileName,
+                        dropPosition: dropPosition,
+                        wasLinked: true // Flag to show notification
+                    });
+                }
+                return;
+            }
+
+            // File is outside workspace - copy to MEDIA folder
             const extension = path.extname(originalFileName);
             const baseName = path.basename(originalFileName, extension);
             const timestamp = Date.now();
             const imageFileName = `${baseName}-${timestamp}${extension}`;
 
-            // Create media folder path
             const mediaFolderName = `${baseFileName}-MEDIA`;
             const mediaFolderPath = path.join(directory, mediaFolderName);
             const imagePath = path.join(mediaFolderPath, imageFileName);
@@ -2340,7 +2366,8 @@ export class MessageHandler {
                     success: true,
                     relativePath: `./${mediaFolderName}/${imageFileName}`,
                     originalFileName: originalFileName,
-                    dropPosition: dropPosition
+                    dropPosition: dropPosition,
+                    wasCopied: true // Flag to show notification
                 });
             }
 
