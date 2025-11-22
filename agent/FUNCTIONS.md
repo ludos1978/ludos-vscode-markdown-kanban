@@ -930,5 +930,5 @@ Total functions documented: **523**
 ## src/html/boardRenderer.js - Board Rendering and Layout System
 
 ### New Functions (2025-11-22):
-- src/html/boardRenderer-waitForColumnImagesAndRecalculateStack - Wait for all images in a specific column to load, then recalculate its stack heights to ensure accurate layout
-- src/html/boardRenderer-setupImageLoadingWatchers - Set up image loading watchers for all non-collapsed columns; each column recalculates its stack independently when images finish loading
+- src/html/boardRenderer-waitForStackImagesAndRecalculate - Wait for ALL images in a stack to load, then recalculate stack heights once; ensures final column positions are correct after all images have loaded (overlaps during loading are acceptable); handles cached images and failed images (5s timeout)
+- src/html/boardRenderer-setupImageLoadingWatchers - Set up image loading watchers for all stacks; each stack waits for ALL its images before recalculating once; called AFTER initial stack calculation (at 50ms)
