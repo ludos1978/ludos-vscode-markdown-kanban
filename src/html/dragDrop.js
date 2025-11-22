@@ -1959,14 +1959,60 @@ function handleVSCodeFileDrop(e, files) {
     const file = files[0];
     const fileName = file.name;
 
-    // Create appropriate link format based on file type
-    const fileLink = createFileMarkdownLink(fileName); // For direct file drops, use filename as path
+    // Check if it's an image file
+    const isImage = file.type.startsWith('image/');
 
-    createNewTaskWithContent(
-        fileName,  // Title: actual filename
-        { x: e.clientX, y: e.clientY },
-        fileLink   // Description: formatted link
-    );
+    if (isImage) {
+        console.log('[Image-Drop] Dropped external image file:', fileName, 'type:', file.type);
+
+        // Read image file contents and save to MEDIA folder
+        // This works for external drops (Finder/Explorer) where we don't have the path
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const base64Data = event.target.result.split(',')[1];
+
+                console.log('[Image-Drop] Image read successfully, sending to backend');
+
+                // Send to backend to save (reuse clipboard image infrastructure)
+                vscode.postMessage({
+                    type: 'saveDroppedImageFromContents',
+                    imageData: base64Data,
+                    originalFileName: fileName,
+                    imageType: file.type,
+                    dropPosition: { x: e.clientX, y: e.clientY }
+                });
+            } catch (error) {
+                console.error('[Image-Drop] Failed to process image:', error);
+
+                // Fallback: create task with broken link
+                createNewTaskWithContent(
+                    fileName,
+                    { x: e.clientX, y: e.clientY },
+                    `![${fileName}](${fileName}) - Failed to copy image`
+                );
+            }
+        };
+
+        reader.onerror = function(error) {
+            console.error('[Image-Drop] FileReader error:', error);
+            createNewTaskWithContent(
+                fileName,
+                { x: e.clientX, y: e.clientY },
+                `![${fileName}](${fileName}) - Failed to read image`
+            );
+        };
+
+        reader.readAsDataURL(file);
+    } else {
+        // Non-image file - keep current behavior
+        const fileLink = createFileMarkdownLink(fileName);
+        createNewTaskWithContent(
+            fileName,
+            { x: e.clientX, y: e.clientY },
+            fileLink
+        );
+    }
 }
 
 
@@ -1977,32 +2023,63 @@ function handleVSCodeUriDrop(e, uriData) {
     });
 
     if (uris.length > 0) {
-        // Prepare all tasks data
-        const tasksData = uris.map(uri => {
-            let filename = uri;
-            let fullPath = uri;
+        // Separate images from other files
+        const imageUris = [];
+        const otherFileUris = [];
 
-            if (uri.startsWith('file://')) {
-                // Extract filename from file:// URIs
-                filename = decodeURIComponent(uri).split('/').pop() || uri;
-                fullPath = decodeURIComponent(uri); // Keep full path for link creation
+        uris.forEach(uri => {
+            const filename = uri.split('/').pop() || uri;
+            const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
+
+            if (isImage) {
+                imageUris.push(uri);
             } else {
-                // For non-file URIs, try to get the filename
-                filename = uri.split('/').pop() || uri;
-                fullPath = uri;
+                otherFileUris.push(uri);
             }
-
-            // Create appropriate link format based on file type
-            const fileLink = createFileMarkdownLink(fullPath);
-
-            return {
-                title: filename,
-                description: fileLink
-            };
         });
 
-        // Batch create all tasks at once (single render)
-        createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
+        // Handle image URIs: copy to MEDIA folder
+        imageUris.forEach(uri => {
+            const fullPath = uri.startsWith('file://')
+                ? decodeURIComponent(uri.replace('file://', ''))
+                : uri;
+            const filename = fullPath.split('/').pop() || uri;
+
+            console.log('[Image-Drop] VS Code image URI:', filename);
+
+            // Ask backend to copy from source path to MEDIA
+            vscode.postMessage({
+                type: 'copyImageToMedia',
+                sourcePath: fullPath,
+                originalFileName: filename,
+                dropPosition: { x: e.clientX, y: e.clientY }
+            });
+        });
+
+        // Handle non-image files: keep current behavior
+        if (otherFileUris.length > 0) {
+            const tasksData = otherFileUris.map(uri => {
+                let filename = uri;
+                let fullPath = uri;
+
+                if (uri.startsWith('file://')) {
+                    filename = decodeURIComponent(uri).split('/').pop() || uri;
+                    fullPath = decodeURIComponent(uri);
+                } else {
+                    filename = uri.split('/').pop() || uri;
+                    fullPath = uri;
+                }
+
+                const fileLink = createFileMarkdownLink(fullPath);
+
+                return {
+                    title: filename,
+                    description: fileLink
+                };
+            });
+
+            createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
+        }
     } else {
         // Could not process dropped file URIs
     }

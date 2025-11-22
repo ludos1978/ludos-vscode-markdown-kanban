@@ -935,3 +935,12 @@ Total functions documented: **523**
 
 ### Modified Functions (2025-11-22):
 - src/html/menuOperations-deleteTask - Added stack height recalculation after task deletion to update positions of all columns in the stack
+- src/html/dragDrop-handleVSCodeFileDrop - Enhanced to detect image files and read contents to save to MEDIA folder instead of creating broken links; works for external file drops (Finder/Explorer)
+- src/html/dragDrop-handleVSCodeUriDrop - Enhanced to detect image URIs and copy files to MEDIA folder; works for VS Code Explorer drops with full file paths
+- src/messageHandler-handleMessage - Added cases for 'saveDroppedImageFromContents' and 'copyImageToMedia' to handle dropped images
+- src/html/webview-messageHandler - Added case for 'droppedImageSaved' to create task with proper markdown image link after backend saves image
+
+### New Functions (2025-11-22 - Image Drop):
+- src/messageHandler-handleSaveDroppedImageFromContents - Save dropped image from base64 contents (external drops); reads file contents, saves to [kanban]-MEDIA folder with unique filename
+- src/messageHandler-handleCopyImageToMedia - Copy dropped image from file path (VS Code Explorer drops); copies file to [kanban]-MEDIA folder with unique filename
+- src/messageHandler-_sendImageDropError - Helper to send error message to frontend when image drop fails

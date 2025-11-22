@@ -2847,6 +2847,32 @@ window.addEventListener('message', event => {
                 );
             }
             break;
+
+        case 'droppedImageSaved':
+            // Handle dropped image save response from backend
+            if (message.success) {
+                console.log('[Image-Drop] Image saved successfully:', message.relativePath);
+
+                // Create task with original filename (without timestamp) as title
+                const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                const safePath = escapeFilePath(message.relativePath);
+                const markdownLink = `![](${safePath})`;
+
+                createNewTaskWithContent(
+                    originalName,
+                    message.dropPosition,
+                    markdownLink
+                );
+            } else {
+                console.error('[Image-Drop] Failed to save image:', message.error);
+                // Create error task if save failed
+                createNewTaskWithContent(
+                    'Dropped Image (Error)',
+                    message.dropPosition,
+                    `Failed to save image: ${message.error || 'Unknown error'}`
+                );
+            }
+            break;
         case 'insertSnippetContent':
             // Insert VS Code snippet content into the active editor
             insertVSCodeSnippetContent(message.content, message.fieldType, message.taskId);

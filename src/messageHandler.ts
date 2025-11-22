@@ -920,6 +920,23 @@ export class MessageHandler {
                 );
                 break;
 
+            case 'saveDroppedImageFromContents':
+                await this.handleSaveDroppedImageFromContents(
+                    message.imageData,
+                    message.originalFileName,
+                    message.imageType,
+                    message.dropPosition
+                );
+                break;
+
+            case 'copyImageToMedia':
+                await this.handleCopyImageToMedia(
+                    message.sourcePath,
+                    message.originalFileName,
+                    message.dropPosition
+                );
+                break;
+
             case 'getExportDefaultFolder':
                 await this.handleGetExportDefaultFolder();
                 break;
@@ -2203,6 +2220,145 @@ export class MessageHandler {
                     dropPosition: dropPosition
                 });
             }
+        }
+    }
+
+    private async handleSaveDroppedImageFromContents(
+        imageData: string,
+        originalFileName: string,
+        imageType: string,
+        dropPosition: { x: number; y: number }
+    ): Promise<void> {
+        try {
+            // Get current file path
+            const document = this._fileManager.getDocument();
+            const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
+            if (!currentFilePath) {
+                console.error('[IMAGE-DROP] No current file path available');
+                this._sendImageDropError('No current file path available', dropPosition);
+                return;
+            }
+
+            // Extract directory and base filename
+            const directory = path.dirname(currentFilePath);
+            const fileName = path.basename(currentFilePath);
+            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+
+            // Generate unique filename
+            const extension = path.extname(originalFileName) || '.png';
+            const baseName = path.basename(originalFileName, extension);
+            const timestamp = Date.now();
+            const imageFileName = `${baseName}-${timestamp}${extension}`;
+
+            // Create media folder path
+            const mediaFolderName = `${baseFileName}-MEDIA`;
+            const mediaFolderPath = path.join(directory, mediaFolderName);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
+
+            // Ensure media folder exists
+            if (!fs.existsSync(mediaFolderPath)) {
+                fs.mkdirSync(mediaFolderPath, { recursive: true });
+            }
+
+            // Convert base64 to buffer
+            const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+            const buffer = Buffer.from(base64Only, 'base64');
+
+            // Write image file
+            fs.writeFileSync(imagePath, buffer);
+
+            console.log('[IMAGE-DROP] Saved dropped image:', imageFileName);
+
+            // Notify frontend
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'droppedImageSaved',
+                    success: true,
+                    relativePath: `./${mediaFolderName}/${imageFileName}`,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition
+                });
+            }
+
+        } catch (error) {
+            console.error('[IMAGE-DROP] Error saving dropped image:', error);
+            this._sendImageDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition);
+        }
+    }
+
+    private async handleCopyImageToMedia(
+        sourcePath: string,
+        originalFileName: string,
+        dropPosition: { x: number; y: number }
+    ): Promise<void> {
+        try {
+            // Get current file path
+            const document = this._fileManager.getDocument();
+            const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
+            if (!currentFilePath) {
+                console.error('[IMAGE-DROP] No current file path available');
+                this._sendImageDropError('No current file path available', dropPosition);
+                return;
+            }
+
+            // Extract directory and base filename
+            const directory = path.dirname(currentFilePath);
+            const fileName = path.basename(currentFilePath);
+            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+
+            // Generate unique filename
+            const extension = path.extname(originalFileName);
+            const baseName = path.basename(originalFileName, extension);
+            const timestamp = Date.now();
+            const imageFileName = `${baseName}-${timestamp}${extension}`;
+
+            // Create media folder path
+            const mediaFolderName = `${baseFileName}-MEDIA`;
+            const mediaFolderPath = path.join(directory, mediaFolderName);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
+
+            // Ensure media folder exists
+            if (!fs.existsSync(mediaFolderPath)) {
+                fs.mkdirSync(mediaFolderPath, { recursive: true });
+            }
+
+            // Copy file from source to media folder
+            if (!fs.existsSync(sourcePath)) {
+                throw new Error(`Source file not found: ${sourcePath}`);
+            }
+
+            fs.copyFileSync(sourcePath, imagePath);
+
+            console.log('[IMAGE-DROP] Copied image from:', sourcePath, 'to:', imagePath);
+
+            // Notify frontend
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'droppedImageSaved',
+                    success: true,
+                    relativePath: `./${mediaFolderName}/${imageFileName}`,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition
+                });
+            }
+
+        } catch (error) {
+            console.error('[IMAGE-DROP] Error copying image:', error);
+            this._sendImageDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition);
+        }
+    }
+
+    private _sendImageDropError(error: string, dropPosition: { x: number; y: number }): void {
+        const panel = this._getWebviewPanel();
+        if (panel && panel._panel) {
+            panel._panel.webview.postMessage({
+                type: 'droppedImageSaved',
+                success: false,
+                error: error,
+                dropPosition: dropPosition
+            });
         }
     }
 
