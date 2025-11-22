@@ -19,5 +19,8 @@ kanban-plugin: board
 ##  #stack
 - [ ] image-512x512.png
   ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-image-tests/folder%20with%20space%202/image-512x512.png)
+  
+
+## !!!include(./root/mid/presentation-with-images.md)!!!
 
 

@@ -2,7 +2,7 @@
 - [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
 Pressing enter should start editing the task.
 
-- [ ] might it be that the way a file is !!!included()!!! (different types of paths) has an influence on the tracking of changes?
+- [x] might it be that the way a file is !!!included()!!! (different types of paths) has an influence on the tracking of changes?
 the path might be of an included file:
 - absolute to the filesystem
 - relative to the include file (the included markdown file, if it's included)
