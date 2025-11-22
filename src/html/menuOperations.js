@@ -2393,7 +2393,20 @@ function deleteTask(taskId, columnId) {
             // Remove task from DOM immediately
             const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
             if (taskElement) {
+                // Get the column element before removing the task
+                const columnElement = taskElement.closest('.kanban-full-height-column');
+
                 taskElement.remove();
+
+                // Recalculate stack heights after task deletion
+                // Task deletion changes column height, so we need to recalculate positions
+                if (columnElement) {
+                    const stack = columnElement.closest('.kanban-column-stack');
+                    if (stack && typeof recalculateStackHeightsImmediate === 'function') {
+                        console.log('[Task-Delete] Recalculating stack heights after task deletion');
+                        recalculateStackHeightsImmediate(stack);
+                    }
+                }
             }
 
             // Check if column is now empty and add placeholder button

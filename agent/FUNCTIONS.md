@@ -932,3 +932,6 @@ Total functions documented: **523**
 ### New Functions (2025-11-22):
 - src/html/boardRenderer-waitForStackImagesAndRecalculate - Wait for ALL images in a stack to load, then recalculate stack heights once; ensures final column positions are correct after all images have loaded (overlaps during loading are acceptable); handles cached images and failed images (5s timeout)
 - src/html/boardRenderer-setupImageLoadingWatchers - Set up image loading watchers for all stacks; each stack waits for ALL its images before recalculating once; called AFTER initial stack calculation (at 50ms)
+
+### Modified Functions (2025-11-22):
+- src/html/menuOperations-deleteTask - Added stack height recalculation after task deletion to update positions of all columns in the stack
