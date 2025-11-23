@@ -22,15 +22,20 @@ export class ExcalidrawService {
             // Read file content
             const content = await fs.promises.readFile(filePath, 'utf8');
 
-            // Determine file type and extract JSON data
+            // For .excalidraw.svg files, return the SVG directly!
+            // Excalidraw already exported these to SVG, no conversion needed
+            if (filePath.endsWith('.excalidraw.svg')) {
+                console.log(`[ExcalidrawService] ✅ Using embedded SVG: ${path.basename(filePath)} (${content.length} bytes)`);
+                return content;
+            }
+
+            // For .excalidraw and .excalidraw.json files, we need to convert
             let excalidrawData: any;
 
-            if (filePath.endsWith('.excalidraw.svg')) {
-                // Extract JSON from SVG file (excalidraw embeds JSON in SVG comments)
-                excalidrawData = this.extractJsonFromSvg(content);
-            } else {
-                // Parse as JSON directly (.excalidraw or .excalidraw.json)
+            try {
                 excalidrawData = JSON.parse(content);
+            } catch (error) {
+                throw new Error('Failed to parse Excalidraw JSON file');
             }
 
             // Validate excalidraw data structure
@@ -126,67 +131,132 @@ export class ExcalidrawService {
      * Attempt to use @excalidraw/excalidraw library for conversion
      *
      * IMPLEMENTATION NOTE:
-     * The @excalidraw/excalidraw package is primarily designed for browser use.
-     * For server-side rendering, we have several options:
-     *
-     * 1. Use excalidraw-to-svg package (if it exists as standalone)
-     * 2. Use puppeteer to render in headless browser
-     * 3. Import only the export utilities from excalidraw
-     *
-     * This requires further research and may need async import of the library.
+     * The @excalidraw/excalidraw package is primarily designed for browser use
+     * and requires DOM APIs. For server-side, we create a simplified SVG representation.
      */
     private async attemptLibraryConversion(excalidrawData: any): Promise<string> {
-        // Try to dynamically import excalidraw
         try {
-            // Attempt 1: Try to import exportToSvg from excalidraw
-            // Note: This may fail if the library has browser dependencies
-            // const { exportToSvg } = await import('@excalidraw/excalidraw');
-            // const svgElement = await exportToSvg(excalidrawData);
-            // return svgElement.outerHTML;
+            // The @excalidraw/excalidraw library requires browser APIs (DOM)
+            // For Node.js environment, we'll create a basic SVG representation
 
-            // For now, throw to use fallback
-            // This will be implemented once we add the dependency
-            throw new Error('Excalidraw library not yet integrated');
+            // Import needed functions (this might fail in Node.js)
+            const excalidraw = await import('@excalidraw/excalidraw');
+
+            // Check if exportToSvg is available
+            if (typeof excalidraw.exportToSvg === 'function') {
+                // Try to use it (might fail without DOM)
+                const svgElement = await excalidraw.exportToSvg(excalidrawData);
+                if (svgElement && typeof svgElement.outerHTML === 'string') {
+                    return svgElement.outerHTML;
+                }
+            }
+
+            // If we get here, the library didn't work
+            throw new Error('exportToSvg not available or failed');
 
         } catch (error) {
-            throw new Error(`Failed to use excalidraw library: ${error}`);
+            // Library failed (expected in Node.js), use manual SVG generation
+            console.log('[ExcalidrawService] Library conversion not available, using manual SVG generation');
+            throw error;
         }
     }
 
     /**
-     * Create a simple fallback SVG when library conversion fails
-     * This ensures the export doesn't break even if conversion isn't perfect
+     * Create a simplified SVG rendering from Excalidraw JSON
+     * Renders basic shapes when the excalidraw library is not available
      */
     private createFallbackSVG(excalidrawData: any): string {
-        const elementCount = excalidrawData.elements?.length || 0;
-        const width = 800;
-        const height = 600;
+        const elements = excalidrawData.elements || [];
+
+        if (elements.length === 0) {
+            const width = 800;
+            const height = 600;
+            return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#ffffff" stroke="#cccccc" stroke-width="2"/>
+  <text x="${width / 2}" y="${height / 2}" text-anchor="middle" font-family="Arial" font-size="18" fill="#666">
+    Empty Excalidraw Diagram
+  </text>
+</svg>`;
+        }
+
+        // Calculate bounding box
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        for (const el of elements) {
+            if (el.x !== undefined && el.y !== undefined && el.width !== undefined && el.height !== undefined) {
+                minX = Math.min(minX, el.x);
+                minY = Math.min(minY, el.y);
+                maxX = Math.max(maxX, el.x + el.width);
+                maxY = Math.max(maxY, el.y + el.height);
+            }
+        }
+
+        // Add padding
+        const padding = 20;
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Generate SVG elements
+        let svgElements = '';
+
+        for (const el of elements) {
+            const x = (el.x || 0) - minX;
+            const y = (el.y || 0) - minY;
+            const w = el.width || 0;
+            const h = el.height || 0;
+            const stroke = el.strokeColor || '#000000';
+            const fill = el.backgroundColor || 'transparent';
+            const strokeWidth = el.strokeWidth || 1;
+
+            switch (el.type) {
+                case 'rectangle':
+                    svgElements += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />\n`;
+                    break;
+                case 'ellipse':
+                    svgElements += `<ellipse cx="${x + w/2}" cy="${y + h/2}" rx="${w/2}" ry="${h/2}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />\n`;
+                    break;
+                case 'diamond':
+                    const cx = x + w/2, cy = y + h/2;
+                    svgElements += `<path d="M ${cx} ${y} L ${x+w} ${cy} L ${cx} ${y+h} L ${x} ${cy} Z" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />\n`;
+                    break;
+                case 'line':
+                case 'arrow':
+                    if (el.points && el.points.length >= 2) {
+                        const points = el.points.map((p: any) => `${x + p[0]},${y + p[1]}`).join(' ');
+                        svgElements += `<polyline points="${points}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" />\n`;
+                        if (el.type === 'arrow' && el.points.length >= 2) {
+                            // Add simple arrowhead
+                            const lastIdx = el.points.length - 1;
+                            const lastPoint = el.points[lastIdx];
+                            const prevPoint = el.points[lastIdx - 1];
+                            const angle = Math.atan2(lastPoint[1] - prevPoint[1], lastPoint[0] - prevPoint[0]);
+                            const arrowSize = 10;
+                            const x1 = x + lastPoint[0] - arrowSize * Math.cos(angle - Math.PI / 6);
+                            const y1 = y + lastPoint[1] - arrowSize * Math.sin(angle - Math.PI / 6);
+                            const x2 = x + lastPoint[0] - arrowSize * Math.cos(angle + Math.PI / 6);
+                            const y2 = y + lastPoint[1] - arrowSize * Math.sin(angle + Math.PI / 6);
+                            svgElements += `<path d="M ${x1} ${y1} L ${x + lastPoint[0]} ${y + lastPoint[1]} L ${x2} ${y2}" stroke="${stroke}" stroke-width="${strokeWidth}" fill="none" />\n`;
+                        }
+                    }
+                    break;
+                case 'text':
+                    const text = (el.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const fontSize = el.fontSize || 20;
+                    svgElements += `<text x="${x}" y="${y + fontSize}" font-family="Arial" font-size="${fontSize}" fill="${stroke}">${text}</text>\n`;
+                    break;
+            }
+        }
 
         return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="${width}" height="${height}" fill="#ffffff" stroke="#cccccc" stroke-width="2"/>
-  <text x="${width / 2}" y="${height / 2 - 20}"
-        text-anchor="middle"
-        font-family="Arial, sans-serif"
-        font-size="18"
-        fill="#666666">
-    Excalidraw Diagram
-  </text>
-  <text x="${width / 2}" y="${height / 2 + 10}"
-        text-anchor="middle"
-        font-family="Arial, sans-serif"
-        font-size="14"
-        fill="#999999">
-    ${elementCount} elements
-  </text>
-  <text x="${width / 2}" y="${height / 2 + 40}"
-        text-anchor="middle"
-        font-family="Arial, sans-serif"
-        font-size="12"
-        fill="#999999">
-    (Full rendering requires excalidraw library integration)
-  </text>
-</svg>`;
+  <rect width="${width}" height="${height}" fill="#ffffff"/>
+${svgElements}</svg>`;
     }
 
     /**

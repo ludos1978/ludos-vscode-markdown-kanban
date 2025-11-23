@@ -4839,27 +4839,14 @@ export class MessageHandler {
                 throw new Error('draw.io CLI not installed');
             }
 
-            // Resolve file path relative to the markdown file's directory
-            let absolutePath: string;
+            // Resolve file path (handles both document-relative and workspace-relative paths)
+            const resolution = await panel._fileManager.resolveFilePath(filePath);
 
-            if (path.isAbsolute(filePath)) {
-                absolutePath = filePath;
-            } else {
-                // Get the document from the panel to resolve relative paths correctly
-                const document = panel._fileManager?.getDocument();
-                if (document) {
-                    const documentDir = path.dirname(document.uri.fsPath);
-                    absolutePath = path.resolve(documentDir, filePath);
-                } else {
-                    // Fallback to workspace folder if document not available
-                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-                    if (workspaceFolder) {
-                        absolutePath = path.resolve(workspaceFolder.uri.fsPath, filePath);
-                    } else {
-                        throw new Error('Cannot resolve diagram path: no document or workspace folder');
-                    }
-                }
+            if (!resolution || !resolution.exists) {
+                throw new Error(`draw.io file not found: ${filePath}`);
             }
+
+            const absolutePath = resolution.resolvedPath;
 
             // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
@@ -4909,27 +4896,14 @@ export class MessageHandler {
             const { ExcalidrawService } = await import('./services/export/ExcalidrawService');
             const service = new ExcalidrawService();
 
-            // Resolve file path relative to the markdown file's directory
-            let absolutePath: string;
+            // Resolve file path (handles both document-relative and workspace-relative paths)
+            const resolution = await panel._fileManager.resolveFilePath(filePath);
 
-            if (path.isAbsolute(filePath)) {
-                absolutePath = filePath;
-            } else {
-                // Get the document from the panel to resolve relative paths correctly
-                const document = panel._fileManager?.getDocument();
-                if (document) {
-                    const documentDir = path.dirname(document.uri.fsPath);
-                    absolutePath = path.resolve(documentDir, filePath);
-                } else {
-                    // Fallback to workspace folder if document not available
-                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-                    if (workspaceFolder) {
-                        absolutePath = path.resolve(workspaceFolder.uri.fsPath, filePath);
-                    } else {
-                        throw new Error('Cannot resolve diagram path: no document or workspace folder');
-                    }
-                }
+            if (!resolution || !resolution.exists) {
+                throw new Error(`Excalidraw file not found: ${filePath}`);
             }
+
+            const absolutePath = resolution.resolvedPath;
 
             // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
