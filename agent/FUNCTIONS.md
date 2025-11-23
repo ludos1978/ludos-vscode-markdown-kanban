@@ -458,9 +458,11 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - Properties: uri, label, isValid (shows warning icon if not a kanban file)
 - Command: Opens kanban board when clicked
 
-**KanbanDragAndDropController** - Handles drag & drop of markdown files into sidebar
-- dropMimeTypes: ['text/uri-list']
-- handleDrop: Validates .md files and adds to sidebar
+**KanbanDragAndDropController** - Handles drag & drop of markdown files and reordering
+- dropMimeTypes: ['text/uri-list', 'application/vnd.code.tree.kanbanBoardsSidebar']
+- dragMimeTypes: ['application/vnd.code.tree.kanbanBoardsSidebar']
+- handleDrag: Creates drag data for internal reordering
+- handleDrop: Validates .md files and adds to sidebar, or reorders items if dragged internally
 
 **KanbanSidebarProvider** - Main TreeDataProvider for sidebar
 - Implements: vscode.TreeDataProvider<KanbanBoardItem>
@@ -498,6 +500,8 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - src/kanbanSidebarProvider-KanbanSidebarProvider_showFilterMenu - (NEW 2025-11-22) Show quick pick menu with all filter categories and counts
 - src/kanbanSidebarProvider-KanbanSidebarProvider_getActiveFilter - (NEW 2025-11-22) Get current active filter category
 - src/kanbanSidebarProvider-KanbanSidebarProvider_getCategoryCounts - (NEW 2025-11-22) Get map of category counts
+- src/kanbanSidebarProvider-KanbanSidebarProvider_reorderFiles - (NEW 2025-11-22) Reorder files via drag & drop, insert dragged items before target
+- src/kanbanSidebarProvider-KanbanSidebarProvider_addFile - Add kanban file manually to sidebar (updated to maintain custom order)
 - src/kanbanSidebarProvider-KanbanSidebarProvider_dispose - Dispose all file watchers and resources
 
 ### Features
@@ -507,11 +511,16 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - **Validation caching**: 24-hour TTL cache to avoid repeated file reads
 - **File watching**: Monitors added files for changes/deletion
 - **Workspace awareness**: Handles multi-root workspaces and folder changes
-- **Persistence**: Stores file list in workspaceState (survives VS Code restart)
-- **Filtering**: (NEW 2025-11-22) Filter boards by category: All, Regular, Backups, Conflicts, Autosaves, Unsaved Changes
+- **Persistence**: Stores file list AND custom order in workspaceState (survives VS Code restart)
+- **Filtering**: (NEW 2025-11-22) Filter boards by category: Regular (default), All, Backups, Conflicts, Autosaves, Unsaved Changes
+  - Default filter: Regular Kanbans (hides backup/conflict/autosave files)
   - Real-time category counts
   - Persistent filter state per session
   - Quick pick menu with icons and descriptions
+- **Drag & Drop Reordering**: (NEW 2025-11-22) Reorder kanban boards by dragging items in the list
+  - Drag items to new positions
+  - Custom order persists in workspaceState
+  - Falls back to alphabetical if no custom order
 
 ### File Categories (NEW 2025-11-22)
 - **Regular**: Normal kanban files (e.g., `myboard.md`)

@@ -109,16 +109,42 @@ export class KanbanBoardItem extends vscode.TreeItem {
  * Drag and drop controller for kanban sidebar
  */
 class KanbanDragAndDropController implements vscode.TreeDragAndDropController<KanbanBoardItem> {
-	dropMimeTypes = ['text/uri-list'];
-	dragMimeTypes: string[] = [];
+	dropMimeTypes = ['text/uri-list', 'application/vnd.code.tree.kanbanBoardsSidebar'];
+	dragMimeTypes = ['application/vnd.code.tree.kanbanBoardsSidebar'];
 
 	constructor(private provider: KanbanSidebarProvider) {}
+
+	async handleDrag(
+		source: readonly KanbanBoardItem[],
+		dataTransfer: vscode.DataTransfer,
+		token: vscode.CancellationToken
+	): Promise<void> {
+		if (source.length === 0) {
+			return;
+		}
+
+		// Store the dragged item's file path
+		const filePaths = source.map(item => item.uri.fsPath);
+		dataTransfer.set(
+			'application/vnd.code.tree.kanbanBoardsSidebar',
+			new vscode.DataTransferItem(JSON.stringify(filePaths))
+		);
+	}
 
 	async handleDrop(
 		target: KanbanBoardItem | undefined,
 		dataTransfer: vscode.DataTransfer,
 		token: vscode.CancellationToken
 	): Promise<void> {
+		// Check for internal reordering first
+		const reorderItem = dataTransfer.get('application/vnd.code.tree.kanbanBoardsSidebar');
+		if (reorderItem) {
+			const draggedPaths = JSON.parse(await reorderItem.asString()) as string[];
+			await this.provider.reorderFiles(draggedPaths, target);
+			return;
+		}
+
+		// Handle external file drops
 		const uriListItem = dataTransfer.get('text/uri-list');
 		if (!uriListItem) {
 			return;
@@ -163,8 +189,11 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	private static readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 	// Filter state
-	private activeFilter: FileCategory = FileCategory.All;
+	private activeFilter: FileCategory = FileCategory.Regular;
 	private categoryCounts: Map<FileCategory, number> = new Map();
+
+	// Custom order state
+	private customOrder: string[] = []; // Array of file paths in custom order
 
 	constructor(
 		private context: vscode.ExtensionContext,
@@ -209,6 +238,10 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		const stored = this.context.workspaceState.get<string[]>('kanbanSidebar.files', []);
 		this.kanbanFiles = new Set(stored);
 
+		// Load custom order
+		const storedOrder = this.context.workspaceState.get<string[]>('kanbanSidebar.order', []);
+		this.customOrder = storedOrder.filter(path => this.kanbanFiles.has(path)); // Only keep valid paths
+
 		// Start watching loaded files
 		for (const filePath of this.kanbanFiles) {
 			this.watchFile(filePath);
@@ -220,6 +253,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	 */
 	private async saveToWorkspaceState(): Promise<void> {
 		await this.context.workspaceState.update('kanbanSidebar.files', Array.from(this.kanbanFiles));
+		await this.context.workspaceState.update('kanbanSidebar.order', this.customOrder);
 	}
 
 	/**
@@ -267,8 +301,31 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			));
 		}
 
-		// Sort by filename
-		items.sort((a, b) => a.label.localeCompare(b.label));
+		// Sort by custom order if available, otherwise alphabetically
+		if (this.customOrder.length > 0) {
+			items.sort((a, b) => {
+				const indexA = this.customOrder.indexOf(a.uri.fsPath);
+				const indexB = this.customOrder.indexOf(b.uri.fsPath);
+
+				// If both items are in custom order, use that order
+				if (indexA !== -1 && indexB !== -1) {
+					return indexA - indexB;
+				}
+				// If only A is in custom order, it comes first
+				if (indexA !== -1) {
+					return -1;
+				}
+				// If only B is in custom order, it comes first
+				if (indexB !== -1) {
+					return 1;
+				}
+				// Neither in custom order, sort alphabetically
+				return a.label.localeCompare(b.label);
+			});
+		} else {
+			// No custom order, sort alphabetically
+			items.sort((a, b) => a.label.localeCompare(b.label));
+		}
 
 		return items;
 	}
@@ -377,39 +434,6 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	}
 
 	/**
-	 * Add kanban file manually
-	 */
-	async addFile(uri: vscode.Uri): Promise<void> {
-		const filePath = uri.fsPath;
-
-		// Check if already exists
-		if (this.kanbanFiles.has(filePath)) {
-			vscode.window.showWarningMessage('File already in kanban list');
-			return;
-		}
-
-		// Validate it's a kanban file
-		const isValid = await this.isKanbanFile(filePath);
-		if (!isValid) {
-			const choice = await vscode.window.showWarningMessage(
-				'This file does not appear to be a kanban board (missing "kanban-plugin: board" in YAML header). Add anyway?',
-				'Yes', 'No'
-			);
-			if (choice !== 'Yes') {
-				return;
-			}
-		}
-
-		// Add to list
-		this.kanbanFiles.add(filePath);
-		this.watchFile(filePath);
-		await this.saveToWorkspaceState();
-		this.refresh();
-
-		vscode.window.showInformationMessage(`Added ${path.basename(filePath)} to kanban list`);
-	}
-
-	/**
 	 * Remove kanban file
 	 */
 	async removeFile(item: KanbanBoardItem): Promise<void> {
@@ -418,6 +442,9 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		this.kanbanFiles.delete(filePath);
 		this.unwatchFile(filePath);
 		this.validationCache.delete(filePath);
+
+		// Remove from custom order
+		this.customOrder = this.customOrder.filter(path => path !== filePath);
 
 		await this.saveToWorkspaceState();
 		this.refresh();
@@ -545,16 +572,16 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		// Build quick pick items with counts
 		const items: vscode.QuickPickItem[] = [
 			{
-				label: `$(${FileTypeDetector.getCategoryIcon(FileCategory.All)}) All Files`,
-				description: `${this.kanbanFiles.size} file(s)`,
-				detail: 'Show all kanban boards',
-				picked: this.activeFilter === FileCategory.All
-			},
-			{
 				label: `$(${FileTypeDetector.getCategoryIcon(FileCategory.Regular)}) Regular Kanbans`,
 				description: `${this.categoryCounts.get(FileCategory.Regular) || 0} file(s)`,
-				detail: 'Show only regular kanban boards',
+				detail: 'Show only regular kanban boards (default)',
 				picked: this.activeFilter === FileCategory.Regular
+			},
+			{
+				label: `$(${FileTypeDetector.getCategoryIcon(FileCategory.All)}) All Files`,
+				description: `${this.kanbanFiles.size} file(s)`,
+				detail: 'Show all kanban boards (including backups, conflicts, etc.)',
+				picked: this.activeFilter === FileCategory.All
 			},
 			{
 				label: `$(${FileTypeDetector.getCategoryIcon(FileCategory.Backups)}) Backups`,
@@ -590,8 +617,8 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		if (selected) {
 			// Extract category from label
 			const categoryMap: { [key: string]: FileCategory } = {
-				'All Files': FileCategory.All,
 				'Regular Kanbans': FileCategory.Regular,
+				'All Files': FileCategory.All,
 				'Backups': FileCategory.Backups,
 				'Conflicts': FileCategory.Conflicts,
 				'Autosaves': FileCategory.Autosaves,
@@ -619,6 +646,84 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	 */
 	getCategoryCounts(): Map<FileCategory, number> {
 		return new Map(this.categoryCounts);
+	}
+
+	/**
+	 * Reorder files via drag & drop
+	 */
+	async reorderFiles(draggedPaths: string[], target: KanbanBoardItem | undefined): Promise<void> {
+		// Get all current file paths in display order
+		const currentItems = await this.getChildren();
+		const currentOrder = currentItems.map(item => item.uri.fsPath);
+
+		// Remove dragged items from current order
+		const withoutDragged = currentOrder.filter(path => !draggedPaths.includes(path));
+
+		let newOrder: string[];
+
+		if (target) {
+			// Insert before target
+			const targetIndex = withoutDragged.indexOf(target.uri.fsPath);
+			if (targetIndex !== -1) {
+				newOrder = [
+					...withoutDragged.slice(0, targetIndex),
+					...draggedPaths,
+					...withoutDragged.slice(targetIndex)
+				];
+			} else {
+				// Target not found, append at end
+				newOrder = [...withoutDragged, ...draggedPaths];
+			}
+		} else {
+			// No target, append at end
+			newOrder = [...withoutDragged, ...draggedPaths];
+		}
+
+		// Update custom order
+		this.customOrder = newOrder;
+
+		// Save and refresh
+		await this.saveToWorkspaceState();
+		this.refresh();
+	}
+
+	/**
+	 * Add file to sidebar and update custom order
+	 */
+	async addFile(uri: vscode.Uri): Promise<void> {
+		const filePath = uri.fsPath;
+
+		// Check if already exists
+		if (this.kanbanFiles.has(filePath)) {
+			vscode.window.showWarningMessage('File already in kanban list');
+			return;
+		}
+
+		// Validate it's a kanban file
+		const isValid = await this.isKanbanFile(filePath);
+		if (!isValid) {
+			const choice = await vscode.window.showWarningMessage(
+				'This file does not appear to be a kanban board (missing "kanban-plugin: board" in YAML header). Add anyway?',
+				'Yes', 'No'
+			);
+			if (choice !== 'Yes') {
+				return;
+			}
+		}
+
+		// Add to list
+		this.kanbanFiles.add(filePath);
+		this.watchFile(filePath);
+
+		// Add to custom order (at end)
+		if (!this.customOrder.includes(filePath)) {
+			this.customOrder.push(filePath);
+		}
+
+		await this.saveToWorkspaceState();
+		this.refresh();
+
+		vscode.window.showInformationMessage(`Added ${path.basename(filePath)} to kanban list`);
 	}
 
 	/**

@@ -2848,6 +2848,80 @@ window.addEventListener('message', event => {
             }
             break;
 
+        case 'fileUriDropped':
+            // Handle dropped file save/link response from backend
+            if (message.success) {
+                const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                const safePath = escapeFilePath(message.filePath);
+                const markdownLink = `[${message.originalFileName}](${safePath})`;
+
+                createNewTaskWithContent(
+                    originalName,
+                    message.dropPosition,
+                    markdownLink
+                );
+
+                // Show notification
+                if (message.wasCopied && window.activityManager) {
+                    const operationId = `file-copy-${Date.now()}`;
+                    window.activityManager.startOperation(
+                        operationId,
+                        'info',
+                        `File copied to MEDIA folder`
+                    );
+                    window.activityManager.updateProgress(operationId, 100);
+                } else if (message.wasLinked && window.activityManager) {
+                    const operationId = `file-link-${Date.now()}`;
+                    window.activityManager.startOperation(
+                        operationId,
+                        'info',
+                        `File linked (already in workspace)`
+                    );
+                    window.activityManager.updateProgress(operationId, 100);
+                }
+            } else {
+                console.error('[File-Drop] Failed to save file:', message.error);
+                createNewTaskWithContent(
+                    message.originalFileName || 'File',
+                    message.dropPosition,
+                    `Error: ${message.error}`
+                );
+            }
+            break;
+
+        case 'fileContentsDropped':
+            // Handle file saved from contents (File object drops)
+            if (message.success) {
+                const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                const safePath = escapeFilePath(message.filePath);
+                const markdownLink = `[${message.originalFileName}](${safePath})`;
+
+                createNewTaskWithContent(
+                    originalName,
+                    message.dropPosition,
+                    markdownLink
+                );
+
+                // Show notification
+                if (window.activityManager) {
+                    const operationId = `file-save-${Date.now()}`;
+                    window.activityManager.startOperation(
+                        operationId,
+                        'info',
+                        `File saved to MEDIA folder`
+                    );
+                    window.activityManager.updateProgress(operationId, 100);
+                }
+            } else {
+                console.error('[File-Drop] Failed to save file from contents:', message.error);
+                createNewTaskWithContent(
+                    message.originalFileName || 'File',
+                    message.dropPosition,
+                    `Error: ${message.error}`
+                );
+            }
+            break;
+
         case 'droppedImageSaved':
             // Handle dropped image save response from backend
             if (message.success) {

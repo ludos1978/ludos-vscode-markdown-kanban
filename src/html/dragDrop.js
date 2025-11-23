@@ -2001,13 +2001,43 @@ function handleVSCodeFileDrop(e, files) {
 
         reader.readAsDataURL(file);
     } else {
-        // Non-image file - keep current behavior
-        const fileLink = createFileMarkdownLink(fileName);
-        createNewTaskWithContent(
-            fileName,
-            { x: e.clientX, y: e.clientY },
-            fileLink
-        );
+        // Non-image file - read contents and send to backend to save
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const base64Data = btoa(
+                    new Uint8Array(event.target.result)
+                        .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                );
+
+                // Send to backend to save to MEDIA folder
+                vscode.postMessage({
+                    type: 'saveDroppedFileFromContents',
+                    fileData: base64Data,
+                    originalFileName: fileName,
+                    fileType: file.type || 'application/octet-stream',
+                    dropPosition: { x: e.clientX, y: e.clientY }
+                });
+            } catch (error) {
+                console.error('[File-Drop] Failed to process file:', error);
+                createNewTaskWithContent(
+                    fileName,
+                    { x: e.clientX, y: e.clientY },
+                    `[${fileName}](${fileName}) - Failed to copy file`
+                );
+            }
+        };
+
+        reader.onerror = function(error) {
+            console.error('[File-Drop] FileReader error:', error);
+            createNewTaskWithContent(
+                fileName,
+                { x: e.clientX, y: e.clientY },
+                `[${fileName}](${fileName}) - Failed to read file`
+            );
+        };
+
+        reader.readAsArrayBuffer(file);
     }
 }
 
@@ -2051,29 +2081,22 @@ function handleVSCodeUriDrop(e, uriData) {
             });
         });
 
-        // Handle non-image files: keep current behavior
+        // Handle non-image files: send to backend for workspace check
         if (otherFileUris.length > 0) {
-            const tasksData = otherFileUris.map(uri => {
-                let filename = uri;
-                let fullPath = uri;
+            otherFileUris.forEach(uri => {
+                const fullPath = uri.startsWith('file://')
+                    ? decodeURIComponent(uri.replace('file://', ''))
+                    : uri;
+                const filename = fullPath.split('/').pop() || uri;
 
-                if (uri.startsWith('file://')) {
-                    filename = decodeURIComponent(uri).split('/').pop() || uri;
-                    fullPath = decodeURIComponent(uri);
-                } else {
-                    filename = uri.split('/').pop() || uri;
-                    fullPath = uri;
-                }
-
-                const fileLink = createFileMarkdownLink(fullPath);
-
-                return {
-                    title: filename,
-                    description: fileLink
-                };
+                // Ask backend to check workspace and copy/link appropriately
+                vscode.postMessage({
+                    type: 'handleFileUriDrop',
+                    sourcePath: fullPath,
+                    originalFileName: filename,
+                    dropPosition: { x: e.clientX, y: e.clientY }
+                });
             });
-
-            createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
         }
     } else {
         // Could not process dropped file URIs

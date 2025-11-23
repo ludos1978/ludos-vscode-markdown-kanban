@@ -938,6 +938,23 @@ export class MessageHandler {
                 );
                 break;
 
+            case 'handleFileUriDrop':
+                await this.handleFileUriDrop(
+                    message.sourcePath,
+                    message.originalFileName,
+                    message.dropPosition
+                );
+                break;
+
+            case 'saveDroppedFileFromContents':
+                await this.handleSaveDroppedFileFromContents(
+                    message.fileData,
+                    message.originalFileName,
+                    message.fileType,
+                    message.dropPosition
+                );
+                break;
+
             case 'getExportDefaultFolder':
                 await this.handleGetExportDefaultFolder();
                 break;
@@ -2350,31 +2367,12 @@ export class MessageHandler {
         dropPosition: { x: number; y: number }
     ): Promise<void> {
         try {
-            // Get current file path
-            const document = this._fileManager.getDocument();
-            const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
-            if (!currentFilePath) {
-                console.error('[IMAGE-DROP] No current file path available');
-                this._sendImageDropError('No current file path available', dropPosition);
-                return;
-            }
+            const { directory, baseFileName } = this._getCurrentFilePaths();
 
-            // Extract directory and base filename
-            const directory = path.dirname(currentFilePath);
-            const fileName = path.basename(currentFilePath);
-            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-
-            // Check if file is already in the kanban directory or subdirectories
-            const sourceDirResolved = path.resolve(path.dirname(sourcePath));
-            const kanbanDirResolved = path.resolve(directory);
-
-            // Check if source is in kanban directory or its subdirectories
-            const isInKanbanDir = sourceDirResolved.startsWith(kanbanDirResolved);
-
-            if (isInKanbanDir) {
+            // Check if file is in workspace
+            if (this._isFileInWorkspace(sourcePath)) {
                 // File is already in workspace - create link without copying
                 const formattedPath = this._formatImagePath(sourcePath, directory);
-
                 console.log('[IMAGE-DROP] Image already in workspace, linking directly:', formattedPath);
 
                 const panel = this._getWebviewPanel();
@@ -2385,30 +2383,19 @@ export class MessageHandler {
                         relativePath: formattedPath,
                         originalFileName: originalFileName,
                         dropPosition: dropPosition,
-                        wasLinked: true // Flag to show notification
+                        wasLinked: true
                     });
                 }
                 return;
             }
 
             // File is outside workspace - copy to MEDIA folder
-            const mediaFolderName = `${baseFileName}-MEDIA`;
-            const mediaFolderPath = path.join(directory, mediaFolderName);
-
-            // Ensure media folder exists
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
-
-            // Check if source file exists
             if (!fs.existsSync(sourcePath)) {
                 throw new Error(`Source file not found: ${sourcePath}`);
             }
 
-            // Read source file to generate hash
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
             const sourceBuffer = fs.readFileSync(sourcePath);
-
-            // Generate unique filename with hash-based collision detection
             const imageFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, sourceBuffer);
             const imagePath = path.join(mediaFolderPath, imageFileName);
 
@@ -2420,10 +2407,8 @@ export class MessageHandler {
                 console.log('[IMAGE-DROP] Reusing existing image:', imageFileName);
             }
 
-            // Format path according to pathGeneration config
             const formattedPath = this._formatImagePath(imagePath, directory);
 
-            // Notify frontend
             const panel = this._getWebviewPanel();
             if (panel && panel._panel) {
                 panel._panel.webview.postMessage({
@@ -2432,7 +2417,7 @@ export class MessageHandler {
                     relativePath: formattedPath,
                     originalFileName: originalFileName,
                     dropPosition: dropPosition,
-                    wasCopied: true // Flag to show notification
+                    wasCopied: true
                 });
             }
 
@@ -2451,6 +2436,200 @@ export class MessageHandler {
                 error: error,
                 dropPosition: dropPosition
             });
+        }
+    }
+
+    // ============================================================================
+    // DRY Helper Methods for File Operations
+    // ============================================================================
+
+    /**
+     * Gets current file path information
+     * @returns Object with currentFilePath, directory, fileName, baseFileName
+     * @throws Error if no current file path is available
+     */
+    private _getCurrentFilePaths(): { currentFilePath: string; directory: string; fileName: string; baseFileName: string } {
+        const document = this._fileManager.getDocument();
+        const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
+        if (!currentFilePath) {
+            throw new Error('No current file path available');
+        }
+
+        const directory = path.dirname(currentFilePath);
+        const fileName = path.basename(currentFilePath);
+        const baseFileName = fileName.replace(/\.[^/.]+$/, '');
+
+        return { currentFilePath, directory, fileName, baseFileName };
+    }
+
+    /**
+     * Gets the MEDIA folder path for the current kanban, creating it if needed
+     * @param directory The directory containing the kanban file
+     * @param baseFileName The base name of the kanban file (without extension)
+     * @returns The absolute path to the MEDIA folder
+     */
+    private _getMediaFolderPath(directory: string, baseFileName: string): string {
+        const mediaFolderName = `${baseFileName}-MEDIA`;
+        const mediaFolderPath = path.join(directory, mediaFolderName);
+
+        if (!fs.existsSync(mediaFolderPath)) {
+            fs.mkdirSync(mediaFolderPath, { recursive: true });
+        }
+
+        return mediaFolderPath;
+    }
+
+    /**
+     * Checks if a file path is within any workspace folder
+     * @param filePath The file path to check
+     * @returns true if file is in workspace, false otherwise
+     */
+    private _isFileInWorkspace(filePath: string): boolean {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return false;
+        }
+
+        const fileResolved = path.resolve(filePath);
+        for (const folder of workspaceFolders) {
+            const workspaceResolved = path.resolve(folder.uri.fsPath);
+            if (fileResolved.startsWith(workspaceResolved)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Generates a unique filename in the target directory, handling collisions
+     * @param targetDir Directory where file will be saved
+     * @param originalFileName Original filename
+     * @returns Unique filename (may have counter suffix if collision)
+     */
+    private _generateUniqueFilename(targetDir: string, originalFileName: string): string {
+        const ext = path.extname(originalFileName);
+        const baseName = path.basename(originalFileName, ext);
+        let targetFileName = originalFileName;
+        let counter = 1;
+
+        while (fs.existsSync(path.join(targetDir, targetFileName))) {
+            targetFileName = `${baseName}_${counter}${ext}`;
+            counter++;
+        }
+
+        return targetFileName;
+    }
+
+    private async handleFileUriDrop(
+        sourcePath: string,
+        originalFileName: string,
+        dropPosition: { x: number; y: number }
+    ): Promise<void> {
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+
+            // Check if file is in workspace
+            if (this._isFileInWorkspace(sourcePath)) {
+                // File is in workspace - create link
+                const formattedPath = this._fileManager.generateConfiguredPath(sourcePath);
+                console.log('[FILE-DROP] File in workspace, linking directly:', formattedPath);
+
+                const panel = this._getWebviewPanel();
+                if (panel && panel._panel) {
+                    panel._panel.webview.postMessage({
+                        type: 'fileUriDropped',
+                        success: true,
+                        filePath: formattedPath,
+                        originalFileName: originalFileName,
+                        dropPosition: dropPosition,
+                        wasLinked: true
+                    });
+                }
+                return;
+            }
+
+            // File is outside workspace - copy to MEDIA folder
+            if (!fs.existsSync(sourcePath)) {
+                throw new Error(`Source file not found: ${sourcePath}`);
+            }
+
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const targetFileName = this._generateUniqueFilename(mediaFolderPath, originalFileName);
+            const targetPath = path.join(mediaFolderPath, targetFileName);
+
+            fs.copyFileSync(sourcePath, targetPath);
+            console.log('[FILE-DROP] Copied file from:', sourcePath, 'to:', targetPath);
+
+            const formattedPath = this._fileManager.generateConfiguredPath(targetPath);
+
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'fileUriDropped',
+                    success: true,
+                    filePath: formattedPath,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition,
+                    wasCopied: true
+                });
+            }
+
+        } catch (error) {
+            console.error('[FILE-DROP] Error handling file:', error);
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'fileUriDropped',
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    dropPosition: dropPosition
+                });
+            }
+        }
+    }
+
+    private async handleSaveDroppedFileFromContents(
+        fileData: string,
+        originalFileName: string,
+        fileType: string,
+        dropPosition: { x: number; y: number }
+    ): Promise<void> {
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const targetFileName = this._generateUniqueFilename(mediaFolderPath, originalFileName);
+            const targetPath = path.join(mediaFolderPath, targetFileName);
+
+            // Decode base64 and write file
+            const buffer = Buffer.from(fileData, 'base64');
+            fs.writeFileSync(targetPath, buffer);
+            console.log('[FILE-DROP] Saved file from contents to:', targetPath);
+
+            const formattedPath = this._fileManager.generateConfiguredPath(targetPath);
+
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'fileContentsDropped',
+                    success: true,
+                    filePath: formattedPath,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition
+                });
+            }
+
+        } catch (error) {
+            console.error('[FILE-DROP] Error saving file from contents:', error);
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'fileContentsDropped',
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    dropPosition: dropPosition
+                });
+            }
         }
     }
 
