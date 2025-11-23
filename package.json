@@ -4333,6 +4333,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.17.0",
     "@marp-team/marp-cli": "^4.2.3",
     "@marp-team/marp-core": "^4.1.0",
     "markdown-it": "^14.1.0",

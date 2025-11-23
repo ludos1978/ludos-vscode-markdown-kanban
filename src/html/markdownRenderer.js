@@ -556,6 +556,117 @@ async function renderPlantUML(code) {
 // Make renderPlantUML globally accessible for conversion handler
 window.renderPlantUML = renderPlantUML;
 
+// Diagram rendering (draw.io, excalidraw)
+const diagramRenderCache = new Map();  // Cache key: `${type}:${path}:${mtime}` → svgDataUrl
+const diagramRenderRequests = new Map();
+let diagramRequestId = 0;
+const pendingDiagramQueue = [];
+let diagramQueueProcessing = false;
+
+/**
+ * Invalidate cached diagram renders for a specific file path
+ * Removes all cache entries for the file (regardless of mtime)
+ */
+function invalidateDiagramCache(filePath, diagramType) {
+    const prefix = `${diagramType}:${filePath}:`;
+    for (const key of diagramRenderCache.keys()) {
+        if (key.startsWith(prefix)) {
+            diagramRenderCache.delete(key);
+        }
+    }
+}
+
+/**
+ * Clear all diagram render cache (called on webview focus)
+ */
+function clearDiagramCache() {
+    diagramRenderCache.clear();
+    console.log('[Diagram Cache] Cleared all cached diagrams');
+}
+
+/**
+ * Render diagram file (draw.io or excalidraw) to SVG using backend
+ * @param {string} filePath - Path to diagram file
+ * @param {string} diagramType - Type of diagram ('drawio' or 'excalidraw')
+ * @returns {Promise<{svgDataUrl: string, fileMtime: number}>} SVG data URL and file mtime
+ */
+async function renderDiagram(filePath, diagramType) {
+    return new Promise((resolve, reject) => {
+        const requestId = `diagram-${++diagramRequestId}`;
+
+        // Store promise callbacks
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath, diagramType });
+
+        // Send request to extension backend
+        const messageType = diagramType === 'drawio' ? 'requestDrawIORender' : 'requestExcalidrawRender';
+        vscode.postMessage({
+            type: messageType,
+            requestId: requestId,
+            filePath: filePath
+        });
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`${diagramType} rendering timeout`));
+            }
+        }, 30000);
+    });
+}
+
+function queueDiagramRender(id, filePath, diagramType) {
+    pendingDiagramQueue.push({ id, filePath, diagramType, timestamp: Date.now() });
+}
+
+/**
+ * Process all pending diagram renders in the queue
+ */
+async function processDiagramQueue() {
+    if (diagramQueueProcessing || pendingDiagramQueue.length === 0) {
+        return;
+    }
+
+    diagramQueueProcessing = true;
+
+    while (pendingDiagramQueue.length > 0) {
+        const item = pendingDiagramQueue.shift();
+        const element = document.getElementById(item.id);
+
+        if (!element) {
+            console.warn(`[Diagram] Placeholder not found: ${item.id}`);
+            continue;
+        }
+
+        try {
+            // Render diagram (returns {svgDataUrl, fileMtime})
+            const result = await renderDiagram(item.filePath, item.diagramType);
+            const { svgDataUrl, fileMtime } = result;
+
+            // Cache with mtime for invalidation on file changes
+            const cacheKey = `${item.diagramType}:${item.filePath}:${fileMtime}`;
+            diagramRenderCache.set(cacheKey, svgDataUrl);
+
+            // Invalidate old cache entries for this file
+            invalidateDiagramCache(item.filePath, item.diagramType);
+            // Re-add current version
+            diagramRenderCache.set(cacheKey, svgDataUrl);
+
+            // Replace placeholder with rendered image
+            // Include data-original-src for alt-click to open in editor
+            element.innerHTML = `<img src="${svgDataUrl}" alt="${item.diagramType} diagram" class="diagram-rendered" data-original-src="${item.filePath}" />`;
+        } catch (error) {
+            console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
+            element.innerHTML = `<div class="diagram-error">
+                <span class="error-icon">⚠️</span>
+                <span class="error-text">Failed to load ${item.diagramType} diagram</span>
+            </div>`;
+        }
+    }
+
+    diagramQueueProcessing = false;
+}
+
 // Handle PlantUML render responses from backend
 window.addEventListener('message', event => {
     const message = event.data;
@@ -582,6 +693,37 @@ window.addEventListener('message', event => {
             request.reject(new Error(error));
             plantUMLRenderRequests.delete(requestId);
         }
+    } else if (message.type === 'drawioRenderSuccess' || message.type === 'excalidrawRenderSuccess') {
+        const { requestId, svgDataUrl, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            // Resolve with both svgDataUrl and fileMtime for cache invalidation
+            request.resolve({ svgDataUrl, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'drawioRenderError' || message.type === 'excalidrawRenderError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[Diagram] Rendering failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    }
+});
+
+// Clear diagram cache when webview gains focus
+// This ensures diagrams are re-rendered if files changed while webview was in background
+window.addEventListener('focus', () => {
+    clearDiagramCache();
+});
+
+// Also listen for visibility change (when tab becomes visible)
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        clearDiagramCache();
     }
 });
 
@@ -1039,6 +1181,37 @@ function renderMarkdown(text, includeContext) {
             const title = token.attrGet('title') || '';
             const alt = token.content || '';
 
+            // Check if this is a diagram file that needs special rendering
+            const isDiagramFile = originalSrc && (
+                originalSrc.endsWith('.drawio') ||
+                originalSrc.endsWith('.dio') ||
+                originalSrc.endsWith('.excalidraw') ||
+                originalSrc.endsWith('.excalidraw.json') ||
+                originalSrc.endsWith('.excalidraw.svg')
+            );
+
+            if (isDiagramFile) {
+                // Determine diagram type
+                let diagramType;
+                if (originalSrc.endsWith('.drawio') || originalSrc.endsWith('.dio')) {
+                    diagramType = 'drawio';
+                } else {
+                    diagramType = 'excalidraw';
+                }
+
+                // Create unique ID for this diagram
+                const diagramId = `diagram-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                // Queue for async rendering
+                queueDiagramRender(diagramId, originalSrc, diagramType);
+
+                // Return placeholder immediately (synchronous)
+                return `<div id="${diagramId}" class="diagram-placeholder">
+                    <div class="placeholder-spinner"></div>
+                    <div class="placeholder-text">Loading ${diagramType} diagram...</div>
+                </div>`;
+            }
+
             let displaySrc = originalSrc;
 
             // Check if we have includeContext and the path is relative
@@ -1135,6 +1308,12 @@ function renderMarkdown(text, includeContext) {
         if (pendingPlantUMLQueue.length > 0) {
             // Use microtask to ensure DOM is updated first
             Promise.resolve().then(() => processPlantUMLQueue());
+        }
+
+        // Trigger diagram queue processing after render completes
+        if (pendingDiagramQueue.length > 0) {
+            // Use microtask to ensure DOM is updated first
+            Promise.resolve().then(() => processDiagramQueue());
         }
 
         // Remove paragraph wrapping for single line content

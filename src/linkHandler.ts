@@ -110,9 +110,49 @@ export class LinkHandler {
                 return;
             }
 
+            const ext = path.extname(resolvedPath).toLowerCase();
+            const basename = path.basename(resolvedPath).toLowerCase();
+
+            // Special handling for diagram files (draw.io, excalidraw)
+            // Try to open in VS Code (will use appropriate extension if installed)
+            const diagramExtensions = ['.drawio', '.dio'];
+            const excalidrawExtensions = ['.excalidraw', '.excalidraw.json', '.excalidraw.svg'];
+
+            const isDiagramFile = diagramExtensions.includes(ext) ||
+                                  excalidrawExtensions.some(e => resolvedPath.toLowerCase().endsWith(e));
+
+            if (isDiagramFile) {
+                try {
+                    // Try to open with VS Code's default handler
+                    // If draw.io or excalidraw extension is installed, it will use that
+                    // Otherwise, VS Code will ask which editor to use
+                    const fileUri = vscode.Uri.file(resolvedPath);
+                    await vscode.commands.executeCommand('vscode.open', fileUri);
+
+                    const diagramType = diagramExtensions.includes(ext) ? 'draw.io' : 'Excalidraw';
+                    vscode.window.showInformationMessage(
+                        `Opened ${diagramType} diagram: ${path.basename(resolvedPath)}`
+                    );
+                    return;
+                } catch (error) {
+                    console.warn(`Could not open diagram in VS Code, trying external: ${resolvedPath}`, error);
+                    // If VS Code can't open it, try opening externally
+                    try {
+                        await vscode.env.openExternal(vscode.Uri.file(resolvedPath));
+                        vscode.window.showInformationMessage(
+                            `Opened externally: ${path.basename(resolvedPath)}`
+                        );
+                        return;
+                    } catch (externalError) {
+                        vscode.window.showErrorMessage(`Failed to open diagram file: ${resolvedPath}`);
+                        return;
+                    }
+                }
+            }
+
             const textExtensions = [
                 '.md', '.markdown', '.txt', '.rtf', '.log', '.csv', '.tsv',
-                '.html', '.htm', '.css', '.scss', '.sass', '.less', 
+                '.html', '.htm', '.css', '.scss', '.sass', '.less',
                 '.js', '.jsx', '.ts', '.tsx', '.json', '.xml', '.svg',
                 '.py', '.java', '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.cs',
                 '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.r',
@@ -123,16 +163,13 @@ export class LinkHandler {
                 '.sh', '.bash', '.zsh', '.fish', '.ps1', '.psm1', '.psd1', '.bat', '.cmd',
                 '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf', '.config',
                 '.env', '.properties', '.gitignore', '.dockerignore', '.editorconfig',
-                '.prettierrc', '.eslintrc', '.babelrc', '.webpack', 
+                '.prettierrc', '.eslintrc', '.babelrc', '.webpack',
                 '.rst', '.tex', '.latex', '.bib',
                 '.sql', '.graphql', '.proto',
                 'makefile', 'Makefile', 'GNUmakefile', '.mk',
                 'dockerfile', 'Dockerfile', '.dockerfile',
                 '.diff', '.patch', '.vue', '.svelte'
             ];
-            
-            const ext = path.extname(resolvedPath).toLowerCase();
-            const basename = path.basename(resolvedPath).toLowerCase();
             
             const isTextFile = textExtensions.includes(ext) || 
                             basename === 'makefile' || 

@@ -24,14 +24,45 @@ This extension uses a **state machine architecture** for handling all file chang
 
 - **Markdown Parsing**: Automatically parses task lists from Markdown files.
 - **Kanban View**: Displays tasks in a Kanban board format with multi-column layout.
-- **Drag & Drop**: Supports dragging and dropping tasks between different columns. Proper movement and displaying of card and column movements. however they seem to be placed on top/bottom incoherently.
+- **Drag & Drop**: Supports dragging and dropping tasks between different columns. Proper movement and displaying of card and column movements. however they seem to be placed on top/bottom incoherently. Shift to drag from external (will copy the file to the {filename}-Media folder if linking is impossible)
 - **Real-time Sync**: Ensures real-time, two-way synchronization between the Kanban board and the Markdown file.
 - **Undo & Redo**
 - **Image & File dropping** creates new cards
 - **Links** embeds images and allows links to other files. Path resolution is done relatively to file, secondly relatively to the opened workspace folders or absolute depending on the path.
-- **Locking the file** so switching the md doesnt change the kaban view.
 - **Tags** that color the columns and cards (if used in the title)
 - **Folding** of cards, columns.
+- **Image Pasting** paste an image using meta+shift+v to create a link direclty from an path or an copyied image data.
+
+
+### Supported Formats for Embeddings
+
+\[\]\(\) or \!\[\]\(\) for direct preview
+- Images
+- Videos (only some mp4 audio formats are supported in vscode)
+- draw.io
+- excalidraw
+
+\`\`\`mermaid
+\`\`\`
+
+#### To use draw.io 
+
+  Option 1: Install via Homebrew (Recommended)
+
+  brew install --cask drawio
+  This creates a drawio CLI command in your PATH.
+
+  Option 2: Add CLI to PATH Manually
+
+  If you want to keep using the installed app, you need to make the CLI
+  accessible. However, this may still not work because the .app bundle needs a display server.
+
+  Option 3: Use drawio-desktop CLI
+
+  Download the CLI-capable version from:
+  https://github.com/jgraph/drawio-desktop/releases
+
+
 
 ### Required Format
 

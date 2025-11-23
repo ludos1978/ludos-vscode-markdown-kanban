@@ -1052,6 +1052,16 @@ export class MessageHandler {
                 await this.handleRenderPlantUML(message);
                 break;
 
+            // Draw.io rendering (backend)
+            case 'requestDrawIORender':
+                await this.handleRenderDrawIO(message);
+                break;
+
+            // Excalidraw rendering (backend)
+            case 'requestExcalidrawRender':
+                await this.handleRenderExcalidraw(message);
+                break;
+
             // PlantUML to SVG conversion
             case 'convertPlantUMLToSVG':
                 await this.handleConvertPlantUMLToSVG(message);
@@ -4800,6 +4810,151 @@ export class MessageHandler {
             // Send error response to webview
             panel.webview.postMessage({
                 type: 'plantUMLRenderError',
+                requestId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Handle draw.io diagram rendering request from webview
+     * Uses backend DrawIOService with CLI for conversion
+     */
+    private async handleRenderDrawIO(message: any): Promise<void> {
+        const { requestId, filePath } = message;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[handleRenderDrawIO] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import draw.io service
+            const { DrawIOService } = await import('./services/export/DrawIOService');
+            const service = new DrawIOService();
+
+            // Check if CLI is available
+            if (!await service.isAvailable()) {
+                throw new Error('draw.io CLI not installed');
+            }
+
+            // Resolve file path relative to the markdown file's directory
+            let absolutePath: string;
+
+            if (path.isAbsolute(filePath)) {
+                absolutePath = filePath;
+            } else {
+                // Get the document from the panel to resolve relative paths correctly
+                const document = panel._fileManager?.getDocument();
+                if (document) {
+                    const documentDir = path.dirname(document.uri.fsPath);
+                    absolutePath = path.resolve(documentDir, filePath);
+                } else {
+                    // Fallback to workspace folder if document not available
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (workspaceFolder) {
+                        absolutePath = path.resolve(workspaceFolder.uri.fsPath, filePath);
+                    } else {
+                        throw new Error('Cannot resolve diagram path: no document or workspace folder');
+                    }
+                }
+            }
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Render to SVG
+            const svg = await service.renderSVG(absolutePath);
+
+            // Convert SVG to data URL
+            const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+
+            // Send success response to webview with mtime for cache invalidation
+            panel.webview.postMessage({
+                type: 'drawioRenderSuccess',
+                requestId,
+                svgDataUrl,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[DrawIO Backend] Render error:', error);
+
+            // Send error response to webview
+            panel.webview.postMessage({
+                type: 'drawioRenderError',
+                requestId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Handle excalidraw diagram rendering request from webview
+     * Uses backend ExcalidrawService with library for conversion
+     */
+    private async handleRenderExcalidraw(message: any): Promise<void> {
+        const { requestId, filePath } = message;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[handleRenderExcalidraw] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import excalidraw service
+            const { ExcalidrawService } = await import('./services/export/ExcalidrawService');
+            const service = new ExcalidrawService();
+
+            // Resolve file path relative to the markdown file's directory
+            let absolutePath: string;
+
+            if (path.isAbsolute(filePath)) {
+                absolutePath = filePath;
+            } else {
+                // Get the document from the panel to resolve relative paths correctly
+                const document = panel._fileManager?.getDocument();
+                if (document) {
+                    const documentDir = path.dirname(document.uri.fsPath);
+                    absolutePath = path.resolve(documentDir, filePath);
+                } else {
+                    // Fallback to workspace folder if document not available
+                    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                    if (workspaceFolder) {
+                        absolutePath = path.resolve(workspaceFolder.uri.fsPath, filePath);
+                    } else {
+                        throw new Error('Cannot resolve diagram path: no document or workspace folder');
+                    }
+                }
+            }
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Render to SVG
+            const svg = await service.renderSVG(absolutePath);
+
+            // Convert SVG to data URL
+            const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+
+            // Send success response to webview with mtime for cache invalidation
+            panel.webview.postMessage({
+                type: 'excalidrawRenderSuccess',
+                requestId,
+                svgDataUrl,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[Excalidraw Backend] Render error:', error);
+
+            // Send error response to webview
+            panel.webview.postMessage({
+                type: 'excalidrawRenderError',
                 requestId,
                 error: error instanceof Error ? error.message : String(error)
             });

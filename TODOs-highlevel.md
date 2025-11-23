@@ -3,7 +3,16 @@
 
 - [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 
-- [ ] can we include draw.io rendering if such a file is included with time image format? When exporting convert them to svg as well. Plan the feature so it's easliy extenable, i want to also include excalidraw if that is similarly possible. the addon should not include the draw.io or excalidraw itself, but require the plugins to be installed (if that's possible). especially when it comes to editing the included files. we might include the converters.
+- [x] COMPLETED: Draw.io & Excalidraw diagram integration
+  - [x] Export-time SVG conversion for `.drawio`, `.dio`, `.excalidraw`, `.excalidraw.json`, `.excalidraw.svg` files
+  - [x] DrawIOService.ts - CLI-based conversion using draw.io desktop app
+  - [x] ExcalidrawService.ts - Library-based conversion with @excalidraw/excalidraw
+  - [x] Extended DiagramPreprocessor to handle file-based diagram references
+  - [x] Asset type detection updated in ExportService
+  - [x] Webview preview rendering (markdownRenderer.js + messageHandler.ts)
+  - [x] Added @excalidraw/excalidraw npm dependency to package.json
+  - NOTE: Excalidraw library integration needs testing - may require puppeteer for server-side rendering
+  - NOTE: Users must install draw.io CLI: `brew install --cask drawio` (macOS) or download from GitHub releases
 
 - [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
 Pressing enter should start editing the task.

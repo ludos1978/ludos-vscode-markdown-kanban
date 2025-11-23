@@ -91,7 +91,7 @@ export interface AssetInfo {
     originalPath: string;
     resolvedPath: string;
     relativePath: string;
-    type: 'image' | 'video' | 'audio' | 'document' | 'file' | 'markdown';
+    type: 'image' | 'video' | 'audio' | 'document' | 'file' | 'markdown' | 'diagram';
     size: number;
     exists: boolean;
     md5?: string;
@@ -679,6 +679,8 @@ export class ExportService {
         const ext = path.extname(filePath).toLowerCase();
 
         if (ext === '.md') { return 'markdown'; }
+        if (['.drawio', '.dio'].includes(ext)) { return 'diagram'; }
+        if (ext === '.excalidraw' || filePath.endsWith('.excalidraw.json') || filePath.endsWith('.excalidraw.svg')) { return 'diagram'; }
         if (this.IMAGE_EXTENSIONS.includes(ext)) { return 'image'; }
         if (this.VIDEO_EXTENSIONS.includes(ext)) { return 'video'; }
         if (this.AUDIO_EXTENSIONS.includes(ext)) { return 'audio'; }
@@ -720,6 +722,7 @@ export class ExportService {
                 case 'video': return packOptions.includeVideos ?? false;
                 case 'audio': return packOptions.includeOtherMedia ?? false;
                 case 'document': return packOptions.includeDocuments ?? false;
+                case 'diagram': return packOptions.includeImages ?? false;  // Treat diagrams like images
                 case 'file': return packOptions.includeFiles ?? false;
                 default: return false;
             }
