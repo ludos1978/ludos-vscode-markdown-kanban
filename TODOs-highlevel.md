@@ -2,7 +2,7 @@
 - [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
 Pressing enter should start editing the task.
 
-- [ ] can you add a sidebar that lists all kanbans in the opened workspaces. it should only have one button to check all workspaces for markdown files with the yaml header element "kanban-plugin: board". the user might also drag&drop kanban board files into it. this files should be saved into the workspaces somehow, so when loading again i have a list of all kanbans in the workspaces.
+- [x] can you add a sidebar that lists all kanbans in the opened workspaces. it should only have one button to check all workspaces for markdown files with the yaml header element "kanban-plugin: board". the user might also drag&drop kanban board files into it. this files should be saved into the workspaces somehow, so when loading again i have a list of all kanbans in the workspaces.
 
 - [x] when an image is dropped into vscode it can read and display it. but when i drop it into the kanban it can only create a link without the file path. would it somehow be possible to copy the file, suggest to the user to create a duplicate or similar so we have better external image handling?
 
