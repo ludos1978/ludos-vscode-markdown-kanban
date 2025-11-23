@@ -922,38 +922,42 @@ export class MessageHandler {
                 break;
 
             case 'saveDroppedImageFromContents':
-                await this.handleImageDrop(
+                await this.handleAnyFileDrop(
                     null, // No source path (File object)
                     message.imageData,
                     message.originalFileName,
-                    message.dropPosition
+                    message.dropPosition,
+                    true // isImage
                 );
                 break;
 
             case 'copyImageToMedia':
-                await this.handleImageDrop(
+                await this.handleAnyFileDrop(
                     message.sourcePath,
                     null, // No base64 data (URI drop)
                     message.originalFileName,
-                    message.dropPosition
+                    message.dropPosition,
+                    true // isImage
                 );
                 break;
 
             case 'handleFileUriDrop':
-                await this.handleFileDrop(
+                await this.handleAnyFileDrop(
                     message.sourcePath,
                     null, // No base64 data (URI drop)
                     message.originalFileName,
-                    message.dropPosition
+                    message.dropPosition,
+                    false // not an image
                 );
                 break;
 
             case 'saveDroppedFileFromContents':
-                await this.handleFileDrop(
+                await this.handleAnyFileDrop(
                     null, // No source path (File object)
                     message.fileData,
                     message.originalFileName,
-                    message.dropPosition
+                    message.dropPosition,
+                    false // not an image
                 );
                 break;
 
@@ -2297,77 +2301,138 @@ export class MessageHandler {
     }
 
     /**
-     * Unified handler for all image drops (URI or File object)
+     * Unified handler for ALL file drops (images and non-images, URI or File object)
      * @param sourcePath File path for URI drops, null for File object drops
-     * @param imageData Base64 data for File object drops, null for URI drops
+     * @param fileData Base64 data for File object drops, null for URI drops
      * @param originalFileName Original filename
      * @param dropPosition Drop position in webview
+     * @param isImage Whether this is an image file (affects filename generation and message type)
      */
-    private async handleImageDrop(
+    private async handleAnyFileDrop(
         sourcePath: string | null,
-        imageData: string | null,
+        fileData: string | null,
         originalFileName: string,
-        dropPosition: { x: number; y: number }
+        dropPosition: { x: number; y: number },
+        isImage: boolean
     ): Promise<void> {
         try {
             const { directory, baseFileName } = this._getCurrentFilePaths();
 
             // URI drop with path - check if in workspace
-            if (sourcePath) {
-                if (this._isFileInWorkspace(sourcePath)) {
-                    // Link to existing file in workspace
-                    const formattedPath = this._formatImagePath(sourcePath, directory);
-                    console.log('[IMAGE-DROP] Image in workspace, linking:', formattedPath);
-
-                    const panel = this._getWebviewPanel();
-                    if (panel && panel._panel) {
-                        panel._panel.webview.postMessage({
-                            type: 'droppedImageSaved',
-                            success: true,
-                            relativePath: formattedPath,
-                            originalFileName: originalFileName,
-                            dropPosition: dropPosition,
-                            wasLinked: true
-                        });
-                    }
-                    return;
-                }
-
-                // File outside workspace - copy it
-                if (!fs.existsSync(sourcePath)) {
-                    throw new Error(`Source file not found: ${sourcePath}`);
-                }
+            if (sourcePath && this._isFileInWorkspace(sourcePath)) {
+                return this._sendLinkMessage(sourcePath, originalFileName, dropPosition, directory, isImage);
             }
 
-            // Copy to MEDIA folder (either File object drop, or URI outside workspace)
-            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            // File outside workspace or File object - copy to MEDIA
+            return this._copyToMediaFolder(sourcePath, fileData, originalFileName, dropPosition, directory, baseFileName, isImage);
 
-            // Get buffer (from file or base64)
-            let buffer: Buffer;
-            if (imageData) {
-                const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
-                buffer = Buffer.from(base64Only, 'base64');
-            } else if (sourcePath) {
-                buffer = fs.readFileSync(sourcePath);
+        } catch (error) {
+            console.error('[FILE-DROP] Error handling file:', error);
+            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, fileData !== null);
+        }
+    }
+
+    /**
+     * Send link message for file already in workspace
+     */
+    private _sendLinkMessage(
+        sourcePath: string,
+        originalFileName: string,
+        dropPosition: { x: number; y: number },
+        directory: string,
+        isImage: boolean
+    ): void {
+        const formattedPath = isImage
+            ? this._formatImagePath(sourcePath, directory)
+            : this._fileManager.generateConfiguredPath(sourcePath);
+
+        console.log(`[FILE-DROP] File in workspace, linking: ${formattedPath}`);
+
+        const panel = this._getWebviewPanel();
+        if (panel && panel._panel) {
+            if (isImage) {
+                panel._panel.webview.postMessage({
+                    type: 'droppedImageSaved',
+                    success: true,
+                    relativePath: formattedPath,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition,
+                    wasLinked: true
+                });
             } else {
-                throw new Error('No source path or image data provided');
+                panel._panel.webview.postMessage({
+                    type: 'fileUriDropped',
+                    success: true,
+                    filePath: formattedPath,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition,
+                    wasLinked: true
+                });
             }
+        }
+    }
 
-            const imageFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, buffer);
-            const imagePath = path.join(mediaFolderPath, imageFileName);
+    /**
+     * Copy file to MEDIA folder (from source path or base64 data)
+     */
+    private async _copyToMediaFolder(
+        sourcePath: string | null,
+        fileData: string | null,
+        originalFileName: string,
+        dropPosition: { x: number; y: number },
+        directory: string,
+        baseFileName: string,
+        isImage: boolean
+    ): Promise<void> {
+        // Verify source exists (for URI drops)
+        if (sourcePath && !fs.existsSync(sourcePath)) {
+            throw new Error(`Source file not found: ${sourcePath}`);
+        }
 
-            // Write file (unless already exists with same hash)
-            if (!fs.existsSync(imagePath)) {
-                fs.writeFileSync(imagePath, buffer);
-                console.log('[IMAGE-DROP] Saved image:', imageFileName);
-            } else {
-                console.log('[IMAGE-DROP] Reusing existing image:', imageFileName);
-            }
+        if (!sourcePath && !fileData) {
+            throw new Error('No source path or file data provided');
+        }
 
-            const formattedPath = this._formatImagePath(imagePath, directory);
+        const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
 
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
+        // Get buffer (from file or base64)
+        let buffer: Buffer;
+        if (fileData) {
+            const base64Only = isImage && fileData.includes(',') ? fileData.split(',')[1] : fileData;
+            buffer = Buffer.from(base64Only, 'base64');
+        } else if (sourcePath) {
+            buffer = fs.readFileSync(sourcePath);
+        } else {
+            throw new Error('No source path or file data provided');
+        }
+
+        // Generate filename (different strategies for images vs files)
+        let targetFileName: string;
+        if (isImage) {
+            targetFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, buffer);
+        } else {
+            targetFileName = this._generateUniqueFilename(mediaFolderPath, originalFileName);
+        }
+
+        const targetPath = path.join(mediaFolderPath, targetFileName);
+
+        // Write file (images check hash, files overwrite)
+        if (isImage && fs.existsSync(targetPath)) {
+            console.log('[FILE-DROP] Reusing existing image:', targetFileName);
+        } else {
+            fs.writeFileSync(targetPath, buffer);
+            console.log('[FILE-DROP] Saved file:', targetFileName);
+        }
+
+        // Format path
+        const formattedPath = isImage
+            ? this._formatImagePath(targetPath, directory)
+            : this._fileManager.generateConfiguredPath(targetPath);
+
+        // Send success message
+        const panel = this._getWebviewPanel();
+        if (panel && panel._panel) {
+            if (isImage) {
                 panel._panel.webview.postMessage({
                     type: 'droppedImageSaved',
                     success: true,
@@ -2376,23 +2441,42 @@ export class MessageHandler {
                     dropPosition: dropPosition,
                     wasCopied: sourcePath ? true : undefined
                 });
+            } else {
+                const messageType = fileData ? 'fileContentsDropped' : 'fileUriDropped';
+                panel._panel.webview.postMessage({
+                    type: messageType,
+                    success: true,
+                    filePath: formattedPath,
+                    originalFileName: originalFileName,
+                    dropPosition: dropPosition,
+                    wasCopied: sourcePath ? true : undefined
+                });
             }
-
-        } catch (error) {
-            console.error('[IMAGE-DROP] Error handling image:', error);
-            this._sendImageDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition);
         }
     }
 
-    private _sendImageDropError(error: string, dropPosition: { x: number; y: number }): void {
+    /**
+     * Send error message for file drop failures
+     */
+    private _sendFileDropError(error: string, dropPosition: { x: number; y: number }, isImage: boolean, isFileObject: boolean): void {
         const panel = this._getWebviewPanel();
         if (panel && panel._panel) {
-            panel._panel.webview.postMessage({
-                type: 'droppedImageSaved',
-                success: false,
-                error: error,
-                dropPosition: dropPosition
-            });
+            if (isImage) {
+                panel._panel.webview.postMessage({
+                    type: 'droppedImageSaved',
+                    success: false,
+                    error: error,
+                    dropPosition: dropPosition
+                });
+            } else {
+                const messageType = isFileObject ? 'fileContentsDropped' : 'fileUriDropped';
+                panel._panel.webview.postMessage({
+                    type: messageType,
+                    success: false,
+                    error: error,
+                    dropPosition: dropPosition
+                });
+            }
         }
     }
 
@@ -2476,98 +2560,6 @@ export class MessageHandler {
         }
 
         return targetFileName;
-    }
-
-    /**
-     * Unified handler for all non-image file drops (URI or File object)
-     * @param sourcePath File path for URI drops, null for File object drops
-     * @param fileData Base64 data for File object drops, null for URI drops
-     * @param originalFileName Original filename
-     * @param dropPosition Drop position in webview
-     */
-    private async handleFileDrop(
-        sourcePath: string | null,
-        fileData: string | null,
-        originalFileName: string,
-        dropPosition: { x: number; y: number }
-    ): Promise<void> {
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-
-            // Determine message type based on source
-            const messageType = fileData ? 'fileContentsDropped' : 'fileUriDropped';
-
-            // URI drop with path - check if in workspace
-            if (sourcePath) {
-                if (this._isFileInWorkspace(sourcePath)) {
-                    // Link to existing file in workspace
-                    const formattedPath = this._fileManager.generateConfiguredPath(sourcePath);
-                    console.log('[FILE-DROP] File in workspace, linking:', formattedPath);
-
-                    const panel = this._getWebviewPanel();
-                    if (panel && panel._panel) {
-                        panel._panel.webview.postMessage({
-                            type: messageType,
-                            success: true,
-                            filePath: formattedPath,
-                            originalFileName: originalFileName,
-                            dropPosition: dropPosition,
-                            wasLinked: true
-                        });
-                    }
-                    return;
-                }
-
-                // File outside workspace - copy it
-                if (!fs.existsSync(sourcePath)) {
-                    throw new Error(`Source file not found: ${sourcePath}`);
-                }
-            }
-
-            // Copy to MEDIA folder (either File object drop, or URI outside workspace)
-            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-            const targetFileName = this._generateUniqueFilename(mediaFolderPath, originalFileName);
-            const targetPath = path.join(mediaFolderPath, targetFileName);
-
-            // Write file (from base64 or copy from source)
-            if (fileData) {
-                const buffer = Buffer.from(fileData, 'base64');
-                fs.writeFileSync(targetPath, buffer);
-                console.log('[FILE-DROP] Saved file from contents:', targetPath);
-            } else if (sourcePath) {
-                fs.copyFileSync(sourcePath, targetPath);
-                console.log('[FILE-DROP] Copied file from:', sourcePath, 'to:', targetPath);
-            } else {
-                throw new Error('No source path or file data provided');
-            }
-
-            const formattedPath = this._fileManager.generateConfiguredPath(targetPath);
-
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: messageType,
-                    success: true,
-                    filePath: formattedPath,
-                    originalFileName: originalFileName,
-                    dropPosition: dropPosition,
-                    wasCopied: sourcePath ? true : undefined
-                });
-            }
-
-        } catch (error) {
-            console.error('[FILE-DROP] Error handling file:', error);
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                const messageType = fileData ? 'fileContentsDropped' : 'fileUriDropped';
-                panel._panel.webview.postMessage({
-                    type: messageType,
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    dropPosition: dropPosition
-                });
-            }
-        }
     }
 
     private async handlePasteImageIntoField(
