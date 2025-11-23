@@ -9,7 +9,8 @@
       "Bash(npm run check-types:*)",
       "Bash(find:*)",
       "Bash(npx tsc:*)",
-      "Bash(node esbuild.js:*)"
+      "Bash(node esbuild.js:*)",
+      "Bash(drawio:*)"
     ],
     "deny": [],
     "ask": []

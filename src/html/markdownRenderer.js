@@ -620,6 +620,176 @@ function queueDiagramRender(id, filePath, diagramType) {
 }
 
 /**
+ * Render a specific PDF page to PNG using backend
+ * @param {string} filePath - Path to PDF file
+ * @param {number} pageNumber - Page number to render (1-indexed)
+ * @returns {Promise<{pngDataUrl: string, fileMtime: number}>} PNG data URL and file mtime
+ */
+async function renderPDFPage(filePath, pageNumber) {
+    return new Promise((resolve, reject) => {
+        const requestId = `pdf-${++diagramRequestId}`;
+
+        // Store promise callbacks
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath, pageNumber });
+
+        // Send request to extension backend
+        vscode.postMessage({
+            type: 'requestPDFPageRender',
+            requestId: requestId,
+            filePath: filePath,
+            pageNumber: pageNumber
+        });
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`PDF page ${pageNumber} rendering timeout`));
+            }
+        }, 30000);
+    });
+}
+
+function queuePDFPageRender(id, filePath, pageNumber) {
+    pendingDiagramQueue.push({ id, filePath, pageNumber, diagramType: 'pdf', timestamp: Date.now() });
+}
+
+/**
+ * Request PDF info (page count) from backend
+ * @param {string} filePath - Path to PDF file
+ * @returns {Promise<{pageCount: number, fileMtime: number}>}
+ */
+async function getPDFInfo(filePath) {
+    return new Promise((resolve, reject) => {
+        const requestId = `pdfinfo-${++diagramRequestId}`;
+
+        // Store promise callbacks
+        diagramRenderRequests.set(requestId, { resolve, reject, filePath });
+
+        // Send request to extension backend
+        vscode.postMessage({
+            type: 'requestPDFInfo',
+            requestId: requestId,
+            filePath: filePath
+        });
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            if (diagramRenderRequests.has(requestId)) {
+                diagramRenderRequests.delete(requestId);
+                reject(new Error(`PDF info request timeout`));
+            }
+        }, 10000);
+    });
+}
+
+function queuePDFSlideshow(id, filePath) {
+    pendingDiagramQueue.push({ id, filePath, diagramType: 'pdf-slideshow', timestamp: Date.now() });
+}
+
+/**
+ * Create interactive PDF slideshow with navigation controls
+ * @param {HTMLElement} element - Container element
+ * @param {string} filePath - Path to PDF file
+ * @param {number} pageCount - Total number of pages
+ * @param {number} fileMtime - File modification time for caching
+ */
+async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
+    // Create unique ID for this slideshow
+    const slideshowId = `pdf-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Initial state: page 1
+    let currentPage = 1;
+
+    // Create slideshow container
+    const container = document.createElement('div');
+    container.className = 'pdf-slideshow';
+    container.id = slideshowId;
+    container.setAttribute('data-pdf-path', filePath);
+    container.setAttribute('data-page-count', pageCount);
+    container.setAttribute('data-current-page', currentPage);
+
+    // Image container
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'pdf-slideshow-image';
+
+    // Controls container
+    const controls = document.createElement('div');
+    controls.className = 'pdf-slideshow-controls';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pdf-slideshow-btn pdf-slideshow-prev';
+    prevBtn.innerHTML = '◀ Prev';
+    prevBtn.disabled = (currentPage === 1);
+
+    const pageInfo = document.createElement('span');
+    pageInfo.className = 'pdf-slideshow-page-info';
+    pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pdf-slideshow-btn pdf-slideshow-next';
+    nextBtn.innerHTML = 'Next ▶';
+    nextBtn.disabled = (currentPage === pageCount);
+
+    controls.appendChild(prevBtn);
+    controls.appendChild(pageInfo);
+    controls.appendChild(nextBtn);
+
+    container.appendChild(imageContainer);
+    container.appendChild(controls);
+
+    // Replace placeholder with slideshow
+    element.innerHTML = '';
+    element.appendChild(container);
+
+    // Function to load and display a specific page
+    const loadPage = async (pageNumber) => {
+        try {
+            imageContainer.innerHTML = '<div class="pdf-slideshow-loading">Loading page...</div>';
+
+            // Request page rendering
+            const result = await renderPDFPage(filePath, pageNumber);
+            const { pngDataUrl } = result;
+
+            // Update image
+            imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
+
+            // Update state
+            currentPage = pageNumber;
+            container.setAttribute('data-current-page', currentPage);
+
+            // Update controls
+            pageInfo.textContent = `Page ${currentPage} of ${pageCount}`;
+            prevBtn.disabled = (currentPage === 1);
+            nextBtn.disabled = (currentPage === pageCount);
+
+        } catch (error) {
+            console.error(`[PDF Slideshow] Failed to load page ${pageNumber}:`, error);
+            imageContainer.innerHTML = `<div class="diagram-error">
+                <span class="error-icon">⚠️</span>
+                <span class="error-text">Failed to load page ${pageNumber}</span>
+            </div>`;
+        }
+    };
+
+    // Event listeners for navigation
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            loadPage(currentPage - 1);
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < pageCount) {
+            loadPage(currentPage + 1);
+        }
+    });
+
+    // Load first page
+    await loadPage(1);
+}
+
+/**
  * Process all pending diagram renders in the queue
  */
 async function processDiagramQueue() {
@@ -628,6 +798,9 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = true;
+
+    // Track which stacks have diagrams inserted (to recalculate heights once per stack)
+    const affectedStacks = new Set();
 
     while (pendingDiagramQueue.length > 0) {
         const item = pendingDiagramQueue.shift();
@@ -639,32 +812,86 @@ async function processDiagramQueue() {
         }
 
         try {
-            // Render diagram (returns {svgDataUrl, fileMtime})
-            const result = await renderDiagram(item.filePath, item.diagramType);
-            const { svgDataUrl, fileMtime } = result;
+            // Handle PDF slideshow separately
+            if (item.diagramType === 'pdf-slideshow') {
+                // Get PDF info (page count)
+                const pdfInfo = await getPDFInfo(item.filePath);
+                const { pageCount, fileMtime } = pdfInfo;
+
+                // Create slideshow UI
+                await createPDFSlideshow(element, item.filePath, pageCount, fileMtime);
+
+                // Track affected stack for batch recalculation
+                const stackElement = element.closest('.kanban-column-stack');
+                if (stackElement) {
+                    affectedStacks.add(stackElement);
+                }
+                continue;
+            }
+
+            let imageDataUrl, fileMtime, displayLabel;
+
+            // Render based on type
+            if (item.diagramType === 'pdf') {
+                // Render PDF page
+                const result = await renderPDFPage(item.filePath, item.pageNumber);
+                imageDataUrl = result.pngDataUrl;
+                fileMtime = result.fileMtime;
+                displayLabel = `PDF page ${item.pageNumber}`;
+            } else {
+                // Render diagram (draw.io or excalidraw)
+                const result = await renderDiagram(item.filePath, item.diagramType);
+                imageDataUrl = result.svgDataUrl;
+                fileMtime = result.fileMtime;
+                displayLabel = `${item.diagramType} diagram`;
+            }
 
             // Cache with mtime for invalidation on file changes
-            const cacheKey = `${item.diagramType}:${item.filePath}:${fileMtime}`;
-            diagramRenderCache.set(cacheKey, svgDataUrl);
+            const cacheKey = item.diagramType === 'pdf'
+                ? `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`
+                : `${item.diagramType}:${item.filePath}:${fileMtime}`;
+            diagramRenderCache.set(cacheKey, imageDataUrl);
 
             // Invalidate old cache entries for this file
             invalidateDiagramCache(item.filePath, item.diagramType);
             // Re-add current version
-            diagramRenderCache.set(cacheKey, svgDataUrl);
+            diagramRenderCache.set(cacheKey, imageDataUrl);
 
             // Replace placeholder with rendered image
             // Include data-original-src for alt-click to open in editor
-            element.innerHTML = `<img src="${svgDataUrl}" alt="${item.diagramType} diagram" class="diagram-rendered" data-original-src="${item.filePath}" />`;
+            element.innerHTML = `<img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${item.filePath}" />`;
+
+            // Track affected stack for batch recalculation
+            const stackElement = element.closest('.kanban-column-stack');
+            if (stackElement) {
+                affectedStacks.add(stackElement);
+            }
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
+            const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` : `${item.diagramType} diagram`;
             element.innerHTML = `<div class="diagram-error">
                 <span class="error-icon">⚠️</span>
-                <span class="error-text">Failed to load ${item.diagramType} diagram</span>
+                <span class="error-text">Failed to load ${errorLabel}</span>
             </div>`;
         }
     }
 
     diagramQueueProcessing = false;
+
+    // Recalculate heights ONCE per affected stack
+    // Uses existing batching system: waits for ALL images in stack to load, then recalculates
+    // Use requestAnimationFrame to ensure browser has rendered the images before recalculating
+    if (typeof window.waitForStackImagesAndRecalculate === 'function' && affectedStacks.size > 0) {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                // Double RAF ensures images are fully decoded and rendered
+                affectedStacks.forEach(stack => {
+                    window.waitForStackImagesAndRecalculate(stack);
+                });
+                console.log(`[Diagram] Triggered height recalculation for ${affectedStacks.size} stack(s)`);
+            });
+        });
+    }
 }
 
 // Handle PlantUML render responses from backend
@@ -708,6 +935,41 @@ window.addEventListener('message', event => {
 
         if (request) {
             console.error(`[Diagram] Rendering failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'pdfPageRenderSuccess') {
+        const { requestId, pngDataUrl, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            // Resolve with both pngDataUrl and fileMtime for cache invalidation
+            request.resolve({ pngDataUrl, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'pdfPageRenderError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[PDF] Page rendering failed:`, error);
+            request.reject(new Error(error));
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'pdfInfoSuccess') {
+        const { requestId, pageCount, fileMtime } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            request.resolve({ pageCount, fileMtime });
+            diagramRenderRequests.delete(requestId);
+        }
+    } else if (message.type === 'pdfInfoError') {
+        const { requestId, error } = message;
+        const request = diagramRenderRequests.get(requestId);
+
+        if (request) {
+            console.error(`[PDF] Info request failed:`, error);
             request.reject(new Error(error));
             diagramRenderRequests.delete(requestId);
         }
@@ -1180,6 +1442,41 @@ function renderMarkdown(text, includeContext) {
             const originalSrc = token.attrGet('src') || '';
             const title = token.attrGet('title') || '';
             const alt = token.content || '';
+
+            // Check if this is a PDF page reference (e.g., file.pdf#12 for page 12)
+            const pdfPageMatch = originalSrc && originalSrc.match(/^(.+\.pdf)#(\d+)$/i);
+            if (pdfPageMatch) {
+                const pdfPath = pdfPageMatch[1];
+                const pageNumber = parseInt(pdfPageMatch[2], 10);
+
+                // Create unique ID for this PDF page
+                const pdfId = `pdf-page-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                // Queue for async rendering
+                queuePDFPageRender(pdfId, pdfPath, pageNumber);
+
+                // Return placeholder immediately (synchronous)
+                return `<div id="${pdfId}" class="diagram-placeholder">
+                    <div class="placeholder-spinner"></div>
+                    <div class="placeholder-text">Loading PDF page ${pageNumber}...</div>
+                </div>`;
+            }
+
+            // Check if this is a PDF file reference without page number (slideshow mode)
+            const isPdfFile = originalSrc && originalSrc.match(/\.pdf$/i) && !originalSrc.includes('#');
+            if (isPdfFile) {
+                // Create unique ID for this PDF slideshow
+                const pdfId = `pdf-slideshow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                // Queue for async slideshow creation
+                queuePDFSlideshow(pdfId, originalSrc);
+
+                // Return placeholder immediately (synchronous)
+                return `<div id="${pdfId}" class="diagram-placeholder">
+                    <div class="placeholder-spinner"></div>
+                    <div class="placeholder-text">Loading PDF slideshow...</div>
+                </div>`;
+            }
 
             // Check if this is a diagram file that needs special rendering
             const isDiagramFile = originalSrc && (

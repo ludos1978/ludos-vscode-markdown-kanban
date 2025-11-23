@@ -1062,6 +1062,16 @@ export class MessageHandler {
                 await this.handleRenderExcalidraw(message);
                 break;
 
+            // PDF page rendering (backend)
+            case 'requestPDFPageRender':
+                await this.handleRenderPDFPage(message);
+                break;
+
+            // PDF info request (get page count)
+            case 'requestPDFInfo':
+                await this.handleGetPDFInfo(message);
+                break;
+
             // PlantUML to SVG conversion
             case 'convertPlantUMLToSVG':
                 await this.handleConvertPlantUMLToSVG(message);
@@ -4852,17 +4862,17 @@ export class MessageHandler {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Render to SVG
-            const svg = await service.renderSVG(absolutePath);
+            // Render to PNG (better rendering than SVG in webview)
+            const pngBuffer = await service.renderPNG(absolutePath);
 
-            // Convert SVG to data URL
-            const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+            // Convert PNG to data URL
+            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
 
             // Send success response to webview with mtime for cache invalidation
             panel.webview.postMessage({
                 type: 'drawioRenderSuccess',
                 requestId,
-                svgDataUrl,
+                svgDataUrl: pngDataUrl,  // Keep property name for compatibility
                 fileMtime
             });
 
@@ -4909,17 +4919,27 @@ export class MessageHandler {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Render to SVG
-            const svg = await service.renderSVG(absolutePath);
-
-            // Convert SVG to data URL
-            const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+            // Try PNG conversion first (better rendering), fallback to SVG if it fails
+            // Note: PNG conversion can fail if our custom SVG renderer produces
+            // SVG that draw.io CLI can't import
+            let dataUrl: string;
+            try {
+                const pngBuffer = await service.renderPNG(absolutePath);
+                dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+                console.log('[Excalidraw Backend] ✅ Rendered as PNG');
+            } catch (pngError) {
+                console.warn('[Excalidraw Backend] PNG conversion failed, falling back to SVG:', pngError);
+                // Fallback to SVG
+                const svg = await service.renderSVG(absolutePath);
+                dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+                console.log('[Excalidraw Backend] ✅ Rendered as SVG (fallback)');
+            }
 
             // Send success response to webview with mtime for cache invalidation
             panel.webview.postMessage({
                 type: 'excalidrawRenderSuccess',
                 requestId,
-                svgDataUrl,
+                svgDataUrl: dataUrl,  // Keep property name for compatibility
                 fileMtime
             });
 
@@ -4929,6 +4949,120 @@ export class MessageHandler {
             // Send error response to webview
             panel.webview.postMessage({
                 type: 'excalidrawRenderError',
+                requestId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Handle PDF page rendering request from webview
+     * Renders a specific page from a PDF file to PNG
+     * Uses backend PDFService with pdftoppm CLI for conversion
+     *
+     * Request format: { type: 'requestPDFPageRender', requestId, filePath, pageNumber }
+     * Response format: { type: 'pdfPageRenderSuccess', requestId, pngDataUrl, fileMtime }
+     */
+    private async handleRenderPDFPage(message: any): Promise<void> {
+        const { requestId, filePath, pageNumber } = message;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[handleRenderPDFPage] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import PDFService dynamically
+            const { PDFService } = await import('./services/export/PDFService');
+            const service = new PDFService();
+
+            // Resolve file path (handles both workspace-relative and document-relative paths)
+            const resolution = await panel._fileManager.resolveFilePath(filePath);
+            if (!resolution || !resolution.exists) {
+                throw new Error(`PDF file not found: ${filePath}`);
+            }
+
+            const absolutePath = resolution.resolvedPath;
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Render PDF page to PNG
+            const pngBuffer = await service.renderPage(absolutePath, pageNumber, 150);
+
+            // Convert PNG to data URL
+            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+
+            // Send success response to webview with mtime for cache invalidation
+            panel.webview.postMessage({
+                type: 'pdfPageRenderSuccess',
+                requestId,
+                pngDataUrl,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[PDF Backend] Render error:', error);
+
+            // Send error response to webview
+            panel.webview.postMessage({
+                type: 'pdfPageRenderError',
+                requestId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Handle PDF info request (get page count)
+     * Request format: { type: 'requestPDFInfo', requestId, filePath }
+     * Response format: { type: 'pdfInfoSuccess', requestId, pageCount, fileMtime }
+     */
+    private async handleGetPDFInfo(message: any): Promise<void> {
+        const { requestId, filePath } = message;
+        const panel = this._getWebviewPanel();
+
+        if (!panel || !panel.webview) {
+            console.error('[handleGetPDFInfo] No panel or webview available');
+            return;
+        }
+
+        try {
+            // Import PDFService dynamically
+            const { PDFService } = await import('./services/export/PDFService');
+            const service = new PDFService();
+
+            // Resolve file path
+            const resolution = await panel._fileManager.resolveFilePath(filePath);
+            if (!resolution || !resolution.exists) {
+                throw new Error(`PDF file not found: ${filePath}`);
+            }
+
+            const absolutePath = resolution.resolvedPath;
+
+            // Get file modification time for cache invalidation
+            const stats = await fs.promises.stat(absolutePath);
+            const fileMtime = stats.mtimeMs;
+
+            // Get page count
+            const pageCount = await service.getPageCount(absolutePath);
+
+            // Send success response
+            panel.webview.postMessage({
+                type: 'pdfInfoSuccess',
+                requestId,
+                pageCount,
+                fileMtime
+            });
+
+        } catch (error) {
+            console.error('[PDF Info] Error:', error);
+
+            // Send error response
+            panel.webview.postMessage({
+                type: 'pdfInfoError',
                 requestId,
                 error: error instanceof Error ? error.message : String(error)
             });

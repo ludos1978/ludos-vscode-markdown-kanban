@@ -25,7 +25,7 @@ export interface NewExportOptions {
     columnIndexes?: number[];
 
     // SCOPE: What to export
-    // scope?: 'board' | 'column' | 'task';
+    scope?: 'board' | 'column' | 'task';
 
     // SELECTION: Specific item to export (for column/task scope)
     selection?: {

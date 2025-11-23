@@ -96,11 +96,12 @@ export class DrawIOService {
     }
 
     /**
-     * Render draw.io diagram file to SVG
+     * Render draw.io diagram file to specified format
      * @param filePath Absolute path to .drawio or .dio file
-     * @returns SVG string
+     * @param format Output format: 'svg' or 'png'
+     * @returns Image data as string (SVG) or Buffer (PNG)
      */
-    async renderSVG(filePath: string): Promise<string> {
+    private async renderDiagram(filePath: string, format: 'svg' | 'png'): Promise<string | Buffer> {
         // Check CLI availability
         if (!await this.isAvailable()) {
             this.showCliWarning();
@@ -115,15 +116,21 @@ export class DrawIOService {
             if (!fs.existsSync(tempDir)) {
                 fs.mkdirSync(tempDir, { recursive: true });
             }
-            const tempOutputPath = path.join(tempDir, `drawio-${Date.now()}.svg`);
+            const ext = format === 'png' ? 'png' : 'svg';
+            const tempOutputPath = path.join(tempDir, `drawio-${Date.now()}.${ext}`);
 
             // Build CLI arguments
             const args = [
                 '--export',
-                '--format', 'svg',
+                '--format', format,
                 '--output', tempOutputPath,
                 filePath
             ];
+
+            // Add transparent background for PNG
+            if (format === 'png') {
+                args.push('--transparent');
+            }
 
             console.log(`[DrawIOService] Converting: ${path.basename(filePath)}`);
             console.log(`[DrawIOService] Command: ${this.cliPath} ${args.join(' ')}`);
@@ -181,20 +188,41 @@ export class DrawIOService {
                         return;
                     }
 
-                    // Read SVG output
-                    const svg = await fs.promises.readFile(tempOutputPath, 'utf8');
-                    console.log(`[DrawIOService] ✅ Converted: ${path.basename(filePath)} (${svg.length} bytes)`);
+                    // Read output file (text for SVG, binary for PNG)
+                    const data = format === 'svg'
+                        ? await fs.promises.readFile(tempOutputPath, 'utf8')
+                        : await fs.promises.readFile(tempOutputPath);
+
+                    console.log(`[DrawIOService] ✅ Converted to ${format.toUpperCase()}: ${path.basename(filePath)} (${data.length} bytes)`);
 
                     // Cleanup temp file
                     await fs.promises.unlink(tempOutputPath);
 
-                    resolve(svg);
+                    resolve(data);
                 } catch (error) {
                     console.error('[DrawIOService] Failed to read output:', error);
                     reject(error);
                 }
             });
         });
+    }
+
+    /**
+     * Render draw.io diagram file to SVG
+     * @param filePath Absolute path to .drawio or .dio file
+     * @returns SVG string
+     */
+    async renderSVG(filePath: string): Promise<string> {
+        return this.renderDiagram(filePath, 'svg') as Promise<string>;
+    }
+
+    /**
+     * Render draw.io diagram file to PNG
+     * @param filePath Absolute path to .drawio or .dio file
+     * @returns PNG data as Buffer
+     */
+    async renderPNG(filePath: string): Promise<Buffer> {
+        return this.renderDiagram(filePath, 'png') as Promise<Buffer>;
     }
 
     /**

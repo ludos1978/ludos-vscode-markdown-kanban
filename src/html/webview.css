@@ -6444,3 +6444,74 @@ figcaption {
   background: var(--vscode-menu-separatorBackground, rgba(128, 128, 128, 0.35));
   margin: 4px 0;
 }
+
+/* PDF Slideshow Styles */
+.pdf-slideshow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.pdf-slideshow-image {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.pdf-slideshow-image img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pdf-slideshow-loading {
+  color: var(--vscode-foreground);
+  padding: 20px;
+  text-align: center;
+}
+
+.pdf-slideshow-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+}
+
+.pdf-slideshow-btn {
+  padding: 6px 12px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  transition: background 0.2s;
+}
+
+.pdf-slideshow-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.pdf-slideshow-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-slideshow-page-info {
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  min-width: 100px;
+  text-align: center;
+}

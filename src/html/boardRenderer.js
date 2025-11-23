@@ -3054,6 +3054,7 @@ window.enforceFoldModesForStacks = enforceFoldModesForStacks;
 // Use debounced version by default for performance, but export immediate version too
 window.recalculateStackHeights = recalculateStackHeightsDebounced;
 window.recalculateStackHeightsImmediate = recalculateStackHeightsImmediate;
+window.waitForStackImagesAndRecalculate = waitForStackImagesAndRecalculate;
 
 /**
  * Setup scroll handler to keep all column headers visible at all times
