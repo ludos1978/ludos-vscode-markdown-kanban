@@ -6352,6 +6352,8 @@ function executeQuickExport() {
 
 // Column Export Functions
 window.exportColumn = function exportColumn(columnId) {
+    closeAllMenus();
+
     // Find the column in the current board
     if (!window.cachedBoard || !window.cachedBoard.columns) {
         vscode.postMessage({

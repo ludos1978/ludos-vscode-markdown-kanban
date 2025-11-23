@@ -1,3 +1,18 @@
+- [ ] can you add a speaker note function that makes lines after ;; to be speakernotes. the way speakernotes are displayed can be defined separately in the css. they should get a border with light oclors. also they might get exported with into different styles. For marp the speaker notes are exported as html comments "<!-- note -->. Also add how html comments are handled when exporting to marp (of course handle this separately from the speaker notes. ex: do NOT convert speakernotes to comments and then handle them according to the speaker note rules). By default they should be hidden by the post processor. make both of these multiple choise selection:
+- Marp Notes:
+  - Comment (<!-- -->)
+  - Keep Style (;;)
+  - Remove
+- Html Comments:
+  - Remove
+  - Keep Style (<!-- -->)
+- Html Content:
+  - Keep Style (<>)
+  - Remove
+Integrate these into the exporter, with the default value being the first one. Save the last defined values for the next export.
+
+- [x] Export Column in the column burger menu doesnt close the burger menu.
+- [x] Copy as Markdown copies the full board, not the selected column or tasks content!
 
 - [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
 Pressing enter should start editing the task.
