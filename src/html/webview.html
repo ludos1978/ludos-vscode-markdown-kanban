@@ -598,7 +598,39 @@
 										<span>Merge Includes into Main File</span>
 									</label>
 									<div class="help-text">When unchecked, include files are exported separately and referenced via !!!include()!!! markers. When checked, all include content is merged into the main export file.</div>
-								</div>						<!-- Use Marp option (always visible but disabled when not presentation format) -->
+								</div>
+
+								<!-- Content Transformations (only shown for presentation format) -->
+								<div id="content-transformations" class="export-field" style="display: none;">
+									<label>Content Transformations:</label>
+									<div class="export-field-row">
+										<div class="export-field-third">
+											<label for="speaker-note-mode">Marp Notes (;;):</label>
+											<select id="speaker-note-mode" class="form-input">
+												<option value="comment" selected>Comment (&lt;!-- --&gt;)</option>
+												<option value="keep">Keep Style (;;)</option>
+												<option value="remove">Remove</option>
+											</select>
+										</div>
+										<div class="export-field-third">
+											<label for="html-comment-mode">HTML Comments:</label>
+											<select id="html-comment-mode" class="form-input">
+												<option value="remove" selected>Remove</option>
+												<option value="keep">Keep Style (&lt;!-- --&gt;)</option>
+											</select>
+										</div>
+										<div class="export-field-third">
+											<label for="html-content-mode">HTML Content:</label>
+											<select id="html-content-mode" class="form-input">
+												<option value="keep" selected>Keep Style (&lt;&gt;)</option>
+												<option value="remove">Remove</option>
+											</select>
+										</div>
+									</div>
+									<div class="help-text">Configure how speaker notes (;;), HTML comments (&lt;!-- --&gt;), and HTML tags (&lt;&gt;) are handled during export.</div>
+								</div>
+
+						<!-- Use Marp option (always visible but disabled when not presentation format) -->
 						<div id="use-marp-container" class="export-field">
 							<label class="export-checkbox">
 								<input type="checkbox" id="use-marp" onchange="handleUseMarpChange()" disabled>

@@ -70,6 +70,11 @@ export interface NewExportOptions {
     marpEnginePath?: string;
     marpWatch?: boolean;            // Run Marp in watch mode
     marpPptxEditable?: boolean;     // Use --pptx-editable flag for PowerPoint exports
+
+    // CONTENT TRANSFORMATIONS
+    speakerNoteMode?: 'comment' | 'keep' | 'remove';  // How to handle ;; speaker notes
+    htmlCommentMode?: 'remove' | 'keep';              // How to handle <!-- --> comments
+    htmlContentMode?: 'keep' | 'remove';              // How to handle <tag> content
 }
 
 /**
@@ -132,6 +137,133 @@ export class ExportService {
             return TagUtils.processMarkdownContent(content, tagVisibility);
         }
         return content;
+    }
+
+    /**
+     * Apply speaker note transformation based on export mode
+     * Transforms lines starting with ;; according to speakerNoteMode setting
+     * Consecutive ;; lines are grouped together
+     */
+    private static applySpeakerNoteTransform(content: string, mode: 'comment' | 'keep' | 'remove'): string {
+        if (!mode || mode === 'keep') {
+            return content;
+        }
+
+        const lines = content.split('\n');
+        const result: string[] = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith(';;')) {
+                // Collect all consecutive ;; lines
+                const noteLines: string[] = [];
+                const indent = line.match(/^(\s*)/)?.[1] || '';
+
+                while (i < lines.length && lines[i].trim().startsWith(';;')) {
+                    const noteContent = lines[i].trim().substring(2).trim();
+                    noteLines.push(noteContent);
+                    i++;
+                }
+
+                // Process the grouped notes based on mode
+                switch (mode) {
+                    case 'comment':
+                        // Combine all notes into a single comment
+                        const combinedContent = noteLines.join('\n');
+                        result.push(`${indent}<!-- ${combinedContent} -->`);
+                        break;
+                    case 'remove':
+                        // Don't add anything (removes all the lines)
+                        break;
+                }
+            } else {
+                result.push(line);
+                i++;
+            }
+        }
+
+        return result.join('\n');
+    }
+
+    /**
+     * Apply HTML comment transformation based on export mode
+     * Handles <!-- --> comments, but preserves speaker-note-generated comments
+     */
+    private static applyHtmlCommentTransform(content: string, mode: 'remove' | 'keep'): string {
+        if (!mode || mode === 'keep') {
+            return content;
+        }
+
+        // Remove HTML comments but preserve those generated from speaker notes
+        // (they won't have this pattern since they were just created)
+        return content.replace(/<!--(?!\s*SPEAKER-NOTE:)(.*?)-->/gs, '');
+    }
+
+    /**
+     * Apply HTML content transformation based on export mode
+     * Handles <tag> HTML content (not comments, not URLs)
+     */
+    private static applyHtmlContentTransform(content: string, mode: 'keep' | 'remove'): string {
+        if (!mode || mode === 'keep') {
+            return content;
+        }
+
+        // Remove HTML tags but NOT comments or URL angle brackets
+        // Protect code blocks first
+        const codeBlockPattern = /```[\s\S]*?```|`[^`]+`/g;
+        const codeBlocks: string[] = [];
+        const placeholder = '___CODE_BLOCK_PLACEHOLDER___';
+
+        // Extract code blocks
+        let protectedContent = content.replace(codeBlockPattern, (match) => {
+            codeBlocks.push(match);
+            return `${placeholder}${codeBlocks.length - 1}${placeholder}`;
+        });
+
+        // Remove HTML tags (but not <!-- comments --> or <http:// URLs)
+        protectedContent = protectedContent.replace(/<(?!\!--|\/?https?:\/\/)(.*?)>/g, '');
+
+        // Restore code blocks
+        protectedContent = protectedContent.replace(new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g'), (match, index) => {
+            return codeBlocks[parseInt(index)];
+        });
+
+        return protectedContent;
+    }
+
+    /**
+     * Apply all content transformations in correct order
+     * Order matters: speaker notes → HTML comments → HTML content
+     * Only applies for presentation format exports
+     */
+    private static applyContentTransformations(content: string, options: NewExportOptions): string {
+        // Only apply transformations for presentation format
+        const isPresentationFormat = options.format === 'presentation' || options.format === 'marp';
+        if (!isPresentationFormat) {
+            return content;
+        }
+
+        let result = content;
+
+        // 1. Speaker notes (;; → <!-- --> or remove)
+        if (options.speakerNoteMode) {
+            result = this.applySpeakerNoteTransform(result, options.speakerNoteMode);
+        }
+
+        // 2. HTML comments (remove or keep)
+        if (options.htmlCommentMode) {
+            result = this.applyHtmlCommentTransform(result, options.htmlCommentMode);
+        }
+
+        // 3. HTML content (remove or keep)
+        if (options.htmlContentMode) {
+            result = this.applyHtmlContentTransform(result, options.htmlContentMode);
+        }
+
+        return result;
     }
 
     /**
@@ -216,7 +348,10 @@ export class ExportService {
 
         // Apply tag filtering to the content if specified
         // This ensures all markdown files (main and included) get tag filtering
-        const filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
+        let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
+
+        // Apply content transformations (speaker notes, HTML comments, HTML content)
+        filteredContent = this.applyContentTransformations(filteredContent, options);
 
         return {
             exportedContent: filteredContent,
@@ -1039,6 +1174,9 @@ export class ExportService {
         // This ensures all markdown files (main and included) get tag filtering
         let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
+        // Apply content transformations (speaker notes, HTML comments, HTML content)
+        filteredContent = this.applyContentTransformations(filteredContent, options);
+
         // Convert to presentation format if requested
         if (convertToPresentation) {
             const { PresentationGenerator } = require('./services/export/PresentationGenerator');
@@ -1734,6 +1872,9 @@ export class ExportService {
         } else {
             // Simple path: tag filtering and link rewriting (no asset packing)
             result = this.applyTagFiltering(result, options.tagVisibility);
+
+            // Apply content transformations (speaker notes, HTML comments, HTML content)
+            result = this.applyContentTransformations(result, options);
 
             // Rewrite links if requested
             if (options.linkHandlingMode !== 'no-modify') {

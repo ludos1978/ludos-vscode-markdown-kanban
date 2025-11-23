@@ -3733,6 +3733,24 @@ blockquote {
   }
 } */
 
+/* Speaker Notes */
+.speaker-note {
+  color: var(--vscode-textPreformat-foreground, #888);
+  background-color: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.05));
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-left: 3px solid var(--vscode-editorInfo-foreground, #4a9eff);
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+
+.speaker-note:hover {
+  opacity: 1;
+}
+
 /* HTML Comment Markers */
 .html-comment-marker {
   /* color: var(--vscode-editor-foreground, #cccccc);

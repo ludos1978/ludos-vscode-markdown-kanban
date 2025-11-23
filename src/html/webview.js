@@ -5038,6 +5038,28 @@ function initializeExportTree(preSelectNodeId = null) {
         });
     }
 
+    // Set up content transformation change listeners
+    const speakerNoteSelect = document.getElementById('speaker-note-mode');
+    if (speakerNoteSelect) {
+        speakerNoteSelect.addEventListener('change', () => {
+            localStorage.setItem('kanban-speaker-note-mode', speakerNoteSelect.value);
+        });
+    }
+
+    const htmlCommentSelect = document.getElementById('html-comment-mode');
+    if (htmlCommentSelect) {
+        htmlCommentSelect.addEventListener('change', () => {
+            localStorage.setItem('kanban-html-comment-mode', htmlCommentSelect.value);
+        });
+    }
+
+    const htmlContentSelect = document.getElementById('html-content-mode');
+    if (htmlContentSelect) {
+        htmlContentSelect.addEventListener('change', () => {
+            localStorage.setItem('kanban-html-content-mode', htmlContentSelect.value);
+        });
+    }
+
     // Select either the pre-selected node or full kanban
     if (preSelectNodeId) {
         exportTreeUI.tree = window.ExportTreeBuilder.toggleSelection(exportTreeUI.tree, preSelectNodeId, true);
@@ -5180,6 +5202,11 @@ function executeUnifiedExport() {
     // Get merge includes option
     const mergeIncludes = document.getElementById('merge-includes')?.checked || false;
 
+    // Get content transformation options
+    const speakerNoteMode = document.getElementById('speaker-note-mode')?.value || 'comment';
+    const htmlCommentMode = document.getElementById('html-comment-mode')?.value || 'remove';
+    const htmlContentMode = document.getElementById('html-content-mode')?.value || 'keep';
+
     // Get new export behavior options
     const autoExportOnSave = document.getElementById('auto-export-on-save')?.checked || false;
     // Get Marp options (only if using Marp)
@@ -5216,6 +5243,9 @@ function executeUnifiedExport() {
         // TRANSFORMATIONS
         tagVisibility: tagVisibility,
         mergeIncludes: mergeIncludes,
+        speakerNoteMode: speakerNoteMode,
+        htmlCommentMode: htmlCommentMode,
+        htmlContentMode: htmlContentMode,
 
         // PACKING & LINK HANDLING
         linkHandlingMode: linkHandlingMode,
@@ -5318,6 +5348,7 @@ function handleFormatChange() {
     const useMarpCheckbox = document.getElementById('use-marp');
     const useMarpHint = document.getElementById('use-marp-hint');
     const marpOptions = document.getElementById('marp-options');
+    const contentTransformations = document.getElementById('content-transformations');
 
     if (formatSelect && useMarpCheckbox && marpOptions) {
         const format = formatSelect.value;
@@ -5327,7 +5358,12 @@ function handleFormatChange() {
             // Enable Use Marp checkbox
             useMarpCheckbox.disabled = false;
             useMarpHint.style.display = 'none';
-            
+
+            // Show content transformations for presentation format
+            if (contentTransformations) {
+                contentTransformations.style.display = 'block';
+            }
+
             // Check if Use Marp is already checked
             if (useMarpCheckbox.checked) {
                 marpOptions.style.opacity = '1';
@@ -5344,7 +5380,12 @@ function handleFormatChange() {
             useMarpCheckbox.disabled = true;
             useMarpCheckbox.checked = false;
             useMarpHint.style.display = 'inline';
-            
+
+            // Hide content transformations for non-presentation formats
+            if (contentTransformations) {
+                contentTransformations.style.display = 'none';
+            }
+
             // Disable Marp options
             marpOptions.style.opacity = '0.5';
             marpOptions.style.pointerEvents = 'none';
@@ -6200,6 +6241,25 @@ function handleMarpThemesAvailable(themes, error) {
     const browserSelect = document.getElementById('marp-browser');
     if (savedBrowser && browserSelect) {
         browserSelect.value = savedBrowser;
+    }
+
+    // Restore content transformation settings
+    const savedSpeakerNoteMode = localStorage.getItem('kanban-speaker-note-mode');
+    const speakerNoteSelect = document.getElementById('speaker-note-mode');
+    if (savedSpeakerNoteMode && speakerNoteSelect) {
+        speakerNoteSelect.value = savedSpeakerNoteMode;
+    }
+
+    const savedHtmlCommentMode = localStorage.getItem('kanban-html-comment-mode');
+    const htmlCommentSelect = document.getElementById('html-comment-mode');
+    if (savedHtmlCommentMode && htmlCommentSelect) {
+        htmlCommentSelect.value = savedHtmlCommentMode;
+    }
+
+    const savedHtmlContentMode = localStorage.getItem('kanban-html-content-mode');
+    const htmlContentSelect = document.getElementById('html-content-mode');
+    if (savedHtmlContentMode && htmlContentSelect) {
+        htmlContentSelect.value = savedHtmlContentMode;
     }
 
 }

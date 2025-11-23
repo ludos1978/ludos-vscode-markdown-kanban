@@ -1,4 +1,8 @@
-- [ ] can you add a speaker note function that makes lines after ;; to be speakernotes. the way speakernotes are displayed can be defined separately in the css. they should get a border with light oclors. also they might get exported with into different styles. For marp the speaker notes are exported as html comments "<!-- note -->. Also add how html comments are handled when exporting to marp (of course handle this separately from the speaker notes. ex: do NOT convert speakernotes to comments and then handle them according to the speaker note rules). By default they should be hidden by the post processor. make both of these multiple choise selection:
+- [ ] can we include draw.io rendering if such a file is included with time image format? When exporting convert them to svg as well. Plan the feature so it's easliy extenable, i want to also include excalidraw if that is similarly possible.
+
+- [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
+
+- [x] can you add a speaker note function that makes lines after ;; to be speakernotes. the way speakernotes are displayed can be defined separately in the css. they should get a border with light oclors. also they might get exported with into different styles. For marp the speaker notes are exported as html comments "<!-- note -->. Also add how html comments are handled when exporting to marp (of course handle this separately from the speaker notes. ex: do NOT convert speakernotes to comments and then handle them according to the speaker note rules). By default they should be hidden by the post processor. make both of these multiple choise selection:
 - Marp Notes:
   - Comment (<!-- -->)
   - Keep Style (;;)
@@ -10,6 +14,8 @@
   - Keep Style (<>)
   - Remove
 Integrate these into the exporter, with the default value being the first one. Save the last defined values for the next export.
+
+- [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 
 - [x] Export Column in the column burger menu doesnt close the burger menu.
 - [x] Copy as Markdown copies the full board, not the selected column or tasks content!
