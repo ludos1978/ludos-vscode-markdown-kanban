@@ -1,6 +1,12 @@
-- [ ] can we include draw.io rendering if such a file is included with time image format? When exporting convert them to svg as well. Plan the feature so it's easliy extenable, i want to also include excalidraw if that is similarly possible.
 
 - [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
+
+- [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
+
+- [ ] can we include draw.io rendering if such a file is included with time image format? When exporting convert them to svg as well. Plan the feature so it's easliy extenable, i want to also include excalidraw if that is similarly possible. the addon should not include the draw.io or excalidraw itself, but require the plugins to be installed (if that's possible). especially when it comes to editing the included files. we might include the converters.
+
+- [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
+Pressing enter should start editing the task.
 
 - [x] can you add a speaker note function that makes lines after ;; to be speakernotes. the way speakernotes are displayed can be defined separately in the css. they should get a border with light oclors. also they might get exported with into different styles. For marp the speaker notes are exported as html comments "<!-- note -->. Also add how html comments are handled when exporting to marp (of course handle this separately from the speaker notes. ex: do NOT convert speakernotes to comments and then handle them according to the speaker note rules). By default they should be hidden by the post processor. make both of these multiple choise selection:
 - Marp Notes:
@@ -15,13 +21,8 @@
   - Remove
 Integrate these into the exporter, with the default value being the first one. Save the last defined values for the next export.
 
-- [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
-
 - [x] Export Column in the column burger menu doesnt close the burger menu.
 - [x] Copy as Markdown copies the full board, not the selected column or tasks content!
-
-- [ ] pressing delete when not in edit mode of a column-header, task-header or task-content but having some element selected, should delete the currently highlighted task.
-Pressing enter should start editing the task.
 
 - [x] can you add a sidebar that lists all kanbans in the opened workspaces. it should only have one button to check all workspaces for markdown files with the yaml header element "kanban-plugin: board". the user might also drag&drop kanban board files into it. this files should be saved into the workspaces somehow, so when loading again i have a list of all kanbans in the workspaces.
 
