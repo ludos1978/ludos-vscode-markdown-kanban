@@ -5,3 +5,6 @@ Modify this line
 ---
 
 second slide
+
+;; some note
+

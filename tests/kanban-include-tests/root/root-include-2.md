@@ -7,3 +7,6 @@ Modify this line 2 - A
 ---
 
 # second slide
+
+;; note in 2
+
