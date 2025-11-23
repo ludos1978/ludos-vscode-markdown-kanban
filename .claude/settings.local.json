@@ -10,7 +10,10 @@
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(node esbuild.js:*)",
-      "Bash(drawio:*)"
+      "Bash(drawio:*)",
+      "Bash(node test-pathresolver.js:*)",
+      "Bash(node test-normalize.js:*)",
+      "Bash(node test-image-path-resolution.js:*)"
     ],
     "deny": [],
     "ask": []

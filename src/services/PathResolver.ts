@@ -50,7 +50,7 @@ export class PathResolver {
      * Also decodes URL-encoded paths for consistency
      *
      * @param relativePath - Path to normalize (may be URL-encoded)
-     * @returns Decoded path with ./ prefix
+     * @returns Decoded path with ./ prefix (only for relative paths; absolute paths returned as-is)
      */
     static normalize(relativePath: string): string {
         if (!relativePath) {
@@ -73,7 +73,12 @@ export class PathResolver {
             return decoded;
         }
 
-        // Add ./ prefix
+        // NEVER add ./ prefix to absolute paths
+        if (path.isAbsolute(decoded)) {
+            return decoded;
+        }
+
+        // Add ./ prefix only to relative paths
         return './' + decoded;
     }
 

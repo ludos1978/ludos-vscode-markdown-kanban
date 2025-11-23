@@ -2245,7 +2245,14 @@ function getTaskEditContent(task) {
     // For task includes, task.description ALREADY contains the complete file content
     // displayTitle is just "# include in path" (UI indicator only, not part of file)
     // Don't reconstruct - just return description directly!
-    return task.description || '';
+    const content = task.description || '';
+
+    // DEBUG: Log newline count
+    const newlineCount = (content.match(/\n/g) || []).length;
+    console.log(`[getTaskEditContent] Task ${task.id}: ${content.length} chars, ${newlineCount} newlines`);
+    console.log(`[getTaskEditContent] includeContext:`, task.includeContext ? 'YES' : 'NO');
+
+    return content;
 }
 
 /**

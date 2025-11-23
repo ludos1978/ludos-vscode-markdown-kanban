@@ -55,7 +55,8 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
 
         // Additional column include validation
         try {
-            const tasks = file.parseToTasks();
+            const mainFilePath = file.getParentFile()?.getPath();
+            const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
             if (tasks.length === 0) {
                 console.warn(`[ValidationVisitor] Column include has no tasks`);
             }
@@ -136,7 +137,8 @@ export class ContentAnalysisVisitor implements IFileVisitor<ContentStats> {
 
     async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<ContentStats> {
         const content = file.getContent();
-        const tasks = file.parseToTasks();
+        const mainFilePath = file.getParentFile()?.getPath();
+        const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
 
         return {
             fileType: 'column-include',

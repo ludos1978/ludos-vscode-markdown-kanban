@@ -1975,7 +1975,8 @@ export class KanbanWebviewPanel {
             if (column) {
                 // Parse tasks from updated file
                 const columnFile = file as any; // ColumnIncludeFile
-                const tasks = columnFile.parseToTasks(column.tasks, column.id);
+                const mainFilePath = this._fileManager.getDocument()?.uri.fsPath;
+                const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
                 column.tasks = tasks;
 
                 // Send update to frontend
@@ -2978,7 +2979,8 @@ export class KanbanWebviewPanel {
             await columnInclude.reload();
 
             // Pass existing tasks to preserve IDs during re-parse
-            const tasks = columnInclude.parseToTasks(existingTasks, column.id);
+            const mainFilePath = mainFile.getPath();
+            const tasks = columnInclude.parseToTasks(existingTasks, column.id, mainFilePath);
             allTasks.push(...tasks);
         }
 

@@ -877,11 +877,13 @@ export class ChangeStateMachine {
                     }
 
                     // Re-load tasks from already-loaded files
+                    const mainFile = this._fileRegistry.getMainFile();
+                    const mainFilePath = mainFile?.getPath();
                     const tasks: any[] = [];
                     for (const relativePath of newFiles) {
                         const file = this._fileRegistry.getByRelativePath(relativePath);
                         if (file) {
-                            const fileTasks = file.parseToTasks([], targetColumn.id);
+                            const fileTasks = file.parseToTasks([], targetColumn.id, mainFilePath);
                             tasks.push(...fileTasks);
                         }
                     }
@@ -983,7 +985,8 @@ export class ChangeStateMachine {
 
                     // Parse tasks from file content
                     if (file.parseToTasks) {
-                        const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id);
+                        const mainFilePath = mainFile.getPath();
+                        const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
                         console.log(`[State:LOADING_NEW] Parsed ${fileTasks.length} tasks from file`);
                         tasks.push(...fileTasks);
                     } else {
