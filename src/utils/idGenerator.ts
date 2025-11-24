@@ -2,6 +2,8 @@
  * UUID Generation Utilities for Kanban Board
  * Provides consistent, unique identifiers for columns and tasks
  * that persist across saves/loads and frontend/backend operations
+ * 
+ * State: manually verified.
  */
 
 export class IdGenerator {

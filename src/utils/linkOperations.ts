@@ -4,6 +4,8 @@
  * This class provides static methods for replacing links in markdown text,
  * handling various link formats including regular links, wiki links, images,
  * and strikethrough links.
+ * 
+ * State: manually verified.
  */
 export class LinkOperations {
     /**
@@ -39,6 +41,7 @@ export class LinkOperations {
         // Otherwise, it's likely an HTML tag like <hr>, <br>, etc.
         return false;
     }
+
     /**
      * Replace only the specific occurrence (by index) of a specific link in text
      * Handles both already strikethrough and regular links properly

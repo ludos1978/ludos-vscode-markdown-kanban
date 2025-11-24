@@ -726,32 +726,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // ============= CONFLICT RESOLUTION =============
 
     /**
-     * Resolve conflict with specified action
-     */
-    public async resolveConflict(action: 'save' | 'discard' | 'backup'): Promise<void> {
-
-        switch (action) {
-            case 'save':
-                // Save current changes (overwrite external changes)
-                await this.save();
-                break;
-
-            case 'discard':
-                // Discard local changes and reload from disk
-                await this.reload();
-                break;
-
-            case 'backup':
-                // Create backup of current content, then reload
-                await this.createBackup('conflict');
-                await this.reload();
-                break;
-        }
-
-        this._emitChange('conflict');
-    }
-
-    /**
      * Show conflict dialog and resolve based on user choice
      */
     public async showConflictDialog(): Promise<ConflictResolution | null> {
@@ -762,7 +736,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
             // Check shouldCreateBackup FIRST because backup-and-reload sets both flags
             if (resolution.shouldCreateBackup) {
                 // resolveConflict('backup') creates backup AND reloads
-                await this.resolveConflict('backup');
+                // Create backup of current content, then reload
+                await this.createBackup('conflict');
+                await this.reload();
+                this._emitChange('conflict');
             } else if (resolution.shouldSave) {
                 // save() method marks itself as legitimate automatically
                 await this.save();
