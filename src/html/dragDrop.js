@@ -343,66 +343,46 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             if (stackColumns.length > 0) {
                 const lastCol = stackColumns[stackColumns.length - 1];
 
-                // FOLDED MODE: Use column-title bottom boundary (content not visible)
+                // PERFORMANCE: Use ONLY cached positions
                 if (lastCol.isFolded && lastCol.columnTitleRect) {
-                    // Use LIVE position for sticky columns since they can move visually
-                    const liveColumnTitle = lastCol.element.querySelector('.column-title');
-                    const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
-
-                    if (liveTitleRect) {
-                        stackLeft = liveTitleRect.left;
-                        stackWidth = liveTitleRect.width;
-                        insertionY = liveTitleRect.bottom;
-                    } else {
-                        // Fallback to cached position
-                        stackLeft = lastCol.columnTitleRect.left;
-                        stackWidth = lastCol.columnTitleRect.width;
-                        insertionY = lastCol.columnTitleRect.bottom;
-                    }
+                    // FOLDED MODE: Use cached column-title bottom
+                    stackLeft = lastCol.columnTitleRect.left;
+                    stackWidth = lastCol.columnTitleRect.width;
+                    insertionY = lastCol.columnTitleRect.bottom;
                 }
-                // UNFOLDED STICKY MODE: Content visible, use content bottom
                 else if (lastCol.isSticky && lastCol.isContentVisible && lastCol.contentRect) {
-                    // Use LIVE content position
-                    const liveColumnContent = lastCol.element.querySelector('.column-content');
-                    const liveContentRect = liveColumnContent?.getBoundingClientRect();
-
-                    if (liveContentRect) {
-                        const viewportBottom = window.innerHeight;
-                        // Position at content bottom or viewport bottom (whichever is smaller)
-                        const effectiveBottom = Math.min(liveContentRect.bottom, viewportBottom);
-
-                        stackLeft = liveContentRect.left;
-                        stackWidth = liveContentRect.width;
-                        insertionY = effectiveBottom;
-                    } else {
-                        // Fallback to cached content rect
-                        const viewportBottom = window.innerHeight;
-                        const effectiveBottom = Math.min(lastCol.contentRect.bottom, viewportBottom);
-                        stackLeft = lastCol.contentRect.left;
-                        stackWidth = lastCol.contentRect.width;
-                        insertionY = effectiveBottom;
-                    }
+                    // UNFOLDED STICKY MODE: Use cached content bottom
+                    const viewportBottom = window.innerHeight;
+                    const effectiveBottom = Math.min(lastCol.contentRect.bottom, viewportBottom);
+                    stackLeft = lastCol.contentRect.left;
+                    stackWidth = lastCol.contentRect.width;
+                    insertionY = effectiveBottom;
                 }
-                // NORMAL MODE: Use bottom margin
                 else if (lastCol.bottomMarginRect) {
+                    // NORMAL MODE: Use cached bottom margin
                     stackLeft = lastCol.bottomMarginRect.left;
                     stackWidth = lastCol.bottomMarginRect.width;
                     insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
                 }
-                // FALLBACK: Use column bottom
                 else {
-                    const liveRect = lastCol.element.getBoundingClientRect();
-                    stackLeft = liveRect.left;
-                    stackWidth = liveRect.width;
-                    insertionY = liveRect.bottom;
+                    // FALLBACK: Use cached column bottom
+                    stackLeft = lastCol.rect.left;
+                    stackWidth = lastCol.rect.width;
+                    insertionY = lastCol.rect.bottom;
                 }
             } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
                 // No OTHER columns in stack, but dragged column IS in this stack
-                // Use dragged column's position for indicator
-                const draggedRect = dragState.draggedColumn.getBoundingClientRect();
-                stackLeft = draggedRect.left;
-                stackWidth = draggedRect.width;
-                insertionY = draggedRect.bottom + 5;
+                // Use dragged column's cached position for indicator
+                const draggedColData = dragState.cachedColumnPositions?.find(pos => pos.element === dragState.draggedColumn);
+                if (draggedColData) {
+                    stackLeft = draggedColData.rect.left;
+                    stackWidth = draggedColData.rect.width;
+                    insertionY = draggedColData.rect.bottom + 5;
+                } else {
+                    // Can't show indicator without cache
+                    indicator.style.display = 'none';
+                    return;
+                }
             } else if (targetStack.classList.contains('column-drop-zone-stack')) {
                 // Horizontal drop zone - don't show indicator (drop zone itself provides visual feedback)
                 indicator.style.display = 'none';
@@ -1422,6 +1402,12 @@ function setupGlobalDragAndDrop() {
     }
 
     function resetDragState() {
+        // PERFORMANCE: Remove scroll handler if it exists
+        if (dragState.scrollHandler) {
+            document.removeEventListener('scroll', dragState.scrollHandler, { capture: true });
+            dragState.scrollHandler = null;
+        }
+
         // Reset all drag state properties
         dragState.draggedClipboardCard = null;
         dragState.draggedEmptyCard = null;
@@ -3366,6 +3352,45 @@ function setupColumnDragAndDrop() {
             // Track throttling for column dragover
             dragState.columnDragoverThrottleId = null;
 
+            // PERFORMANCE: Add scroll handler to update cache during drag
+            // This keeps cached positions accurate if user scrolls while dragging
+            const scrollHandler = () => {
+                if (!dragState.isDragging || !dragState.draggedColumn) return;
+
+                // Re-cache all column positions on scroll
+                const allColumns = document.querySelectorAll('.kanban-full-height-column');
+                dragState.cachedColumnPositions = Array.from(allColumns)
+                    .filter(col => col !== dragState.draggedColumn)
+                    .map(col => {
+                        const colId = col.getAttribute('data-column-id');
+                        const columnTitle = col.querySelector('.column-title');
+                        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
+                        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+                        const bottomMargin = col.querySelector('.column-margin-bottom');
+                        const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
+                        const columnContent = col.querySelector('.column-content');
+                        const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
+                        const viewportHeight = window.innerHeight;
+                        const isContentVisible = contentRect && contentRect.bottom > 0 && contentRect.top < viewportHeight;
+                        const isFolded = isSticky && !isContentVisible;
+
+                        return {
+                            element: col,
+                            rect: col.getBoundingClientRect(),
+                            columnId: colId,
+                            isSticky: isSticky,
+                            isFolded: isFolded,
+                            isContentVisible: isContentVisible,
+                            contentRect: contentRect,
+                            topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
+                            bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
+                            columnTitleRect: columnTitleRect
+                        };
+                    });
+            };
+            dragState.scrollHandler = scrollHandler;
+            document.addEventListener('scroll', scrollHandler, { passive: true, capture: true });
+
             // Set drag data
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', `kanban-full-height-column:${columnId}`);
@@ -3470,60 +3495,30 @@ function setupColumnDragAndDrop() {
             const stackColumns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'));
             const isLastColumnInStack = stackColumns[stackColumns.length - 1] === column;
 
-            // FOLDED MODE: Use column-title boundaries (content not visible)
+            // PERFORMANCE: Use ONLY cached positions - zero DOM queries during drag!
             let midpoint, isInTopMargin, isBelowColumnTitle;
+
             if (colData.isFolded && colData.columnTitleRect) {
-                // For sticky columns, use LIVE position since sticky elements can move visually
-                const liveColumnTitle = column.querySelector('.column-title');
-                const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
-
-                if (liveTitleRect) {
-                    midpoint = liveTitleRect.top + liveTitleRect.height / 2;
-                    isInTopMargin = e.clientY <= midpoint;
-                    // Check if hovering below column-title (extended drop zone for last column)
-                    isBelowColumnTitle = isLastColumnInStack && e.clientY > liveTitleRect.bottom;
-                } else {
-                    // Fallback to cached if live query fails
-                    midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
-                    isInTopMargin = e.clientY <= midpoint;
-                    isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
-                }
+                // FOLDED MODE: Use cached column-title boundaries
+                midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
+                isInTopMargin = e.clientY <= midpoint;
+                isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
             }
-            // UNFOLDED STICKY MODE: Content is visible, use content boundaries
             else if (colData.isSticky && colData.isContentVisible && colData.contentRect) {
-                // For unfolded columns, use LIVE content position
-                const liveColumnContent = column.querySelector('.column-content');
-                const liveContentRect = liveColumnContent?.getBoundingClientRect();
-
-                if (liveContentRect) {
-                    const viewportBottom = window.innerHeight;
-                    // Use content bottom or viewport bottom (whichever is smaller)
-                    const effectiveBottom = Math.min(liveContentRect.bottom, viewportBottom);
-
-                    midpoint = liveContentRect.top + (liveContentRect.height / 2);
-                    isInTopMargin = e.clientY <= midpoint;
-                    // Check if hovering below visible content
-                    isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
-                } else {
-                    // Fallback to cached content rect
-                    const viewportBottom = window.innerHeight;
-                    const effectiveBottom = Math.min(colData.contentRect.bottom, viewportBottom);
-                    midpoint = colData.contentRect.top + (colData.contentRect.height / 2);
-                    isInTopMargin = e.clientY <= midpoint;
-                    isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
-                }
+                // UNFOLDED STICKY MODE: Use cached content boundaries
+                const viewportBottom = window.innerHeight;
+                const effectiveBottom = Math.min(colData.contentRect.bottom, viewportBottom);
+                midpoint = colData.contentRect.top + (colData.contentRect.height / 2);
+                isInTopMargin = e.clientY <= midpoint;
+                isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
             }
-            // NORMAL MODE: Use margins for drop detection
             else {
+                // NORMAL MODE: Use cached margins for drop detection
                 const rect = colData.rect;
                 midpoint = rect.top + rect.height / 2;
-
-                // Check if hovering in margin areas using cached positions
                 isInTopMargin = colData.topMarginRect &&
                     e.clientY >= colData.topMarginRect.top &&
                     e.clientY <= colData.topMarginRect.bottom;
-
-                // Check if hovering in bottom margin (for last column)
                 isBelowColumnTitle = isLastColumnInStack && colData.bottomMarginRect &&
                     e.clientY >= colData.bottomMarginRect.top &&
                     e.clientY <= colData.bottomMarginRect.bottom;
@@ -3571,58 +3566,33 @@ function setupColumnDragAndDrop() {
 
             const lastColumn = columns[columns.length - 1];
 
-            // PERFORMANCE: Use cached position if available
+            // PERFORMANCE: Use ONLY cached positions - zero live queries!
             const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
             let lastBottom, stackLeft, stackRight;
 
             if (cachedCol) {
-                // FOLDED MODE: Use column-title bottom (content not visible)
                 if (cachedCol.isFolded && cachedCol.columnTitleRect) {
-                    const liveColumnTitle = lastColumn.querySelector('.column-title');
-                    const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
-
-                    if (liveTitleRect) {
-                        lastBottom = liveTitleRect.bottom;
-                        stackLeft = liveTitleRect.left;
-                        stackRight = liveTitleRect.right;
-                    } else {
-                        // Fallback to cached
-                        lastBottom = cachedCol.columnTitleRect.bottom;
-                        stackLeft = cachedCol.columnTitleRect.left;
-                        stackRight = cachedCol.columnTitleRect.right;
-                    }
+                    // FOLDED MODE: Use cached column-title bottom
+                    lastBottom = cachedCol.columnTitleRect.bottom;
+                    stackLeft = cachedCol.columnTitleRect.left;
+                    stackRight = cachedCol.columnTitleRect.right;
                 }
-                // UNFOLDED STICKY MODE: Content visible, use content bottom
                 else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
-                    const liveColumnContent = lastColumn.querySelector('.column-content');
-                    const liveContentRect = liveColumnContent?.getBoundingClientRect();
-
-                    if (liveContentRect) {
-                        const viewportBottom = window.innerHeight;
-                        lastBottom = Math.min(liveContentRect.bottom, viewportBottom);
-                        stackLeft = liveContentRect.left;
-                        stackRight = liveContentRect.right;
-                    } else {
-                        // Fallback to cached
-                        const viewportBottom = window.innerHeight;
-                        lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
-                        stackLeft = cachedCol.contentRect.left;
-                        stackRight = cachedCol.contentRect.right;
-                    }
+                    // UNFOLDED STICKY MODE: Use cached content bottom
+                    const viewportBottom = window.innerHeight;
+                    lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
+                    stackLeft = cachedCol.contentRect.left;
+                    stackRight = cachedCol.contentRect.right;
                 }
-                // NORMAL MODE: Use full column bottom
                 else {
+                    // NORMAL MODE: Use cached column bottom
                     lastBottom = cachedCol.rect.bottom;
                     stackLeft = cachedCol.rect.left;
                     stackRight = cachedCol.rect.right;
                 }
             } else {
-                // Fallback: use live positions
-                const lastRect = lastColumn.getBoundingClientRect();
-                const stackRect = candidateStack.getBoundingClientRect();
-                lastBottom = lastRect.bottom;
-                stackLeft = stackRect.left;
-                stackRight = stackRect.right;
+                // No cache available - skip this stack
+                continue;
             }
 
             // Check if mouse is horizontally within column bounds and vertically below last visible part
@@ -3640,7 +3610,7 @@ function setupColumnDragAndDrop() {
 
         e.preventDefault();
 
-        // PERFORMANCE: Use cached positions to check if below last column
+        // PERFORMANCE: Use ONLY cached positions
         const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
         if (columns.length === 0) {return;}
 
@@ -3649,31 +3619,22 @@ function setupColumnDragAndDrop() {
 
         let lastBottom;
         if (cachedCol) {
-            // FOLDED MODE: Use column-title bottom (content not visible)
             if (cachedCol.isFolded && cachedCol.columnTitleRect) {
-                const liveColumnTitle = lastColumn.querySelector('.column-title');
-                const liveTitleRect = liveColumnTitle?.getBoundingClientRect();
-                lastBottom = liveTitleRect ? liveTitleRect.bottom : cachedCol.columnTitleRect.bottom;
+                // FOLDED MODE: Use cached column-title bottom
+                lastBottom = cachedCol.columnTitleRect.bottom;
             }
-            // UNFOLDED STICKY MODE: Content visible, use content bottom
             else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
-                const liveColumnContent = lastColumn.querySelector('.column-content');
-                const liveContentRect = liveColumnContent?.getBoundingClientRect();
-                if (liveContentRect) {
-                    const viewportBottom = window.innerHeight;
-                    lastBottom = Math.min(liveContentRect.bottom, viewportBottom);
-                } else {
-                    const viewportBottom = window.innerHeight;
-                    lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
-                }
+                // UNFOLDED STICKY MODE: Use cached content bottom
+                const viewportBottom = window.innerHeight;
+                lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
             }
-            // NORMAL MODE: Use full column bottom
             else {
+                // NORMAL MODE: Use cached column bottom
                 lastBottom = cachedCol.rect.bottom;
             }
         } else {
-            // Fallback: use live position
-            lastBottom = lastColumn.getBoundingClientRect().bottom;
+            // No cache - can't determine position, skip
+            return;
         }
 
         // Only handle vertical drops below the last column/title/content

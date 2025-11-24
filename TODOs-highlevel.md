@@ -1,7 +1,25 @@
 
+- [ ] "move to column" from a task burger menu doesnt work.
+
 - [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
 
+- [ ] Craete a group of tags
+  - #overview
+  - #schedule
+  - #general_information
+  - #preparation
+  - #presentation
+  - #tasks
+  - #homework
+  - #deliveries
+  - #handouts
+  - #references
+  - #example
+  - #planning
+
 - [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
+
+- [ ] when focus is regained by the kanban (possible configuration change), check if the tag menus of column and tag burger menus have changed and if so, regenerate these submenus.
 
 - [x] COMPLETED: Draw.io & Excalidraw diagram integration
   - [x] Export-time SVG conversion for `.drawio`, `.dio`, `.excalidraw`, `.excalidraw.json`, `.excalidraw.svg` files

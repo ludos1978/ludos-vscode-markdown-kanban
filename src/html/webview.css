@@ -3280,6 +3280,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 /* Drag and drop styles */
 .task-item.dragging {
   opacity: 0.5;
+  will-change: transform, opacity;
 }
 
 .kanban-full-height-column.column-dragging {
@@ -3296,6 +3297,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 .kanban-full-height-column.dragging {
   z-index: 1000 !important;
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* Multi-row drag overlay fix: ensure proper stacking context for rows */
@@ -3474,6 +3476,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   opacity: 0;
   transition: opacity 0.15s ease, top 0.1s ease-out;
   box-shadow: 0 0 6px var(--vscode-focusBorder);
+  will-change: transform, opacity, top, left;
 }
 
 .internal-drop-indicator.active {
@@ -3484,11 +3487,13 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 .task-item.drag-source {
   opacity: 0.3;
   filter: grayscale(50%);
+  will-change: transform, opacity;
 }
 
 .kanban-full-height-column.drag-source {
   opacity: 0.3;
   filter: grayscale(50%);
+  will-change: transform, opacity;
 }
 
 .drop-zone-feedback {
@@ -3737,7 +3742,7 @@ blockquote {
 
 /* Speaker Notes */
 .speaker-note {
-  color: var(--vscode-textPreformat-foreground, #888);
+  color: var(--vscode-textCodeBlock-foreground, #888);
   background-color: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.05));
   padding: 8px 12px;
   margin: 4px 0;
