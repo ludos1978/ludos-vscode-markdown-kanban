@@ -3307,6 +3307,37 @@ function setupColumnDragAndDrop() {
 
             // PERFORMANCE: Cache column AND margin/title positions for fast lookup during drag
             const allColumns = document.querySelectorAll('.kanban-full-height-column');
+
+            // Cache dragged column separately (needed for drop-below-last-column indicator)
+            const draggedColumnTitle = columnElement.querySelector('.column-title');
+            const draggedIsSticky = draggedColumnTitle && window.getComputedStyle(draggedColumnTitle).position === 'sticky';
+            const draggedContent = columnElement.querySelector('.column-content');
+            const draggedContentRect = draggedContent ? draggedContent.getBoundingClientRect() : null;
+            const draggedTitleRect = draggedColumnTitle ? draggedColumnTitle.getBoundingClientRect() : null;
+            const draggedContentVisible = draggedContentRect && draggedContentRect.bottom > 0 && draggedContentRect.top < window.innerHeight;
+
+            dragState.draggedColumnCache = {
+                element: columnElement,
+                rect: columnElement.getBoundingClientRect(),
+                columnId: columnId,
+                isSticky: draggedIsSticky,
+                isFolded: draggedIsSticky && !draggedContentVisible,
+                isContentVisible: draggedContentVisible,
+                contentRect: draggedContentRect,
+                columnTitleRect: draggedTitleRect
+            };
+
+            // PERFORMANCE: Cache stack structure to avoid querySelectorAll during drag
+            const board = document.getElementById('kanban-board');
+            dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {
+                const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+                return {
+                    element: stack,
+                    columns: columnsInStack,
+                    lastColumn: columnsInStack[columnsInStack.length - 1]
+                };
+            });
+
             dragState.cachedColumnPositions = Array.from(allColumns)
                 .filter(col => col !== columnElement)
                 .map(col => {
@@ -3357,7 +3388,27 @@ function setupColumnDragAndDrop() {
             const scrollHandler = () => {
                 if (!dragState.isDragging || !dragState.draggedColumn) return;
 
-                // Re-cache all column positions on scroll
+                // Re-cache dragged column position
+                const draggedCol = dragState.draggedColumn;
+                const draggedTitle = draggedCol.querySelector('.column-title');
+                const draggedSticky = draggedTitle && window.getComputedStyle(draggedTitle).position === 'sticky';
+                const draggedCont = draggedCol.querySelector('.column-content');
+                const draggedContRect = draggedCont ? draggedCont.getBoundingClientRect() : null;
+                const draggedTitleRect = draggedTitle ? draggedTitle.getBoundingClientRect() : null;
+                const draggedContVisible = draggedContRect && draggedContRect.bottom > 0 && draggedContRect.top < window.innerHeight;
+
+                dragState.draggedColumnCache = {
+                    element: draggedCol,
+                    rect: draggedCol.getBoundingClientRect(),
+                    columnId: draggedCol.getAttribute('data-column-id'),
+                    isSticky: draggedSticky,
+                    isFolded: draggedSticky && !draggedContVisible,
+                    isContentVisible: draggedContVisible,
+                    contentRect: draggedContRect,
+                    columnTitleRect: draggedTitleRect
+                };
+
+                // Re-cache all other column positions on scroll
                 const allColumns = document.querySelectorAll('.kanban-full-height-column');
                 dragState.cachedColumnPositions = Array.from(allColumns)
                     .filter(col => col !== dragState.draggedColumn)
@@ -3461,6 +3512,7 @@ function setupColumnDragAndDrop() {
 
 
         // PERFORMANCE-OPTIMIZED: Zero-recalc dragover using cached positions from dragstart
+        // RAF-THROTTLED: Limits processing to 60fps max
         column.addEventListener('dragover', e => {
             if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
@@ -3470,6 +3522,19 @@ function setupColumnDragAndDrop() {
             }
 
             e.preventDefault();
+
+            // CRITICAL: Capture mouse Y coordinate BEFORE RAF (becomes stale inside callback)
+            const mouseY = e.clientY;
+
+            // PERFORMANCE: RAF throttle - skip if already scheduled
+            if (dragState.columnDragoverPending) {return;}
+
+            dragState.columnDragoverPending = true;
+            requestAnimationFrame(() => {
+                dragState.columnDragoverPending = false;
+
+                // Re-check state in case drag ended while waiting
+                if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
 
             const draggedStack = dragState.draggedColumn.parentNode;
             const targetStack = column.parentNode;
@@ -3491,9 +3556,9 @@ function setupColumnDragAndDrop() {
                 return;
             }
 
-            // Check if this is the last column in the stack
-            const stackColumns = Array.from(targetStack.querySelectorAll('.kanban-full-height-column'));
-            const isLastColumnInStack = stackColumns[stackColumns.length - 1] === column;
+            // PERFORMANCE: Check if this is the last column using cached stack structure
+            const stackCache = dragState.cachedStacks?.find(s => s.element === targetStack);
+            const isLastColumnInStack = stackCache && stackCache.lastColumn === column;
 
             // PERFORMANCE: Use ONLY cached positions - zero DOM queries during drag!
             let midpoint, isInTopMargin, isBelowColumnTitle;
@@ -3501,27 +3566,27 @@ function setupColumnDragAndDrop() {
             if (colData.isFolded && colData.columnTitleRect) {
                 // FOLDED MODE: Use cached column-title boundaries
                 midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
-                isInTopMargin = e.clientY <= midpoint;
-                isBelowColumnTitle = isLastColumnInStack && e.clientY > colData.columnTitleRect.bottom;
+                isInTopMargin = mouseY <= midpoint;
+                isBelowColumnTitle = isLastColumnInStack && mouseY > colData.columnTitleRect.bottom;
             }
             else if (colData.isSticky && colData.isContentVisible && colData.contentRect) {
                 // UNFOLDED STICKY MODE: Use cached content boundaries
                 const viewportBottom = window.innerHeight;
                 const effectiveBottom = Math.min(colData.contentRect.bottom, viewportBottom);
                 midpoint = colData.contentRect.top + (colData.contentRect.height / 2);
-                isInTopMargin = e.clientY <= midpoint;
-                isBelowColumnTitle = isLastColumnInStack && e.clientY > effectiveBottom;
+                isInTopMargin = mouseY <= midpoint;
+                isBelowColumnTitle = isLastColumnInStack && mouseY > effectiveBottom;
             }
             else {
                 // NORMAL MODE: Use cached margins for drop detection
                 const rect = colData.rect;
                 midpoint = rect.top + rect.height / 2;
                 isInTopMargin = colData.topMarginRect &&
-                    e.clientY >= colData.topMarginRect.top &&
-                    e.clientY <= colData.topMarginRect.bottom;
+                    mouseY >= colData.topMarginRect.top &&
+                    mouseY <= colData.topMarginRect.bottom;
                 isBelowColumnTitle = isLastColumnInStack && colData.bottomMarginRect &&
-                    e.clientY >= colData.bottomMarginRect.top &&
-                    e.clientY <= colData.bottomMarginRect.bottom;
+                    mouseY >= colData.bottomMarginRect.top &&
+                    mouseY <= colData.bottomMarginRect.bottom;
             }
 
             // Determine drop position based on mouse Y
@@ -3529,7 +3594,7 @@ function setupColumnDragAndDrop() {
             if (isBelowColumnTitle) {
                 // Drop at END of stack (after last column)
                 beforeColumn = null;
-            } else if (e.clientY < midpoint || isInTopMargin) {
+            } else if (mouseY < midpoint || isInTopMargin) {
                 // Drop before this column
                 beforeColumn = column;
             } else {
@@ -3539,11 +3604,13 @@ function setupColumnDragAndDrop() {
 
             // Show indicator, DON'T move actual column!
             showInternalColumnDropIndicator(targetStack, beforeColumn);
+            }); // End RAF callback
         });
     });
 
     // Add dragover handler to allow dropping below the last column in a stack
     // STICKY-AWARE: Uses column-title bottom when sticky, column bottom when normal
+    // RAF-THROTTLED: Limits processing to 60fps max
     document.addEventListener('dragover', e => {
         if (!dragState.draggedColumn) {return;}
 
@@ -3552,22 +3619,38 @@ function setupColumnDragAndDrop() {
             return;
         }
 
-        // ROBUST: Always check ALL stacks in visible area, don't rely on e.target
-        // This handles sticky columns where stack element might not extend to visible area
+        // CRITICAL: Capture mouse coordinates BEFORE RAF (they become stale inside callback)
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+
+        // PERFORMANCE: RAF throttle - skip if already scheduled
+        if (dragState.documentDragoverPending) {return;}
+
+        dragState.documentDragoverPending = true;
+        requestAnimationFrame(() => {
+            dragState.documentDragoverPending = false;
+
+            // Re-check state in case drag ended while waiting
+            if (!dragState.draggedColumn) {return;}
+
+        // PERFORMANCE: Use cached stacks instead of querySelectorAll
+        if (!dragState.cachedStacks || dragState.cachedStacks.length === 0) {return;}
+
         let stack = null;
-        const board = document.getElementById('kanban-board');
-        if (!board) {return;}
 
-        const allStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)'));
+        for (const stackCache of dragState.cachedStacks) {
+            if (stackCache.columns.length === 0) {continue;}
 
-        for (const candidateStack of allStacks) {
-            const columns = Array.from(candidateStack.querySelectorAll('.kanban-full-height-column'));
-            if (columns.length === 0) {continue;}
-
-            const lastColumn = columns[columns.length - 1];
+            const lastColumn = stackCache.lastColumn;
 
             // PERFORMANCE: Use ONLY cached positions - zero live queries!
-            const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+            let cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+
+            // Fallback: if lastColumn IS the dragged column, use its separate cache
+            if (!cachedCol && lastColumn === dragState.draggedColumn && dragState.draggedColumnCache) {
+                cachedCol = dragState.draggedColumnCache;
+            }
+
             let lastBottom, stackLeft, stackRight;
 
             if (cachedCol) {
@@ -3596,10 +3679,10 @@ function setupColumnDragAndDrop() {
             }
 
             // Check if mouse is horizontally within column bounds and vertically below last visible part
-            if (e.clientX >= stackLeft &&
-                e.clientX <= stackRight &&
-                e.clientY > lastBottom) {
-                stack = candidateStack;
+            if (mouseX >= stackLeft &&
+                mouseX <= stackRight &&
+                mouseY > lastBottom) {
+                stack = stackCache.element;
                 break;
             }
         }
@@ -3610,12 +3693,17 @@ function setupColumnDragAndDrop() {
 
         e.preventDefault();
 
-        // PERFORMANCE: Use ONLY cached positions
-        const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
-        if (columns.length === 0) {return;}
+        // PERFORMANCE: Use cached stack structure
+        const stackCache2 = dragState.cachedStacks?.find(s => s.element === stack);
+        if (!stackCache2 || stackCache2.columns.length === 0) {return;}
 
-        const lastColumn = columns[columns.length - 1];
-        const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+        const lastColumn = stackCache2.lastColumn;
+        let cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
+
+        // Fallback: if lastColumn IS the dragged column, use its separate cache
+        if (!cachedCol && lastColumn === dragState.draggedColumn && dragState.draggedColumnCache) {
+            cachedCol = dragState.draggedColumnCache;
+        }
 
         let lastBottom;
         if (cachedCol) {
@@ -3638,10 +3726,11 @@ function setupColumnDragAndDrop() {
         }
 
         // Only handle vertical drops below the last column/title/content
-        if (e.clientY > lastBottom) {
+        if (mouseY > lastBottom) {
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
             showInternalColumnDropIndicator(stack, null);
         }
+        }); // End RAF callback
     });
 
     // Add dragover handlers specifically to drop zones - visual feedback only
