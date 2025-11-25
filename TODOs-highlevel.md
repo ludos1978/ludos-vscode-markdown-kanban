@@ -1,3 +1,21 @@
+- [x] before starting the migration, create todos, make sure that before you replace a function you know
+  all features of the old code and reimplement them in the replacement. also make sure you remove the
+  old code ompletely!
+  - PLANNED: See tmp/plugin-migration-features.md for feature checklist
+  - Solution 1 (Interface-Based Plugin Registry, 96% quality) selected
+
+- [x] COMPLETED: PLUGIN ARCHITECTURE MIGRATION (Solution 1: Interface-Based Plugin Registry)
+  - [x] PHASE 0: Document existing code features (see tmp/plugin-migration-features.md)
+  - [x] PHASE 1: Create plugin interfaces (ImportPlugin.ts, ExportPlugin.ts)
+  - [x] PHASE 2: Create plugin implementations wrapping existing code
+    - ColumnIncludePlugin, TaskIncludePlugin, RegularIncludePlugin
+    - MarpExportPlugin
+  - [x] PHASE 3: Migrate FileFactory to use plugins (createIncludeViaPlugin method)
+  - [x] PHASE 4: Migrate markdownParser to use PluginRegistry.detectIncludes
+  - [x] PHASE 5: Plugins wrap existing code (IncludeFile classes preserved)
+  - [x] PHASE 6: Update documentation (agent/FUNCTIONS.md updated)
+  - NOTE: Plugins use wrapper pattern for backwards compatibility
+  - FILES: src/plugins/{interfaces,registry,import,export}/, PluginLoader.ts
 
 - [ ] "move to column" from a task burger menu doesnt work.
 

@@ -1035,3 +1035,176 @@ Total functions documented: **523**
 - src/messageHandler-handleSaveDroppedImageFromContents - Save dropped image from base64 contents (external drops); reads file contents, saves to [kanban]-MEDIA folder with unique filename
 - src/messageHandler-handleCopyImageToMedia - Copy dropped image from file path (VS Code Explorer drops); copies file to [kanban]-MEDIA folder with unique filename
 - src/messageHandler-_sendImageDropError - Helper to send error message to frontend when image drop fails
+
+---
+
+## Plugin System (2025-11-25)
+
+### Overview
+Plugin-based architecture for import/export operations. Provides unified interfaces for include file detection, creation, and export format handling. Plugins are registered at extension activation and used throughout the application.
+
+### Architecture
+- **PluginRegistry**: Singleton managing all registered plugins
+- **ImportPlugin**: Interface for include file handling (detection, creation, parsing)
+- **ExportPlugin**: Interface for export format handling (PDF, PPTX, HTML via Marp)
+- **PluginLoader**: Static class that loads built-in plugins at activation
+
+## src/plugins/interfaces/ImportPlugin.ts - ImportPlugin Interface
+
+### Types:
+- **ImportPluginMetadata** - Plugin metadata (id, name, version, priority, fileType, extensions, includePattern, contextLocation)
+- **IncludeContextLocation** - Where includes are valid: 'column-header' | 'task-title' | 'description' | 'any'
+- **ImportContext** - Context for detection (location, lineNumber, parentFile, lineContent)
+- **IncludeMatch** - Detection result (pluginId, filePath, fullMatch, startIndex, endIndex, context)
+- **PluginDependencies** - Injected dependencies (conflictResolver, backupManager, isInline)
+- **ParseOptions** - Parsing options (filePath, mainFilePath, existingTasks, columnId)
+- **ParseResult** - Parse result (success, data, error)
+- **GenerateOptions** - Generation options (filterIncludes, includeMarpDirectives)
+- **PluginContext** - Plugin lifecycle context (extensionContext, logger)
+
+### Interface Methods:
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_canHandle - Check if plugin can handle path in context
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_detectIncludes - Detect all includes in content
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_createFile - Create MarkdownFile instance
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_parseContent - (Optional) Parse file content to data
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_generateContent - (Optional) Generate content from data
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_activate - (Optional) Plugin activation
+- src/plugins/interfaces/ImportPlugin-ImportPlugin_deactivate - (Optional) Plugin deactivation
+
+## src/plugins/interfaces/ExportPlugin.ts - ExportPlugin Interface
+
+### Types:
+- **ExportFormat** - Format definition (id, name, extension, mimeType, description)
+- **ExportPluginMetadata** - Plugin metadata (id, name, version, formats, requiresExternalTool, externalToolName)
+- **ExportOptions** - Export options (formatId, inputPath, outputPath, watchMode, pptxEditable, theme, enginePath, additionalArgs, pluginOptions)
+- **ExportResult** - Export result (success, outputPath, error, metadata)
+- **PreviewOptions** - Preview options (formatId, maxSize, quality)
+
+### Interface Methods:
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_getSupportedFormats - Get list of supported formats
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_canExport - Check if plugin can export board to format
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_isAvailable - (Optional) Check external tool availability
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_getToolVersion - (Optional) Get external tool version
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_export - Export board to format
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_preview - (Optional) Generate preview HTML
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_stopWatch - (Optional) Stop watch process for file
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_stopAllWatches - (Optional) Stop all watch processes
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_isWatching - (Optional) Check if file is being watched
+- src/plugins/interfaces/ExportPlugin-ExportPlugin_getAvailableThemes - (Optional) Get available themes
+
+## src/plugins/registry/PluginRegistry.ts - PluginRegistry
+
+### Static Methods:
+- src/plugins/registry/PluginRegistry-PluginRegistry_getInstance - Get singleton instance
+- src/plugins/registry/PluginRegistry-PluginRegistry_resetInstance - Reset singleton (for testing)
+
+### Instance Methods:
+- src/plugins/registry/PluginRegistry-PluginRegistry_initialize - Initialize registry with context
+- src/plugins/registry/PluginRegistry-PluginRegistry_isInitialized - Check if registry is initialized
+- src/plugins/registry/PluginRegistry-PluginRegistry_registerImportPlugin - Register import plugin
+- src/plugins/registry/PluginRegistry-PluginRegistry_unregisterImportPlugin - Unregister import plugin
+- src/plugins/registry/PluginRegistry-PluginRegistry_getImportPlugin - Get import plugin by ID
+- src/plugins/registry/PluginRegistry-PluginRegistry_getAllImportPlugins - Get all import plugins
+- src/plugins/registry/PluginRegistry-PluginRegistry_getImportPluginsByPriority - Get plugins sorted by priority
+- src/plugins/registry/PluginRegistry-PluginRegistry_registerExportPlugin - Register export plugin
+- src/plugins/registry/PluginRegistry-PluginRegistry_unregisterExportPlugin - Unregister export plugin
+- src/plugins/registry/PluginRegistry-PluginRegistry_getExportPlugin - Get export plugin by ID
+- src/plugins/registry/PluginRegistry-PluginRegistry_getAllExportPlugins - Get all export plugins
+- src/plugins/registry/PluginRegistry-PluginRegistry_findImportPlugin - Find best plugin for path/context
+- src/plugins/registry/PluginRegistry-PluginRegistry_findImportPluginByFileType - Find plugin by file type
+- src/plugins/registry/PluginRegistry-PluginRegistry_detectIncludes - Detect includes using all plugins (replaces INCLUDE_SYNTAX.REGEX)
+- src/plugins/registry/PluginRegistry-PluginRegistry_findExportPlugin - Find export plugin for format
+- src/plugins/registry/PluginRegistry-PluginRegistry_getSupportedExportFormats - Get all supported export formats
+- src/plugins/registry/PluginRegistry-PluginRegistry_getDebugInfo - Get debug info about plugins
+
+## src/plugins/PluginLoader.ts - PluginLoader
+
+### Static Methods:
+- src/plugins/PluginLoader-PluginLoader_loadBuiltinPlugins - Load all built-in plugins (called at extension activation)
+- src/plugins/PluginLoader-PluginLoader_initializePlugins - Initialize registry with context
+- src/plugins/PluginLoader-PluginLoader_isLoaded - Check if plugins are loaded
+- src/plugins/PluginLoader-PluginLoader_reset - Reset loader state (for testing)
+- src/plugins/PluginLoader-PluginLoader_getDebugInfo - Get debug info about loaded plugins
+
+## src/plugins/import/ColumnIncludePlugin.ts - ColumnIncludePlugin
+
+### Properties:
+- metadata.id: 'column-include'
+- metadata.priority: 100 (highest)
+- metadata.fileType: 'include-column'
+- metadata.contextLocation: 'column-header'
+
+### Methods:
+- src/plugins/import/ColumnIncludePlugin-ColumnIncludePlugin_canHandle - Only handles column-header context
+- src/plugins/import/ColumnIncludePlugin-ColumnIncludePlugin_detectIncludes - Detect !!!include()!!! in column headers
+- src/plugins/import/ColumnIncludePlugin-ColumnIncludePlugin_createFile - Create ColumnIncludeFile instance
+- src/plugins/import/ColumnIncludePlugin-ColumnIncludePlugin_parseContent - Parse presentation to KanbanTask[] (preserves IDs by position)
+- src/plugins/import/ColumnIncludePlugin-ColumnIncludePlugin_generateContent - Generate presentation from KanbanTask[]
+
+## src/plugins/import/TaskIncludePlugin.ts - TaskIncludePlugin
+
+### Properties:
+- metadata.id: 'task-include'
+- metadata.priority: 90
+- metadata.fileType: 'include-task'
+- metadata.contextLocation: 'task-title'
+
+### Methods:
+- src/plugins/import/TaskIncludePlugin-TaskIncludePlugin_canHandle - Only handles task-title context
+- src/plugins/import/TaskIncludePlugin-TaskIncludePlugin_detectIncludes - Detect !!!include()!!! in task titles
+- src/plugins/import/TaskIncludePlugin-TaskIncludePlugin_createFile - Create TaskIncludeFile instance
+- src/plugins/import/TaskIncludePlugin-TaskIncludePlugin_parseContent - Returns raw content (used as task description)
+
+## src/plugins/import/RegularIncludePlugin.ts - RegularIncludePlugin
+
+### Properties:
+- metadata.id: 'regular-include'
+- metadata.priority: 80 (lowest)
+- metadata.fileType: 'include-regular'
+- metadata.contextLocation: 'description'
+
+### Methods:
+- src/plugins/import/RegularIncludePlugin-RegularIncludePlugin_canHandle - Only handles description context
+- src/plugins/import/RegularIncludePlugin-RegularIncludePlugin_detectIncludes - Detect !!!include()!!! in descriptions
+- src/plugins/import/RegularIncludePlugin-RegularIncludePlugin_createFile - Create RegularIncludeFile instance (always inline)
+- src/plugins/import/RegularIncludePlugin-RegularIncludePlugin_parseContent - Returns raw content (frontend renders)
+
+## src/plugins/export/MarpExportPlugin.ts - MarpExportPlugin
+
+### Properties:
+- metadata.id: 'marp'
+- metadata.formats: ['marp-pdf', 'marp-pptx', 'marp-html']
+- metadata.requiresExternalTool: true
+- metadata.externalToolName: 'Marp CLI (@marp-team/marp-cli)'
+
+### Methods:
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_getSupportedFormats - Get PDF, PPTX, HTML formats
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_canExport - Check format supported and board has columns
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_isAvailable - Check Marp CLI availability
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_getToolVersion - Get Marp CLI version
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_export - Export board (delegates to MarpExportService)
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopWatch - Stop Marp watch process
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_stopAllWatches - Stop all Marp watch processes
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_isWatching - Check if file is being watched
+- src/plugins/export/MarpExportPlugin-MarpExportPlugin_getAvailableThemes - Get available Marp themes
+
+## Modified Files for Plugin Integration
+
+### src/files/FileFactory.ts - FileFactory (Modified)
+- src/files/FileFactory-FileFactory_createIncludeViaPlugin - (NEW) Create include using plugin system
+- src/files/FileFactory-FileFactory_createInclude - (MODIFIED) Now tries plugins first, falls back to switch
+- src/files/FileFactory-FileFactory__typeToContextLocation - (NEW) Map type to context location
+
+### src/markdownParser.ts - MarkdownKanbanParser (Modified)
+- src/markdownParser-MarkdownKanbanParser_detectIncludesWithFallback - (NEW) Detect includes with plugin fallback to regex
+- src/markdownParser-MarkdownKanbanParser_getIncludeMatches - (NEW) Get detailed include matches with plugin fallback
+- Column header detection (line ~245) - Now uses detectIncludesWithFallback('column-header')
+- Task title detection (line ~420) - Now uses detectIncludesWithFallback('task-title')
+- Description detection (line ~487) - Now uses detectIncludesWithFallback('description')
+
+### src/extension.ts - Extension Activation (Modified)
+- Plugin initialization added after output channel creation
+- PluginLoader.loadBuiltinPlugins() called at extension activation
+- Error handling for plugin initialization failure
+
+---

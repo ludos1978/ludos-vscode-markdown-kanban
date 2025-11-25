@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './configurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
+import { PluginLoader } from './plugins';
 
 // Global output channel for extension logging
 let outputChannel: vscode.OutputChannel | undefined;
@@ -16,6 +17,16 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(outputChannel);
 
 	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
+
+	// Initialize plugin system
+	// This loads all built-in import/export plugins
+	try {
+		PluginLoader.loadBuiltinPlugins();
+		outputChannel.appendLine('[Extension] Plugin system initialized');
+	} catch (error) {
+		outputChannel.appendLine(`[Extension] Warning: Plugin system initialization failed: ${error}`);
+		console.error('[Extension] Plugin system initialization failed:', error);
+	}
 
 	// Initialize kanban sidebar
 	const config = configService.getAllConfig();

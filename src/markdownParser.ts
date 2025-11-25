@@ -4,6 +4,7 @@ import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from './constants/IncludeConstants';
+import { PluginRegistry, IncludeMatch, IncludeContextLocation } from './plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -67,6 +68,86 @@ export class MarkdownKanbanParser {
 
     // No position provided or out of bounds - this is a NEW column
     return undefined;
+  }
+
+  // ============= PLUGIN-BASED INCLUDE DETECTION =============
+
+  /**
+   * Detect includes in content using plugin system with fallback to regex
+   *
+   * Uses PluginRegistry.detectIncludes() if plugins are loaded,
+   * otherwise falls back to INCLUDE_SYNTAX.REGEX for backwards compatibility.
+   *
+   * @param content - Content to search for includes
+   * @param contextLocation - Where the content comes from (column-header, task-title, description)
+   * @returns Array of detected include file paths
+   */
+  private static detectIncludesWithFallback(content: string, contextLocation: IncludeContextLocation): string[] {
+    try {
+      const registry = PluginRegistry.getInstance();
+      const plugins = registry.getAllImportPlugins();
+
+      // If plugins are loaded, use plugin-based detection
+      if (plugins.length > 0) {
+        const matches = registry.detectIncludes(content, { location: contextLocation });
+        return matches.map(m => m.filePath);
+      }
+    } catch (error) {
+      // Plugin system not available, fall through to regex fallback
+      console.warn('[MarkdownParser] Plugin detection failed, using regex fallback:', error);
+    }
+
+    // Fallback to direct regex matching
+    const matches = content.match(INCLUDE_SYNTAX.REGEX);
+    if (!matches) {
+      return [];
+    }
+
+    return matches.map(match => {
+      return match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+    });
+  }
+
+  /**
+   * Get include matches with full details using plugin system
+   *
+   * Returns IncludeMatch objects with position information for advanced processing.
+   * Falls back to creating match objects from regex results if plugins not loaded.
+   *
+   * @param content - Content to search for includes
+   * @param contextLocation - Where the content comes from
+   * @returns Array of IncludeMatch objects
+   */
+  private static getIncludeMatches(content: string, contextLocation: IncludeContextLocation): IncludeMatch[] {
+    try {
+      const registry = PluginRegistry.getInstance();
+      const plugins = registry.getAllImportPlugins();
+
+      // If plugins are loaded, use plugin-based detection
+      if (plugins.length > 0) {
+        return registry.detectIncludes(content, { location: contextLocation });
+      }
+    } catch (error) {
+      // Plugin system not available, fall through to regex fallback
+    }
+
+    // Fallback: Create match objects from regex results
+    const matches: IncludeMatch[] = [];
+    const regex = new RegExp(INCLUDE_SYNTAX.REGEX.source, 'g');
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      matches.push({
+        pluginId: 'fallback-regex',
+        filePath: match[1].trim(),
+        fullMatch: match[0],
+        startIndex: match.index,
+        endIndex: match.index + match[0].length,
+        context: contextLocation
+      });
+    }
+
+    return matches;
   }
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
@@ -160,13 +241,13 @@ export class MarkdownKanbanParser {
           const columnTitle = line.substring(3);
 
           // Check for include syntax in column header (location-based: column includes)
-          const columnIncludeMatches = columnTitle.match(INCLUDE_SYNTAX.REGEX);
+          // Uses plugin system with fallback to regex for backwards compatibility
+          const includeFilePaths = this.detectIncludesWithFallback(columnTitle, 'column-header');
 
-          if (columnIncludeMatches && columnIncludeMatches.length > 0) {
+          if (includeFilePaths.length > 0) {
             // This is a column include - process included files as Marp presentations
             const includeFiles: string[] = [];
-            columnIncludeMatches.forEach(match => {
-              const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+            includeFilePaths.forEach(filePath => {
               includeFiles.push(filePath);
               // Track for file watching (FOUNDATION-1: Use normalized comparison)
               if (!columnIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
@@ -335,13 +416,13 @@ export class MarkdownKanbanParser {
     for (const column of board.columns) {
       for (const task of column.tasks) {
         // Check if task title contains include syntax (location-based: task includes)
-        const taskIncludeMatches = task.title.match(INCLUDE_SYNTAX.REGEX);
+        // Uses plugin system with fallback to regex for backwards compatibility
+        const taskIncludeFilePaths = this.detectIncludesWithFallback(task.title, 'task-title');
 
-        if (taskIncludeMatches && taskIncludeMatches.length > 0) {
+        if (taskIncludeFilePaths.length > 0) {
           // This is a task include - process included file (first line as title, rest as description)
           const includeFiles: string[] = [];
-          taskIncludeMatches.forEach(match => {
-            const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+          taskIncludeFilePaths.forEach(filePath => {
             includeFiles.push(filePath);
             // Track for file watching (FOUNDATION-1: Use normalized comparison)
             if (taskIncludeFiles && !taskIncludeFiles.some(p => MarkdownFile.isSameFile(p, filePath))) {
@@ -391,7 +472,7 @@ export class MarkdownKanbanParser {
 
   private static detectRegularIncludes(board: KanbanBoard, includedFiles: string[]): void {
     // Scan all task descriptions for !!!include()!!! patterns (regular includes)
-    const includeRegex = new RegExp(INCLUDE_SYNTAX.REGEX.source, 'gi');
+    // Uses plugin system with fallback to regex for backwards compatibility
 
     for (const column of board.columns) {
       for (const task of column.tasks) {
@@ -402,14 +483,11 @@ export class MarkdownKanbanParser {
 
         if (task.description) {
           // Track which regular includes this task uses
+          // Use plugin-based detection with fallback
+          const detectedFiles = this.detectIncludesWithFallback(task.description, 'description');
           const taskIncludes: string[] = [];
 
-          let match;
-          // Reset regex state
-          includeRegex.lastIndex = 0;
-          while ((match = includeRegex.exec(task.description)) !== null) {
-            const includeFile = match[1].trim();
-
+          for (const includeFile of detectedFiles) {
             // Add to global list if not already present
             if (!includedFiles.includes(includeFile)) {
               includedFiles.push(includeFile);
