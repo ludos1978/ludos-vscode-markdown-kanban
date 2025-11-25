@@ -42,9 +42,11 @@ export class IncludeFile extends MarkdownFile {
     // ============= INCLUDE-SPECIFIC STATE =============
     protected _isInline: boolean = false;           // True for inline includes (embedded in parent)
 
-    // ============= COLUMN ASSOCIATION (for include-column) =============
-    private _columnId?: string;                     // ID of the column this belongs to
-    private _columnTitle?: string;                  // Title of the column
+    // ============= COLUMN/TASK ASSOCIATION =============
+    // Note: _columnId is used by BOTH column includes (the column itself)
+    // AND task includes (which column contains the task)
+    private _columnId?: string;                     // ID of the column (or containing column for tasks)
+    private _columnTitle?: string;                  // Title of the column (for include-column)
 
     // ============= TASK ASSOCIATION (for include-task) =============
     private _taskId?: string;                       // ID of the task this belongs to
@@ -121,10 +123,12 @@ export class IncludeFile extends MarkdownFile {
         return path.resolve(parentDir, relativePath);
     }
 
-    // ============= COLUMN ASSOCIATION (for include-column) =============
+    // ============= COLUMN ASSOCIATION (used by both column and task includes) =============
 
     /**
      * Set the column ID this include belongs to
+     * For column includes: the column itself
+     * For task includes: the column containing the task
      */
     public setColumnId(columnId: string): void {
         this._columnId = columnId;
@@ -541,12 +545,20 @@ export class IncludeFile extends MarkdownFile {
 
     /**
      * Validate task include content (for include-task)
-     * Note: Task includes can be empty - this is valid
+     * Matches original TaskIncludeFile behavior - rejects empty content
      */
-    private _validateTaskContent(_content: string): { valid: boolean; errors?: string[] } {
-        // Task includes accept any content, including empty
-        // This matches the original TaskIncludeFile behavior
-        return { valid: true };
+    private _validateTaskContent(content: string): { valid: boolean; errors?: string[] } {
+        const errors: string[] = [];
+
+        // Task includes should have some content (original behavior)
+        if (!content || content.trim().length === 0) {
+            errors.push('Task include cannot be empty');
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors: errors.length > 0 ? errors : undefined
+        };
     }
 
     // ============= OVERRIDES =============
