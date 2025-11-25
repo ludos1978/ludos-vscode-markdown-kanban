@@ -1,3 +1,5 @@
+- [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
+
 - [x] before starting the migration, create todos, make sure that before you replace a function you know
   all features of the old code and reimplement them in the replacement. also make sure you remove the
   old code ompletely!
@@ -45,19 +47,23 @@
 - [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
 
 - [ ] Create a group of tags
-  - #overview
+
   - #schedule
-  - #verify
-  - #information
+  - #planning
   - #preparation
+  - #verify
+
+  - #overview
+  - #information
   - #presentation
+
+  - #example
   - #tasks
   - #homework
+
   - #deliveries
   - #handouts
   - #references
-  - #example
-  - #planning
 
 - [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 

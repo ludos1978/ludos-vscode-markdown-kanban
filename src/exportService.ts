@@ -13,6 +13,9 @@ import { MarpExportService, MarpOutputFormat } from './services/export/MarpExpor
 import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
 import { getMermaidExportService } from './services/export/MermaidExportService';
 import { ConfigurationService } from './configurationService';
+import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
+import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
+import { AssetHandler } from './services/assets/AssetHandler';
 
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
@@ -90,10 +93,10 @@ export interface ExportResult {
 
 /**
  * Asset information for export operations.
- * Note: This is different from AssetHandler.AssetInfo which is used for asset detection.
+ * Note: This is different from AssetHandler.DetectedAsset which is used for asset detection.
  * This interface includes export-specific fields like relativePath, exists, and md5.
  */
-export interface AssetInfo {
+export interface ExportAssetInfo {
     originalPath: string;
     resolvedPath: string;
     relativePath: string;
@@ -104,27 +107,25 @@ export interface AssetInfo {
 }
 
 interface ProcessedAsset {
-    original: AssetInfo;
+    original: ExportAssetInfo;
     exportedPath: string;
     exportedRelativePath: string;
 }
 
 export class ExportService {
-    private static readonly IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'];
-    private static readonly VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv'];
-    private static readonly AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a'];
-    private static readonly DOCUMENT_EXTENSIONS = ['.pdf', '.epub', '.doc', '.docx', '.txt'];
+    // Use centralized extension constants from fileTypeDefinitions.ts
+    // This ensures consistency across all asset detection code
 
     // Include patterns for different include types
     // UNIFIED SYNTAX: All includes use !!!include()!!! - position determines behavior
-    private static readonly INCLUDE_PATTERN = /!!!include\s*\(([^)]+)\)\s*!!!/g;
+    // Base pattern uses INCLUDE_SYNTAX.REGEX from centralized constants
     // For task includes, match the entire task line including the checkbox prefix
     // This prevents checkbox duplication when replacing with converted content
     // USES UNIFIED SYNTAX: !!!include()!!! in task title (position-based)
-    private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!include\s*\(([^)]+)\)\s*!!!/gm;
+    private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!include\(([^)]+)\)!!!/gm;
     // For column includes (position-based: !!!include()!!! in column header), match the entire column header line
     // Captures: prefix title, file path, and suffix (tags/other content)
-    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\s*\(([^)]+)\)\s*!!!(.*?)$/gm;
+    private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\(([^)]+)\)!!!(.*?)$/gm;
 
     // Track MD5 hashes to detect duplicates
     private static fileHashMap = new Map<string, string>();
@@ -303,7 +304,7 @@ export class ExportService {
         convertToPresentation: boolean = false
     ): Promise<{
         exportedContent: string;
-        notIncludedAssets: AssetInfo[];
+        notIncludedAssets: ExportAssetInfo[];
         stats: { includedCount: number; excludedCount: number; includeFiles: number };
     }> {
         const content = fs.readFileSync(markdownPath, 'utf8');
@@ -392,21 +393,21 @@ export class ExportService {
         // Otherwise, write separate files for all include types
         const includePatterns = [
             {
-                pattern: this.INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `!!!include(${filename})!!!`,
+                pattern: INCLUDE_SYNTAX.REGEX,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'include'
             },
             {
                 pattern: this.TASK_INCLUDE_PATTERN,
                 // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] !!!include(${filename})!!!`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },
             {
                 pattern: this.COLUMN_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}!!!include(${filename})!!!${suffix}`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'columninclude' // Internal type identifier (position-based detection)
             }
@@ -587,45 +588,18 @@ export class ExportService {
 
     /**
      * Calculate MD5 hash for file (first 1MB for large files)
+     * Uses centralized AssetHandler.calculateMD5 implementation
      */
     private static async calculateMD5(filePath: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const hash = crypto.createHash('md5');
-            const stream = fs.createReadStream(filePath);
-            const stats = fs.statSync(filePath);
-
-            let bytesRead = 0;
-            const maxBytes = stats.size > 1024 * 1024 ? 1024 * 1024 : stats.size; // 1MB for files > 1MB
-
-            stream.on('data', (chunk) => {
-                bytesRead += chunk.length;
-                if (bytesRead <= maxBytes) {
-                    hash.update(chunk);
-                } else {
-                    const remaining = maxBytes - (bytesRead - chunk.length);
-                    if (remaining > 0) {
-                        hash.update(Buffer.isBuffer(chunk) ? chunk.subarray(0, remaining) : chunk.slice(0, remaining));
-                    }
-                    // Resolve immediately when we've read enough data
-                    stream.destroy();
-                    resolve(hash.digest('hex'));
-                    return;
-                }
-            });
-
-            stream.on('end', () => {
-                resolve(hash.digest('hex'));
-            });
-
-            stream.on('error', reject);
-        });
+        // Use 1MB limit for export (larger files for duplicate detection)
+        return AssetHandler.calculateMD5(filePath, 1024 * 1024);
     }
 
     /**
      * Find all assets referenced in the markdown content
      */
-    private static findAssets(content: string, sourceDir: string): AssetInfo[] {
-        const assets: AssetInfo[] = [];
+    private static findAssets(content: string, sourceDir: string): ExportAssetInfo[] {
+        const assets: ExportAssetInfo[] = [];
 
         // Match markdown images: ![alt](path) and ![alt](path "title")
         const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
@@ -680,17 +654,18 @@ export class ExportService {
 
     /**
      * Determine asset type based on file extension
+     * Uses centralized DOTTED_EXTENSIONS from fileTypeDefinitions.ts
      */
-    private static getAssetType(filePath: string): AssetInfo['type'] {
+    private static getAssetType(filePath: string): ExportAssetInfo['type'] {
         const ext = path.extname(filePath).toLowerCase();
 
         if (ext === '.md') { return 'markdown'; }
         if (['.drawio', '.dio'].includes(ext)) { return 'diagram'; }
         if (ext === '.excalidraw' || filePath.endsWith('.excalidraw.json') || filePath.endsWith('.excalidraw.svg')) { return 'diagram'; }
-        if (this.IMAGE_EXTENSIONS.includes(ext)) { return 'image'; }
-        if (this.VIDEO_EXTENSIONS.includes(ext)) { return 'video'; }
-        if (this.AUDIO_EXTENSIONS.includes(ext)) { return 'audio'; }
-        if (this.DOCUMENT_EXTENSIONS.includes(ext)) { return 'document'; }
+        if (DOTTED_EXTENSIONS.image.includes(ext)) { return 'image'; }
+        if (DOTTED_EXTENSIONS.video.includes(ext)) { return 'video'; }
+        if (DOTTED_EXTENSIONS.audio.includes(ext)) { return 'audio'; }
+        if (DOTTED_EXTENSIONS.document.includes(ext)) { return 'document'; }
 
         return 'file';
     }
@@ -699,7 +674,7 @@ export class ExportService {
      * Filter assets based on export options
      * uses obsolete data structures: ExportOptions
      */
-    private static filterAssets(assets: AssetInfo[], options: NewExportOptions): AssetInfo[] {
+    private static filterAssets(assets: ExportAssetInfo[], options: NewExportOptions): ExportAssetInfo[] {
         // If packing is disabled or no pack options, return empty array
         if (!options.packAssets || !options.packOptions) {
             return [];
@@ -740,13 +715,13 @@ export class ExportService {
      */
     private static async processAssets(
         content: string,
-        assetsToInclude: AssetInfo[],
-        allAssets: AssetInfo[],
+        assetsToInclude: ExportAssetInfo[],
+        allAssets: ExportAssetInfo[],
         mediaFolder: string,
         fileBasename: string
-    ): Promise<{ modifiedContent: string; notIncludedAssets: AssetInfo[] }> {
+    ): Promise<{ modifiedContent: string; notIncludedAssets: ExportAssetInfo[] }> {
         let modifiedContent = content;
-        const notIncludedAssets: AssetInfo[] = [];
+        const notIncludedAssets: ExportAssetInfo[] = [];
         const includedPaths = new Set(assetsToInclude.map(a => a.originalPath));
 
         // Ensure media folder exists if we have assets to include
@@ -1044,7 +1019,7 @@ export class ExportService {
     /**
      * Create _not_included.md file with excluded assets
      */
-    private static async createNotIncludedFile(notIncludedAssets: AssetInfo[], targetFolder: string): Promise<void> {
+    private static async createNotIncludedFile(notIncludedAssets: ExportAssetInfo[], targetFolder: string): Promise<void> {
         // Ensure target folder exists
         if (!fs.existsSync(targetFolder)) {
             fs.mkdirSync(targetFolder, { recursive: true });
@@ -1131,7 +1106,7 @@ export class ExportService {
         mergeIncludes: boolean = false
     ): Promise<{
         exportedContent: string;
-        notIncludedAssets: AssetInfo[];
+        notIncludedAssets: ExportAssetInfo[];
         stats: { includedCount: number; excludedCount: number; includeFiles: number };
     }> {
         const mediaFolder = path.join(exportFolder, `${fileBasename}-Media`);
@@ -1782,14 +1757,14 @@ export class ExportService {
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
         board?: any
-    ): Promise<{ content: string; notIncludedAssets: AssetInfo[] }> {
+    ): Promise<{ content: string; notIncludedAssets: ExportAssetInfo[] }> {
 
         const sourcePath = sourceDocument.uri.fsPath;
         const sourceDir = path.dirname(sourcePath);
         const sourceBasename = path.basename(sourcePath, '.md');
 
         let result = content;
-        let notIncludedAssets: AssetInfo[] = [];
+        let notIncludedAssets: ExportAssetInfo[] = [];
 
         // ROUTING LOGIC:
         // - Converting format (presentation/marp) WITH includes → Use file-based pipeline
@@ -1905,7 +1880,7 @@ export class ExportService {
      * Phase 3 of export pipeline: OUTPUT
      */
     private static async outputContent(
-        transformed: { content: string; notIncludedAssets: AssetInfo[] },
+        transformed: { content: string; notIncludedAssets: ExportAssetInfo[] },
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions
     ): Promise<ExportResult> {

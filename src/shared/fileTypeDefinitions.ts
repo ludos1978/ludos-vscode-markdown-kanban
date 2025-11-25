@@ -41,6 +41,19 @@ export const FILE_EXTENSIONS = {
 };
 
 /**
+ * File extension arrays with dot prefix for direct comparison
+ * Usage: DOTTED_EXTENSIONS.image.includes(ext) where ext = '.jpg'
+ *
+ * SINGLE SOURCE OF TRUTH - Use these instead of defining local arrays!
+ */
+export const DOTTED_EXTENSIONS = {
+    image: FILE_EXTENSIONS.image.map(e => `.${e}`),
+    video: FILE_EXTENSIONS.video.map(e => `.${e}`),
+    audio: FILE_EXTENSIONS.audio.map(e => `.${e}`),
+    document: FILE_EXTENSIONS.document.map(e => `.${e}`),
+};
+
+/**
  * MIME type mappings for common file extensions
  */
 export const MIME_TYPE_MAP: Record<string, string> = {

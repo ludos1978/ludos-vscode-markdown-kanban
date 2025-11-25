@@ -13,7 +13,15 @@
       "Bash(drawio:*)",
       "Bash(node test-pathresolver.js:*)",
       "Bash(node test-normalize.js:*)",
-      "Bash(node test-image-path-resolution.js:*)"
+      "Bash(node test-image-path-resolution.js:*)",
+      "Bash(for dir in adapter builder chain composite decorators flyweight iterator memento prototype singleton visitor strategies types)",
+      "Bash(do)",
+      "Bash(if [ -d \"src/core/$dir\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(else)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

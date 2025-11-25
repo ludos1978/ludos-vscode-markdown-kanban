@@ -2,11 +2,16 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 export type ConflictType = 'panel_close' | 'external_main' | 'external_include' | 'presave_check' | 'watcher_failure' | 'permission_denied' | 'file_missing' | 'circular_dependency' | 'batch_conflict' | 'network_timeout' | 'crash_recovery';
-export type FileType = 'main' | 'include';
+/**
+ * File type for conflict resolution context.
+ * Note: This is different from IncludeConstants.FileType which has specific include subtypes.
+ * ConflictFileType is simpler: just 'main' vs any kind of 'include'.
+ */
+export type ConflictFileType = 'main' | 'include';
 
 export interface ConflictContext {
     type: ConflictType;
-    fileType: FileType;
+    fileType: ConflictFileType;
     filePath: string;
     fileName: string;
     hasMainUnsavedChanges: boolean;

@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import { PathResolver } from '../PathResolver';
 import { FileWriter } from '../FileWriter';
 import { AssetStrategy } from '../OperationOptions';
-import { MIME_TYPE_MAP } from '../../shared/fileTypeDefinitions';
+import { MIME_TYPE_MAP, DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 
 /**
  * Unified asset handling utility
@@ -14,14 +14,8 @@ import { MIME_TYPE_MAP } from '../../shared/fileTypeDefinitions';
  * - kanbanWebviewPanel.ts: Asset path resolution
  */
 export class AssetHandler {
-    /** Supported image extensions */
-    private static readonly IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'];
-
-    /** Supported video extensions */
-    private static readonly VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg', '.mov', '.avi'];
-
-    /** Supported audio extensions */
-    private static readonly AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac'];
+    // Use centralized extension constants from fileTypeDefinitions.ts
+    // This ensures consistency across all asset detection code
 
     /**
      * Find all assets referenced in markdown content
@@ -30,8 +24,8 @@ export class AssetHandler {
      * @param basePath - Base path for resolving relative asset paths
      * @returns List of detected assets
      */
-    static findAssets(content: string, basePath: string): AssetInfo[] {
-        const assets: AssetInfo[] = [];
+    static findAssets(content: string, basePath: string): DetectedAsset[] {
+        const assets: DetectedAsset[] = [];
         const seenPaths = new Set<string>();
 
         // Markdown image syntax: ![alt](path)
@@ -164,7 +158,7 @@ export class AssetHandler {
      * Copy asset to target directory
      */
     private static async copyAsset(
-        asset: AssetInfo,
+        asset: DetectedAsset,
         targetDir: string,
         result: AssetProcessResult
     ): Promise<void> {
@@ -200,7 +194,7 @@ export class AssetHandler {
      * Embed asset as base64 data URL
      */
     private static async embedAsset(
-        asset: AssetInfo,
+        asset: DetectedAsset,
         content: string,
         result: AssetProcessResult
     ): Promise<void> {
@@ -270,17 +264,18 @@ export class AssetHandler {
 
     /**
      * Detect asset type from file extension
+     * Uses centralized DOTTED_EXTENSIONS from fileTypeDefinitions.ts
      */
     private static detectAssetType(extension: string): AssetType | null {
         const ext = extension.toLowerCase();
 
-        if (this.IMAGE_EXTENSIONS.includes(ext)) {
+        if (DOTTED_EXTENSIONS.image.includes(ext)) {
             return 'image';
         }
-        if (this.VIDEO_EXTENSIONS.includes(ext)) {
+        if (DOTTED_EXTENSIONS.video.includes(ext)) {
             return 'video';
         }
-        if (this.AUDIO_EXTENSIONS.includes(ext)) {
+        if (DOTTED_EXTENSIONS.audio.includes(ext)) {
             return 'audio';
         }
 
@@ -307,14 +302,14 @@ export class AssetHandler {
     /**
      * Get all assets of a specific type
      */
-    static getAssetsByType(assets: AssetInfo[], type: AssetType): AssetInfo[] {
+    static getAssetsByType(assets: DetectedAsset[], type: AssetType): DetectedAsset[] {
         return assets.filter(asset => asset.type === type);
     }
 
     /**
      * Calculate total size of assets
      */
-    static getTotalSize(assets: AssetInfo[]): number {
+    static getTotalSize(assets: DetectedAsset[]): number {
         return assets.reduce((total, asset) => total + asset.size, 0);
     }
 
@@ -349,10 +344,10 @@ export class AssetHandler {
 
 /**
  * Information about an asset for detection and classification.
- * Note: This is different from exportService.AssetInfo which is used for export operations.
+ * Note: This is different from exportService.ExportAssetInfo which is used for export operations.
  * This interface focuses on asset detection with fields like extension.
  */
-export interface AssetInfo {
+export interface DetectedAsset {
     /** Original path as it appears in content */
     originalPath: string;
 
