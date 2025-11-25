@@ -31,12 +31,24 @@
 
 - [ ] "move to column" from a task burger menu doesnt work.
 
+- [ ] an #tag and @tags are only separated by spaces, tabs, newlines etc, not by any other character such as dots, commas, etc. 
+  - #tags that start with a number are allways displayed as numbers in a badge (the system is already in place, but it doesnt accept 3.1.3 indexes)
+  - @tags
+    - can be @w13 : week 13
+    - can be @mon or @monday : any weekdays
+    - can be @10:30 : time in 24h mode, without am, pm it's allways 24h mode
+    - can be @10pm : time in 12h mode
+    - can be @10:30-12:00 : timeslot in 24h mode
+
+    - the date and timeslots will be highlighted when they are active (already in place for dates)
+
 - [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
 
-- [ ] Craete a group of tags
+- [ ] Create a group of tags
   - #overview
   - #schedule
-  - #general_information
+  - #verify
+  - #information
   - #preparation
   - #presentation
   - #tasks

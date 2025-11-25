@@ -30,6 +30,7 @@ import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { PresentationParser } from '../../presentationParser';
 import { KanbanTask } from '../../markdownParser';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
+import { FileTypeUtils } from '../../utils/fileTypeUtils';
 
 /**
  * Column Include Plugin
@@ -61,7 +62,7 @@ export class ColumnIncludePlugin implements ImportPlugin {
         }
 
         // Check file extension
-        const ext = this._getExtension(path);
+        const ext = FileTypeUtils.getExtensionWithDot(path);
         return this.metadata.extensions.includes(ext);
     }
 
@@ -188,16 +189,4 @@ export class ColumnIncludePlugin implements ImportPlugin {
         // No cleanup needed
     }
 
-    // ============= PRIVATE HELPERS =============
-
-    /**
-     * Get file extension (lowercase)
-     */
-    private _getExtension(path: string): string {
-        const lastDot = path.lastIndexOf('.');
-        if (lastDot === -1) {
-            return '';
-        }
-        return path.substring(lastDot).toLowerCase();
-    }
 }

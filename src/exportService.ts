@@ -14,8 +14,9 @@ import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
 import { getMermaidExportService } from './services/export/MermaidExportService';
 import { ConfigurationService } from './configurationService';
 
-export type ExportScope = 'full' | 'row' | 'stack' | 'column' | 'task';
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
+
+// Note: ExportScope type is defined in './services/OperationOptions' for unified usage
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -87,6 +88,11 @@ export interface ExportResult {
     exportedPath?: string;              // For mode: 'save'
 }
 
+/**
+ * Asset information for export operations.
+ * Note: This is different from AssetHandler.AssetInfo which is used for asset detection.
+ * This interface includes export-specific fields like relativePath, exists, and md5.
+ */
 export interface AssetInfo {
     originalPath: string;
     resolvedPath: string;

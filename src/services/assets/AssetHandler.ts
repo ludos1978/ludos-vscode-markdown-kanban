@@ -348,7 +348,9 @@ export class AssetHandler {
 }
 
 /**
- * Information about an asset
+ * Information about an asset for detection and classification.
+ * Note: This is different from exportService.AssetInfo which is used for export operations.
+ * This interface focuses on asset detection with fields like extension.
  */
 export interface AssetInfo {
     /** Original path as it appears in content */
