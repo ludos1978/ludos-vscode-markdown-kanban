@@ -21,7 +21,10 @@
       "Bash(echo:*)",
       "Bash(else)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npm run compile:backend:*)",
+      "Bash(npm run:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

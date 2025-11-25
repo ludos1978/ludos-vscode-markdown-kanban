@@ -3732,9 +3732,12 @@ export class MessageHandler {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
 
+            // Get backend board for comparison (ensures we compare generated-to-generated)
+            const backendBoard = panel.getBoard ? panel.getBoard() : undefined;
+
             // Compare each file
             for (const file of allFiles) {
-                const backendContent = file.getContent();
+                let backendContent: string;
                 let frontendContent: string;
                 let savedFileContent: string | null = null;
 
@@ -3750,9 +3753,15 @@ export class MessageHandler {
                 if (savedFileContent !== null) {
                 }
 
-                // For main file, regenerate markdown from frontend board
+                // For main file, regenerate markdown from BOTH boards to ensure like-for-like comparison
+                // This avoids false mismatches from raw file vs generated markdown formatting differences
                 if (file.getFileType() === 'main') {
                     frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
+                    // Generate backend content from backend board (not raw file content)
+                    // This ensures we compare board state, not formatting artifacts
+                    backendContent = backendBoard
+                        ? MarkdownKanbanParser.generateMarkdown(backendBoard)
+                        : file.getContent(); // Fallback to raw if no board available
 
                     // DEBUG: Log regenerated content details
 
@@ -3769,13 +3778,22 @@ export class MessageHandler {
                         if (firstDiff >= 0) {
                             const start = Math.max(0, firstDiff - 20);
                             const end = Math.min(minLen, firstDiff + 80);
+                            console.log(`[VerifySync] MISMATCH at char ${firstDiff}:`);
+                            console.log(`  Frontend[${start}:${end}]: "${frontendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
+                            console.log(`  Backend [${start}:${end}]: "${backendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
                         } else if (frontendContent.length !== backendContent.length) {
+                            console.log(`[VerifySync] LENGTH MISMATCH: frontend=${frontendContent.length}, backend=${backendContent.length}`);
+                            // Show the extra content at the end
+                            const longer = frontendContent.length > backendContent.length ? frontendContent : backendContent;
+                            const shorter = frontendContent.length > backendContent.length ? backendContent : frontendContent;
+                            const which = frontendContent.length > backendContent.length ? 'Frontend' : 'Backend';
+                            console.log(`  ${which} has extra: "${longer.substring(shorter.length).replace(/\n/g, '\\n')}"`);
                         }
                     }
                 } else {
-                    // For include files, get their actual content
-                    // (For now, we don't have a way to get modified include content from frontend)
-                    // So we compare backend to backend for includes
+                    // For include files, use raw file content for both
+                    // (Frontend doesn't track include file content separately)
+                    backendContent = file.getContent();
                     frontendContent = backendContent;
                 }
 
