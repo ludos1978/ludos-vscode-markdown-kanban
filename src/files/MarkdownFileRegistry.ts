@@ -2,9 +2,6 @@ import * as vscode from 'vscode';
 import { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile } from './IncludeFile';
-import { ColumnIncludeFile } from './ColumnIncludeFile';
-import { TaskIncludeFile } from './TaskIncludeFile';
-import { RegularIncludeFile } from './RegularIncludeFile';
 import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
 
 /**
@@ -235,33 +232,28 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Get all include files
      */
     public getIncludeFiles(): IncludeFile[] {
-        // Can't use getByType with abstract class, so filter manually
-        return this.getAll().filter(f =>
-            f instanceof ColumnIncludeFile ||
-            f instanceof TaskIncludeFile ||
-            f instanceof RegularIncludeFile
-        ) as IncludeFile[];
+        return this.getByType(IncludeFile);
     }
 
     /**
      * Get column include files
      */
-    public getColumnIncludeFiles(): ColumnIncludeFile[] {
-        return this.getByType(ColumnIncludeFile);
+    public getColumnIncludeFiles(): IncludeFile[] {
+        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-column');
     }
 
     /**
      * Get task include files
      */
-    public getTaskIncludeFiles(): TaskIncludeFile[] {
-        return this.getByType(TaskIncludeFile);
+    public getTaskIncludeFiles(): IncludeFile[] {
+        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-task');
     }
 
     /**
      * Get regular include files
      */
-    public getRegularIncludeFiles(): RegularIncludeFile[] {
-        return this.getByType(RegularIncludeFile);
+    public getRegularIncludeFiles(): IncludeFile[] {
+        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-regular');
     }
 
     // ============= STATE QUERIES =============
@@ -445,8 +437,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      *
      * Process:
      * 1. Get main file's parsed board
-     * 2. For each column with includeFiles, load tasks from ColumnIncludeFiles
-     * 3. For each task with includeFiles, load description from TaskIncludeFiles
+     * 2. For each column with includeFiles, load tasks from IncludeFile (type=include-column)
+     * 3. For each task with includeFiles, load description from IncludeFile (type=include-task)
      * 4. Return complete board
      *
      * @param existingBoard Optional existing board to preserve column/task IDs during regeneration
@@ -483,7 +475,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             if (column.includeFiles && column.includeFiles.length > 0) {
 
                 for (const relativePath of column.includeFiles) {
-                    const file = this.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    const file = this.getByRelativePath(relativePath) as IncludeFile;
                     if (file && file.getFileType() === 'include-column') {
                         // Parse tasks from include file, preserving existing task IDs
                         const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
@@ -499,7 +491,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 if (task.includeFiles && task.includeFiles.length > 0) {
 
                     for (const relativePath of task.includeFiles) {
-                        const file = this.getByRelativePath(relativePath) as TaskIncludeFile;
+                        const file = this.getByRelativePath(relativePath) as IncludeFile;
                         if (file && file.getFileType() === 'include-task') {
                             // Load description from task include file
                             task.description = file.getContent();

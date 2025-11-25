@@ -1,7 +1,5 @@
 import { MainKanbanFile } from './MainKanbanFile';
-import { ColumnIncludeFile } from './ColumnIncludeFile';
-import { TaskIncludeFile } from './TaskIncludeFile';
-import { RegularIncludeFile } from './RegularIncludeFile';
+import { IncludeFile, IncludeFileType } from './IncludeFile';
 import { MarkdownFile } from './MarkdownFile';
 import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { FileManager } from '../fileManager';
@@ -15,21 +13,13 @@ import { PluginRegistry, ImportContext, IncludeContextLocation } from '../plugin
  * This factory encapsulates the creation logic and ensures all files
  * are created with the correct dependencies.
  *
- * Supports both:
- * 1. Plugin-based creation via PluginRegistry (preferred)
- * 2. Direct type-based creation (fallback for backwards compatibility)
+ * Uses the plugin system exclusively for include file creation.
+ * No fallback code - plugins MUST be loaded for include files to work.
  *
  * Usage:
  *   const factory = new FileFactory(fileManager, conflictResolver, backupManager);
  *   const mainFile = factory.createMainFile('/path/to/kanban.md');
- *   const columnInclude = factory.createColumnInclude('./includes/column.md', mainFile);
- *
- * Plugin-based usage:
- *   const includeFile = factory.createIncludeViaPlugin(
- *       './includes/column.md',
- *       mainFile,
- *       { location: 'column-header' }
- *   );
+ *   const includeFile = factory.createInclude('./includes/column.md', mainFile, 'include-column');
  */
 export class FileFactory {
     private _pluginRegistry: PluginRegistry;
@@ -58,113 +48,60 @@ export class FileFactory {
         );
     }
 
-    // ============= INCLUDE FILES =============
-
-    /**
-     * Create a ColumnIncludeFile instance
-     */
-    public createColumnInclude(
-        relativePath: string,
-        parentFile: MainKanbanFile,
-        isInline: boolean = false
-    ): ColumnIncludeFile {
-        return new ColumnIncludeFile(
-            relativePath,
-            parentFile,
-            this.conflictResolver,
-            this.backupManager,
-            isInline
-        );
-    }
-
-    /**
-     * Create a TaskIncludeFile instance
-     */
-    public createTaskInclude(
-        relativePath: string,
-        parentFile: MainKanbanFile,
-        isInline: boolean = false
-    ): TaskIncludeFile {
-        return new TaskIncludeFile(
-            relativePath,
-            parentFile,
-            this.conflictResolver,
-            this.backupManager,
-            isInline
-        );
-    }
-
-    /**
-     * Create a RegularIncludeFile instance
-     */
-    public createRegularInclude(
-        relativePath: string,
-        parentFile: MainKanbanFile,
-        isInline: boolean = false
-    ): RegularIncludeFile {
-        return new RegularIncludeFile(
-            relativePath,
-            parentFile,
-            this.conflictResolver,
-            this.backupManager,
-            isInline
-        );
-    }
-
-    // ============= PLUGIN-BASED CREATION =============
+    // ============= INCLUDE FILES (PLUGIN-BASED ONLY) =============
 
     /**
      * Create include file using plugin system
      *
-     * This is the preferred method for creating include files.
      * Uses the PluginRegistry to find the appropriate plugin based on context.
      *
      * @param relativePath - Relative path to the include file
      * @param parentFile - Parent MainKanbanFile
      * @param context - Import context specifying where the include was found
      * @param isInline - Whether this is an inline include
-     * @returns Created file instance or null if no plugin can handle it
+     * @returns Created file instance
+     * @throws Error if no plugin can handle the file
      */
     public createIncludeViaPlugin(
         relativePath: string,
         parentFile: MainKanbanFile,
         context: ImportContext,
         isInline: boolean = false
-    ): MarkdownFile | null {
+    ): IncludeFile {
         const plugin = this._pluginRegistry.findImportPlugin(relativePath, context);
 
         if (!plugin) {
-            console.warn(`[FileFactory] No plugin found for: ${relativePath} in context: ${context.location}`);
-            return null;
+            throw new Error(
+                `[FileFactory] No plugin found for include: ${relativePath} in context: ${context.location}. ` +
+                `Ensure plugins are loaded via PluginLoader.loadBuiltinPlugins() at extension activation.`
+            );
         }
 
         return plugin.createFile(relativePath, parentFile, {
             conflictResolver: this.conflictResolver,
             backupManager: this.backupManager,
             isInline
-        });
+        }) as IncludeFile;
     }
 
-    // ============= AUTO-DETECTION =============
-
     /**
-     * Create include file with type auto-detection based on file type parameter
+     * Create include file with type specification
      *
-     * This method first tries to use the plugin system, then falls back
-     * to direct creation for backwards compatibility.
+     * This method uses the plugin system based on the file type.
      *
      * @param relativePath - Relative path to the include file
      * @param parentFile - Parent MainKanbanFile
      * @param type - Include type ('include-regular', 'include-column', 'include-task')
      * @param isInline - Whether this is an inline include
      * @returns Created file instance
+     * @throws Error if no plugin can handle the file
      */
     public createInclude(
         relativePath: string,
         parentFile: MainKanbanFile,
-        type: 'include-regular' | 'include-column' | 'include-task',
+        type: IncludeFileType,
         isInline: boolean = false
-    ): MarkdownFile {
+    ): IncludeFile {
         // Map type to context location
         const contextLocation = this._typeToContextLocation(type);
         const context: ImportContext = {
@@ -172,24 +109,36 @@ export class FileFactory {
             parentFile
         };
 
-        // Try plugin-based creation first
-        const pluginResult = this.createIncludeViaPlugin(relativePath, parentFile, context, isInline);
-        if (pluginResult) {
-            return pluginResult;
-        }
+        // Use plugin-based creation (no fallback)
+        return this.createIncludeViaPlugin(relativePath, parentFile, context, isInline);
+    }
 
-        // Fallback to direct creation (backwards compatibility)
-        console.log(`[FileFactory] Falling back to direct creation for type: ${type}`);
-        switch (type) {
-            case 'include-regular':
-                return this.createRegularInclude(relativePath, parentFile, isInline);
-            case 'include-column':
-                return this.createColumnInclude(relativePath, parentFile, isInline);
-            case 'include-task':
-                return this.createTaskInclude(relativePath, parentFile, isInline);
-            default:
-                throw new Error(`Unknown include type: ${type}`);
-        }
+    /**
+     * Create include file directly without plugin lookup
+     *
+     * Use this when you already know the file type and don't need plugin detection.
+     * This creates an IncludeFile instance directly.
+     *
+     * @param relativePath - Relative path to the include file
+     * @param parentFile - Parent MainKanbanFile
+     * @param fileType - Include file type
+     * @param isInline - Whether this is an inline include
+     * @returns Created IncludeFile instance
+     */
+    public createIncludeDirect(
+        relativePath: string,
+        parentFile: MainKanbanFile,
+        fileType: IncludeFileType,
+        isInline: boolean = false
+    ): IncludeFile {
+        return new IncludeFile(
+            relativePath,
+            parentFile,
+            this.conflictResolver,
+            this.backupManager,
+            fileType,
+            isInline
+        );
     }
 
     // ============= PRIVATE HELPERS =============
@@ -197,7 +146,7 @@ export class FileFactory {
     /**
      * Map include type to context location
      */
-    private _typeToContextLocation(type: string): IncludeContextLocation {
+    private _typeToContextLocation(type: IncludeFileType): IncludeContextLocation {
         switch (type) {
             case 'include-column':
                 return 'column-header';

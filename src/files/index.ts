@@ -7,31 +7,26 @@
  * Key Classes:
  * - MarkdownFile: Abstract base class with state, operations, and change detection
  * - MainKanbanFile: The main kanban.md file
- * - IncludeFile: Abstract base for all include files
- *   - ColumnIncludeFile: Column includes (presentation format)
- *   - TaskIncludeFile: Task includes (markdown description)
- *   - RegularIncludeFile: Regular includes (kanban format)
+ * - IncludeFile: Unified class for all include file types
+ *   - fileType='include-column': Column includes (presentation format)
+ *   - fileType='include-task': Task includes (markdown description)
+ *   - fileType='include-regular': Regular includes (inline markdown)
  * - MarkdownFileRegistry: Central registry for file management
- * - FileFactory: Factory for creating file instances
+ * - FileFactory: Factory for creating file instances (uses plugin system)
  *
  * Benefits:
- * - Type-safe file operations (instanceof checks instead of string types)
+ * - Type-safe file operations (instanceof checks)
  * - Polymorphic behavior (file.handleExternalChange() works for all types)
  * - Encapsulation (state and behavior together)
  * - Integrated change detection (built-in file watchers)
  * - Event system (subscribe to file changes)
- * - Easy extension (add new file types by subclassing)
+ * - Plugin-based creation (FileFactory uses PluginRegistry)
  */
 
 // Base classes
 export { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 export { MainKanbanFile } from './MainKanbanFile';
-export { IncludeFile } from './IncludeFile';
-
-// Concrete include types
-export { ColumnIncludeFile } from './ColumnIncludeFile';
-export { TaskIncludeFile } from './TaskIncludeFile';
-export { RegularIncludeFile } from './RegularIncludeFile';
+export { IncludeFile, IncludeFileType } from './IncludeFile';
 
 // Registry and factory
 export { MarkdownFileRegistry } from './MarkdownFileRegistry';

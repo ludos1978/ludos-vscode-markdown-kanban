@@ -6,7 +6,7 @@
  *
  * Features:
  * - Detects !!!include()!!! in column headers (## Title)
- * - Creates ColumnIncludeFile instances
+ * - Creates IncludeFile instances with fileType='include-column'
  * - Parses presentation format to KanbanTask[]
  * - Generates presentation format from KanbanTask[]
  * - Preserves task IDs by position matching
@@ -25,7 +25,7 @@ import {
     GenerateOptions,
     PluginContext
 } from '../interfaces';
-import { ColumnIncludeFile } from '../../files/ColumnIncludeFile';
+import { IncludeFile } from '../../files/IncludeFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { PresentationParser } from '../../presentationParser';
 import { KanbanTask } from '../../markdownParser';
@@ -34,8 +34,8 @@ import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 /**
  * Column Include Plugin
  *
- * Wraps ColumnIncludeFile to provide plugin interface.
- * All functionality delegates to the existing implementation.
+ * Creates IncludeFile instances with fileType='include-column'.
+ * All column-specific functionality is in the unified IncludeFile class.
  */
 export class ColumnIncludePlugin implements ImportPlugin {
     readonly metadata: ImportPluginMetadata = {
@@ -96,20 +96,19 @@ export class ColumnIncludePlugin implements ImportPlugin {
     }
 
     /**
-     * Create a ColumnIncludeFile instance
-     *
-     * Wraps the existing ColumnIncludeFile class.
+     * Create an IncludeFile instance with fileType='include-column'
      */
     createFile(
         relativePath: string,
         parentFile: MainKanbanFile,
         dependencies: PluginDependencies
-    ): ColumnIncludeFile {
-        return new ColumnIncludeFile(
+    ): IncludeFile {
+        return new IncludeFile(
             relativePath,
             parentFile,
             dependencies.conflictResolver,
             dependencies.backupManager,
+            'include-column',
             dependencies.isInline ?? false
         );
     }

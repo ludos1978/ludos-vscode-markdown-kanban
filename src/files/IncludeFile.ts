@@ -6,9 +6,22 @@ import { ConflictResolver, ConflictContext } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { MainKanbanFile } from './MainKanbanFile';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
+import { KanbanTask } from '../markdownParser';
+import { PresentationParser } from '../presentationParser';
 
 /**
- * Abstract base class for all include files (column, task, regular includes).
+ * Include file types supported by the plugin system
+ */
+export type IncludeFileType = 'include-regular' | 'include-column' | 'include-task';
+
+/**
+ * Unified class for all include files (column, task, regular includes).
+ *
+ * This class consolidates all include file functionality into a single,
+ * configurable class. The file type is specified at construction time
+ * and determines behavior for parsing, generation, and validation.
+ *
+ * Replaces: ColumnIncludeFile, TaskIncludeFile, RegularIncludeFile
  *
  * Responsibilities:
  * - Manage include file paths (relative to parent)
@@ -16,8 +29,12 @@ import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
  * - Handle parent-child relationship
  * - Coordinate changes with parent file
  * - Handle include-specific conflicts
+ * - Parse/generate content based on file type
  */
-export abstract class IncludeFile extends MarkdownFile {
+export class IncludeFile extends MarkdownFile {
+    // ============= FILE TYPE =============
+    private _fileType: IncludeFileType;
+
     // ============= PARENT RELATIONSHIP =============
     protected _parentFile: MainKanbanFile;          // Reference to parent kanban file
     protected _absolutePath: string;                 // Cached absolute path
@@ -25,20 +42,41 @@ export abstract class IncludeFile extends MarkdownFile {
     // ============= INCLUDE-SPECIFIC STATE =============
     protected _isInline: boolean = false;           // True for inline includes (embedded in parent)
 
+    // ============= COLUMN ASSOCIATION (for include-column) =============
+    private _columnId?: string;                     // ID of the column this belongs to
+    private _columnTitle?: string;                  // Title of the column
+
+    // ============= TASK ASSOCIATION (for include-task) =============
+    private _taskId?: string;                       // ID of the task this belongs to
+    private _taskTitle?: string;                    // Title of the task
+
     constructor(
         relativePath: string,
         parentFile: MainKanbanFile,
         conflictResolver: ConflictResolver,
         backupManager: BackupManager,
+        fileType: IncludeFileType,
         isInline: boolean = false
     ) {
         const absolutePath = IncludeFile._resolveAbsolutePath(relativePath, parentFile.getPath());
 
         super(absolutePath, relativePath, conflictResolver, backupManager);
 
+        this._fileType = fileType;
         this._parentFile = parentFile;
         this._absolutePath = absolutePath;
         this._isInline = isInline;
+
+        // Regular includes are always inline
+        if (fileType === 'include-regular') {
+            this._isInline = true;
+        }
+    }
+
+    // ============= FILE TYPE =============
+
+    public getFileType(): IncludeFileType {
+        return this._fileType;
     }
 
     // ============= PATH RESOLUTION =============
@@ -83,6 +121,82 @@ export abstract class IncludeFile extends MarkdownFile {
         return path.resolve(parentDir, relativePath);
     }
 
+    // ============= COLUMN ASSOCIATION (for include-column) =============
+
+    /**
+     * Set the column ID this include belongs to
+     */
+    public setColumnId(columnId: string): void {
+        this._columnId = columnId;
+    }
+
+    /**
+     * Get the column ID
+     */
+    public getColumnId(): string | undefined {
+        return this._columnId;
+    }
+
+    /**
+     * Set the column title
+     */
+    public setColumnTitle(title: string): void {
+        this._columnTitle = title;
+    }
+
+    /**
+     * Get the column title
+     */
+    public getColumnTitle(): string | undefined {
+        return this._columnTitle;
+    }
+
+    // ============= TASK ASSOCIATION (for include-task) =============
+
+    /**
+     * Set the task ID this include belongs to
+     */
+    public setTaskId(taskId: string): void {
+        this._taskId = taskId;
+    }
+
+    /**
+     * Get the task ID
+     */
+    public getTaskId(): string | undefined {
+        return this._taskId;
+    }
+
+    /**
+     * Set the task title
+     */
+    public setTaskTitle(title: string): void {
+        this._taskTitle = title;
+    }
+
+    /**
+     * Get the task title
+     */
+    public getTaskTitle(): string | undefined {
+        return this._taskTitle;
+    }
+
+    // ============= CONTENT OPERATIONS (for include-task) =============
+
+    /**
+     * Get task description content (for include-task)
+     */
+    public getTaskDescription(): string {
+        return this._content;
+    }
+
+    /**
+     * Set task description content (for include-task)
+     */
+    public setTaskDescription(description: string): void {
+        this.setContent(description, false);
+    }
+
     // ============= FILE I/O =============
 
     /**
@@ -123,6 +237,73 @@ export abstract class IncludeFile extends MarkdownFile {
             console.error(`[${this.getFileType()}] Failed to write file:`, error);
             throw error;
         }
+    }
+
+    // ============= PARSING (for include-column) =============
+
+    /**
+     * Parse presentation format into tasks, preserving IDs for existing tasks
+     * CRITICAL: Match by POSITION only, never by title/content
+     * @param existingTasks Optional array of existing tasks to preserve IDs from
+     * @param columnId Optional columnId to use for task ID generation (supports file reuse across columns)
+     * @param mainFilePath Optional path to main kanban file (for dynamic image path resolution)
+     */
+    public parseToTasks(existingTasks?: KanbanTask[], columnId?: string, mainFilePath?: string): KanbanTask[] {
+        if (this._fileType !== 'include-column') {
+            console.warn(`[IncludeFile] parseToTasks called on non-column include: ${this._fileType}`);
+            return [];
+        }
+
+        // Use PresentationParser to convert slides to tasks
+        const slides = PresentationParser.parsePresentation(this._content);
+        const tasks = PresentationParser.slidesToTasks(slides, this._path, mainFilePath);
+
+        // Use provided columnId if available, otherwise fall back to stored _columnId
+        const effectiveColumnId = columnId || this._columnId;
+
+        // CRITICAL: Match by POSITION, not title - tasks identified by position
+        return tasks.map((task, index) => {
+            // Get existing task at SAME POSITION to preserve ID
+            const existingTask = existingTasks?.[index];
+
+            return {
+                ...task,
+                id: existingTask?.id || `task-${effectiveColumnId}-${index}`,
+                includeMode: false, // Tasks from column includes are NOT individual includes
+                includeFiles: undefined, // Column has the includeFiles, not individual tasks
+                includeContext: task.includeContext // Preserve includeContext for dynamic image resolution
+            };
+        });
+    }
+
+    /**
+     * Generate presentation format from tasks (for include-column)
+     */
+    public generateFromTasks(tasks: KanbanTask[]): string {
+        if (this._fileType !== 'include-column') {
+            console.warn(`[IncludeFile] generateFromTasks called on non-column include: ${this._fileType}`);
+            return this._content;
+        }
+
+        // Use unified presentation generator (no YAML for copying)
+        const { PresentationGenerator } = require('../services/export/PresentationGenerator');
+        return PresentationGenerator.fromTasks(tasks, {
+            filterIncludes: true
+            // Note: includeMarpDirectives defaults to false (no YAML when copying)
+        });
+    }
+
+    /**
+     * Update tasks (regenerate content from tasks and mark as unsaved)
+     * For include-column only
+     */
+    public updateTasks(tasks: KanbanTask[]): void {
+        if (this._fileType !== 'include-column') {
+            console.warn(`[IncludeFile] updateTasks called on non-column include: ${this._fileType}`);
+            return;
+        }
+        const newContent = this.generateFromTasks(tasks);
+        this.setContent(newContent, false);
     }
 
     // ============= EXTERNAL CHANGE HANDLING =============
@@ -302,6 +483,70 @@ export abstract class IncludeFile extends MarkdownFile {
             isClosing: false,
             isInEditMode: this._isInEditMode
         };
+    }
+
+    // ============= VALIDATION =============
+
+    /**
+     * Validate file content based on file type
+     */
+    public validate(content: string): { valid: boolean; errors?: string[] } {
+        switch (this._fileType) {
+            case 'include-column':
+                return this._validateColumnContent(content);
+            case 'include-task':
+                return this._validateTaskContent(content);
+            case 'include-regular':
+                // Regular includes accept any markdown content
+                return { valid: true };
+            default:
+                return { valid: true };
+        }
+    }
+
+    /**
+     * Validate presentation format content (for include-column)
+     */
+    private _validateColumnContent(content: string): { valid: boolean; errors?: string[] } {
+        const errors: string[] = [];
+
+        // Parse as presentation
+        try {
+            const slides = PresentationParser.parsePresentation(content);
+
+            if (slides.length === 0) {
+                errors.push('Column include must have at least one slide (task)');
+            }
+
+            // Check if slides have at least a title or content
+            // A slide with just a title is valid (represents a task with no description)
+            for (let i = 0; i < slides.length; i++) {
+                const slide = slides[i];
+                const hasTitle = slide.title && slide.title.trim().length > 0;
+                const hasContent = slide.content && slide.content.trim().length > 0;
+
+                if (!hasTitle && !hasContent) {
+                    errors.push(`Slide ${i + 1} is empty (no title or content)`);
+                }
+            }
+        } catch (error) {
+            errors.push(`Failed to parse presentation: ${error}`);
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors: errors.length > 0 ? errors : undefined
+        };
+    }
+
+    /**
+     * Validate task include content (for include-task)
+     * Note: Task includes can be empty - this is valid
+     */
+    private _validateTaskContent(_content: string): { valid: boolean; errors?: string[] } {
+        // Task includes accept any content, including empty
+        // This matches the original TaskIncludeFile behavior
+        return { valid: true };
     }
 
     // ============= OVERRIDES =============

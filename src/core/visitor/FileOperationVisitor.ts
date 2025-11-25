@@ -1,21 +1,19 @@
 import { MarkdownFile } from '../../files/MarkdownFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
-import { ColumnIncludeFile } from '../../files/ColumnIncludeFile';
-import { TaskIncludeFile } from '../../files/TaskIncludeFile';
-import { RegularIncludeFile } from '../../files/RegularIncludeFile';
+import { IncludeFile } from '../../files/IncludeFile';
 
 /**
  * Visitor Pattern - File Operation Visitor
  *
  * Defines operations that can be performed on different file types
  * without modifying the file classes themselves.
+ *
+ * Uses the unified IncludeFile class with fileType-based dispatch.
  */
 
 export interface IFileVisitor<T = any> {
     visitMainFile(file: MainKanbanFile): Promise<T>;
-    visitColumnIncludeFile(file: ColumnIncludeFile): Promise<T>;
-    visitTaskIncludeFile(file: TaskIncludeFile): Promise<T>;
-    visitRegularIncludeFile(file: RegularIncludeFile): Promise<T>;
+    visitIncludeFile(file: IncludeFile): Promise<T>;
 }
 
 export interface IVisitableFile {
@@ -45,52 +43,32 @@ export class ValidationVisitor implements IFileVisitor<boolean> {
         return true;
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<boolean> {
+    async visitIncludeFile(file: IncludeFile): Promise<boolean> {
 
         const validation = file.validate(file.getContent());
         if (!validation.valid) {
-            console.error(`[ValidationVisitor] Column include validation failed:`, validation.errors);
+            console.error(`[ValidationVisitor] Include file validation failed:`, validation.errors);
             return false;
         }
 
-        // Additional column include validation
-        try {
-            const mainFilePath = file.getParentFile()?.getPath();
-            const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
-            if (tasks.length === 0) {
-                console.warn(`[ValidationVisitor] Column include has no tasks`);
+        // Type-specific validation
+        const fileType = file.getFileType();
+        if (fileType === 'include-column') {
+            try {
+                const mainFilePath = file.getParentFile()?.getPath();
+                const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
+                if (tasks.length === 0) {
+                    console.warn(`[ValidationVisitor] Column include has no tasks`);
+                }
+            } catch (error) {
+                console.error(`[ValidationVisitor] Column include parsing failed:`, error);
+                return false;
             }
-        } catch (error) {
-            console.error(`[ValidationVisitor] Column include parsing failed:`, error);
-            return false;
-        }
-
-        return true;
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<boolean> {
-
-        const validation = file.validate(file.getContent());
-        if (!validation.valid) {
-            console.error(`[ValidationVisitor] Task include validation failed:`, validation.errors);
-            return false;
-        }
-
-        // Additional task include validation
-        const content = file.getTaskDescription();
-        if (!content || content.trim().length === 0) {
-            console.warn(`[ValidationVisitor] Task include is empty`);
-        }
-
-        return true;
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<boolean> {
-
-        const validation = file.validate(file.getContent());
-        if (!validation.valid) {
-            console.error(`[ValidationVisitor] Regular include validation failed:`, validation.errors);
-            return false;
+        } else if (fileType === 'include-task') {
+            const content = file.getTaskDescription();
+            if (!content || content.trim().length === 0) {
+                console.warn(`[ValidationVisitor] Task include is empty`);
+            }
         }
 
         return true;
@@ -104,15 +82,7 @@ export class BackupVisitor implements IFileVisitor<void> {
         await file.createBackup(this.label);
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        await file.createBackup(this.label);
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        await file.createBackup(this.label);
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
+    async visitIncludeFile(file: IncludeFile): Promise<void> {
         await file.createBackup(this.label);
     }
 }
@@ -135,49 +105,34 @@ export class ContentAnalysisVisitor implements IFileVisitor<ContentStats> {
         };
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<ContentStats> {
+    async visitIncludeFile(file: IncludeFile): Promise<ContentStats> {
         const content = file.getContent();
-        const mainFilePath = file.getParentFile()?.getPath();
-        const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
+        const fileType = file.getFileType();
 
-        return {
-            fileType: 'column-include',
-            size: content.length,
-            lines: content.split('\n').length,
-            hasUnsavedChanges: file.hasUnsavedChanges(),
-            metadata: {
+        let metadata: Record<string, any> = {};
+
+        if (fileType === 'include-column') {
+            const mainFilePath = file.getParentFile()?.getPath();
+            const tasks = file.parseToTasks(undefined, undefined, mainFilePath);
+            metadata = {
                 tasks: tasks.length,
                 columnId: file.getColumnId(),
                 columnTitle: file.getColumnTitle()
-            }
-        };
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<ContentStats> {
-        const content = file.getTaskDescription();
-
-        return {
-            fileType: 'task-include',
-            size: content.length,
-            lines: content.split('\n').length,
-            hasUnsavedChanges: file.hasUnsavedChanges(),
-            metadata: {
+            };
+        } else if (fileType === 'include-task') {
+            metadata = {
                 taskId: file.getTaskId(),
                 taskTitle: file.getTaskTitle(),
                 columnId: file.getColumnId()
-            }
-        };
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<ContentStats> {
-        const content = file.getContent();
+            };
+        }
 
         return {
-            fileType: 'regular-include',
+            fileType: fileType,
             size: content.length,
             lines: content.split('\n').length,
             hasUnsavedChanges: file.hasUnsavedChanges(),
-            metadata: {}
+            metadata
         };
     }
 }
@@ -187,15 +142,7 @@ export class SaveVisitor implements IFileVisitor<void> {
         await file.save();
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        await file.save();
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        await file.save();
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
+    async visitIncludeFile(file: IncludeFile): Promise<void> {
         await file.save();
     }
 }
@@ -205,15 +152,7 @@ export class ReloadVisitor implements IFileVisitor<void> {
         await file.reload();
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
-        await file.reload();
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        await file.reload();
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
+    async visitIncludeFile(file: IncludeFile): Promise<void> {
         await file.reload();
     }
 }
@@ -303,12 +242,8 @@ export class FileOperationManager {
         // Type guard to determine file type and call appropriate visit method
         if (file instanceof MainKanbanFile) {
             return await visitor.visitMainFile(file);
-        } else if (file instanceof ColumnIncludeFile) {
-            return await visitor.visitColumnIncludeFile(file);
-        } else if (file instanceof TaskIncludeFile) {
-            return await visitor.visitTaskIncludeFile(file);
-        } else if (file instanceof RegularIncludeFile) {
-            return await visitor.visitRegularIncludeFile(file);
+        } else if (file instanceof IncludeFile) {
+            return await visitor.visitIncludeFile(file);
         } else {
             throw new Error(`Unknown file type: ${file.constructor.name}`);
         }
@@ -331,21 +266,9 @@ export class CompositeFileOperation implements IFileVisitor<void> {
         }
     }
 
-    async visitColumnIncludeFile(file: ColumnIncludeFile): Promise<void> {
+    async visitIncludeFile(file: IncludeFile): Promise<void> {
         for (const operation of this.operations) {
-            await operation.visitColumnIncludeFile(file);
-        }
-    }
-
-    async visitTaskIncludeFile(file: TaskIncludeFile): Promise<void> {
-        for (const operation of this.operations) {
-            await operation.visitTaskIncludeFile(file);
-        }
-    }
-
-    async visitRegularIncludeFile(file: RegularIncludeFile): Promise<void> {
-        for (const operation of this.operations) {
-            await operation.visitRegularIncludeFile(file);
+            await operation.visitIncludeFile(file);
         }
     }
 }

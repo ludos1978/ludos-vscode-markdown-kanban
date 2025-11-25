@@ -4,7 +4,7 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { BackupManager } from './backupManager';
 import { ConflictResolver } from './conflictResolver';
-import { MarkdownFileRegistry, IncludeFile, ColumnIncludeFile, TaskIncludeFile, FileState, FileFactory } from './files';
+import { MarkdownFileRegistry, IncludeFile, FileState, FileFactory } from './files';
 
 /**
  * IncludeFileManager - Thin wrapper around MarkdownFileRegistry
@@ -38,8 +38,8 @@ export class IncludeFileManager {
         const files = this.fileRegistry.getIncludeFiles();
         return files
             .filter(file => {
-                if (type === 'column') return file instanceof ColumnIncludeFile;
-                if (type === 'task') return file instanceof TaskIncludeFile;
+                if (type === 'column') return file.getFileType() === 'include-column';
+                if (type === 'task') return file.getFileType() === 'include-task';
                 return file.getFileType() === 'include-regular';
             })
             .map(file => file.getRelativePath());
@@ -47,13 +47,13 @@ export class IncludeFileManager {
 
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard, documentGetter: any, filePathGetter: any): Promise<boolean> {
 
-        // Update ColumnIncludeFile instances with current task content (without saving to disk)
+        // Update IncludeFile instances (type=include-column) with current task content (without saving to disk)
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     // FOUNDATION-1: Registry handles normalization internally
-                    const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
-                    if (file) {
+                    const file = this.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+                    if (file && file.getFileType() === 'include-column') {
                         // Generate content from current tasks
                         const content = file.generateFromTasks(column.tasks);
                         const currentContent = file.getContent();
@@ -82,14 +82,14 @@ export class IncludeFileManager {
             }
         }
 
-        // Update TaskIncludeFile instances with current task content (without saving to disk)
+        // Update IncludeFile instances (type=include-task) with current task content (without saving to disk)
         for (const column of board.columns) {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
                         // FOUNDATION-1: Registry handles normalization internally
-                        const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
-                        if (file) {
+                        const file = this.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+                        if (file && file.getFileType() === 'include-task') {
                             // STRATEGY 1: No-parsing approach
                             // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
                             // task.description contains the COMPLETE file content (no parsing, no truncation)
@@ -136,8 +136,8 @@ export class IncludeFileManager {
 
         for (const relativePath of column.includeFiles) {
             // FOUNDATION-1: Registry handles normalization internally
-            const file = this.fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
-            if (file) {
+            const file = this.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+            if (file && file.getFileType() === 'include-column') {
                 const content = file.generateFromTasks(column.tasks);
                 file.setContent(content);
                 await file.save();
@@ -151,8 +151,8 @@ export class IncludeFileManager {
 
         for (const relativePath of task.includeFiles) {
             // FOUNDATION-1: Registry handles normalization internally
-            const file = this.fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
-            if (file) {
+            const file = this.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+            if (file && file.getFileType() === 'include-task') {
                 // STRATEGY 1: No-parsing approach
                 // task.displayTitle is now a formatted header "# include in ./path" (UI only, not file content)
                 // task.description contains the COMPLETE file content (no parsing, no reconstruction needed)
@@ -300,14 +300,14 @@ export class IncludeFileManager {
             }
 
 
-            // Create appropriate file type
-            let includeFile;
+            // Create appropriate file type using plugin system
+            let includeFile: IncludeFile;
             if (type === 'regular') {
-                includeFile = this.fileFactory.createRegularInclude(relativePath, mainFile, true);
+                includeFile = this.fileFactory.createIncludeDirect(relativePath, mainFile, 'include-regular', true);
             } else if (type === 'column') {
-                includeFile = this.fileFactory.createColumnInclude(relativePath, mainFile, true);
+                includeFile = this.fileFactory.createIncludeDirect(relativePath, mainFile, 'include-column', true);
             } else if (type === 'task') {
-                includeFile = this.fileFactory.createTaskInclude(relativePath, mainFile, true);
+                includeFile = this.fileFactory.createIncludeDirect(relativePath, mainFile, 'include-task', true);
             } else {
                 console.error(`[IncludeFileManager] ✗ Unknown type: ${type}`);
                 return;

@@ -6,7 +6,7 @@
  *
  * Features:
  * - Detects !!!include()!!! in task descriptions
- * - Creates RegularIncludeFile instances
+ * - Creates IncludeFile instances with fileType='include-regular'
  * - Content is rendered by frontend (markdown-it-include plugin)
  * - Always treated as inline includes
  *
@@ -23,14 +23,14 @@ import {
     ParseResult,
     PluginContext
 } from '../interfaces';
-import { RegularIncludeFile } from '../../files/RegularIncludeFile';
+import { IncludeFile } from '../../files/IncludeFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
 /**
  * Regular Include Plugin
  *
- * Wraps RegularIncludeFile to provide plugin interface.
+ * Creates IncludeFile instances with fileType='include-regular'.
  * Regular includes are rendered inline in task descriptions.
  */
 export class RegularIncludePlugin implements ImportPlugin {
@@ -92,22 +92,22 @@ export class RegularIncludePlugin implements ImportPlugin {
     }
 
     /**
-     * Create a RegularIncludeFile instance
+     * Create an IncludeFile instance with fileType='include-regular'
      *
-     * Wraps the existing RegularIncludeFile class.
      * Regular includes are always inline (isInline = true).
      */
     createFile(
         relativePath: string,
         parentFile: MainKanbanFile,
         dependencies: PluginDependencies
-    ): RegularIncludeFile {
+    ): IncludeFile {
         // Regular includes are always inline
-        return new RegularIncludeFile(
+        return new IncludeFile(
             relativePath,
             parentFile,
             dependencies.conflictResolver,
             dependencies.backupManager,
+            'include-regular',
             true  // Always inline
         );
     }

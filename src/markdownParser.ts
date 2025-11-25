@@ -73,81 +73,35 @@ export class MarkdownKanbanParser {
   // ============= PLUGIN-BASED INCLUDE DETECTION =============
 
   /**
-   * Detect includes in content using plugin system with fallback to regex
+   * Detect includes in content using plugin system
    *
-   * Uses PluginRegistry.detectIncludes() if plugins are loaded,
-   * otherwise falls back to INCLUDE_SYNTAX.REGEX for backwards compatibility.
+   * Uses PluginRegistry.detectIncludes() exclusively.
+   * Plugins MUST be loaded via PluginLoader.loadBuiltinPlugins() at extension activation.
    *
    * @param content - Content to search for includes
    * @param contextLocation - Where the content comes from (column-header, task-title, description)
    * @returns Array of detected include file paths
+   * @throws Error if plugin system is not available
    */
-  private static detectIncludesWithFallback(content: string, contextLocation: IncludeContextLocation): string[] {
-    try {
-      const registry = PluginRegistry.getInstance();
-      const plugins = registry.getAllImportPlugins();
-
-      // If plugins are loaded, use plugin-based detection
-      if (plugins.length > 0) {
-        const matches = registry.detectIncludes(content, { location: contextLocation });
-        return matches.map(m => m.filePath);
-      }
-    } catch (error) {
-      // Plugin system not available, fall through to regex fallback
-      console.warn('[MarkdownParser] Plugin detection failed, using regex fallback:', error);
-    }
-
-    // Fallback to direct regex matching
-    const matches = content.match(INCLUDE_SYNTAX.REGEX);
-    if (!matches) {
-      return [];
-    }
-
-    return matches.map(match => {
-      return match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-    });
+  private static detectIncludes(content: string, contextLocation: IncludeContextLocation): string[] {
+    const registry = PluginRegistry.getInstance();
+    const matches = registry.detectIncludes(content, { location: contextLocation });
+    return matches.map(m => m.filePath);
   }
 
   /**
    * Get include matches with full details using plugin system
    *
    * Returns IncludeMatch objects with position information for advanced processing.
-   * Falls back to creating match objects from regex results if plugins not loaded.
+   * Plugins MUST be loaded via PluginLoader.loadBuiltinPlugins() at extension activation.
    *
    * @param content - Content to search for includes
    * @param contextLocation - Where the content comes from
    * @returns Array of IncludeMatch objects
    */
   private static getIncludeMatches(content: string, contextLocation: IncludeContextLocation): IncludeMatch[] {
-    try {
-      const registry = PluginRegistry.getInstance();
-      const plugins = registry.getAllImportPlugins();
-
-      // If plugins are loaded, use plugin-based detection
-      if (plugins.length > 0) {
-        return registry.detectIncludes(content, { location: contextLocation });
-      }
-    } catch (error) {
-      // Plugin system not available, fall through to regex fallback
-    }
-
-    // Fallback: Create match objects from regex results
-    const matches: IncludeMatch[] = [];
-    const regex = new RegExp(INCLUDE_SYNTAX.REGEX.source, 'g');
-    let match;
-
-    while ((match = regex.exec(content)) !== null) {
-      matches.push({
-        pluginId: 'fallback-regex',
-        filePath: match[1].trim(),
-        fullMatch: match[0],
-        startIndex: match.index,
-        endIndex: match.index + match[0].length,
-        context: contextLocation
-      });
-    }
-
-    return matches;
+    const registry = PluginRegistry.getInstance();
+    return registry.detectIncludes(content, { location: contextLocation });
   }
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
@@ -241,8 +195,8 @@ export class MarkdownKanbanParser {
           const columnTitle = line.substring(3);
 
           // Check for include syntax in column header (location-based: column includes)
-          // Uses plugin system with fallback to regex for backwards compatibility
-          const includeFilePaths = this.detectIncludesWithFallback(columnTitle, 'column-header');
+          // Uses plugin system exclusively (no fallback)
+          const includeFilePaths = this.detectIncludes(columnTitle, 'column-header');
 
           if (includeFilePaths.length > 0) {
             // This is a column include - process included files as Marp presentations
@@ -416,8 +370,8 @@ export class MarkdownKanbanParser {
     for (const column of board.columns) {
       for (const task of column.tasks) {
         // Check if task title contains include syntax (location-based: task includes)
-        // Uses plugin system with fallback to regex for backwards compatibility
-        const taskIncludeFilePaths = this.detectIncludesWithFallback(task.title, 'task-title');
+        // Uses plugin system exclusively (no fallback)
+        const taskIncludeFilePaths = this.detectIncludes(task.title, 'task-title');
 
         if (taskIncludeFilePaths.length > 0) {
           // This is a task include - process included file (first line as title, rest as description)
@@ -472,7 +426,7 @@ export class MarkdownKanbanParser {
 
   private static detectRegularIncludes(board: KanbanBoard, includedFiles: string[]): void {
     // Scan all task descriptions for !!!include()!!! patterns (regular includes)
-    // Uses plugin system with fallback to regex for backwards compatibility
+    // Uses plugin system exclusively (no fallback)
 
     for (const column of board.columns) {
       for (const task of column.tasks) {
@@ -483,8 +437,8 @@ export class MarkdownKanbanParser {
 
         if (task.description) {
           // Track which regular includes this task uses
-          // Use plugin-based detection with fallback
-          const detectedFiles = this.detectIncludesWithFallback(task.description, 'description');
+          // Use plugin-based detection exclusively
+          const detectedFiles = this.detectIncludes(task.description, 'description');
           const taskIncludes: string[] = [];
 
           for (const includeFile of detectedFiles) {

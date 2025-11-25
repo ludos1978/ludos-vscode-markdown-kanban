@@ -7,15 +7,27 @@
 - [x] COMPLETED: PLUGIN ARCHITECTURE MIGRATION (Solution 1: Interface-Based Plugin Registry)
   - [x] PHASE 0: Document existing code features (see tmp/plugin-migration-features.md)
   - [x] PHASE 1: Create plugin interfaces (ImportPlugin.ts, ExportPlugin.ts)
-  - [x] PHASE 2: Create plugin implementations wrapping existing code
+  - [x] PHASE 2: Create plugin implementations
     - ColumnIncludePlugin, TaskIncludePlugin, RegularIncludePlugin
     - MarpExportPlugin
-  - [x] PHASE 3: Migrate FileFactory to use plugins (createIncludeViaPlugin method)
-  - [x] PHASE 4: Migrate markdownParser to use PluginRegistry.detectIncludes
-  - [x] PHASE 5: Plugins wrap existing code (IncludeFile classes preserved)
-  - [x] PHASE 6: Update documentation (agent/FUNCTIONS.md updated)
-  - NOTE: Plugins use wrapper pattern for backwards compatibility
-  - FILES: src/plugins/{interfaces,registry,import,export}/, PluginLoader.ts
+  - [x] PHASE 3: Migrate FileFactory to use plugins (createIncludeViaPlugin, createIncludeDirect methods)
+  - [x] PHASE 4: Migrate markdownParser to use PluginRegistry.detectIncludes (NO fallback)
+  - [x] PHASE 5: Unified IncludeFile class with fileType property
+    - DELETED: ColumnIncludeFile.ts, TaskIncludeFile.ts, RegularIncludeFile.ts
+    - All functionality consolidated into IncludeFile.ts
+  - [x] PHASE 6: Update all imports and usages
+    - Updated: kanbanWebviewPanel.ts, includeFileManager.ts, FileOperationVisitor.ts
+    - Updated: MarkdownFileRegistry.ts, files/index.ts
+  - ARCHITECTURE:
+    - IncludeFile.ts: Unified class with fileType='include-column'|'include-task'|'include-regular'
+    - Plugins create IncludeFile instances with appropriate fileType
+    - NO fallback code - plugins MUST be loaded at extension activation
+    - FileFactory.createIncludeDirect() for direct file creation
+    - FileFactory.createInclude() uses plugins for context-based creation
+  - FILES:
+    - src/plugins/{interfaces,registry,import,export}/, PluginLoader.ts
+    - src/files/IncludeFile.ts (unified, non-abstract)
+    - REMOVED: src/files/{ColumnIncludeFile,TaskIncludeFile,RegularIncludeFile}.ts
 
 - [ ] "move to column" from a task burger menu doesnt work.
 

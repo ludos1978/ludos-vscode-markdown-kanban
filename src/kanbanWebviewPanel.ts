@@ -27,10 +27,7 @@ import {
     FileChangeEvent,
     MarkdownFile,
     MainKanbanFile,
-    IncludeFile,
-    ColumnIncludeFile,
-    TaskIncludeFile,
-    RegularIncludeFile
+    IncludeFile
 } from './files';
 import { MainFileCoordinator, ChangeAnalysis, ChangeType } from './core/state-machine';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
@@ -1353,7 +1350,7 @@ export class KanbanWebviewPanel {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     // FOUNDATION-1: Registry handles normalization internally
-                    const file = this._fileRegistry.getByRelativePath(relativePath) as ColumnIncludeFile;
+                    const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
                     if (file) {
                         try {
                             // Reload from disk and parse to tasks
@@ -1412,7 +1409,7 @@ export class KanbanWebviewPanel {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
                         // FOUNDATION-1: Registry handles normalization internally
-                        const file = this._fileRegistry.getByRelativePath(relativePath) as TaskIncludeFile;
+                        const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
                         if (file) {
                             try {
                                 // Reload from disk and get content
@@ -1486,7 +1483,7 @@ export class KanbanWebviewPanel {
             const regularIncludes = mainFile.getIncludedFiles();
 
             for (const relativePath of regularIncludes) {
-                const file = this._fileRegistry.getByRelativePath(relativePath) as RegularIncludeFile;
+                const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
                 if (file) {
                     try {
                         // Reload from disk
@@ -1544,9 +1541,10 @@ export class KanbanWebviewPanel {
 
                     if (!this._fileRegistry.hasByRelativePath(relativePath)) {
 
-                        const columnInclude = this._fileFactory.createColumnInclude(
+                        const columnInclude = this._fileFactory.createIncludeDirect(
                             relativePath,
                             mainFile,
+                            'include-column',
                             false
                         );
 
@@ -1588,9 +1586,10 @@ export class KanbanWebviewPanel {
 
                         if (!this._fileRegistry.hasByRelativePath(relativePath)) {
 
-                            const taskInclude = this._fileFactory.createTaskInclude(
+                            const taskInclude = this._fileFactory.createIncludeDirect(
                                 relativePath,
                                 mainFile,
+                                'include-task',
                                 false
                             );
 
@@ -1633,9 +1632,10 @@ export class KanbanWebviewPanel {
 
             if (!this._fileRegistry.hasByRelativePath(relativePath)) {
 
-                const regularInclude = this._fileFactory.createRegularInclude(
+                const regularInclude = this._fileFactory.createIncludeDirect(
                     relativePath,
                     mainFile,
+                    'include-regular',
                     true // Regular includes are inline
                 );
 
@@ -1673,10 +1673,10 @@ export class KanbanWebviewPanel {
                 for (const relativePath of column.includeFiles) {
                     const file = this._fileRegistry.getByRelativePath(relativePath);
                     if (file && file.getFileType() === 'include-column') {
-                        // CRITICAL: Use the ColumnIncludeFile's updateTasks() method
+                        // CRITICAL: Use the IncludeFile's updateTasks() method
                         // which generates the correct PRESENTATION format (slides with --- separators)
                         // NOT task list markdown!
-                        const columnIncludeFile = file as ColumnIncludeFile;
+                        const columnIncludeFile = file as IncludeFile;
                         columnIncludeFile.updateTasks(column.tasks);
 
                     }
@@ -2347,14 +2347,14 @@ export class KanbanWebviewPanel {
     /**
      * Get all column include files
      */
-    private _getColumnIncludeFiles(): ColumnIncludeFile[] {
+    private _getColumnIncludeFiles(): IncludeFile[] {
         return this._fileRegistry.getColumnIncludeFiles();
     }
 
     /**
      * Get all task include files
      */
-    private _getTaskIncludeFiles(): TaskIncludeFile[] {
+    private _getTaskIncludeFiles(): IncludeFile[] {
         return this._fileRegistry.getTaskIncludeFiles();
     }
 
@@ -2965,9 +2965,10 @@ export class KanbanWebviewPanel {
             }
 
             // ALWAYS create fresh instance (Solution 3)
-            const columnInclude = this._fileFactory.createColumnInclude(
+            const columnInclude = this._fileFactory.createIncludeDirect(
                 relativePath,
                 mainFile,
+                'include-column',
                 false
             );
             columnInclude.setColumnId(column.id);
