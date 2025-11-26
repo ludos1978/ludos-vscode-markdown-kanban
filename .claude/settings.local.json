@@ -46,7 +46,13 @@
       "Bash(MARP_HANDOUT=true MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=4 npx @marp-team/marp-cli:*)",
       "Bash(node /tmp/test-board.js:*)",
       "Bash(node /tmp/test-frommarkdown.js:*)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(grep:*)",
+      "Bash(node /tmp/test-column-markers.js:*)",
+      "Bash(node /tmp/test-real-content.js:*)",
+      "Bash(node /tmp/test-board-parsing.js:*)",
+      "Bash(node /tmp/test-export-simulation.js:*)",
+      "Bash(node /tmp/test-comment-regex.js:*)"
     ],
     "deny": [],
     "ask": []

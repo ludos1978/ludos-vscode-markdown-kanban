@@ -15,11 +15,20 @@ export class TagUtils {
 
     /**
      * Remove tags from text based on visibility setting
+     * IMPORTANT: Leading whitespace is structurally significant in kanban markdown
+     * (indented ## is slide content, non-indented ## is column header)
      */
     static filterTagsFromText(text: string, visibility: TagVisibility): string {
         if (!text) {
             return text;
         }
+
+        // Preserve leading whitespace - it's structurally significant!
+        const leadingMatch = text.match(/^(\s*)/);
+        const leadingWhitespace = leadingMatch ? leadingMatch[1] : '';
+        const contentPart = text.substring(leadingWhitespace.length);
+
+        let processed: string;
 
         switch (visibility) {
             case 'all':
@@ -28,42 +37,48 @@ export class TagUtils {
 
             case 'allexcludinglayout':
                 // Remove layout tags (#span, #row, #stack)
-                return text
+                processed = contentPart
                     .replace(this.ROW_TAG_PATTERN, '')
                     .replace(this.SPAN_TAG_PATTERN, '')
                     .replace(this.STACK_TAG_PATTERN, '')
-                    .replace(/\s+/g, ' ')
+                    .replace(/  +/g, ' ')  // Collapse multiple spaces (not all whitespace)
                     .trim();
+                break;
 
             case 'customonly':
                 // Keep only custom tags and @ tags
-                // For simplicity in export, we'll remove all configured tags
-                // This is a simplified version - in production you'd check against configured tags
-                return this.removeConfiguredTags(text);
+                processed = this.removeConfiguredTags(contentPart);
+                break;
 
             case 'mentionsonly':
                 // Remove all # tags, keep only @ tags
-                return text
+                processed = contentPart
                     .replace(this.BASIC_TAG_PATTERN, '')
-                    .replace(/\s+/g, ' ')
+                    .replace(/  +/g, ' ')  // Collapse multiple spaces (not all whitespace)
                     .trim();
+                break;
 
             case 'none':
                 // Remove all tags
-                return text
+                processed = contentPart
                     .replace(this.BASIC_TAG_PATTERN, '')
                     .replace(this.AT_TAG_PATTERN, '')
-                    .replace(/\s+/g, ' ')
+                    .replace(/  +/g, ' ')  // Collapse multiple spaces (not all whitespace)
                     .trim();
+                break;
 
             default:
                 return text;
         }
+
+        // Restore leading whitespace
+        return leadingWhitespace + processed;
     }
 
     /**
      * Remove configured tags (simplified version)
      * In a full implementation, this would check against the actual configured tags
+     * NOTE: Caller passes content WITHOUT leading whitespace
      */
     private static removeConfiguredTags(text: string): string {
         // Common configured tags to remove
@@ -81,7 +96,8 @@ export class TagUtils {
             result = result.replace(pattern, '');
         }
 
-        return result.replace(/\s+/g, ' ').trim();
+        // Collapse multiple spaces (not all whitespace), trim trailing
+        return result.replace(/  +/g, ' ').trim();
     }
 
     /**
