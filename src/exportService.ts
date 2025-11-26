@@ -365,6 +365,23 @@ export class ExportService {
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
 
+        // Convert to presentation format if requested
+        // This is needed for include files that are in kanban format
+        if (convertToPresentation) {
+            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
+
+            filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
+                includeMarpDirectives: false,  // Include files don't need their own YAML frontmatter
+                marp: {
+                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
+                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
+                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
+                }
+            });
+        }
+
         return {
             exportedContent: filteredContent,
             notIncludedAssets,
@@ -396,7 +413,6 @@ export class ExportService {
         // Define include patterns and their replacement formats
         // If mergeIncludes is true, don't write separate files for ANY includes
         // Otherwise, write separate files for all include types
-        // When converting to presentation, don't add kanban-specific syntax (- [ ], ##)
         const includePatterns = [
             {
                 pattern: INCLUDE_SYNTAX.REGEX,
@@ -407,21 +423,13 @@ export class ExportService {
             {
                 pattern: this.TASK_INCLUDE_PATTERN,
                 // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
-                // When converting to presentation, don't add - [ ] prefix (presentations don't use checkboxes)
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') =>
-                    convertToPresentation
-                        ? `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`
-                        : `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },
             {
                 pattern: this.COLUMN_INCLUDE_PATTERN,
-                // When converting to presentation, don't add ## prefix (presentations use --- separators)
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') =>
-                    convertToPresentation
-                        ? `${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`
-                        : `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'columninclude' // Internal type identifier (position-based detection)
             }
