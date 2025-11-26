@@ -188,6 +188,7 @@ export class MarpExportService {
             // Log any output or errors from the Marp process
             if (marpProcess.stdout) {
                 marpProcess.stdout.on('data', (data) => {
+                    console.log(`[kanban.MarpExportService.stdout] ${data.toString()}`);
                 });
             }
 

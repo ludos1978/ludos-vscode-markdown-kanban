@@ -43,7 +43,10 @@
       "Bash(export MARP_HANDOUT_LAYOUT=landscape)",
       "Bash(export MARP_HANDOUT_SLIDES_PER_PAGE=2)",
       "Bash(export MARP_HANDOUT_DIRECTION=vertical)",
-      "Bash(MARP_HANDOUT=true MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=4 npx @marp-team/marp-cli:*)"
+      "Bash(MARP_HANDOUT=true MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=4 npx @marp-team/marp-cli:*)",
+      "Bash(node /tmp/test-board.js:*)",
+      "Bash(node /tmp/test-frommarkdown.js:*)",
+      "Bash(xxd:*)"
     ],
     "deny": [],
     "ask": []

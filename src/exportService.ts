@@ -365,23 +365,6 @@ export class ExportService {
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
 
-        // Convert to presentation format if requested
-        // This is needed for include files that are in kanban format
-        if (convertToPresentation) {
-            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
-            const config = ConfigurationService.getInstance();
-            const marpConfig = config.getConfig('marp');
-
-            filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
-                includeMarpDirectives: false,  // Include files don't need their own YAML frontmatter
-                marp: {
-                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
-                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
-                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
-                }
-            });
-        }
-
         return {
             exportedContent: filteredContent,
             notIncludedAssets,

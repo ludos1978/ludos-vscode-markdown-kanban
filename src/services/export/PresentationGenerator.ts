@@ -222,8 +222,9 @@ export class PresentationGenerator {
             }
 
             // Task: - [ ] or - [x] (non-indented only)
-            if (line.match(/^- \[[x ]\] /) && !line.startsWith(' ')) {
-                const taskTitle = line.replace(/^- \[[x ]\] /, '');
+            // Note: trailing space is optional (empty tasks may not have it)
+            if (line.match(/^- \[[x ]\]( |$)/) && !line.startsWith(' ')) {
+                const taskTitle = line.replace(/^- \[[x ]\] ?/, '');
 
                 // Collect description (indented lines)
                 const descriptionLines: string[] = [];
@@ -233,8 +234,9 @@ export class PresentationGenerator {
                     const nextLine = lines[i];
 
                     // Stop at next non-indented column or task
+                    // Note: trailing space is optional (empty tasks may not have it)
                     if (!nextLine.startsWith(' ') &&
-                        (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\] /))) {
+                        (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\]( |$)/))) {
                         break;
                     }
 
