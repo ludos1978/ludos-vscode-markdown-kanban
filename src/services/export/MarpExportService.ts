@@ -164,13 +164,16 @@ export class MarpExportService {
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
             // Build environment with handout settings if enabled
+            // Handout mode only applies to PDF output - for HTML, generate normal presentation
             const env: NodeJS.ProcessEnv = { ...process.env };
-            if (options.handout) {
+            if (options.handout && options.format === 'pdf') {
                 env.MARP_HANDOUT = 'true';
                 env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
                 env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
                 env.MARP_HANDOUT_DIRECTION = options.handoutDirection || 'horizontal';
-                console.log(`[kanban.MarpExportService] Handout mode enabled: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}, direction=${options.handoutDirection}`);
+                console.log(`[kanban.MarpExportService] Handout mode enabled for PDF: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}, direction=${options.handoutDirection}`);
+            } else if (options.handout && options.format !== 'pdf') {
+                console.log(`[kanban.MarpExportService] Handout mode skipped for ${options.format} format (only active for PDF)`);
             }
 
             // Spawn Marp as a detached background process

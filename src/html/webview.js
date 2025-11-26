@@ -5438,14 +5438,17 @@ function handleUseMarpChange() {
 }
 
 /**
- * Handle Marp output format change - enable/disable pptx-editable checkbox
+ * Handle Marp output format change - enable/disable pptx-editable and handout checkboxes
  */
 function handleMarpOutputFormatChange() {
     const outputFormatSelect = document.getElementById('marp-output-format');
     const pptxEditableCheckbox = document.getElementById('marp-pptx-editable');
+    const handoutCheckbox = document.getElementById('marp-handout');
+    const handoutRow = document.getElementById('marp-handout-row');
 
     if (outputFormatSelect && pptxEditableCheckbox) {
         const isPptx = outputFormatSelect.value === 'pptx';
+        const isPdf = outputFormatSelect.value === 'pdf';
 
         if (isPptx) {
             // Enable checkbox for PowerPoint format
@@ -5454,6 +5457,24 @@ function handleMarpOutputFormatChange() {
             // Disable and uncheck for other formats
             pptxEditableCheckbox.disabled = true;
             pptxEditableCheckbox.checked = false;
+        }
+
+        // Handout is only available for PDF format
+        if (handoutCheckbox && handoutRow) {
+            if (isPdf) {
+                // Enable handout option for PDF format
+                handoutCheckbox.disabled = false;
+                handoutRow.style.opacity = '1';
+                handoutRow.title = '';
+            } else {
+                // Disable and uncheck handout for other formats
+                handoutCheckbox.disabled = true;
+                handoutCheckbox.checked = false;
+                handoutRow.style.opacity = '0.5';
+                handoutRow.title = 'Handout is only available for PDF format';
+                // Hide the layout/direction options when disabled
+                handleMarpHandoutChange();
+            }
         }
     }
 }

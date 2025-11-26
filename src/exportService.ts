@@ -396,6 +396,7 @@ export class ExportService {
         // Define include patterns and their replacement formats
         // If mergeIncludes is true, don't write separate files for ANY includes
         // Otherwise, write separate files for all include types
+        // When converting to presentation, don't add kanban-specific syntax (- [ ], ##)
         const includePatterns = [
             {
                 pattern: INCLUDE_SYNTAX.REGEX,
@@ -406,13 +407,21 @@ export class ExportService {
             {
                 pattern: this.TASK_INCLUDE_PATTERN,
                 // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
+                // When converting to presentation, don't add - [ ] prefix (presentations don't use checkboxes)
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') =>
+                    convertToPresentation
+                        ? `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`
+                        : `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },
             {
                 pattern: this.COLUMN_INCLUDE_PATTERN,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
+                // When converting to presentation, don't add ## prefix (presentations use --- separators)
+                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') =>
+                    convertToPresentation
+                        ? `${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`
+                        : `## ${prefixTitle}${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}${suffix}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'columninclude' // Internal type identifier (position-based detection)
             }
