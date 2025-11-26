@@ -211,9 +211,11 @@ export class ChangeStateMachine {
         // If already processing, queue the event
         if (this._isProcessing) {
             this._eventQueue.push(event);
+            const currentState = this._currentState;
+            const currentEventType = this._currentContext?.event?.type || 'unknown';
             return {
                 success: false,
-                error: new Error('Event queued - state machine busy'),
+                error: new Error(`Event queued - state machine busy (currentState: ${currentState}, processing: ${currentEventType}, queued: ${event.type})`),
                 context: this._createEmptyContext(event),
                 duration: 0
             };
@@ -963,7 +965,7 @@ export class ChangeStateMachine {
                     }
 
                     console.log(`[State:LOADING_NEW] Creating new column include file instance for: "${relativePath}"`);
-                    const columnInclude = fileFactory.createColumnInclude(relativePath, mainFile, false);
+                    const columnInclude = fileFactory.createIncludeDirect(relativePath, mainFile, 'include-column', false);
                     columnInclude.setColumnId(targetColumn.id);
                     columnInclude.setColumnTitle(targetColumn.title);
                     this._fileRegistry.register(columnInclude);
