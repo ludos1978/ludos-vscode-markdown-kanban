@@ -17,34 +17,6 @@ import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
 import { AssetHandler } from './services/assets/AssetHandler';
 
-// DEBUG: Export pipeline state logging
-const DEBUG_EXPORT_PIPELINE = true;
-let debugLogCounter = 0;
-
-function debugWriteExportState(targetFolder: string, stage: string, content: string, extra?: string): void {
-    if (!DEBUG_EXPORT_PIPELINE) return;
-    const logDir = path.join(targetFolder, '_export-debug-logs');
-    if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-    }
-    const timestamp = Date.now();
-    const counter = String(++debugLogCounter).padStart(3, '0');
-    const filename = `${counter}-${stage}.md`;
-    const logPath = path.join(logDir, filename);
-
-    let logContent = `<!-- DEBUG LOG: ${stage} at ${new Date().toISOString()} -->\n`;
-    if (extra) {
-        logContent += `<!-- ${extra} -->\n`;
-    }
-    logContent += `<!-- Has :--: = ${content.includes(':--:')} -->\n`;
-    logContent += `<!-- Has :--- = ${content.includes(':---')} -->\n`;
-    logContent += `<!-- Has ---: = ${content.includes('---:')} -->\n\n`;
-    logContent += content;
-
-    fs.writeFileSync(logPath, logContent, 'utf8');
-    console.log(`[ExportDebug] Wrote ${stage} to ${logPath}`);
-}
-
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
 // Note: ExportScope type is defined in './services/OperationOptions' for unified usage
@@ -1144,9 +1116,6 @@ export class ExportService {
     }> {
         const mediaFolder = path.join(exportFolder, `${fileBasename}-Media`);
 
-        // DEBUG LOG: processMarkdownContent input
-        debugWriteExportState(exportFolder, 'processMarkdown-01-input', content, `convertToPresentation: ${convertToPresentation}`);
-
         // Find all assets in the markdown
         const assets = this.findAssets(content, sourceDir);
 
@@ -1194,14 +1163,8 @@ export class ExportService {
         // This ensures all markdown files (main and included) get tag filtering
         let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
 
-        // DEBUG LOG: After tag filtering
-        debugWriteExportState(exportFolder, 'processMarkdown-02-after-tagfilter', filteredContent, 'After tag filtering');
-
         // Apply content transformations (speaker notes, HTML comments, HTML content)
         filteredContent = this.applyContentTransformations(filteredContent, options);
-
-        // DEBUG LOG: After content transformations
-        debugWriteExportState(exportFolder, 'processMarkdown-03-after-transforms', filteredContent, 'After content transformations');
 
         // Convert to presentation format if requested
         if (convertToPresentation) {
@@ -1217,9 +1180,6 @@ export class ExportService {
                     localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
                 }
             });
-
-            // DEBUG LOG: After presentation conversion
-            debugWriteExportState(exportFolder, 'processMarkdown-04-after-fromMarkdown', filteredContent, 'After PresentationGenerator.fromMarkdown');
         }
 
         return {
@@ -1809,14 +1769,8 @@ export class ExportService {
         const sourceBasename = path.basename(sourcePath, '.md');
         const targetFolder = options.targetFolder || path.join(os.tmpdir(), 'kanban-export');
 
-        // DEBUG: Reset counter for each export
-        debugLogCounter = 0;
-
         let result = content;
         let notIncludedAssets: ExportAssetInfo[] = [];
-
-        // DEBUG LOG: Initial input
-        debugWriteExportState(targetFolder, '01-input-content', content, `Source: ${sourcePath}`);
 
         // ROUTING LOGIC:
         // - Converting format (presentation/marp) WITH includes → Use file-based pipeline
@@ -1870,15 +1824,12 @@ export class ExportService {
                 }
             });
 
-            // DEBUG LOG: After board-based conversion
-            debugWriteExportState(targetFolder, '02-after-fromBoard', result, 'BOARD-BASED PATH');
-
             // Rewrite links if requested
             if (options.linkHandlingMode !== 'no-modify') {
                 result = this.rewriteLinksForExport(
                     result,
                     sourceDir,
-                    options.targetFolder || path.join(os.tmpdir(), 'kanban-export'),
+                    targetFolder,
                     sourceBasename,
                     true
                 );
@@ -1908,9 +1859,6 @@ export class ExportService {
             result = processed.exportedContent;
             notIncludedAssets = processed.notIncludedAssets;
 
-            // DEBUG LOG: After file-based processing
-            debugWriteExportState(targetFolder, '02-after-processMarkdown', result, 'FILE-BASED PATH');
-
         } else {
             // Simple path: tag filtering and link rewriting (no asset packing)
             result = this.applyTagFiltering(result, options.tagVisibility);
@@ -1928,13 +1876,7 @@ export class ExportService {
                     true
                 );
             }
-
-            // DEBUG LOG: After simple path
-            debugWriteExportState(targetFolder, '02-after-simple-path', result, 'SIMPLE PATH');
         }
-
-        // DEBUG LOG: Final result
-        debugWriteExportState(targetFolder, '03-final-result', result, `Format: ${options.format}`);
 
         return { content: result, notIncludedAssets };
     }

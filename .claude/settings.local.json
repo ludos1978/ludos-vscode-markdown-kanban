@@ -52,7 +52,8 @@
       "Bash(node /tmp/test-real-content.js:*)",
       "Bash(node /tmp/test-board-parsing.js:*)",
       "Bash(node /tmp/test-export-simulation.js:*)",
-      "Bash(node /tmp/test-comment-regex.js:*)"
+      "Bash(node /tmp/test-comment-regex.js:*)",
+      "Bash(node /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/esbuild.js:*)"
     ],
     "deny": [],
     "ask": []
