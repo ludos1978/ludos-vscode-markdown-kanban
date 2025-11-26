@@ -5219,7 +5219,6 @@ function executeUnifiedExport() {
     let marpHandout = false;
     let marpHandoutLayout = 'portrait';
     let marpHandoutSlidesPerPage = 1;
-    let marpHandoutWritingSpace = false;
 
     if (useMarp) {
         marpOutputFormat = document.getElementById('marp-output-format')?.value || 'html';
@@ -5228,9 +5227,12 @@ function executeUnifiedExport() {
         marpPreview = document.getElementById('marp-preview')?.checked || false;
         marpPptxEditable = document.getElementById('marp-pptx-editable')?.checked || false;
         marpHandout = document.getElementById('marp-handout')?.checked || false;
-        marpHandoutLayout = document.getElementById('marp-handout-layout')?.value || 'portrait';
-        marpHandoutSlidesPerPage = parseInt(document.getElementById('marp-handout-slides-per-page')?.value || '1', 10);
-        marpHandoutWritingSpace = document.getElementById('marp-handout-writing-space')?.checked || false;
+
+        // Parse handout preset (e.g., "portrait-1", "landscape-2", "portrait-4")
+        const handoutPreset = document.getElementById('marp-handout-preset')?.value || 'portrait-1';
+        const [layout, slides] = handoutPreset.split('-');
+        marpHandoutLayout = layout || 'portrait';
+        marpHandoutSlidesPerPage = parseInt(slides || '1', 10);
     }
 
     // Close modal
@@ -5272,7 +5274,7 @@ function executeUnifiedExport() {
         marpHandout: useMarp && marpHandout ? true : undefined,
         marpHandoutLayout: useMarp && marpHandout ? marpHandoutLayout : undefined,
         marpHandoutSlidesPerPage: useMarp && marpHandout ? marpHandoutSlidesPerPage : undefined,
-        marpHandoutWritingSpace: useMarp && marpHandout && marpHandoutWritingSpace ? true : undefined
+        marpHandoutPdf: useMarp && marpHandout ? true : undefined  // Handout always outputs PDF
     };
 
     // Save last export settings for quick re-export
@@ -5457,21 +5459,9 @@ function handleMarpOutputFormatChange() {
 function handleMarpHandoutChange() {
     const handoutCheckbox = document.getElementById('marp-handout');
     const layoutContainer = document.getElementById('handout-layout-container');
-    const slidesContainer = document.getElementById('handout-slides-container');
-    const optionsRow = document.getElementById('marp-handout-options-row');
 
-    if (handoutCheckbox && layoutContainer && slidesContainer && optionsRow) {
-        const isHandout = handoutCheckbox.checked;
-
-        if (isHandout) {
-            layoutContainer.style.display = 'block';
-            slidesContainer.style.display = 'block';
-            optionsRow.style.display = 'flex';
-        } else {
-            layoutContainer.style.display = 'none';
-            slidesContainer.style.display = 'none';
-            optionsRow.style.display = 'none';
-        }
+    if (handoutCheckbox && layoutContainer) {
+        layoutContainer.style.display = handoutCheckbox.checked ? 'block' : 'none';
     }
 }
 
@@ -6199,6 +6189,7 @@ function toggleMarpClass(scope, id, columnId, className, classScope) {
  */
 function handleMarpStatus(status) {
     const statusText = document.getElementById('marp-status-text');
+    const enginePathEl = document.getElementById('marp-engine-path');
     if (!statusText) {
         console.error('[kanban.webview] marp-status-text element not found');
         return;
@@ -6221,6 +6212,13 @@ function handleMarpStatus(status) {
     } else {
         statusText.textContent = '⚠ Unknown Status';
         statusText.classList.add('status-warning');
+    }
+
+    // Display engine path
+    if (enginePathEl && status.enginePath) {
+        const engineExists = status.engineFileExists ? '✓' : '✗';
+        enginePathEl.textContent = `Engine: ${engineExists} ${status.enginePath}`;
+        enginePathEl.title = status.enginePath;
     }
 }
 

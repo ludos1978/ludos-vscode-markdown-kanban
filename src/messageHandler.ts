@@ -4293,6 +4293,7 @@ export class MessageHandler {
             const marpExtensionStatus = MarpExtensionService.getMarpStatus();
             const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
             const engineFileExists = MarpExportService.engineFileExists();
+            const enginePath = MarpExportService.getEnginePath();
 
             const panel = this._getWebviewPanel();
             if (panel && panel._panel && panel._panel.webview) {
@@ -4301,7 +4302,8 @@ export class MessageHandler {
                     extensionInstalled: marpExtensionStatus.installed,
                     extensionVersion: marpExtensionStatus.version,
                     cliAvailable: marpCliAvailable,
-                    engineFileExists: engineFileExists
+                    engineFileExists: engineFileExists,
+                    enginePath: enginePath
                 });
             } else {
                 console.error('[kanban.messageHandler.handleCheckMarpStatus] No webview panel available');

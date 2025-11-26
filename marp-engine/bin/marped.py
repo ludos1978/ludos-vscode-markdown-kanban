@@ -302,21 +302,41 @@ def run_app(input_filenames, args):
 			postprocess_script = script_dir / "handout-postprocess.js"
 
 			if postprocess_script.exists():
+				# Determine output path for handout
+				if args.handout_pdf:
+					# For PDF output, replace .html with -handout.pdf
+					handout_output = str(marp_output_filepath).replace('.html', '-handout.pdf')
+				else:
+					# For HTML, overwrite in place
+					handout_output = str(marp_output_filepath)
+
 				postprocess_params = [
 					'node',
 					str(postprocess_script),
-					str(marp_output_filepath)
+					str(marp_output_filepath),
+					handout_output
 				]
+
+				# Add --pdf flag if requested
+				if args.handout_pdf:
+					postprocess_params.append('--pdf')
+
 				postprocess_env = os.environ.copy()
 				postprocess_env['MARP_HANDOUT_LAYOUT'] = args.handout_layout
 				postprocess_env['MARP_HANDOUT_SLIDES_PER_PAGE'] = str(args.handout_slides_per_page)
+				if args.handout_pdf:
+					postprocess_env['MARP_HANDOUT_OUTPUT_PDF'] = 'true'
 
 				try:
 					result = subprocess.run(postprocess_params, env=postprocess_env, capture_output=True, text=True)
 					if result.returncode == 0:
-						print(f"[Handout] Post-processing complete")
+						print(f"[Handout] Post-processing complete: {handout_output}")
+						if result.stdout:
+							print(result.stdout)
 					else:
 						print(f"[Handout] Post-processing error: {result.stderr}")
+						if result.stdout:
+							print(result.stdout)
 				except Exception as e:
 					print(f"[Handout] Post-processing failed: {e}")
 			else:
@@ -396,5 +416,6 @@ if __name__ == "__main__":
 	parser.add_argument('-H', '--handout', dest='handout', action='store_true', help='generate handout format (slides + notes)')
 	parser.add_argument('--handout-layout', dest='handout_layout', choices=['portrait', 'landscape'], default='portrait', help='handout layout (default: portrait)')
 	parser.add_argument('--handout-slides-per-page', dest='handout_slides_per_page', type=int, choices=[1, 2, 3, 4, 6], default=1, help='slides per page for handout (default: 1)')
+	parser.add_argument('--handout-pdf', dest='handout_pdf', action='store_true', help='generate handout as PDF (requires puppeteer)')
 	args = parser.parse_args()
 	run_app(args.positional_arg, args)

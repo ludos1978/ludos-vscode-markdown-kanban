@@ -29,7 +29,15 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "WebSearch",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(npx @marp-team/marp-cli:*)",
+      "Bash(node marp-engine/handout-postprocess.js:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(python3:*)",
+      "Bash(/Users/rspoerri/_SYNC/_SYSTEM/py312-venv/bin/python3:*)",
+      "Bash(open:*)",
+      "Bash(MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=2 node:*)"
     ],
     "deny": [],
     "ask": []

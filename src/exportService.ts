@@ -74,10 +74,10 @@ export interface NewExportOptions {
     marpEnginePath?: string;
     marpWatch?: boolean;            // Run Marp in watch mode
     marpPptxEditable?: boolean;     // Use --pptx-editable flag for PowerPoint exports
-    marpHandout?: boolean;          // Generate handout format (slides + notes)
+    marpHandout?: boolean;          // Generate handout PDF (slides + notes)
     marpHandoutLayout?: 'portrait' | 'landscape';  // Handout page layout
-    marpHandoutSlidesPerPage?: 1 | 2 | 3 | 4 | 6;  // Slides per page in handout
-    marpHandoutWritingSpace?: boolean;  // Include writing lines in handout
+    marpHandoutSlidesPerPage?: 1 | 2 | 4;  // Slides per page in handout (1=portrait, 2=landscape, 4=portrait)
+    marpHandoutPdf?: boolean;  // Always true when handout is enabled
 
     // CONTENT TRANSFORMATIONS
     speakerNoteMode?: 'comment' | 'keep' | 'remove';  // How to handle ;; speaker notes
@@ -2046,7 +2046,7 @@ export class ExportService {
                     handout: options.marpHandout,
                     handoutLayout: options.marpHandoutLayout,
                     handoutSlidesPerPage: options.marpHandoutSlidesPerPage,
-                    handoutWritingSpace: options.marpHandoutWritingSpace
+                    handoutPdf: options.marpHandoutPdf
                 });
 
                 // DON'T cleanup in watch mode - Marp needs the preprocessed file to continue watching
@@ -2084,7 +2084,7 @@ export class ExportService {
                     handout: options.marpHandout,
                     handoutLayout: options.marpHandoutLayout,
                     handoutSlidesPerPage: options.marpHandoutSlidesPerPage,
-                    handoutWritingSpace: options.marpHandoutWritingSpace
+                    handoutPdf: options.marpHandoutPdf
                 });
                 return {
                     success: true,

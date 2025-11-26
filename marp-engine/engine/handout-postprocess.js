@@ -7,15 +7,25 @@
  *
  * Usage:
  *   node handout-postprocess.js input.html [output.html] [options]
+ *   node handout-postprocess.js input.html --pdf output.pdf
  *
  * Options (via environment variables):
  *   MARP_HANDOUT_LAYOUT=portrait|landscape
  *   MARP_HANDOUT_SLIDES_PER_PAGE=1|2|3|4|6
  *   MARP_HANDOUT_WRITING_SPACE=true
+ *   MARP_HANDOUT_OUTPUT_PDF=true
  */
 
 const fs = require('fs');
 const path = require('path');
+
+// Try to load puppeteer (optional for PDF generation)
+let puppeteer = null;
+try {
+  puppeteer = require('puppeteer');
+} catch (e) {
+  // Puppeteer not available - PDF generation won't work
+}
 
 // Default options
 const defaultOptions = {
@@ -24,7 +34,8 @@ const defaultOptions = {
   includeWritingSpace: false,
   writingSpaceLines: 6,
   slideNumbering: true,
-  pageSize: 'A4'
+  pageSize: 'A4',
+  outputPdf: false
 };
 
 /**
@@ -37,7 +48,8 @@ function getOptionsFromEnv() {
     slidesPerPage: parseInt(process.env.MARP_HANDOUT_SLIDES_PER_PAGE || '1', 10),
     includeWritingSpace: process.env.MARP_HANDOUT_WRITING_SPACE === 'true',
     slideNumbering: process.env.MARP_HANDOUT_SLIDE_NUMBERING !== 'false',
-    pageSize: process.env.MARP_HANDOUT_PAGE_SIZE || defaultOptions.pageSize
+    pageSize: process.env.MARP_HANDOUT_PAGE_SIZE || defaultOptions.pageSize,
+    outputPdf: process.env.MARP_HANDOUT_OUTPUT_PDF === 'true'
   };
 }
 
@@ -61,15 +73,32 @@ function extractSlidesAndNotes(html) {
   });
 
   // Extract speaker notes (Marp puts them in different ways depending on template)
-  // Pattern 1: <aside class="marp-note">...</aside>
-  const noteRegex = /<aside[^>]*class="[^"]*marp-note[^"]*"[^>]*>([\s\S]*?)<\/aside>/gi;
+  // Pattern 1: <div class="bespoke-marp-note" data-index="N">...</div>
+  // Notes are indexed by slide number in data-index attribute
+  const noteRegex = /<div[^>]*class="[^"]*bespoke-marp-note[^"]*"[^>]*data-index="(\d+)"[^>]*>([\s\S]*?)<\/div>/gi;
+  const noteMap = new Map();
   let noteMatch;
   while ((noteMatch = noteRegex.exec(html)) !== null) {
-    notes.push(noteMatch[1].trim());
+    const index = parseInt(noteMatch[1], 10);
+    const content = noteMatch[2].replace(/<[^>]+>/g, '').trim(); // Strip HTML tags
+    noteMap.set(index, content);
   }
 
-  // Pattern 2: <!-- presenter notes in comments -->
-  // These are usually stripped, but let's check anyway
+  // Convert map to array, filling gaps with empty strings
+  const maxIndex = Math.max(...noteMap.keys(), -1);
+  for (let i = 0; i <= maxIndex; i++) {
+    notes.push(noteMap.get(i) || '');
+  }
+
+  // Pattern 2: <aside class="marp-note">...</aside> (older Marp versions)
+  if (notes.length === 0) {
+    const asideNoteRegex = /<aside[^>]*class="[^"]*marp-note[^"]*"[^>]*>([\s\S]*?)<\/aside>/gi;
+    while ((noteMatch = asideNoteRegex.exec(html)) !== null) {
+      notes.push(noteMatch[1].trim());
+    }
+  }
+
+  // Pattern 3: <!-- presenter notes in comments --> (fallback)
   if (notes.length === 0) {
     const commentNoteRegex = /<!--\s*([\s\S]*?)\s*-->/g;
     let commentMatch;
@@ -350,8 +379,13 @@ function getHandoutStyles(options) {
       width: 100%;
     }
 
-    .marp-handout-grid-2 { grid-template-columns: 1fr 1fr; }
+    /* 2 slides per page - landscape: 2 rows, each with slide + notes side by side */
+    .marp-handout-grid-2 {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
     .marp-handout-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    /* 4 slides per page - portrait: 2x2 grid */
     .marp-handout-grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
     .marp-handout-grid-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
 
@@ -362,16 +396,33 @@ function getHandoutStyles(options) {
       overflow: hidden;
     }
 
+    /* For 2 slides per page (landscape), arrange slide and notes side by side */
+    .marp-handout-grid-2 .marp-handout-multi-slide-item {
+      flex-direction: row;
+    }
+
+    .marp-handout-grid-2 .marp-handout-slide-mini {
+      flex: 0 0 50%;
+    }
+
+    .marp-handout-grid-2 .marp-handout-notes-mini {
+      flex: 1;
+    }
+
     .marp-handout-slide-mini {
       flex: 0 0 60%;
       position: relative;
       overflow: hidden;
       background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .marp-handout-slide-mini svg {
       width: 100% !important;
       height: auto !important;
+      max-height: 100%;
     }
 
     .slide-number-mini {
@@ -469,9 +520,81 @@ ${pages.join('\n')}
 }
 
 /**
- * Process a file
+ * Generate PDF from HTML using Puppeteer
  */
-function processFile(inputPath, outputPath, options) {
+async function generatePdf(htmlContent, outputPath, options) {
+  if (!puppeteer) {
+    throw new Error('Puppeteer is required for PDF generation. Install with: npm install puppeteer');
+  }
+
+  const isPortrait = options.layout === 'portrait';
+  const pageSize = options.pageSize || 'A4';
+
+  console.log(`[Handout] Generating PDF: ${outputPath}`);
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+    // Wait a bit for any SVG rendering
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    await page.pdf({
+      path: outputPath,
+      format: pageSize,
+      landscape: !isPortrait,
+      printBackground: true,
+      margin: {
+        top: '10mm',
+        bottom: '10mm',
+        left: '10mm',
+        right: '10mm'
+      }
+    });
+
+    console.log(`[Handout] PDF written: ${outputPath}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * Process a file (async version that supports PDF output)
+ */
+async function processFile(inputPath, outputPath, options) {
+  console.log(`[Handout] Processing: ${inputPath}`);
+
+  const inputHtml = fs.readFileSync(inputPath, 'utf-8');
+  const outputHtml = transformToHandout(inputHtml, options);
+
+  // Determine output path and type
+  let outPath = outputPath || inputPath;
+  const isPdfOutput = options.outputPdf || outPath.toLowerCase().endsWith('.pdf');
+
+  if (isPdfOutput) {
+    // Generate PDF
+    if (!outPath.toLowerCase().endsWith('.pdf')) {
+      outPath = outPath.replace(/\.html?$/i, '.pdf');
+    }
+    await generatePdf(outputHtml, outPath, options);
+  } else {
+    // Write HTML
+    fs.writeFileSync(outPath, outputHtml, 'utf-8');
+    console.log(`[Handout] HTML written: ${outPath}`);
+  }
+
+  return outPath;
+}
+
+/**
+ * Process a file (sync version for backward compatibility - HTML only)
+ */
+function processFileSync(inputPath, outputPath, options) {
   console.log(`[Handout] Processing: ${inputPath}`);
 
   const inputHtml = fs.readFileSync(inputPath, 'utf-8');
@@ -488,6 +611,8 @@ function processFile(inputPath, outputPath, options) {
 module.exports = {
   transformToHandout,
   processFile,
+  processFileSync,
+  generatePdf,
   getOptionsFromEnv,
   defaultOptions
 };
@@ -497,23 +622,50 @@ if (require.main === module) {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log('Usage: node handout-postprocess.js input.html [output.html]');
+    console.log('Usage: node handout-postprocess.js input.html [output.html|output.pdf]');
+    console.log('       node handout-postprocess.js input.html --pdf [output.pdf]');
     console.log('');
     console.log('Environment variables:');
     console.log('  MARP_HANDOUT_LAYOUT=portrait|landscape');
     console.log('  MARP_HANDOUT_SLIDES_PER_PAGE=1|2|3|4|6');
     console.log('  MARP_HANDOUT_WRITING_SPACE=true');
+    console.log('  MARP_HANDOUT_OUTPUT_PDF=true');
+    console.log('  MARP_HANDOUT_PAGE_SIZE=A4|letter|legal');
     process.exit(1);
   }
 
+  // Parse CLI arguments
   const inputPath = args[0];
-  const outputPath = args[1] || inputPath;
-  const options = getOptionsFromEnv();
+  let outputPath = null;
+  let forcePdf = false;
 
-  try {
-    processFile(inputPath, outputPath, options);
-  } catch (error) {
-    console.error(`[Handout] Error: ${error.message}`);
-    process.exit(1);
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === '--pdf') {
+      forcePdf = true;
+    } else if (!outputPath) {
+      outputPath = args[i];
+    }
   }
+
+  // Default output path based on input
+  if (!outputPath) {
+    outputPath = forcePdf
+      ? inputPath.replace(/\.html?$/i, '-handout.pdf')
+      : inputPath;
+  }
+
+  const options = getOptionsFromEnv();
+  if (forcePdf) {
+    options.outputPdf = true;
+  }
+
+  // Run async
+  (async () => {
+    try {
+      await processFile(inputPath, outputPath, options);
+    } catch (error) {
+      console.error(`[Handout] Error: ${error.message}`);
+      process.exit(1);
+    }
+  })();
 }

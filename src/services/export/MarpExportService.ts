@@ -24,14 +24,14 @@ export interface MarpExportOptions {
     pptxEditable?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
-    /** Handout mode: generates slides + notes layout */
+    /** Handout mode: generates slides + notes layout as PDF */
     handout?: boolean;
     /** Handout layout: portrait or landscape */
     handoutLayout?: 'portrait' | 'landscape';
-    /** Handout slides per page: 1, 2, 3, 4, or 6 */
-    handoutSlidesPerPage?: 1 | 2 | 3 | 4 | 6;
-    /** Handout writing space: include writing lines */
-    handoutWritingSpace?: boolean;
+    /** Handout slides per page: 1 (portrait), 2 (landscape), or 4 (portrait) */
+    handoutSlidesPerPage?: 1 | 2 | 4;
+    /** Handout PDF: always true when handout is enabled */
+    handoutPdf?: boolean;
 }
 
 /**
@@ -167,9 +167,6 @@ export class MarpExportService {
                 env.MARP_HANDOUT = 'true';
                 env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
                 env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
-                if (options.handoutWritingSpace) {
-                    env.MARP_HANDOUT_WRITING_SPACE = 'true';
-                }
                 console.log(`[kanban.MarpExportService] Handout mode enabled: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}`);
             }
 
@@ -537,12 +534,15 @@ export class MarpExportService {
         const env: NodeJS.ProcessEnv = { ...process.env };
         env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
         env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
-        if (options.handoutWritingSpace) {
-            env.MARP_HANDOUT_WRITING_SPACE = 'true';
-        }
+        env.MARP_HANDOUT_OUTPUT_PDF = 'true';  // Handout always outputs PDF
+
+        // Build command arguments - handout always outputs PDF
+        const pdfOutputPath = options.outputPath.replace(/\.html?$/i, '-handout.pdf');
+        const args = [postProcessorPath, options.outputPath, pdfOutputPath, '--pdf'];
+        console.log(`[kanban.MarpExportService] Handout PDF output: ${pdfOutputPath}`);
 
         return new Promise((resolve, reject) => {
-            const postProcess = spawn('node', [postProcessorPath, options.outputPath], {
+            const postProcess = spawn('node', args, {
                 env: env,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
@@ -595,6 +595,14 @@ export class MarpExportService {
     static engineFileExists(enginePath?: string): boolean {
         const resolvedPath = enginePath || this.getDefaultEnginePath();
         return fs.existsSync(resolvedPath);
+    }
+
+    /**
+     * Get the resolved engine path (public accessor)
+     * @returns The resolved engine path
+     */
+    static getEnginePath(): string {
+        return this.getDefaultEnginePath();
     }
 
     /**
