@@ -685,6 +685,40 @@
 														</div>
 												</div>
 										</div>
+										<!-- Handout Options -->
+										<div class="export-field-row" id="marp-handout-row">
+												<div class="export-field-third">
+														<label class="export-checkbox">
+																<input type="checkbox" id="marp-handout" onchange="handleMarpHandoutChange()">
+																<span>Handout Mode (slides + notes)</span>
+														</label>
+												</div>
+												<div class="export-field-third" id="handout-layout-container" style="display: none;">
+														<label for="marp-handout-layout">Layout:</label>
+														<select id="marp-handout-layout" class="form-input">
+																<option value="portrait" selected>Portrait</option>
+																<option value="landscape">Landscape</option>
+														</select>
+												</div>
+												<div class="export-field-third" id="handout-slides-container" style="display: none;">
+														<label for="marp-handout-slides-per-page">Slides per Page:</label>
+														<select id="marp-handout-slides-per-page" class="form-input">
+																<option value="1" selected>1</option>
+																<option value="2">2</option>
+																<option value="3">3</option>
+																<option value="4">4</option>
+																<option value="6">6</option>
+														</select>
+												</div>
+										</div>
+										<div class="export-field-row" id="marp-handout-options-row" style="display: none;">
+												<div class="export-field-third">
+														<label class="export-checkbox">
+																<input type="checkbox" id="marp-handout-writing-space">
+																<span>Include Writing Lines</span>
+														</label>
+												</div>
+										</div>
 								</div>
 
                 <div class="export-field">

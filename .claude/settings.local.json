@@ -24,7 +24,12 @@
       "Bash(done)",
       "Bash(npm run compile:backend:*)",
       "Bash(npm run:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebSearch",
+      "Bash(node -c:*)"
     ],
     "deny": [],
     "ask": []

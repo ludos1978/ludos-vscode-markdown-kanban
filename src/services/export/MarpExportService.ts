@@ -24,6 +24,14 @@ export interface MarpExportOptions {
     pptxEditable?: boolean;
     /** Additional Marp CLI arguments */
     additionalArgs?: string[];
+    /** Handout mode: generates slides + notes layout */
+    handout?: boolean;
+    /** Handout layout: portrait or landscape */
+    handoutLayout?: 'portrait' | 'landscape';
+    /** Handout slides per page: 1, 2, 3, 4, or 6 */
+    handoutSlidesPerPage?: 1 | 2 | 3 | 4 | 6;
+    /** Handout writing space: include writing lines */
+    handoutWritingSpace?: boolean;
 }
 
 /**
@@ -153,12 +161,25 @@ export class MarpExportService {
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
+            // Build environment with handout settings if enabled
+            const env: NodeJS.ProcessEnv = { ...process.env };
+            if (options.handout) {
+                env.MARP_HANDOUT = 'true';
+                env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
+                env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
+                if (options.handoutWritingSpace) {
+                    env.MARP_HANDOUT_WRITING_SPACE = 'true';
+                }
+                console.log(`[kanban.MarpExportService] Handout mode enabled: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}`);
+            }
+
             // Spawn Marp as a detached background process
             // Use 'pipe' for stdio to capture errors for debugging
             const marpProcess = spawn(command, commandArgs, {
                 cwd: inputFileDir,  // Use input file directory, not workspace root
                 detached: true,
-                stdio: ['ignore', 'pipe', 'pipe'] // stdin: ignore, stdout: pipe, stderr: pipe
+                stdio: ['ignore', 'pipe', 'pipe'], // stdin: ignore, stdout: pipe, stderr: pipe
+                env: env
             });
 
             // Log any output or errors from the Marp process
@@ -178,9 +199,14 @@ export class MarpExportService {
                 console.error(`[kanban.MarpExportService] Process error:`, error);
             });
 
-            marpProcess.on('exit', (code, signal) => {
+            marpProcess.on('exit', async (code, signal) => {
                 if (options.inputFilePath) {
                     this.marpProcessPids.delete(options.inputFilePath);
+                }
+
+                // Post-process for handout mode (only for non-watch exports)
+                if (options.handout && !options.watchMode && code === 0) {
+                    await this.runHandoutPostProcess(options);
                 }
             });
 
@@ -479,6 +505,71 @@ export class MarpExportService {
                 }
             }
         }
+    }
+
+    /**
+     * Run handout post-processor on the generated HTML
+     * @param options - Export options containing output path and handout settings
+     */
+    private static async runHandoutPostProcess(options: MarpExportOptions): Promise<void> {
+        // Only process HTML outputs
+        if (options.format !== 'html') {
+            console.log('[kanban.MarpExportService] Handout post-processing only supported for HTML format');
+            return;
+        }
+
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            console.warn('[kanban.MarpExportService] No workspace folder for handout post-processing');
+            return;
+        }
+
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const postProcessorPath = path.join(workspaceRoot, 'marp-engine', 'handout-postprocess.js');
+
+        if (!fs.existsSync(postProcessorPath)) {
+            console.warn(`[kanban.MarpExportService] Handout post-processor not found: ${postProcessorPath}`);
+            return;
+        }
+
+        console.log(`[kanban.MarpExportService] Running handout post-processor on: ${options.outputPath}`);
+
+        const env: NodeJS.ProcessEnv = { ...process.env };
+        env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
+        env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
+        if (options.handoutWritingSpace) {
+            env.MARP_HANDOUT_WRITING_SPACE = 'true';
+        }
+
+        return new Promise((resolve, reject) => {
+            const postProcess = spawn('node', [postProcessorPath, options.outputPath], {
+                env: env,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            let stderr = '';
+
+            if (postProcess.stderr) {
+                postProcess.stderr.on('data', (data) => {
+                    stderr += data.toString();
+                });
+            }
+
+            postProcess.on('exit', (code) => {
+                if (code === 0) {
+                    console.log('[kanban.MarpExportService] Handout post-processing complete');
+                    resolve();
+                } else {
+                    console.error(`[kanban.MarpExportService] Handout post-processing failed: ${stderr}`);
+                    resolve(); // Don't reject, just log the error
+                }
+            });
+
+            postProcess.on('error', (error) => {
+                console.error('[kanban.MarpExportService] Handout post-processing error:', error);
+                resolve(); // Don't reject, just log the error
+            });
+        });
     }
 
     /**
