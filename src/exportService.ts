@@ -77,6 +77,7 @@ export interface NewExportOptions {
     marpHandout?: boolean;          // Generate handout PDF (slides + notes)
     marpHandoutLayout?: 'portrait' | 'landscape';  // Handout page layout
     marpHandoutSlidesPerPage?: 1 | 2 | 4;  // Slides per page in handout (1=portrait, 2=landscape, 4=portrait)
+    marpHandoutDirection?: 'horizontal' | 'vertical';  // Direction for 2-slide layout (horizontal=left-right, vertical=top-bottom)
     marpHandoutPdf?: boolean;  // Always true when handout is enabled
 
     // CONTENT TRANSFORMATIONS
@@ -2046,6 +2047,7 @@ export class ExportService {
                     handout: options.marpHandout,
                     handoutLayout: options.marpHandoutLayout,
                     handoutSlidesPerPage: options.marpHandoutSlidesPerPage,
+                    handoutDirection: options.marpHandoutDirection,
                     handoutPdf: options.marpHandoutPdf
                 });
 
@@ -2084,6 +2086,7 @@ export class ExportService {
                     handout: options.marpHandout,
                     handoutLayout: options.marpHandoutLayout,
                     handoutSlidesPerPage: options.marpHandoutSlidesPerPage,
+                    handoutDirection: options.marpHandoutDirection,
                     handoutPdf: options.marpHandoutPdf
                 });
                 return {

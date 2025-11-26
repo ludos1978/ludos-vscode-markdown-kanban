@@ -30,6 +30,8 @@ export interface MarpExportOptions {
     handoutLayout?: 'portrait' | 'landscape';
     /** Handout slides per page: 1 (portrait), 2 (landscape), or 4 (portrait) */
     handoutSlidesPerPage?: 1 | 2 | 4;
+    /** Handout direction for 2-slide layout: horizontal (left-right) or vertical (top-bottom) */
+    handoutDirection?: 'horizontal' | 'vertical';
     /** Handout PDF: always true when handout is enabled */
     handoutPdf?: boolean;
 }
@@ -167,7 +169,8 @@ export class MarpExportService {
                 env.MARP_HANDOUT = 'true';
                 env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
                 env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
-                console.log(`[kanban.MarpExportService] Handout mode enabled: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}`);
+                env.MARP_HANDOUT_DIRECTION = options.handoutDirection || 'horizontal';
+                console.log(`[kanban.MarpExportService] Handout mode enabled: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}, direction=${options.handoutDirection}`);
             }
 
             // Spawn Marp as a detached background process
@@ -515,14 +518,10 @@ export class MarpExportService {
             return;
         }
 
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-            console.warn('[kanban.MarpExportService] No workspace folder for handout post-processing');
-            return;
-        }
-
-        const workspaceRoot = workspaceFolders[0].uri.fsPath;
-        const postProcessorPath = path.join(workspaceRoot, 'marp-engine', 'handout-postprocess.js');
+        // Get engine path and find handout-postprocess.js in the same directory
+        const enginePath = options.enginePath || this.getDefaultEnginePath();
+        const engineDir = path.dirname(enginePath);
+        const postProcessorPath = path.join(engineDir, 'handout-postprocess.js');
 
         if (!fs.existsSync(postProcessorPath)) {
             console.warn(`[kanban.MarpExportService] Handout post-processor not found: ${postProcessorPath}`);
@@ -534,6 +533,7 @@ export class MarpExportService {
         const env: NodeJS.ProcessEnv = { ...process.env };
         env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
         env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
+        env.MARP_HANDOUT_DIRECTION = options.handoutDirection || 'horizontal';
         env.MARP_HANDOUT_OUTPUT_PDF = 'true';  // Handout always outputs PDF
 
         // Build command arguments - handout always outputs PDF

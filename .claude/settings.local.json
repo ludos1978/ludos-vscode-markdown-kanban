@@ -37,7 +37,13 @@
       "Bash(python3:*)",
       "Bash(/Users/rspoerri/_SYNC/_SYSTEM/py312-venv/bin/python3:*)",
       "Bash(open:*)",
-      "Bash(MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=2 node:*)"
+      "Bash(MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=2 node:*)",
+      "Bash(MARP_HANDOUT=true MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=2 MARP_HANDOUT_DIRECTION=vertical npx:*)",
+      "Bash(export MARP_HANDOUT=true)",
+      "Bash(export MARP_HANDOUT_LAYOUT=landscape)",
+      "Bash(export MARP_HANDOUT_SLIDES_PER_PAGE=2)",
+      "Bash(export MARP_HANDOUT_DIRECTION=vertical)",
+      "Bash(MARP_HANDOUT=true MARP_HANDOUT_LAYOUT=landscape MARP_HANDOUT_SLIDES_PER_PAGE=4 npx @marp-team/marp-cli:*)"
     ],
     "deny": [],
     "ask": []

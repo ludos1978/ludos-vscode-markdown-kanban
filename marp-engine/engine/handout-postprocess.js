@@ -31,6 +31,7 @@ try {
 const defaultOptions = {
   layout: 'portrait',
   slidesPerPage: 1,
+  direction: 'horizontal',  // 'horizontal' (left-right) or 'vertical' (top-bottom) for 2-slide layout
   includeWritingSpace: false,
   writingSpaceLines: 6,
   slideNumbering: true,
@@ -46,6 +47,7 @@ function getOptionsFromEnv() {
     ...defaultOptions,
     layout: process.env.MARP_HANDOUT_LAYOUT || defaultOptions.layout,
     slidesPerPage: parseInt(process.env.MARP_HANDOUT_SLIDES_PER_PAGE || '1', 10),
+    direction: process.env.MARP_HANDOUT_DIRECTION || defaultOptions.direction,
     includeWritingSpace: process.env.MARP_HANDOUT_WRITING_SPACE === 'true',
     slideNumbering: process.env.MARP_HANDOUT_SLIDE_NUMBERING !== 'false',
     pageSize: process.env.MARP_HANDOUT_PAGE_SIZE || defaultOptions.pageSize,
@@ -229,9 +231,12 @@ function createMultiSlidePage(slides, notes, startIdx, options) {
     `;
   }).join('');
 
+  // Add direction class for 2-slide layout
+  const directionClass = options.slidesPerPage === 2 ? `marp-handout-${options.direction || 'horizontal'}` : '';
+
   return `
     <div class="marp-handout-page marp-handout-multi">
-      <div class="marp-handout-grid marp-handout-grid-${options.slidesPerPage}">
+      <div class="marp-handout-grid marp-handout-grid-${options.slidesPerPage} ${directionClass}">
         ${slideGrids}
       </div>
     </div>
@@ -379,7 +384,7 @@ function getHandoutStyles(options) {
       width: 100%;
     }
 
-    /* 2 slides per page - landscape: 2 rows, each with slide + notes side by side */
+    /* 2 slides per page - landscape: 2 rows, each with slide + notes */
     .marp-handout-grid-2 {
       grid-template-columns: 1fr;
       grid-template-rows: 1fr 1fr;
@@ -394,19 +399,37 @@ function getHandoutStyles(options) {
       flex-direction: column;
       border: 1px solid #ddd;
       overflow: hidden;
+      height: 100%;
     }
 
-    /* For 2 slides per page (landscape), arrange slide and notes side by side */
-    .marp-handout-grid-2 .marp-handout-multi-slide-item {
-      flex-direction: row;
+    /* For 2 slides per page - horizontal (left-right): slide and notes side by side */
+    .marp-handout-grid-2.marp-handout-horizontal .marp-handout-multi-slide-item {
+      flex-direction: row !important;
     }
 
-    .marp-handout-grid-2 .marp-handout-slide-mini {
-      flex: 0 0 50%;
+    .marp-handout-grid-2.marp-handout-horizontal .marp-handout-slide-mini {
+      flex: 0 0 50% !important;
+      max-width: 50%;
     }
 
-    .marp-handout-grid-2 .marp-handout-notes-mini {
+    .marp-handout-grid-2.marp-handout-horizontal .marp-handout-notes-mini {
       flex: 1;
+    }
+
+    /* For 2 slides per page - vertical (top-bottom): slide above notes */
+    .marp-handout-grid-2.marp-handout-vertical .marp-handout-multi-slide-item {
+      flex-direction: column !important;
+    }
+
+    .marp-handout-grid-2.marp-handout-vertical .marp-handout-slide-mini {
+      flex: 0 0 60% !important;
+      max-height: 60%;
+      width: 100%;
+    }
+
+    .marp-handout-grid-2.marp-handout-vertical .marp-handout-notes-mini {
+      flex: 1;
+      max-height: 40%;
     }
 
     .marp-handout-slide-mini {

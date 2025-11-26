@@ -5219,6 +5219,7 @@ function executeUnifiedExport() {
     let marpHandout = false;
     let marpHandoutLayout = 'portrait';
     let marpHandoutSlidesPerPage = 1;
+    let marpHandoutDirection = 'horizontal';
 
     if (useMarp) {
         marpOutputFormat = document.getElementById('marp-output-format')?.value || 'html';
@@ -5233,6 +5234,9 @@ function executeUnifiedExport() {
         const [layout, slides] = handoutPreset.split('-');
         marpHandoutLayout = layout || 'portrait';
         marpHandoutSlidesPerPage = parseInt(slides || '1', 10);
+
+        // Get direction for 2-slide landscape layout
+        marpHandoutDirection = document.getElementById('marp-handout-direction')?.value || 'horizontal';
     }
 
     // Close modal
@@ -5274,6 +5278,7 @@ function executeUnifiedExport() {
         marpHandout: useMarp && marpHandout ? true : undefined,
         marpHandoutLayout: useMarp && marpHandout ? marpHandoutLayout : undefined,
         marpHandoutSlidesPerPage: useMarp && marpHandout ? marpHandoutSlidesPerPage : undefined,
+        marpHandoutDirection: useMarp && marpHandout ? marpHandoutDirection : undefined,
         marpHandoutPdf: useMarp && marpHandout ? true : undefined  // Handout always outputs PDF
     };
 
@@ -5459,9 +5464,30 @@ function handleMarpOutputFormatChange() {
 function handleMarpHandoutChange() {
     const handoutCheckbox = document.getElementById('marp-handout');
     const layoutContainer = document.getElementById('handout-layout-container');
+    const directionContainer = document.getElementById('handout-direction-container');
 
     if (handoutCheckbox && layoutContainer) {
         layoutContainer.style.display = handoutCheckbox.checked ? 'block' : 'none';
+        // Also update direction visibility based on preset
+        handleMarpHandoutPresetChange();
+    }
+    if (!handoutCheckbox?.checked && directionContainer) {
+        directionContainer.style.display = 'none';
+    }
+}
+
+/**
+ * Handle Marp handout preset change - show/hide direction option for 2-slide layout
+ */
+function handleMarpHandoutPresetChange() {
+    const handoutCheckbox = document.getElementById('marp-handout');
+    const presetSelect = document.getElementById('marp-handout-preset');
+    const directionContainer = document.getElementById('handout-direction-container');
+
+    if (handoutCheckbox && presetSelect && directionContainer) {
+        // Show direction option only for 2-slide landscape layout
+        const show2SlideOptions = handoutCheckbox.checked && presetSelect.value === 'landscape-2';
+        directionContainer.style.display = show2SlideOptions ? 'block' : 'none';
     }
 }
 

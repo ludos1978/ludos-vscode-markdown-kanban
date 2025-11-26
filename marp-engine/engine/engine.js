@@ -57,6 +57,7 @@ const HandoutTransformer = {
     layout: 'portrait',        // 'portrait' or 'landscape'
     notesPosition: 'below',    // 'below' or 'beside'
     slidesPerPage: 1,          // 1, 2, 3, 4, or 6
+    direction: 'horizontal',   // 'horizontal' (left-right) or 'vertical' (top-bottom) for 2-slide layout
     includeWritingSpace: false,
     writingSpaceLines: 6,
     slideNumbering: true,
@@ -71,6 +72,7 @@ const HandoutTransformer = {
       layout: process.env.MARP_HANDOUT_LAYOUT || this.defaultOptions.layout,
       notesPosition: process.env.MARP_HANDOUT_NOTES_POSITION || this.defaultOptions.notesPosition,
       slidesPerPage: parseInt(process.env.MARP_HANDOUT_SLIDES_PER_PAGE || '1', 10),
+      direction: process.env.MARP_HANDOUT_DIRECTION || this.defaultOptions.direction,
       includeWritingSpace: process.env.MARP_HANDOUT_WRITING_SPACE === 'true',
       slideNumbering: process.env.MARP_HANDOUT_SLIDE_NUMBERING !== 'false',
       pageSize: process.env.MARP_HANDOUT_PAGE_SIZE || this.defaultOptions.pageSize
@@ -162,9 +164,10 @@ const HandoutTransformer = {
       `;
     }).join('');
 
+    const directionClass = options.slidesPerPage === 2 ? `marp-handout-${options.direction || 'horizontal'}` : '';
     return `
       <div class="marp-handout-page marp-handout-multi">
-        <div class="marp-handout-grid marp-handout-grid-${options.slidesPerPage}">
+        <div class="marp-handout-grid marp-handout-grid-${options.slidesPerPage} ${directionClass}">
           ${slideGrids}
         </div>
       </div>
@@ -282,6 +285,12 @@ const HandoutTransformer = {
         break-after: auto;
       }
 
+      /* Multi-slide pages need block display for grid to work properly */
+      .marp-handout-page.marp-handout-multi {
+        display: block;
+        height: ${isPortrait ? '277mm' : '190mm'};
+      }
+
       .marp-handout-slide-container {
         flex: 0 0 ${isPortrait ? '45%' : '55%'};
         border: 2px solid #333;
@@ -383,8 +392,13 @@ const HandoutTransformer = {
         width: 100%;
       }
 
-      .marp-handout-grid-2 { grid-template-columns: 1fr 1fr; }
+      /* 2 slides per page - landscape: 2 rows, each with slide + notes side by side */
+      .marp-handout-grid-2 {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
       .marp-handout-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+      /* 4 slides per page - portrait: 2x2 grid */
       .marp-handout-grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
       .marp-handout-grid-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
 
@@ -393,6 +407,49 @@ const HandoutTransformer = {
         flex-direction: column;
         border: 1px solid #ddd;
         overflow: hidden;
+        height: 100%;
+      }
+
+      /* For 2 slides per page - horizontal (left-right): slide and notes side by side */
+      .marp-handout-grid-2.marp-handout-horizontal .marp-handout-multi-slide-item {
+        flex-direction: row !important;
+      }
+
+      .marp-handout-grid-2.marp-handout-horizontal .marp-handout-slide-mini {
+        flex: 0 0 50% !important;
+        max-width: 50%;
+      }
+
+      .marp-handout-grid-2.marp-handout-horizontal .marp-handout-notes-mini {
+        flex: 1 !important;
+      }
+
+      /* For 2 slides per page - vertical (top-bottom): slide above notes */
+      .marp-handout-grid-2.marp-handout-vertical .marp-handout-multi-slide-item {
+        flex-direction: column !important;
+        gap: 3mm;
+      }
+
+      .marp-handout-grid-2.marp-handout-vertical .marp-handout-slide-mini {
+        flex: 0 0 auto !important;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border: 1px solid #333;
+        box-sizing: border-box;
+      }
+
+      .marp-handout-grid-2.marp-handout-vertical .marp-handout-slide-mini svg {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 100%;
+        display: block;
+      }
+
+      .marp-handout-grid-2.marp-handout-vertical .marp-handout-notes-mini {
+        flex: 1 1 auto !important;
+        overflow-y: auto;
+        background: #f8f8f8;
+        padding: 2mm;
       }
 
       .marp-handout-slide-mini {
@@ -400,11 +457,15 @@ const HandoutTransformer = {
         position: relative;
         overflow: hidden;
         background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .marp-handout-slide-mini svg {
         width: 100% !important;
         height: auto !important;
+        max-height: 100%;
       }
 
       .slide-number-mini {
@@ -435,7 +496,30 @@ const HandoutTransformer = {
 
         .marp-handout-page {
           min-height: 0;
-          height: auto;
+          height: ${isPortrait ? '277mm' : '190mm'};
+          box-sizing: border-box;
+        }
+
+        .marp-handout-page.marp-handout-multi {
+          height: ${isPortrait ? '277mm' : '190mm'};
+          display: block;
+        }
+
+        .marp-handout-multi .marp-handout-grid {
+          height: 100%;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        .marp-handout-multi-slide-item {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        /* Ensure vertical grid columns work in print */
+        .marp-handout-grid-2.marp-handout-vertical {
+          grid-template-columns: 1fr 1fr !important;
+          grid-template-rows: 1fr !important;
         }
 
         * {

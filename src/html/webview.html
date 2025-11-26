@@ -696,10 +696,17 @@
 												</div>
 												<div class="export-field-third" id="handout-layout-container" style="display: none;">
 														<label for="marp-handout-preset">Layout:</label>
-														<select id="marp-handout-preset" class="form-input">
+														<select id="marp-handout-preset" class="form-input" onchange="handleMarpHandoutPresetChange()">
 																<option value="portrait-1" selected>1 slide (portrait)</option>
 																<option value="landscape-2">2 slides (landscape)</option>
 																<option value="portrait-4">4 slides (portrait)</option>
+														</select>
+												</div>
+												<div class="export-field-third" id="handout-direction-container" style="display: none;">
+														<label for="marp-handout-direction">Direction:</label>
+														<select id="marp-handout-direction" class="form-input">
+																<option value="horizontal" selected>Left-Right</option>
+																<option value="vertical">Top-Bottom</option>
 														</select>
 												</div>
 										</div>
