@@ -1208,3 +1208,104 @@ Plugin-based architecture for import/export operations. Provides unified interfa
 - Error handling for plugin initialization failure
 
 ---
+
+## Core Architecture: Bridge (2025-11-27)
+
+### Overview
+WebviewBridge provides a typed, promise-based interface for webview communication between VS Code backend and the webview frontend. Supports message batching and request/response patterns.
+
+## src/core/bridge/MessageTypes.ts - Message Type Definitions
+
+### Types:
+- **BaseMessage** - Base interface for all messages
+- **RequestMessage** - Base interface for request messages (with requestId)
+- **ResponseMessage** - Base interface for response messages
+- **OutgoingMessage** - Union of all backend → frontend messages
+- **IncomingMessage** - Union of all frontend → backend messages
+- **OutgoingMessageType** - String literal type for outgoing message types
+- **IncomingMessageType** - String literal type for incoming message types
+
+### Outgoing Messages (Backend → Frontend):
+- **BoardUpdateMessage** - Full board state update
+- **UpdateColumnContentMessage** - Single column content update
+- **UpdateTaskContentMessage** - Single task content update
+- **UndoRedoStatusMessage** - Undo/redo availability status
+- **FileInfoMessage** - File information update
+- **OperationStartedMessage** - Operation started notification
+- **OperationProgressMessage** - Operation progress update
+- **OperationCompletedMessage** - Operation completed notification
+- **StopEditingRequestMessage** - Request to capture edit value (request/response)
+- **UnfoldColumnsRequestMessage** - Request to unfold columns (request/response)
+- **ExportResultMessage** - Export result notification
+- **MarpThemesMessage** - Available Marp themes
+- **MarpStatusMessage** - Marp extension status
+- **ShowMessageMessage** - Show message notification
+- **TrackedFilesDebugInfoMessage** - Debug info for tracked files
+- **ContentVerificationResultMessage** - Content sync verification result
+
+### Incoming Messages (Frontend → Backend):
+- **UndoMessage** - Undo request
+- **RedoMessage** - Redo request
+- **RequestBoardUpdateMessage** - Request board update
+- **BoardUpdateFromFrontendMessage** - Board update from user edits
+- **EditTaskMessage** - Edit task request
+- **MoveTaskMessage** - Move task request
+- **AddTaskMessage** - Add task request
+- **DeleteTaskMessage** - Delete task request
+- **AddColumnMessage** - Add column request
+- **MoveColumnMessage** - Move column request
+- **DeleteColumnMessage** - Delete column request
+- **EditColumnTitleMessage** - Edit column title request
+- **EditModeStartMessage** - Edit mode started notification
+- **EditModeEndMessage** - Edit mode ended notification
+- **EditingStoppedMessage** - Response with captured edit value
+- **ColumnsUnfoldedMessage** - Response confirming columns unfolded
+- **OpenFileLinkMessage** - Open file link request
+- **OpenWikiLinkMessage** - Open wiki link request
+- **OpenExternalLinkMessage** - Open external link request
+- **SaveBoardStateMessage** - Save board state request
+- **SaveUndoStateMessage** - Save undo state request
+- **RequestIncludeFileMessage** - Request include file
+- **ExportMessage** - Export request
+- **RenderCompletedMessage** - Render completed notification
+- **RenderSkippedMessage** - Render skipped notification
+
+### Type Guards:
+- src/core/bridge/MessageTypes-isRequestMessage - Check if message has requestId
+- src/core/bridge/MessageTypes-isResponseMessage - Check if message is a response
+- src/core/bridge/MessageTypes-isMessageType - Type guard for specific message types
+
+## src/core/bridge/WebviewBridge.ts - WebviewBridge
+
+### Properties:
+- _webview: vscode.Webview | null - Current webview instance
+- _eventBus: PanelEventBus - Event bus for bridge events
+- _isReady: boolean - Whether bridge is ready to send
+- _pendingRequests: Map - Pending request/response operations
+- _batchedMessages: OutgoingMessage[] - Messages awaiting batch flush
+- _defaultTimeout: number - Default request timeout (5000ms)
+- _maxBatchSize: number - Max messages before auto-flush (10)
+- _batchFlushDelay: number - Batch flush delay (16ms)
+
+### Methods:
+- src/core/bridge/WebviewBridge-WebviewBridge_setWebview - Set the webview instance, mark bridge as ready
+- src/core/bridge/WebviewBridge-WebviewBridge_clearWebview - Clear webview, cancel pending requests
+- src/core/bridge/WebviewBridge-WebviewBridge_isReady - Check if bridge is ready to send
+- src/core/bridge/WebviewBridge-WebviewBridge_state - Get current bridge state
+- src/core/bridge/WebviewBridge-WebviewBridge_send - Send message immediately
+- src/core/bridge/WebviewBridge-WebviewBridge_sendBatched - Send message with batching
+- src/core/bridge/WebviewBridge-WebviewBridge_flushBatch - Flush all batched messages
+- src/core/bridge/WebviewBridge-WebviewBridge_request - Send request and wait for response (promise-based)
+- src/core/bridge/WebviewBridge-WebviewBridge_handleResponse - Handle incoming response message
+- src/core/bridge/WebviewBridge-WebviewBridge_onMessage - Set message handler for incoming messages
+- src/core/bridge/WebviewBridge-WebviewBridge_processIncomingMessage - Process incoming message (routes responses)
+- src/core/bridge/WebviewBridge-WebviewBridge_dispose - Dispose bridge and cleanup
+
+### Features:
+- **Type-safe messaging**: Compile-time type checking for all messages
+- **Request/Response pattern**: Promise-based async operations with timeout
+- **Message batching**: Collect messages and send together for performance
+- **Ready state handling**: Tracks webview availability
+- **Incremental migration**: Coexists with existing postMessage calls
+
+---

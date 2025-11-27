@@ -166,6 +166,10 @@ export interface DebugHandlerErrorPayload {
     handlerName: string;
 }
 
+export interface BridgeReadyPayload {
+    bridge: any; // WebviewBridge - using any to avoid circular dependency
+}
+
 // ============= EVENT DEFINITIONS MAP =============
 
 /**
@@ -224,6 +228,9 @@ export interface EventDefinitions {
     // Debug/Monitoring (internal use)
     'debug:event_slow': DebugEventSlowPayload;
     'debug:handler_error': DebugHandlerErrorPayload;
+
+    // Bridge lifecycle
+    'bridge:ready': BridgeReadyPayload;
 }
 
 // ============= TYPE HELPERS =============
