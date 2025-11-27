@@ -22,6 +22,36 @@ Summary: Recommended Pattern Adoption
   2. Introduce Command Pattern for backend message handling
   3. Create Frontend Module Facade to encapsulate state
 
+- [ ] I want to be able to add templates for columns. these should be markdown presentation style that create the content of a column with none or some tasks with default content when dragged into the scene. It should also allow a -Media folder with the same name that would be instantiated into the markdown-kanban when instantiated.
+
+On instantiation the user is asked for a filename which is defined by default from the first line of the file where {kanbanfilename} is the filename of the main-board-markdown-file.
+
+a template might look like:
+"""
+{kanbanfilename}-Homework
+
+## Homework
+
+==Requirements==
+
+- ...
+
+==Deliveries==
+
+- ...
+"""
+
+or 
+
+"""
+{kanbanfilename}-SemesterSchedule
+
+## Semester Schedule
+
+![]({thisfilename}-Schedule)
+"""
+
+
 - [ ] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
 - [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
