@@ -1,5 +1,5 @@
 import { FileManager } from './fileManager';
-import { UndoRedoManager } from './undoRedoManager';
+import { BoardStore } from './core/stores';
 import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
@@ -36,7 +36,7 @@ interface FocusTarget {
 
 export class MessageHandler {
     private _fileManager: FileManager;
-    private _undoRedoManager: UndoRedoManager;
+    private _boardStore: BoardStore;
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
     private _plantUMLService: PlantUMLService;
@@ -63,7 +63,7 @@ export class MessageHandler {
 
     constructor(
         fileManager: FileManager,
-        undoRedoManager: UndoRedoManager,
+        boardStore: BoardStore,
         boardOperations: BoardOperations,
         linkHandler: LinkHandler,
         callbacks: {
@@ -79,7 +79,7 @@ export class MessageHandler {
         }
     ) {
         this._fileManager = fileManager;
-        this._undoRedoManager = undoRedoManager;
+        this._boardStore = boardStore;
         this._boardOperations = boardOperations;
         this._linkHandler = linkHandler;
         this._plantUMLService = new PlantUMLService();
@@ -377,7 +377,7 @@ export class MessageHandler {
                 // Use the board state from the webview cache if provided, otherwise fallback to backend board
                 const boardToSave = message.currentBoard || this._getCurrentBoard();
                 if (boardToSave) {
-                    this._undoRedoManager.saveStateForUndo(boardToSave);
+                    this._boardStore.saveStateForUndo(boardToSave);
                 } else {
                     console.warn('❌ No current board available for undo state saving');
                 }
@@ -1099,7 +1099,7 @@ export class MessageHandler {
 
     private async handleUndo() {
         const currentBoard = this._getCurrentBoard();
-        const restoredBoard = this._undoRedoManager.undo(currentBoard);
+        const restoredBoard = this._boardStore.undo();
         
         if (restoredBoard) {
             // Detect changes for focusing
@@ -1233,7 +1233,7 @@ export class MessageHandler {
 
     private async handleRedo() {
         const currentBoard = this._getCurrentBoard();
-        const restoredBoard = this._undoRedoManager.redo(currentBoard);
+        const restoredBoard = this._boardStore.redo();
         
         if (restoredBoard) {
             // Detect changes for focusing
@@ -1556,7 +1556,7 @@ export class MessageHandler {
         if (!board) {return;}
 
         if (saveUndo) {
-            this._undoRedoManager.saveStateForUndo(board);
+            this._boardStore.saveStateForUndo(board);
         }
 
         const success = action();

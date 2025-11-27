@@ -1,26 +1,31 @@
-Summary: Recommended Pattern Adoption
+- [ ] ARCHITECTURE REFACTORING: Event-Driven Component System
+  **Plan:** See `agent/ARCHITECTURE-REFACTORING-PLAN.md` for full details
+  **Phase 1 Guide:** See `agent/PHASE1-EVENTBUS-IMPLEMENTATION.md`
 
-  | Area                             | Current Issue           |
-  Recommended Pattern     | Priority |
-  |----------------------------------|-------------------------|--------
-  -----------------|----------|
-  | Backend MessageHandler           | Giant switch statement  | Command
-   Pattern         | High     |
-  | Backend KanbanWebviewPanel       | God class (2000+ lines) |
-  Mediator + Split        | High     |
-  | Backend Event Handling           | Scattered observers     | Event 
-  Bus               | Medium   |
-  | Frontend Global State            | 20+ globals             | Module 
-  Facade           | High     |
-  | Frontend Message Handling        | Giant switch            | Chain 
-  of Responsibility | Medium   |
-  | Frontend Component Communication | Direct calls            |
-  PubSub/Observer         | Medium   |
+  **Target Architecture:**
+  ```
+  KanbanPanelShell (~200 lines) - VS Code lifecycle only
+       │
+       ▼
+  PanelEventBus (~400 lines) - typed events, middleware, correlation
+       │
+       ├── BoardStore (~350 lines) - state, selectors, undo/redo
+       ├── FileCoordinator (~500 lines) - files, includes, conflicts
+       ├── WebviewBridge (~400 lines) - messages, batching, req/res
+       └── EditSession (~250 lines) - edit mode, checkpoints
+  ```
 
-  The most impactful changes would be:
-  1. Split KanbanWebviewPanel into focused managers
-  2. Introduce Command Pattern for backend message handling
-  3. Create Frontend Module Facade to encapsulate state
+  **Phases (14 sessions, ~40 hours total):**
+  - [ ] Phase 1: PanelEventBus (foundation) - 2 sessions
+  - [ ] Phase 2: BoardStore (state management) - 2 sessions
+  - [ ] Phase 3: WebviewBridge (message routing) - 2 sessions
+  - [ ] Phase 4: FileCoordinator (file operations) - 2 sessions
+  - [ ] Phase 5: EditSession (undo/redo) - 2 sessions
+  - [ ] Phase 6: KanbanPanelShell (final assembly) - 2 sessions
+  - [ ] Phase 7: Testing & Documentation - 2 sessions
+
+  **Quality Targets:** All components 95%+ quality rating
+  **Risk:** Medium-High (core refactoring), mitigated by incremental migration
 
 - [ ] I want to be able to add templates for columns. these should be markdown presentation style that create the content of a column with none or some tasks with default content when dragged into the scene. It should also allow a -Media folder with the same name that would be instantiated into the markdown-kanban when instantiated.
 
@@ -51,41 +56,11 @@ or
 ![]({thisfilename}-Schedule)
 """
 
+- [ ] if a column already has tasks and a !!!include()!!! is added to the column header the content gets removed when saving it. To prevent loosing data the user should be asked wether he wants to add the existing tasks to the included file or if it should be discarded.
 
 - [ ] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
 - [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
-
-- [x] before starting the migration, create todos, make sure that before you replace a function you know
-  all features of the old code and reimplement them in the replacement. also make sure you remove the
-  old code ompletely!
-  - PLANNED: See tmp/plugin-migration-features.md for feature checklist
-  - Solution 1 (Interface-Based Plugin Registry, 96% quality) selected
-
-- [x] COMPLETED: PLUGIN ARCHITECTURE MIGRATION (Solution 1: Interface-Based Plugin Registry)
-  - [x] PHASE 0: Document existing code features (see tmp/plugin-migration-features.md)
-  - [x] PHASE 1: Create plugin interfaces (ImportPlugin.ts, ExportPlugin.ts)
-  - [x] PHASE 2: Create plugin implementations
-    - ColumnIncludePlugin, TaskIncludePlugin, RegularIncludePlugin
-    - MarpExportPlugin
-  - [x] PHASE 3: Migrate FileFactory to use plugins (createIncludeViaPlugin, createIncludeDirect methods)
-  - [x] PHASE 4: Migrate markdownParser to use PluginRegistry.detectIncludes (NO fallback)
-  - [x] PHASE 5: Unified IncludeFile class with fileType property
-    - DELETED: ColumnIncludeFile.ts, TaskIncludeFile.ts, RegularIncludeFile.ts
-    - All functionality consolidated into IncludeFile.ts
-  - [x] PHASE 6: Update all imports and usages
-    - Updated: kanbanWebviewPanel.ts, includeFileManager.ts, FileOperationVisitor.ts
-    - Updated: MarkdownFileRegistry.ts, files/index.ts
-  - ARCHITECTURE:
-    - IncludeFile.ts: Unified class with fileType='include-column'|'include-task'|'include-regular'
-    - Plugins create IncludeFile instances with appropriate fileType
-    - NO fallback code - plugins MUST be loaded at extension activation
-    - FileFactory.createIncludeDirect() for direct file creation
-    - FileFactory.createInclude() uses plugins for context-based creation
-  - FILES:
-    - src/plugins/{interfaces,registry,import,export}/, PluginLoader.ts
-    - src/files/IncludeFile.ts (unified, non-abstract)
-    - REMOVED: src/files/{ColumnIncludeFile,TaskIncludeFile,RegularIncludeFile}.ts
 
 - [ ] "move to column" from a task burger menu doesnt work.
 
@@ -124,6 +99,39 @@ or
 - [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 
 - [ ] when focus is regained by the kanban (possible configuration change), check if the tag menus of column and tag burger menus have changed and if so, regenerate these submenus.
+
+
+- [x] before starting the migration, create todos, make sure that before you replace a function you know
+  all features of the old code and reimplement them in the replacement. also make sure you remove the
+  old code ompletely!
+  - PLANNED: See tmp/plugin-migration-features.md for feature checklist
+  - Solution 1 (Interface-Based Plugin Registry, 96% quality) selected
+
+- [x] COMPLETED: PLUGIN ARCHITECTURE MIGRATION (Solution 1: Interface-Based Plugin Registry)
+  - [x] PHASE 0: Document existing code features (see tmp/plugin-migration-features.md)
+  - [x] PHASE 1: Create plugin interfaces (ImportPlugin.ts, ExportPlugin.ts)
+  - [x] PHASE 2: Create plugin implementations
+    - ColumnIncludePlugin, TaskIncludePlugin, RegularIncludePlugin
+    - MarpExportPlugin
+  - [x] PHASE 3: Migrate FileFactory to use plugins (createIncludeViaPlugin, createIncludeDirect methods)
+  - [x] PHASE 4: Migrate markdownParser to use PluginRegistry.detectIncludes (NO fallback)
+  - [x] PHASE 5: Unified IncludeFile class with fileType property
+    - DELETED: ColumnIncludeFile.ts, TaskIncludeFile.ts, RegularIncludeFile.ts
+    - All functionality consolidated into IncludeFile.ts
+  - [x] PHASE 6: Update all imports and usages
+    - Updated: kanbanWebviewPanel.ts, includeFileManager.ts, FileOperationVisitor.ts
+    - Updated: MarkdownFileRegistry.ts, files/index.ts
+  - ARCHITECTURE:
+    - IncludeFile.ts: Unified class with fileType='include-column'|'include-task'|'include-regular'
+    - Plugins create IncludeFile instances with appropriate fileType
+    - NO fallback code - plugins MUST be loaded at extension activation
+    - FileFactory.createIncludeDirect() for direct file creation
+    - FileFactory.createInclude() uses plugins for context-based creation
+  - FILES:
+    - src/plugins/{interfaces,registry,import,export}/, PluginLoader.ts
+    - src/files/IncludeFile.ts (unified, non-abstract)
+    - REMOVED: src/files/{ColumnIncludeFile,TaskIncludeFile,RegularIncludeFile}.ts
+
 
 - [x] COMPLETED: Draw.io & Excalidraw diagram integration
   - [x] Export-time SVG conversion for `.drawio`, `.dio`, `.excalidraw`, `.excalidraw.json`, `.excalidraw.svg` files
