@@ -71,6 +71,8 @@
 
 * {
   box-sizing: border-box;
+  perspective: 1000000px;
+  transform-style: preserve-3d;
 }
 
 body {
@@ -82,7 +84,7 @@ body {
   overflow: hidden; /* Prevent body scroll - container handles it */
   height: 100vh;
 
-  transform-style: preserve-3d;
+  /* transform-style: preserve-3d; */
 }
 
 /* File info bar - fixed at top */
@@ -2197,7 +2199,7 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack {
-	transform-style: preserve-3d;
+	/* transform-style: preserve-3d; */
   display: grid;
   grid-template: 1fr / 1fr;
   position: relative;
@@ -2206,7 +2208,7 @@ button.file-bar-menu-item {
 
 /* All columns in grid */
 .kanban-column-stack .kanban-full-height-column {
-	transform-style: preserve-3d;
+	/* transform-style: preserve-3d; */
 	perspective: 1000px;
   grid-row: 1;
   grid-column: 1;
