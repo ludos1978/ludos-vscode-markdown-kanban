@@ -1705,7 +1705,7 @@ body.vscode-high-contrast-light .task-count {
 
 .fold-all-btn.fold-collapsed .fold-icon,
 .global-fold-btn.fold-collapsed .global-fold-icon {
-  background: var(--button-background);
+  /* background: var(--button-background);
   color: var(--button-foreground);
   border: var(--button-border);
   cursor: pointer;
@@ -1714,12 +1714,12 @@ body.vscode-high-contrast-light .task-count {
   user-select: none;
   flex-shrink: 0;
   width: 16px;
-  height: 16px;
+  height: 16px; */
   transform: rotate(0deg);
-  border-radius: 3px;
+  /* border-radius: 3px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: center; */
 
   /* color: var(--vscode-button);
   transform: rotate(0deg); */

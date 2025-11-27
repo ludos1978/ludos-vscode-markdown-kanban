@@ -265,7 +265,15 @@ export class LinkHandler {
     private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number) {
         const document = this._fileManager.getDocument();
         if (!document) {
-            vscode.window.showErrorMessage('No document loaded to update links');
+            console.error(`[LinkHandler] No document loaded. FileManager state:`, {
+                hasDocument: !!this._fileManager.getDocument(),
+                originalPath,
+                replacementUri: replacementUri.fsPath,
+                taskId,
+                columnId,
+                linkIndex
+            });
+            vscode.window.showErrorMessage(`No document loaded to update links. originalPath: ${originalPath}, taskId: ${taskId}, columnId: ${columnId}`);
             return;
         }
 
