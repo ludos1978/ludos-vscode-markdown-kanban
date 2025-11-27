@@ -1,3 +1,29 @@
+Summary: Recommended Pattern Adoption
+
+  | Area                             | Current Issue           |
+  Recommended Pattern     | Priority |
+  |----------------------------------|-------------------------|--------
+  -----------------|----------|
+  | Backend MessageHandler           | Giant switch statement  | Command
+   Pattern         | High     |
+  | Backend KanbanWebviewPanel       | God class (2000+ lines) |
+  Mediator + Split        | High     |
+  | Backend Event Handling           | Scattered observers     | Event 
+  Bus               | Medium   |
+  | Frontend Global State            | 20+ globals             | Module 
+  Facade           | High     |
+  | Frontend Message Handling        | Giant switch            | Chain 
+  of Responsibility | Medium   |
+  | Frontend Component Communication | Direct calls            |
+  PubSub/Observer         | Medium   |
+
+  The most impactful changes would be:
+  1. Split KanbanWebviewPanel into focused managers
+  2. Introduce Command Pattern for backend message handling
+  3. Create Frontend Module Facade to encapsulate state
+
+- [ ] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
+
 - [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
 
 - [x] before starting the migration, create todos, make sure that before you replace a function you know
