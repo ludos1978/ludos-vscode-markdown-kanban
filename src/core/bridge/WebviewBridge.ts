@@ -144,14 +144,18 @@ export class WebviewBridge implements vscode.Disposable {
      * Send a message to the webview immediately
      */
     send<T extends OutgoingMessage>(message: T): boolean {
-        if (!this.isReady || !this._webview) {
-            this._log(`Cannot send message: bridge not ready (type: ${message.type})`);
+        if (!this._webview) {
+            console.warn(`[WebviewBridge] Cannot send message: no webview (type: ${message.type})`);
+            return false;
+        }
+
+        if (this._isDisposed) {
+            console.warn(`[WebviewBridge] Cannot send message: bridge disposed (type: ${message.type})`);
             return false;
         }
 
         try {
             this._webview.postMessage(message);
-            this._log(`Sent message: ${message.type}`);
             return true;
         } catch (error) {
             console.error(`[WebviewBridge] Error sending message:`, error);
@@ -164,8 +168,8 @@ export class WebviewBridge implements vscode.Disposable {
      * Messages are collected and sent together for performance
      */
     sendBatched<T extends OutgoingMessage>(message: T): void {
-        if (!this.isReady) {
-            this._log(`Cannot batch message: bridge not ready (type: ${message.type})`);
+        if (!this._webview || this._isDisposed) {
+            console.warn(`[WebviewBridge] Cannot batch message: bridge not ready (type: ${message.type})`);
             return;
         }
 

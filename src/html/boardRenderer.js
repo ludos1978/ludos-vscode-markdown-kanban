@@ -2248,9 +2248,9 @@ function getTaskEditContent(task) {
     const content = task.description || '';
 
     // DEBUG: Log newline count
-    const newlineCount = (content.match(/\n/g) || []).length;
-    console.log(`[getTaskEditContent] Task ${task.id}: ${content.length} chars, ${newlineCount} newlines`);
-    console.log(`[getTaskEditContent] includeContext:`, task.includeContext ? 'YES' : 'NO');
+    // const newlineCount = (content.match(/\n/g) || []).length;
+    // console.log(`[getTaskEditContent] Task ${task.id}: ${content.length} chars, ${newlineCount} newlines`);
+    // console.log(`[getTaskEditContent] includeContext:`, task.includeContext ? 'YES' : 'NO');
 
     return content;
 }
