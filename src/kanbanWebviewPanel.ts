@@ -35,6 +35,8 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 // NEW: Centralized board state management (Phase 2 of architecture refactoring)
 import { BoardStore } from './core/stores';
+// NEW: Unified webview communication layer (Phase 3 of architecture refactoring)
+import { WebviewBridge } from './core/bridge';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -109,11 +111,6 @@ export class KanbanWebviewPanel {
     // CRITICAL: Prevent board regeneration during initial include file loading
     private _isInitialBoardLoad: boolean = false;  // Track if we're loading include files for first time
 
-    // PERFORMANCE: Webview message batching
-    private _messageQueue: any[] = [];
-    private _messageTimer: NodeJS.Timeout | null = null;
-    private readonly MESSAGE_BATCH_DELAY = 50; // Batch messages for 50ms
-
     // NEW: Event bus for component communication (Phase 1 of architecture refactoring)
     // Events are emitted IN PARALLEL with existing behavior - no functionality replaced yet
     private _eventBus: PanelEventBus;
@@ -121,6 +118,10 @@ export class KanbanWebviewPanel {
     // NEW: Centralized board state (Phase 2 of architecture refactoring)
     // Replaces: _cachedBoard, _boardCacheValid, _dirtyColumns, _dirtyTasks, _undoRedoManager
     private _boardStore: BoardStore;
+
+    // NEW: Unified webview communication (Phase 3 of architecture refactoring)
+    // Replaces: _messageQueue, _messageTimer, MESSAGE_BATCH_DELAY, queueMessage(), flushMessages()
+    private _webviewBridge: WebviewBridge;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -350,6 +351,16 @@ export class KanbanWebviewPanel {
             webview: this._panel.webview,
             maxUndoStackSize: 100
         });
+
+        // NEW: Initialize WebviewBridge (Phase 3 of architecture refactoring)
+        // Replaces: queueMessage(), flushMessages(), direct postMessage calls
+        this._webviewBridge = new WebviewBridge(this._eventBus, {
+            defaultTimeout: 5000,
+            maxBatchSize: 10,
+            batchFlushDelay: 50,
+            debug: isDevelopment
+        });
+        this._webviewBridge.setWebview(this._panel.webview);
 
         // Initialize components
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
@@ -1011,15 +1022,15 @@ export class KanbanWebviewPanel {
         await this._refreshAllViewConfiguration();
 
         // Send include file contents immediately after board update
-        // postMessage guarantees message ordering, so no delay needed
+        // WebviewBridge batching handles message ordering
         const includeFiles = this._fileRegistry.getIncludeFiles();
         if (includeFiles.length > 0) {
             for (const file of includeFiles) {
-                this.queueMessage({
+                this._webviewBridge.sendBatched({
                     type: 'updateIncludeContent',
                     filePath: file.getRelativePath(),
                     content: file.getContent()
-                });
+                } as any);
             }
         }
 
@@ -1429,7 +1440,7 @@ export class KanbanWebviewPanel {
 
                             // Send update to frontend
                             if (this._panel) {
-                                this.queueMessage({
+                                this._webviewBridge.sendBatched({
                                     type: 'updateColumnContent',
                                     columnId: column.id,
                                     tasks: tasks,
@@ -1438,7 +1449,7 @@ export class KanbanWebviewPanel {
                                     includeMode: true,
                                     includeFiles: column.includeFiles,
                                     isLoadingContent: false
-                                });
+                                } as any);
                             }
                         } catch (error) {
                             console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
@@ -1446,7 +1457,7 @@ export class KanbanWebviewPanel {
 
                             // Send error state to frontend
                             if (this._panel) {
-                                this._panel.webview.postMessage({
+                                this._webviewBridge.send({
                                     type: 'updateColumnContent',
                                     columnId: column.id,
                                     tasks: [],
@@ -1456,7 +1467,7 @@ export class KanbanWebviewPanel {
                                     includeFiles: column.includeFiles,
                                     isLoadingContent: false,
                                     loadError: true
-                                });
+                                } as any);
                             }
                         }
                     }
@@ -1498,7 +1509,7 @@ export class KanbanWebviewPanel {
 
                                 // Send update to frontend
                                 if (this._panel) {
-                                    this._panel.webview.postMessage({
+                                    this._webviewBridge.send({
                                         type: 'updateTaskContent',
                                         columnId: column.id,
                                         taskId: task.id,
@@ -1509,7 +1520,7 @@ export class KanbanWebviewPanel {
                                         includeMode: true,
                                         includeFiles: task.includeFiles,
                                         isLoadingContent: false
-                                    });
+                                    } as any);
                                 }
                             } catch (error) {
                                 console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
@@ -1517,7 +1528,7 @@ export class KanbanWebviewPanel {
 
                                 // Send error state to frontend
                                 if (this._panel) {
-                                    this._panel.webview.postMessage({
+                                    this._webviewBridge.send({
                                         type: 'updateTaskContent',
                                         columnId: column.id,
                                         taskId: task.id,
@@ -1529,7 +1540,7 @@ export class KanbanWebviewPanel {
                                         includeFiles: task.includeFiles,
                                         isLoadingContent: false,
                                         loadError: true
-                                    });
+                                    } as any);
                                 }
                             }
                         }
@@ -1554,11 +1565,11 @@ export class KanbanWebviewPanel {
 
                         // Send update to frontend
                         if (this._panel) {
-                            this.queueMessage({
+                            this._webviewBridge.sendBatched({
                                 type: 'updateIncludeContent',
                                 filePath: relativePath,
                                 content: content
-                            });
+                            } as any);
                         }
                     } catch (error) {
                         console.error(`[_loadIncludeContentAsync] Failed to load regular include ${relativePath}:`, error);
@@ -1568,9 +1579,9 @@ export class KanbanWebviewPanel {
 
             // Trigger re-render after all regular includes are loaded
             if (regularIncludes.length > 0 && this._panel) {
-                this.queueMessage({
+                this._webviewBridge.sendBatched({
                     type: 'includesUpdated'
-                });
+                } as any);
             }
         }
 
@@ -1881,11 +1892,11 @@ export class KanbanWebviewPanel {
         }
 
         // Send single batched message
-        this._panel.webview.postMessage({
+        this._webviewBridge.send({
             type: 'syncDirtyItems',
             columns: dirtyColumns,
             tasks: dirtyTasks
-        });
+        } as any);
 
         this._boardStore.clearAllDirty();
     }
@@ -2048,7 +2059,7 @@ export class KanbanWebviewPanel {
                 column.tasks = tasks;
 
                 // Send update to frontend
-                this._panel.webview.postMessage({
+                this._webviewBridge.send({
                     type: 'updateColumnContent',
                     columnId: column.id,
                     tasks: tasks,
@@ -2056,7 +2067,7 @@ export class KanbanWebviewPanel {
                     displayTitle: column.displayTitle,
                     includeMode: true,
                     includeFiles: column.includeFiles
-                });
+                } as any);
 
 
                 // DON'T invalidate cache for include files - state machine already updated it
@@ -2091,7 +2102,7 @@ export class KanbanWebviewPanel {
                 foundTask.description = fullContent;
 
                 // Send update to frontend
-                this._panel.webview.postMessage({
+                this._webviewBridge.send({
                     type: 'updateTaskContent',
                     columnId: foundColumn.id,
                     taskId: foundTask.id,
@@ -2101,7 +2112,7 @@ export class KanbanWebviewPanel {
                     originalTitle: foundTask.originalTitle,
                     includeMode: true,
                     includeFiles: foundTask.includeFiles
-                });
+                } as any);
 
 
                 // DON'T invalidate cache for include files - state machine already updated it
@@ -2115,11 +2126,11 @@ export class KanbanWebviewPanel {
 
             // CRITICAL: Send updated include content to frontend cache
             const content = file.getContent();
-            this.queueMessage({
+            this._webviewBridge.sendBatched({
                 type: 'updateIncludeContent',
                 filePath: relativePath,
                 content: content
-            });
+            } as any);
 
             // Find all tasks that use this regular include
             const affectedTasks: Array<{task: KanbanTask, column: KanbanColumn}> = [];
@@ -2142,10 +2153,10 @@ export class KanbanWebviewPanel {
 
 
             // Send targeted updates for each affected task
-            // IMPORTANT: Use queueMessage (not postMessage) to ensure cache update arrives BEFORE task updates
+            // WebviewBridge batching ensures cache update arrives BEFORE task updates
             for (const {task, column} of affectedTasks) {
                 // Send task update with current description (frontend will re-render the markdown with updated cache)
-                this.queueMessage({
+                this._webviewBridge.sendBatched({
                     type: 'updateTaskContent',
                     columnId: column.id,
                     taskId: task.id,
@@ -2155,7 +2166,7 @@ export class KanbanWebviewPanel {
                     originalTitle: task.originalTitle,
                     includeMode: false, // Regular includes are NOT includeMode
                     regularIncludeFiles: task.regularIncludeFiles // Send the list so frontend knows what changed
-                });
+                } as any);
 
             }
 
@@ -2173,10 +2184,10 @@ export class KanbanWebviewPanel {
 
         try {
             const shortcuts = await this._messageHandler.getAllShortcuts();
-            this._panel.webview.postMessage({
+            this._webviewBridge.send({
                 type: 'updateShortcuts',
                 shortcuts: shortcuts
-            });
+            } as any);
         } catch (error) {
             console.error('[KanbanWebviewPanel] Failed to send shortcuts to webview:', error);
         }
@@ -2259,10 +2270,10 @@ export class KanbanWebviewPanel {
             };
 
             // Send configuration to webview
-            this._panel.webview.postMessage({
+            this._webviewBridge.send({
                 type: 'configurationUpdate',
                 config: config
-            });
+            } as any);
 
             console.log('[KanbanWebviewPanel] ✅ Configuration refresh complete');
 
@@ -2307,7 +2318,7 @@ export class KanbanWebviewPanel {
             ...(options.version && { version: options.version })
         };
 
-        this._panel.webview.postMessage(message);
+        this._webviewBridge.send(message as any);
     }
 
     /**
@@ -2839,11 +2850,8 @@ export class KanbanWebviewPanel {
             this._unsavedChangesCheckInterval = undefined;
         }
 
-        // Clear message timer to prevent flush attempts after disposal
-        if (this._messageTimer) {
-            clearTimeout(this._messageTimer);
-            this._messageTimer = null;
-        }
+        // Dispose WebviewBridge (Phase 3 migration)
+        this._webviewBridge.dispose();
 
         // Clear panel state
         KanbanWebviewPanel.panelStates.delete(this._panelId);
@@ -3067,7 +3075,7 @@ export class KanbanWebviewPanel {
 
         // Send update to frontend (use normalized paths)
         if (this._panel) {
-            this._panel.webview.postMessage({
+            this._webviewBridge.send({
                 type: 'updateColumnContent',
                 columnId: column.id,
                 tasks: allTasks,
@@ -3075,7 +3083,7 @@ export class KanbanWebviewPanel {
                 displayTitle: column.displayTitle,
                 includeMode: true,
                 includeFiles: normalizedNewFiles
-            });
+            } as any);
         }
     }
 
@@ -3216,51 +3224,17 @@ export class KanbanWebviewPanel {
         // External changes are detected and handled by file watchers and the registry
     }
 
-    /**
-     * PERFORMANCE: Queue message for batched sending to webview
-     */
-    private queueMessage(message: any): void {
-        this._messageQueue.push(message);
-
-        if (!this._messageTimer) {
-            this._messageTimer = setTimeout(() => {
-                this.flushMessages();
-            }, this.MESSAGE_BATCH_DELAY);
-        }
-    }
-
-    /**
-     * PERFORMANCE: Flush queued messages to webview
-     */
-    private flushMessages(): void {
-        // Don't try to flush messages if panel is disposed
-        if (this._isDisposed) {
-            this._messageQueue = [];
-            this._messageTimer = null;
-            return;
-        }
-
-        if (this._messageQueue.length > 0) {
-            // Send batched messages
-            if (this._panel) {
-                this._panel.webview.postMessage({
-                    type: 'batch',
-                    messages: this._messageQueue
-                });
-            }
-            this._messageQueue = [];
-        }
-        this._messageTimer = null;
-    }
+    // REMOVED: queueMessage() - now handled by WebviewBridge.sendBatched() (Phase 3 migration)
+    // REMOVED: flushMessages() - now handled by WebviewBridge.flushBatch() (Phase 3 migration)
 
     /**
      * Trigger snippet insertion in the webview
      */
     public triggerSnippetInsertion(): void {
         if (this._panel) {
-            this._panel.webview.postMessage({
+            this._webviewBridge.send({
                 type: 'triggerSnippet'
-            });
+            } as any);
         }
     }
 }
