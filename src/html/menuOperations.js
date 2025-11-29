@@ -35,6 +35,69 @@ function scrollToElementIfNeeded(element, type = 'element') {
     }
 }
 
+/**
+ * Moves a task element in the DOM without full re-render
+ * @param {string} taskId - The task ID to move
+ * @param {string} columnId - The column ID containing the task (source)
+ * @param {number} newIndex - The new index position in the column
+ * @param {string} [targetColumnId] - Target column ID if moving between columns
+ */
+function moveTaskInDOM(taskId, columnId, newIndex, targetColumnId = null) {
+    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!taskElement) return false;
+
+    const targetColId = targetColumnId || columnId;
+    const targetContainer = document.querySelector(`#tasks-${targetColId}`);
+    if (!targetContainer) return false;
+
+    // Track source stack before moving (for height recalculation)
+    const sourceColumn = taskElement.closest('.kanban-full-height-column');
+    const sourceStack = sourceColumn?.closest('.kanban-column-stack');
+
+    // Get all task items in the target container (excluding the task being moved if same column)
+    const taskItems = Array.from(targetContainer.querySelectorAll('.task-item'))
+        .filter(el => el.dataset.taskId !== taskId);
+
+    // Find the add button to insert before if needed
+    const addButton = targetContainer.querySelector('.add-task-btn');
+
+    // Remove task from current position
+    taskElement.parentNode.removeChild(taskElement);
+
+    // Insert at new position
+    if (newIndex >= taskItems.length) {
+        // Insert at end (before add button if exists)
+        if (addButton) {
+            targetContainer.insertBefore(taskElement, addButton);
+        } else {
+            targetContainer.appendChild(taskElement);
+        }
+    } else {
+        // Insert before the element at newIndex
+        targetContainer.insertBefore(taskElement, taskItems[newIndex]);
+    }
+
+    // Recalculate stack heights after task move
+    const targetColumn = targetContainer.closest('.kanban-full-height-column');
+    const targetStack = targetColumn?.closest('.kanban-column-stack');
+
+    if (typeof window.recalculateStackHeightsImmediate === 'function') {
+        // Recalculate source stack
+        if (sourceStack) {
+            window.recalculateStackHeightsImmediate(sourceStack);
+        }
+        // Recalculate target stack (if different from source)
+        if (targetStack && targetStack !== sourceStack) {
+            window.recalculateStackHeightsImmediate(targetStack);
+        }
+    }
+
+    // Scroll to make the moved task visible
+    scrollToElementIfNeeded(taskElement, 'task');
+
+    return true;
+}
+
 // Simple Menu Manager - handles all menu types
 class SimpleMenuManager {
     constructor() {
@@ -2188,129 +2251,93 @@ function insertTaskAfter(taskId, columnId) {
 }
 
 function moveTaskToTop(taskId, columnId) {
-
-    // Close all menus before full board re-render
-    // CRITICAL: renderBoard() destroys and recreates all DOM elements
     closeAllMenus();
 
-    // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
             const { column } = found;
             const taskIndex = column.tasks.findIndex(t => t.id === taskId);
             if (taskIndex > 0) {
+                // Update cache
                 const task = column.tasks.splice(taskIndex, 1)[0];
                 column.tasks.unshift(task);
 
-                // Re-render UI to reflect changes
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
+                // Update DOM directly instead of full re-render
+                moveTaskInDOM(taskId, column.id, 0);
 
                 markUnsavedChanges();
             }
         }
     }
-
-    // Cache-first: No automatic save, UI updated via cache update above
-    // vscode.postMessage({ type: 'moveTaskToTop', taskId, columnId });
-
 }
 
 function moveTaskUp(taskId, columnId) {
-
-    // Close all menus before full board re-render
-    // CRITICAL: renderBoard() destroys and recreates all DOM elements
     closeAllMenus();
 
-    // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
             const { column } = found;
             const taskIndex = column.tasks.findIndex(t => t.id === taskId);
             if (taskIndex > 0) {
+                // Update cache - swap with previous
                 const task = column.tasks[taskIndex];
                 column.tasks[taskIndex] = column.tasks[taskIndex - 1];
                 column.tasks[taskIndex - 1] = task;
 
-                // Re-render UI to reflect changes
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
+                // Update DOM directly instead of full re-render
+                moveTaskInDOM(taskId, column.id, taskIndex - 1);
 
                 markUnsavedChanges();
             }
         }
     }
-
-    // Cache-first: No automatic save, UI updated via cache update above
-    // vscode.postMessage({ type: 'moveTaskUp', taskId, columnId });
-
 }
 
 function moveTaskDown(taskId, columnId) {
-
-    // Close all menus before full board re-render
-    // CRITICAL: renderBoard() destroys and recreates all DOM elements
     closeAllMenus();
 
-    // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
             const { column } = found;
             const taskIndex = column.tasks.findIndex(t => t.id === taskId);
             if (taskIndex >= 0 && taskIndex < column.tasks.length - 1) {
+                // Update cache - swap with next
                 const task = column.tasks[taskIndex];
                 column.tasks[taskIndex] = column.tasks[taskIndex + 1];
                 column.tasks[taskIndex + 1] = task;
 
-                // Re-render UI to reflect changes
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
+                // Update DOM directly instead of full re-render
+                moveTaskInDOM(taskId, column.id, taskIndex + 1);
 
                 markUnsavedChanges();
             }
         }
     }
-
-    // Cache-first: No automatic save, UI updated via cache update above
-    // vscode.postMessage({ type: 'moveTaskDown', taskId, columnId });
-
 }
 
 function moveTaskToBottom(taskId, columnId) {
-
-    // Close all menus before full board re-render
-    // CRITICAL: renderBoard() destroys and recreates all DOM elements
     closeAllMenus();
 
-    // NEW CACHE SYSTEM: Update cached board directly
     if (window.cachedBoard) {
         const found = findTaskInBoard(taskId, columnId);
         if (found) {
             const { column } = found;
             const taskIndex = column.tasks.findIndex(t => t.id === taskId);
             if (taskIndex >= 0 && taskIndex < column.tasks.length - 1) {
+                // Update cache
                 const task = column.tasks.splice(taskIndex, 1)[0];
                 column.tasks.push(task);
 
-                // Re-render UI to reflect changes
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
+                // Update DOM directly - move to end (last index)
+                moveTaskInDOM(taskId, column.id, column.tasks.length - 1);
 
                 markUnsavedChanges();
             }
         }
     }
-
-    // Cache-first: No automatic save, UI updated via cache update above
-    // vscode.postMessage({ type: 'moveTaskToBottom', taskId, columnId });
-
 }
 
 /**
@@ -2320,7 +2347,7 @@ function moveTaskToBottom(taskId, columnId) {
  * @param {string} taskId - Task to move
  * @param {string} fromColumnId - Source column
  * @param {string} toColumnId - Destination column
- * Side effects: Flushes pending changes, unfolds target
+ * Side effects: Unfolds target column
  */
 function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
     // Unfold the destination column if it's collapsed BEFORE any DOM changes
@@ -2334,39 +2361,25 @@ function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
     const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
     const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
 
-    if (!fromColumn) {
-        closeAllMenus();
-        return;
-    }
-
-    if (!toColumn) {
+    if (!fromColumn || !toColumn) {
         closeAllMenus();
         return;
     }
 
     const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
-
     if (taskIndex < 0) {
         closeAllMenus();
         return;
     }
 
-    // Move the task
+    // Update cache - move task to end of target column
     const task = fromColumn.tasks.splice(taskIndex, 1)[0];
     toColumn.tasks.push(task);
 
-    // Re-render UI to reflect changes
-    if (typeof renderBoard === 'function') {
-        renderBoard();
-        console.log('[moveTaskToColumn] Board re-rendered');
-    } else {
-        console.error('[moveTaskToColumn] renderBoard is not a function!');
-    }
+    // Update DOM directly - move to end of target column
+    moveTaskInDOM(taskId, fromColumnId, toColumn.tasks.length - 1, toColumnId);
 
     markUnsavedChanges();
-    console.log('[moveTaskToColumn] Marked as unsaved');
-
-    // Close all menus
     closeAllMenus();
 }
 
