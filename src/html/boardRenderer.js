@@ -2680,6 +2680,158 @@ function applyStackedColumnStyles(columnId = null) {
 window.applyStackedColumnStyles = applyStackedColumnStyles;
 
 /**
+ * Reorganize stacks around a specific column after #stack tag change
+ * This is much faster than full renderBoard() as it only touches affected stacks
+ * @param {string} columnId - The column whose #stack tag changed
+ */
+function reorganizeStacksForColumn(columnId) {
+    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+    if (!columnElement || !window.cachedBoard) return false;
+
+    const column = window.cachedBoard.columns.find(c => c.id === columnId);
+    if (!column) return false;
+
+    const columnIndex = window.cachedBoard.columns.indexOf(column);
+    const rowContainer = columnElement.closest('.kanban-row');
+    if (!rowContainer) return false;
+
+    const hasStackTag = /#stack\b/i.test(column.title);
+    const currentStack = columnElement.closest('.kanban-column-stack');
+
+    // Get columns in the same row
+    const columnRow = window.getColumnRow ? window.getColumnRow(column.title) : 1;
+    const columnsInRow = window.cachedBoard.columns
+        .map((col, idx) => ({ col, idx }))
+        .filter(({ col }) => (window.getColumnRow ? window.getColumnRow(col.title) : 1) === columnRow);
+
+    // Find this column's position in the row
+    const posInRow = columnsInRow.findIndex(({ col }) => col.id === columnId);
+    const prevInRow = posInRow > 0 ? columnsInRow[posInRow - 1] : null;
+    const nextInRow = posInRow < columnsInRow.length - 1 ? columnsInRow[posInRow + 1] : null;
+
+    if (hasStackTag) {
+        // ADDING #stack - merge with previous column's stack
+        if (prevInRow) {
+            const prevElement = document.querySelector(`[data-column-id="${prevInRow.col.id}"]`);
+            if (prevElement) {
+                const prevStack = prevElement.closest('.kanban-column-stack');
+                if (prevStack && prevStack !== currentStack) {
+                    // Move this column (and any following #stack columns) to the previous stack
+                    // First, collect columns to move (this column + consecutive #stack columns after)
+                    const columnsToMove = [columnElement];
+
+                    // Check if there are more #stack columns after this one in the current stack
+                    if (currentStack) {
+                        const siblings = Array.from(currentStack.querySelectorAll('.kanban-full-height-column'));
+                        const myIndex = siblings.indexOf(columnElement);
+                        for (let i = myIndex + 1; i < siblings.length; i++) {
+                            const siblingId = siblings[i].getAttribute('data-column-id');
+                            const siblingCol = window.cachedBoard.columns.find(c => c.id === siblingId);
+                            if (siblingCol && /#stack\b/i.test(siblingCol.title)) {
+                                columnsToMove.push(siblings[i]);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Move columns to previous stack
+                    columnsToMove.forEach(col => {
+                        prevStack.appendChild(col);
+                    });
+
+                    // Clean up empty stack
+                    if (currentStack && currentStack.children.length === 0) {
+                        currentStack.remove();
+                    }
+                }
+            }
+        }
+    } else {
+        // REMOVING #stack - split from current stack
+        if (currentStack) {
+            const siblings = Array.from(currentStack.querySelectorAll('.kanban-full-height-column'));
+            const myIndex = siblings.indexOf(columnElement);
+
+            if (myIndex > 0) {
+                // This column is not the first in the stack - need to split
+                // Create new stack for this column and all following columns
+                const newStack = document.createElement('div');
+                newStack.className = 'kanban-column-stack';
+
+                // Move this column and all following to the new stack
+                for (let i = myIndex; i < siblings.length; i++) {
+                    newStack.appendChild(siblings[i]);
+                }
+
+                // Insert new stack after the current stack
+                currentStack.parentNode.insertBefore(newStack, currentStack.nextSibling);
+
+                // Now check if the new stack needs further splitting
+                // (if there are non-#stack columns after this one that should be separate)
+                const newSiblings = Array.from(newStack.querySelectorAll('.kanban-full-height-column'));
+                for (let i = 1; i < newSiblings.length; i++) {
+                    const siblingId = newSiblings[i].getAttribute('data-column-id');
+                    const siblingCol = window.cachedBoard.columns.find(c => c.id === siblingId);
+                    if (siblingCol && !/#stack\b/i.test(siblingCol.title)) {
+                        // This column doesn't have #stack - needs its own stack
+                        // But first check if next columns have #stack (they'd stay with this one)
+                        const splitStack = document.createElement('div');
+                        splitStack.className = 'kanban-column-stack';
+
+                        // Move this and remaining columns
+                        while (newSiblings[i]) {
+                            splitStack.appendChild(newSiblings[i]);
+                            i++;
+                        }
+                        newStack.parentNode.insertBefore(splitStack, newStack.nextSibling);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Recalculate heights for affected stacks
+    const affectedStacks = new Set();
+    const finalStack = columnElement.closest('.kanban-column-stack');
+    if (finalStack) affectedStacks.add(finalStack);
+    if (currentStack && currentStack !== finalStack) affectedStacks.add(currentStack);
+
+    // Also get prev/next stacks
+    if (prevInRow) {
+        const prevEl = document.querySelector(`[data-column-id="${prevInRow.col.id}"]`);
+        if (prevEl) {
+            const prevStack = prevEl.closest('.kanban-column-stack');
+            if (prevStack) affectedStacks.add(prevStack);
+        }
+    }
+    if (nextInRow) {
+        const nextEl = document.querySelector(`[data-column-id="${nextInRow.col.id}"]`);
+        if (nextEl) {
+            const nextStack = nextEl.closest('.kanban-column-stack');
+            if (nextStack) affectedStacks.add(nextStack);
+        }
+    }
+
+    // Recalculate only affected stacks
+    affectedStacks.forEach(stack => {
+        if (stack && stack.parentNode) {
+            enforceFoldModesForStacks(stack);
+            recalculateStackHeightsImmediate(stack);
+        }
+    });
+
+    // Update drop zones
+    if (typeof cleanupStacksAndAddDropZones === 'function') {
+        cleanupStacksAndAddDropZones(rowContainer);
+    }
+
+    return true;
+}
+window.reorganizeStacksForColumn = reorganizeStacksForColumn;
+
+/**
  * DEPRECATED - DO NOT USE - keeping for reference only
  * Use enforceFoldModesForStacks() and recalculateStackHeights() instead
  */

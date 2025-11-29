@@ -904,7 +904,40 @@ class TaskEditor {
                                 window.updateAllVisualTagElements(columnElement, allTags, 'column');
                             }
 
-                            // STEP 4: Return (matching task pattern line 1049)
+                            // STEP 4: Check layout changes even for include columns (they can have #stack too!)
+                            const originalTitleForLayout = element.getAttribute('data-original-title') || '';
+                            const layoutChangedForInclude = this.hasLayoutChanged(originalTitleForLayout, newTitle);
+
+                            if (layoutChangedForInclude) {
+                                // Layout tags changed - reorganize stacks (optimized, no full re-render)
+                                const stackChangedForInclude = this.hasStackTagChanged(originalTitleForLayout, newTitle);
+
+                                if (stackChangedForInclude && typeof window.reorganizeStacksForColumn === 'function') {
+                                    // Use optimized stack reorganization
+                                    window.reorganizeStacksForColumn(columnId);
+                                } else {
+                                    // Other layout changes need full re-render
+                                    const savedEditorForInclude = this.currentEditor;
+                                    this.currentEditor = null;
+
+                                    if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+                                        window.renderBoard();
+                                    }
+                                    if (typeof window.applyStackedColumnStyles === 'function') {
+                                        requestAnimationFrame(() => {
+                                            window.applyStackedColumnStyles();
+                                        });
+                                    }
+
+                                    this.currentEditor = savedEditorForInclude;
+                                }
+                            }
+
+                            // Mark as unsaved
+                            if (typeof markUnsavedChanges === 'function') {
+                                markUnsavedChanges();
+                            }
+
                             return;
                         }
 
@@ -913,18 +946,29 @@ class TaskEditor {
                         const layoutChanged = this.hasLayoutChanged(originalTitle, newTitle);
 
                         if (layoutChanged) {
-                            // Layout tags changed - refresh the board layout
-                            if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                window.renderBoard(); // Full re-render to recalculate positions
-                            }
+                            // Layout tags changed - reorganize stacks (optimized, no full re-render)
+                            // Check if only #stack changed (not #row or #span)
+                            const stackChanged = this.hasStackTagChanged(originalTitle, newTitle);
 
-                            // CRITICAL: Recalculate stack positions after layout change
-                            // This handles #stack tag additions/removals immediately
-                            // Recalculate all stacks since adding/removing #stack affects neighboring columns
-                            if (typeof window.applyStackedColumnStyles === 'function') {
-                                requestAnimationFrame(() => {
-                                    window.applyStackedColumnStyles(); // Recalculate all stacks
-                                });
+                            if (stackChanged && typeof window.reorganizeStacksForColumn === 'function') {
+                                // Use optimized stack reorganization (only affects nearby stacks)
+                                window.reorganizeStacksForColumn(columnId);
+                            } else {
+                                // Other layout changes need full re-render
+                                const savedEditor = this.currentEditor;
+                                this.currentEditor = null;
+
+                                if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+                                    window.renderBoard();
+                                }
+
+                                if (typeof window.applyStackedColumnStyles === 'function') {
+                                    requestAnimationFrame(() => {
+                                        window.applyStackedColumnStyles();
+                                    });
+                                }
+
+                                this.currentEditor = savedEditor;
                             }
                         }
 
@@ -1459,16 +1503,15 @@ class TaskEditor {
             result += ` ${originalSpan}`;
         }
 
-        // Handle stack tags with conflict resolution
+        // Handle stack tags - user sees full title with #stack, so if they removed it, respect that
+        // (Unlike hidden tags that users can't see, #stack is visible in editor)
         if (userNoStack) {
             // User explicitly disabled stack - don't add stack tag
         } else if (userStack) {
-            // User specified stack tag - use it
-            result += ` #stack`;
-        } else if (originalStack) {
-            // Keep original stack tag if user didn't specify one
+            // User kept or added stack tag - use it
             result += ` #stack`;
         }
+        // If originalStack existed but userStack is null, user intentionally removed it - don't re-add
 
         return result.trim();
     }
@@ -1489,6 +1532,25 @@ class TaskEditor {
         };
 
         return getLayoutTags(oldTitle) !== getLayoutTags(newTitle);
+    }
+
+    /**
+     * Checks if only the #stack tag changed (not #row or #span)
+     * Used to determine if we can use optimized stack reorganization
+     * @param {string} oldTitle - Original title
+     * @param {string} newTitle - New title
+     * @returns {boolean} - True if only #stack changed
+     */
+    hasStackTagChanged(oldTitle, newTitle) {
+        const oldStack = /#stack\b/i.test(oldTitle);
+        const newStack = /#stack\b/i.test(newTitle);
+        const oldSpan = oldTitle.match(/#span(\d+)\b/i)?.[0] || '';
+        const newSpan = newTitle.match(/#span(\d+)\b/i)?.[0] || '';
+        const oldRow = oldTitle.match(/#row(\d+)\b/i)?.[0] || '';
+        const newRow = newTitle.match(/#row(\d+)\b/i)?.[0] || '';
+
+        // Only #stack changed if: stack is different AND span/row are the same
+        return (oldStack !== newStack) && (oldSpan === newSpan) && (oldRow === newRow);
     }
 
     /**
