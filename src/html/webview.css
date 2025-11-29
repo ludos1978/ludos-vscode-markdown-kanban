@@ -2247,17 +2247,17 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack .kanban-full-height-column .column-inner {
-	transform: translateZ(-0.08px);
+	transform: translateZ(-0.08px) translate(0px,-2.0px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  transform: translateZ(-0.11px);
+  transform: translateZ(-0.11px) translate(0px,-2.0px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(-0.133px);
+	transform: translateZ(-0.133px) translate(0px,-2.0px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
@@ -3929,7 +3929,7 @@ h6 .kanban-tag {
   pointer-events: none;
   z-index: 10;
   gap: 16px;
-  translate: translateZ(1px);
+  translate: translateZ(1px) translate(0px,-2.0px);
 }
 
 /* Positioning for each corner - horizontal by default */
