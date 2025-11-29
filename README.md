@@ -45,7 +45,7 @@ This extension uses a **state machine architecture** for handling all file chang
 \`\`\`mermaid
 \`\`\`
 
-#### To use draw.io 
+#### To use draw.io
 
   Option 1: Install via Homebrew (Recommended)
 
@@ -95,273 +95,309 @@ Add cards using the buttons.
 
 ### Open Issues
 
-Drag & Dropping Files from outside the editor doesnt create a correct path. Caused by https://github.com/microsoft/vscode-discussions/discussions/1663 
+Drag & Dropping Files from outside the editor doesnt create a correct path. Caused by https://github.com/microsoft/vscode-discussions/discussions/1663
 
 ### Screenshot
 
 ![](./imgs/screenshot-20250901.png)
 
 
-## @ Tags and #gather\_ System Documentation
+## Tag System
 
-## Overview
+The Kanban board uses a flexible tag system with four distinct tag types, each with its own prefix character. Tags capture everything after the prefix until whitespace (space, tab, or newline).
 
-The Markdown Kanban board supports advanced card organization using `@` tags and `#gather_` rules. This system allows automatic sorting and distribution of cards across columns based on tags and rules.
+### Tag Types Overview
 
-## @ Tags (Card Tags)
+| Prefix | Type | Description | Examples |
+|--------|------|-------------|----------|
+| `#` | Hash tags | Regular tags for categorization | `#todo`, `#urgent`, `#feature` |
+| `@` | Person tags | Assign people/mentions | `@john`, `@team-alpha` |
+| `.` | Temporal tags | Dates, times, weeks, weekdays | `.2025.01.28`, `.w15`, `.mon` |
+| `?` | Query tags | Gather cards matching criteria | `?#todo`, `?@reto`, `?.today` |
 
-Cards can be tagged with `@` symbols to add metadata. Tags can appear in either the card title or description.
+---
 
-### Person Tags
+## Hash Tags (`#`)
 
-Assign people to cards:
+Regular tags for categorization, status, and layout control.
 
-markdown
+### Basic Tags
 
-```
-- [ ] Review PR @Reto
-- [ ] Meeting preparation @Anita @Reto
-```
-
-### Date Tags
-
-Add dates to cards. The first date tag of each type is recognized:
-
-**Shorthand format** (assumes due date):
-
-markdown
-
-```
-- [ ] Submit report @2025-03-27
-- [ ] Review document @27-03-2025
+```markdown
+- [ ] Review code #urgent #frontend
+- [ ] Write tests #todo #backend
 ```
 
-**Typed format**:
+### Priority & State Tags
 
-markdown
-
-```
-- [ ] Task @due:2025-03-27
-- [ ] Completed task @done:2025-03-26
-- [ ] Project @start:2025-03-01 @end:2025-04-01
+```markdown
+#high #medium #low #urgent
+#todo #doing #done #blocked #waiting
 ```
 
-Supported date types: `due`, `done`, `modified`, `start`, `end`
+### Layout Tags
 
-### Sticky Tag
+| Tag | Description | Example |
+|-----|-------------|---------|
+| `#row2` | Place column in row 2 | `## Backlog #row2` |
+| `#span2` | Column spans 2 units wide | `## Main #span2` |
+| `#stack` | Stack columns horizontally | `## Week 1 #stack` |
+| `#sticky` | Prevent card from being moved during sorting | `- [ ] Important #sticky` |
+| `#fold` | Collapse column/card by default | `## Archive #fold` |
+| `#archive` | Mark as archived | `## Done #archive` |
+| `#hidden` | Hide from view | `## Hidden #hidden` |
+| `#include:path` | Include content from another file | `## Tasks #include:./tasks.md` |
 
-Prevents a card from being moved during sorting:
+### Numeric Index Tags
 
-markdown
+For ordering columns/cards:
 
+```markdown
+## #1 First Column
+## #2 Second Column
+## #1.1 Sub-section
+## #3.1.4 Deep nesting
 ```
-- [ ] Important task @sticky
+
+---
+
+## Person Tags (`@`)
+
+Assign people or teams to cards. Everything after `@` until whitespace is the person/team name.
+
+```markdown
+- [ ] Review PR @reto
+- [ ] Team meeting @team-alpha
+- [ ] Collaboration @johnson&smith
 ```
 
-## #gather\_ Rules (Column Tags)
+---
 
-Column headers can contain `#gather_` tags to automatically collect cards matching specific criteria when the sort button is pressed.
+## Temporal Tags (`.`)
+
+Date and time tags for scheduling. The `.` prefix is followed by various time formats.
+
+### Date Formats
+
+```markdown
+.2025.01.28      # Date with dots
+.2025-01-28      # Date with dashes
+.2025/01/28      # Date with slashes
+```
+
+### Week Tags
+
+```markdown
+.w15             # Week 15 (current year)
+.W15             # Case insensitive
+.2025.w15        # Week 15 of 2025
+.2025-w15        # Alternative format
+```
+
+### Weekday Tags
+
+```markdown
+.mon .monday     # Monday
+.tue .tuesday    # Tuesday
+.wed .wednesday  # Wednesday
+.thu .thursday   # Thursday
+.fri .friday     # Friday
+.sat .saturday   # Saturday
+.sun .sunday     # Sunday
+```
+
+### Time Tags
+
+```markdown
+.15:30           # 24-hour format
+.9am             # 12-hour format
+.10pm            # Evening
+.22:00           # 24-hour evening
+```
+
+### Time Slot Tags
+
+```markdown
+.9am-5pm         # Work hours
+.15:30-17:00     # Meeting slot
+.10am-12pm       # Morning block
+```
+
+### Temporal Highlighting
+
+Cards and columns with temporal tags matching the current date/time are automatically highlighted (e.g., today's date, current week, current weekday).
+
+---
+
+## Query Tags (`?`)
+
+Query tags gather/collect cards matching specific criteria into a column. The `?` is followed by a tag type prefix (`#`, `@`, or `.`) and the query content.
 
 ### Basic Syntax
 
-markdown
-
-```
-## To Do #gather_Reto
-## This Week #gather_day<7
-## Urgent #gather_priority
+```markdown
+## Reto's Tasks ?@reto
+## Todo Items ?#todo
+## Today ?.today
 ```
 
-### Operators
+### Query Operators
 
 | Operator | Description | Example |
-| --- | --- | --- |
-| `&` | AND (all conditions must match) | `#gather_Reto&day<3` |
-| `\|` | OR (any condition matches) | `#gather_Reto\|Anita` |
-| `=` | EQUAL | `#gather_day=0` (today) |
-| `!=` | NOT EQUAL | `#gather_weekday!=2` (not Tuesday) |
-| `<` | LESS THAN | `#gather_day<7` (within 7 days) |
-| `>` | GREATER THAN | `#gather_day>0` (future dates) |
-| `!` | NOT (negates expression) | `#gather_!Reto` (not assigned to Reto) |
+|----------|-------------|---------|
+| `&` | AND - all conditions must match | `?#urgent&important` |
+| `\|` | OR - any condition matches | `?@reto\|bruno` |
+| `!` | NOT - exclude matches | `?#todo!done` |
 
-### Date Properties
+### Query Examples
+
+#### Gather by Person
+
+```markdown
+## Reto's Tasks ?@reto
+## Team Work ?@reto|bruno|anna
+```
+
+#### Gather by Hash Tag
+
+```markdown
+## Urgent ?#urgent
+## Features ?#feature&frontend
+## Not Done ?#todo!completed
+```
+
+#### Gather by Temporal
+
+```markdown
+## Today ?.today
+## Today (alternate) ?.day=0
+## This Week ?.w15
+## Monday Tasks ?.mon
+```
+
+#### Gather by Day Offset
+
+Use comparison operators with `day` to gather cards relative to today:
+
+```markdown
+## Past Due ?.day<0
+## Today ?.day=0
+## Tomorrow ?.day=1
+## Next 7 Days ?.day<7
+## This Week ?.0<day&day<7
+```
+
+| Expression | Description |
+|------------|-------------|
+| `?.day<0` | Cards with dates before today (overdue) |
+| `?.day=0` | Cards with today's date |
+| `?.day>0` | Cards with future dates |
+| `?.day<7` | Cards within the next 7 days |
+| `?.day>-7&day<0` | Cards from the past 7 days |
+
+#### Combined Queries
+
+A column can have multiple query tags:
+
+```markdown
+## Reto This Week ?@reto ?.w15
+```
+
+---
+
+## Legacy Gather System
+
+The legacy `#gather_` syntax is still supported for backward compatibility:
+
+```markdown
+## To Do #gather_Reto
+## This Week #gather_day<7
+```
+
+### Legacy Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | AND | `#gather_Reto&day<3` |
+| `\|` | OR | `#gather_Reto\|Anita` |
+| `=` | EQUAL | `#gather_day=0` |
+| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
+| `<` | LESS THAN | `#gather_day<7` |
+| `>` | GREATER THAN | `#gather_day>0` |
+
+### Legacy Date Properties
 
 | Property | Description | Values |
-| --- | --- | --- |
-| `day` or `dayoffset` | Days from today | ..., -2, -1, 0, 1, 2, ... |
-| `weekday` | Day name | mon, tue, wed, thu, fri, sat, sun |
+|----------|-------------|--------|
+| `day` | Days from today | -2, -1, 0, 1, 2, ... |
+| `weekday` | Day name | mon, tue, wed, ... |
 | `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
-| `month` | Month name | jan, feb, mar, ... dec |
+| `month` | Month name | jan, feb, mar, ... |
 | `monthnum` | Month number | 1 to 12 |
-
-## Examples
-
-### Simple Person Gathering
-
-markdown
-
-```
-## Reto's Tasks #gather_Reto
-```
-
-Collects all cards with `@Reto`
-
-### Multiple People
-
-markdown
-
-```
-## Team Tasks #gather_Reto|Anita|John
-```
-
-Collects cards with `@Reto` OR `@Anita` OR `@John`
-
-### Today's Tasks
-
-markdown
-
-```
-## Today #gather_day=0
-```
-
-Collects cards with today's date
-
-### This Week
-
-markdown
-
-```
-## This Week #gather_day>=0&day<7
-```
-
-Collects cards dated from today through next 6 days
-
-### Complex Rules
-
-markdown
-
-```
-## Urgent This Week #gather_day>0&day<7&weekday!=sat&weekday!=sun
-```
-
-Collects cards due in the next 7 days, excluding weekends
-
-### Combined Person and Date
-
-markdown
-
-```
-## Reto This Week #gather_Reto&day<7
-```
-
-Collects cards assigned to Reto that are due within 7 days
-
-### Next Week's Mondays
-
-markdown
-
-```
-## Monday Tasks #gather_weekday=mon&day>0&day<14
-```
-
-Collects tasks on Mondays in the next two weeks
-
-## Special Tags
 
 ### #ungathered
 
-A fallback that collects all cards with @ tags that didn't match any gather rule:
+Collects all cards that didn't match any gather rule:
 
-markdown
-
-```
-## Unassigned #ungathered
-```
-
-**Important**: `#ungathered` is always processed LAST, regardless of column position. It only catches cards with @ tags that weren't matched by any `#gather_` rule.
-
-### #sort-bydate and #sort-byname
-
-Sort cards within a column:
-
-markdown
-
-```
-## This Week #gather_day<7 #sort-bydate
-## Team Tasks #gather_Reto|Anita #sort-byname
-```
-
-## Sorting Process
-
-When you press the Sort button:
-
-1.  **Sticky cards** stay in place (marked with `@sticky`)
-2.  **Regular gather rules** are processed in column order (left to right)
-    *   Each card is checked against all rules
-    *   First matching rule wins
-    *   Card moves to that column
-3.  **Ungathered rule** processes remaining cards with @ tags
-4.  **Unmatched cards** stay in their original columns
-5.  **Sort rules** are applied within each column
-
-## Advanced Examples
-
-### Project Dashboard
-
-markdown
-
-```
-## Overdue #gather_day<0 #sort-bydate
-## Today #gather_day=0
-## This Week #gather_day>0&day<7 #sort-bydate
-## Next Week #gather_day>=7&day<14 #sort-bydate
-## Reto #gather_Reto&day>=14
-## Anita #gather_Anita&day>=14
+```markdown
 ## Backlog #ungathered
 ```
 
-### Sprint Board
+---
 
-markdown
+## Sorting Tags
 
-```
-## Monday #gather_weekday=mon&day>=0&day<7
-## Tuesday #gather_weekday=tue&day>=0&day<7
-## Wednesday #gather_weekday=wed&day>=0&day<7
-## Thursday #gather_weekday=thu&day>=0&day<7
-## Friday #gather_weekday=fri&day>=0&day<7
-## Unscheduled #ungathered
+### Sort Within Column
+
+```markdown
+## Tasks #sort-bydate
+## People #sort-byname
 ```
 
-### Priority System
+### Sorting Process
 
-markdown
+1. **Sticky cards** (`#sticky`) stay in place
+2. **Query/gather rules** processed left to right
+3. **First match wins** - card moves to matching column
+4. **#ungathered** processes remaining tagged cards
+5. **Sort rules** applied within each column
 
+---
+
+## Complete Example
+
+```markdown
+---
+kanban-plugin: board
+---
+
+## Today ?.today #sort-bydate
+- [ ] Morning standup .9am @team
+- [ ] Code review #urgent @reto
+
+## This Week ?.w48
+- [ ] Feature implementation #feature .fri
+- [ ] Documentation #docs .thu
+
+## Reto ?@reto
+- [ ] Bug fix #bug
+- [ ] Testing #qa
+
+## Backlog #ungathered #fold
+- [ ] Future task #idea
 ```
-## Critical Today #gather_priority&day=0
-## Urgent This Week #gather_urgent&day<7
-## Normal #gather_!priority&!urgent
-## Backlog #ungathered
-```
+
+---
 
 ## Tips
 
-1.  **Order matters**: Place columns with more specific rules first
-2.  **First match wins**: Once a card matches a rule, it stops checking
-3.  **Use @sticky**: Keep important cards in place during sorting
-4.  **Combine operators**: Create complex rules with & and |
-5.  **Test incrementally**: Start with simple rules and add complexity
+1. **Order matters**: Place columns with specific queries first
+2. **First match wins**: Cards stop checking after first match
+3. **Use #sticky**: Keep important cards in place during sorting
+4. **Temporal highlighting**: Current date/week/day cards are highlighted
+5. **Combine tags**: Use multiple tag types on same card/column
 
-## Notes
-
-*   Date comparisons use the system's local time
-*   European date format (DD-MM-YYYY) is automatically converted
-*   Cards without any @ tags are never moved by gather rules
-*   Multiple gather rules in one column are combined with OR
-
-## Layout Tags
-
-#stack and #row{number} are for layouting purposes.
+---
 
 ## marp
 

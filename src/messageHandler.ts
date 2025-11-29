@@ -4849,6 +4849,7 @@ export class MessageHandler {
     /**
      * Handle draw.io diagram rendering request from webview
      * Uses backend DrawIOService with CLI for conversion
+     * Implements file-based caching to avoid re-rendering unchanged diagrams
      */
     private async handleRenderDrawIO(message: any): Promise<void> {
         const { requestId, filePath } = message;
@@ -4860,15 +4861,6 @@ export class MessageHandler {
         }
 
         try {
-            // Import draw.io service
-            const { DrawIOService } = await import('./services/export/DrawIOService');
-            const service = new DrawIOService();
-
-            // Check if CLI is available
-            if (!await service.isAvailable()) {
-                throw new Error('draw.io CLI not installed');
-            }
-
             // Resolve file path (handles both document-relative and workspace-relative paths)
             const resolution = await panel._fileManager.resolveFilePath(filePath);
 
@@ -4882,11 +4874,48 @@ export class MessageHandler {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Render to PNG (better rendering than SVG in webview)
-            const pngBuffer = await service.renderPNG(absolutePath);
+            // Determine cache location based on file context
+            // For included files: {include-filename}-Media/drawio-cache/
+            // For main file: {kanban-filename}-Media/drawio-cache/
+            const cacheDir = this.getDrawIOCacheDir(absolutePath, panel);
+            const cacheFileName = this.getDrawIOCacheFileName(absolutePath, fileMtime);
+            const cachePath = path.join(cacheDir, cacheFileName);
 
-            // Convert PNG to data URL
-            const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            let pngDataUrl: string;
+
+            // Check if cached version exists and is valid
+            if (fs.existsSync(cachePath)) {
+                console.log(`[DrawIO Backend] Using cached render: ${cacheFileName}`);
+                const cachedPng = await fs.promises.readFile(cachePath);
+                pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
+            } else {
+                // Import draw.io service
+                const { DrawIOService } = await import('./services/export/DrawIOService');
+                const service = new DrawIOService();
+
+                // Check if CLI is available
+                if (!await service.isAvailable()) {
+                    throw new Error('draw.io CLI not installed');
+                }
+
+                console.log(`[DrawIO Backend] Rendering: ${path.basename(absolutePath)}`);
+
+                // Render to PNG (better rendering than SVG in webview)
+                const pngBuffer = await service.renderPNG(absolutePath);
+
+                // Ensure cache directory exists
+                await fs.promises.mkdir(cacheDir, { recursive: true });
+
+                // Save to cache
+                await fs.promises.writeFile(cachePath, pngBuffer);
+                console.log(`[DrawIO Backend] Cached render: ${cacheFileName}`);
+
+                // Clean up old cache files for this diagram (different mtimes)
+                await this.cleanOldDrawIOCache(cacheDir, absolutePath, cacheFileName);
+
+                // Convert PNG to data URL
+                pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+            }
 
             // Send success response to webview with mtime for cache invalidation
             panel.webview.postMessage({
@@ -4905,6 +4934,63 @@ export class MessageHandler {
                 requestId,
                 error: error instanceof Error ? error.message : String(error)
             });
+        }
+    }
+
+    /**
+     * Get cache directory for draw.io rendered images
+     * Uses {filename}-Media/drawio-cache/ structure
+     */
+    private getDrawIOCacheDir(diagramPath: string, panel: any): string {
+        // Determine which file the diagram belongs to (main kanban or include file)
+        const diagramDir = path.dirname(diagramPath);
+        const kanbanPath = panel._documentPath;
+        const kanbanDir = path.dirname(kanbanPath);
+        const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
+
+        // Check if diagram is in a different directory (likely from an include file)
+        if (diagramDir !== kanbanDir) {
+            // Find the include file this diagram likely belongs to
+            // Use the diagram's directory to create a local cache
+            const diagramBaseName = path.basename(diagramDir);
+            return path.join(diagramDir, `${diagramBaseName}-Media`, 'drawio-cache');
+        }
+
+        // Default: use main kanban's media folder
+        return path.join(kanbanDir, `${kanbanBaseName}-Media`, 'drawio-cache');
+    }
+
+    /**
+     * Generate cache file name based on source file path and mtime
+     * Format: {basename}-{hash}-{mtime}.png
+     */
+    private getDrawIOCacheFileName(sourcePath: string, mtime: number): string {
+        const basename = path.basename(sourcePath, path.extname(sourcePath));
+        // Create a simple hash from the full path to handle files with same name in different dirs
+        const pathHash = Buffer.from(sourcePath).toString('base64').replace(/[/+=]/g, '').substring(0, 8);
+        return `${basename}-${pathHash}-${Math.floor(mtime)}.png`;
+    }
+
+    /**
+     * Clean up old cache files for a diagram (different mtimes = outdated)
+     */
+    private async cleanOldDrawIOCache(cacheDir: string, sourcePath: string, currentCacheFile: string): Promise<void> {
+        try {
+            const basename = path.basename(sourcePath, path.extname(sourcePath));
+            const pathHash = Buffer.from(sourcePath).toString('base64').replace(/[/+=]/g, '').substring(0, 8);
+            const prefix = `${basename}-${pathHash}-`;
+
+            const files = await fs.promises.readdir(cacheDir);
+            for (const file of files) {
+                if (file.startsWith(prefix) && file !== currentCacheFile && file.endsWith('.png')) {
+                    const oldPath = path.join(cacheDir, file);
+                    await fs.promises.unlink(oldPath);
+                    console.log(`[DrawIO Backend] Cleaned old cache: ${file}`);
+                }
+            }
+        } catch (error) {
+            // Ignore cleanup errors
+            console.warn('[DrawIO Backend] Cache cleanup warning:', error);
         }
     }
 

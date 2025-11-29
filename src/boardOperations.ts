@@ -620,10 +620,10 @@ export class BoardOperations {
         // Collect all rules from columns in order
         board.columns.forEach(column => {
             if (!column.title) {return;}
-            
-            // Extract gather and ungathered tags
-            const matches = column.title.match(/#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g) || [];
-            matches.forEach(match => {
+
+            // Extract legacy gather and ungathered tags (#gather_...)
+            const legacyMatches = column.title.match(/#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g) || [];
+            legacyMatches.forEach(match => {
                 const tag = match.substring(1);
                 if (tag === 'ungathered') {
                     // Store ungathered rules separately
@@ -633,6 +633,70 @@ export class BoardOperations {
                     gatherRules.push({
                         column: column,
                         expression: tag.substring(7)
+                    });
+                }
+            });
+
+            // Extract new query tags (?. for temporal, ?@ for person, ?# for hash)
+            // Pattern: ?[.@#]<content> where content is everything until whitespace
+            const queryMatches = column.title.match(/\?([.@#])([^\s]+)/g) || [];
+            queryMatches.forEach(match => {
+                const typePrefix = match[1]; // . @ or #
+                const queryContent = match.substring(2); // Everything after the type prefix
+
+                if (typePrefix === '.') {
+                    // Temporal query: ?.day<0, ?.today, ?.w15, etc.
+                    // Convert to gather expression format
+                    if (queryContent === 'today') {
+                        // ?.today -> day=0
+                        gatherRules.push({
+                            column: column,
+                            expression: 'day=0'
+                        });
+                    } else if (queryContent.match(/^day[<>=!]/)) {
+                        // ?.day<0, ?.day=0, ?.day>5, etc. -> pass through
+                        gatherRules.push({
+                            column: column,
+                            expression: queryContent
+                        });
+                    } else if (queryContent.match(/^-?\d+[<>]day$/)) {
+                        // ?.0<day, ?.-7<day -> pass through (reverse notation)
+                        gatherRules.push({
+                            column: column,
+                            expression: queryContent
+                        });
+                    } else if (queryContent.match(/^w\d+$/i)) {
+                        // ?.w15 -> week comparison (need to add week support)
+                        const weekNum = parseInt(queryContent.substring(1));
+                        gatherRules.push({
+                            column: column,
+                            expression: `week=${weekNum}`
+                        });
+                    } else if (queryContent.match(/^(mon|tue|wed|thu|fri|sat|sun)/i)) {
+                        // ?.mon, ?.tuesday -> weekday comparison
+                        gatherRules.push({
+                            column: column,
+                            expression: `weekday=${queryContent.substring(0, 3).toLowerCase()}`
+                        });
+                    } else {
+                        // Other temporal queries - try to parse as date or pass through
+                        gatherRules.push({
+                            column: column,
+                            expression: queryContent
+                        });
+                    }
+                } else if (typePrefix === '@') {
+                    // Person query: ?@reto, ?@reto|bruno
+                    gatherRules.push({
+                        column: column,
+                        expression: queryContent
+                    });
+                } else if (typePrefix === '#') {
+                    // Hash tag query: ?#urgent, ?#todo&important
+                    // For hash tags, we need to check if the card has the tag
+                    gatherRules.push({
+                        column: column,
+                        expression: `tag_${queryContent}`
                     });
                 }
             });
@@ -792,7 +856,17 @@ export class BoardOperations {
             const flippedOp = operator === '<' ? '>' : '<';
             return this.createComparisonEvaluator(property.trim(), flippedOp, value.trim());
         }
-        
+
+        // Handle hash tag queries (tag_X from ?#X)
+        if (expr.startsWith('tag_')) {
+            const tagName = expr.substring(4).toLowerCase();
+            return (taskText, taskDate, personNames) => {
+                // Check if task text contains the hash tag
+                const tagPattern = new RegExp(`#${tagName}(?=\\s|$)`, 'i');
+                return tagPattern.test(taskText);
+            };
+        }
+
         // Default: treat as person name
         return (taskText, taskDate, personNames) => {
             return personNames.map(p => p.toLowerCase()).includes(expr.toLowerCase());
@@ -833,7 +907,7 @@ export class BoardOperations {
         (taskText: string, taskDate: string | null, personNames: string[]) => boolean {
         
         // List of date-related properties
-        const dateProperties = ['dayoffset', 'day', 'weekday', 'weekdaynum', 'month', 'monthnum'];
+        const dateProperties = ['dayoffset', 'day', 'weekday', 'weekdaynum', 'month', 'monthnum', 'week', 'weeknum'];
         const isDateProperty = dateProperties.includes(property.toLowerCase());
         
         if (isDateProperty) {
@@ -1094,7 +1168,19 @@ export class BoardOperations {
             case 'monthnum':
                 // Return month number 1-12
                 return date.getMonth() + 1;
-                
+
+            case 'week':
+            case 'weeknum': {
+                // Return ISO week number (1-53)
+                const d = new Date(date);
+                d.setHours(0, 0, 0, 0);
+                // Set to Thursday of current week to get correct ISO week number
+                d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+                const yearStart = new Date(d.getFullYear(), 0, 1);
+                const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+                return weekNo;
+            }
+
             default:
                 return null;
         }
