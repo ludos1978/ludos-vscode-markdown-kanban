@@ -2187,8 +2187,8 @@ function createColumnElement(column, columnIndex) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
 
-    // Check if column has current week tag
-    if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+    // Check if column has current week tag or other active temporal tags
+    if (window.tagUtils && window.tagUtils.isTemporallyActive(column.title)) {
         columnDiv.setAttribute('data-current-week', 'true');
     }
 
@@ -2448,8 +2448,8 @@ function createTaskElement(task, columnId, taskIndex) {
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
 
-    // Check if task has current week tag
-    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isCurrentWeek(task.title)) ? ' data-current-week="true"' : '';
+    // Check if task has current week tag or other active temporal tags
+    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isTemporallyActive(task.title)) ? ' data-current-week="true"' : '';
 
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"

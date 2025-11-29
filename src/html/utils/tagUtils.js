@@ -3,50 +3,95 @@
  * Centralizes all tag extraction, parsing, and processing functionality
  */
 
+// ============================================================================
+// TAG PREFIX CONFIGURATION - Change these to modify tag prefixes globally
+// ============================================================================
+const TAG_PREFIXES = {
+    HASH: '#',      // Regular tags: #todo, #urgent, #row2
+    PERSON: '@',    // Person/mention tags: @john, @team-alpha
+    TEMPORAL: '.',  // Temporal tags: .2025.01.28, .w15, .mon, .15:30
+    QUERY: '?'      // Query/gather tags: ?#tag, ?@person, ?.today (gathers cards with matching tags)
+};
+
+// Helper to escape special regex characters in prefixes
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Pre-escaped prefixes for regex patterns
+const P = {
+    H: escapeRegex(TAG_PREFIXES.HASH),
+    P: escapeRegex(TAG_PREFIXES.PERSON),
+    T: escapeRegex(TAG_PREFIXES.TEMPORAL),
+    Q: escapeRegex(TAG_PREFIXES.QUERY)
+};
+
 class TagUtils {
     constructor() {
-        // Centralized regex patterns for tag matching
-        this.patterns = {
-            // Basic tag patterns
-            // Rule: Everything after # until space is a tag (includes numeric, positivity, gather, etc.)
-            // Supports: #tag, #1, #1.5, #++, #gather_reto|anita, #gather_bruno&karl, etc.
-            basicTags: /#([a-zA-Z0-9_\-&|=<>!+øØ.]+)/g,
+        // Store prefixes for external access
+        this.prefixes = TAG_PREFIXES;
 
-            // Rule: Each @ is one person/mention, ampersand is part of the name (@Johnson&johnson is ONE name)
-            atTags: /@([a-zA-Z0-9_\-&]+)/g,
+        // Centralized regex patterns for tag matching
+        // All tags capture everything after their prefix until whitespace (space, tab, newline)
+        this.patterns = {
+            // HASH TAGS - regular tags, everything until whitespace
+            // Supports: #tag, #1, #1.5, #++, #gather_reto|anita, #gather_bruno&karl, etc.
+            basicTags: new RegExp(`${P.H}([^\\s]+)`, 'g'),
+
+            // PERSON/MENTION TAGS - everything until whitespace
+            // @johnson, @Johnson&johnson, @team-alpha, etc.
+            personTags: new RegExp(`${P.P}([^\\s]+)`, 'g'),
 
             // Special positivity tags (#++, #+, #ø, #-, #--)
-            // Use negative lookahead to ensure - doesn't match when it's part of --
-            positivityTags: /#(\+\+|--|\+|ø|Ø|-(?!-))/g,
+            positivityTags: new RegExp(`${P.H}(\\+\\+|--|\\+|ø|Ø|-(?!-))`, 'g'),
 
-            // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01)
-            numericTag: /#(\d+(?:\.\d+)?)\b/g,
+            // Numeric index tags (#1, #13, #013, #1.1, #0.1, #0.13, #0.01, #3.1.3, #1.2.3.4)
+            numericTag: new RegExp(`${P.H}(\\d+(?:\\.\\d+)*)(?=\\s|$)`, 'g'),
 
             // Layout-specific tags
-            rowTag: /#row(\d+)\b/gi,
-            spanTag: /#span(\d+)\b/gi,
-            stackTag: /#stack\b/gi,
-            stickyTag: /#sticky\b/gi,
-            includeTag: /#include:([^\s]+)/i,
+            rowTag: new RegExp(`${P.H}row(\\d+)(?=\\s|$)`, 'gi'),
+            spanTag: new RegExp(`${P.H}span(\\d+)(?=\\s|$)`, 'gi'),
+            stackTag: new RegExp(`${P.H}stack(?=\\s|$)`, 'gi'),
+            stickyTag: new RegExp(`${P.H}sticky(?=\\s|$)`, 'gi'),
+            includeTag: new RegExp(`${P.H}include:([^\\s]+)`, 'i'),
 
-            // Special gather tags
-            gatherTags: /#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g,
+            // QUERY/GATHER TAGS - start with ? followed by tag type prefix (#, @, !)
+            // Examples: ?#tag, ?@person, ?!today, ?#tag1&tag2, ?@reto|bruno
+            // Captures: type prefix and the query content
+            queryTags: new RegExp(`${P.Q}([${P.H}${P.P}${P.T}])([^\\s]+)`, 'g'),
 
-            // Date patterns
-            dateTags: /@(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})(?:\s|$)/,
+            // Legacy gather tags (for backward compatibility)
+            gatherTags: new RegExp(`${P.H}(gather_[^\\s]+|ungathered)(?=\\s|$)`, 'g'),
 
-            // Week date patterns (@2001-W1, @2001W1, @W1, @W01)
-            weekTags: /(?:@(\d{4})-?W(\d{1,2})|@W(\d{1,2}))\b/gi,
+            // TEMPORAL TAGS - all start with . and capture everything until whitespace
+            // Date patterns (.2025.01.28, .2025-01-05, .2025/01/05)
+            dateTags: new RegExp(`${P.T}(\\d{4}[-./]\\d{1,2}[-./]\\d{1,2})(?=\\s|$)`, 'g'),
+
+            // Week patterns (.w15, .W15, .2025.w15, .2025-w15)
+            weekTags: new RegExp(`${P.T}(?:(\\d{4})[-.]?)?[wW](\\d{1,2})(?=\\s|$)`, 'g'),
+
+            // Weekday patterns (.mon, .monday, .tue, .tuesday, etc.)
+            weekdayTags: new RegExp(`${P.T}(mon|monday|tue|tuesday|wed|wednesday|thu|thursday|fri|friday|sat|saturday|sun|sunday)(?=\\s|$)`, 'gi'),
+
+            // Time patterns (.15:30, .9am, .10pm, .22:00)
+            timeTags: new RegExp(`${P.T}(\\d{1,2}(?::\\d{2})?(?:am|pm)?)(?=\\s|$)`, 'gi'),
+
+            // Time slot patterns (.15:30-17:00, .9am-5pm)
+            timeSlotTags: new RegExp(`${P.T}(\\d{1,2}(?::\\d{2})?(?:am|pm)?)-(\\d{1,2}(?::\\d{2})?(?:am|pm)?)(?=\\s|$)`, 'gi'),
+
+            // Generic temporal tag - captures everything after . until whitespace (for future extensions)
+            temporalTag: new RegExp(`${P.T}([^\\s]+)`, 'g'),
 
             // Priority/state tags
-            priorityTag: /#(high|medium|low|urgent)\b/i,
-            stateTag: /#(todo|doing|done|blocked|waiting)\b/i,
+            priorityTag: new RegExp(`${P.H}(high|medium|low|urgent)(?=\\s|$)`, 'i'),
+            stateTag: new RegExp(`${P.H}(todo|doing|done|blocked|waiting)(?=\\s|$)`, 'i'),
 
             // Card/column state tags
-            foldTag: /#fold\b/i,
-            archiveTag: /#archive\b/i,
-            hiddenTag: /#hidden\b/i
+            foldTag: new RegExp(`${P.H}fold(?=\\s|$)`, 'i'),
+            archiveTag: new RegExp(`${P.H}archive(?=\\s|$)`, 'i'),
+            hiddenTag: new RegExp(`${P.H}hidden(?=\\s|$)`, 'i')
         };
+
+        // Dynamic regex for stripping any tag prefix
+        this.prefixStripRegex = new RegExp(`^[${escapeRegex(TAG_PREFIXES.HASH + TAG_PREFIXES.PERSON + TAG_PREFIXES.TEMPORAL + TAG_PREFIXES.QUERY)}]`);
 
         // Layout tags that should not be displayed
         this.layoutTags = ['row', 'span', 'stack', 'sticky', 'fold', 'archive', 'hidden', 'include'];
@@ -63,8 +108,10 @@ class TagUtils {
      */
     extractTags(text, options = {}) {
         const {
-            includeHash = false,
-            includeAt = false,
+            includeHash = false,      // # tags (regular tags)
+            includePerson = false,    // @ tags (person/mention tags)
+            includeTemporal = false,  // . tags (temporal tags)
+            includeQuery = false,     // ? tags (query/gather tags)
             excludeLayout = true,
             unique = true
         } = options;
@@ -73,29 +120,41 @@ class TagUtils {
             return [];
         }
 
+        const { HASH: H, PERSON: P, TEMPORAL: T, QUERY: Q } = this.prefixes;
         const tags = [];
 
         // Extract hash tags
         if (includeHash !== false) {
             const hashMatches = text.matchAll(this.patterns.basicTags);
             for (const match of hashMatches) {
-                const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
-                tags.push(tag);
-            }
-
-            // Extract special positivity tags
-            const positivityMatches = text.matchAll(this.patterns.positivityTags);
-            for (const match of positivityMatches) {
-                const tag = includeHash === 'withSymbol' ? `#${match[1]}` : match[1];
+                const tag = includeHash === 'withSymbol' ? `${H}${match[1]}` : match[1];
                 tags.push(tag);
             }
         }
 
-        // Extract @ tags
-        if (includeAt) {
-            const atMatches = text.matchAll(this.patterns.atTags);
-            for (const match of atMatches) {
-                const tag = includeAt === 'withSymbol' ? `@${match[1]}` : match[1];
+        // Extract person tags
+        if (includePerson) {
+            const personMatches = text.matchAll(this.patterns.personTags);
+            for (const match of personMatches) {
+                const tag = includePerson === 'withSymbol' ? `${P}${match[1]}` : match[1];
+                tags.push(tag);
+            }
+        }
+
+        // Extract temporal tags
+        if (includeTemporal) {
+            const temporalMatches = text.matchAll(this.patterns.temporalTag);
+            for (const match of temporalMatches) {
+                const tag = includeTemporal === 'withSymbol' ? `${T}${match[1]}` : match[1];
+                tags.push(tag);
+            }
+        }
+
+        // Extract query tags
+        if (includeQuery) {
+            const queryMatches = text.matchAll(this.patterns.queryTags);
+            for (const match of queryMatches) {
+                const tag = includeQuery === 'withSymbol' ? `${Q}${match[1]}${match[2]}` : `${match[1]}${match[2]}`;
                 tags.push(tag);
             }
         }
@@ -104,7 +163,7 @@ class TagUtils {
         let filteredTags = tags;
         if (excludeLayout) {
             filteredTags = tags.filter(tag => {
-                const cleanTag = tag.replace(/^[#@]/, '').toLowerCase();
+                const cleanTag = tag.replace(this.prefixStripRegex, '').toLowerCase();
                 return !this.isLayoutTag(cleanTag);
             });
         }
@@ -194,7 +253,56 @@ class TagUtils {
     }
 
     /**
-     * Extract week date tag from text
+     * Extract date tag from text
+     * @param {string} text - Text to extract date tag from
+     * @returns {Object|null} Object with {year, month, day} or null if not found
+     */
+    extractDateTag(text) {
+        if (!text) return null;
+
+        this.patterns.dateTags.lastIndex = 0;
+        const match = this.patterns.dateTags.exec(text);
+        if (!match) return null;
+
+        // Parse date string (supports -, ., / separators)
+        const parts = match[1].split(/[-./]/);
+        if (parts.length !== 3) return null;
+
+        return {
+            year: parseInt(parts[0], 10),
+            month: parseInt(parts[1], 10),
+            day: parseInt(parts[2], 10)
+        };
+    }
+
+    /**
+     * Check if a date tag matches the current date
+     * @param {string} text - Text containing date tag
+     * @returns {boolean} True if text contains current date tag
+     */
+    isCurrentDate(text) {
+        const dateTag = this.extractDateTag(text);
+        if (!dateTag) return false;
+
+        const now = new Date();
+        return dateTag.year === now.getFullYear() &&
+               dateTag.month === (now.getMonth() + 1) &&
+               dateTag.day === now.getDate();
+    }
+
+    /**
+     * Check if text contains a date tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains date tag
+     */
+    hasDateTag(text) {
+        if (!text) return false;
+        this.patterns.dateTags.lastIndex = 0;
+        return this.patterns.dateTags.test(text);
+    }
+
+    /**
+     * Extract week tag from text
      * @param {string} text - Text to extract week tag from
      * @returns {Object|null} Object with {year, week} or null if not found
      */
@@ -207,7 +315,7 @@ class TagUtils {
 
         if (!match) return null;
 
-        // Format: @2001-W1 or @2001W1 (groups 1 and 2)
+        // Format: :2025-w15 or :2025w15 (groups 1 and 2)
         if (match[1] && match[2]) {
             return {
                 year: parseInt(match[1], 10),
@@ -215,12 +323,12 @@ class TagUtils {
             };
         }
 
-        // Format: @W1 (group 3) - use current year
-        if (match[3]) {
+        // Format: :w15 (only group 2) - use current year
+        if (match[2]) {
             const currentYear = new Date().getFullYear();
             return {
                 year: currentYear,
-                week: parseInt(match[3], 10)
+                week: parseInt(match[2], 10)
             };
         }
 
@@ -280,6 +388,202 @@ class TagUtils {
     }
 
     /**
+     * Extract weekday tag from text
+     * @param {string} text - Text to extract weekday tag from
+     * @returns {number|null} Day of week (0=Sunday, 1=Monday, ..., 6=Saturday) or null
+     */
+    extractWeekdayTag(text) {
+        if (!text) return null;
+
+        this.patterns.weekdayTags.lastIndex = 0;
+        const match = this.patterns.weekdayTags.exec(text);
+        if (!match) return null;
+
+        const dayMap = {
+            'sun': 0, 'sunday': 0,
+            'mon': 1, 'monday': 1,
+            'tue': 2, 'tuesday': 2,
+            'wed': 3, 'wednesday': 3,
+            'thu': 4, 'thursday': 4,
+            'fri': 5, 'friday': 5,
+            'sat': 6, 'saturday': 6
+        };
+
+        return dayMap[match[1].toLowerCase()] ?? null;
+    }
+
+    /**
+     * Check if a weekday tag matches the current day
+     * @param {string} text - Text containing weekday tag
+     * @returns {boolean} True if text contains current weekday tag
+     */
+    isCurrentWeekday(text) {
+        const weekdayTag = this.extractWeekdayTag(text);
+        if (weekdayTag === null) return false;
+
+        const currentDay = new Date().getDay();
+        return weekdayTag === currentDay;
+    }
+
+    /**
+     * Check if text contains a weekday tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains weekday tag
+     */
+    hasWeekdayTag(text) {
+        if (!text) return false;
+        this.patterns.weekdayTags.lastIndex = 0;
+        return this.patterns.weekdayTags.test(text);
+    }
+
+    /**
+     * Parse time string to minutes since midnight
+     * @param {string} timeStr - Time string like "10:30", "10pm", "22:00"
+     * @returns {number|null} Minutes since midnight or null if invalid
+     */
+    parseTimeToMinutes(timeStr) {
+        if (!timeStr) return null;
+
+        const lower = timeStr.toLowerCase();
+
+        // Check for am/pm format
+        const ampmMatch = lower.match(/^(\d{1,2})(?::(\d{2}))?(am|pm)$/);
+        if (ampmMatch) {
+            let hours = parseInt(ampmMatch[1], 10);
+            const minutes = ampmMatch[2] ? parseInt(ampmMatch[2], 10) : 0;
+            const isPM = ampmMatch[3] === 'pm';
+
+            // Handle 12-hour format
+            if (hours === 12) {
+                hours = isPM ? 12 : 0;
+            } else if (isPM) {
+                hours += 12;
+            }
+
+            return hours * 60 + minutes;
+        }
+
+        // Check for 24-hour format
+        const hourMatch = lower.match(/^(\d{1,2})(?::(\d{2}))?$/);
+        if (hourMatch) {
+            const hours = parseInt(hourMatch[1], 10);
+            const minutes = hourMatch[2] ? parseInt(hourMatch[2], 10) : 0;
+
+            if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+                return hours * 60 + minutes;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract time tag from text
+     * @param {string} text - Text to extract time tag from
+     * @returns {number|null} Minutes since midnight or null
+     */
+    extractTimeTag(text) {
+        if (!text) return null;
+
+        this.patterns.timeTags.lastIndex = 0;
+        const match = this.patterns.timeTags.exec(text);
+        if (!match) return null;
+
+        return this.parseTimeToMinutes(match[1]);
+    }
+
+    /**
+     * Check if a time tag matches the current hour
+     * @param {string} text - Text containing time tag
+     * @returns {boolean} True if text contains current hour time tag
+     */
+    isCurrentTime(text) {
+        const timeTag = this.extractTimeTag(text);
+        if (timeTag === null) return false;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Match if within the same hour (±30 minutes from tag time)
+        return Math.abs(currentMinutes - timeTag) <= 30;
+    }
+
+    /**
+     * Check if text contains a time tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains time tag
+     */
+    hasTimeTag(text) {
+        if (!text) return false;
+        this.patterns.timeTags.lastIndex = 0;
+        return this.patterns.timeTags.test(text);
+    }
+
+    /**
+     * Extract time slot tag from text
+     * @param {string} text - Text to extract time slot from
+     * @returns {Object|null} Object with {start, end} in minutes since midnight or null
+     */
+    extractTimeSlotTag(text) {
+        if (!text) return null;
+
+        this.patterns.timeSlotTags.lastIndex = 0;
+        const match = this.patterns.timeSlotTags.exec(text);
+        if (!match) return null;
+
+        const start = this.parseTimeToMinutes(match[1]);
+        const end = this.parseTimeToMinutes(match[2]);
+
+        if (start === null || end === null) return null;
+
+        return { start, end };
+    }
+
+    /**
+     * Check if current time falls within a time slot tag
+     * @param {string} text - Text containing time slot tag
+     * @returns {boolean} True if current time is within the time slot
+     */
+    isCurrentTimeSlot(text) {
+        const timeSlot = this.extractTimeSlotTag(text);
+        if (!timeSlot) return false;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Handle slots that cross midnight (e.g., @10pm-2am)
+        if (timeSlot.end < timeSlot.start) {
+            return currentMinutes >= timeSlot.start || currentMinutes <= timeSlot.end;
+        }
+
+        return currentMinutes >= timeSlot.start && currentMinutes <= timeSlot.end;
+    }
+
+    /**
+     * Check if text contains a time slot tag
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains time slot tag
+     */
+    hasTimeSlotTag(text) {
+        if (!text) return false;
+        this.patterns.timeSlotTags.lastIndex = 0;
+        return this.patterns.timeSlotTags.test(text);
+    }
+
+    /**
+     * Check if any temporal tag (date, week, weekday, time, time slot) is currently active
+     * @param {string} text - Text to check
+     * @returns {boolean} True if any temporal tag matches current time
+     */
+    isTemporallyActive(text) {
+        return this.isCurrentDate(text) ||
+               this.isCurrentWeek(text) ||
+               this.isCurrentWeekday(text) ||
+               this.isCurrentTime(text) ||
+               this.isCurrentTimeSlot(text);
+    }
+
+    /**
      * Check if a tag is a numeric index tag
      * @param {string} tag - Tag to check (with or without # symbol)
      * @returns {boolean} True if numeric tag
@@ -298,7 +602,7 @@ class TagUtils {
     isLayoutTag(tag) {
         if (!tag) return false;
 
-        const cleanTag = tag.replace(/^[#@]/, '').toLowerCase();
+        const cleanTag = tag.replace(this.prefixStripRegex, '').toLowerCase();
 
         // Check static layout tags
         if (this.layoutTags.includes(cleanTag)) {
@@ -306,23 +610,106 @@ class TagUtils {
         }
 
         // Check pattern-based layout tags
-        if (this.patterns.rowTag.test(`#${cleanTag}`)) return true;
-        if (this.patterns.spanTag.test(`#${cleanTag}`)) return true;
-        if (this.patterns.stackTag.test(`#${cleanTag}`)) return true;
-        if (this.patterns.includeTag.test(`#${cleanTag}`)) return true;
+        const H = this.prefixes.HASH;
+        if (this.patterns.rowTag.test(`${H}${cleanTag}`)) return true;
+        if (this.patterns.spanTag.test(`${H}${cleanTag}`)) return true;
+        if (this.patterns.stackTag.test(`${H}${cleanTag}`)) return true;
+        if (this.patterns.includeTag.test(`${H}${cleanTag}`)) return true;
 
         return false;
     }
 
     /**
-     * Check if a tag is a gather tag
+     * Check if a tag is a query/gather tag
      * @param {string} tag - Tag to check
-     * @returns {boolean} True if gather tag
+     * @returns {boolean} True if query/gather tag
+     */
+    isQueryTag(tag) {
+        if (!tag) return false;
+        return tag.startsWith(this.prefixes.QUERY);
+    }
+
+    /**
+     * Check if a tag is a legacy gather tag (#gather_...)
+     * @param {string} tag - Tag to check
+     * @returns {boolean} True if legacy gather tag
      */
     isGatherTag(tag) {
         if (!tag) return false;
-        const cleanTag = tag.replace(/^[#@]/, '');
+        const cleanTag = tag.replace(this.prefixStripRegex, '');
         return cleanTag.startsWith('gather_') || cleanTag === 'ungathered';
+    }
+
+    /**
+     * Extract query tags from text
+     * @param {string} text - Text to extract query tags from
+     * @returns {Array} Array of query tag objects {type, query, full}
+     */
+    extractQueryTags(text) {
+        if (!text) return [];
+
+        const { HASH: H, PERSON: P, TEMPORAL: T, QUERY: Q } = this.prefixes;
+        const queries = [];
+
+        this.patterns.queryTags.lastIndex = 0;
+        let match;
+        while ((match = this.patterns.queryTags.exec(text)) !== null) {
+            const typePrefix = match[1];
+            const queryContent = match[2];
+
+            let type;
+            if (typePrefix === H) type = 'hash';
+            else if (typePrefix === P) type = 'person';
+            else if (typePrefix === T) type = 'temporal';
+            else type = 'unknown';
+
+            queries.push({
+                type,
+                typePrefix,
+                query: queryContent,
+                full: `${Q}${typePrefix}${queryContent}`
+            });
+        }
+
+        return queries;
+    }
+
+    /**
+     * Parse query tag conditions (supports &, |, ! operators)
+     * @param {string} queryContent - Query content (without ?# prefix)
+     * @returns {Object} Parsed conditions {include, exclude, operator}
+     */
+    parseQueryConditions(queryContent) {
+        if (!queryContent) return null;
+
+        const conditions = {
+            include: [],
+            exclude: [],
+            operator: 'AND'
+        };
+
+        // Parse OR conditions (|)
+        if (queryContent.includes('|')) {
+            conditions.operator = 'OR';
+            conditions.include = queryContent.split('|').map(t => t.trim()).filter(t => t);
+        }
+        // Parse AND conditions (&)
+        else if (queryContent.includes('&')) {
+            conditions.operator = 'AND';
+            conditions.include = queryContent.split('&').map(t => t.trim()).filter(t => t);
+        }
+        // Parse NOT conditions (!)
+        else if (queryContent.includes('!')) {
+            const parts = queryContent.split('!');
+            conditions.include = parts[0] ? [parts[0].trim()] : [];
+            conditions.exclude = parts.slice(1).map(t => t.trim()).filter(t => t);
+        }
+        // Single condition
+        else {
+            conditions.include = [queryContent.trim()];
+        }
+
+        return conditions;
     }
 
     /**
@@ -385,7 +772,7 @@ class TagUtils {
         if (!Array.isArray(tags)) return [];
 
         return tags.filter(tag => {
-            const cleanTag = tag.replace(/^[#@]/, '').toLowerCase();
+            const cleanTag = tag.replace(this.prefixStripRegex, '').toLowerCase();
 
             // Skip layout tags
             if (this.isLayoutTag(cleanTag)) return false;
@@ -408,26 +795,30 @@ class TagUtils {
      * @returns {Object} Grouped tags
      */
     groupTagsByType(tags) {
+        const { HASH: H, PERSON: P, TEMPORAL: T, QUERY: Q } = this.prefixes;
         const groups = {
             priority: [],
             state: [],
-            date: [],
-            person: [],
+            temporal: [],   // . tags (dates, times, weeks, weekdays)
+            person: [],     // @ tags
+            query: [],      // ? tags (queries/gathers)
             layout: [],
-            gather: [],
-            regular: []
+            gather: [],     // legacy #gather_ tags
+            regular: []     // # tags
         };
 
         tags.forEach(tag => {
-            const cleanTag = tag.replace(/^[#@]/, '');
+            const cleanTag = tag.replace(this.prefixStripRegex, '');
 
-            if (this.patterns.priorityTag.test(`#${cleanTag}`)) {
+            if (tag.startsWith(Q)) {
+                groups.query.push(tag);
+            } else if (this.patterns.priorityTag.test(`${H}${cleanTag}`)) {
                 groups.priority.push(tag);
-            } else if (this.patterns.stateTag.test(`#${cleanTag}`)) {
+            } else if (this.patterns.stateTag.test(`${H}${cleanTag}`)) {
                 groups.state.push(tag);
-            } else if (this.patterns.dateTags.test(`@${cleanTag}`)) {
-                groups.date.push(tag);
-            } else if (tag.startsWith('@')) {
+            } else if (tag.startsWith(T)) {
+                groups.temporal.push(tag);
+            } else if (tag.startsWith(P)) {
                 groups.person.push(tag);
             } else if (this.isLayoutTag(cleanTag)) {
                 groups.layout.push(tag);
@@ -452,7 +843,8 @@ class TagUtils {
         if (typeof tags === 'string') {
             tagArray = this.extractTags(tags, {
                 includeHash: true,
-                includeAt: true,
+                includePerson: true,
+                includeTemporal: true,
                 excludeLayout: false
             });
         }
@@ -461,7 +853,7 @@ class TagUtils {
 
         return tagArray
             .map(tag => {
-                const cleanTag = tag.replace(/^[#@]/, '').replace(/[^a-zA-Z0-9_-]/g, '-');
+                const cleanTag = tag.replace(this.prefixStripRegex, '').replace(/[^a-zA-Z0-9_-]/g, '-');
                 return `tag-${cleanTag}`;
             })
             .join(' ');
@@ -516,8 +908,9 @@ class TagUtils {
      */
     removeTagsFromText(text, options = {}) {
         const {
-            removeHash = true,
-            removeAt = false,
+            removeHash = true,      // # tags
+            removePerson = false,   // $ tags
+            removeTemporal = false, // @ tags
             keepLayout = false
         } = options;
 
@@ -525,7 +918,7 @@ class TagUtils {
 
         let cleanedText = text;
 
-        // Remove hash tags
+        // Remove hash tags (#)
         if (removeHash) {
             if (keepLayout) {
                 // Remove only non-layout tags
@@ -537,9 +930,14 @@ class TagUtils {
             }
         }
 
-        // Remove @ tags
-        if (removeAt) {
-            cleanedText = cleanedText.replace(this.patterns.atTags, '');
+        // Remove person tags ($)
+        if (removePerson) {
+            cleanedText = cleanedText.replace(this.patterns.personTags, '');
+        }
+
+        // Remove temporal tags (@)
+        if (removeTemporal) {
+            cleanedText = cleanedText.replace(this.patterns.temporalTag, '');
         }
 
         // Clean up extra spaces
@@ -619,8 +1017,8 @@ class TagUtils {
         };
 
         return tags.sort((a, b) => {
-            const cleanA = a.replace(/^[#@]/, '').toLowerCase();
-            const cleanB = b.replace(/^[#@]/, '').toLowerCase();
+            const cleanA = a.replace(this.prefixStripRegex, '').toLowerCase();
+            const cleanB = b.replace(this.prefixStripRegex, '').toLowerCase();
 
             const priorityA = priority[cleanA] ?? 999;
             const priorityB = priority[cleanB] ?? 999;
@@ -643,7 +1041,7 @@ class TagUtils {
         if (!tag || typeof tag !== 'string') return false;
 
         // Remove symbol if present
-        const cleanTag = tag.replace(/^[#@]/, '');
+        const cleanTag = tag.replace(this.prefixStripRegex, '');
 
         // Check if empty after cleaning
         if (!cleanTag) return false;
@@ -663,7 +1061,7 @@ class TagUtils {
      * @returns {string} Configuration key for tag color
      */
     getTagColorKey(tag) {
-        const cleanTag = tag.replace(/^[#@]/, '');
+        const cleanTag = tag.replace(this.prefixStripRegex, '');
         return `tag-${cleanTag}`;
     }
 
@@ -702,17 +1100,19 @@ class TagUtils {
                     .trim();
             case 'mentions':
             case 'mentionsonly':
-                // Hide all # tags, keep @ tags
+                // Hide all # and @ tags, keep $ person tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
-                    removeAt: false,
+                    removePerson: false,
+                    removeTemporal: true,
                     keepLayout: false
                 });
             case 'none':
                 // Hide all tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
-                    removeAt: true,
+                    removePerson: true,
+                    removeTemporal: true,
                     keepLayout: false
                 });
             default:
@@ -743,7 +1143,7 @@ class TagUtils {
                     .replace(this.patterns.stickyTag, '')
                     .trim();
             case 'customonly':
-                // Export only custom tags and @ tags (remove standard layout tags)
+                // Export only custom tags and $ person tags (remove standard layout tags)
                 return text
                     .replace(this.patterns.rowTag, '')
                     .replace(this.patterns.spanTag, '')
@@ -751,17 +1151,19 @@ class TagUtils {
                     .replace(this.patterns.stickyTag, '')
                     .trim();
             case 'mentionsonly':
-                // Export only @ tags - remove all # tags
+                // Export only $ person tags - remove all # and @ tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
-                    removeAt: false,
+                    removePerson: false,
+                    removeTemporal: true,
                     keepLayout: false
                 });
             case 'none':
                 // Export no tags - remove all tags
                 return this.removeTagsFromText(text, {
                     removeHash: true,
-                    removeAt: true,
+                    removePerson: true,
+                    removeTemporal: true,
                     keepLayout: false
                 });
             default:
@@ -979,7 +1381,18 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.tagUtils = tagUtils;
 
+    // Expose tag prefixes for external use
+    window.TAG_PREFIXES = TAG_PREFIXES;
+
     // Backward compatibility functions
     window.extractFirstTag = (text) => tagUtils.extractFirstTag(text);
     window.extractAllTags = (text) => tagUtils.extractTags(text, { includeHash: false });
+
+    // Temporal tag functions
+    window.isCurrentDate = (text) => tagUtils.isCurrentDate(text);
+    window.isCurrentWeek = (text) => tagUtils.isCurrentWeek(text);
+    window.isCurrentWeekday = (text) => tagUtils.isCurrentWeekday(text);
+    window.isCurrentTime = (text) => tagUtils.isCurrentTime(text);
+    window.isCurrentTimeSlot = (text) => tagUtils.isCurrentTimeSlot(text);
+    window.isTemporallyActive = (text) => tagUtils.isTemporallyActive(text);
 }

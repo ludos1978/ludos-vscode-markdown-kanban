@@ -546,17 +546,14 @@ export class BoardOperations {
 
     private hasSticky(text: string): boolean {
         if (!text) {return false;}
-        return /@sticky(?:\s|$)/.test(text);
+        return /#sticky(?:\s|$)/.test(text);
     }
 
-    // Add this method to extract person names from text
+    // Extract person names from text (@ prefix, everything until whitespace)
     private extractPersonNames(text: string): string[] {
         if (!text) {return [];}
-        const matches = text.match(/@([a-zA-Z0-9_&-]+)/g) || [];
-        // Filter out dates
-        return matches
-            .map(m => m.substring(1))
-            .filter(m => !m.match(/^\d{4}-\d{2}-\d{2}$/) && !m.match(/^\d{2}-\d{2}-\d{4}$/));
+        const matches = text.match(/@([^\s]+)/g) || [];
+        return matches.map(m => m.substring(1));
     }
 
     // Add this method to get today's date in YYYY-MM-DD format

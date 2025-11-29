@@ -1025,8 +1025,8 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-column-tag');
                         }
 
-                        // Update current week attribute
-                        if (window.tagUtils && window.tagUtils.isCurrentWeek(column.title)) {
+                        // Update current week / temporal active attribute
+                        if (window.tagUtils && window.tagUtils.isTemporallyActive(column.title)) {
                             columnElement2.setAttribute('data-current-week', 'true');
                         } else {
                             columnElement2.removeAttribute('data-current-week');
