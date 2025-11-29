@@ -2176,9 +2176,11 @@ export class KanbanWebviewPanel {
      * - Avoids stale configuration (e.g., changing tag colors and not seeing updates)
      * - Centralizes configuration loading logic in ONE place
      * - Makes it obvious what gets loaded and when
-     *
-     * @private
      */
+    public async refreshConfiguration(): Promise<void> {
+        await this._refreshAllViewConfiguration();
+    }
+
     private async _refreshAllViewConfiguration(): Promise<void> {
         if (!this._panel) {
             console.warn('[KanbanWebviewPanel] Cannot refresh configuration - panel is null');

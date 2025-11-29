@@ -1174,8 +1174,102 @@ function generateTagMenuItems(id, type, columnId = null) {
     return menuHtml;
 }
 
+/**
+ * Regenerates all burger menus' tag sections with updated configuration
+ * Called when tag categories are enabled/disabled in settings
+ * This avoids a full board re-render by only updating the tag menu parts
+ */
+function regenerateAllBurgerMenus() {
+    const columns = document.querySelectorAll('.kanban-full-height-column');
 
+    // Find all column dropdowns and update their tag menu sections
+    columns.forEach(columnElement => {
+        const columnId = columnElement.getAttribute('data-column-id');
+        if (!columnId) return;
 
+        const dropdown = columnElement.querySelector('.donut-menu-dropdown');
+        if (!dropdown) return;
+
+        // Find tag menu items using data-group attribute (catches both tag categories and "No tags available")
+        // Tag items have: data-group="groupKey" and data-type="column"
+        const tagItems = Array.from(dropdown.querySelectorAll('[data-group][data-type="column"]'));
+
+        if (tagItems.length === 0) {
+            // No existing tag items - find where to insert (after "Move column right" divider)
+            const moveRightBtn = dropdown.querySelector('[onclick*="moveColumnRight"]');
+            if (moveRightBtn) {
+                let divider = moveRightBtn.nextElementSibling;
+                if (divider && divider.classList.contains('donut-menu-divider')) {
+                    // Create new tag menu HTML and insert after the divider
+                    const newTagHtml = generateTagMenuItems(columnId, 'column', null);
+                    if (newTagHtml && newTagHtml.trim()) {
+                        const tempContainer = document.createElement('div');
+                        tempContainer.innerHTML = newTagHtml;
+                        let insertAfter = divider;
+                        while (tempContainer.firstChild) {
+                            insertAfter.parentNode.insertBefore(tempContainer.firstChild, insertAfter.nextSibling);
+                            insertAfter = insertAfter.nextSibling;
+                        }
+                    }
+                }
+            }
+        } else {
+            // Get insertion point (before first tag item)
+            const insertPoint = tagItems[0];
+            const parent = insertPoint.parentNode;
+
+            // Generate new tag menu HTML
+            const newTagHtml = generateTagMenuItems(columnId, 'column', null);
+
+            // Insert new items first
+            if (newTagHtml && newTagHtml.trim()) {
+                const tempContainer = document.createElement('div');
+                tempContainer.innerHTML = newTagHtml;
+                while (tempContainer.firstChild) {
+                    parent.insertBefore(tempContainer.firstChild, insertPoint);
+                }
+            }
+
+            // Remove old items
+            tagItems.forEach(item => item.remove());
+        }
+    });
+
+    // Find all task dropdowns and update their tag menu sections
+    document.querySelectorAll('.task-item').forEach(taskElement => {
+        const taskId = taskElement.getAttribute('data-task-id');
+        const columnElement = taskElement.closest('.kanban-full-height-column');
+        const columnId = columnElement?.getAttribute('data-column-id');
+        if (!taskId || !columnId) return;
+
+        const dropdown = taskElement.querySelector('.donut-menu-dropdown');
+        if (!dropdown) return;
+
+        // Find tag menu items using data-group attribute
+        const tagItems = Array.from(dropdown.querySelectorAll('[data-group][data-type="task"]'));
+        if (tagItems.length === 0) return; // Skip if no tag section exists
+
+        // Get insertion point
+        const insertPoint = tagItems[0];
+        const parent = insertPoint.parentNode;
+
+        // Generate new tag menu HTML
+        const newTagHtml = generateTagMenuItems(taskId, 'task', columnId);
+
+        // Insert new items first
+        if (newTagHtml && newTagHtml.trim()) {
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = newTagHtml;
+            while (tempContainer.firstChild) {
+                parent.insertBefore(tempContainer.firstChild, insertPoint);
+            }
+        }
+
+        // Remove old items
+        tagItems.forEach(item => item.remove());
+    });
+}
+window.regenerateAllBurgerMenus = regenerateAllBurgerMenus;
 
 // Helper function to generate tag items for a group (horizontal layout)
 function generateGroupTagItems(tags, id, type, columnId = null, isConfigured = true) {

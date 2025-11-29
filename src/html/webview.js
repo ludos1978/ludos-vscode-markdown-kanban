@@ -2082,7 +2082,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     });
     
-    // Also handle visibility change (tab switching)
+    // Also handle visibility change (tab switching, alt-tabbing)
     // Use same delayed approach to avoid auto-save during quick view switches
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
@@ -2092,6 +2092,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     autoSavePendingChanges();
                 }
             }, 100);
+        } else {
+            // Page became visible - request configuration refresh from backend
+            // This handles alt-tabbing back, switching views, etc.
+            vscode.postMessage({ type: 'requestConfigurationRefresh' });
         }
     });
     
@@ -2760,20 +2764,44 @@ window.addEventListener('message', event => {
             window.cachedShortcuts = message.shortcuts || {};
             break;
 
-        case 'configurationUpdate':
+        case 'configurationUpdate': {
             // ⚠️ CONFIGURATION REFRESH - Cache all workspace settings
             // This is called on view focus and initial load to ensure fresh configuration
+            const configData = message.config || {};
 
             // Store all configuration in window.cachedConfig for global access
-            window.cachedConfig = message.config || {};
+            window.cachedConfig = configData;
 
-            // Apply configuration immediately (re-render with new settings)
-            if (window.cachedBoard) {
-                // Trigger re-render with new configuration
-                // The board renderer will use window.cachedConfig for layout/styling
-                renderBoard(window.cachedBoard);
+            // Apply tag category settings to window properties for menu generation
+            if (configData.enabledTagCategoriesColumn !== undefined) {
+                window.enabledTagCategoriesColumn = configData.enabledTagCategoriesColumn;
+            }
+            if (configData.enabledTagCategoriesTask !== undefined) {
+                window.enabledTagCategoriesTask = configData.enabledTagCategoriesTask;
+            }
+
+            // Merge custom tag categories into tagColors
+            if (configData.customTagCategories && Object.keys(configData.customTagCategories).length > 0) {
+                window.tagColors = window.tagColors || {};
+                Object.assign(window.tagColors, configData.customTagCategories);
+            }
+
+            // Apply tag colors if they changed
+            if (configData.tagColors && Object.keys(configData.tagColors).length > 0) {
+                window.tagColors = window.tagColors || {};
+                Object.assign(window.tagColors, configData.tagColors);
+                if (typeof applyTagStyles === 'function') {
+                    applyTagStyles();
+                }
+            }
+
+            // Regenerate burger menus with updated tag categories
+            // This updates the tag menu items without a full board re-render
+            if (typeof window.regenerateAllBurgerMenus === 'function') {
+                window.regenerateAllBurgerMenus();
             }
             break;
+        }
         case 'unfoldColumnsBeforeUpdate':
             // Unfold columns immediately before board update happens
             if (typeof unfoldColumnIfCollapsed === 'function') {

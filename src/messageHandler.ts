@@ -390,6 +390,13 @@ export class MessageHandler {
             case 'requestFileInfo':
                 this._fileManager.sendFileInfo();
                 break;
+            case 'requestConfigurationRefresh':
+                // Webview is requesting configuration refresh (e.g., after visibility change)
+                const panelForConfig = this._getWebviewPanel();
+                if (panelForConfig && typeof panelForConfig.refreshConfiguration === 'function') {
+                    await panelForConfig.refreshConfiguration();
+                }
+                break;
             case 'initializeFile':
                 await this._onInitializeFile();
                 break;
