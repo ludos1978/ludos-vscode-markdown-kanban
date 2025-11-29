@@ -2384,10 +2384,10 @@ function createTaskElement(task, columnId, taskIndex) {
                             <button class="donut-menu-item" onclick="duplicateTask('${task.id}', '${columnId}')">Duplicate card</button>
                             <button class="donut-menu-item danger" onclick="deleteTask('${task.id}', '${columnId}')">Delete card</button>
                             <div class="donut-menu-divider"></div>
-                            <div class="donut-menu-item has-submenu" data-submenu-type="move" data-id="${task.id}" data-type="task">
+                            <div class="donut-menu-item has-submenu" data-submenu-type="move" data-id="${task.id}" data-type="task" data-column-id="${columnId}">
                                 Move
                             </div>
-                            <div class="donut-menu-item has-submenu" data-submenu-type="move-to-list" data-id="${task.id}" data-type="task">
+                            <div class="donut-menu-item has-submenu" data-submenu-type="move-to-list" data-id="${task.id}" data-type="task" data-column-id="${columnId}">
                                 Move to list
                             </div>
                             <div class="donut-menu-divider"></div>

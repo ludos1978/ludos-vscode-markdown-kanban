@@ -2323,39 +2323,51 @@ function moveTaskToBottom(taskId, columnId) {
  * Side effects: Flushes pending changes, unfolds target
  */
 function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
-
     // Unfold the destination column if it's collapsed BEFORE any DOM changes
     unfoldColumnIfCollapsed(toColumnId);
 
-    // NEW CACHE SYSTEM: Update cached board directly
-    if (window.cachedBoard) {
-        const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
-        const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
-
-
-        if (fromColumn && toColumn) {
-            const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex >= 0) {
-                const task = fromColumn.tasks.splice(taskIndex, 1)[0];
-                toColumn.tasks.push(task);
-
-
-                // Re-render UI to reflect changes
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
-
-                markUnsavedChanges();
-            }
-        }
+    if (!window.cachedBoard) {
+        closeAllMenus();
+        return;
     }
-    
-    // Cache-first: No automatic save, UI updated via cache update above
-    // vscode.postMessage({ type: 'moveTaskToColumn', taskId, fromColumnId, toColumnId });
-    
+
+    const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
+    const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
+
+    if (!fromColumn) {
+        closeAllMenus();
+        return;
+    }
+
+    if (!toColumn) {
+        closeAllMenus();
+        return;
+    }
+
+    const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
+
+    if (taskIndex < 0) {
+        closeAllMenus();
+        return;
+    }
+
+    // Move the task
+    const task = fromColumn.tasks.splice(taskIndex, 1)[0];
+    toColumn.tasks.push(task);
+
+    // Re-render UI to reflect changes
+    if (typeof renderBoard === 'function') {
+        renderBoard();
+        console.log('[moveTaskToColumn] Board re-rendered');
+    } else {
+        console.error('[moveTaskToColumn] renderBoard is not a function!');
+    }
+
+    markUnsavedChanges();
+    console.log('[moveTaskToColumn] Marked as unsaved');
+
     // Close all menus
     closeAllMenus();
-    
 }
 
 function deleteTask(taskId, columnId) {
@@ -4095,6 +4107,14 @@ window.hasUnsavedChanges = hasUnsavedChanges;
 window.flushPendingTagChanges = flushPendingTagChanges; // Legacy redirect
 window.updateRefreshButtonState = updateRefreshButtonState;
 window.handleSaveError = handleSaveError;
+
+// Task movement functions (called from submenu onclick handlers via executeSafeFunction)
+window.moveTaskToColumn = moveTaskToColumn;
+window.moveTaskToTop = moveTaskToTop;
+window.moveTaskUp = moveTaskUp;
+window.moveTaskDown = moveTaskDown;
+window.moveTaskToBottom = moveTaskToBottom;
+window.deleteTask = deleteTask;
 
 // Legacy/compatibility functions - marked for removal
 window.applyPendingChangesLocally = applyPendingChangesLocally;

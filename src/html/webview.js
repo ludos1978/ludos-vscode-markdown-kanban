@@ -4077,6 +4077,26 @@ document.addEventListener('keydown', (e) => {
                 document.addEventListener('keydown', escapeHandler);
             }
         }
+        // Delete or Backspace to delete the focused task
+        else if ((e.key === 'Delete' || e.key === 'Backspace') && currentFocusedCard) {
+            e.preventDefault();
+            const taskId = currentFocusedCard.dataset.taskId;
+            const columnId = window.getColumnIdFromElement(currentFocusedCard);
+            if (taskId && typeof deleteTask === 'function') {
+                deleteTask(taskId, columnId);
+                focusCard(null);
+            }
+        }
+        // Enter to start editing the focused task
+        else if (e.key === 'Enter' && currentFocusedCard) {
+            e.preventDefault();
+            const taskId = currentFocusedCard.dataset.taskId;
+            const columnId = window.getColumnIdFromElement(currentFocusedCard);
+            // Start editing the title section
+            if (window.taskEditor && taskId) {
+                window.taskEditor.startEdit(currentFocusedCard, 'task-title', taskId, columnId, false);
+            }
+        }
     }
 });
 

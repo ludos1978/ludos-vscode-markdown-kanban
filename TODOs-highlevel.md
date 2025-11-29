@@ -27,6 +27,8 @@
   **Quality Targets:** All components 95%+ quality rating
   **Risk:** Medium-High (core refactoring), mitigated by incremental migration
 
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+
 - [ ] I want to be able to add templates for columns. these should be markdown presentation style that create the content of a column with none or some tasks with default content when dragged into the scene. It should also allow a -Media folder with the same name that would be instantiated into the markdown-kanban when instantiated.
 
 On instantiation the user is asked for a filename which is defined by default from the first line of the file where {kanbanfilename} is the filename of the main-board-markdown-file.
