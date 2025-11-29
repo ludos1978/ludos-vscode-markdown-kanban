@@ -71,8 +71,8 @@
 
 * {
   box-sizing: border-box;
-  perspective: 1000000px;
-  transform-style: preserve-3d;
+  /* perspective: 1000000px;
+  transform-style: preserve-3d; */
 }
 
 
@@ -883,6 +883,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 	padding-top: var(--whitespace-div4);
   background-color: var(--column-background);
 	position: sticky;
+  height: 4px;
 	/* top: 28px; */
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
 	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
@@ -2257,7 +2258,7 @@ button.file-bar-menu-item {
 
 .kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(-0.133px) translate(0px,-2.0px);
+	transform: translateZ(-0.133px) translate(0px,0px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {

@@ -312,9 +312,6 @@ export class MessageHandler {
                 await this.handleRequestEditTaskIncludeFileName(message);
                 break;
 
-            // REMOVED: Legacy switchTaskIncludeFile - now routes through editTaskTitle -> state machine
-            // See menuOperations.js updateTaskIncludeFile() which now sends editTaskTitle instead
-
             // Enhanced file and link handling
             case 'openFileLink':
                 await this._linkHandler.handleFileLink(message.href, message.taskId, message.columnId, message.linkIndex, message.includeContext);
@@ -502,8 +499,7 @@ export class MessageHandler {
                     { sendUpdate: false }
                 );
 
-                // NEW: If this is a task include and description was updated, update the file instance immediately
-                // This unifies Path 1 (edit include file) and Path 2 (text modification) to call the same functions
+                // If this is a task include and description was updated, update the file instance immediately
                 if (message.taskData.description !== undefined) {
                     const board = this._getCurrentBoard();
                     const column = board?.columns.find((c: any) => c.id === message.columnId);
@@ -3115,9 +3111,6 @@ export class MessageHandler {
             console.error('[requestEditTaskIncludeFileName] Error handling input request:', error);
         }
     }
-
-    // REMOVED: Legacy handleSwitchTaskIncludeFile method - replaced by state machine
-    // All include switches now route through ChangeStateMachine via editTaskTitle message
 
     /**
      * Handle request for task include filename (enabling include mode)

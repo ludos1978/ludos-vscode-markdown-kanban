@@ -3371,7 +3371,7 @@ function setupColumnDragAndDrop() {
                         rect: col.getBoundingClientRect(),
                         columnId: colId,
                         isSticky: isSticky,
-                        isFolded: isFolded,  // NEW: True folded detection
+                        isFolded: isFolded,
                         isContentVisible: isContentVisible,
                         contentRect: contentRect,  // Cache content rect
                         topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,

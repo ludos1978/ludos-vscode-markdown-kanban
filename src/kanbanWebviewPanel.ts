@@ -6,7 +6,6 @@ import { getOutputChannel } from './extension';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { FileManager } from './fileManager';
-// REMOVED: UndoRedoManager import - now handled by BoardStore (Phase 2 migration)
 import { BoardOperations } from './boardOperations';
 import { LinkHandler } from './linkHandler';
 import { MessageHandler } from './messageHandler';
@@ -31,11 +30,8 @@ import {
 } from './files';
 import { MainFileCoordinator, ChangeAnalysis, ChangeType } from './core/state-machine';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
-// NEW: Event bus for future component communication (Phase 1 of architecture refactoring)
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
-// NEW: Centralized board state management (Phase 2 of architecture refactoring)
 import { BoardStore } from './core/stores';
-// NEW: Unified webview communication layer (Phase 3 of architecture refactoring)
 import { WebviewBridge } from './core/bridge';
 
 export class KanbanWebviewPanel {
@@ -51,7 +47,6 @@ export class KanbanWebviewPanel {
 
     // Main components
     private _fileManager: FileManager;
-    // REMOVED: _undoRedoManager - now handled by BoardStore (Phase 2 migration)
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
     private _messageHandler: MessageHandler;
@@ -67,12 +62,7 @@ export class KanbanWebviewPanel {
     // State machine coordinator for unified change handling
     private _changeCoordinator: MainFileCoordinator | null = null;
 
-    // NEW: Unified change state machine (Phase 6)
     private _stateMachine: ChangeStateMachine;
-
-    // STATE-2: Board caching now handled by BoardStore (Phase 2 migration)
-    // REMOVED: _cachedBoard - now in BoardStore
-    // REMOVED: _boardCacheValid - now in BoardStore
     private _includeSwitchInProgress: boolean = false; // Protects cache during include switches
 
     // RACE-3: Track last processed timestamp per file to prevent stale updates
@@ -94,10 +84,6 @@ export class KanbanWebviewPanel {
     private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
     private _unsavedFilesToPrompt: string[] = [];  // Files with unsaved changes that need user prompt
 
-    // Dirty tracking now handled by BoardStore (Phase 2 migration)
-    // REMOVED: _dirtyColumns - now in BoardStore
-    // REMOVED: _dirtyTasks - now in BoardStore
-
     private _panelId: string;  // Unique identifier for this panel
     private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management
 
@@ -111,16 +97,9 @@ export class KanbanWebviewPanel {
     // CRITICAL: Prevent board regeneration during initial include file loading
     private _isInitialBoardLoad: boolean = false;  // Track if we're loading include files for first time
 
-    // NEW: Event bus for component communication (Phase 1 of architecture refactoring)
-    // Events are emitted IN PARALLEL with existing behavior - no functionality replaced yet
     private _eventBus: PanelEventBus;
 
-    // NEW: Centralized board state (Phase 2 of architecture refactoring)
-    // Replaces: _cachedBoard, _boardCacheValid, _dirtyColumns, _dirtyTasks, _undoRedoManager
     private _boardStore: BoardStore;
-
-    // NEW: Unified webview communication (Phase 3 of architecture refactoring)
-    // Replaces: _messageQueue, _messageTimer, MESSAGE_BATCH_DELAY, queueMessage(), flushMessages()
     private _webviewBridge: WebviewBridge;
 
     // Public getter for webview to allow proper access from messageHandler
@@ -329,8 +308,6 @@ export class KanbanWebviewPanel {
         this._panelId = `panel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Generate unique ID
         this._context = context;
 
-        // NEW: Initialize event bus (Phase 1 of architecture refactoring)
-        // Events emitted IN PARALLEL with existing behavior - no functionality replaced yet
         this._eventBus = new PanelEventBus({
             enableTracing: true, // Enable during development for debugging
             defaultTimeout: 5000
@@ -345,15 +322,11 @@ export class KanbanWebviewPanel {
             }));
         }
 
-        // NEW: Initialize BoardStore (Phase 2 of architecture refactoring)
-        // Centralizes: _cachedBoard, _boardCacheValid, _dirtyColumns, _dirtyTasks, undo/redo
         this._boardStore = new BoardStore(this._eventBus, {
             webview: this._panel.webview,
             maxUndoStackSize: 100
         });
 
-        // NEW: Initialize WebviewBridge (Phase 3 of architecture refactoring)
-        // Replaces: queueMessage(), flushMessages(), direct postMessage calls
         this._webviewBridge = new WebviewBridge(this._eventBus, {
             defaultTimeout: 5000,
             maxBatchSize: 10,
@@ -362,9 +335,7 @@ export class KanbanWebviewPanel {
         });
         this._webviewBridge.setWebview(this._panel.webview);
 
-        // Initialize components
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
-        // REMOVED: UndoRedoManager initialization - now handled by BoardStore (Phase 2 migration)
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
 
@@ -548,7 +519,6 @@ export class KanbanWebviewPanel {
         // Listen for document close events
         this._setupDocumentCloseListener();
 
-        // NEW: Emit panel:initialized event (Phase 1 - parallel to existing behavior)
         this._eventBus.emit('panel:initialized', undefined).catch(() => {});
 
         // Document will be loaded via loadMarkdownFile call from createOrShow
@@ -950,7 +920,6 @@ export class KanbanWebviewPanel {
             // This prevents the main file's 'reloaded' event from triggering board regeneration
             this._isInitialBoardLoad = true;
 
-            // NEW: Emit board:loading event (Phase 1 - parallel to existing behavior)
             this._eventBus.emit('board:loading', { path: document.uri.fsPath }).catch(() => {});
 
             await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
@@ -968,7 +937,6 @@ export class KanbanWebviewPanel {
             // Phase 1: Create or update MainKanbanFile instance
             await this._syncMainFileToRegistry(document);
 
-            // NEW: Emit board:loaded event (Phase 1 - parallel to existing behavior)
             const loadedBoard = this.getBoard();
             if (loadedBoard) {
                 this._eventBus.emit('board:loaded', {
@@ -991,7 +959,6 @@ export class KanbanWebviewPanel {
             kanbanFooter: null
         };
 
-        // NEW: Emit board:updated event (Phase 1 - parallel to existing behavior)
         if (board.valid) {
             this._eventBus.emit('board:updated', {
                 board,
@@ -1053,7 +1020,6 @@ export class KanbanWebviewPanel {
         this._lastDocumentUri = state.lastDocumentUri;
         this._trackedDocumentUri = state.trackedDocumentUri;
 
-        // NEW: Emit file:saved event (Phase 1 - parallel to existing behavior)
         const document = this._fileManager.getDocument();
         if (document) {
             this._eventBus.emit('file:saved', {
@@ -1802,7 +1768,6 @@ export class KanbanWebviewPanel {
 
     /**
      * Mark a column as having unrendered changes (cache updated, DOM not synced)
-     * Delegates to BoardStore (Phase 2 migration)
      */
     public markColumnDirty(columnId: string): void {
         this._boardStore.markColumnDirty(columnId);
@@ -1810,7 +1775,6 @@ export class KanbanWebviewPanel {
 
     /**
      * Mark a task as having unrendered changes (cache updated, DOM not synced)
-     * Delegates to BoardStore (Phase 2 migration)
      */
     public markTaskDirty(taskId: string): void {
         this._boardStore.markTaskDirty(taskId);
@@ -1818,7 +1782,6 @@ export class KanbanWebviewPanel {
 
     /**
      * Clear dirty flag for a column (render completed successfully)
-     * Delegates to BoardStore (Phase 2 migration)
      */
     public clearColumnDirty(columnId: string): void {
         this._boardStore.clearColumnDirty(columnId);
@@ -1826,7 +1789,6 @@ export class KanbanWebviewPanel {
 
     /**
      * Clear dirty flag for a task (render completed successfully)
-     * Delegates to BoardStore (Phase 2 migration)
      */
     public clearTaskDirty(taskId: string): void {
         this._boardStore.clearTaskDirty(taskId);
@@ -1837,7 +1799,6 @@ export class KanbanWebviewPanel {
      *
      * Called when view becomes visible to apply any pending DOM updates.
      * Also called after editing stops to ensure skipped updates are applied.
-     * MIGRATED: Now uses BoardStore for dirty tracking (Phase 2)
      */
     public syncDirtyItems(): void {
         // CRITICAL FIX: Don't sync during include switches - state machine sends correct updates
@@ -1850,7 +1811,6 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (!board || !this._panel) return;
 
-        // MIGRATED: Check BoardStore for dirty items (Phase 2)
         if (!this._boardStore.hasDirtyItems()) {
             return; // Nothing to sync
         }
@@ -2444,19 +2404,14 @@ export class KanbanWebviewPanel {
         return this._fileRegistry.getMainFile() !== undefined;
     }
 
-    // ============= STATE-2: Board Caching Methods =============
-
     /**
-     * STATE-2: Get board (single source of truth)
+     * Get board (single source of truth)
      *
      * Returns cached board if valid, otherwise generates fresh board from registry.
-     * This replaces direct access to _board and _cachedBoardFromWebview.
-     * MIGRATED: Now uses BoardStore as primary source (Phase 2)
      *
      * @returns KanbanBoard with all include content, or undefined if not ready
      */
     public getBoard(): KanbanBoard | undefined {
-        // MIGRATED: Check BoardStore for valid cache (Phase 2)
         if (this._boardStore.isCacheValid()) {
             const cachedBoard = this._boardStore.getBoard();
             if (cachedBoard) {
@@ -2485,7 +2440,6 @@ export class KanbanWebviewPanel {
      * Examples: file reload, content change, include switch, etc.
      *
      * CRITICAL: Blocked during include switches to prevent ID regeneration
-     * Uses BoardStore (Phase 2 migration)
      */
     public invalidateBoardCache(): void {
         // CRITICAL FIX: Block invalidation during include switches
@@ -2850,7 +2804,6 @@ export class KanbanWebviewPanel {
             this._unsavedChangesCheckInterval = undefined;
         }
 
-        // Dispose WebviewBridge (Phase 3 migration)
         this._webviewBridge.dispose();
 
         // Clear panel state
@@ -2873,14 +2826,9 @@ export class KanbanWebviewPanel {
         // Stop backup timer
         this._backupManager.dispose();
 
-        // Dispose file registry (Phase 1: cleanup)
         this._fileRegistry.dispose();
-
-        // NEW: Emit disposing event and dispose event bus (Phase 1 architecture refactoring)
         this._eventBus.emit('panel:disposing', undefined).catch(() => {});
         this._eventBus.dispose();
-
-        // NEW: Dispose BoardStore (Phase 2 architecture refactoring)
         this._boardStore.dispose();
 
         this._panel.dispose();
@@ -3223,9 +3171,6 @@ export class KanbanWebviewPanel {
         // This method is now handled by the unified conflict resolution system
         // External changes are detected and handled by file watchers and the registry
     }
-
-    // REMOVED: queueMessage() - now handled by WebviewBridge.sendBatched() (Phase 3 migration)
-    // REMOVED: flushMessages() - now handled by WebviewBridge.flushBatch() (Phase 3 migration)
 
     /**
      * Trigger snippet insertion in the webview

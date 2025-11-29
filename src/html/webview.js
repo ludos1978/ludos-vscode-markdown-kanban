@@ -1,6 +1,5 @@
 // Use the global vscode instance set up in HTML
 // (vscode is already declared globally in webview.html)
-console.log('[webview.js] Script loading started...');
 
 // Global variables
 let currentFileInfo = null;
@@ -2363,8 +2362,7 @@ window.addEventListener('message', event => {
 
     switch (message.type) {
         case 'batch':
-            // CRITICAL FIX: Handle batched messages from backend
-            // Backend uses queueMessage() which batches multiple messages into one
+            // Handle batched messages from backend (via WebviewBridge.sendBatched)
             if (message.messages && Array.isArray(message.messages)) {
                 for (const batchedMessage of message.messages) {
                     // Re-dispatch each batched message through this same handler
@@ -6903,10 +6901,8 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
  * Toggle the Marp global settings burger menu
  */
 function toggleMarpGlobalMenu(event, button) {
-    console.log('[BurgerMenu] toggleMarpGlobalMenu called', { event, button });
     event.stopPropagation();
     const menu = button.parentElement;
-    console.log('[BurgerMenu] menu element:', menu);
     const dropdown = menu.querySelector('.marp-global-menu-dropdown');
     const isActive = menu.classList.contains('active');
 
@@ -7178,5 +7174,4 @@ document.addEventListener("click", function(event) {
 // Make functions globally available
 window.toggleMarpGlobalMenu = toggleMarpGlobalMenu;
 window.updateMarpGlobalSetting = updateMarpGlobalSetting;
-console.log('[webview.js] Script fully loaded, toggleMarpGlobalMenu:', typeof window.toggleMarpGlobalMenu);
 
