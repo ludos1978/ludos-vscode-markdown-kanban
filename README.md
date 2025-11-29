@@ -277,14 +277,15 @@ Query tags gather/collect cards matching specific criteria into a column. The `?
 
 #### Gather by Day Offset
 
-Use comparison operators with `day` to gather cards relative to today:
+Use comparison operators with `day` to gather cards relative to today. The `day` property represents the number of days from today (negative = past, positive = future).
 
 ```markdown
 ## Past Due ?.day<0
 ## Today ?.day=0
 ## Tomorrow ?.day=1
 ## Next 7 Days ?.day<7
-## This Week ?.0<day&day<7
+## Next 3 Days ?.day>0&day<4
+## Past Week ?.day>-7&day<0
 ```
 
 | Expression | Description |
@@ -292,8 +293,11 @@ Use comparison operators with `day` to gather cards relative to today:
 | `?.day<0` | Cards with dates before today (overdue) |
 | `?.day=0` | Cards with today's date |
 | `?.day>0` | Cards with future dates |
-| `?.day<7` | Cards within the next 7 days |
-| `?.day>-7&day<0` | Cards from the past 7 days |
+| `?.day=1` | Cards with tomorrow's date |
+| `?.day<7` | Cards within the next 7 days (including today) |
+| `?.day>0&day<4` | Cards 1-3 days from now (tomorrow to 3 days out) |
+| `?.day>-7&day<0` | Cards from the past 7 days (not including today) |
+| `?.day>-7&day<7` | Cards within ±7 days of today |
 
 #### Combined Queries
 
