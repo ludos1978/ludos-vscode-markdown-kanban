@@ -944,17 +944,9 @@ export class ChangeStateMachine {
             // Get preloaded content map if this is an include_switch event
             const preloadedContentMap = event.type === 'include_switch' ? event.preloadedContent : undefined;
 
-            // DEBUG: Log preloaded content state
-            console.log(`[State:LOADING_NEW] loadingFiles: ${JSON.stringify(loadingFiles)}`);
-            console.log(`[State:LOADING_NEW] preloadedContentMap exists: ${!!preloadedContentMap}, size: ${preloadedContentMap?.size || 0}`);
-            if (preloadedContentMap) {
-                console.log(`[State:LOADING_NEW] preloadedContentMap keys: ${JSON.stringify(Array.from(preloadedContentMap.keys()))}`);
-            }
-
             for (const relativePath of loadingFiles) {
                 // Check if we have preloaded content for this file (from "append tasks to include file" flow)
                 const preloadedContent = preloadedContentMap?.get(relativePath);
-                console.log(`[State:LOADING_NEW] Looking up path "${relativePath}", found: ${preloadedContent !== undefined}, contentLength: ${preloadedContent?.length || 0}`);
 
                 // Check if file exists and verify it's the correct type
                 const existingFile = this._fileRegistry.getByRelativePath(relativePath);

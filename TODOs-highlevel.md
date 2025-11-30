@@ -58,7 +58,7 @@ or
 ![]({thisfilename}-Schedule)
 """
 
-- [ ] if a column already has tasks and a !!!include()!!! is added to the column header the content gets removed when saving it. To prevent loosing data the user should be asked wether he wants to add the existing tasks to the included file or if it should be discarded.
+- [x] if a column already has tasks and a !!!include()!!! is added to the column header the content gets removed when saving it. To prevent loosing data the user should be asked wether he wants to add the existing tasks to the included file or if it should be discarded.
 
 - [x] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
@@ -100,7 +100,7 @@ or
 
 - [x] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 
-- [ ] when focus is regained by the kanban (possible configuration change), check if the tag menus of column and tag burger menus have changed and if so, regenerate these submenus.
+- [x] when focus is regained by the kanban (possible configuration change), check if the tag menus of column and tag burger menus have changed and if so, regenerate these submenus.
 
 
 - [x] before starting the migration, create todos, make sure that before you replace a function you know
