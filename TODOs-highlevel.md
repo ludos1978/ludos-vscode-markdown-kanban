@@ -60,13 +60,13 @@ or
 
 - [ ] if a column already has tasks and a !!!include()!!! is added to the column header the content gets removed when saving it. To prevent loosing data the user should be asked wether he wants to add the existing tasks to the included file or if it should be discarded.
 
-- [ ] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
+- [x] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
 - [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
 
-- [ ] "move to column" from a task burger menu doesnt work.
+- [x] "move to column" from a task burger menu doesnt work.
 
-- [ ] an #tag and @tags are only separated by spaces, tabs, newlines etc, not by any other character such as dots, commas, etc. 
+- [x] an #tag, @tags and .tags are only separated by spaces, tabs, newlines etc, not by any other character such as dots, commas, etc. 
   - #tags that start with a number are allways displayed as numbers in a badge (the system is already in place, but it doesnt accept 3.1.3 indexes)
   - @tags
     - can be @w13 : week 13
@@ -77,9 +77,9 @@ or
 
     - the date and timeslots will be highlighted when they are active (already in place for dates)
 
-- [ ] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
+- [x] include in the column header is still not reliably loading the file. also the enable include isnt working properly. i tested in this logfile: @logs/vscode-app-1763916142426.log 
 
-- [ ] Create a group of tags
+- [x] Create a group of tags
 
   - #schedule
   - #planning
@@ -98,7 +98,7 @@ or
   - #handouts
   - #references
 
-- [ ] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
+- [x] in the column handling after a text change of a column header, it must check for #stack tags as well. because if a stack tag is removed a column might in that current stack might be required to be moved into a separate column, or a separate column might get merged with a previous stack.
 
 - [ ] when focus is regained by the kanban (possible configuration change), check if the tag menus of column and tag burger menus have changed and if so, regenerate these submenus.
 

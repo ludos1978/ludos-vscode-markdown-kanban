@@ -74,6 +74,8 @@ export interface IncludeSwitchEvent {
     oldFiles: string[];
     newFiles: string[];
     newTitle?: string;
+    /** Pre-loaded content for include files (bypasses registry caching) */
+    preloadedContent?: Map<string, string>;
 }
 
 export type ChangeEvent =
@@ -939,7 +941,21 @@ export class ChangeStateMachine {
             // Create/register file instances and load content
             const tasks: any[] = [];
 
+            // Get preloaded content map if this is an include_switch event
+            const preloadedContentMap = event.type === 'include_switch' ? event.preloadedContent : undefined;
+
+            // DEBUG: Log preloaded content state
+            console.log(`[State:LOADING_NEW] loadingFiles: ${JSON.stringify(loadingFiles)}`);
+            console.log(`[State:LOADING_NEW] preloadedContentMap exists: ${!!preloadedContentMap}, size: ${preloadedContentMap?.size || 0}`);
+            if (preloadedContentMap) {
+                console.log(`[State:LOADING_NEW] preloadedContentMap keys: ${JSON.stringify(Array.from(preloadedContentMap.keys()))}`);
+            }
+
             for (const relativePath of loadingFiles) {
+                // Check if we have preloaded content for this file (from "append tasks to include file" flow)
+                const preloadedContent = preloadedContentMap?.get(relativePath);
+                console.log(`[State:LOADING_NEW] Looking up path "${relativePath}", found: ${preloadedContent !== undefined}, contentLength: ${preloadedContent?.length || 0}`);
+
                 // Check if file exists and verify it's the correct type
                 const existingFile = this._fileRegistry.getByRelativePath(relativePath);
                 const isCorrectType = existingFile?.getFileType() === 'include-column';
@@ -963,8 +979,19 @@ export class ChangeStateMachine {
                 const file = this._fileRegistry.getByRelativePath(relativePath);
 
                 if (file) {
-                    // ALWAYS reload from disk when switching includes to ensure fresh content
-                    await file.reload();
+                    // PRIORITY: Use preloaded content if available (bypasses registry caching issues)
+                    // This is used when "append tasks to include file" was selected
+                    if (preloadedContent !== undefined) {
+                        // Set the preloaded content on the file (marks as unsaved)
+                        file.setContent(preloadedContent, false);
+                    } else {
+                        // No preloaded content - check if file has cached unsaved changes
+                        const hasUnsaved = file.hasUnsavedChanges();
+                        if (!hasUnsaved) {
+                            // Only reload from disk if there are no unsaved changes
+                            await file.reload();
+                        }
+                    }
 
                     // Parse tasks from file content
                     if (file.parseToTasks) {

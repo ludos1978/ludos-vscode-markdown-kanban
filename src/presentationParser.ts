@@ -37,11 +37,19 @@ export class PresentationParser {
       return [];
     }
 
+    // Strip YAML frontmatter if present (e.g., ---\nmarp: true\n---\n)
+    // This is critical for parsing include files that have Marp YAML headers
+    let workingContent = content;
+    const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n/);
+    if (yamlMatch) {
+      workingContent = content.substring(yamlMatch[0].length);
+    }
+
     // CRITICAL: Temporarily replace HTML comments with placeholders
     // This prevents '---' inside comments from being treated as slide separators
     // while preserving the comments in the output
     const comments: string[] = [];
-    const contentWithPlaceholders = content.replace(/<!--[\s\S]*?-->/g, (match) => {
+    const contentWithPlaceholders = workingContent.replace(/<!--[\s\S]*?-->/g, (match) => {
       const index = comments.length;
       comments.push(match);
       return `__COMMENT_PLACEHOLDER_${index}__`;

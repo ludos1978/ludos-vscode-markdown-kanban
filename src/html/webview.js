@@ -3032,6 +3032,25 @@ window.addEventListener('message', event => {
                 console.error('[FRONTEND proceedUpdateTaskIncludeFile] updateTaskIncludeFile function not found!');
             }
             break;
+        case 'revertColumnTitle':
+            // Revert column title when user cancels include switch
+            if (window.cachedBoard && window.cachedBoard.columns) {
+                const columnToRevert = window.cachedBoard.columns.find(c => c.id === message.columnId);
+                if (columnToRevert) {
+                    columnToRevert.title = message.title;
+                    // Clear any pending changes for this column
+                    if (window.pendingColumnChanges && window.pendingColumnChanges.has(message.columnId)) {
+                        window.pendingColumnChanges.delete(message.columnId);
+                    }
+                    // Re-render the column to show reverted title
+                    if (typeof window.renderSingleColumn === 'function') {
+                        window.renderSingleColumn(message.columnId, columnToRevert);
+                    } else if (typeof window.renderBoard === 'function') {
+                        window.renderBoard();
+                    }
+                }
+            }
+            break;
         case 'updateColumnContent':
             // Handle targeted column content update for include file changes
             if (window.cachedBoard && window.cachedBoard.columns) {

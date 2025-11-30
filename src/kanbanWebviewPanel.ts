@@ -1874,6 +1874,8 @@ export class KanbanWebviewPanel {
         oldFiles: string[];
         newFiles: string[];
         newTitle?: string;
+        /** Pre-loaded content for include files (bypasses registry caching) */
+        preloadedContent?: Map<string, string>;
     }): Promise<void> {
 
         // Route through unified change state machine
@@ -1888,7 +1890,8 @@ export class KanbanWebviewPanel {
             columnIdForTask: params.columnId ? undefined : column?.id,
             oldFiles: params.oldFiles,
             newFiles: params.newFiles,
-            newTitle: params.newTitle
+            newTitle: params.newTitle,
+            preloadedContent: params.preloadedContent
         });
 
         if (!result.success) {

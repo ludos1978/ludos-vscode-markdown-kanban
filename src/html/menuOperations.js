@@ -180,7 +180,7 @@ class SimpleMenuManager {
                     // Simple function call
                     const funcName = match[1];
                     const params = this.parseParameters(match[2]);
-                    
+
                     if (window[funcName] && typeof window[funcName] === 'function') {
                         window[funcName].apply(window, params);
                         return true;

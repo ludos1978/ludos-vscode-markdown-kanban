@@ -12,6 +12,7 @@ import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { PlantUMLService } from './plantUMLService';
 import { getMermaidExportService } from './services/export/MermaidExportService';
+import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import * as vscode from 'vscode';
@@ -4132,6 +4133,78 @@ export class MessageHandler {
             log(`[editColumnTitle] New include files from title:`, newIncludeFiles);
             log(`[editColumnTitle] Column title in board:`, column.title);
 
+            // DATA LOSS PREVENTION: Check if column has existing tasks that would be lost
+            // This happens when a regular column (no include) is being converted to an include column
+            const isAddingIncludeToRegularColumn = !oldIncludeMatches && hasColumnIncludeMatches && !column.includeMode;
+            const hasExistingTasks = column.tasks && column.tasks.length > 0;
+
+            log(`[editColumnTitle] DATA LOSS CHECK: oldIncludeMatches=${!!oldIncludeMatches}, hasColumnIncludeMatches=${!!hasColumnIncludeMatches}, column.includeMode=${column.includeMode}`);
+            log(`[editColumnTitle] DATA LOSS CHECK: isAddingIncludeToRegularColumn=${isAddingIncludeToRegularColumn}, hasExistingTasks=${hasExistingTasks}, tasks.length=${column.tasks?.length || 0}`);
+
+            // Prepare preloaded content map for include switch event (used if user chooses "append tasks")
+            let preloadedContent: Map<string, string> | undefined;
+
+            if (isAddingIncludeToRegularColumn && hasExistingTasks) {
+                log(`[editColumnTitle] Column has ${column.tasks.length} existing tasks that would be lost`);
+
+                // Ask user what to do with existing tasks
+                const choice = await vscode.window.showWarningMessage(
+                    `This column has ${column.tasks.length} existing task(s). Adding an include will replace them with the included file's content.`,
+                    { modal: true },
+                    'Append tasks to include file',
+                    'Discard tasks',
+                    'Cancel'
+                );
+
+                if (choice === 'Cancel' || choice === undefined) {
+                    log(`[editColumnTitle] User cancelled include switch to preserve tasks`);
+                    // Revert the title change in the frontend
+                    const panel = this._getWebviewPanel();
+                    if (panel && panel._panel && panel._panel.webview) {
+                        panel._panel.webview.postMessage({
+                            type: 'revertColumnTitle',
+                            columnId: columnId,
+                            title: column.title
+                        });
+                    }
+                    this._getWebviewPanel().setEditingInProgress(false);
+                    return;
+                }
+
+                if (choice === 'Append tasks to include file') {
+                    // Generate content for appending tasks to the include file
+                    const includeFilePath = newIncludeFiles[0];
+                    log(`[editColumnTitle] User chose 'Append tasks to include file', includeFilePath: ${includeFilePath}`);
+                    if (includeFilePath) {
+                        try {
+                            const { absolutePath, content } = await this.generateAppendTasksContent(column, includeFilePath, currentBoard);
+                            // Create a map with the preloaded content to pass through the event
+                            // IMPORTANT: Use absolute path as key - loadingFiles in state machine uses absolute paths
+                            preloadedContent = new Map<string, string>();
+                            preloadedContent.set(absolutePath, content);
+                            log(`[editColumnTitle] Generated content for ${column.tasks.length} tasks`);
+                            log(`[editColumnTitle] Map key (absolutePath): "${absolutePath}"`);
+                            log(`[editColumnTitle] Content length: ${content.length}`);
+                        } catch (error: any) {
+                            log(`[editColumnTitle] Error generating tasks content:`, error);
+                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${error.message}`);
+                            // Revert the title change
+                            const panel = this._getWebviewPanel();
+                            if (panel && panel._panel && panel._panel.webview) {
+                                panel._panel.webview.postMessage({
+                                    type: 'revertColumnTitle',
+                                    columnId: columnId,
+                                    title: column.title
+                                });
+                            }
+                            this._getWebviewPanel().setEditingInProgress(false);
+                            return;
+                        }
+                    }
+                }
+                // If 'Discard tasks' was chosen, continue with the include switch (tasks will be cleared)
+            }
+
             // Route through unified state machine via handleIncludeSwitch
             const panel = this._getWebviewPanel();
 
@@ -4148,11 +4221,15 @@ export class MessageHandler {
 
             try {
                 // Call new state machine-based handler
+                // Pass preloaded content if we generated it (from "append tasks to include file")
+                log(`[editColumnTitle] Calling handleIncludeSwitch with preloadedContent: ${!!preloadedContent}, size: ${preloadedContent?.size || 0}`);
+                log(`[editColumnTitle] oldFiles: ${JSON.stringify(oldIncludeFiles)}, newFiles: ${JSON.stringify(newIncludeFiles)}`);
                 await panel.handleIncludeSwitch({
                     columnId: columnId,
                     oldFiles: oldIncludeFiles,
                     newFiles: newIncludeFiles,
-                    newTitle: newTitle
+                    newTitle: newTitle,
+                    preloadedContent: preloadedContent
                 });
 
                 log(`[editColumnTitle] Column include switch completed successfully`);
@@ -5537,5 +5614,78 @@ ${mermaidCode}
         // If no fuzzy match found, return original content unchanged
         console.warn('[Mermaid] No fuzzy match found, content unchanged');
         return content;
+    }
+
+    /**
+     * Generate content for appending tasks from a column to an include file.
+     * Returns the content and relative path to be passed through the include switch event.
+     * The actual file write happens when the user saves the main kanban file.
+     *
+     * @returns Object with absolutePath and content to be passed to handleIncludeSwitch
+     *          absolutePath is used because loadingFiles in state machine uses absolute paths
+     */
+    private async generateAppendTasksContent(
+        column: any,
+        includeFilePath: string,
+        _board: any
+    ): Promise<{ absolutePath: string; content: string }> {
+        const panel = this._getWebviewPanel();
+        if (!panel) {
+            throw new Error('No panel available');
+        }
+
+        // Get the main file and file registry
+        const mainFile = panel._fileRegistry.getMainFile();
+        if (!mainFile) {
+            throw new Error('No main file found');
+        }
+
+        const mainFilePath = mainFile.getPath();
+        const mainFileDir = path.dirname(mainFilePath);
+        const absoluteIncludePath = path.isAbsolute(includeFilePath)
+            ? includeFilePath
+            : path.resolve(mainFileDir, includeFilePath);
+
+        // Use the relative path as-is for registry lookup
+        // IMPORTANT: Do NOT normalize by removing ./ prefix - the registry uses the path
+        // exactly as it appears in the include syntax, just lowercased
+        let relativePath = includeFilePath;
+        if (path.isAbsolute(includeFilePath)) {
+            relativePath = path.relative(mainFileDir, includeFilePath);
+        }
+
+        // Generate presentation format content from the column's tasks
+        // This uses PresentationGenerator to create proper Marp slides (each task = one slide)
+        const tasksContent = PresentationGenerator.fromTasks(column.tasks, {
+            filterIncludes: true,  // Filter out task includes - they have their own files
+            includeMarpDirectives: false  // No YAML header - we'll add it ourselves or append to existing
+        });
+
+        // Check if the file exists on disk to read existing content
+        let existingContent = '';
+        try {
+            const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(absoluteIncludePath));
+            existingContent = Buffer.from(fileContent).toString('utf8');
+        } catch {
+            // File doesn't exist yet - that's fine, we'll create it with YAML header
+        }
+
+        let finalContent: string;
+        if (existingContent) {
+            // Append tasks at the end with slide separator
+            // Ensure proper slide separation
+            const separator = existingContent.trimEnd().endsWith('---') ? '\n' : '\n---\n';
+            finalContent = existingContent.trimEnd() + separator + tasksContent;
+        } else {
+            // Create new content with YAML header for Marp compatibility
+            finalContent = `---
+marp: true
+---
+${tasksContent}`;
+        }
+
+        log(`[generateAppendTasksContent] Generated content for ${column.tasks.length} tasks, absolutePath: ${absoluteIncludePath}`);
+
+        return { absolutePath: absoluteIncludePath, content: finalContent };
     }
 }

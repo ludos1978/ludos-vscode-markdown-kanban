@@ -3859,7 +3859,8 @@ function getTagConfig(tagName) {
         'content-type-teaching', 'content-type-product',
         'complexity', 'review-status', 'time-estimate',
         'testing-status', 'platform-teaching', 'platform-product',
-        'version', 'impact'
+        'version', 'impact',
+        'schedule', 'overview', 'example', 'deliveries'
     ];
     for (const group of groups) {
         if (window.tagColors[group] && window.tagColors[group][tagName]) {
@@ -4372,7 +4373,9 @@ function generateTagStyles() {
                      window.tagColors.complexity || window.tagColors['review-status'] ||
                      window.tagColors['time-estimate'] || window.tagColors['testing-status'] ||
                      window.tagColors['platform-teaching'] || window.tagColors['platform-product'] ||
-                     window.tagColors.version || window.tagColors.impact;
+                     window.tagColors.version || window.tagColors.impact ||
+                     window.tagColors.schedule || window.tagColors.overview ||
+                     window.tagColors.example || window.tagColors.deliveries;
 
     if (isGrouped) {
         // Process each group
@@ -4383,7 +4386,8 @@ function generateTagStyles() {
             'content-type-teaching', 'content-type-product',
             'complexity', 'review-status', 'time-estimate',
             'testing-status', 'platform-teaching', 'platform-product',
-            'version', 'impact'
+            'version', 'impact',
+            'schedule', 'overview', 'example', 'deliveries'
         ];
         groups.forEach(groupName => {
             if (window.tagColors[groupName]) {
