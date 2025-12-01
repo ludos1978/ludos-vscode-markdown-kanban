@@ -184,8 +184,8 @@ body {
   white-space: nowrap;
 }
 
-/* Container query: Hide text when file-info-bar is narrow */
-@container file-info-bar (max-width: 600px) {
+/* Container query: Hide text when file-info-bar is narrow (below 1000px) */
+@container file-info-bar (max-width: 1000px) {
   .empty-card-text,
   .clipboard-text,
   .global-fold-text,
@@ -204,13 +204,14 @@ body {
   .layout-presets-btn:hover .layout-presets-text {
     display: inline !important;
   }
+}
 
-  /* Truncate file name */
+/* Compact mode at medium widths */
+@container file-info-bar (max-width: 700px) {
   .file-name {
     max-width: 100px;
   }
 
-  /* Reduce gaps */
   .file-info-content {
     gap: 4px;
   }
@@ -222,8 +223,8 @@ body {
   }
 }
 
-/* Even more compact at very narrow widths */
-@container file-info-bar (max-width: 400px) {
+/* Very compact at narrow widths */
+@container file-info-bar (max-width: 500px) {
   .file-name {
     max-width: 60px;
   }
@@ -241,7 +242,7 @@ body {
 
 /* Media query fallback for browsers without container query support */
 @supports not (container-type: inline-size) {
-  @media (max-width: 700px) {
+  @media (max-width: 1000px) {
     .empty-card-text,
     .clipboard-text,
     .global-fold-text,
