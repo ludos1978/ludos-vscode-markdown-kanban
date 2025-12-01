@@ -1112,7 +1112,7 @@ class TaskEditor {
                             // Update all visual tag elements (badges, bars, backgrounds, borders)
                             const taskElement = element.closest('.task-item');
                             if (taskElement && window.updateAllVisualTagElements) {
-                                const allTags = window.tagUtils ? window.tagUtils.getActiveTagsInTitle(value) : [];
+                                const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(value) : [];
                                 window.updateAllVisualTagElements(taskElement, allTags, 'task');
                             }
 

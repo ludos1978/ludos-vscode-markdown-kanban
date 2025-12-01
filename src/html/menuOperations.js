@@ -1175,6 +1175,35 @@ function moveColumnLeft(columnId) {
     if (index > 0) {
         const column = currentBoard.columns[index];
         const currentRow = getColumnRow(column.title);
+
+        // Update cache immediately
+        const [movedColumn] = currentBoard.columns.splice(index, 1);
+        currentBoard.columns.splice(index - 1, 0, movedColumn);
+        if (window.cachedBoard && window.cachedBoard !== currentBoard) {
+            const cachedIndex = window.cachedBoard.columns.findIndex(c => c.id === columnId);
+            if (cachedIndex > 0) {
+                const [cachedMovedColumn] = window.cachedBoard.columns.splice(cachedIndex, 1);
+                window.cachedBoard.columns.splice(cachedIndex - 1, 0, cachedMovedColumn);
+            }
+        }
+
+        // Move DOM element immediately
+        const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+        if (columnElement) {
+            const parent = columnElement.parentNode;
+            const prevSibling = columnElement.previousElementSibling;
+            if (prevSibling && parent) {
+                parent.insertBefore(columnElement, prevSibling);
+
+                // Recalculate stack heights after DOM move
+                const stack = columnElement.closest('.kanban-column-stack');
+                if (stack && typeof recalculateStackHeightsImmediate === 'function') {
+                    recalculateStackHeightsImmediate(stack);
+                }
+            }
+        }
+
+        // Send to backend (no re-render needed)
         vscode.postMessage({
             type: 'moveColumnWithRowUpdate',
             columnId,
@@ -1186,12 +1215,7 @@ function moveColumnLeft(columnId) {
         document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 
         // Update button state to show unsaved changes
-        updateRefreshButtonState('unsaved', 1);
-
-        // Recalculate stack positions after column move
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            requestAnimationFrame(() => window.applyStackedColumnStyles());
-        }
+        markUnsavedChanges();
     }
 }
 
@@ -1695,7 +1719,15 @@ function deleteColumn(columnId) {
             // Remove column from DOM immediately - use specific selector to avoid removing tasks
             const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
             if (columnElement) {
+                // Get the stack before removing the column
+                const stack = columnElement.closest('.kanban-column-stack');
+
                 columnElement.remove();
+
+                // Recalculate stack heights after column deletion
+                if (stack && typeof recalculateStackHeightsImmediate === 'function') {
+                    recalculateStackHeightsImmediate(stack);
+                }
             }
 
             // Mark board as having unsaved changes
@@ -2423,7 +2455,10 @@ function deleteTask(taskId, columnId) {
 
                 taskElement.remove();
 
-                // Recalculate stack heights after task deletion
+                // Check if column is now empty and add placeholder button (before height recalc)
+                updateColumnEmptyState(foundColumn.id);
+
+                // Recalculate stack heights after task deletion and button restoration
                 // Task deletion changes column height, so we need to recalculate positions
                 if (columnElement) {
                     const stack = columnElement.closest('.kanban-column-stack');
@@ -2432,9 +2467,6 @@ function deleteTask(taskId, columnId) {
                     }
                 }
             }
-
-            // Check if column is now empty and add placeholder button
-            updateColumnEmptyState(foundColumn.id);
 
             // Mark board as having unsaved changes
             markUnsavedChanges();
@@ -2455,16 +2487,13 @@ function updateColumnEmptyState(columnId) {
     const taskElements = tasksContainer.querySelectorAll('.task-item');
     const hasAddButton = tasksContainer.querySelector('.add-task-btn');
 
+    // Add button if column is empty (CSS handles hiding when tasks present)
     if (taskElements.length === 0 && !hasAddButton) {
-        // Column is empty and has no add button - add it
         const addButton = document.createElement('button');
         addButton.className = 'add-task-btn';
         addButton.setAttribute('onclick', `addTask('${columnId}')`);
         addButton.innerHTML = '\n                        + Add Task\n                    ';
         tasksContainer.appendChild(addButton);
-    } else if (taskElements.length > 0 && hasAddButton) {
-        // Column has tasks but still has add button - remove it
-        hasAddButton.remove();
     }
 }
 

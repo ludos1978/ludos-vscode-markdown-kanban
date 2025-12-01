@@ -1018,7 +1018,7 @@ export class ChangeStateMachine {
                     this._fileRegistry.unregister(existingFile);
                 }
 
-                const taskInclude = fileFactory.createTaskInclude(relativePath, mainFile, false);
+                const taskInclude = fileFactory.createInclude(relativePath, mainFile, 'include-task', false);
                 taskInclude.setTaskId(targetTask.id);
                 taskInclude.setTaskTitle(targetTask.title);
                 taskInclude.setColumnId(targetColumn.id);

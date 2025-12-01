@@ -4927,12 +4927,7 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
     const taskElement = tempDiv.firstElementChild;
 
     try {
-        // The "+ Add Task" button is inside the tasks container, so we need to insert before it
-        const addTaskBtn = tasksContainer.querySelector('.add-task-btn');
-
-        // DEBUG: Log insertion details
-
-        // Insert the task at the correct position
+        // Insert the task at the correct position (add-task button visibility handled by CSS)
         if (insertIndex >= 0 && insertIndex < tasksContainer.children.length) {
             const referenceNode = tasksContainer.children[insertIndex];
             if (referenceNode && referenceNode.parentNode === tasksContainer) {
@@ -4941,14 +4936,7 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
                 tasksContainer.appendChild(taskElement);
             }
         } else {
-            // Insert before the "+ Add Task" button if it exists, otherwise append to end
-            if (addTaskBtn) {
-                tasksContainer.insertBefore(taskElement, addTaskBtn);
-                // Remove the button after adding the first task (matches createColumnElement behavior)
-                addTaskBtn.remove();
-            } else {
-                tasksContainer.appendChild(taskElement);
-            }
+            tasksContainer.appendChild(taskElement);
         }
     } catch (error) {
         console.error('[addSingleTaskToDOM] Error inserting task:', error);

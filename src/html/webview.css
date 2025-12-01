@@ -1772,6 +1772,11 @@ body.section-height-limited .task-section figure img {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Hide add-task button when column has tasks */
+.tasks-container:has(.task-item) .add-task-btn {
+  display: none;
+}
+
 /* the column button should be styled vertically and is displayed at the end of each row after the last column */
 .add-column-btn {
   background: var(--button-background);
@@ -2528,11 +2533,11 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack .kanban-full-height-column .column-header{
-	transform: translateZ(-0.133px) translate(0px,-3px);
+	transform: translateZ(-0.133px) translate(0px,-2.66px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(-0.133px) translate(0px,-2px);
+	transform: translateZ(-0.133px) translate(0px,-4px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
