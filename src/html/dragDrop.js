@@ -4254,6 +4254,59 @@ function clearTemplateDragCache() {
     dragState.cachedStacks = null;
 }
 
+/**
+ * Normalize stack tags for all columns based on DOM positions
+ * Same logic as processColumnDrop uses - first column in stack has no #stack tag,
+ * all subsequent columns have #stack tag
+ * Call this after board updates (e.g., after creating empty columns or applying templates)
+ */
+function normalizeAllStackTags() {
+    const boardElement = document.getElementById('kanban-board');
+    if (!boardElement || !window.cachedBoard) return;
+
+    let hasChanges = false;
+
+    // Get all column stacks (not drop zone stacks)
+    const allStacks = boardElement.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
+
+    allStacks.forEach(stack => {
+        const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column')).filter(col => {
+            return col.closest('.kanban-column-stack') === stack;
+        });
+
+        columnsInStack.forEach((col, idx) => {
+            const colId = col.getAttribute('data-column-id');
+            const cachedCol = window.cachedBoard.columns.find(c => c.id === colId);
+            if (!cachedCol) return;
+
+            if (idx === 0) {
+                // First column - remove #stack tag
+                const hadStack = /#stack\b/i.test(cachedCol.title);
+                if (hadStack) {
+                    cachedCol.title = cachedCol.title.replace(/#stack\b/gi, '').replace(/\s+/g, ' ').trim();
+                    updateColumnTitleDisplay(colId);
+                    hasChanges = true;
+                }
+            } else {
+                // Other columns - ensure they have #stack tag
+                if (!/#stack\b/i.test(cachedCol.title)) {
+                    const trimmedTitle = cachedCol.title.trim();
+                    cachedCol.title = trimmedTitle ? trimmedTitle + ' #stack' : ' #stack';
+                    updateColumnTitleDisplay(colId);
+                    hasChanges = true;
+                }
+            }
+        });
+    });
+
+    // If changes were made, mark as unsaved
+    if (hasChanges && typeof markUnsavedChanges === 'function') {
+        markUnsavedChanges();
+    }
+
+    return hasChanges;
+}
+
 // Make template functions globally available
 window.setupTemplateDragHandlers = setupTemplateDragHandlers;
 window.handleTemplateDragOver = handleTemplateDragOver;
@@ -4261,3 +4314,4 @@ window.handleTemplateDragLeave = handleTemplateDragLeave;
 window.templateDragState = templateDragState;
 window.cacheColumnPositionsForTemplateDrag = cacheColumnPositionsForTemplateDrag;
 window.clearTemplateDragCache = clearTemplateDragCache;
+window.normalizeAllStackTags = normalizeAllStackTags;

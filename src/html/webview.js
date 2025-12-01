@@ -3272,6 +3272,10 @@ window.addEventListener('message', event => {
                 window.cachedBoard = message.board;
                 if (typeof window.renderBoard === 'function') {
                     window.renderBoard();
+                    // Normalize stack tags after render (uses same logic as column drops)
+                    if (typeof window.normalizeAllStackTags === 'function') {
+                        window.normalizeAllStackTags();
+                    }
                 }
             }
             break;

@@ -5787,6 +5787,7 @@ ${tasksContent}`;
 
     /**
      * Create an empty column at the specified position
+     * Stack tags are handled by the frontend after board update (same code path as column drops)
      */
     private async createEmptyColumn(message: any): Promise<void> {
         try {
@@ -5834,6 +5835,7 @@ ${tasksContent}`;
             }
 
             // Create column title with row tag if needed (same as template system)
+            // Stack tags will be normalized by frontend after render
             let columnTitle = 'New Column';
             if (targetRow > 1) {
                 columnTitle = `New Column #row${targetRow}`;
@@ -5850,9 +5852,18 @@ ${tasksContent}`;
             // Insert empty column
             currentBoard.columns.splice(insertIndex, 0, emptyColumn);
 
-            // Mark unsaved and update frontend
+            // Mark unsaved
             this._markUnsavedChanges(true, currentBoard);
-            await this._onBoardUpdate();
+
+            // Send templateApplied message so frontend normalizes stack tags
+            // (uses same code path as column drops for stack tag handling)
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'templateApplied',
+                    board: currentBoard
+                });
+            }
 
             log(`[createEmptyColumn] Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}`);
 
