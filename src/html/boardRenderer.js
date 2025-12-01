@@ -1517,148 +1517,79 @@ function requestTemplates() {
 
 /**
  * Update templates list (called from webview message handler)
- * Populates the template dropdown in the file-info header
+ * Populates the template dropdown in the file-info header and the columns menu
  */
 window.updateTemplates = function(templates, showBar = true) {
     window.availableTemplates = templates || [];
     window.showTemplateBar = showBar;
 
-    // Get the template source container and select element
+    // Get the template source container and select element (legacy, kept hidden)
     const templateSource = document.getElementById('template-source');
     const templateSelect = document.getElementById('template-select');
-    const templateDragHandle = document.getElementById('template-drag-handle');
 
-    if (!templateSource || !templateSelect) {
-        return;
-    }
+    // Get the new columns menu dropdown
+    const columnsMenuDropdown = document.getElementById('columns-menu-dropdown');
 
-    // Show/hide based on whether we have templates
-    if (!showBar || !templates || templates.length === 0) {
-        templateSource.style.display = 'none';
-        return;
-    }
+    // Update legacy template select (hidden, for backwards compatibility)
+    if (templateSelect) {
+        // Clear existing options (keep first placeholder)
+        while (templateSelect.options.length > 1) {
+            templateSelect.remove(1);
+        }
 
-    // Clear existing options (keep first placeholder)
-    while (templateSelect.options.length > 1) {
-        templateSelect.remove(1);
-    }
-
-    // Add template options
-    templates.forEach(template => {
-        const option = document.createElement('option');
-        option.value = template.path;
-        option.textContent = (template.icon ? template.icon + ' ' : '') + template.name;
-        option.dataset.templateName = template.name;
-        option.dataset.templatePath = template.path;
-        templateSelect.appendChild(option);
-    });
-
-    // Show the template source
-    templateSource.style.display = 'flex';
-
-    // Setup drag handler for the drag handle
-    if (templateDragHandle && !templateDragHandle.dataset.dragSetup) {
-        templateDragHandle.dataset.dragSetup = 'true';
-
-        templateDragHandle.addEventListener('dragstart', (e) => {
-            const selectedOption = templateSelect.options[templateSelect.selectedIndex];
-            if (!selectedOption || !selectedOption.value) {
-                e.preventDefault();
-                return;
-            }
-
-            // Set template drag state
-            if (typeof window.templateDragState !== 'undefined') {
-                window.templateDragState.isDragging = true;
-                window.templateDragState.templatePath = selectedOption.dataset.templatePath || selectedOption.value;
-                window.templateDragState.templateName = selectedOption.dataset.templateName || selectedOption.textContent;
-            }
-
-            // Cache column positions for template drag (same as column drags)
-            if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
-                window.cacheColumnPositionsForTemplateDrag();
-            }
-
-            // Set drag data
-            e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('text/plain', `template:${selectedOption.value}`);
-            e.dataTransfer.setData('application/x-kanban-template', JSON.stringify({
-                path: selectedOption.value,
-                name: selectedOption.dataset.templateName || selectedOption.textContent
-            }));
-
-            // Visual feedback
-            templateDragHandle.classList.add('dragging');
-            templateSource.classList.add('dragging');
-
-            // Add class to board for drop zone highlighting
-            const boardElement = document.getElementById('kanban-board');
-            if (boardElement) {
-                boardElement.classList.add('template-dragging');
-            }
-        });
-
-        templateDragHandle.addEventListener('dragend', (e) => {
-            templateDragHandle.classList.remove('dragging');
-            templateSource.classList.remove('dragging');
-
-            // Remove drop zone highlighting
-            const boardElement = document.getElementById('kanban-board');
-            if (boardElement) {
-                boardElement.classList.remove('template-dragging');
-            }
-
-            // Clear all template-drag-over classes
-            document.querySelectorAll('.template-drag-over').forEach(el => {
-                el.classList.remove('template-drag-over');
+        if (templates && templates.length > 0) {
+            templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.path;
+                option.textContent = (template.icon ? template.icon + ' ' : '') + template.name;
+                option.dataset.templateName = template.name;
+                option.dataset.templatePath = template.path;
+                templateSelect.appendChild(option);
             });
+        }
+    }
 
-            // If we have a valid drop target, apply the template
-            if (typeof window.templateDragState !== 'undefined' &&
-                window.templateDragState.isDragging &&
-                window.templateDragState.targetRow !== null) {
-                // Call the apply function from dragDrop.js
-                if (typeof applyTemplateAtPosition === 'function') {
-                    applyTemplateAtPosition();
-                } else if (typeof window.applyTemplateAtPosition === 'function') {
-                    window.applyTemplateAtPosition();
-                } else {
-                    // Fallback: send message directly
-                    if (typeof vscode !== 'undefined') {
-                        vscode.postMessage({
-                            type: 'applyTemplate',
-                            templatePath: window.templateDragState.templatePath,
-                            templateName: window.templateDragState.templateName,
-                            targetRow: window.templateDragState.targetRow || 1,
-                            insertAfterColumnId: window.templateDragState.targetPosition === 'after' ? window.templateDragState.targetColumnId : null,
-                            insertBeforeColumnId: window.templateDragState.targetPosition === 'before' ? window.templateDragState.targetColumnId : null,
-                            position: window.templateDragState.targetPosition
-                        });
-                    }
-                }
-            }
+    // Keep template source hidden (using new drag menus instead)
+    if (templateSource) {
+        templateSource.style.display = 'none';
+    }
 
-            // Reset state
-            if (typeof window.templateDragState !== 'undefined') {
-                window.templateDragState.isDragging = false;
-                window.templateDragState.templatePath = null;
-                window.templateDragState.templateName = null;
-                window.templateDragState.targetRow = null;
-                window.templateDragState.targetPosition = null;
-                window.templateDragState.targetColumnId = null;
-            }
+    // Populate the columns menu dropdown with templates
+    if (columnsMenuDropdown) {
+        // Remove existing template items and separators (keep empty column source)
+        const existingTemplates = columnsMenuDropdown.querySelectorAll('.template-item, .drag-menu-separator');
+        existingTemplates.forEach(el => el.remove());
 
-            // Clear cached column positions
-            if (typeof window.clearTemplateDragCache === 'function') {
-                window.clearTemplateDragCache();
-            }
+        // Add templates if available
+        if (templates && templates.length > 0) {
+            // Add separator
+            const separator = document.createElement('div');
+            separator.className = 'drag-menu-separator';
+            columnsMenuDropdown.appendChild(separator);
 
-            // Hide any internal drop indicator
-            const indicator = document.querySelector('.internal-drop-indicator');
-            if (indicator) {
-                indicator.style.display = 'none';
-            }
-        });
+            // Add each template as a draggable menu item
+            templates.forEach(template => {
+                const item = document.createElement('div');
+                item.className = 'drag-menu-item template-item';
+                item.draggable = true;
+                item.dataset.templatePath = template.path;
+                item.dataset.templateName = template.name;
+                item.ondragstart = window.handleTemplateMenuDragStart;
+                item.ondragend = window.handleTemplateMenuDragEnd;
+
+                const icon = document.createElement('span');
+                icon.className = 'drag-menu-item-icon';
+                icon.textContent = template.icon || '📑';
+
+                const text = document.createElement('span');
+                text.className = 'drag-menu-item-text';
+                text.textContent = template.name;
+
+                item.appendChild(icon);
+                item.appendChild(text);
+                columnsMenuDropdown.appendChild(item);
+            });
+        }
     }
 };
 

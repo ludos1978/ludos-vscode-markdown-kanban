@@ -311,24 +311,42 @@
                 </div>
             </div>
             <div class="file-info-center">
-                <div id="empty-card-source" class="empty-card-source" draggable="true" title="Drag to create empty card" ondragstart="handleEmptyCardDragStart(event)" ondragend="handleEmptyCardDragEnd(event)">
-                    <span class="empty-card-icon" draggable="false">📝</span>
-                    <span class="empty-card-text" draggable="false">New Card</span>
-                </div>
-                <div id="clipboard-card-source" class="clipboard-card-source" draggable="true" title="Drag to create card from clipboard content" onmousedown="handleClipboardMouseDown(event)" ondragstart="handleClipboardDragStart(event)" ondragend="handleClipboardDragEnd(event)" onmouseenter="showClipboardPreview()" onmouseleave="hideClipboardPreview()">
-                    <span class="clipboard-icon" draggable="false">📋</span>
-                    <span class="clipboard-text" draggable="false">Clip</span>
-                    <div id="clipboard-preview" class="clipboard-preview">
-                        <div class="clipboard-preview-content">
-                            <div class="clipboard-preview-header" id="clipboard-preview-header">Clipboard Content</div>
-                            <div id="clipboard-preview-body"></div>
+                <!-- Cards Hover Menu -->
+                <div class="drag-menu cards-menu">
+                    <div class="drag-menu-trigger" title="Drag cards to board">
+                        <span class="drag-menu-icon">📝</span>
+                        <span class="drag-menu-label">Card</span>
+                    </div>
+                    <div class="drag-menu-dropdown">
+                        <div id="empty-card-source" class="drag-menu-item" draggable="true" ondragstart="handleEmptyCardDragStart(event)" ondragend="handleEmptyCardDragEnd(event)">
+                            <span class="drag-menu-item-icon">📝</span>
+                            <span class="drag-menu-item-text">Empty Card</span>
+                        </div>
+                        <div id="clipboard-card-source" class="drag-menu-item" draggable="true" onmousedown="handleClipboardMouseDown(event)" ondragstart="handleClipboardDragStart(event)" ondragend="handleClipboardDragEnd(event)">
+                            <span class="drag-menu-item-icon">📋</span>
+                            <span class="drag-menu-item-text" id="clipboard-menu-text">Clipboard</span>
                         </div>
                     </div>
                 </div>
+
+                <!-- Columns/Stacks Hover Menu -->
+                <div class="drag-menu columns-menu">
+                    <div class="drag-menu-trigger" title="Drag columns/stacks to board">
+                        <span class="drag-menu-icon">📊</span>
+                        <span class="drag-menu-label">Column</span>
+                    </div>
+                    <div class="drag-menu-dropdown" id="columns-menu-dropdown">
+                        <div id="empty-column-source" class="drag-menu-item" draggable="true" ondragstart="handleEmptyColumnDragStart(event)" ondragend="handleEmptyColumnDragEnd(event)">
+                            <span class="drag-menu-item-icon">➕</span>
+                            <span class="drag-menu-item-text">Empty Column</span>
+                        </div>
+                        <!-- Templates will be populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Hidden template source for backwards compatibility -->
                 <div id="template-source" class="template-source" style="display: none;">
-                    <div id="template-drag-handle" class="template-drag-handle" draggable="true" title="Drag selected template to board">⋮⋮</div>
-                    <span class="template-icon" draggable="false">📑</span>
-                    <select id="template-select" class="template-select" title="Select a template to drag">
+                    <select id="template-select" class="template-select">
                         <option value="">Template...</option>
                     </select>
                 </div>

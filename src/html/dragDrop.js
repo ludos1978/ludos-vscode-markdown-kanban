@@ -352,6 +352,41 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     // (same behavior as column drags over drop zones)
     const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
     if (isTemplateDrag && targetStack.classList.contains('column-drop-zone-stack')) {
+        // CRITICAL: Still need to set templateDragState for the drop zone!
+        // Find the row from the previous or next stack
+        const row = targetStack.closest('.kanban-row');
+        if (row) {
+            templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
+        } else {
+            // Single-row layout - default to row 1
+            templateDragState.targetRow = 1;
+        }
+
+        // For drop zone stacks, insert at the beginning (this creates a new stack position)
+        // Find adjacent columns to determine position
+        const prevStack = targetStack.previousElementSibling;
+        const nextStack = targetStack.nextElementSibling;
+
+        if (prevStack && prevStack.classList.contains('kanban-column-stack')) {
+            // Insert after the last column of the previous stack
+            const lastCol = prevStack.querySelector('.kanban-full-height-column:last-of-type');
+            if (lastCol) {
+                templateDragState.targetPosition = 'after';
+                templateDragState.targetColumnId = lastCol.dataset?.columnId || null;
+            }
+        } else if (nextStack && nextStack.classList.contains('kanban-column-stack')) {
+            // Insert before the first column of the next stack
+            const firstCol = nextStack.querySelector('.kanban-full-height-column:first-of-type');
+            if (firstCol) {
+                templateDragState.targetPosition = 'before';
+                templateDragState.targetColumnId = firstCol.dataset?.columnId || null;
+            }
+        } else {
+            // No adjacent stacks - insert at end
+            templateDragState.targetPosition = 'first';
+            templateDragState.targetColumnId = null;
+        }
+
         indicator.style.display = 'none';
         return;
     }

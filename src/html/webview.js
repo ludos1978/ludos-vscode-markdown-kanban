@@ -813,14 +813,211 @@ window.handleEmptyCardDragStart = function(e) {
 };
 
 window.handleEmptyCardDragEnd = function(e) {
-    
+
     // Clear visual feedback
     e.target.classList.remove('dragging');
-    
+
     // Clear drag state
     if (window.dragState) {
         window.dragState.isDragging = false;
         window.dragState.draggedEmptyCard = null;
+    }
+};
+
+// Empty column drag handlers
+window.handleEmptyColumnDragStart = function(e) {
+    // Set template drag state for empty column
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = true;
+        window.templateDragState.templatePath = null; // No template path for empty column
+        window.templateDragState.templateName = 'Empty Column';
+        window.templateDragState.isEmptyColumn = true;
+    }
+
+    // Cache column positions for drag (same as template drags)
+    if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
+        window.cacheColumnPositionsForTemplateDrag();
+    }
+
+    // Set drag data
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', 'empty-column');
+    e.dataTransfer.setData('application/x-kanban-empty-column', JSON.stringify({
+        type: 'empty-column',
+        name: 'Empty Column'
+    }));
+
+    // Visual feedback
+    e.target.classList.add('dragging');
+
+    // Add class to board for drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.add('template-dragging');
+    }
+};
+
+window.handleEmptyColumnDragEnd = function(e) {
+    // Clear visual feedback
+    e.target.classList.remove('dragging');
+
+    // Remove drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.remove('template-dragging');
+    }
+
+    // Clear all drag-over classes
+    document.querySelectorAll('.template-drag-over, .drag-over').forEach(el => {
+        el.classList.remove('template-drag-over', 'drag-over');
+    });
+
+    // If we have a valid drop target, create empty column using template system
+    if (typeof window.templateDragState !== 'undefined' &&
+        window.templateDragState.isDragging &&
+        window.templateDragState.isEmptyColumn &&
+        window.templateDragState.targetRow !== null) {
+
+        // Use applyTemplate with special empty column marker
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'applyTemplate',
+                templatePath: '__empty_column__', // Special marker for empty column
+                templateName: 'Empty Column',
+                isEmptyColumn: true,
+                targetRow: window.templateDragState.targetRow || 1,
+                insertAfterColumnId: window.templateDragState.targetPosition === 'after' ? window.templateDragState.targetColumnId : null,
+                insertBeforeColumnId: window.templateDragState.targetPosition === 'before' ? window.templateDragState.targetColumnId : null,
+                position: window.templateDragState.targetPosition
+            });
+        }
+    }
+
+    // Reset state
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = false;
+        window.templateDragState.templatePath = null;
+        window.templateDragState.templateName = null;
+        window.templateDragState.isEmptyColumn = false;
+        window.templateDragState.targetRow = null;
+        window.templateDragState.targetPosition = null;
+        window.templateDragState.targetColumnId = null;
+    }
+
+    // Clear cached column positions
+    if (typeof window.clearTemplateDragCache === 'function') {
+        window.clearTemplateDragCache();
+    }
+
+    // Hide any internal drop indicator
+    const indicator = document.querySelector('.internal-drop-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+};
+
+// Template menu item drag handlers (for columns menu)
+window.handleTemplateMenuDragStart = function(e) {
+    const templatePath = e.target.dataset.templatePath;
+    const templateName = e.target.dataset.templateName;
+
+    if (!templatePath) {
+        e.preventDefault();
+        return;
+    }
+
+    // Set template drag state
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = true;
+        window.templateDragState.templatePath = templatePath;
+        window.templateDragState.templateName = templateName;
+        window.templateDragState.isEmptyColumn = false;
+    }
+
+    // Cache column positions for template drag
+    if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
+        window.cacheColumnPositionsForTemplateDrag();
+    }
+
+    // Set drag data
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', `template:${templatePath}`);
+    e.dataTransfer.setData('application/x-kanban-template', JSON.stringify({
+        path: templatePath,
+        name: templateName
+    }));
+
+    // Visual feedback
+    e.target.classList.add('dragging');
+
+    // Add class to board for drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.add('template-dragging');
+    }
+};
+
+window.handleTemplateMenuDragEnd = function(e) {
+    // Clear visual feedback
+    e.target.classList.remove('dragging');
+
+    // Remove drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.remove('template-dragging');
+    }
+
+    // Clear all drag-over classes
+    document.querySelectorAll('.template-drag-over, .drag-over').forEach(el => {
+        el.classList.remove('template-drag-over', 'drag-over');
+    });
+
+    // If we have a valid drop target, apply the template
+    if (typeof window.templateDragState !== 'undefined' &&
+        window.templateDragState.isDragging &&
+        window.templateDragState.targetRow !== null) {
+
+        // Call the apply function from dragDrop.js
+        if (typeof applyTemplateAtPosition === 'function') {
+            applyTemplateAtPosition();
+        } else if (typeof window.applyTemplateAtPosition === 'function') {
+            window.applyTemplateAtPosition();
+        } else {
+            // Fallback: send message directly
+            if (typeof vscode !== 'undefined') {
+                vscode.postMessage({
+                    type: 'applyTemplate',
+                    templatePath: window.templateDragState.templatePath,
+                    templateName: window.templateDragState.templateName,
+                    targetRow: window.templateDragState.targetRow || 1,
+                    insertAfterColumnId: window.templateDragState.targetPosition === 'after' ? window.templateDragState.targetColumnId : null,
+                    insertBeforeColumnId: window.templateDragState.targetPosition === 'before' ? window.templateDragState.targetColumnId : null,
+                    position: window.templateDragState.targetPosition
+                });
+            }
+        }
+    }
+
+    // Reset state
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = false;
+        window.templateDragState.templatePath = null;
+        window.templateDragState.templateName = null;
+        window.templateDragState.isEmptyColumn = false;
+        window.templateDragState.targetRow = null;
+        window.templateDragState.targetPosition = null;
+        window.templateDragState.targetColumnId = null;
+    }
+
+    // Clear cached column positions
+    if (typeof window.clearTemplateDragCache === 'function') {
+        window.clearTemplateDragCache();
+    }
+
+    // Hide any internal drop indicator
+    const indicator = document.querySelector('.internal-drop-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
     }
 };
 
@@ -1104,48 +1301,54 @@ async function updateClipboardCardSource(force = false) {
     }
 
     const clipboardSource = document.getElementById('clipboard-card-source');
-    
+    const clipboardMenuText = document.getElementById('clipboard-menu-text');
+
     if (clipboardSource) {
-        const iconSpan = clipboardSource.querySelector('.clipboard-icon');
-        const textSpan = clipboardSource.querySelector('.clipboard-text');
-        
+        const iconSpan = clipboardSource.querySelector('.drag-menu-item-icon');
+
         if (clipboardCardData && clipboardCardData.content) {
             clipboardSource.style.opacity = '1';
             const escapedTitle = (typeof escapeHtml === 'function') ? escapeHtml(clipboardCardData.title) : clipboardCardData.title;
-            clipboardSource.title = `Drag to create card: "${escapedTitle}"`;
 
-            // Show first 15 characters + character count (escaped for display)
-            const rawPreview = clipboardCardData.content.length > 15
-                ? clipboardCardData.content.substring(0, 15) + `... (${clipboardCardData.content.length})`
-                : `${clipboardCardData.content} (${clipboardCardData.content.length})`;
+            // Show first 20 characters for menu preview
+            const rawPreview = clipboardCardData.content.length > 20
+                ? clipboardCardData.content.substring(0, 20) + '...'
+                : clipboardCardData.content;
 
             // Escape the preview content to prevent HTML rendering
             const preview = (typeof escapeHtml === 'function') ? escapeHtml(rawPreview) : rawPreview;
-            
+
             // Update visual indicator based on content type
+            let menuLabel = 'Clipboard';
             if (clipboardCardData.isImage) {
-                iconSpan.textContent = '🖼️';
-                textSpan.textContent = 'Image';
+                if (iconSpan) iconSpan.textContent = '🖼️';
+                menuLabel = 'Image';
             } else if (clipboardCardData.isLink) {
                 // Check if it's an image file or URL
                 if (clipboardCardData.content.startsWith('![')) {
-                    iconSpan.textContent = '🖼️';
+                    if (iconSpan) iconSpan.textContent = '🖼️';
+                    menuLabel = 'Image Link';
                 } else if (clipboardCardData.content.startsWith('[')) {
-                    iconSpan.textContent = '📄';
+                    if (iconSpan) iconSpan.textContent = '📄';
+                    menuLabel = 'File Link';
                 } else {
-                    iconSpan.textContent = '🔗';
+                    if (iconSpan) iconSpan.textContent = '🔗';
+                    menuLabel = 'URL';
                 }
-                textSpan.textContent = preview;
             } else {
-                iconSpan.textContent = '📋';
-                textSpan.textContent = preview;
+                if (iconSpan) iconSpan.textContent = '📋';
+                menuLabel = `"${preview}"`;
+            }
+
+            // Update menu text
+            if (clipboardMenuText) {
+                clipboardMenuText.textContent = menuLabel;
             }
         } else {
             clipboardSource.style.opacity = '0.5';
-            clipboardSource.title = 'No clipboard content available';
-            
-            iconSpan.textContent = '📋';
-            textSpan.textContent = 'Clip';
+
+            if (iconSpan) iconSpan.textContent = '📋';
+            if (clipboardMenuText) clipboardMenuText.textContent = 'Clipboard';
         }
     }
 }

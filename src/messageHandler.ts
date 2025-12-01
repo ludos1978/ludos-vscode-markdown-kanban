@@ -5748,6 +5748,12 @@ ${tasksContent}`;
         }
 
         try {
+            // Handle empty column creation (special case)
+            if (message.isEmptyColumn || message.templatePath === '__empty_column__') {
+                await this.createEmptyColumn(message);
+                return;
+            }
+
             const templatePath = message.templatePath;
             if (!templatePath) {
                 vscode.window.showErrorMessage('No template path provided');
@@ -5776,6 +5782,83 @@ ${tasksContent}`;
         } catch (error: any) {
             log('[handleApplyTemplate] Error:', error);
             vscode.window.showErrorMessage(`Failed to load template: ${error.message}`);
+        }
+    }
+
+    /**
+     * Create an empty column at the specified position
+     */
+    private async createEmptyColumn(message: any): Promise<void> {
+        try {
+            const insertAfterColumnId = message.insertAfterColumnId;
+            const insertBeforeColumnId = message.insertBeforeColumnId;
+
+            // Get current board
+            const currentBoard = this._getCurrentBoard();
+            if (!currentBoard) {
+                log('[createEmptyColumn] No current board');
+                return;
+            }
+
+            // Save undo state
+            this._boardStore.saveStateForUndo(currentBoard);
+
+            // Helper to get row from column title
+            const getColumnRow = (col: any): number => {
+                const rowMatch = col.title?.match(/#row(\d+)/i);
+                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
+            };
+
+            // Determine target row from adjacent column (if specified)
+            let targetRow = message.targetRow || 1;
+            let insertIndex = currentBoard.columns.length;
+
+            if (insertAfterColumnId) {
+                const afterIdx = currentBoard.columns.findIndex((c: any) => c.id === insertAfterColumnId);
+                if (afterIdx >= 0) {
+                    insertIndex = afterIdx + 1;
+                    // Get row from the column we're inserting after
+                    targetRow = getColumnRow(currentBoard.columns[afterIdx]);
+                }
+            } else if (insertBeforeColumnId) {
+                const beforeIdx = currentBoard.columns.findIndex((c: any) => c.id === insertBeforeColumnId);
+                if (beforeIdx >= 0) {
+                    insertIndex = beforeIdx;
+                    // Get row from the column we're inserting before
+                    targetRow = getColumnRow(currentBoard.columns[beforeIdx]);
+                }
+            } else if (message.position === 'first') {
+                // Find first column in target row
+                const firstInRow = currentBoard.columns.findIndex((c: any) => getColumnRow(c) === targetRow);
+                insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
+            }
+
+            // Create column title with row tag if needed (same as template system)
+            let columnTitle = 'New Column';
+            if (targetRow > 1) {
+                columnTitle = `New Column #row${targetRow}`;
+            }
+
+            // Create empty column structure
+            const emptyColumn = {
+                id: `col-${Date.now()}`,
+                title: columnTitle,
+                tasks: [],
+                settings: {}
+            };
+
+            // Insert empty column
+            currentBoard.columns.splice(insertIndex, 0, emptyColumn);
+
+            // Mark unsaved and update frontend
+            this._markUnsavedChanges(true, currentBoard);
+            await this._onBoardUpdate();
+
+            log(`[createEmptyColumn] Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}`);
+
+        } catch (error: any) {
+            log('[createEmptyColumn] Error:', error);
+            vscode.window.showErrorMessage(`Failed to create empty column: ${error.message}`);
         }
     }
 

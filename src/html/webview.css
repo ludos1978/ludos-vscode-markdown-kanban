@@ -117,7 +117,8 @@ body {
 
 .file-info-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  /* Left: flexible but prefers natural size, Center: flexible with min width to prevent sudden collapse, Right: auto (natural size) */
+  grid-template-columns: minmax(0, auto) minmax(120px, 1fr) auto;
   align-items: center;
   height: 100%;
   gap: 8px;
@@ -129,6 +130,7 @@ body {
   gap: 6px;
   min-width: 0;
   overflow: hidden;
+  flex-shrink: 1;
 }
 
 .file-info-center {
@@ -137,6 +139,8 @@ body {
   justify-content: center;
   gap: 6px;
   min-width: 0;
+  overflow: visible; /* Allow dropdowns to appear */
+  flex-shrink: 1;
 }
 
 .file-icon {
@@ -165,6 +169,8 @@ body {
   gap: 6px;
   align-items: center;
   justify-content: flex-end;
+  overflow: hidden;
+  flex-shrink: 0; /* Right section keeps its size, left/center shrink first */
 }
 
 /* ============================================================================
@@ -195,14 +201,12 @@ body {
     display: none !important;
   }
 
-  /* Show text on hover of parent element */
-  .empty-card-source:hover .empty-card-text,
-  .clipboard-card-source:hover .clipboard-text,
-  .global-fold-btn:hover .global-fold-text,
-  .sort-btn:hover .sort-text,
-  .refresh-btn:hover .refresh-text,
-  .layout-presets-btn:hover .layout-presets-text {
-    display: inline !important;
+  /* Make template select compact - just show dropdown arrow */
+  .template-select {
+    width: 20px !important;
+    min-width: 20px !important;
+    padding: 0 2px !important;
+    color: transparent !important;
   }
 }
 
@@ -238,6 +242,28 @@ body {
   .file-info-right {
     gap: 2px;
   }
+
+  /* Hide marp menu at very narrow widths */
+  .marp-global-menu {
+    display: none;
+  }
+}
+
+/* Extremely narrow - hide center section elements */
+@container file-info-bar (max-width: 350px) {
+  .file-info-content {
+    /* Only left and right, no center - override the min-width */
+    grid-template-columns: minmax(0, 1fr) 0 auto;
+  }
+
+  .file-info-center {
+    display: none;
+    min-width: 0 !important;
+  }
+
+  .file-name {
+    max-width: 40px;
+  }
 }
 
 /* Media query fallback for browsers without container query support */
@@ -252,15 +278,6 @@ body {
       display: none !important;
     }
 
-    .empty-card-source:hover .empty-card-text,
-    .clipboard-card-source:hover .clipboard-text,
-    .global-fold-btn:hover .global-fold-text,
-    .sort-btn:hover .sort-text,
-    .refresh-btn:hover .refresh-text,
-    .layout-presets-btn:hover .layout-presets-text {
-      display: inline !important;
-    }
-
     .file-name {
       max-width: 80px;
     }
@@ -272,6 +289,217 @@ body {
       gap: 4px;
     }
   }
+}
+
+/* ============================================================================
+   IMMEDIATE CSS TOOLTIPS - Shows on hover without delay
+   ============================================================================ */
+
+/* All file-info-bar elements with title get immediate tooltip */
+.file-info-bar [title] {
+  position: relative;
+}
+
+/* Tooltip appears immediately on hover - below the element */
+.file-info-bar [title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--vscode-editorWidget-background, #252526);
+  color: var(--vscode-editorWidget-foreground, #cccccc);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: normal;
+  white-space: nowrap;
+  z-index: 10000;
+  pointer-events: none;
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Small arrow pointing up */
+.file-info-bar [title]:hover::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: var(--vscode-editorWidget-border, #454545);
+  z-index: 10001;
+  pointer-events: none;
+}
+
+/* Don't show tooltip for elements without meaningful title or nested elements */
+.file-info-bar [title=""]:hover::after,
+.file-info-bar [title=""]:hover::before {
+  display: none;
+}
+
+/* Prevent double tooltips - only show on direct interactive elements, not wrappers */
+.file-info-bar .marp-global-menu:hover::after,
+.file-info-bar .marp-global-menu:hover::before,
+.file-info-bar .layout-presets-menu-container:hover::after,
+.file-info-bar .layout-presets-menu-container:hover::before,
+.file-info-bar .file-bar-menu:hover::after,
+.file-info-bar .file-bar-menu:hover::before {
+  display: none;
+}
+
+/* ============================================================================
+   DRAG MENU - Hover menus for Cards and Columns/Stacks
+   ============================================================================ */
+
+.drag-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.drag-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  height: 22px;
+  min-height: 22px;
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  border: var(--button-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.drag-menu-trigger:hover {
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
+}
+
+.drag-menu-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.drag-menu-label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Dropdown menu - appears on hover */
+.drag-menu-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 10000;
+  padding: 4px 0;
+  padding-top: 8px; /* Extra padding at top for visual gap */
+  margin-top: 0; /* No gap - continuous hover zone */
+}
+
+/* Invisible bridge to maintain hover when moving to dropdown */
+.drag-menu-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: transparent;
+}
+
+.drag-menu:hover .drag-menu-dropdown {
+  display: block;
+}
+
+/* Menu items - draggable */
+.drag-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: grab;
+  font-size: 12px;
+  color: var(--vscode-dropdown-foreground);
+  background: transparent;
+  transition: background 0.1s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.drag-menu-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.drag-menu-item:active,
+.drag-menu-item.dragging {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+.drag-menu-item-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.drag-menu-item-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Clipboard item shows preview text */
+.drag-menu-item .clipboard-preview-snippet {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+/* Template items in column menu */
+.drag-menu-item.template-item {
+  border-left: 2px solid transparent;
+  margin-left: 2px;
+  padding-left: 10px;
+}
+
+.drag-menu-item.template-item:hover {
+  border-left-color: var(--vscode-focusBorder);
+}
+
+/* Separator line between empty column and templates */
+.drag-menu-separator {
+  height: 1px;
+  background: var(--vscode-dropdown-border);
+  margin: 4px 8px;
+}
+
+/* Hide label text at narrow widths */
+@container file-info-bar (max-width: 1000px) {
+  .drag-menu-label {
+    display: none;
+  }
+}
+
+/* Prevent tooltip on drag menu (has its own dropdown) */
+.file-info-bar .drag-menu-trigger:hover::after,
+.file-info-bar .drag-menu-trigger:hover::before {
+  display: none;
 }
 
 /* Consistent styling for all file-info header buttons */
@@ -6678,13 +6906,17 @@ figcaption {
   align-items: center;
   gap: 4px;
   border: var(--button-border);
-  padding: 4px 4px;
+  padding: 2px 4px;
   margin: 0;
+  height: 22px;
+  min-height: 22px;
+  min-width: 22px;
   background: var(--button-alternative-background);
   color: var(--button-alternative-foreground);
   cursor: pointer;
   border-radius: 3px;
   font-size: 12px;
+  box-sizing: border-box;
   white-space: nowrap;
 }
 
