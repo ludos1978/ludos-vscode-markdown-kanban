@@ -468,6 +468,24 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     // Otherwise processColumnDrop() won't know where to drop
     dragState.dropTargetStack = targetStack;
     dragState.dropTargetBeforeColumn = beforeColumn;
+
+    // For template drags, also update templateDragState with target position
+    if (isTemplateDrag && typeof templateDragState !== 'undefined') {
+        const stackRow = parseInt(targetStack.dataset.row) || 1;
+        templateDragState.targetRow = stackRow;
+
+        if (beforeColumn) {
+            // Insert before this column
+            templateDragState.targetPosition = 'before';
+            templateDragState.targetColumnId = beforeColumn.dataset?.columnId || null;
+        } else {
+            // Insert after last column in stack
+            const columnsInStack = targetStack.querySelectorAll('.kanban-full-height-column');
+            const lastColumn = columnsInStack[columnsInStack.length - 1];
+            templateDragState.targetPosition = 'after';
+            templateDragState.targetColumnId = lastColumn?.dataset?.columnId || null;
+        }
+    }
 }
 
 function hideInternalDropIndicator() {
@@ -3240,14 +3258,31 @@ function updateStackBottomDropZones() {
             if (!dragState.draggedColumn && !isTemplateDrag) {return;}
             e.preventDefault();
 
+            // Use same visual style for both column and template drags
+            dropZone.classList.add('drag-over');
+
             // PERFORMANCE: Just show indicator, DON'T move column!
-            // Drop at end of stack (before drop zone)
+            // Drop at end of stack (after last column)
             showInternalColumnDropIndicator(stack, null);
 
-            // For template drags, update target position
+            // For template drags, update target position (drop after last column in this stack)
             if (isTemplateDrag) {
-                handleTemplateDragOver(e, dropZone);
+                const row = stack.closest('.kanban-row');
+                if (row) {
+                    templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
+                }
+                // Insert after last column in this stack
+                const lastColumn = stack.querySelector('.kanban-full-height-column:last-of-type');
+                if (lastColumn) {
+                    templateDragState.targetColumnId = lastColumn.dataset.columnId;
+                    templateDragState.targetPosition = 'after';
+                }
             }
+        });
+
+        // Add dragleave handler to clear styles
+        dropZone.addEventListener('dragleave', e => {
+            dropZone.classList.remove('drag-over');
         });
 
         // Append to stack
@@ -3558,8 +3593,16 @@ function setupColumnDragAndDrop() {
 
         // PERFORMANCE-OPTIMIZED: Zero-recalc dragover using cached positions from dragstart
         // RAF-THROTTLED: Limits processing to 60fps max
+        // Also handles template drags with same visual behavior as column drags
         column.addEventListener('dragover', e => {
-            if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
+            const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+            const isColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
+
+            // Handle both column drags and template drags
+            if (!isColumnDrag && !isTemplateDrag) {return;}
+
+            // For column drags, skip if dragging over self
+            if (isColumnDrag && dragState.draggedColumn === column) {return;}
 
             // Don't handle if we're currently over a drop zone - let the drop zone handle it
             if (dragState.pendingDropZone) {
@@ -3579,18 +3622,22 @@ function setupColumnDragAndDrop() {
                 dragState.columnDragoverPending = false;
 
                 // Re-check state in case drag ended while waiting
-                if (!dragState.draggedColumn || dragState.draggedColumn === column) {return;}
+                const stillTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+                const stillColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
+                if (!stillColumnDrag && !stillTemplateDrag) {return;}
 
-            const draggedStack = dragState.draggedColumn.parentNode;
+            // For column drags, check dragged column's parent stack
+            // For template drags, we only need the target stack
+            const draggedStack = stillColumnDrag ? dragState.draggedColumn.parentNode : null;
             const targetStack = column.parentNode;
 
-            if (!draggedStack || !targetStack ||
-                !draggedStack.classList.contains('kanban-column-stack') ||
-                !targetStack.classList.contains('kanban-column-stack')) {
-                console.warn('[ColumnDragover] Not in stacks', {
-                    draggedStack: draggedStack?.className,
-                    targetStack: targetStack?.className
-                });
+            // Validate stacks
+            if (!targetStack || !targetStack.classList.contains('kanban-column-stack')) {
+                console.warn('[ColumnDragover] Target not in stack', { targetStack: targetStack?.className });
+                return;
+            }
+            if (stillColumnDrag && (!draggedStack || !draggedStack.classList.contains('kanban-column-stack'))) {
+                console.warn('[ColumnDragover] Dragged column not in stack', { draggedStack: draggedStack?.className });
                 return;
             }
 
@@ -3648,6 +3695,7 @@ function setupColumnDragAndDrop() {
             }
 
             // Show indicator, DON'T move actual column!
+            // (also sets templateDragState target position for template drags)
             showInternalColumnDropIndicator(targetStack, beforeColumn);
             }); // End RAF callback
         });
@@ -3656,8 +3704,10 @@ function setupColumnDragAndDrop() {
     // Add dragover handler to allow dropping below the last column in a stack
     // STICKY-AWARE: Uses column-title bottom when sticky, column bottom when normal
     // RAF-THROTTLED: Limits processing to 60fps max
+    // Also handles template drags with same behavior
     document.addEventListener('dragover', e => {
-        if (!dragState.draggedColumn) {return;}
+        const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+        if (!dragState.draggedColumn && !isTemplateDrag) {return;}
 
         // Don't interfere if over a drop zone
         if (e.target.classList.contains('column-drop-zone')) {
@@ -3676,7 +3726,8 @@ function setupColumnDragAndDrop() {
             dragState.documentDragoverPending = false;
 
             // Re-check state in case drag ended while waiting
-            if (!dragState.draggedColumn) {return;}
+            const stillTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+            if (!dragState.draggedColumn && !stillTemplateDrag) {return;}
 
         // PERFORMANCE: Use cached stacks instead of querySelectorAll
         if (!dragState.cachedStacks || dragState.cachedStacks.length === 0) {return;}
@@ -3773,6 +3824,7 @@ function setupColumnDragAndDrop() {
         // Only handle vertical drops below the last column/title/content
         if (mouseY > lastBottom) {
             // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
+            // (also sets templateDragState target position for template drags)
             showInternalColumnDropIndicator(stack, null);
         }
         }); // End RAF callback
@@ -3782,9 +3834,12 @@ function setupColumnDragAndDrop() {
     document.addEventListener('dragover', (e) => {
         // ONLY handle if the direct target is a drop zone (not a child element)
         if (!e.target.classList.contains('column-drop-zone')) {
-            // Clear any previous drag-over states
+            // Clear any previous drag-over states (both column and template styles)
             document.querySelectorAll('.column-drop-zone.drag-over').forEach(dz => {
                 dz.classList.remove('drag-over');
+            });
+            document.querySelectorAll('.column-drop-zone.template-drag-over').forEach(dz => {
+                dz.classList.remove('template-drag-over');
             });
             dragState.pendingDropZone = null;
             return;
@@ -3801,25 +3856,58 @@ function setupColumnDragAndDrop() {
         const dropZone = e.target;
         e.preventDefault();
 
-        // Add visual feedback only - don't move anything yet
+        // Clear previous highlights from other drop zones
         document.querySelectorAll('.column-drop-zone.drag-over').forEach(dz => {
             if (dz !== dropZone) {dz.classList.remove('drag-over');}
         });
+        document.querySelectorAll('.column-drop-zone.template-drag-over').forEach(dz => {
+            if (dz !== dropZone) {dz.classList.remove('template-drag-over');}
+        });
+
+        // Use same visual style for both column and template drags
         dropZone.classList.add('drag-over');
 
-        // Show indicator in the drop zone
-        const dropZoneStack = dropZone.parentNode;
-        if (dropZoneStack && dropZoneStack.classList.contains('column-drop-zone-stack')) {
-            // Show indicator at the drop zone (null = drop at end, which positions it in the zone)
-            showInternalColumnDropIndicator(dropZoneStack, null);
+        // For column drags, show indicator and store pending drop zone
+        if (dragState.draggedColumn) {
+            const dropZoneStack = dropZone.parentNode;
+            if (dropZoneStack && dropZoneStack.classList.contains('column-drop-zone-stack')) {
+                showInternalColumnDropIndicator(dropZoneStack, null);
+            }
+            dragState.pendingDropZone = dropZone;
         }
 
-        // For template drags, update the template drag state
+        // For template drags, just update the target position (no indicator for drop zones)
         if (isTemplateDrag) {
-            handleTemplateDragOver(e, dropZone);
-        } else {
-            // Store the drop zone for processing on dragend (column drag)
-            dragState.pendingDropZone = dropZone;
+            // Determine target row and position
+            const row = dropZone.closest('.kanban-row');
+            if (row) {
+                templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
+            }
+
+            // Find the column before/after this drop zone
+            const stack = dropZone.closest('.kanban-column-stack');
+            if (stack) {
+                const prevStack = stack.previousElementSibling;
+                const nextStack = stack.nextElementSibling;
+
+                if (prevStack && prevStack.classList.contains('kanban-column-stack') && !prevStack.classList.contains('column-drop-zone-stack')) {
+                    const prevColumn = prevStack.querySelector('.kanban-full-height-column');
+                    if (prevColumn) {
+                        templateDragState.targetColumnId = prevColumn.dataset.columnId;
+                        templateDragState.targetPosition = 'after';
+                    }
+                } else if (nextStack && nextStack.classList.contains('kanban-column-stack') && !nextStack.classList.contains('column-drop-zone-stack')) {
+                    const nextColumn = nextStack.querySelector('.kanban-full-height-column');
+                    if (nextColumn) {
+                        templateDragState.targetColumnId = nextColumn.dataset.columnId;
+                        templateDragState.targetPosition = 'before';
+                    }
+                } else {
+                    // First or last position
+                    templateDragState.targetColumnId = null;
+                    templateDragState.targetPosition = dropZone.classList.contains('column-drop-zone-before') ? 'first' : 'last';
+                }
+            }
         }
     });
 
@@ -4042,12 +4130,14 @@ function applyTemplateAtPosition() {
 /**
  * Cache column positions for template drags
  * Called when template drag starts to enable same drop behavior as column drags
+ * MUST match the caching logic in setupColumnDragAndDrop exactly!
  */
 function cacheColumnPositionsForTemplateDrag() {
     const allColumns = document.querySelectorAll('.kanban-full-height-column');
     const board = document.getElementById('kanban-board');
+    const viewportHeight = window.innerHeight;
 
-    // Cache stack structure
+    // Cache stack structure (same as column drag)
     dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {
         const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
         return {
@@ -4057,53 +4147,43 @@ function cacheColumnPositionsForTemplateDrag() {
         };
     });
 
-    // Cache column positions
+    // Cache column positions (same logic as column drag in setupColumnDragAndDrop)
     dragState.cachedColumnPositions = Array.from(allColumns).map(col => {
         const colId = col.getAttribute('data-column-id');
         const columnTitle = col.querySelector('.column-title');
-        const columnContent = col.querySelector('.column-content');
-        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
-        const isFolded = col.classList.contains('collapsed') || col.classList.contains('collapsed-vertical');
 
-        const rect = col.getBoundingClientRect();
+        // Check if column is using sticky positioning (collapsed/stacked)
+        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
+
+        // Cache margins (used when NOT sticky) - use actual DOM elements
+        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+        const bottomMargin = col.querySelector('.column-margin-bottom');
+
+        // Cache column title rect (used when sticky)
         const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
+
+        // CRITICAL: Check if column-content is visible in viewport (determines folded state)
+        const columnContent = col.querySelector('.column-content');
         const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
 
-        // Calculate margin rects for drop detection
-        let topMarginRect = null;
-        let bottomMarginRect = null;
-
-        if (columnTitleRect) {
-            topMarginRect = {
-                top: rect.top,
-                bottom: columnTitleRect.top + columnTitleRect.height / 2,
-                left: rect.left,
-                width: rect.width,
-                height: columnTitleRect.top + columnTitleRect.height / 2 - rect.top
-            };
-        }
-
-        if (contentRect) {
-            bottomMarginRect = {
-                top: contentRect.bottom,
-                bottom: rect.bottom,
-                left: rect.left,
-                width: rect.width,
-                height: rect.bottom - contentRect.bottom
-            };
-        }
+        // Column is "folded" only if content is NOT visible in viewport
+        // If any part of content is visible, it's NOT folded
+        const isContentVisible = contentRect &&
+            contentRect.bottom > 0 &&
+            contentRect.top < viewportHeight;
+        const isFolded = isSticky && !isContentVisible;
 
         return {
             element: col,
+            rect: col.getBoundingClientRect(),
             columnId: colId,
-            rect: rect,
-            columnTitleRect: columnTitleRect,
-            contentRect: contentRect,
-            topMarginRect: topMarginRect,
-            bottomMarginRect: bottomMarginRect,
             isSticky: isSticky,
             isFolded: isFolded,
-            isContentVisible: contentRect && contentRect.height > 0
+            isContentVisible: isContentVisible,
+            contentRect: contentRect,
+            topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
+            bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
+            columnTitleRect: columnTitleRect
         };
     });
 }

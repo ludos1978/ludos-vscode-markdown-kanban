@@ -1574,6 +1574,11 @@ window.updateTemplates = function(templates, showBar = true) {
                 window.templateDragState.templateName = selectedOption.dataset.templateName || selectedOption.textContent;
             }
 
+            // Cache column positions for template drag (same as column drags)
+            if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
+                window.cacheColumnPositionsForTemplateDrag();
+            }
+
             // Set drag data
             e.dataTransfer.effectAllowed = 'copy';
             e.dataTransfer.setData('text/plain', `template:${selectedOption.value}`);
@@ -1641,6 +1646,17 @@ window.updateTemplates = function(templates, showBar = true) {
                 window.templateDragState.targetRow = null;
                 window.templateDragState.targetPosition = null;
                 window.templateDragState.targetColumnId = null;
+            }
+
+            // Clear cached column positions
+            if (typeof window.clearTemplateDragCache === 'function') {
+                window.clearTemplateDragCache();
+            }
+
+            // Hide any internal drop indicator
+            const indicator = document.querySelector('.internal-drop-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
             }
         });
     }

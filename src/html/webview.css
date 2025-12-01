@@ -164,16 +164,89 @@ body {
   justify-content: flex-end;
 }
 
+/* Make file-info-bar a container for container queries */
+.file-info-bar {
+  container-type: inline-size;
+  container-name: file-info-bar;
+}
+
+/* Responsive text hiding - hide text labels when space is limited */
+/* Text elements that can be hidden */
+.empty-card-text,
+.clipboard-text,
+.global-fold-text,
+.sort-text,
+.refresh-text,
+.layout-presets-text {
+  transition: opacity 0.15s ease, max-width 0.15s ease;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Hide text when container is narrow (below 600px) */
+@container file-info-bar (max-width: 600px) {
+  .empty-card-text,
+  .clipboard-text,
+  .global-fold-text,
+  .sort-text,
+  .refresh-text,
+  .layout-presets-text {
+    max-width: 0;
+    opacity: 0;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Show text on hover of parent element */
+  .empty-card-source:hover .empty-card-text,
+  .clipboard-card-source:hover .clipboard-text,
+  .global-fold-btn:hover .global-fold-text,
+  .sort-btn:hover .sort-text,
+  .refresh-btn:hover .refresh-text,
+  .layout-presets-btn:hover .layout-presets-text {
+    max-width: 100px;
+    opacity: 1;
+  }
+
+  /* Adjust button widths to be icon-only when compact */
+  .file-info-right .global-fold-btn,
+  .file-info-right .sort-btn,
+  .file-info-right .refresh-btn,
+  .file-info-right .layout-presets-btn {
+    width: auto;
+    min-width: 22px;
+    padding: 2px 4px;
+  }
+
+  /* Hide file name when very narrow */
+  .file-name {
+    max-width: 80px;
+  }
+}
+
+/* Even more compact at very narrow widths */
+@container file-info-bar (max-width: 450px) {
+  .file-name {
+    max-width: 50px;
+  }
+
+  /* Reduce gaps */
+  .file-info-content {
+    gap: 4px;
+  }
+
+  .file-info-left,
+  .file-info-center,
+  .file-info-right {
+    gap: 3px;
+  }
+}
+
 /* Consistent styling for all file-info header elements */
-.file-info-left .global-fold-btn,
-.file-info-left .sort-btn,
-.file-info-right .global-fold-btn,
-.file-info-right .sort-btn,
+/* Icon-only buttons (no text labels) */
 .file-info-right .global-sticky-btn,
 .file-info-right .font-size-btn,
-.file-info-right .refresh-btn,
 .file-info-right .auto-export-btn,
-.file-info-right .layout-presets-btn,
 .file-info-right .file-bar-menu-btn {
   border: var(--button-border);
   padding: 2px 2px;
@@ -181,6 +254,27 @@ body {
   height: 22px;
   min-height: 22px;
   width: 22px;
+  min-width: 22px;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+/* Buttons with text labels - auto width to accommodate text */
+.file-info-left .global-fold-btn,
+.file-info-left .sort-btn,
+.file-info-right .global-fold-btn,
+.file-info-right .sort-btn,
+.file-info-right .refresh-btn,
+.file-info-right .layout-presets-btn {
+  border: var(--button-border);
+  padding: 2px 6px;
+  margin: 0;
+  height: 22px;
+  min-height: 22px;
+  width: auto;
   min-width: 22px;
   justify-content: center;
   gap: 4px;
@@ -2383,7 +2477,8 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 /* Visual feedback for drop zones - no scaling */
-.column-drop-zone.drag-over {
+.column-drop-zone.drag-over,
+.stack-bottom-drop-zone.drag-over {
   background: var(--vscode-editor-selectionBackground);
   border: 2px dashed var(--vscode-editor-selectionForeground);
   border-radius: 4px;
