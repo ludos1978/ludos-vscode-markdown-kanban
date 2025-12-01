@@ -3785,6 +3785,25 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   will-change: transform, opacity;
 }
 
+/* Phantom column for empty column drag - visible placeholder */
+.kanban-full-height-column.phantom-column {
+  opacity: 0.6;
+  background: var(--vscode-editor-background);
+  border: 2px dashed var(--vscode-focusBorder);
+  border-radius: 4px;
+  min-height: 100px;
+}
+
+.kanban-full-height-column.phantom-column.drag-source {
+  opacity: 0.4;
+}
+
+.kanban-full-height-column.phantom-column .column-title {
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
 .drop-zone-feedback {
   display: none !important;
   pointer-events: none !important;

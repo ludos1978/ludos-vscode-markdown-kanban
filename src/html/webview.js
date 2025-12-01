@@ -824,28 +824,34 @@ window.handleEmptyCardDragEnd = function(e) {
     }
 };
 
-// Empty column drag handlers
+// Empty column drag handlers - Uses templateDragState like templates do
 window.handleEmptyColumnDragStart = function(e) {
-    // Set template drag state for empty column
+    // DEBUG: Log drag start
+    console.log('[EmptyColumnDragStart] Starting empty column drag');
+
+    // Use templateDragState - same as column templates
     if (typeof window.templateDragState !== 'undefined') {
         window.templateDragState.isDragging = true;
-        window.templateDragState.templatePath = null; // No template path for empty column
+        window.templateDragState.templatePath = null;
         window.templateDragState.templateName = 'Empty Column';
         window.templateDragState.isEmptyColumn = true;
+        window.templateDragState.targetRow = null;
+        window.templateDragState.targetPosition = null;
+        window.templateDragState.targetColumnId = null;
+    } else {
+        console.error('[EmptyColumnDragStart] templateDragState is undefined!');
     }
 
     // Cache column positions for drag (same as template drags)
     if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
         window.cacheColumnPositionsForTemplateDrag();
+    } else {
+        console.error('[EmptyColumnDragStart] cacheColumnPositionsForTemplateDrag is undefined!');
     }
 
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('text/plain', 'empty-column');
-    e.dataTransfer.setData('application/x-kanban-empty-column', JSON.stringify({
-        type: 'empty-column',
-        name: 'Empty Column'
-    }));
 
     // Visual feedback
     e.target.classList.add('dragging');
@@ -858,10 +864,18 @@ window.handleEmptyColumnDragStart = function(e) {
 };
 
 window.handleEmptyColumnDragEnd = function(e) {
+    // DEBUG: Log templateDragState to see what values were captured
+    console.log('[EmptyColumnDragEnd] templateDragState:', {
+        isDragging: window.templateDragState?.isDragging,
+        isEmptyColumn: window.templateDragState?.isEmptyColumn,
+        targetRow: window.templateDragState?.targetRow,
+        targetPosition: window.templateDragState?.targetPosition,
+        targetColumnId: window.templateDragState?.targetColumnId
+    });
+
     // Clear visual feedback
     e.target.classList.remove('dragging');
 
-    // Remove drop zone highlighting
     const boardElement = document.getElementById('kanban-board');
     if (boardElement) {
         boardElement.classList.remove('template-dragging');
@@ -872,17 +886,16 @@ window.handleEmptyColumnDragEnd = function(e) {
         el.classList.remove('template-drag-over', 'drag-over');
     });
 
-    // If we have a valid drop target, create empty column using template system
+    // If we have a valid drop target, create empty column
     if (typeof window.templateDragState !== 'undefined' &&
         window.templateDragState.isDragging &&
         window.templateDragState.isEmptyColumn &&
         window.templateDragState.targetRow !== null) {
 
-        // Use applyTemplate with special empty column marker
         if (typeof vscode !== 'undefined') {
             vscode.postMessage({
                 type: 'applyTemplate',
-                templatePath: '__empty_column__', // Special marker for empty column
+                templatePath: '__empty_column__',
                 templateName: 'Empty Column',
                 isEmptyColumn: true,
                 targetRow: window.templateDragState.targetRow || 1,
@@ -893,7 +906,7 @@ window.handleEmptyColumnDragEnd = function(e) {
         }
     }
 
-    // Reset state
+    // Reset templateDragState
     if (typeof window.templateDragState !== 'undefined') {
         window.templateDragState.isDragging = false;
         window.templateDragState.templatePath = null;
