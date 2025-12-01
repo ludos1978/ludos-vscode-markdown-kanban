@@ -511,13 +511,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         const stackRow = row ? parseInt(row.dataset.rowNumber, 10) || 1 : 1;
         templateDragState.targetRow = stackRow;
 
-        // DEBUG: Log template drag position update
-        console.log('[showInternalColumnDropIndicator] Template drag position update:', {
-            stackRow,
-            beforeColumn: beforeColumn?.dataset?.columnId,
-            isEmptyColumn: templateDragState.isEmptyColumn
-        });
-
         if (beforeColumn) {
             // Insert before this column
             templateDragState.targetPosition = 'before';
@@ -1509,6 +1502,17 @@ function setupGlobalDragAndDrop() {
             dragState.scrollHandler = null;
         }
 
+        // CRITICAL: Clear all position caches to prevent memory leaks and stale references
+        dragState.cachedColumnPositions = null;
+        dragState.cachedStacks = null;
+        dragState.cachedTaskPositions = null;
+        dragState.cachedAddButtonRect = null;
+        dragState.draggedColumnCache = null;
+        if (dragState.allColumnPositions) {
+            dragState.allColumnPositions.clear();
+            dragState.allColumnPositions = null;
+        }
+
         // Reset all drag state properties
         dragState.draggedClipboardCard = null;
         dragState.draggedEmptyCard = null;
@@ -1526,6 +1530,17 @@ function setupGlobalDragAndDrop() {
         dragState.lastDropTarget = null;
         dragState.leftView = false;
         dragState.leftViewTimestamp = null;
+
+        // Reset drop target tracking
+        dragState.dropTargetContainer = null;
+        dragState.dropTargetAfterElement = null;
+        dragState.dropTargetStack = null;
+        dragState.dropTargetBeforeColumn = null;
+        dragState.pendingDropZone = null;
+
+        // Reset RAF throttle flags
+        dragState.columnDragoverPending = false;
+        dragState.documentDragoverPending = false;
     }
 
     // ============================================================================
@@ -3320,12 +3335,6 @@ function updateStackBottomDropZones() {
                 if (lastColumn) {
                     templateDragState.targetColumnId = lastColumn.dataset.columnId;
                     templateDragState.targetPosition = 'after';
-                    // DEBUG: Log drop zone position update
-                    console.log('[StackDropZone] Template drag over drop zone:', {
-                        row: templateDragState.targetRow,
-                        columnId: templateDragState.targetColumnId,
-                        position: templateDragState.targetPosition
-                    });
                 }
             }
         });
@@ -3648,11 +3657,6 @@ function setupColumnDragAndDrop() {
             const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
             const isColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
 
-            // DEBUG: Log dragover events for template drags
-            if (isTemplateDrag) {
-                console.log('[ColumnDragover] Template drag over column:', column.dataset?.columnId);
-            }
-
             // Handle both column drags and template drags
             if (!isColumnDrag && !isTemplateDrag) {return;}
 
@@ -3681,11 +3685,6 @@ function setupColumnDragAndDrop() {
                 const stillColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
                 if (!stillColumnDrag && !stillTemplateDrag) {return;}
 
-                // DEBUG: Log that we're inside RAF callback
-                if (stillTemplateDrag) {
-                    console.log('[ColumnDragover RAF] Processing template drag for:', column.dataset?.columnId);
-                }
-
             // For column drags, check dragged column's parent stack
             // For template drags, we only need the target stack
             const draggedStack = stillColumnDrag ? dragState.draggedColumn.parentNode : null;
@@ -3704,11 +3703,6 @@ function setupColumnDragAndDrop() {
             // PERFORMANCE: Use cached column position - ZERO DOM queries!
             const colData = dragState.cachedColumnPositions?.find(pos => pos.element === column);
             if (!colData) {
-                console.warn('[ColumnDragPerf] Cache miss for column', column.dataset.columnId, {
-                    hasCachedPositions: !!dragState.cachedColumnPositions,
-                    cacheLength: dragState.cachedColumnPositions?.length,
-                    columnElement: column
-                });
                 return;
             }
 
@@ -3942,9 +3936,6 @@ function setupColumnDragAndDrop() {
 
         // For template drags, just update the target position (no indicator for drop zones)
         if (isTemplateDrag) {
-            // DEBUG: Log horizontal drop zone template drag
-            console.log('[HorizontalDropZone] Template drag over horizontal drop zone');
-
             // Determine target row and position
             const row = dropZone.closest('.kanban-row');
             if (row) {
@@ -4203,12 +4194,6 @@ function cacheColumnPositionsForTemplateDrag() {
     const allColumns = document.querySelectorAll('.kanban-full-height-column');
     const board = document.getElementById('kanban-board');
     const viewportHeight = window.innerHeight;
-
-    // DEBUG: Log what we're caching
-    console.log('[cacheColumnPositionsForTemplateDrag] Caching columns:', {
-        numColumns: allColumns.length,
-        columnIds: Array.from(allColumns).map(c => c.dataset?.columnId)
-    });
 
     // Cache stack structure (same as column drag)
     dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {

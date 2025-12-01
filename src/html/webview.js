@@ -826,9 +826,6 @@ window.handleEmptyCardDragEnd = function(e) {
 
 // Empty column drag handlers - Uses templateDragState like templates do
 window.handleEmptyColumnDragStart = function(e) {
-    // DEBUG: Log drag start
-    console.log('[EmptyColumnDragStart] Starting empty column drag');
-
     // Use templateDragState - same as column templates
     if (typeof window.templateDragState !== 'undefined') {
         window.templateDragState.isDragging = true;
@@ -838,15 +835,11 @@ window.handleEmptyColumnDragStart = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
-    } else {
-        console.error('[EmptyColumnDragStart] templateDragState is undefined!');
     }
 
     // Cache column positions for drag (same as template drags)
     if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
         window.cacheColumnPositionsForTemplateDrag();
-    } else {
-        console.error('[EmptyColumnDragStart] cacheColumnPositionsForTemplateDrag is undefined!');
     }
 
     // Set drag data
@@ -864,15 +857,6 @@ window.handleEmptyColumnDragStart = function(e) {
 };
 
 window.handleEmptyColumnDragEnd = function(e) {
-    // DEBUG: Log templateDragState to see what values were captured
-    console.log('[EmptyColumnDragEnd] templateDragState:', {
-        isDragging: window.templateDragState?.isDragging,
-        isEmptyColumn: window.templateDragState?.isEmptyColumn,
-        targetRow: window.templateDragState?.targetRow,
-        targetPosition: window.templateDragState?.targetPosition,
-        targetColumnId: window.templateDragState?.targetColumnId
-    });
-
     // Clear visual feedback
     e.target.classList.remove('dragging');
 
