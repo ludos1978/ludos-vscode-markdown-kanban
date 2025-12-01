@@ -869,13 +869,15 @@ export class MessageHandler {
                 this._getWebviewPanel().setEditingInProgress(false);
                 break;
             case 'moveColumnWithRowUpdate':
-                await this.performBoardAction(() => 
+                // Frontend already updated (cache-first), don't send update back
+                await this.performBoardAction(() =>
                     this._boardOperations.moveColumnWithRowUpdate(
-                        this._getCurrentBoard()!, 
-                        message.columnId, 
-                        message.newPosition, 
+                        this._getCurrentBoard()!,
+                        message.columnId,
+                        message.newPosition,
                         message.newRow
-                    )
+                    ),
+                    { sendUpdate: false }
                 );
                 break;
             case 'reorderColumns':

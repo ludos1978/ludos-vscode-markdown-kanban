@@ -1229,11 +1229,24 @@ function setupGlobalDragAndDrop() {
             markUnsavedChanges();
         }
 
-        // Recalculate column heights after task drop
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            requestAnimationFrame(() => {
-                window.applyStackedColumnStyles();
-            });
+        // Invalidate height cache for affected columns (content changed)
+        if (typeof window.invalidateColumnHeightCache === 'function') {
+            window.invalidateColumnHeightCache(originalColumnId);
+            if (finalColumnId !== originalColumnId) {
+                window.invalidateColumnHeightCache(finalColumnId);
+            }
+        }
+
+        // Recalculate only affected stacks (not entire board)
+        const sourceStack = originalColumnElement?.closest('.kanban-column-stack');
+        const targetStack = finalColumnElement?.closest('.kanban-column-stack');
+        if (typeof window.recalculateStackHeightsDebounced === 'function') {
+            if (sourceStack) {
+                window.recalculateStackHeightsDebounced(sourceStack);
+            }
+            if (targetStack && targetStack !== sourceStack) {
+                window.recalculateStackHeightsDebounced(targetStack);
+            }
         }
     }
 
@@ -1424,9 +1437,22 @@ function setupGlobalDragAndDrop() {
             markUnsavedChanges();
         }
 
-        // Recalculate stacked column styles after drag
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            window.applyStackedColumnStyles();
+        // Recalculate only affected stacks (column heights unchanged, just positions)
+        // Cache remains valid - no invalidation needed for column reorder
+        const sourceStack = dragState.originalColumnParent;
+        const targetStack = columnElement.closest('.kanban-column-stack');
+        if (typeof window.recalculateStackHeightsDebounced === 'function') {
+            if (sourceStack && sourceStack.classList?.contains('kanban-column-stack')) {
+                window.recalculateStackHeightsDebounced(sourceStack);
+            }
+            if (targetStack && targetStack !== sourceStack) {
+                window.recalculateStackHeightsDebounced(targetStack);
+            }
+        }
+
+        // Update drop zones after column reorder
+        if (typeof window.updateStackBottomDropZones === 'function') {
+            window.updateStackBottomDropZones();
         }
     }
 
@@ -1653,10 +1679,16 @@ function setupGlobalDragAndDrop() {
                     dragLogger.always('Calling restoreColumnToOriginalPosition');
                     restoreColumnToOriginalPosition();
 
-                    // Update stacked column styles after DOM restoration
-                    if (typeof window.applyStackedColumnStyles === 'function') {
-                        window.applyStackedColumnStyles();
+                    // Recalculate affected stack after restoration (no cache invalidation - just position restore)
+                    const restoredStack = droppedColumn?.closest('.kanban-column-stack');
+                    if (restoredStack && typeof window.recalculateStackHeightsDebounced === 'function') {
+                        window.recalculateStackHeightsDebounced(restoredStack);
                         dragLogger.always('Applied stacked column styles after restoration');
+                    }
+
+                    // Update drop zones after restoration
+                    if (typeof window.updateStackBottomDropZones === 'function') {
+                        window.updateStackBottomDropZones();
                     }
                 }
 
@@ -2374,11 +2406,11 @@ function createNewTaskWithContent(content, dropPosition, description = '', expli
                 }
             }
 
-            // Recalculate column heights after adding task
-            if (typeof window.applyStackedColumnStyles === 'function') {
-                requestAnimationFrame(() => {
-                    window.applyStackedColumnStyles();
-                });
+            // Recalculate affected stack after adding task (cache already invalidated by addSingleTaskToDOM)
+            const targetColumnElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
+            const targetStack = targetColumnElement?.closest('.kanban-column-stack');
+            if (targetStack && typeof window.recalculateStackHeightsDebounced === 'function') {
+                window.recalculateStackHeightsDebounced(targetStack);
             }
         }
     } else {
@@ -2548,11 +2580,11 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
             }
         }
 
-        // Recalculate column heights after adding tasks
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            requestAnimationFrame(() => {
-                window.applyStackedColumnStyles();
-            });
+        // Recalculate affected stack after adding tasks (cache already invalidated by addSingleTaskToDOM)
+        const targetColumnElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
+        const targetStack = targetColumnElement?.closest('.kanban-column-stack');
+        if (targetStack && typeof window.recalculateStackHeightsDebounced === 'function') {
+            window.recalculateStackHeightsDebounced(targetStack);
         }
     } else {
         vscode.postMessage({

@@ -77,18 +77,27 @@ function moveTaskInDOM(taskId, columnId, newIndex, targetColumnId = null) {
         targetContainer.insertBefore(taskElement, taskItems[newIndex]);
     }
 
-    // Recalculate stack heights after task move
+    // Invalidate height cache for affected columns (task moved = content changed)
+    const sourceColId = sourceColumn?.dataset?.columnId;
+    if (sourceColId && typeof invalidateColumnHeightCache === 'function') {
+        invalidateColumnHeightCache(sourceColId);
+    }
+    if (targetColId !== sourceColId && typeof invalidateColumnHeightCache === 'function') {
+        invalidateColumnHeightCache(targetColId);
+    }
+
+    // Recalculate stack heights after task move (use debounced for better performance)
     const targetColumn = targetContainer.closest('.kanban-full-height-column');
     const targetStack = targetColumn?.closest('.kanban-column-stack');
 
-    if (typeof window.recalculateStackHeightsImmediate === 'function') {
+    if (typeof recalculateStackHeightsDebounced === 'function') {
         // Recalculate source stack
         if (sourceStack) {
-            window.recalculateStackHeightsImmediate(sourceStack);
+            recalculateStackHeightsDebounced(sourceStack);
         }
         // Recalculate target stack (if different from source)
         if (targetStack && targetStack !== sourceStack) {
-            window.recalculateStackHeightsImmediate(targetStack);
+            recalculateStackHeightsDebounced(targetStack);
         }
     }
 
@@ -1195,10 +1204,18 @@ function moveColumnLeft(columnId) {
             if (prevSibling && parent) {
                 parent.insertBefore(columnElement, prevSibling);
 
-                // Recalculate stack heights after DOM move
+                // Only recalculate if columns are stacked (have multiple columns in stack)
                 const stack = columnElement.closest('.kanban-column-stack');
-                if (stack && typeof recalculateStackHeightsImmediate === 'function') {
-                    recalculateStackHeightsImmediate(stack);
+                if (stack) {
+                    const columnsInStack = stack.querySelectorAll('.kanban-full-height-column').length;
+                    if (columnsInStack > 1 && typeof recalculateStackHeightsDebounced === 'function') {
+                        recalculateStackHeightsDebounced(stack);
+                    }
+                }
+
+                // Update drop zones after column move
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
                 }
             }
         }
@@ -1232,6 +1249,44 @@ function moveColumnRight(columnId) {
     if (index < currentBoard.columns.length - 1) {
         const column = currentBoard.columns[index];
         const currentRow = getColumnRow(column.title);
+
+        // Update cache immediately
+        const [movedColumn] = currentBoard.columns.splice(index, 1);
+        currentBoard.columns.splice(index + 1, 0, movedColumn);
+        if (window.cachedBoard && window.cachedBoard !== currentBoard) {
+            const cachedIndex = window.cachedBoard.columns.findIndex(c => c.id === columnId);
+            if (cachedIndex >= 0 && cachedIndex < window.cachedBoard.columns.length - 1) {
+                const [cachedMovedColumn] = window.cachedBoard.columns.splice(cachedIndex, 1);
+                window.cachedBoard.columns.splice(cachedIndex + 1, 0, cachedMovedColumn);
+            }
+        }
+
+        // Move DOM element immediately
+        const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+        if (columnElement) {
+            const parent = columnElement.parentNode;
+            const nextSibling = columnElement.nextElementSibling;
+            if (nextSibling && parent) {
+                // Insert after nextSibling (before nextSibling.nextSibling)
+                parent.insertBefore(columnElement, nextSibling.nextElementSibling);
+
+                // Only recalculate if columns are stacked (have multiple columns in stack)
+                const stack = columnElement.closest('.kanban-column-stack');
+                if (stack) {
+                    const columnsInStack = stack.querySelectorAll('.kanban-full-height-column').length;
+                    if (columnsInStack > 1 && typeof recalculateStackHeightsDebounced === 'function') {
+                        recalculateStackHeightsDebounced(stack);
+                    }
+                }
+
+                // Update drop zones after column move
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
+                }
+            }
+        }
+
+        // Send to backend (no re-render needed)
         vscode.postMessage({
             type: 'moveColumnWithRowUpdate',
             columnId,
@@ -1243,12 +1298,7 @@ function moveColumnRight(columnId) {
         document.querySelectorAll('.donut-menu').forEach(menu => menu.classList.remove('active'));
 
         // Update button state to show unsaved changes
-        updateRefreshButtonState('unsaved', 1);
-
-        // Recalculate stack positions after column move
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            requestAnimationFrame(() => window.applyStackedColumnStyles());
-        }
+        markUnsavedChanges();
     }
 }
 
@@ -1724,9 +1774,19 @@ function deleteColumn(columnId) {
 
                 columnElement.remove();
 
+                // Invalidate height cache for deleted column
+                if (typeof invalidateColumnHeightCache === 'function') {
+                    invalidateColumnHeightCache(columnId);
+                }
+
                 // Recalculate stack heights after column deletion
-                if (stack && typeof recalculateStackHeightsImmediate === 'function') {
-                    recalculateStackHeightsImmediate(stack);
+                if (stack && typeof recalculateStackHeightsDebounced === 'function') {
+                    recalculateStackHeightsDebounced(stack);
+                }
+
+                // Update drop zones after column deletion
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
                 }
             }
 
@@ -2458,12 +2518,17 @@ function deleteTask(taskId, columnId) {
                 // Check if column is now empty and add placeholder button (before height recalc)
                 updateColumnEmptyState(foundColumn.id);
 
+                // Invalidate height cache for this column (content changed)
+                if (typeof invalidateColumnHeightCache === 'function') {
+                    invalidateColumnHeightCache(foundColumn.id);
+                }
+
                 // Recalculate stack heights after task deletion and button restoration
                 // Task deletion changes column height, so we need to recalculate positions
                 if (columnElement) {
                     const stack = columnElement.closest('.kanban-column-stack');
-                    if (stack && typeof recalculateStackHeightsImmediate === 'function') {
-                        recalculateStackHeightsImmediate(stack);
+                    if (stack && typeof recalculateStackHeightsDebounced === 'function') {
+                        recalculateStackHeightsDebounced(stack);
                     }
                 }
             }
