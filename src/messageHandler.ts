@@ -15,6 +15,10 @@ import { getMermaidExportService } from './services/export/MermaidExportService'
 import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
+import { TemplateService } from './templates/TemplateService';
+import { TemplateParser } from './templates/TemplateParser';
+import { VariableProcessor } from './templates/VariableProcessor';
+import { FileCopyService } from './templates/FileCopyService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -1093,6 +1097,17 @@ export class MessageHandler {
 
             case 'mermaidExportError':
                 getMermaidExportService().handleRenderError(message.requestId, message.error);
+                break;
+
+            // Template operations
+            case 'getTemplates':
+                await this.handleGetTemplates();
+                break;
+            case 'applyTemplate':
+                await this.handleApplyTemplate(message);
+                break;
+            case 'submitTemplateVariables':
+                await this.handleSubmitTemplateVariables(message);
                 break;
 
             default:
@@ -5687,5 +5702,256 @@ ${tasksContent}`;
         log(`[generateAppendTasksContent] Generated content for ${column.tasks.length} tasks, absolutePath: ${absoluteIncludePath}`);
 
         return { absolutePath: absoluteIncludePath, content: finalContent };
+    }
+
+    // ========================================================================
+    // TEMPLATE HANDLERS
+    // ========================================================================
+
+    private _templateService: TemplateService = new TemplateService();
+
+    /**
+     * Handle request for available templates
+     */
+    private async handleGetTemplates(): Promise<void> {
+        const panel = this._getWebviewPanel();
+        if (!panel || !panel._panel) {
+            return;
+        }
+
+        try {
+            // Get workspace folder from main file
+            const mainFile = panel.fileRegistry.getMainFile();
+            const workspaceFolder = mainFile ? path.dirname(mainFile.getPath()) : undefined;
+
+            const templates = await this._templateService.getTemplateList(workspaceFolder);
+            const showBar = this._templateService.shouldShowBar();
+
+            panel._panel.webview.postMessage({
+                type: 'updateTemplates',
+                templates,
+                showBar
+            });
+        } catch (error) {
+            log('[handleGetTemplates] Error:', error);
+        }
+    }
+
+    /**
+     * Handle initial template application request (before variables)
+     * This loads the template and sends variable definitions to frontend
+     */
+    private async handleApplyTemplate(message: any): Promise<void> {
+        const panel = this._getWebviewPanel();
+        if (!panel || !panel._panel) {
+            return;
+        }
+
+        try {
+            const templatePath = message.templatePath;
+            if (!templatePath) {
+                vscode.window.showErrorMessage('No template path provided');
+                return;
+            }
+
+            // Load template definition
+            const template = await this._templateService.loadTemplate(templatePath);
+
+            // If template has variables, send them to frontend for dialog
+            if (template.variables && template.variables.length > 0) {
+                panel._panel.webview.postMessage({
+                    type: 'templateVariables',
+                    templatePath: templatePath,
+                    templateName: template.name,
+                    variables: template.variables,
+                    targetRow: message.targetRow,
+                    insertAfterColumnId: message.insertAfterColumnId,
+                    insertBeforeColumnId: message.insertBeforeColumnId,
+                    position: message.position
+                });
+            } else {
+                // No variables - apply immediately
+                await this.applyTemplateWithVariables(message, {});
+            }
+        } catch (error: any) {
+            log('[handleApplyTemplate] Error:', error);
+            vscode.window.showErrorMessage(`Failed to load template: ${error.message}`);
+        }
+    }
+
+    /**
+     * Handle template variable submission
+     */
+    private async handleSubmitTemplateVariables(message: any): Promise<void> {
+        await this.applyTemplateWithVariables(message, message.variables || {});
+    }
+
+    /**
+     * Apply a template with the given variable values
+     */
+    private async applyTemplateWithVariables(
+        message: any,
+        variables: Record<string, string | number>
+    ): Promise<void> {
+        const panel = this._getWebviewPanel();
+        if (!panel || !panel._panel) {
+            return;
+        }
+
+        try {
+            const templatePath = message.templatePath;
+            if (!templatePath) {
+                vscode.window.showErrorMessage('No template path provided');
+                return;
+            }
+
+            // Load template definition
+            const template = await this._templateService.loadTemplate(templatePath);
+
+            // Apply default values
+            const finalVariables = VariableProcessor.applyDefaults(template.variables, variables);
+
+            // Validate required variables
+            const validation = VariableProcessor.validateVariables(template.variables, finalVariables);
+            if (!validation.valid) {
+                vscode.window.showErrorMessage(`Missing required variables: ${validation.missing.join(', ')}`);
+                return;
+            }
+
+            // Get board folder
+            const mainFile = panel.fileRegistry.getMainFile();
+            if (!mainFile) {
+                vscode.window.showErrorMessage('No main file found');
+                return;
+            }
+            const boardFolder = path.dirname(mainFile.getPath());
+
+            // Copy template files to board folder
+            const copiedFiles = await FileCopyService.copyTemplateFiles(
+                templatePath,
+                boardFolder,
+                finalVariables,
+                template.variables
+            );
+            log(`[applyTemplateWithVariables] Copied ${copiedFiles.length} files`);
+
+            // Process template content (columns and tasks)
+            const processedColumns = this.processTemplateColumns(template, finalVariables);
+
+            // Get current board
+            const currentBoard = this._getCurrentBoard();
+            if (!currentBoard) {
+                vscode.window.showErrorMessage('No board available');
+                return;
+            }
+
+            // Find insertion point
+            const targetRow = message.targetRow || 1;
+            let insertIndex = currentBoard.columns.length;
+
+            if (message.insertAfterColumnId) {
+                const afterIndex = currentBoard.columns.findIndex(c => c.id === message.insertAfterColumnId);
+                if (afterIndex >= 0) {
+                    insertIndex = afterIndex + 1;
+                }
+            } else if (message.insertBeforeColumnId) {
+                const beforeIndex = currentBoard.columns.findIndex(c => c.id === message.insertBeforeColumnId);
+                if (beforeIndex >= 0) {
+                    insertIndex = beforeIndex;
+                }
+            } else if (message.position === 'first') {
+                // Find first column in target row
+                const firstInRow = currentBoard.columns.findIndex(c => {
+                    const rowMatch = c.title.match(/#row(\d+)/i);
+                    const colRow = rowMatch ? parseInt(rowMatch[1], 10) : 1;
+                    return colRow === targetRow;
+                });
+                insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
+            }
+
+            // Add row tag to columns if needed
+            const columnsWithRow = processedColumns.map(col => {
+                if (targetRow > 1 && !/#row\d+/i.test(col.title)) {
+                    col.title = `${col.title} #row${targetRow}`;
+                }
+                return col;
+            });
+
+            // Insert columns into board
+            currentBoard.columns.splice(insertIndex, 0, ...columnsWithRow);
+
+            // Save undo state and update
+            await this.performBoardAction(() => true);
+
+            // Send updated board to frontend
+            panel._panel.webview.postMessage({
+                type: 'templateApplied',
+                board: currentBoard
+            });
+
+            log(`[applyTemplateWithVariables] Applied template with ${columnsWithRow.length} columns`);
+
+        } catch (error: any) {
+            log('[applyTemplateWithVariables] Error:', error);
+            vscode.window.showErrorMessage(`Failed to apply template: ${error.message}`);
+        }
+    }
+
+    /**
+     * Process template columns with variable substitution
+     */
+    private processTemplateColumns(
+        template: any,
+        variables: Record<string, string | number>
+    ): any[] {
+        const { IdGenerator } = require('./utils/idGenerator');
+
+        return template.columns.map((col: any) => {
+            // Process title
+            const processedTitle = VariableProcessor.substitute(
+                col.title,
+                variables,
+                template.variables
+            );
+
+            // Process tasks
+            const processedTasks = (col.tasks || []).map((task: any) => {
+                const processedTaskTitle = VariableProcessor.substitute(
+                    task.title,
+                    variables,
+                    template.variables
+                );
+
+                const processedTask: any = {
+                    id: IdGenerator.generateTaskId(),
+                    title: processedTaskTitle,
+                    completed: task.completed || false
+                };
+
+                if (task.description) {
+                    processedTask.description = VariableProcessor.substitute(
+                        task.description,
+                        variables,
+                        template.variables
+                    );
+                }
+
+                // Handle include files in task title
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    processedTask.includeFiles = task.includeFiles.map((f: string) =>
+                        VariableProcessor.substituteFilename(f, variables, template.variables)
+                    );
+                    processedTask.includeMode = true;
+                }
+
+                return processedTask;
+            });
+
+            return {
+                id: IdGenerator.generateColumnId(),
+                title: processedTitle,
+                tasks: processedTasks
+            };
+        });
     }
 }

@@ -6,6 +6,10 @@ window.collapsedTasks = window.collapsedTasks || new Set();
 window.columnFoldStates = window.columnFoldStates || new Map(); // Track last manual fold state for each column
 window.globalColumnFoldState = window.globalColumnFoldState || 'fold-mixed'; // Track global column fold state
 
+// Template bar state
+window.availableTemplates = window.availableTemplates || [];
+window.showTemplateBar = window.showTemplateBar !== false; // Default to true
+
 // Use global window.window.cachedBoard instead of local variable
 // let window.cachedBoard = null; // Removed to avoid conflicts
 let renderTimeout = null;
@@ -1495,6 +1499,154 @@ function renderSingleColumn(columnId, columnData) {
     // before the element is inserted into the DOM, eliminating timing/race conditions
 
 }
+
+// ============================================================================
+// TEMPLATE HANDLING
+// ============================================================================
+
+/**
+ * Request templates from backend
+ */
+function requestTemplates() {
+    if (typeof vscode !== 'undefined') {
+        vscode.postMessage({
+            type: 'getTemplates'
+        });
+    }
+}
+
+/**
+ * Update templates list (called from webview message handler)
+ * Populates the template dropdown in the file-info header
+ */
+window.updateTemplates = function(templates, showBar = true) {
+    window.availableTemplates = templates || [];
+    window.showTemplateBar = showBar;
+
+    // Get the template source container and select element
+    const templateSource = document.getElementById('template-source');
+    const templateSelect = document.getElementById('template-select');
+    const templateDragHandle = document.getElementById('template-drag-handle');
+
+    if (!templateSource || !templateSelect) {
+        return;
+    }
+
+    // Show/hide based on whether we have templates
+    if (!showBar || !templates || templates.length === 0) {
+        templateSource.style.display = 'none';
+        return;
+    }
+
+    // Clear existing options (keep first placeholder)
+    while (templateSelect.options.length > 1) {
+        templateSelect.remove(1);
+    }
+
+    // Add template options
+    templates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.path;
+        option.textContent = (template.icon ? template.icon + ' ' : '') + template.name;
+        option.dataset.templateName = template.name;
+        option.dataset.templatePath = template.path;
+        templateSelect.appendChild(option);
+    });
+
+    // Show the template source
+    templateSource.style.display = 'flex';
+
+    // Setup drag handler for the drag handle
+    if (templateDragHandle && !templateDragHandle.dataset.dragSetup) {
+        templateDragHandle.dataset.dragSetup = 'true';
+
+        templateDragHandle.addEventListener('dragstart', (e) => {
+            const selectedOption = templateSelect.options[templateSelect.selectedIndex];
+            if (!selectedOption || !selectedOption.value) {
+                e.preventDefault();
+                return;
+            }
+
+            // Set template drag state
+            if (typeof window.templateDragState !== 'undefined') {
+                window.templateDragState.isDragging = true;
+                window.templateDragState.templatePath = selectedOption.dataset.templatePath || selectedOption.value;
+                window.templateDragState.templateName = selectedOption.dataset.templateName || selectedOption.textContent;
+            }
+
+            // Set drag data
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', `template:${selectedOption.value}`);
+            e.dataTransfer.setData('application/x-kanban-template', JSON.stringify({
+                path: selectedOption.value,
+                name: selectedOption.dataset.templateName || selectedOption.textContent
+            }));
+
+            // Visual feedback
+            templateDragHandle.classList.add('dragging');
+            templateSource.classList.add('dragging');
+
+            // Add class to board for drop zone highlighting
+            const boardElement = document.getElementById('kanban-board');
+            if (boardElement) {
+                boardElement.classList.add('template-dragging');
+            }
+        });
+
+        templateDragHandle.addEventListener('dragend', (e) => {
+            templateDragHandle.classList.remove('dragging');
+            templateSource.classList.remove('dragging');
+
+            // Remove drop zone highlighting
+            const boardElement = document.getElementById('kanban-board');
+            if (boardElement) {
+                boardElement.classList.remove('template-dragging');
+            }
+
+            // Clear all template-drag-over classes
+            document.querySelectorAll('.template-drag-over').forEach(el => {
+                el.classList.remove('template-drag-over');
+            });
+
+            // If we have a valid drop target, apply the template
+            if (typeof window.templateDragState !== 'undefined' &&
+                window.templateDragState.isDragging &&
+                window.templateDragState.targetRow !== null) {
+                // Call the apply function from dragDrop.js
+                if (typeof applyTemplateAtPosition === 'function') {
+                    applyTemplateAtPosition();
+                } else if (typeof window.applyTemplateAtPosition === 'function') {
+                    window.applyTemplateAtPosition();
+                } else {
+                    // Fallback: send message directly
+                    if (typeof vscode !== 'undefined') {
+                        vscode.postMessage({
+                            type: 'applyTemplate',
+                            templatePath: window.templateDragState.templatePath,
+                            templateName: window.templateDragState.templateName,
+                            targetRow: window.templateDragState.targetRow || 1,
+                            insertAfterColumnId: window.templateDragState.targetPosition === 'after' ? window.templateDragState.targetColumnId : null,
+                            insertBeforeColumnId: window.templateDragState.targetPosition === 'before' ? window.templateDragState.targetColumnId : null,
+                            position: window.templateDragState.targetPosition
+                        });
+                    }
+                }
+            }
+
+            // Reset state
+            if (typeof window.templateDragState !== 'undefined') {
+                window.templateDragState.isDragging = false;
+                window.templateDragState.templatePath = null;
+                window.templateDragState.templateName = null;
+                window.templateDragState.targetRow = null;
+                window.templateDragState.targetPosition = null;
+                window.templateDragState.targetColumnId = null;
+            }
+        });
+    }
+};
+
+// ============================================================================
 
 // Render Kanban board
 /**

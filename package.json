@@ -4382,6 +4382,16 @@
             "type": "string",
             "description": "CSS class name from availableClasses"
           }
+        },
+        "markdown-kanban.templates.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the folder containing column templates. Each template should be in its own subfolder with a template.md file."
+        },
+        "markdown-kanban.templates.showBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the template bar at the top of the kanban board when templates are available"
         }
       },
       "markdown-kanban.sidebar.autoScan": {

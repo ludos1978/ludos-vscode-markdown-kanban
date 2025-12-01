@@ -118,14 +118,16 @@ body {
   align-items: center;
   height: 100%;
   position: relative;
+  gap: 8px;
 }
 
 .file-info-left {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .file-info-center {
@@ -133,10 +135,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex-shrink: 0;
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 0 0 auto;
 }
 
 .file-icon {
@@ -6523,4 +6522,302 @@ figcaption {
   font-family: var(--vscode-font-family);
   min-width: 100px;
   text-align: center;
+}
+
+/* ============================================================================
+   TEMPLATE BAR STYLES
+   ============================================================================ */
+
+.template-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--vscode-sideBar-background, #252526);
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+.template-bar-label {
+  color: var(--vscode-descriptionForeground, #888);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.template-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #fff);
+  border: 1px solid var(--vscode-contrastBorder, transparent);
+  border-radius: 4px;
+  cursor: grab;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+
+.template-item:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.template-item:active {
+  cursor: grabbing;
+  transform: translateY(0);
+}
+
+.template-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.template-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.template-name {
+  white-space: nowrap;
+}
+
+/* Template drop indicator - shown when dragging template over board */
+.template-drop-indicator {
+  position: absolute;
+  width: 4px;
+  background: var(--vscode-focusBorder, #007acc);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 0 8px var(--vscode-focusBorder, #007acc);
+}
+
+/* Column drop zone highlight when template is being dragged - same as column drag */
+.column-drop-zone.template-drag-over {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* Template source in file-info header (next to clipboard/empty card) */
+.template-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: var(--button-border);
+  padding: 4px 4px;
+  margin: 0;
+  background: var(--button-alternative-background);
+  color: var(--button-alternative-foreground);
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.template-source:hover {
+  background: var(--button-alternative-background-hover);
+  color: var(--button-alternative-foreground-hover);
+}
+
+.template-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.template-select {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  max-width: 120px;
+}
+
+.template-select:focus {
+  outline: none;
+}
+
+.template-select option {
+  background: var(--vscode-dropdown-background, #3c3c3c);
+  color: var(--vscode-dropdown-foreground, #fff);
+}
+
+.template-drag-handle {
+  cursor: grab;
+  padding: 0 4px;
+  font-size: 12px;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.template-drag-handle:hover {
+  opacity: 1;
+}
+
+.template-drag-handle.dragging {
+  cursor: grabbing;
+  opacity: 0.4;
+}
+
+/* ============================================================================
+   TEMPLATE VARIABLE DIALOG STYLES
+   ============================================================================ */
+
+.template-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.template-dialog {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 6px;
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.template-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.template-dialog-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.template-dialog-close {
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.template-dialog-close:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+.template-dialog-form {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.template-dialog-field {
+  margin-bottom: 16px;
+}
+
+.template-dialog-field:last-child {
+  margin-bottom: 0;
+}
+
+.template-dialog-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  font-weight: 500;
+}
+
+.template-dialog-field label .required {
+  color: var(--vscode-errorForeground, #f14c4c);
+}
+
+.template-dialog-field input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #fff);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.template-dialog-field input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.template-dialog-field input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #888);
+}
+
+.template-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.template-dialog-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.template-dialog-cancel {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41);
+}
+
+.template-dialog-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.template-dialog-submit {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+}
+
+.template-dialog-submit:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
 }

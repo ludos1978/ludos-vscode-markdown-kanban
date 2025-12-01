@@ -98,9 +98,24 @@ if (!dragState) {
 
         // View tracking
         leftView: false,
-        leftViewTimestamp: null
+        leftViewTimestamp: null,
+
+        // Template dragging
+        draggedTemplate: null,
+        draggedTemplatePath: null,
+        draggedTemplateName: null
     });
 }
+
+// Template drag state (separate from main drag state for clarity)
+let templateDragState = {
+    isDragging: false,
+    templatePath: null,
+    templateName: null,
+    targetRow: null,
+    targetPosition: null,  // 'before' | 'after'
+    targetColumnId: null
+};
 
 // External file drop location indicators
 function createExternalDropIndicator() {
@@ -333,6 +348,29 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     // PERFORMANCE: Use cached column positions instead of querying DOM!
     let insertionY, stackLeft, stackWidth;
 
+    // Special handling for template drags - calculate positions on-the-fly
+    const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+    if (isTemplateDrag && targetStack.classList.contains('column-drop-zone-stack')) {
+        // Calculate drop zone position on-the-fly for template drags
+        const dropZone = targetStack.querySelector('.column-drop-zone');
+        if (dropZone) {
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            stackLeft = dropZoneRect.left;
+            stackWidth = Math.max(dropZoneRect.width, 40); // Minimum width for visibility
+            insertionY = dropZoneRect.top + dropZoneRect.height / 2;
+
+            // Show the indicator
+            indicator.style.position = 'fixed';
+            indicator.style.left = (stackLeft + 5) + 'px';
+            indicator.style.width = (stackWidth - 10) + 'px';
+            indicator.style.top = insertionY + 'px';
+            indicator.style.height = '3px';
+            indicator.style.display = 'block';
+            indicator.classList.add('active');
+            return;
+        }
+    }
+
     if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
         if (!beforeColumn) {
             // Drop at end of stack (after last column)
@@ -384,7 +422,8 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                     return;
                 }
             } else if (targetStack.classList.contains('column-drop-zone-stack')) {
-                // Horizontal drop zone - don't show indicator (drop zone itself provides visual feedback)
+                // Horizontal drop zone - drop zone itself provides visual feedback
+                // (template drags are handled earlier in this function)
                 indicator.style.display = 'none';
                 return;
             } else {
@@ -577,15 +616,20 @@ function setupGlobalDragAndDrop() {
 
         // Prevent default browser behavior
         e.preventDefault();
-        
+
         // Check if this is an internal column/task drag (not clipboard/empty cards)
-        const isInternalDrag = dragState.isDragging && 
-            (dragState.draggedColumn || dragState.draggedTask) && 
-            !dragState.draggedClipboardCard && 
+        const isInternalDrag = dragState.isDragging &&
+            (dragState.draggedColumn || dragState.draggedTask) &&
+            !dragState.draggedClipboardCard &&
             !dragState.draggedEmptyCard;
-            
+
         if (isInternalDrag) {
                 return;
+        }
+
+        // Check if this is a template drag - let template handlers handle it
+        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
+            return;
         }
         
         // Stop event propagation to prevent duplicate handling
@@ -702,6 +746,11 @@ function setupGlobalDragAndDrop() {
             return; // Don't show external drop indicators during internal drags
         }
 
+        // Skip visual indicators for template drags - they use column drop zones
+        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
+            return; // Don't show external drop indicators during template drags
+        }
+
         // Show drop indicators for external drags
         const now = Date.now();
         if (now - lastIndicatorUpdate >= INDICATOR_UPDATE_THROTTLE) {
@@ -759,7 +808,12 @@ function setupGlobalDragAndDrop() {
         if (dragState.isDragging && (dragState.draggedColumn || dragState.draggedTask)) {
             return; // Don't show external drop feedback during internal drags
         }
-        
+
+        // Skip for template drags
+        if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
+            return;
+        }
+
         if (isExternalFileDrag(e)) {
             e.preventDefault();
             showDropFeedback();
@@ -3745,8 +3799,11 @@ function setupColumnDragAndDrop() {
             return;
         }
 
-        // Only handle drop zones for column drags, not task drags
-        if (!dragState.draggedColumn) {
+        // Check if this is a template drag
+        const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+
+        // Only handle drop zones for column drags or template drags, not task drags
+        if (!dragState.draggedColumn && !isTemplateDrag) {
             return;
         }
 
@@ -3766,8 +3823,13 @@ function setupColumnDragAndDrop() {
             showInternalColumnDropIndicator(dropZoneStack, null);
         }
 
-        // Store the drop zone for processing on dragend
-        dragState.pendingDropZone = dropZone;
+        // For template drags, update the template drag state
+        if (isTemplateDrag) {
+            handleTemplateDragOver(e, dropZone);
+        } else {
+            // Store the drop zone for processing on dragend (column drag)
+            dragState.pendingDropZone = dropZone;
+        }
     });
 
     // NOTE: Drop zone cleanup dragend handler removed - now handled by unified global dragend handler (cleanupDragVisuals)
@@ -3809,7 +3871,185 @@ function calculateColumnNewPosition(draggedColumn) {
     
     // Find where our dragged column should be in the final order
     const targetPosition = desiredOrder.indexOf(columnId);
-    
-    
+
+
     return targetPosition >= 0 ? targetPosition : 0;
 }
+
+// ============================================================================
+// TEMPLATE DRAG AND DROP
+// ============================================================================
+
+/**
+ * Setup drag handlers for template items in the template bar
+ * Called after template bar is rendered
+ */
+function setupTemplateDragHandlers() {
+    const templateItems = document.querySelectorAll('.template-item');
+
+    templateItems.forEach(item => {
+        // Skip if already setup
+        if (item.dataset.dragSetup === 'true') {
+            return;
+        }
+
+        item.addEventListener('dragstart', handleTemplateDragStart);
+        item.addEventListener('dragend', handleTemplateDragEnd);
+        item.dataset.dragSetup = 'true';
+    });
+}
+
+/**
+ * Handle template drag start
+ */
+function handleTemplateDragStart(e) {
+    const templateItem = e.target.closest('.template-item');
+    if (!templateItem) {
+        return;
+    }
+
+    // Store template info
+    templateDragState.isDragging = true;
+    templateDragState.templatePath = templateItem.dataset.templatePath;
+    templateDragState.templateName = templateItem.dataset.templateName;
+
+    // Set drag data
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', `template:${templateDragState.templatePath}`);
+    e.dataTransfer.setData('application/x-kanban-template', JSON.stringify({
+        path: templateDragState.templatePath,
+        name: templateDragState.templateName
+    }));
+
+    // Visual feedback
+    templateItem.classList.add('dragging');
+
+    // Add class to board for drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.add('template-dragging');
+    }
+}
+
+/**
+ * Handle template drag end
+ */
+function handleTemplateDragEnd(e) {
+    const templateItem = e.target.closest('.template-item');
+    if (templateItem) {
+        templateItem.classList.remove('dragging');
+    }
+
+    // Remove drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.remove('template-dragging');
+    }
+
+    // Clear all template-drag-over classes
+    document.querySelectorAll('.template-drag-over').forEach(el => {
+        el.classList.remove('template-drag-over');
+    });
+
+    // If we have a valid drop target, apply the template
+    if (templateDragState.isDragging && templateDragState.targetRow !== null) {
+        applyTemplateAtPosition();
+    }
+
+    // Reset state
+    templateDragState.isDragging = false;
+    templateDragState.templatePath = null;
+    templateDragState.templateName = null;
+    templateDragState.targetRow = null;
+    templateDragState.targetPosition = null;
+    templateDragState.targetColumnId = null;
+}
+
+/**
+ * Handle template drag over a drop zone
+ * Called from existing dragover handlers
+ */
+function handleTemplateDragOver(e, dropZone) {
+    if (!templateDragState.isDragging) {
+        return false;
+    }
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+
+    // Highlight the drop zone
+    dropZone.classList.add('template-drag-over');
+
+    // Determine target row and position
+    const row = dropZone.closest('.kanban-row');
+    if (row) {
+        templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
+    }
+
+    // Find the column before/after this drop zone
+    const stack = dropZone.closest('.kanban-column-stack');
+    if (stack) {
+        const prevStack = stack.previousElementSibling;
+        const nextStack = stack.nextElementSibling;
+
+        if (prevStack && prevStack.classList.contains('kanban-column-stack')) {
+            const prevColumn = prevStack.querySelector('.kanban-full-height-column');
+            if (prevColumn) {
+                templateDragState.targetColumnId = prevColumn.dataset.columnId;
+                templateDragState.targetPosition = 'after';
+            }
+        } else if (nextStack && nextStack.classList.contains('kanban-column-stack')) {
+            const nextColumn = nextStack.querySelector('.kanban-full-height-column');
+            if (nextColumn) {
+                templateDragState.targetColumnId = nextColumn.dataset.columnId;
+                templateDragState.targetPosition = 'before';
+            }
+        } else {
+            // First or last position
+            templateDragState.targetColumnId = null;
+            templateDragState.targetPosition = dropZone.classList.contains('column-drop-zone-before') ? 'first' : 'last';
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Handle template drag leave
+ */
+function handleTemplateDragLeave(e, dropZone) {
+    if (!templateDragState.isDragging) {
+        return;
+    }
+
+    dropZone.classList.remove('template-drag-over');
+}
+
+/**
+ * Apply template at the determined position
+ * Sends message to backend to show variable dialog and apply template
+ */
+function applyTemplateAtPosition() {
+    if (!templateDragState.templatePath) {
+        return;
+    }
+
+    // Send message to backend
+    if (typeof vscode !== 'undefined') {
+        vscode.postMessage({
+            type: 'applyTemplate',
+            templatePath: templateDragState.templatePath,
+            templateName: templateDragState.templateName,
+            targetRow: templateDragState.targetRow || 1,
+            insertAfterColumnId: templateDragState.targetPosition === 'after' ? templateDragState.targetColumnId : null,
+            insertBeforeColumnId: templateDragState.targetPosition === 'before' ? templateDragState.targetColumnId : null,
+            position: templateDragState.targetPosition
+        });
+    }
+}
+
+// Make template functions globally available
+window.setupTemplateDragHandlers = setupTemplateDragHandlers;
+window.handleTemplateDragOver = handleTemplateDragOver;
+window.handleTemplateDragLeave = handleTemplateDragLeave;
+window.templateDragState = templateDragState;
