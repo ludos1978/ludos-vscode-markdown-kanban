@@ -113,11 +113,10 @@ body {
 }
 
 .file-info-content {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: center;
   height: 100%;
-  position: relative;
   gap: 8px;
 }
 
@@ -125,7 +124,6 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
 }
@@ -135,9 +133,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
 }
 
 .file-icon {
@@ -165,10 +161,6 @@ body {
   display: flex;
   gap: 6px;
   align-items: center;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  container-type: inline-size;
   justify-content: flex-end;
 }
 

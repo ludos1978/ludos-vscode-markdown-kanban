@@ -348,27 +348,12 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     // PERFORMANCE: Use cached column positions instead of querying DOM!
     let insertionY, stackLeft, stackWidth;
 
-    // Special handling for template drags - calculate positions on-the-fly
+    // For template drags over drop zones, don't show indicator - drop zone highlight is sufficient
+    // (same behavior as column drags over drop zones)
     const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
     if (isTemplateDrag && targetStack.classList.contains('column-drop-zone-stack')) {
-        // Calculate drop zone position on-the-fly for template drags
-        const dropZone = targetStack.querySelector('.column-drop-zone');
-        if (dropZone) {
-            const dropZoneRect = dropZone.getBoundingClientRect();
-            stackLeft = dropZoneRect.left;
-            stackWidth = Math.max(dropZoneRect.width, 40); // Minimum width for visibility
-            insertionY = dropZoneRect.top + dropZoneRect.height / 2;
-
-            // Show the indicator
-            indicator.style.position = 'fixed';
-            indicator.style.left = (stackLeft + 5) + 'px';
-            indicator.style.width = (stackWidth - 10) + 'px';
-            indicator.style.top = insertionY + 'px';
-            indicator.style.height = '3px';
-            indicator.style.display = 'block';
-            indicator.classList.add('active');
-            return;
-        }
+        indicator.style.display = 'none';
+        return;
     }
 
     if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
