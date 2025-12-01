@@ -135,7 +135,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .file-icon {
@@ -163,9 +165,11 @@ body {
   display: flex;
   gap: 6px;
   align-items: center;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   container-type: inline-size;
-	justify-content: flex-end;
+  justify-content: flex-end;
 }
 
 /* Consistent styling for all file-info header elements */
