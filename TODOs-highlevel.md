@@ -45,7 +45,7 @@ a template might look like:
 
 ==Deliveries==
 
-- ...
+- ... 
 """
 
 or 
