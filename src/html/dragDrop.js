@@ -3236,12 +3236,18 @@ function updateStackBottomDropZones() {
 
         // Add dragover handler for this drop zone
         dropZone.addEventListener('dragover', e => {
-            if (!dragState.draggedColumn) {return;}
+            const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
+            if (!dragState.draggedColumn && !isTemplateDrag) {return;}
             e.preventDefault();
 
             // PERFORMANCE: Just show indicator, DON'T move column!
             // Drop at end of stack (before drop zone)
             showInternalColumnDropIndicator(stack, null);
+
+            // For template drags, update target position
+            if (isTemplateDrag) {
+                handleTemplateDragOver(e, dropZone);
+            }
         });
 
         // Append to stack
@@ -4033,8 +4039,87 @@ function applyTemplateAtPosition() {
     }
 }
 
+/**
+ * Cache column positions for template drags
+ * Called when template drag starts to enable same drop behavior as column drags
+ */
+function cacheColumnPositionsForTemplateDrag() {
+    const allColumns = document.querySelectorAll('.kanban-full-height-column');
+    const board = document.getElementById('kanban-board');
+
+    // Cache stack structure
+    dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {
+        const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+        return {
+            element: stack,
+            columns: columnsInStack,
+            lastColumn: columnsInStack[columnsInStack.length - 1]
+        };
+    });
+
+    // Cache column positions
+    dragState.cachedColumnPositions = Array.from(allColumns).map(col => {
+        const colId = col.getAttribute('data-column-id');
+        const columnTitle = col.querySelector('.column-title');
+        const columnContent = col.querySelector('.column-content');
+        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
+        const isFolded = col.classList.contains('collapsed') || col.classList.contains('collapsed-vertical');
+
+        const rect = col.getBoundingClientRect();
+        const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
+        const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
+
+        // Calculate margin rects for drop detection
+        let topMarginRect = null;
+        let bottomMarginRect = null;
+
+        if (columnTitleRect) {
+            topMarginRect = {
+                top: rect.top,
+                bottom: columnTitleRect.top + columnTitleRect.height / 2,
+                left: rect.left,
+                width: rect.width,
+                height: columnTitleRect.top + columnTitleRect.height / 2 - rect.top
+            };
+        }
+
+        if (contentRect) {
+            bottomMarginRect = {
+                top: contentRect.bottom,
+                bottom: rect.bottom,
+                left: rect.left,
+                width: rect.width,
+                height: rect.bottom - contentRect.bottom
+            };
+        }
+
+        return {
+            element: col,
+            columnId: colId,
+            rect: rect,
+            columnTitleRect: columnTitleRect,
+            contentRect: contentRect,
+            topMarginRect: topMarginRect,
+            bottomMarginRect: bottomMarginRect,
+            isSticky: isSticky,
+            isFolded: isFolded,
+            isContentVisible: contentRect && contentRect.height > 0
+        };
+    });
+}
+
+/**
+ * Clear cached positions after template drag ends
+ */
+function clearTemplateDragCache() {
+    dragState.cachedColumnPositions = null;
+    dragState.cachedStacks = null;
+}
+
 // Make template functions globally available
 window.setupTemplateDragHandlers = setupTemplateDragHandlers;
 window.handleTemplateDragOver = handleTemplateDragOver;
 window.handleTemplateDragLeave = handleTemplateDragLeave;
 window.templateDragState = templateDragState;
+window.cacheColumnPositionsForTemplateDrag = cacheColumnPositionsForTemplateDrag;
+window.clearTemplateDragCache = clearTemplateDragCache;

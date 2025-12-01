@@ -6605,7 +6605,9 @@ figcaption {
 
 /* Column drop zone highlight when template is being dragged - same as column drag */
 .column-drop-zone.template-drag-over {
-  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+  background: var(--vscode-editor-selectionBackground);
+  border: 2px dashed var(--vscode-editor-selectionForeground);
+  border-radius: 4px;
 }
 
 /* Template source in file-info header (next to clipboard/empty card) */
