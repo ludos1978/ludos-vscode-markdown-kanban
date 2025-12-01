@@ -1562,12 +1562,7 @@ window.updateTemplates = function(templates, showBar = true) {
 
         // Add templates if available
         if (templates && templates.length > 0) {
-            // Add separator
-            const separator = document.createElement('div');
-            separator.className = 'drag-menu-separator';
-            columnsMenuDropdown.appendChild(separator);
-
-            // Add each template as a draggable menu item
+            // Add each template as a draggable menu item (no separator - match cards menu style)
             templates.forEach(template => {
                 const item = document.createElement('div');
                 item.className = 'drag-menu-item template-item';

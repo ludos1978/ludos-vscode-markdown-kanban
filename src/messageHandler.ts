@@ -5787,7 +5787,7 @@ ${tasksContent}`;
 
     /**
      * Create an empty column at the specified position
-     * Stack tags are handled by the frontend after board update (same code path as column drops)
+     * Stack tags MUST be set here because renderer groups columns based on #stack tag
      */
     private async createEmptyColumn(message: any): Promise<void> {
         try {
@@ -5810,35 +5810,53 @@ ${tasksContent}`;
                 return rowMatch ? parseInt(rowMatch[1], 10) : 1;
             };
 
-            // Determine target row from adjacent column (if specified)
+            // Helper to check if column has #stack tag
+            const hasStackTag = (col: any): boolean => {
+                return /#stack\b/i.test(col.title || '');
+            };
+
+            // Determine target row and whether we need #stack tag
             let targetRow = message.targetRow || 1;
             let insertIndex = currentBoard.columns.length;
+            let needsStackTag = false;
 
             if (insertAfterColumnId) {
                 const afterIdx = currentBoard.columns.findIndex((c: any) => c.id === insertAfterColumnId);
                 if (afterIdx >= 0) {
                     insertIndex = afterIdx + 1;
-                    // Get row from the column we're inserting after
                     targetRow = getColumnRow(currentBoard.columns[afterIdx]);
+
+                    // Check if next column exists in same row - if so, we're inserting into a stack
+                    const nextCol = currentBoard.columns[afterIdx + 1];
+                    if (nextCol && getColumnRow(nextCol) === targetRow) {
+                        // Inserting between columns in same row - new column needs #stack
+                        needsStackTag = true;
+                    }
                 }
             } else if (insertBeforeColumnId) {
                 const beforeIdx = currentBoard.columns.findIndex((c: any) => c.id === insertBeforeColumnId);
                 if (beforeIdx >= 0) {
                     insertIndex = beforeIdx;
-                    // Get row from the column we're inserting before
                     targetRow = getColumnRow(currentBoard.columns[beforeIdx]);
+
+                    // If beforeCol has #stack, we're inserting into an existing stack
+                    if (hasStackTag(currentBoard.columns[beforeIdx])) {
+                        needsStackTag = true;
+                    }
                 }
             } else if (message.position === 'first') {
-                // Find first column in target row
                 const firstInRow = currentBoard.columns.findIndex((c: any) => getColumnRow(c) === targetRow);
                 insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
+                // First position doesn't need #stack (it becomes the base of the stack)
             }
 
-            // Create column title with row tag if needed (same as template system)
-            // Stack tags will be normalized by frontend after render
+            // Create column title with appropriate tags
             let columnTitle = 'New Column';
             if (targetRow > 1) {
                 columnTitle = `New Column #row${targetRow}`;
+            }
+            if (needsStackTag) {
+                columnTitle = columnTitle + ' #stack';
             }
 
             // Create empty column structure
@@ -5852,20 +5870,11 @@ ${tasksContent}`;
             // Insert empty column
             currentBoard.columns.splice(insertIndex, 0, emptyColumn);
 
-            // Mark unsaved
+            // Mark unsaved and update frontend
             this._markUnsavedChanges(true, currentBoard);
+            await this._onBoardUpdate();
 
-            // Send templateApplied message so frontend normalizes stack tags
-            // (uses same code path as column drops for stack tag handling)
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'templateApplied',
-                    board: currentBoard
-                });
-            }
-
-            log(`[createEmptyColumn] Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}`);
+            log(`[createEmptyColumn] Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}, stack=${needsStackTag}`);
 
         } catch (error: any) {
             log('[createEmptyColumn] Error:', error);

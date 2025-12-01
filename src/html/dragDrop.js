@@ -1229,21 +1229,10 @@ function setupGlobalDragAndDrop() {
             markUnsavedChanges();
         }
 
-        // Recalculate stack heights if needed
-        if (originalColumnId !== finalColumnId && typeof window.recalculateStackHeights === 'function') {
+        // Recalculate column heights after task drop
+        if (typeof window.applyStackedColumnStyles === 'function') {
             requestAnimationFrame(() => {
-                const originalCol = originalColumnElement;
-                const finalCol = finalColumnElement;
-
-                const originalStack = originalCol?.closest('.kanban-column-stack');
-                const finalStack = finalCol?.closest('.kanban-column-stack');
-
-                if (originalStack) {
-                    window.recalculateStackHeights(originalStack);
-                }
-                if (finalStack && finalStack !== originalStack) {
-                    window.recalculateStackHeights(finalStack);
-                }
+                window.applyStackedColumnStyles();
             });
         }
     }
@@ -2384,6 +2373,13 @@ function createNewTaskWithContent(content, dropPosition, description = '', expli
                     renderBoard();
                 }
             }
+
+            // Recalculate column heights after adding task
+            if (typeof window.applyStackedColumnStyles === 'function') {
+                requestAnimationFrame(() => {
+                    window.applyStackedColumnStyles();
+                });
+            }
         }
     } else {
         // Could not find suitable column
@@ -2550,6 +2546,13 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
             if (typeof renderBoard === 'function') {
                 renderBoard();
             }
+        }
+
+        // Recalculate column heights after adding tasks
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            requestAnimationFrame(() => {
+                window.applyStackedColumnStyles();
+            });
         }
     } else {
         vscode.postMessage({

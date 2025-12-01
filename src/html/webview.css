@@ -471,22 +471,9 @@ body {
   opacity: 0.7;
 }
 
-/* Template items in column menu */
+/* Template items in column menu - same style as other drag menu items */
 .drag-menu-item.template-item {
-  border-left: 2px solid transparent;
-  margin-left: 2px;
-  padding-left: 10px;
-}
-
-.drag-menu-item.template-item:hover {
-  border-left-color: var(--vscode-focusBorder);
-}
-
-/* Separator line between empty column and templates */
-.drag-menu-separator {
-  height: 1px;
-  background: var(--vscode-dropdown-border);
-  margin: 4px 8px;
+  /* No special styling - matches other menu items */
 }
 
 /* Hide label text at narrow widths */
@@ -2540,9 +2527,12 @@ button.file-bar-menu-item {
   transform: translateZ(-0.11px) translate(0px,-2.0px);
 }
 
-.kanban-column-stack .kanban-full-height-column .column-header,
+.kanban-column-stack .kanban-full-height-column .column-header{
+	transform: translateZ(-0.133px) translate(0px,-3px);
+}
+
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(-0.133px) translate(0px,0px);
+	transform: translateZ(-0.133px) translate(0px,-2px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {

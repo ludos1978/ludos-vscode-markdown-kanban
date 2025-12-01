@@ -870,23 +870,117 @@ window.handleEmptyColumnDragEnd = function(e) {
         el.classList.remove('template-drag-over', 'drag-over');
     });
 
-    // If we have a valid drop target, create empty column
+    // If we have a valid drop target, create empty column using SAME logic as regular column drops
     if (typeof window.templateDragState !== 'undefined' &&
         window.templateDragState.isDragging &&
         window.templateDragState.isEmptyColumn &&
-        window.templateDragState.targetRow !== null) {
+        window.templateDragState.targetRow !== null &&
+        window.cachedBoard) {
 
-        if (typeof vscode !== 'undefined') {
-            vscode.postMessage({
-                type: 'applyTemplate',
-                templatePath: '__empty_column__',
-                templateName: 'Empty Column',
-                isEmptyColumn: true,
-                targetRow: window.templateDragState.targetRow || 1,
-                insertAfterColumnId: window.templateDragState.targetPosition === 'after' ? window.templateDragState.targetColumnId : null,
-                insertBeforeColumnId: window.templateDragState.targetPosition === 'before' ? window.templateDragState.targetColumnId : null,
-                position: window.templateDragState.targetPosition
-            });
+        const targetRow = window.templateDragState.targetRow || 1;
+        const targetPosition = window.templateDragState.targetPosition;
+        const targetColumnId = window.templateDragState.targetColumnId;
+
+        // CRITICAL: Determine if we need #stack BEFORE rendering, based on current DOM
+        // This uses the same logic as processColumnDrop's stack normalization
+        let needsStackTag = false;
+
+        if (targetColumnId) {
+            const targetColElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
+            if (targetColElement) {
+                const targetStack = targetColElement.closest('.kanban-column-stack:not(.column-drop-zone-stack)');
+                if (targetStack) {
+                    if (targetPosition === 'after') {
+                        // Inserting after a column in a stack - always need #stack (we're not first)
+                        needsStackTag = true;
+                    } else if (targetPosition === 'before') {
+                        // Inserting before target
+                        const targetData = window.cachedBoard.columns.find(c => c.id === targetColumnId);
+                        if (targetData) {
+                            if (/#stack\b/i.test(targetData.title)) {
+                                // Target has #stack - we're inserting into middle of stack
+                                needsStackTag = true;
+                            } else {
+                                // Target is first in its stack - we become new first, target gets #stack
+                                // Add #stack to target BEFORE rendering so it stays in the same stack
+                                const trimmedTitle = targetData.title.trim();
+                                targetData.title = trimmedTitle ? trimmedTitle + ' #stack' : '#stack';
+                                // New column doesn't need #stack (it becomes the new first)
+                                needsStackTag = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 'first' or 'last' position means starting a new stack, so no #stack needed
+
+        // Create new column data with correct #stack tag
+        let columnTitle = 'New Column';
+        if (targetRow > 1) {
+            columnTitle = `New Column #row${targetRow}`;
+        }
+        if (needsStackTag) {
+            columnTitle = columnTitle + ' #stack';
+        }
+
+        const newColumn = {
+            id: `col-${Date.now()}`,
+            title: columnTitle,
+            tasks: [],
+            settings: {}
+        };
+
+        // Find insert position in cachedBoard.columns based on target
+        let insertIndex = window.cachedBoard.columns.length;
+
+        if (targetColumnId) {
+            const targetIdx = window.cachedBoard.columns.findIndex(c => c.id === targetColumnId);
+            if (targetIdx >= 0) {
+                if (targetPosition === 'after') {
+                    insertIndex = targetIdx + 1;
+                } else if (targetPosition === 'before') {
+                    insertIndex = targetIdx;
+                }
+            }
+        } else if (targetPosition === 'first' || targetPosition === 'last') {
+            // Find position in target row
+            const getColumnRow = (col) => {
+                const rowMatch = col.title?.match(/#row(\d+)/i);
+                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
+            };
+
+            if (targetPosition === 'first') {
+                const firstInRow = window.cachedBoard.columns.findIndex(c => getColumnRow(c) === targetRow);
+                insertIndex = firstInRow >= 0 ? firstInRow : window.cachedBoard.columns.length;
+            } else {
+                // 'last' - find last column in row and insert after it
+                let lastInRowIdx = -1;
+                for (let i = 0; i < window.cachedBoard.columns.length; i++) {
+                    if (getColumnRow(window.cachedBoard.columns[i]) === targetRow) {
+                        lastInRowIdx = i;
+                    }
+                }
+                insertIndex = lastInRowIdx >= 0 ? lastInRowIdx + 1 : window.cachedBoard.columns.length;
+            }
+        }
+
+        // Insert column into cachedBoard
+        window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
+
+        // Re-render the board - this creates the DOM structure with correct stacking
+        if (typeof window.renderBoard === 'function') {
+            window.renderBoard();
+        }
+
+        // Normalize ALL stack tags to handle edge cases (same as processColumnDrop does)
+        if (typeof window.normalizeAllStackTags === 'function') {
+            window.normalizeAllStackTags();
+        }
+
+        // Mark as unsaved to trigger backend save
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
         }
     }
 
@@ -3272,10 +3366,6 @@ window.addEventListener('message', event => {
                 window.cachedBoard = message.board;
                 if (typeof window.renderBoard === 'function') {
                     window.renderBoard();
-                    // Normalize stack tags after render (uses same logic as column drops)
-                    if (typeof window.normalizeAllStackTags === 'function') {
-                        window.normalizeAllStackTags();
-                    }
                 }
             }
             break;
