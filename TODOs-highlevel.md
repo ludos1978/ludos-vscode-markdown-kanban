@@ -1,3 +1,37 @@
+- [ ] first we need to figure out on what row we are, then which stack, then in which column, if it's a task we are dragging we also need to check within the column. we have calculated all the positions already or we can read them from a few items.
+
+the row is split up into areas by the:
+  kanban-container > kanban-board multi-row > kanban-row
+
+the vertical dividers between stacks are the:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack column-drop-zone-stack
+when on top of one of those, drop it into the new stack
+
+if within a:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack
+we should check the columns for the right position
+
+for the column drop position we need to use:
+  ( kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-margin )
+
+the middle of a column is defined by:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-header > the top of it
+  +
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-footer > the bottom of it
+  / 2
+when above : the column should be placed above
+when below : we need to check the next one until we find one that it's above
+if there are none left, it's the last one.
+if it's a column we have decided for the column position here. a tasks position must be further calculated.
+
+to find the position of a task:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
+take the mid of each : the task should be placed above if above the mid
+othervise check the next task-item, if there are none left, it's the last item.
+
+
+
+
 - [ ] ARCHITECTURE REFACTORING: Event-Driven Component System
   **Plan:** See `agent/ARCHITECTURE-REFACTORING-PLAN.md` for full details
   **Phase 1 Guide:** See `agent/PHASE1-EVENTBUS-IMPLEMENTATION.md`
