@@ -2,6 +2,7 @@
 
 the row is split up into areas by the:
   kanban-container > kanban-board multi-row > kanban-row
+only check within this row for any further checks!
 
 the vertical dividers between stacks are the:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack column-drop-zone-stack
@@ -9,8 +10,9 @@ when on top of one of those, drop the column into the new stack. do not add a #s
 
 if within a:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack
-we should check the columns for the right position
+we should only check this columns for the right position
 
+only check within the found kanban-column-stack:
 for the column drop position we need to use the middle of a column, which is defined by:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-header > the top of it
   +
@@ -27,6 +29,7 @@ if it's a column we have decided for the column position here. a tasks position 
 
 if a vertically folded column is dropped into a stack it must converted to be horizontally folded. also if a column is dropped into a stack with a vertically folded column, it must be converted to horizontally folded.
 
+only check within the found task for the kanban-full-height-column:
 to find the position of a task:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
 take the mid of each : the task should be placed above if above the mid
