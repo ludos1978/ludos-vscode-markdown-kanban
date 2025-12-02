@@ -2669,11 +2669,21 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
-.stack-bottom-drop-zone.drag-over,
-.column-margin.drag-over {
+.stack-bottom-drop-zone.drag-over {
   background: var(--vscode-editor-selectionBackground);
   border: 2px dashed var(--vscode-editor-selectionForeground);
   border-radius: 4px;
+}
+
+/* Column margin drop indicator - needs to be visible! */
+.column-margin.drag-over {
+  background: var(--vscode-focusBorder) !important;
+  min-height: 8px !important;
+  height: 8px !important;
+  border-radius: 4px;
+  box-shadow: 0 0 6px var(--vscode-focusBorder);
+  z-index: 10000;
+  position: relative;
 }
 
 /* Visual separation - add padding to content of stacked columns
