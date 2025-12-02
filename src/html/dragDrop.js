@@ -618,9 +618,14 @@ function setupGlobalDragAndDrop() {
         // Always clean up visual indicators
         hideDropFeedback();
         hideExternalDropIndicator();
+        hideInternalDropIndicator();
         document.querySelectorAll('.kanban-full-height-column').forEach(col => {
             col.classList.remove('external-drag-over');
         });
+        // Clean up any margin/drop-zone highlights from clipboard/empty card drags
+        document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.querySelectorAll('.column-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
         
         const dt = e.dataTransfer;
         if (!dt) {
@@ -710,12 +715,7 @@ function setupGlobalDragAndDrop() {
         
     }
     
-    // PERFORMANCE-OPTIMIZED: Board container dragover with throttling
-    // Cache column positions for external file drag indicators
-    let cachedBoardColumns = null;
-    let boardCacheTimestamp = 0;
-    const BOARD_CACHE_DURATION = 1000; // Re-cache every 1 second
-
+    // Board container dragover for external file drag indicators
     boardContainer.addEventListener('dragover', function(e) {
         // Always prevent default to allow drops
         e.preventDefault();
@@ -731,51 +731,18 @@ function setupGlobalDragAndDrop() {
             return; // Don't show external drop indicators during template drags
         }
 
-        // Show drop indicators for external drags
+        // Show drop indicators for external drags using hierarchical lookup
         const now = Date.now();
         if (now - lastIndicatorUpdate >= INDICATOR_UPDATE_THROTTLE) {
             lastIndicatorUpdate = now;
 
-            // Check if we're over a column (works for both single and multi-row layouts)
-            const column = e.target && e.target.closest ? e.target.closest('.kanban-full-height-column') : null;
-            if (column) {
-                // Allow drops on collapsed columns - they will be unfolded on drop
-                showExternalDropIndicator(column, e.clientY);
+            // Use hierarchical position finder: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
+            const dropResult = findDropPositionHierarchical(e.clientX, e.clientY, null);
+
+            if (dropResult && dropResult.columnElement) {
+                showExternalDropIndicator(dropResult.columnElement, e.clientY);
             } else {
-                // Check if we're over a row or spacer in multi-row mode
-                const row = e.target && e.target.closest ? e.target.closest('.kanban-row') : null;
-                const spacer = e.target && e.target.closest ? e.target.closest('.row-drop-zone-spacer') : null;
-                if (row || spacer) {
-                    // PERFORMANCE: Cache column positions for 1 second to avoid repeated querySelectorAll
-                    if (!cachedBoardColumns || (now - boardCacheTimestamp) > BOARD_CACHE_DURATION) {
-                        const columns = boardContainer.querySelectorAll('.kanban-full-height-column');
-                        cachedBoardColumns = Array.from(columns).map(col => ({
-                            element: col,
-                            rect: col.getBoundingClientRect()
-                        }));
-                        boardCacheTimestamp = now;
-                    }
-
-                    // Find nearest column using cached positions
-                    let nearestColumn = null;
-                    let minDistance = Infinity;
-
-                    cachedBoardColumns.forEach(item => {
-                        const distance = Math.abs(item.rect.left + item.rect.width / 2 - e.clientX);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            nearestColumn = item.element;
-                        }
-                    });
-
-                    if (nearestColumn) {
-                        showExternalDropIndicator(nearestColumn, e.clientY);
-                    } else {
-                        hideExternalDropIndicator();
-                    }
-                } else {
-                    hideExternalDropIndicator();
-                }
+                hideExternalDropIndicator();
             }
             showDropFeedback();
         }
@@ -803,12 +770,16 @@ function setupGlobalDragAndDrop() {
     boardContainer.addEventListener('dragleave', function(e) {
         // More robust check for actually leaving the board
         const rect = boardContainer.getBoundingClientRect();
-        const isReallyLeaving = e.clientX < rect.left || e.clientX > rect.right || 
+        const isReallyLeaving = e.clientX < rect.left || e.clientX > rect.right ||
                                e.clientY < rect.top || e.clientY > rect.bottom;
-        
+
         if (isReallyLeaving || (!boardContainer.contains(e.relatedTarget) && e.relatedTarget !== null)) {
             hideDropFeedback();
             hideExternalDropIndicator();
+            hideInternalDropIndicator();
+            // Clean up margin highlights
+            document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
+            document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
         }
     }, false);
     
@@ -854,6 +825,10 @@ function setupGlobalDragAndDrop() {
             // Clean up indicators if drop happens outside board
             hideDropFeedback();
             hideExternalDropIndicator();
+            hideInternalDropIndicator();
+            // Clean up margin highlights
+            document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
+            document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
         }
     }, false);
 
@@ -1390,6 +1365,13 @@ function setupGlobalDragAndDrop() {
             }
         }
 
+        // Enforce horizontal folding for stacked columns:
+        // If a column is already folded (vertically), convert it to horizontal folding
+        // Do NOT fold unfolded columns
+        if (typeof window.enforceFoldModesForStacks === 'function' && targetStack) {
+            window.enforceFoldModesForStacks(targetStack);
+        }
+
         // Update drop zones after column reorder
         if (typeof window.updateStackBottomDropZones === 'function') {
             window.updateStackBottomDropZones();
@@ -1444,6 +1426,10 @@ function setupGlobalDragAndDrop() {
         document.querySelectorAll('.column-drop-zone.drag-over').forEach(dz => {
             dz.classList.remove('drag-over');
         });
+
+        // Clean up margin and stack-bottom highlights (from column/clipboard/empty card drags)
+        document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
+        document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
 
         // Hide drop feedback and indicators
         hideDropFeedback();
@@ -2215,94 +2201,24 @@ function createNewTaskWithContent(content, dropPosition, description = '', expli
         return;
     }
 
-    // Find target column
+    // Find target column using hierarchical lookup
     let targetColumnId = explicitColumnId;
     let insertionIndex = explicitInsertionIndex !== null ? explicitInsertionIndex : -1;
 
     // Only calculate position if explicit values not provided
     if (targetColumnId === null) {
-        const elementAtPoint = document.elementFromPoint(dropPosition.x, dropPosition.y);
+        // Use hierarchical position finder: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
+        const dropResult = findDropPositionHierarchical(dropPosition.x, dropPosition.y, null);
 
-        // Try multiple strategies to find the column
-        let columnElement = elementAtPoint?.closest('.kanban-full-height-column');
-
-        // If we didn't find a column, try the parent elements
-        if (!columnElement) {
-            // Check if we're on a row
-            const row = elementAtPoint?.closest('.kanban-row');
-            if (row) {
-                // Find the column that contains this x position
-                const columns = row.querySelectorAll('.kanban-full-height-column');
-                for (const col of columns) {
-                    const rect = col.getBoundingClientRect();
-                    if (dropPosition.x >= rect.left && dropPosition.x <= rect.right) {
-                        columnElement = col;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (columnElement) {
-            targetColumnId = columnElement.dataset.columnId;
+        if (dropResult) {
+            targetColumnId = dropResult.columnId;
+            insertionIndex = dropResult.insertionIndex;
 
             // Unfold the column if it's collapsed
-            if (columnElement.classList.contains('collapsed')) {
+            if (dropResult.columnElement && dropResult.columnElement.classList.contains('collapsed')) {
                 if (typeof unfoldColumnIfCollapsed === 'function') {
                     unfoldColumnIfCollapsed(targetColumnId);
                 }
-            }
-
-            insertionIndex = calculateInsertionIndex(columnElement, dropPosition.y);
-        } else {
-            const columns = document.querySelectorAll('.kanban-full-height-column'); // Allow collapsed columns
-            let minDistance = Infinity;
-
-            columns.forEach(column => {
-                const rect = column.getBoundingClientRect();
-                const distX = Math.abs((rect.left + rect.right) / 2 - dropPosition.x);
-                const distY = Math.abs((rect.top + rect.bottom) / 2 - dropPosition.y);
-                const distance = Math.sqrt(distX * distX + distY * distY);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    targetColumnId = column.dataset.columnId;
-
-                    // Unfold the nearest column if it's collapsed
-                    if (column.classList.contains('collapsed')) {
-                        if (typeof unfoldColumnIfCollapsed === 'function') {
-                            unfoldColumnIfCollapsed(targetColumnId);
-                        }
-                    }
-
-                    insertionIndex = calculateInsertionIndex(column, dropPosition.y);
-                }
-            });
-
-            if (targetColumnId) {
-            }
-        }
-
-        if (!targetColumnId && window.cachedBoard.columns.length > 0) {
-            // Try non-collapsed first, then any column
-            let fallbackColumn = window.cachedBoard.columns.find(col =>
-                !window.collapsedColumns || !window.collapsedColumns.has(col.id)
-            );
-
-            if (!fallbackColumn) {
-                // If all columns are collapsed, use the first one and unfold it
-                fallbackColumn = window.cachedBoard.columns[0];
-            }
-
-            if (fallbackColumn) {
-                targetColumnId = fallbackColumn.id;
-
-                // Unfold if collapsed
-                if (typeof unfoldColumnIfCollapsed === 'function') {
-                    unfoldColumnIfCollapsed(targetColumnId);
-                }
-
-                insertionIndex = -1;
             }
         }
     }
@@ -2391,80 +2307,22 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
         return;
     }
 
-    // Calculate target column and insertion index ONCE
+    // Calculate target column and insertion index ONCE using hierarchical lookup
     let targetColumnId = null;
     let insertionIndex = -1;
 
-    const elementAtPoint = document.elementFromPoint(dropPosition.x, dropPosition.y);
-    let columnElement = elementAtPoint?.closest('.kanban-full-height-column');
+    // Use hierarchical position finder: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
+    const dropResult = findDropPositionHierarchical(dropPosition.x, dropPosition.y, null);
 
-    if (!columnElement) {
-        const row = elementAtPoint?.closest('.kanban-row');
-        if (row) {
-            const columns = row.querySelectorAll('.kanban-full-height-column');
-            for (const col of columns) {
-                const rect = col.getBoundingClientRect();
-                if (dropPosition.x >= rect.left && dropPosition.x <= rect.right) {
-                    columnElement = col;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (columnElement) {
-        targetColumnId = columnElement.dataset.columnId;
+    if (dropResult) {
+        targetColumnId = dropResult.columnId;
+        insertionIndex = dropResult.insertionIndex;
 
         // Unfold the column if it's collapsed
-        if (columnElement.classList.contains('collapsed')) {
+        if (dropResult.columnElement && dropResult.columnElement.classList.contains('collapsed')) {
             if (typeof unfoldColumnIfCollapsed === 'function') {
                 unfoldColumnIfCollapsed(targetColumnId);
             }
-        }
-
-        insertionIndex = calculateInsertionIndex(columnElement, dropPosition.y);
-    } else {
-        const columns = document.querySelectorAll('.kanban-full-height-column');
-        let minDistance = Infinity;
-
-        columns.forEach(column => {
-            const rect = column.getBoundingClientRect();
-            const distX = Math.abs((rect.left + rect.right) / 2 - dropPosition.x);
-            const distY = Math.abs((rect.top + rect.bottom) / 2 - dropPosition.y);
-            const distance = Math.sqrt(distX * distX + distY * distY);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                targetColumnId = column.dataset.columnId;
-
-                if (column.classList.contains('collapsed')) {
-                    if (typeof unfoldColumnIfCollapsed === 'function') {
-                        unfoldColumnIfCollapsed(targetColumnId);
-                    }
-                }
-
-                insertionIndex = calculateInsertionIndex(column, dropPosition.y);
-            }
-        });
-    }
-
-    if (!targetColumnId && window.cachedBoard.columns.length > 0) {
-        let fallbackColumn = window.cachedBoard.columns.find(col =>
-            !window.collapsedColumns || !window.collapsedColumns.has(col.id)
-        );
-
-        if (!fallbackColumn) {
-            fallbackColumn = window.cachedBoard.columns[0];
-        }
-
-        if (fallbackColumn) {
-            targetColumnId = fallbackColumn.id;
-
-            if (typeof unfoldColumnIfCollapsed === 'function') {
-                unfoldColumnIfCollapsed(targetColumnId);
-            }
-
-            insertionIndex = -1;
         }
     }
 
@@ -2534,33 +2392,6 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
         });
     }
 }
-
-
-function calculateInsertionIndex(column, clientY) {
-
-    const tasksContainer = column.querySelector('.tasks-container');
-    if (!tasksContainer) {
-        return -1;
-    }
-    
-    const tasks = Array.from(tasksContainer.children);
-    
-    if (tasks.length === 0) {
-        return 0;
-    }
-    
-    for (let i = 0; i < tasks.length; i++) {
-        const taskRect = tasks[i].getBoundingClientRect();
-        const taskCenter = taskRect.top + taskRect.height / 2;
-        
-        if (clientY < taskCenter) {
-            return i;
-        }
-    }
-    
-    return -1;
-}
-
 
 // Helper function to restore original task position
 function restoreTaskPosition() {
@@ -2829,142 +2660,104 @@ function setupTaskDragHandle(handle) {
     }
 }
 
-function getDragAfterTaskElement(container, y) {
-
-    const draggableElements = [...container.querySelectorAll('.task-item')].filter(el => el !== dragState.draggedTask);
-    const addButton = container.querySelector('.add-task-btn');
-
-    // If column is empty (only has add button), always drop at the beginning (before add button)
-    if (draggableElements.length === 0) {
-        return null; // This means insert at the end (before add button if it exists)
-    }
-
-    // If dragging over or near the add button area, treat it as dropping at the end
-    if (addButton) {
-        const addButtonBox = addButton.getBoundingClientRect();
-        if (y >= addButtonBox.top - 10) { // Add 10px buffer above the button
-            // Return null to indicate dropping at the end (but before the add button)
-            return null;
-        }
-    }
-
-    return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
-
 /**
- * PERFORMANCE-OPTIMIZED: Get the element to insert after using CACHED positions
- * This eliminates querySelectorAll and getBoundingClientRect calls during drag
- * Uses positions cached at dragstart in dragState.cachedTaskPositions
+ * HIERARCHICAL POSITION FINDER
+ * Finds drop position using strict hierarchy: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
+ * Used by ALL drop operations (internal drags and external drops)
+ * @param {number} mouseX - X coordinate
+ * @param {number} mouseY - Y coordinate
+ * @param {HTMLElement|null} draggedTask - Task being dragged (to skip in position calculation), or null for external drops
+ * @returns {Object} { columnElement, columnId, insertionIndex, tasksContainer }
  */
-function getDragAfterTaskElementCached(y) {
-    const cachedPositions = dragState.cachedTaskPositions;
+function findDropPositionHierarchical(mouseX, mouseY, draggedTask = null) {
+    const board = document.getElementById('kanban-board');
+    if (!board) {return null;}
 
-    // If column is empty, return null (insert at end)
-    if (!cachedPositions || cachedPositions.length === 0) {
-        return null;
-    }
-
-    // Check if dragging over add button area
-    if (dragState.cachedAddButtonRect) {
-        if (y >= dragState.cachedAddButtonRect.top - 10) {
-            return null; // Drop at end (before add button)
+    // STEP 1: Find ROW by Y coordinate
+    let foundRow = null;
+    const rows = board.querySelectorAll('.kanban-row');
+    if (rows.length > 0) {
+        for (const row of rows) {
+            const rect = row.getBoundingClientRect();
+            if (mouseY >= rect.top && mouseY <= rect.bottom) {
+                foundRow = row;
+                break;
+            }
+        }
+    } else {
+        // Single row layout - use board as the row
+        const boardRect = board.getBoundingClientRect();
+        if (mouseY >= boardRect.top && mouseY <= boardRect.bottom) {
+            foundRow = board;
         }
     }
+    if (!foundRow) {return null;}
 
-    // Use cached positions instead of getBoundingClientRect
-    const result = cachedPositions.reduce((closest, item) => {
-        const offset = y - item.rect.top - item.rect.height / 2;
-
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: item.element };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY });
-
-    return result.element;
-}
-
-/**
- * PERFORMANCE-OPTIMIZED: Get element to insert after using ANY cached positions
- * Generic version that works with any position cache (original column or new column)
- * @param {number} y - Mouse Y position
- * @param {Array} cachedPositions - Array of {element, rect} objects
- * @param {DOMRect|null} addButtonRect - Optional add button rect
- */
-function getDragAfterTaskElementFromCache(y, cachedPositions, addButtonRect) {
-    // If column is empty, return null (insert at end)
-    if (!cachedPositions || cachedPositions.length === 0) {
-        return null;
-    }
-
-    // Check if dragging over add button area
-    if (addButtonRect && y >= addButtonRect.top - 10) {
-        return null; // Drop at end (before add button)
-    }
-
-    // Use cached positions instead of getBoundingClientRect
-    const result = cachedPositions.reduce((closest, item) => {
-        const offset = y - item.rect.top - item.rect.height / 2;
-
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: item.element };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY });
-
-    return result.element;
-}
-
-function calculateTaskDropIndex(tasksContainer, draggedTask, event) {
-
-    const tasks = Array.from(tasksContainer.children);
-    const currentIndex = tasks.indexOf(draggedTask);
-    
-    // Return the current index in the DOM
-    return currentIndex >= 0 ? currentIndex : 0;
-}
-
-/**
- * Calculates insertion index based on mouse position
- * Purpose: Determine where to insert dropped task
- * Used by: Task drop operations
- * @param {HTMLElement} tasksContainer - Target container
- * @param {number} clientY - Mouse Y position
- * @returns {number} Insertion index
- */
-function calculateDropIndex(tasksContainer, clientY) {
-
-    const tasks = Array.from(tasksContainer.children);
-    let dropIndex = tasks.length;
-
-    for (let i = 0; i < tasks.length; i++) {
-        const taskElement = tasks[i];
-        const rect = taskElement.getBoundingClientRect();
-        const taskCenter = rect.top + rect.height / 2;
-
-        if (clientY < taskCenter) {
-            dropIndex = i;
+    // STEP 2: Within ROW, find STACK by X coordinate
+    let foundStack = null;
+    const stacks = foundRow.querySelectorAll(':scope > .kanban-column-stack');
+    for (const stack of stacks) {
+        // Skip drop zone stacks
+        if (stack.classList.contains('column-drop-zone-stack')) {continue;}
+        const stackRect = stack.getBoundingClientRect();
+        if (mouseX >= stackRect.left && mouseX <= stackRect.right) {
+            foundStack = stack;
             break;
         }
     }
+    if (!foundStack) {return null;}
 
-    return dropIndex;
-}
+    // STEP 3: Within STACK, find COLUMN by X coordinate
+    let targetColumn = null;
+    const columns = foundStack.querySelectorAll(':scope > .kanban-full-height-column');
+    for (const col of columns) {
+        const colRect = col.getBoundingClientRect();
+        if (mouseX >= colRect.left && mouseX <= colRect.right) {
+            targetColumn = col;
+            break;
+        }
+    }
+    if (!targetColumn) {return null;}
 
-function getOriginalColumnIndex(columnId) {
-    if (!currentBoard || !currentBoard.columns) {return -1;}
-    return currentBoard.columns.findIndex(col => col.id === columnId);
+    // STEP 4: Within COLUMN, find TASK position by Y midpoint
+    const tasksContainer = targetColumn.querySelector('.tasks-container');
+    if (!tasksContainer) {
+        return {
+            columnElement: targetColumn,
+            columnId: targetColumn.dataset.columnId,
+            insertionIndex: -1,
+            tasksContainer: null
+        };
+    }
+
+    const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+    let insertionIndex = -1; // -1 means append at end
+
+    let taskIndex = 0;
+    for (const task of tasks) {
+        // Skip the dragged task if provided
+        if (draggedTask && task === draggedTask) {
+            continue;
+        }
+
+        const taskRect = task.getBoundingClientRect();
+        // Task midpoint: (task.top + task.bottom) / 2
+        const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
+
+        if (mouseY < taskMidpoint) {
+            // Insert BEFORE this task
+            insertionIndex = taskIndex;
+            break;
+        }
+        taskIndex++;
+    }
+
+    return {
+        columnElement: targetColumn,
+        columnId: targetColumn.dataset.columnId,
+        insertionIndex: insertionIndex,
+        tasksContainer: tasksContainer
+    };
 }
 
 // Drag and drop setup
