@@ -1294,6 +1294,24 @@ body.small-card-fonts .task-title-container .markdown-content img {
   color: var(--vscode-errorForeground, #f48771) !important;
 }
 
+/* Style for images that failed to load (file not found) */
+.image-not-found {
+  /* Show subtle placeholder for missing images */
+  display: inline-block;
+  min-width: 60px;
+  min-height: 20px;
+  padding: 4px 8px;
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.1));
+  border: 1px dashed var(--vscode-inputValidation-warningBorder, #cca700);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+.image-not-found::before {
+  content: '📷 Image not found';
+}
+
 /* Left side controls (drag handle, collapse toggle) */
 .column-left-controls {
   display: flex;

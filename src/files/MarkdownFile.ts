@@ -799,6 +799,14 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
         const watchPath = this._path;
 
+        // BUGFIX: Don't create watcher for non-existent files to prevent listener leaks
+        // The _exists flag may not be set yet, so also check file system synchronously
+        if (!fs.existsSync(watchPath)) {
+            console.warn(`[${this.getFileType()}] Skipping watcher for non-existent file: ${this._relativePath}`);
+            this._exists = false;
+            return;
+        }
+
         // PERFORMANCE: Check if we already have a watcher for this file
         const existingWatcher = MarkdownFile._activeWatchers.get(watchPath);
         if (existingWatcher) {

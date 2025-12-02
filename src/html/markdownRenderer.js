@@ -1563,7 +1563,10 @@ function renderMarkdown(text, includeContext) {
             const originalSrcAttr = ` data-original-src="${escapeHtml(originalSrc)}"`;
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
 
-            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" />`;
+            // Add onerror handler to gracefully hide broken images (prevents 404 console noise)
+            const onerrorHandler = `onerror="this.style.display='none'; this.parentElement?.classList.add('image-not-found');"`;
+
+            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" ${onerrorHandler} />`;
         };
         
         // Enhanced link renderer
