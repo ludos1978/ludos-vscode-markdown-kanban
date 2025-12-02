@@ -1563,8 +1563,17 @@ function renderMarkdown(text, includeContext) {
             const originalSrcAttr = ` data-original-src="${escapeHtml(originalSrc)}"`;
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
 
-            // Add onerror handler to gracefully hide broken images (prevents 404 console noise)
-            const onerrorHandler = `onerror="this.style.display='none'; this.parentElement?.classList.add('image-not-found');"`;
+            // Add onerror handler to replace broken image with searchable placeholder
+            // The placeholder includes data-original-src so Alt+click search still works
+            const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const onerrorHandler = `onerror="
+                var placeholder = document.createElement('span');
+                placeholder.className = 'image-not-found';
+                placeholder.setAttribute('data-original-src', '${escapedOriginalSrc}');
+                placeholder.title = 'Image not found: ${escapedOriginalSrc}';
+                this.parentElement.insertBefore(placeholder, this);
+                this.style.display = 'none';
+            "`;
 
             return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" ${onerrorHandler} />`;
         };

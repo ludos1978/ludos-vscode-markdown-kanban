@@ -3737,6 +3737,7 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
 function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
     const link = target.closest('a');
     const img = target.closest('img');
+    const imageNotFound = target.closest('.image-not-found'); // Handle missing image placeholders
     const wikiLink = target.closest('.wiki-link');
 
     // Function to find the position index of clicked element among similar elements
@@ -3867,7 +3868,29 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         }
         return true;
     }
-    
+
+    // Handle missing image placeholders (triggers search for alternative image)
+    if (imageNotFound) {
+        event.preventDefault();
+        event.stopPropagation();
+        const originalSrc = imageNotFound.getAttribute('data-original-src');
+
+        if (originalSrc) {
+            // Calculate index for image-not-found placeholders
+            linkIndex = findElementIndex(imageNotFound, containerElement, 'data-original-src');
+
+            vscode.postMessage({
+                type: 'openFileLink',
+                href: originalSrc,
+                linkIndex: linkIndex,
+                taskId: taskId,
+                columnId: columnId,
+                includeContext: includeContext
+            });
+        }
+        return true;
+    }
+
     return false;
 }
 
