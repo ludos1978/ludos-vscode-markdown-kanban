@@ -272,68 +272,54 @@ function showInternalTaskDropIndicatorFallback(tasksContainer, afterElement) {
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     const indicator = createInternalDropIndicator();
 
-    // CRITICAL: Always store drop target FIRST, even if indicator can't be shown!
-    // Otherwise processTaskDrop() won't know where to drop
+    // CRITICAL: Always store drop target FIRST!
     dragState.dropTargetContainer = tasksContainer;
     dragState.dropTargetAfterElement = afterElement;
 
-    // PERFORMANCE: Look up cached data instead of querying DOM!
-    const containerKey = tasksContainer.id || tasksContainer.dataset.columnId || tasksContainer;
-    const cachedData = dragState.allColumnPositions?.get(containerKey);
-
-    if (!cachedData) {
-        // Can't show indicator, but drop target is already stored
-        indicator.style.display = 'none';
-        return;
-    }
-
+    // Direct DOM queries - NO CACHE
     let insertionY;
     let containerLeft, containerWidth;
-    let canShowIndicator = false;
 
-    // Use cached container dimensions
-    if (cachedData.tasks.length > 0) {
-        // Estimate container bounds from task positions
-        const firstTask = cachedData.tasks[0];
-        containerLeft = firstTask.rect.left;
-        containerWidth = firstTask.rect.width;
-        canShowIndicator = true;
-    } else if (cachedData.addButtonRect) {
-        containerLeft = cachedData.addButtonRect.left;
-        containerWidth = cachedData.addButtonRect.width;
-        canShowIndicator = true;
-    }
+    // Get container dimensions from direct DOM query
+    const containerRect = tasksContainer.getBoundingClientRect();
+    containerLeft = containerRect.left;
+    containerWidth = containerRect.width;
 
-    if (!canShowIndicator) {
-        indicator.style.display = 'none';
-        return;
-    }
+    // Get tasks and add button via direct DOM query
+    const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+    const addButton = tasksContainer.querySelector('.add-task-btn');
 
     if (!afterElement) {
-        // Drop at end (before add button if exists)
-        if (cachedData.addButtonRect) {
-            insertionY = cachedData.addButtonRect.top - 2;
-        } else if (cachedData.tasks.length > 0) {
-            // After last task
-            const lastTask = cachedData.tasks[cachedData.tasks.length - 1];
-            insertionY = lastTask.rect.bottom + 2;
+        // Drop at end
+        if (addButton) {
+            const addBtnRect = addButton.getBoundingClientRect();
+            insertionY = addBtnRect.top - 2;
+        } else if (tasks.length > 0) {
+            // Find last non-dragged task
+            let lastTask = null;
+            for (const task of tasks) {
+                if (task !== dragState.draggedTask) {
+                    lastTask = task;
+                }
+            }
+            if (lastTask) {
+                const lastRect = lastTask.getBoundingClientRect();
+                insertionY = lastRect.bottom + 2;
+            } else {
+                // Only dragged task in container
+                insertionY = containerRect.top + 10;
+            }
         } else {
-            indicator.style.display = 'none';
-            return;
+            // Empty container
+            insertionY = containerRect.top + 10;
         }
     } else {
-        // Drop before afterElement - find it in cached positions
-        const taskData = cachedData.tasks.find(t => t.element === afterElement);
-        if (taskData) {
-            insertionY = taskData.rect.top - 2;
-        } else {
-            // Can't find in cache - hide indicator but drop target already stored
-            indicator.style.display = 'none';
-            return;
-        }
+        // Drop before afterElement - direct DOM query
+        const afterRect = afterElement.getBoundingClientRect();
+        insertionY = afterRect.top - 2;
     }
 
-    // Position the indicator using CACHED dimensions
+    // Position the indicator
     indicator.style.position = 'fixed';
     indicator.style.left = (containerLeft + 10) + 'px';
     indicator.style.width = (containerWidth - 20) + 'px';
@@ -345,44 +331,36 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
 function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     const indicator = createInternalDropIndicator();
 
-    // PERFORMANCE: Use cached column positions instead of querying DOM!
+    // Direct DOM queries - NO CACHE
     let insertionY, stackLeft, stackWidth;
 
     // For template drags over drop zones, don't show indicator - drop zone highlight is sufficient
-    // (same behavior as column drags over drop zones)
     const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
     if (isTemplateDrag && targetStack.classList.contains('column-drop-zone-stack')) {
         // CRITICAL: Still need to set templateDragState for the drop zone!
-        // Find the row from the previous or next stack
         const row = targetStack.closest('.kanban-row');
         if (row) {
             templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
         } else {
-            // Single-row layout - default to row 1
             templateDragState.targetRow = 1;
         }
 
-        // For drop zone stacks, insert at the beginning (this creates a new stack position)
-        // Find adjacent columns to determine position
         const prevStack = targetStack.previousElementSibling;
         const nextStack = targetStack.nextElementSibling;
 
         if (prevStack && prevStack.classList.contains('kanban-column-stack')) {
-            // Insert after the last column of the previous stack
             const lastCol = prevStack.querySelector('.kanban-full-height-column:last-of-type');
             if (lastCol) {
                 templateDragState.targetPosition = 'after';
                 templateDragState.targetColumnId = lastCol.dataset?.columnId || null;
             }
         } else if (nextStack && nextStack.classList.contains('kanban-column-stack')) {
-            // Insert before the first column of the next stack
             const firstCol = nextStack.querySelector('.kanban-full-height-column:first-of-type');
             if (firstCol) {
                 templateDragState.targetPosition = 'before';
                 templateDragState.targetColumnId = firstCol.dataset?.columnId || null;
             }
         } else {
-            // No adjacent stacks - insert at end
             templateDragState.targetPosition = 'first';
             templateDragState.targetColumnId = null;
         }
@@ -391,133 +369,95 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         return;
     }
 
-    if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
-        if (!beforeColumn) {
-            // Drop at end of stack (after last column)
-            const stackColumns = dragState.cachedColumnPositions.filter(
-                pos => pos.element.parentNode === targetStack
-            );
+    // Handle drop zone stacks (for column drags)
+    if (targetStack.classList.contains('column-drop-zone-stack')) {
+        indicator.style.display = 'none';
+        dragState.dropTargetStack = targetStack;
+        dragState.dropTargetBeforeColumn = beforeColumn;
+        return;
+    }
 
-            if (stackColumns.length > 0) {
-                const lastCol = stackColumns[stackColumns.length - 1];
+    // Direct DOM query for columns in stack
+    const columnsInStack = targetStack.querySelectorAll(':scope > .kanban-full-height-column');
 
-                // PERFORMANCE: Use ONLY cached positions
-                if (lastCol.isFolded && lastCol.columnTitleRect) {
-                    // FOLDED MODE: Use cached column-title bottom
-                    stackLeft = lastCol.columnTitleRect.left;
-                    stackWidth = lastCol.columnTitleRect.width;
-                    insertionY = lastCol.columnTitleRect.bottom;
-                }
-                else if (lastCol.isSticky && lastCol.isContentVisible && lastCol.contentRect) {
-                    // UNFOLDED STICKY MODE: Use cached content bottom
-                    const viewportBottom = window.innerHeight;
-                    const effectiveBottom = Math.min(lastCol.contentRect.bottom, viewportBottom);
-                    stackLeft = lastCol.contentRect.left;
-                    stackWidth = lastCol.contentRect.width;
-                    insertionY = effectiveBottom;
-                }
-                else if (lastCol.bottomMarginRect) {
-                    // NORMAL MODE: Use cached bottom margin
-                    stackLeft = lastCol.bottomMarginRect.left;
-                    stackWidth = lastCol.bottomMarginRect.width;
-                    insertionY = lastCol.bottomMarginRect.top + (lastCol.bottomMarginRect.height / 2);
-                }
-                else {
-                    // FALLBACK: Use cached column bottom
-                    stackLeft = lastCol.rect.left;
-                    stackWidth = lastCol.rect.width;
-                    insertionY = lastCol.rect.bottom;
-                }
-            } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
-                // No OTHER columns in stack, but dragged column IS in this stack
-                // Use dragged column's cached position for indicator
-                const draggedColData = dragState.cachedColumnPositions?.find(pos => pos.element === dragState.draggedColumn);
-                if (draggedColData) {
-                    stackLeft = draggedColData.rect.left;
-                    stackWidth = draggedColData.rect.width;
-                    insertionY = draggedColData.rect.bottom + 5;
-                } else {
-                    // Can't show indicator without cache
-                    indicator.style.display = 'none';
-                    return;
-                }
-            } else if (targetStack.classList.contains('column-drop-zone-stack')) {
-                // Horizontal drop zone - drop zone itself provides visual feedback
-                // (template drags are handled earlier in this function)
-                indicator.style.display = 'none';
-                return;
-            } else {
-                // Truly empty stack - hide indicator
-                indicator.style.display = 'none';
-                return;
-            }
-        } else {
-            // Drop before specific column - use title top if sticky, margin otherwise
-            const colData = dragState.cachedColumnPositions.find(pos => pos.element === beforeColumn);
-            if (colData) {
-                // STICKY MODE: Use column-title top boundary
-                if (colData.isSticky && colData.columnTitleRect) {
-                    stackLeft = colData.columnTitleRect.left;
-                    stackWidth = colData.columnTitleRect.width;
-                    insertionY = colData.columnTitleRect.top;
-                }
-                // NORMAL MODE: Use top margin
-                else if (colData.topMarginRect) {
-                    stackLeft = colData.topMarginRect.left;
-                    stackWidth = colData.topMarginRect.width;
-                    insertionY = colData.topMarginRect.top + (colData.topMarginRect.height / 2);
-                }
-                // FALLBACK: Use column edge
-                else {
-                    stackLeft = colData.rect.left;
-                    stackWidth = colData.rect.width;
-                    insertionY = colData.rect.top;
-                }
-            } else {
-                // Fallback: not in cache
-                indicator.style.display = 'none';
-                return;
+    if (!beforeColumn) {
+        // Drop at end of stack (after last column)
+        // Find last non-dragged column
+        let lastCol = null;
+        for (const col of columnsInStack) {
+            if (col !== dragState.draggedColumn) {
+                lastCol = col;
             }
         }
+
+        if (lastCol) {
+            // Direct DOM query for position
+            const colRect = lastCol.getBoundingClientRect();
+            const bottomMargin = lastCol.querySelector('.column-margin-bottom');
+
+            if (bottomMargin) {
+                const marginRect = bottomMargin.getBoundingClientRect();
+                stackLeft = marginRect.left;
+                stackWidth = marginRect.width;
+                insertionY = marginRect.top + (marginRect.height / 2);
+            } else {
+                stackLeft = colRect.left;
+                stackWidth = colRect.width;
+                insertionY = colRect.bottom;
+            }
+        } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
+            // Only dragged column in stack - use its position
+            const draggedRect = dragState.draggedColumn.getBoundingClientRect();
+            stackLeft = draggedRect.left;
+            stackWidth = draggedRect.width;
+            insertionY = draggedRect.bottom + 5;
+        } else {
+            // Empty stack
+            indicator.style.display = 'none';
+            dragState.dropTargetStack = targetStack;
+            dragState.dropTargetBeforeColumn = beforeColumn;
+            return;
+        }
     } else {
-        // No cache available - can't position indicator precisely
-        // But STILL store drop target so drop works!
-        indicator.style.display = 'none';
-        stackLeft = 0;
-        stackWidth = 200; // Fallback width
-        insertionY = 0;
+        // Drop before specific column - direct DOM query
+        const colRect = beforeColumn.getBoundingClientRect();
+        const topMargin = beforeColumn.querySelector('.column-margin:not(.column-margin-bottom)');
+
+        if (topMargin) {
+            const marginRect = topMargin.getBoundingClientRect();
+            stackLeft = marginRect.left;
+            stackWidth = marginRect.width;
+            insertionY = marginRect.top + (marginRect.height / 2);
+        } else {
+            stackLeft = colRect.left;
+            stackWidth = colRect.width;
+            insertionY = colRect.top;
+        }
     }
 
-    // Show horizontal indicator for column stacking (if cache available)
-    if (dragState.cachedColumnPositions && dragState.cachedColumnPositions.length > 0) {
-        indicator.style.position = 'fixed';
-        indicator.style.left = (stackLeft + 10) + 'px';
-        indicator.style.width = (stackWidth - 20) + 'px';
-        indicator.style.top = insertionY + 'px';
-        indicator.style.height = '3px';
-        indicator.style.display = 'block';
-        indicator.classList.add('active');
-    }
+    // Show horizontal indicator for column stacking
+    indicator.style.position = 'fixed';
+    indicator.style.left = (stackLeft + 10) + 'px';
+    indicator.style.width = (stackWidth - 20) + 'px';
+    indicator.style.top = insertionY + 'px';
+    indicator.style.height = '3px';
+    indicator.style.display = 'block';
+    indicator.classList.add('active');
 
-    // CRITICAL: Always store drop target, even if indicator can't be shown!
-    // Otherwise processColumnDrop() won't know where to drop
+    // CRITICAL: Always store drop target!
     dragState.dropTargetStack = targetStack;
     dragState.dropTargetBeforeColumn = beforeColumn;
 
     // For template drags, also update templateDragState with target position
     if (isTemplateDrag && typeof templateDragState !== 'undefined') {
-        // Get row from closest kanban-row (stacks don't have data-row attribute)
         const row = targetStack.closest('.kanban-row');
         const stackRow = row ? parseInt(row.dataset.rowNumber, 10) || 1 : 1;
         templateDragState.targetRow = stackRow;
 
         if (beforeColumn) {
-            // Insert before this column
             templateDragState.targetPosition = 'before';
             templateDragState.targetColumnId = beforeColumn.dataset?.columnId || null;
         } else {
-            // Insert after last column in stack
-            const columnsInStack = targetStack.querySelectorAll('.kanban-full-height-column');
             const lastColumn = columnsInStack[columnsInStack.length - 1];
             templateDragState.targetPosition = 'after';
             templateDragState.targetColumnId = lastColumn?.dataset?.columnId || null;
@@ -1520,6 +1460,7 @@ function setupGlobalDragAndDrop() {
         // CRITICAL: Clear all position caches to prevent memory leaks and stale references
         dragState.cachedColumnPositions = null;
         dragState.cachedStacks = null;
+        dragState.cachedRows = null;
         dragState.cachedTaskPositions = null;
         dragState.cachedAddButtonRect = null;
         dragState.draggedColumnCache = null;
@@ -2760,120 +2701,14 @@ function setupTaskDragAndDropForColumn(columnElement) {
     }
     tasksContainer.dataset.taskDragSetup = 'true';
 
-    // Add dragover handler to the entire column for appending to end
-    columnElement.addEventListener('dragover', e => {
-        // Update Alt key state during drag (user might press/release Alt mid-drag)
-        if (dragState.isDragging) {
-            dragState.altKeyPressed = e.altKey;
-        }
-
-        // Only process if we have a dragged task
-        if (!dragState.draggedTask) {return;}
-
-        // Check if we're over the tasks container specifically
-        const isOverTasksContainer = tasksContainer.contains(e.target);
-
-        if (!isOverTasksContainer) {
-            // We're over the column but not the tasks container (e.g., header area)
-            e.preventDefault();
-
-            // PERFORMANCE: Just show indicator at end, DON'T move actual element!
-            // Store target for dragend to perform actual move
-            dragState.dropTargetContainer = tasksContainer;
-            dragState.dropTargetAfterElement = null; // null = append at end
-
-            // Show drop indicator at end of column
-            showInternalTaskDropIndicator(tasksContainer, null);
-
-            // Add visual feedback
-            columnElement.classList.add('drag-over-append');
-        }
-    });
-
-    // Add drop handler to entire column
-    columnElement.addEventListener('drop', e => {
-        if (!dragState.draggedTask) {return;}
-
-        const isOverTasksContainer = tasksContainer.contains(e.target);
-        if (!isOverTasksContainer) {
-            e.preventDefault();
-            columnElement.classList.remove('drag-over-append');
-        }
-    });
-
-    // Clean up visual feedback when leaving column
-    columnElement.addEventListener('dragleave', e => {
-        if (!columnElement.contains(e.relatedTarget)) {
-            columnElement.classList.remove('drag-over-append');
-        }
-    });
-
-    // PERFORMANCE-OPTIMIZED: Zero-recalc dragover handler using cached positions from dragstart
-    tasksContainer.addEventListener('dragover', e => {
-        e.preventDefault();
-
-        // Update Alt key state during drag (user might press/release Alt mid-drag)
-        if (dragState.isDragging) {
-            dragState.altKeyPressed = e.altKey;
-        }
-
-        // Only stop propagation for internal task drags, not external drops
-        if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
-            e.stopPropagation(); // Prevent column-level handler from interfering
-        }
-
-        if (!dragState.draggedTask) {
-            return;
-        }
-
-        // PERFORMANCE: Add drag-source class to dim the task (stays in original position)
-        if (!dragState.draggedTask.classList.contains('drag-source')) {
-            dragState.draggedTask.classList.add('drag-source');
-        }
-
-        // Remove any column-level visual feedback when over tasks
-        columnElement.classList.remove('drag-over-append');
-
-        // PERFORMANCE: Use pre-cached positions from dragstart - ZERO recalculation during drag!
-        const containerKey = tasksContainer.id || tasksContainer.dataset.columnId || tasksContainer;
-        const cachedData = dragState.allColumnPositions?.get(containerKey);
-
-        if (!cachedData) {
-            // DEBUG: Log cache miss to help diagnose
-            console.warn('[DragPerf] Cache miss for container', {
-                hasMap: !!dragState.allColumnPositions,
-                mapSize: dragState.allColumnPositions?.size,
-                containerKey: containerKey,
-                keys: dragState.allColumnPositions ? Array.from(dragState.allColumnPositions.keys()) : []
-            });
-
-            // FALLBACK: Calculate positions on-the-fly (slower but functional)
-            const tasks = Array.from(tasksContainer.querySelectorAll('.task-item'))
-                .filter(task => task !== dragState.draggedTask);
-            const afterElement = getDragAfterTaskElement(tasksContainer, e.clientY);
-
-            // Show indicator with fallback positioning
-            showInternalTaskDropIndicatorFallback(tasksContainer, afterElement);
-            return;
-        }
-
-        // Use cached positions to find drop location (no DOM queries!)
-        const afterElement = getDragAfterTaskElementFromCache(
-            e.clientY,
-            cachedData.tasks,
-            cachedData.addButtonRect
-        );
-
-        // Show drop indicator at calculated position
-        showInternalTaskDropIndicator(tasksContainer, afterElement);
-    });
-
+    // NOTE: Task dragover handlers removed - now handled by unified hierarchical document handler
+    // Drop handler kept for cleanup
     tasksContainer.addEventListener('drop', e => {
         e.preventDefault();
 
         // Only stop propagation for internal task drags, let external drops bubble up
         if (dragState.draggedTask && !dragState.draggedClipboardCard && !dragState.draggedEmptyCard) {
-            e.stopPropagation(); // Prevent column-level handler for internal drags only
+            e.stopPropagation();
         }
 
         columnElement.classList.remove('drag-over');
@@ -3346,35 +3181,8 @@ function updateStackBottomDropZones() {
             transform: translateZ(-1px);
         `;
 
-        // Add dragover handler for this drop zone
-        dropZone.addEventListener('dragover', e => {
-            const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-            if (!dragState.draggedColumn && !isTemplateDrag) {return;}
-            e.preventDefault();
-
-            // Use same visual style for both column and template drags
-            dropZone.classList.add('drag-over');
-
-            // PERFORMANCE: Just show indicator, DON'T move column!
-            // Drop at end of stack (after last column)
-            showInternalColumnDropIndicator(stack, null);
-
-            // For template drags, update target position (drop after last column in this stack)
-            if (isTemplateDrag) {
-                const row = stack.closest('.kanban-row');
-                if (row) {
-                    templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
-                }
-                // Insert after last column in this stack
-                const lastColumn = stack.querySelector('.kanban-full-height-column:last-of-type');
-                if (lastColumn) {
-                    templateDragState.targetColumnId = lastColumn.dataset.columnId;
-                    templateDragState.targetPosition = 'after';
-                }
-            }
-        });
-
-        // Add dragleave handler to clear styles
+        // NOTE: dragover handler removed - now handled by unified hierarchical document handler
+        // dragleave handler kept for cleanup
         dropZone.addEventListener('dragleave', e => {
             dropZone.classList.remove('drag-over');
         });
@@ -3501,43 +3309,102 @@ function setupColumnDragAndDrop() {
                 columnTitleRect: draggedTitleRect
             };
 
-            // PERFORMANCE: Cache stack structure to avoid querySelectorAll during drag
+            // HIERARCHICAL CACHE: Rows → Stacks → Columns
             const board = document.getElementById('kanban-board');
-            dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {
-                const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+
+            // STEP 1: Cache ROW positions
+            const rows = board.querySelectorAll('.kanban-row');
+            if (rows.length > 0) {
+                dragState.cachedRows = Array.from(rows).map(row => {
+                    const rect = row.getBoundingClientRect();
+                    return {
+                        element: row,
+                        rowNumber: parseInt(row.dataset.rowNumber, 10) || 1,
+                        top: rect.top,
+                        bottom: rect.bottom
+                    };
+                });
+            } else {
+                // Single row layout - use board as the row
+                const boardRect = board.getBoundingClientRect();
+                dragState.cachedRows = [{
+                    element: board,
+                    rowNumber: 1,
+                    top: boardRect.top,
+                    bottom: boardRect.bottom
+                }];
+            }
+
+            // STEP 2: Cache ALL STACKS (including drop-zone-stacks) with hierarchical column data
+            dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack')).map(stack => {
+                const stackRect = stack.getBoundingClientRect();
+                const isDropZoneStack = stack.classList.contains('column-drop-zone-stack');
+                const rowElement = stack.closest('.kanban-row') || board;
+
+                // For regular stacks, cache columns with header/footer positions
+                let columnsData = [];
+                if (!isDropZoneStack) {
+                    const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+                    columnsData = columnsInStack.map(col => {
+                        const columnTitle = col.querySelector('.column-title');
+                        const columnFooter = col.querySelector('.column-footer');
+                        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+                        const bottomMargin = col.querySelector('.column-margin-bottom');
+
+                        // Get header top (column-title top)
+                        const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
+
+                        // Get footer bottom (column-footer bottom, or column bottom if no footer)
+                        let footerBottom;
+                        if (columnFooter) {
+                            footerBottom = columnFooter.getBoundingClientRect().bottom;
+                        } else {
+                            // Use column bottom as fallback
+                            footerBottom = col.getBoundingClientRect().bottom;
+                        }
+
+                        return {
+                            element: col,
+                            columnId: col.getAttribute('data-column-id'),
+                            headerTop: headerTop,
+                            footerBottom: footerBottom,
+                            topMarginElement: topMargin,
+                            bottomMarginElement: bottomMargin
+                        };
+                    });
+                }
+
+                // Find stack-bottom-drop-zone if exists
+                const stackBottomDropZone = stack.querySelector('.stack-bottom-drop-zone');
+
                 return {
                     element: stack,
-                    columns: columnsInStack,
-                    lastColumn: columnsInStack[columnsInStack.length - 1]
+                    rowElement: rowElement,
+                    isDropZoneStack: isDropZoneStack,
+                    left: stackRect.left,
+                    right: stackRect.right,
+                    top: stackRect.top,
+                    bottom: stackRect.bottom,
+                    columns: columnsData,
+                    lastColumn: columnsData.length > 0 ? columnsData[columnsData.length - 1].element : null,
+                    stackBottomDropZone: stackBottomDropZone
                 };
             });
 
+            // Keep cachedColumnPositions for backward compatibility with showInternalColumnDropIndicator
             dragState.cachedColumnPositions = Array.from(allColumns)
                 .filter(col => col !== columnElement)
                 .map(col => {
                     const colId = col.getAttribute('data-column-id');
                     const columnTitle = col.querySelector('.column-title');
-
-                    // Check if column is using sticky positioning (collapsed/stacked)
                     const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
-
-                    // Cache margins (used when NOT sticky)
                     const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
                     const bottomMargin = col.querySelector('.column-margin-bottom');
-
-                    // Cache column title (used when sticky)
                     const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
-
-                    // CRITICAL: Check if column-content is visible in viewport (determines folded state)
                     const columnContent = col.querySelector('.column-content');
                     const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
                     const viewportHeight = window.innerHeight;
-
-                    // Column is "folded" only if content is NOT visible in viewport
-                    // If any part of content is visible, it's NOT folded
-                    const isContentVisible = contentRect &&
-                        contentRect.bottom > 0 &&
-                        contentRect.top < viewportHeight;
+                    const isContentVisible = contentRect && contentRect.bottom > 0 && contentRect.top < viewportHeight;
                     const isFolded = isSticky && !isContentVisible;
 
                     return {
@@ -3547,7 +3414,7 @@ function setupColumnDragAndDrop() {
                         isSticky: isSticky,
                         isFolded: isFolded,
                         isContentVisible: isContentVisible,
-                        contentRect: contentRect,  // Cache content rect
+                        contentRect: contentRect,
                         topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
                         bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
                         columnTitleRect: columnTitleRect
@@ -3561,6 +3428,8 @@ function setupColumnDragAndDrop() {
             // This keeps cached positions accurate if user scrolls while dragging
             const scrollHandler = () => {
                 if (!dragState.isDragging || !dragState.draggedColumn) return;
+
+                const board = document.getElementById('kanban-board');
 
                 // Re-cache dragged column position
                 const draggedCol = dragState.draggedColumn;
@@ -3582,7 +3451,73 @@ function setupColumnDragAndDrop() {
                     columnTitleRect: draggedTitleRect
                 };
 
-                // Re-cache all other column positions on scroll
+                // Re-cache ROW positions
+                const rows = board.querySelectorAll('.kanban-row');
+                if (rows.length > 0) {
+                    dragState.cachedRows = Array.from(rows).map(row => {
+                        const rect = row.getBoundingClientRect();
+                        return {
+                            element: row,
+                            rowNumber: parseInt(row.dataset.rowNumber, 10) || 1,
+                            top: rect.top,
+                            bottom: rect.bottom
+                        };
+                    });
+                } else {
+                    const boardRect = board.getBoundingClientRect();
+                    dragState.cachedRows = [{
+                        element: board,
+                        rowNumber: 1,
+                        top: boardRect.top,
+                        bottom: boardRect.bottom
+                    }];
+                }
+
+                // Re-cache STACKS with hierarchical column data
+                dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack')).map(stack => {
+                    const stackRect = stack.getBoundingClientRect();
+                    const isDropZoneStack = stack.classList.contains('column-drop-zone-stack');
+                    const rowElement = stack.closest('.kanban-row') || board;
+
+                    let columnsData = [];
+                    if (!isDropZoneStack) {
+                        const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+                        columnsData = columnsInStack.map(col => {
+                            const columnTitle = col.querySelector('.column-title');
+                            const columnFooter = col.querySelector('.column-footer');
+                            const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+                            const bottomMargin = col.querySelector('.column-margin-bottom');
+                            const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
+                            let footerBottom = columnFooter ? columnFooter.getBoundingClientRect().bottom : col.getBoundingClientRect().bottom;
+
+                            return {
+                                element: col,
+                                columnId: col.getAttribute('data-column-id'),
+                                headerTop: headerTop,
+                                footerBottom: footerBottom,
+                                topMarginElement: topMargin,
+                                bottomMarginElement: bottomMargin
+                            };
+                        });
+                    }
+
+                    const stackBottomDropZone = stack.querySelector('.stack-bottom-drop-zone');
+
+                    return {
+                        element: stack,
+                        rowElement: rowElement,
+                        isDropZoneStack: isDropZoneStack,
+                        left: stackRect.left,
+                        right: stackRect.right,
+                        top: stackRect.top,
+                        bottom: stackRect.bottom,
+                        columns: columnsData,
+                        lastColumn: columnsData.length > 0 ? columnsData[columnsData.length - 1].element : null,
+                        stackBottomDropZone: stackBottomDropZone
+                    };
+                });
+
+                // Re-cache all other column positions (for backward compatibility)
                 const allColumns = document.querySelectorAll('.kanban-full-height-column');
                 dragState.cachedColumnPositions = Array.from(allColumns)
                     .filter(col => col !== dragState.draggedColumn)
@@ -3683,325 +3618,253 @@ function setupColumnDragAndDrop() {
         });
 
         // NOTE: Column dragend handler removed - now handled by unified global dragend handler
-
-
-        // PERFORMANCE-OPTIMIZED: Zero-recalc dragover using cached positions from dragstart
-        // RAF-THROTTLED: Limits processing to 60fps max
-        // Also handles template drags with same visual behavior as column drags
-        column.addEventListener('dragover', e => {
-            const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-            const isColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
-
-            // Handle both column drags and template drags
-            if (!isColumnDrag && !isTemplateDrag) {return;}
-
-            // For column drags, skip if dragging over self
-            if (isColumnDrag && dragState.draggedColumn === column) {return;}
-
-            // Don't handle if we're currently over a drop zone - let the drop zone handle it
-            if (dragState.pendingDropZone) {
-                return;
-            }
-
-            e.preventDefault();
-
-            // CRITICAL: Capture mouse Y coordinate BEFORE RAF (becomes stale inside callback)
-            const mouseY = e.clientY;
-
-            // PERFORMANCE: RAF throttle - skip if already scheduled
-            if (dragState.columnDragoverPending) {return;}
-
-            dragState.columnDragoverPending = true;
-            requestAnimationFrame(() => {
-                dragState.columnDragoverPending = false;
-
-                // Re-check state in case drag ended while waiting
-                const stillTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-                const stillColumnDrag = dragState.draggedColumn && dragState.draggedColumn !== column;
-                if (!stillColumnDrag && !stillTemplateDrag) {return;}
-
-            // For column drags, check dragged column's parent stack
-            // For template drags, we only need the target stack
-            const draggedStack = stillColumnDrag ? dragState.draggedColumn.parentNode : null;
-            const targetStack = column.parentNode;
-
-            // Validate stacks
-            if (!targetStack || !targetStack.classList.contains('kanban-column-stack')) {
-                console.warn('[ColumnDragover] Target not in stack', { targetStack: targetStack?.className });
-                return;
-            }
-            if (stillColumnDrag && (!draggedStack || !draggedStack.classList.contains('kanban-column-stack'))) {
-                console.warn('[ColumnDragover] Dragged column not in stack', { draggedStack: draggedStack?.className });
-                return;
-            }
-
-            // PERFORMANCE: Use cached column position - ZERO DOM queries!
-            const colData = dragState.cachedColumnPositions?.find(pos => pos.element === column);
-            if (!colData) {
-                return;
-            }
-
-            // PERFORMANCE: Check if this is the last column using cached stack structure
-            const stackCache = dragState.cachedStacks?.find(s => s.element === targetStack);
-            const isLastColumnInStack = stackCache && stackCache.lastColumn === column;
-
-            // PERFORMANCE: Use ONLY cached positions - zero DOM queries during drag!
-            let midpoint, isInTopMargin, isBelowColumnTitle;
-
-            if (colData.isFolded && colData.columnTitleRect) {
-                // FOLDED MODE: Use cached column-title boundaries
-                midpoint = colData.columnTitleRect.top + colData.columnTitleRect.height / 2;
-                isInTopMargin = mouseY <= midpoint;
-                isBelowColumnTitle = isLastColumnInStack && mouseY > colData.columnTitleRect.bottom;
-            }
-            else if (colData.isSticky && colData.isContentVisible && colData.contentRect) {
-                // UNFOLDED STICKY MODE: Use cached content boundaries
-                const viewportBottom = window.innerHeight;
-                const effectiveBottom = Math.min(colData.contentRect.bottom, viewportBottom);
-                midpoint = colData.contentRect.top + (colData.contentRect.height / 2);
-                isInTopMargin = mouseY <= midpoint;
-                isBelowColumnTitle = isLastColumnInStack && mouseY > effectiveBottom;
-            }
-            else {
-                // NORMAL MODE: Use cached margins for drop detection
-                const rect = colData.rect;
-                midpoint = rect.top + rect.height / 2;
-                isInTopMargin = colData.topMarginRect &&
-                    mouseY >= colData.topMarginRect.top &&
-                    mouseY <= colData.topMarginRect.bottom;
-                isBelowColumnTitle = isLastColumnInStack && colData.bottomMarginRect &&
-                    mouseY >= colData.bottomMarginRect.top &&
-                    mouseY <= colData.bottomMarginRect.bottom;
-            }
-
-            // Determine drop position based on mouse Y
-            let beforeColumn;
-            if (isBelowColumnTitle) {
-                // Drop at END of stack (after last column)
-                beforeColumn = null;
-            } else if (mouseY < midpoint || isInTopMargin) {
-                // Drop before this column
-                beforeColumn = column;
-            } else {
-                // Drop after this column
-                beforeColumn = column.nextSibling;
-            }
-
-            // Show indicator, DON'T move actual column!
-            // (also sets templateDragState target position for template drags)
-            showInternalColumnDropIndicator(targetStack, beforeColumn);
-            }); // End RAF callback
-        });
+        // NOTE: Column dragover handler removed - now handled by unified hierarchical document handler
     });
 
-    // Add dragover handler to allow dropping below the last column in a stack
-    // STICKY-AWARE: Uses column-title bottom when sticky, column bottom when normal
-    // RAF-THROTTLED: Limits processing to 60fps max
-    // Also handles template drags with same behavior
+    // HIERARCHICAL DRAGOVER HANDLER for column drags
+    // Follows strict hierarchy: Row (by Y) → Stack (by X) → Column (by midpoint)
+    // NO CACHE - Direct DOM queries according to rules
+    // Highlights .column-margin elements for drop position
     document.addEventListener('dragover', e => {
         const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-        if (!dragState.draggedColumn && !isTemplateDrag) {return;}
+        const isColumnDrag = !!dragState.draggedColumn;
+        const isTaskDrag = !!dragState.draggedTask;
+        const isClipboardDrag = !!dragState.draggedClipboardCard;
+        const isEmptyCardDrag = !!dragState.draggedEmptyCard;
 
-        // Don't interfere if over a drop zone
-        if (e.target.classList.contains('column-drop-zone')) {
-            return;
+        // Handle column drags, template drags, task drags, clipboard drags, empty card drags
+        if (!isColumnDrag && !isTemplateDrag && !isTaskDrag && !isClipboardDrag && !isEmptyCardDrag) {return;}
+
+        e.preventDefault();
+
+        // Update Alt key state during drag (for task-like drags)
+        if ((isTaskDrag || isClipboardDrag || isEmptyCardDrag) && dragState.isDragging) {
+            dragState.altKeyPressed = e.altKey;
         }
 
-        // CRITICAL: Capture mouse coordinates BEFORE RAF (they become stale inside callback)
+        // CRITICAL: Capture mouse coordinates BEFORE RAF
         const mouseX = e.clientX;
         const mouseY = e.clientY;
 
-        // PERFORMANCE: RAF throttle - skip if already scheduled
-        if (dragState.documentDragoverPending) {return;}
+        // RAF throttle
+        if (dragState.columnDragoverPending) {return;}
 
-        dragState.documentDragoverPending = true;
+        dragState.columnDragoverPending = true;
         requestAnimationFrame(() => {
-            dragState.documentDragoverPending = false;
+            dragState.columnDragoverPending = false;
 
-            // Re-check state in case drag ended while waiting
+            // Re-check state in case drag ended
             const stillTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-            if (!dragState.draggedColumn && !stillTemplateDrag) {return;}
+            const stillColumnDrag = !!dragState.draggedColumn;
+            const stillTaskDrag = !!dragState.draggedTask;
+            const stillClipboardDrag = !!dragState.draggedClipboardCard;
+            const stillEmptyCardDrag = !!dragState.draggedEmptyCard;
+            if (!stillColumnDrag && !stillTemplateDrag && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {return;}
 
-        // PERFORMANCE: Use cached stacks instead of querySelectorAll
-        if (!dragState.cachedStacks || dragState.cachedStacks.length === 0) {return;}
+            const board = document.getElementById('kanban-board');
+            if (!board) {return;}
 
-        let stack = null;
+            // Clear previous highlights
+            document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
+            document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
+            document.querySelectorAll('.column-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
 
-        for (const stackCache of dragState.cachedStacks) {
-            if (stackCache.columns.length === 0) {continue;}
-
-            const lastColumn = stackCache.lastColumn;
-
-            // PERFORMANCE: Use ONLY cached positions - zero live queries!
-            let cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
-
-            // Fallback: if lastColumn IS the dragged column, use its separate cache
-            if (!cachedCol && lastColumn === dragState.draggedColumn && dragState.draggedColumnCache) {
-                cachedCol = dragState.draggedColumnCache;
-            }
-
-            let lastBottom, stackLeft, stackRight;
-
-            if (cachedCol) {
-                if (cachedCol.isFolded && cachedCol.columnTitleRect) {
-                    // FOLDED MODE: Use cached column-title bottom
-                    lastBottom = cachedCol.columnTitleRect.bottom;
-                    stackLeft = cachedCol.columnTitleRect.left;
-                    stackRight = cachedCol.columnTitleRect.right;
-                }
-                else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
-                    // UNFOLDED STICKY MODE: Use cached content bottom
-                    const viewportBottom = window.innerHeight;
-                    lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
-                    stackLeft = cachedCol.contentRect.left;
-                    stackRight = cachedCol.contentRect.right;
-                }
-                else {
-                    // NORMAL MODE: Use cached column bottom
-                    lastBottom = cachedCol.rect.bottom;
-                    stackLeft = cachedCol.rect.left;
-                    stackRight = cachedCol.rect.right;
+            // STEP 1: Find ROW by Y coordinate (direct DOM query)
+            let foundRow = null;
+            let foundRowNumber = 1;
+            const rows = board.querySelectorAll('.kanban-row');
+            if (rows.length > 0) {
+                for (const row of rows) {
+                    const rect = row.getBoundingClientRect();
+                    if (mouseY >= rect.top && mouseY <= rect.bottom) {
+                        foundRow = row;
+                        foundRowNumber = parseInt(row.dataset.rowNumber, 10) || 1;
+                        break;
+                    }
                 }
             } else {
-                // No cache available - skip this stack
-                continue;
-            }
-
-            // Check if mouse is horizontally within column bounds and vertically below last visible part
-            if (mouseX >= stackLeft &&
-                mouseX <= stackRight &&
-                mouseY > lastBottom) {
-                stack = stackCache.element;
-                break;
-            }
-        }
-
-        if (!stack || stack.classList.contains('column-drop-zone-stack')) {
-            return;
-        }
-
-        e.preventDefault();
-
-        // PERFORMANCE: Use cached stack structure
-        const stackCache2 = dragState.cachedStacks?.find(s => s.element === stack);
-        if (!stackCache2 || stackCache2.columns.length === 0) {return;}
-
-        const lastColumn = stackCache2.lastColumn;
-        let cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === lastColumn);
-
-        // Fallback: if lastColumn IS the dragged column, use its separate cache
-        if (!cachedCol && lastColumn === dragState.draggedColumn && dragState.draggedColumnCache) {
-            cachedCol = dragState.draggedColumnCache;
-        }
-
-        let lastBottom;
-        if (cachedCol) {
-            if (cachedCol.isFolded && cachedCol.columnTitleRect) {
-                // FOLDED MODE: Use cached column-title bottom
-                lastBottom = cachedCol.columnTitleRect.bottom;
-            }
-            else if (cachedCol.isSticky && cachedCol.isContentVisible && cachedCol.contentRect) {
-                // UNFOLDED STICKY MODE: Use cached content bottom
-                const viewportBottom = window.innerHeight;
-                lastBottom = Math.min(cachedCol.contentRect.bottom, viewportBottom);
-            }
-            else {
-                // NORMAL MODE: Use cached column bottom
-                lastBottom = cachedCol.rect.bottom;
-            }
-        } else {
-            // No cache - can't determine position, skip
-            return;
-        }
-
-        // Only handle vertical drops below the last column/title/content
-        if (mouseY > lastBottom) {
-            // PERFORMANCE: Just show indicator at end of stack, DON'T move column!
-            // (also sets templateDragState target position for template drags)
-            showInternalColumnDropIndicator(stack, null);
-        }
-        }); // End RAF callback
-    });
-
-    // Add dragover handlers specifically to drop zones - visual feedback only
-    document.addEventListener('dragover', (e) => {
-        // ONLY handle if the direct target is a drop zone (not a child element)
-        if (!e.target.classList.contains('column-drop-zone')) {
-            // Clear any previous drag-over states (both column and template styles)
-            document.querySelectorAll('.column-drop-zone.drag-over').forEach(dz => {
-                dz.classList.remove('drag-over');
-            });
-            document.querySelectorAll('.column-drop-zone.template-drag-over').forEach(dz => {
-                dz.classList.remove('template-drag-over');
-            });
-            dragState.pendingDropZone = null;
-            return;
-        }
-
-        // Check if this is a template drag
-        const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
-
-        // Only handle drop zones for column drags or template drags, not task drags
-        if (!dragState.draggedColumn && !isTemplateDrag) {
-            return;
-        }
-
-        const dropZone = e.target;
-        e.preventDefault();
-
-        // Clear previous highlights from other drop zones
-        document.querySelectorAll('.column-drop-zone.drag-over').forEach(dz => {
-            if (dz !== dropZone) {dz.classList.remove('drag-over');}
-        });
-        document.querySelectorAll('.column-drop-zone.template-drag-over').forEach(dz => {
-            if (dz !== dropZone) {dz.classList.remove('template-drag-over');}
-        });
-
-        // Use same visual style for both column and template drags
-        dropZone.classList.add('drag-over');
-
-        // For column drags, show indicator and store pending drop zone
-        if (dragState.draggedColumn) {
-            const dropZoneStack = dropZone.parentNode;
-            if (dropZoneStack && dropZoneStack.classList.contains('column-drop-zone-stack')) {
-                showInternalColumnDropIndicator(dropZoneStack, null);
-            }
-            dragState.pendingDropZone = dropZone;
-        }
-
-        // For template drags, just update the target position (no indicator for drop zones)
-        if (isTemplateDrag) {
-            // Determine target row and position
-            const row = dropZone.closest('.kanban-row');
-            if (row) {
-                templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
-            }
-
-            // Find the column before/after this drop zone
-            const stack = dropZone.closest('.kanban-column-stack');
-            if (stack) {
-                const prevStack = stack.previousElementSibling;
-                const nextStack = stack.nextElementSibling;
-
-                if (prevStack && prevStack.classList.contains('kanban-column-stack') && !prevStack.classList.contains('column-drop-zone-stack')) {
-                    const prevColumn = prevStack.querySelector('.kanban-full-height-column');
-                    if (prevColumn) {
-                        templateDragState.targetColumnId = prevColumn.dataset.columnId;
-                        templateDragState.targetPosition = 'after';
-                    }
-                } else if (nextStack && nextStack.classList.contains('kanban-column-stack') && !nextStack.classList.contains('column-drop-zone-stack')) {
-                    const nextColumn = nextStack.querySelector('.kanban-full-height-column');
-                    if (nextColumn) {
-                        templateDragState.targetColumnId = nextColumn.dataset.columnId;
-                        templateDragState.targetPosition = 'before';
-                    }
-                } else {
-                    // First or last position
-                    templateDragState.targetColumnId = null;
-                    templateDragState.targetPosition = dropZone.classList.contains('column-drop-zone-before') ? 'first' : 'last';
+                // Single row layout - use board as the row
+                const boardRect = board.getBoundingClientRect();
+                if (mouseY >= boardRect.top && mouseY <= boardRect.bottom) {
+                    foundRow = board;
                 }
             }
-        }
+            if (!foundRow) {return;}
+
+            // STEP 2: Within that ROW, find STACK by X coordinate (direct DOM query)
+            let foundStack = null;
+            let isDropZoneStack = false;
+            const stacks = foundRow.querySelectorAll(':scope > .kanban-column-stack');
+            for (const stack of stacks) {
+                const stackRect = stack.getBoundingClientRect();
+                if (mouseX >= stackRect.left && mouseX <= stackRect.right) {
+                    foundStack = stack;
+                    isDropZoneStack = stack.classList.contains('column-drop-zone-stack');
+                    break;
+                }
+            }
+
+            // Handle drop zone stacks (vertical dividers between stacks) - only for column/template drags
+            // Task/clipboard/emptycard drags skip drop zones - they go INTO columns
+            if (foundStack && isDropZoneStack && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {
+                const dropZone = foundStack.querySelector('.column-drop-zone');
+                if (dropZone) {
+                    dropZone.classList.add('drag-over');
+                    dragState.pendingDropZone = dropZone;
+
+                    // For template drags, set target position
+                    if (stillTemplateDrag) {
+                        templateDragState.targetRow = foundRowNumber;
+                        const prevStack = foundStack.previousElementSibling;
+                        const nextStack = foundStack.nextElementSibling;
+                        if (prevStack && prevStack.classList.contains('kanban-column-stack') && !prevStack.classList.contains('column-drop-zone-stack')) {
+                            const prevColumn = prevStack.querySelector('.kanban-full-height-column');
+                            if (prevColumn) {
+                                templateDragState.targetColumnId = prevColumn.dataset.columnId;
+                                templateDragState.targetPosition = 'after';
+                            }
+                        } else if (nextStack && nextStack.classList.contains('kanban-column-stack') && !nextStack.classList.contains('column-drop-zone-stack')) {
+                            const nextColumn = nextStack.querySelector('.kanban-full-height-column');
+                            if (nextColumn) {
+                                templateDragState.targetColumnId = nextColumn.dataset.columnId;
+                                templateDragState.targetPosition = 'before';
+                            }
+                        } else {
+                            templateDragState.targetColumnId = null;
+                            templateDragState.targetPosition = 'first';
+                        }
+                    }
+                }
+                showInternalColumnDropIndicator(foundStack, null);
+                return;
+            }
+
+            if (!foundStack) {return;}
+            dragState.pendingDropZone = null;
+
+            // STEP 3: Within that STACK, find COLUMN by midpoint (header.top + footer.bottom) / 2
+            const columns = foundStack.querySelectorAll(':scope > .kanban-full-height-column');
+            if (columns.length === 0) {return;}
+
+            // For TASK/CLIPBOARD/EMPTYCARD drags: find which column we're over, then find task position within it
+            if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
+                // Find column by X coordinate (these drags go into columns, not between them)
+                let targetColumn = null;
+                for (const col of columns) {
+                    const colRect = col.getBoundingClientRect();
+                    if (mouseX >= colRect.left && mouseX <= colRect.right) {
+                        targetColumn = col;
+                        break;
+                    }
+                }
+
+                if (!targetColumn) {return;}
+
+                // Add drag-source class to dim the task (only for actual task drags)
+                if (stillTaskDrag && dragState.draggedTask && !dragState.draggedTask.classList.contains('drag-source')) {
+                    dragState.draggedTask.classList.add('drag-source');
+                }
+
+                // STEP 4: Within that COLUMN, find TASK position by task midpoint
+                const tasksContainer = targetColumn.querySelector('.tasks-container');
+                if (!tasksContainer) {return;}
+
+                const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+                let afterElement = null;
+
+                for (const task of tasks) {
+                    // Skip the dragged task (only for actual task drags)
+                    if (stillTaskDrag && task === dragState.draggedTask) {continue;}
+
+                    const taskRect = task.getBoundingClientRect();
+                    // Task midpoint: (task.top + task.bottom) / 2
+                    const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
+
+                    if (mouseY < taskMidpoint) {
+                        // Drop BEFORE this task
+                        afterElement = task;
+                        break;
+                    }
+                }
+
+                // If no task found, afterElement stays null (drop at end)
+                // Show the drop indicator
+                showInternalTaskDropIndicator(tasksContainer, afterElement);
+                return;
+            }
+
+            // For COLUMN/TEMPLATE drags: find position between columns
+            let beforeColumn = null;
+            let highlightMargin = null;
+
+            for (const col of columns) {
+                // Skip the dragged column
+                if (col === dragState.draggedColumn) {continue;}
+
+                // Get header (column-title) top
+                const columnTitle = col.querySelector('.column-title');
+                const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
+
+                // Get footer bottom (column-footer bottom, or column bottom if no footer)
+                const columnFooter = col.querySelector('.column-footer');
+                const footerBottom = columnFooter ? columnFooter.getBoundingClientRect().bottom : col.getBoundingClientRect().bottom;
+
+                // Calculate midpoint: (header.top + footer.bottom) / 2
+                const midpoint = (headerTop + footerBottom) / 2;
+
+                if (mouseY < midpoint) {
+                    // Drop BEFORE this column
+                    beforeColumn = col;
+                    // Highlight top margin of this column
+                    highlightMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
+                    break;
+                }
+            }
+
+            // If no column found (mouse is below all columns), drop at end of stack
+            if (!beforeColumn) {
+                // Find last non-dragged column
+                let lastCol = null;
+                for (const col of columns) {
+                    if (col !== dragState.draggedColumn) {
+                        lastCol = col;
+                    }
+                }
+                if (lastCol) {
+                    // Highlight bottom margin or stack-bottom-drop-zone
+                    highlightMargin = lastCol.querySelector('.column-margin-bottom') || foundStack.querySelector('.stack-bottom-drop-zone');
+                }
+            }
+
+            // Highlight the appropriate margin element
+            if (highlightMargin) {
+                highlightMargin.classList.add('drag-over');
+            }
+
+            // Show the drop indicator and update state
+            showInternalColumnDropIndicator(foundStack, beforeColumn);
+
+            // For template drags, update target info
+            if (stillTemplateDrag) {
+                templateDragState.targetRow = foundRowNumber;
+                if (beforeColumn) {
+                    templateDragState.targetColumnId = beforeColumn.dataset?.columnId || null;
+                    templateDragState.targetPosition = 'before';
+                } else {
+                    // Find last column for "after" position
+                    let lastCol = null;
+                    for (const col of columns) {
+                        if (col !== dragState.draggedColumn) {
+                            lastCol = col;
+                        }
+                    }
+                    if (lastCol) {
+                        templateDragState.targetColumnId = lastCol.dataset?.columnId || null;
+                        templateDragState.targetPosition = 'after';
+                    }
+                }
+            }
+        }); // End RAF callback
     });
 
     // NOTE: Drop zone cleanup dragend handler removed - now handled by unified global dragend handler (cleanupDragVisuals)
@@ -4287,6 +4150,7 @@ function cacheColumnPositionsForTemplateDrag() {
 function clearTemplateDragCache() {
     dragState.cachedColumnPositions = null;
     dragState.cachedStacks = null;
+    dragState.cachedRows = null;
 }
 
 /**
