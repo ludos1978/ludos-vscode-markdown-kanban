@@ -3430,6 +3430,12 @@ function setupColumnDragAndDrop() {
                     // Cache column title (used when sticky)
                     const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
 
+                    // CRITICAL: Cache header.top and footer.bottom for midpoint calculation
+                    const header = col.querySelector('.column-header');
+                    const footer = col.querySelector('.column-footer');
+                    const headerRect = header ? header.getBoundingClientRect() : null;
+                    const footerRect = footer ? footer.getBoundingClientRect() : null;
+
                     // CRITICAL: Check if column-content is visible in viewport (determines folded state)
                     const columnContent = col.querySelector('.column-content');
                     const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
@@ -3449,10 +3455,13 @@ function setupColumnDragAndDrop() {
                         isSticky: isSticky,
                         isFolded: isFolded,
                         isContentVisible: isContentVisible,
-                        contentRect: contentRect,  // Cache content rect
+                        contentRect: contentRect,
                         topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
                         bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
-                        columnTitleRect: columnTitleRect
+                        columnTitleRect: columnTitleRect,
+                        // For midpoint: (header.top + footer.bottom) / 2
+                        headerTop: headerRect ? headerRect.top : null,
+                        footerBottom: footerRect ? footerRect.bottom : null
                     };
                 });
 
@@ -3495,6 +3504,10 @@ function setupColumnDragAndDrop() {
                         const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
                         const bottomMargin = col.querySelector('.column-margin-bottom');
                         const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
+                        const header = col.querySelector('.column-header');
+                        const footer = col.querySelector('.column-footer');
+                        const headerRect = header ? header.getBoundingClientRect() : null;
+                        const footerRect = footer ? footer.getBoundingClientRect() : null;
                         const columnContent = col.querySelector('.column-content');
                         const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
                         const viewportHeight = window.innerHeight;
@@ -3511,7 +3524,9 @@ function setupColumnDragAndDrop() {
                             contentRect: contentRect,
                             topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
                             bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
-                            columnTitleRect: columnTitleRect
+                            columnTitleRect: columnTitleRect,
+                            headerTop: headerRect ? headerRect.top : null,
+                            footerBottom: footerRect ? footerRect.bottom : null
                         };
                     });
             };
@@ -3637,19 +3652,22 @@ function setupColumnDragAndDrop() {
                 return;
             }
 
-            // Calculate column midpoint using: (header.top + footer.bottom) / 2
-            const header = column.querySelector('.column-header');
-            const footer = column.querySelector('.column-footer');
+            // PERFORMANCE: Use cached header.top + footer.bottom for midpoint
+            const cachedCol = dragState.cachedColumnPositions?.find(pos => pos.element === column);
 
             let midpoint;
-            if (header && footer) {
-                const headerRect = header.getBoundingClientRect();
-                const footerRect = footer.getBoundingClientRect();
-                midpoint = (headerRect.top + footerRect.bottom) / 2;
+            if (cachedCol && cachedCol.headerTop !== undefined && cachedCol.footerBottom !== undefined) {
+                midpoint = (cachedCol.headerTop + cachedCol.footerBottom) / 2;
             } else {
-                // Fallback: use column bounds
-                const rect = column.getBoundingClientRect();
-                midpoint = rect.top + rect.height / 2;
+                // Fallback: live query (only if cache missing)
+                const header = column.querySelector('.column-header');
+                const footer = column.querySelector('.column-footer');
+                if (header && footer) {
+                    midpoint = (header.getBoundingClientRect().top + footer.getBoundingClientRect().bottom) / 2;
+                } else {
+                    const rect = column.getBoundingClientRect();
+                    midpoint = rect.top + rect.height / 2;
+                }
             }
 
             // Determine drop position based on mouse Y vs midpoint
