@@ -837,11 +837,6 @@ window.handleEmptyColumnDragStart = function(e) {
         window.templateDragState.targetColumnId = null;
     }
 
-    // Cache column positions for drag (same as template drags)
-    if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
-        window.cacheColumnPositionsForTemplateDrag();
-    }
-
     // Set drag data
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('text/plain', 'empty-column');
@@ -995,11 +990,6 @@ window.handleEmptyColumnDragEnd = function(e) {
         window.templateDragState.targetColumnId = null;
     }
 
-    // Clear cached column positions
-    if (typeof window.clearTemplateDragCache === 'function') {
-        window.clearTemplateDragCache();
-    }
-
     // Hide any internal drop indicator
     const indicator = document.querySelector('.internal-drop-indicator');
     if (indicator) {
@@ -1023,11 +1013,6 @@ window.handleTemplateMenuDragStart = function(e) {
         window.templateDragState.templatePath = templatePath;
         window.templateDragState.templateName = templateName;
         window.templateDragState.isEmptyColumn = false;
-    }
-
-    // Cache column positions for template drag
-    if (typeof window.cacheColumnPositionsForTemplateDrag === 'function') {
-        window.cacheColumnPositionsForTemplateDrag();
     }
 
     // Set drag data
@@ -1098,11 +1083,6 @@ window.handleTemplateMenuDragEnd = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
-    }
-
-    // Clear cached column positions
-    if (typeof window.clearTemplateDragCache === 'function') {
-        window.clearTemplateDragCache();
     }
 
     // Hide any internal drop indicator

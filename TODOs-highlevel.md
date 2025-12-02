@@ -5,16 +5,13 @@ the row is split up into areas by the:
 
 the vertical dividers between stacks are the:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack column-drop-zone-stack
-when on top of one of those, drop it into the new stack
+when on top of one of those, drop the column into the new stack. do not add a #stack tag to it. depending on the row add a row tag.
 
 if within a:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack
 we should check the columns for the right position
 
-for the column drop position we need to use:
-  ( kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-margin )
-
-the middle of a column is defined by:
+for the column drop position we need to use the middle of a column, which is defined by:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-header > the top of it
   +
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-footer > the bottom of it
@@ -22,7 +19,13 @@ the middle of a column is defined by:
 when above : the column should be placed above
 when below : we need to check the next one until we find one that it's above
 if there are none left, it's the last one.
-if it's a column we have decided for the column position here. a tasks position must be further calculated.
+to display the position place the marker in:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-margin
+if it's the last position display it at the top of:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > stack-bottom-drop-zone
+if it's a column we have decided for the column position here. a tasks position must be further calculated. if it's dropped as the first collumn in the stack dont add a stack tag, but add a stack tag to the column below. if it's placed anywhere else add a stack tag.
+
+if a vertically folded column is dropped into a stack it must converted to be horizontally folded. also if a column is dropped into a stack with a vertically folded column, it must be converted to horizontally folded.
 
 to find the position of a task:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item

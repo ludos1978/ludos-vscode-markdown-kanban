@@ -71,8 +71,6 @@
 
 * {
   box-sizing: border-box;
-  /* perspective: 1000000px;
-  transform-style: preserve-3d; */
 }
 
 
@@ -85,7 +83,8 @@ body {
   overflow: hidden; /* Prevent body scroll - container handles it */
   height: 100vh;
 
-  /* transform-style: preserve-3d; */
+  transform-style: preserve-3d;
+  perspective: 9999px;
 }
 
 /* File info bar - fixed at top */
@@ -2486,8 +2485,6 @@ button.file-bar-menu-item {
 
 /* All columns in grid */
 .kanban-column-stack .kanban-full-height-column {
-	/* transform-style: preserve-3d; */
-	perspective: 1000px;
   grid-row: 1;
   grid-column: 1;
   align-self: start;
@@ -2524,20 +2521,24 @@ button.file-bar-menu-item {
 }
 
 .kanban-column-stack .kanban-full-height-column .column-inner {
-	transform: translateZ(-0.08px) translate(0px,-2.0px);
+	/* transform: translateZ(-0.08px) translate(0px,-2.0px); */
+  transform: translateZ(-0.08px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  transform: translateZ(-0.11px) translate(0px,-2.0px);
+  /* transform: translateZ(-0.11px) translate(0px,-2.0px); */
+  transform: translateZ(-0.11px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-header{
-	transform: translateZ(-0.133px) translate(0px,-2.66px);
+	/* transform: translateZ(-0.133px) translate(0px,-2.66px); */
+  transform: translateZ(-0.133px)
 }
 
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	transform: translateZ(-0.133px) translate(0px,-4px);
+	/* transform: translateZ(-0.133px) translate(0px,-4px); */
+  transform: translateZ(-0.133px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
@@ -2668,7 +2669,8 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
-.stack-bottom-drop-zone.drag-over {
+.stack-bottom-drop-zone.drag-over,
+.column-margin.drag-over {
   background: var(--vscode-editor-selectionBackground);
   border: 2px dashed var(--vscode-editor-selectionForeground);
   border-radius: 4px;
