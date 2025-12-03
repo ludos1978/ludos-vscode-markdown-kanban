@@ -754,6 +754,20 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
             // Update image
             imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
 
+            // Decode the image to ensure dimensions are ready
+            const img = imageContainer.querySelector('img');
+            if (img) {
+                await img.decode().catch(() => {});
+            }
+
+            // Recalculate stack heights after page change (image dimensions may differ)
+            const stackElement = container.closest('.kanban-column-stack');
+            if (stackElement && typeof window.waitForStackImagesAndRecalculate === 'function') {
+                requestAnimationFrame(() => {
+                    window.waitForStackImagesAndRecalculate(stackElement);
+                });
+            }
+
             // Update state
             currentPage = pageNumber;
             container.setAttribute('data-current-page', currentPage);
@@ -801,6 +815,8 @@ async function processDiagramQueue() {
 
     // Track which stacks have diagrams inserted (to recalculate heights once per stack)
     const affectedStacks = new Set();
+    // Track decode promises for all inserted images
+    const decodePromises = [];
 
     while (pendingDiagramQueue.length > 0) {
         const item = pendingDiagramQueue.shift();
@@ -861,6 +877,15 @@ async function processDiagramQueue() {
             // Include data-original-src for alt-click to open in editor
             element.innerHTML = `<img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${item.filePath}" />`;
 
+            // Get the inserted image and queue its decode() promise
+            // decode() ensures the image is fully decoded before we measure heights
+            const insertedImg = element.querySelector('img');
+            if (insertedImg) {
+                decodePromises.push(insertedImg.decode().catch(() => {
+                    // Ignore decode errors - image might still render
+                }));
+            }
+
             // Track affected stack for batch recalculation
             const stackElement = element.closest('.kanban-column-stack');
             if (stackElement) {
@@ -878,17 +903,16 @@ async function processDiagramQueue() {
 
     diagramQueueProcessing = false;
 
-    // Recalculate heights ONCE per affected stack
-    // Uses existing batching system: waits for ALL images in stack to load, then recalculates
-    // Use requestAnimationFrame to ensure browser has rendered the images before recalculating
+    // Recalculate heights ONCE per affected stack after all images are decoded
+    // Wait for all decode() promises to ensure images have their final dimensions
     if (typeof window.waitForStackImagesAndRecalculate === 'function' && affectedStacks.size > 0) {
-        requestAnimationFrame(() => {
+        Promise.all(decodePromises).then(() => {
+            // Use RAF to ensure layout is complete after decode
             requestAnimationFrame(() => {
-                // Double RAF ensures images are fully decoded and rendered
                 affectedStacks.forEach(stack => {
                     window.waitForStackImagesAndRecalculate(stack);
                 });
-                console.log(`[Diagram] Triggered height recalculation for ${affectedStacks.size} stack(s)`);
+                console.log(`[Diagram] Triggered height recalculation for ${affectedStacks.size} stack(s) after ${decodePromises.length} image(s) decoded`);
             });
         });
     }
