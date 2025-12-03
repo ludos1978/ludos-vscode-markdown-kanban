@@ -3159,7 +3159,11 @@ window.addEventListener('message', event => {
             if (message.success) {
                 const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
                 const safePath = escapeFilePath(message.filePath);
-                const markdownLink = `[${message.originalFileName}](${safePath})`;
+                // Use image link syntax for diagram files (pdf, excalidraw, drawio)
+                const isDiagramFile = /\.(pdf|excalidraw|excalidraw\.json|excalidraw\.svg|drawio|dio)$/i.test(message.originalFileName);
+                const markdownLink = isDiagramFile
+                    ? `![${message.originalFileName}](${safePath})`
+                    : `[${message.originalFileName}](${safePath})`;
 
                 createNewTaskWithContent(
                     originalName,
@@ -3200,7 +3204,11 @@ window.addEventListener('message', event => {
             if (message.success) {
                 const originalName = message.originalFileName.replace(/\.[^/.]+$/, ''); // Remove extension
                 const safePath = escapeFilePath(message.filePath);
-                const markdownLink = `[${message.originalFileName}](${safePath})`;
+                // Use image link syntax for diagram files (pdf, excalidraw, drawio)
+                const isDiagramFile = /\.(pdf|excalidraw|excalidraw\.json|excalidraw\.svg|drawio|dio)$/i.test(message.originalFileName);
+                const markdownLink = isDiagramFile
+                    ? `![${message.originalFileName}](${safePath})`
+                    : `[${message.originalFileName}](${safePath})`;
 
                 createNewTaskWithContent(
                     originalName,

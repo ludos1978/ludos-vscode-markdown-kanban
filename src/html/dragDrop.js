@@ -134,7 +134,9 @@ function createExternalDropIndicator() {
 }
 
 function showExternalDropIndicator(column, clientY) {
-    if (DEBUG_DROP && currentExternalDropColumn !== column) {
+    // Remove highlight from previous column when switching to a different column
+    if (currentExternalDropColumn && currentExternalDropColumn !== column) {
+        currentExternalDropColumn.classList.remove('external-drag-over');
     }
     const indicator = createExternalDropIndicator();
     const tasksContainer = column.querySelector('.tasks-container');
@@ -2525,14 +2527,52 @@ function findDropPositionHierarchical(mouseX, mouseY, draggedTask = null) {
     }
     if (!foundStack) {return null;}
 
-    // STEP 3: Within STACK, find COLUMN by X coordinate
+    // STEP 3: Within STACK, find COLUMN
+    // In stacked mode, columns overlap in X (same grid cell) - use Y to find target
+    // In side-by-side mode (multiple columns horizontally), use X to find target
     let targetColumn = null;
-    const columns = foundStack.querySelectorAll(':scope > .kanban-full-height-column');
-    for (const col of columns) {
-        const colRect = col.getBoundingClientRect();
-        if (mouseX >= colRect.left && mouseX <= colRect.right) {
-            targetColumn = col;
-            break;
+    const columns = Array.from(foundStack.querySelectorAll(':scope > .kanban-full-height-column'));
+
+    if (columns.length === 0) {return null;}
+
+    // Check if columns are stacked (overlapping in X) by comparing first two columns
+    const isStackedLayout = columns.length > 1 && (() => {
+        const rect1 = columns[0].getBoundingClientRect();
+        const rect2 = columns[1].getBoundingClientRect();
+        // If X ranges overlap significantly, it's stacked mode
+        const overlap = Math.min(rect1.right, rect2.right) - Math.max(rect1.left, rect2.left);
+        return overlap > 50; // More than 50px overlap means stacked
+    })();
+
+    if (isStackedLayout) {
+        // STACKED MODE: Find column by Y coordinate using header positions
+        // Columns are stacked vertically, each header is at a cumulative Y offset
+        // Iterate from last (bottom) to first (top) to find the column whose header area contains mouseY
+        for (let i = columns.length - 1; i >= 0; i--) {
+            const col = columns[i];
+            const header = col.querySelector('.column-title') || col.querySelector('.column-header');
+            if (header) {
+                const headerRect = header.getBoundingClientRect();
+                // Check if mouseY is at or below this header's top
+                // The column "owns" the space from its header top to the next column's header top (or bottom of stack)
+                if (mouseY >= headerRect.top) {
+                    targetColumn = col;
+                    break;
+                }
+            }
+        }
+        // If no match found (mouseY above all headers), use first column
+        if (!targetColumn && columns.length > 0) {
+            targetColumn = columns[0];
+        }
+    } else {
+        // SIDE-BY-SIDE MODE: Find column by X coordinate
+        for (const col of columns) {
+            const colRect = col.getBoundingClientRect();
+            if (mouseX >= colRect.left && mouseX <= colRect.right) {
+                targetColumn = col;
+                break;
+            }
         }
     }
     if (!targetColumn) {return null;}
