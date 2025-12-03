@@ -516,13 +516,17 @@ export class KanbanFileService {
         // Update known file content
         this.updateKnownFileContent(markdown);
 
-        // Notify frontend that save is complete
+        // Notify frontend that save is complete (may fail if webview is disposed during close)
         const panelInstance = this.panel();
         if (panelInstance) {
-            panelInstance.webview.postMessage({
-                type: 'saveCompleted',
-                success: true
-            });
+            try {
+                panelInstance.webview.postMessage({
+                    type: 'saveCompleted',
+                    success: true
+                });
+            } catch (e) {
+                // Webview may be disposed during panel close - save already succeeded
+            }
         }
 
     }

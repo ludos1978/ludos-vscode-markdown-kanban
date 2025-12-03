@@ -3041,6 +3041,10 @@ function setupColumnResizeObserver() {
                 affectedStacks.forEach(stack => {
                     recalculateStackHeightsImmediate(stack);
                 });
+                // Update stack bottom drop zones after height recalculation
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
+                }
                 // Reset flag after a short delay to allow layout to settle
                 requestAnimationFrame(() => {
                     isRecalculatingHeights = false;
