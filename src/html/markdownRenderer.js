@@ -1548,7 +1548,7 @@ function renderMarkdown(text, includeContext) {
                 onerrorHandler = ` onerror="var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';"`;
             }
 
-            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image"${onerrorHandler} />`;
+            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" loading="lazy"${onerrorHandler} />`;
         };
         
         // Enhanced link renderer
