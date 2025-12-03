@@ -3354,13 +3354,18 @@ window.addEventListener('message', event => {
             if (window.cachedBoard && window.cachedBoard.columns) {
                 const column = window.cachedBoard.columns.find(c => c.id === message.columnId);
                 if (column) {
+                    // Support both formats: individual properties OR column object
+                    const colData = message.column || message;
+
                     // Update tasks and column metadata
-                    column.tasks = message.tasks || [];
+                    if (colData.tasks !== undefined) column.tasks = colData.tasks;
 
                     // Update column title and displayTitle from backend
                     // Backend is source of truth after processing
-                    column.title = message.columnTitle || column.title;
-                    column.displayTitle = message.displayTitle || column.displayTitle;
+                    if (colData.title !== undefined) column.title = colData.title;
+                    // Also support legacy columnTitle property
+                    if (message.columnTitle !== undefined) column.title = message.columnTitle;
+                    if (colData.displayTitle !== undefined) column.displayTitle = colData.displayTitle;
 
                     // Clear any pending changes - backend has authoritative data
                     // This prevents stale pending changes from overriding backend updates
@@ -3369,15 +3374,15 @@ window.addEventListener('message', event => {
                     }
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
-                    if (message.includeMode !== undefined) {
-                        column.includeMode = message.includeMode;
+                    if (colData.includeMode !== undefined) {
+                        column.includeMode = colData.includeMode;
                     }
-                    if (message.includeFiles !== undefined) {
-                        column.includeFiles = message.includeFiles;
+                    if (colData.includeFiles !== undefined) {
+                        column.includeFiles = colData.includeFiles;
                     }
                     // Update loading state for includes
-                    if (message.isLoadingContent !== undefined) {
-                        column.isLoadingContent = message.isLoadingContent;
+                    if (colData.isLoadingContent !== undefined) {
+                        column.isLoadingContent = colData.isLoadingContent;
                     }
 
                     // Check if user is currently editing
@@ -3462,25 +3467,29 @@ window.addEventListener('message', event => {
                 }
 
                 if (foundTask && foundColumn) {
+                    // Support both formats: individual properties OR task object
+                    const taskData = message.task || message;
 
                     // Update task metadata
                     // CRITICAL FIX: Use !== undefined checks instead of || operator
                     // Empty string "" is falsy and would fall back to old value with ||
-                    foundTask.description = message.description !== undefined ? message.description : '';
-                    foundTask.title = message.taskTitle !== undefined ? message.taskTitle : foundTask.title;
-                    foundTask.displayTitle = message.displayTitle !== undefined ? message.displayTitle : foundTask.displayTitle;
-                    foundTask.originalTitle = message.originalTitle !== undefined ? message.originalTitle : foundTask.originalTitle;
+                    if (taskData.description !== undefined) foundTask.description = taskData.description;
+                    if (taskData.title !== undefined) foundTask.title = taskData.title;
+                    // Also support legacy taskTitle property
+                    if (message.taskTitle !== undefined) foundTask.title = message.taskTitle;
+                    if (taskData.displayTitle !== undefined) foundTask.displayTitle = taskData.displayTitle;
+                    if (taskData.originalTitle !== undefined) foundTask.originalTitle = taskData.originalTitle;
 
                     // Only update includeMode if explicitly provided (preserve existing value otherwise)
-                    if (message.includeMode !== undefined) {
-                        foundTask.includeMode = message.includeMode;
+                    if (taskData.includeMode !== undefined) {
+                        foundTask.includeMode = taskData.includeMode;
                     }
-                    if (message.includeFiles !== undefined) {
-                        foundTask.includeFiles = message.includeFiles;
+                    if (taskData.includeFiles !== undefined) {
+                        foundTask.includeFiles = taskData.includeFiles;
                     }
                     // Update loading state for includes
-                    if (message.isLoadingContent !== undefined) {
-                        foundTask.isLoadingContent = message.isLoadingContent;
+                    if (taskData.isLoadingContent !== undefined) {
+                        foundTask.isLoadingContent = taskData.isLoadingContent;
                     }
 
 
@@ -7196,6 +7205,13 @@ function deleteStrikethroughFromTask(container, taskElement) {
     // Surgically remove the strikethrough pattern from original markdown
     const updatedMarkdownContent = removeStrikethroughFromMarkdown(originalMarkdown, textToRemove, strikethroughIndex);
 
+    // CACHE-FIRST: Update the cached board immediately so subsequent renders don't revert
+    if (isTitle) {
+        task.title = updatedMarkdownContent;
+        task.originalTitle = updatedMarkdownContent;
+    } else if (isDescription) {
+        task.description = updatedMarkdownContent;
+    }
 
     const message = {
         type: 'updateTaskFromStrikethroughDeletion',
@@ -7248,6 +7264,9 @@ function deleteStrikethroughFromColumn(container, columnTitleElement) {
     // Surgically remove the strikethrough pattern from original markdown
     const updatedMarkdownTitle = removeStrikethroughFromMarkdown(originalMarkdown, textToRemove, strikethroughIndex);
 
+    // CACHE-FIRST: Update the cached board immediately so subsequent renders don't revert
+    column.title = updatedMarkdownTitle;
+    column.originalTitle = updatedMarkdownTitle;
 
     // Send message to backend to update the column title
     const message = {

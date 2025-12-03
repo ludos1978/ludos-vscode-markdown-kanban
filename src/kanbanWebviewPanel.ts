@@ -627,6 +627,36 @@ export class KanbanWebviewPanel {
                 mainFile.updateFromBoard(board);
             }
 
+            // OPTIMIZATION: Send targeted update instead of full board redraw
+            if (taskId && columnId) {
+                // Find the updated task and send targeted update
+                const targetColumn = board.columns.find(col => col.id === columnId);
+                const targetTask = targetColumn?.tasks.find(task => task.id === taskId);
+                if (targetTask) {
+                    this._webviewBridge.sendBatched({
+                        type: 'updateTaskContent',
+                        taskId: taskId,
+                        columnId: columnId,
+                        task: targetTask,
+                        imageMappings: {}
+                    });
+                    return;
+                }
+            } else if (columnId && !taskId) {
+                // Find the updated column and send targeted update
+                const targetColumn = board.columns.find(col => col.id === columnId);
+                if (targetColumn) {
+                    this._webviewBridge.sendBatched({
+                        type: 'updateColumnContent',
+                        columnId: columnId,
+                        column: targetColumn,
+                        imageMappings: {}
+                    });
+                    return;
+                }
+            }
+
+            // Fallback to full board update if no specific target
             await this.sendBoardUpdate();
         }
     }

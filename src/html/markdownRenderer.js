@@ -1563,19 +1563,18 @@ function renderMarkdown(text, includeContext) {
             const originalSrcAttr = ` data-original-src="${escapeHtml(originalSrc)}"`;
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
 
+            // Skip onerror for data URLs (they don't fail to load)
+            const isDataUrl = displaySrc && displaySrc.startsWith('data:');
+
             // Add onerror handler to replace broken image with searchable placeholder
             // The placeholder includes data-original-src so Alt+click search still works
-            const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"');
-            const onerrorHandler = `onerror="
-                var placeholder = document.createElement('span');
-                placeholder.className = 'image-not-found';
-                placeholder.setAttribute('data-original-src', '${escapedOriginalSrc}');
-                placeholder.title = 'Image not found: ${escapedOriginalSrc}';
-                this.parentElement.insertBefore(placeholder, this);
-                this.style.display = 'none';
-            "`;
+            let onerrorHandler = '';
+            if (!isDataUrl) {
+                const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
+                onerrorHandler = ` onerror="var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';"`;
+            }
 
-            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" ${onerrorHandler} />`;
+            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image"${onerrorHandler} />`;
         };
         
         // Enhanced link renderer

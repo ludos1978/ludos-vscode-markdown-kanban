@@ -4092,10 +4092,12 @@ export class MessageHandler {
                 updateData.title = markdownContent;
             }
 
+            // OPTIMIZATION: Use sendUpdate: false to skip full board redraw
+            // Frontend already has the updated content, we just need to persist the change
             await this.performBoardAction(() =>
-                this._boardOperations.editTask(board, taskId, columnId, updateData)
+                this._boardOperations.editTask(board, taskId, columnId, updateData),
+                { sendUpdate: false }
             );
-
 
         } catch (error) {
             console.error('🗑️ Backend: Error updating task from strikethrough deletion:', error);
@@ -5038,7 +5040,12 @@ export class MessageHandler {
     private getDrawIOCacheDir(diagramPath: string, panel: any): string {
         // Determine which file the diagram belongs to (main kanban or include file)
         const diagramDir = path.dirname(diagramPath);
-        const kanbanPath = panel._documentPath;
+        // Get kanban path from fileManager (not panel._documentPath which doesn't exist)
+        const kanbanPath = this._fileManager.getFilePath() || this._fileManager.getDocument()?.uri.fsPath;
+        if (!kanbanPath) {
+            // Fallback: use diagram directory if no kanban path available
+            return path.join(diagramDir, 'drawio-cache');
+        }
         const kanbanDir = path.dirname(kanbanPath);
         const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
 
