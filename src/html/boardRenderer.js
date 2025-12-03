@@ -1950,10 +1950,10 @@ function renderBoard(options = null) {
                 });
             }
 
-            // Set up image loading watchers AFTER initial stack calculation
-            // This ensures we only recalculate for images that load after the initial render
-            if (typeof setupImageLoadingWatchers === 'function') {
-                setupImageLoadingWatchers();
+            // Set up column resize observer AFTER initial stack calculation
+            // This automatically recalculates heights when any column content changes (images, diagrams, etc.)
+            if (typeof setupColumnResizeObserver === 'function') {
+                setupColumnResizeObserver();
             }
 
             window.stackedColumnStylesTimeout = null;
@@ -1980,87 +1980,6 @@ function renderBoard(options = null) {
     // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
     // Recommendation: Remove entirely OR wait for user request before reimplementing
     // setupCompactViewHandler();
-}
-
-/**
- * Wait for ALL images in a stack to load, then recalculate stack heights ONCE.
- * This ensures final column positions are correct after all images have loaded.
- * Columns may overlap during loading, but will be correctly positioned after.
- *
- * @param {HTMLElement} stackElement - The stack element containing columns to watch
- */
-function waitForStackImagesAndRecalculate(stackElement) {
-    if (!stackElement) {
-        return;
-    }
-
-    const columns = stackElement.querySelectorAll('.kanban-full-height-column:not(.collapsed)');
-    if (columns.length === 0) {
-        return;
-    }
-
-    const allImages = [];
-    columns.forEach((col) => {
-        const images = col.querySelectorAll('img');
-        allImages.push(...Array.from(images));
-    });
-
-    if (allImages.length === 0) {
-        return;
-    }
-
-    const unloadedImages = allImages.filter(img => !img.complete);
-
-    if (unloadedImages.length === 0) {
-        if (typeof recalculateStackHeightsImmediate === 'function') {
-            recalculateStackHeightsImmediate(stackElement);
-        }
-        return;
-    }
-
-    const imagePromises = unloadedImages.map((img) => {
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                resolve('timeout');
-            }, 5000);
-
-            const cleanup = () => {
-                clearTimeout(timeout);
-                img.removeEventListener('load', onLoad);
-                img.removeEventListener('error', onError);
-            };
-
-            const onLoad = () => {
-                cleanup();
-                resolve('loaded');
-            };
-
-            const onError = () => {
-                cleanup();
-                resolve('error');
-            };
-
-            img.addEventListener('load', onLoad, { once: true });
-            img.addEventListener('error', onError, { once: true });
-        });
-    });
-
-    Promise.all(imagePromises).then(() => {
-        if (typeof recalculateStackHeightsImmediate === 'function') {
-            recalculateStackHeightsImmediate(stackElement);
-        }
-    });
-}
-
-/**
- * Set up image loading watchers for all stacks in the board.
- * Each stack waits for ALL its images to load, then recalculates once.
- */
-function setupImageLoadingWatchers() {
-    const allStacks = document.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
-    allStacks.forEach((stack) => {
-        waitForStackImagesAndRecalculate(stack);
-    });
 }
 
 function getFoldAllButtonState(columnId) {
@@ -3083,6 +3002,76 @@ function invalidateAllColumnHeightCache() {
 }
 window.invalidateAllColumnHeightCache = invalidateAllColumnHeightCache;
 
+// COLUMN RESIZE OBSERVER: Automatically recalculates stack heights when column content changes
+// This handles all dynamic content: images, diagrams, text changes, etc.
+let columnResizeObserver = null;
+let isRecalculatingHeights = false; // Prevent infinite loops
+
+function setupColumnResizeObserver() {
+    // Disconnect existing observer if any
+    if (columnResizeObserver) {
+        columnResizeObserver.disconnect();
+    }
+
+    columnResizeObserver = new ResizeObserver((entries) => {
+        // Skip if we're currently in a recalculation (prevents infinite loops)
+        if (isRecalculatingHeights) {
+            return;
+        }
+
+        const affectedStacks = new Set();
+
+        entries.forEach(entry => {
+            const column = entry.target.closest('.kanban-full-height-column');
+            const stack = entry.target.closest('.kanban-column-stack');
+            if (column && stack) {
+                // Invalidate cache for this column
+                const columnId = column.getAttribute('data-column-id');
+                if (columnId) {
+                    invalidateColumnHeightCache(columnId);
+                }
+                affectedStacks.add(stack);
+            }
+        });
+
+        // Batch recalculate affected stacks
+        if (affectedStacks.size > 0) {
+            requestAnimationFrame(() => {
+                isRecalculatingHeights = true;
+                affectedStacks.forEach(stack => {
+                    recalculateStackHeightsImmediate(stack);
+                });
+                // Reset flag after a short delay to allow layout to settle
+                requestAnimationFrame(() => {
+                    isRecalculatingHeights = false;
+                });
+            });
+        }
+    });
+
+    // Observe all existing column-inner elements
+    document.querySelectorAll('.column-inner').forEach(columnInner => {
+        columnResizeObserver.observe(columnInner);
+    });
+
+    console.log(`[ResizeObserver] Watching ${document.querySelectorAll('.column-inner').length} column(s) for size changes`);
+}
+
+// Observe a new column when it's added to the DOM
+function observeColumnForResize(columnElement) {
+    if (!columnResizeObserver) {
+        return;
+    }
+    const columnInner = columnElement.querySelector('.column-inner');
+    if (columnInner) {
+        columnResizeObserver.observe(columnInner);
+    }
+}
+window.observeColumnForResize = observeColumnForResize;
+
+// Export setup function
+window.setupColumnResizeObserver = setupColumnResizeObserver;
+
 function recalculateStackHeightsDebounced(stackElement = null) {
     // Store the stack element - if null is passed, it will recalculate all
     // If a specific stack is passed multiple times, we still only recalculate once
@@ -3414,7 +3403,6 @@ window.enforceFoldModesForStacks = enforceFoldModesForStacks;
 // Use debounced version by default for performance, but export immediate version too
 window.recalculateStackHeights = recalculateStackHeightsDebounced;
 window.recalculateStackHeightsImmediate = recalculateStackHeightsImmediate;
-window.waitForStackImagesAndRecalculate = waitForStackImagesAndRecalculate;
 
 /**
  * Setup scroll handler to keep all column headers visible at all times

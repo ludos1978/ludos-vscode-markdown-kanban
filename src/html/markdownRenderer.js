@@ -752,21 +752,8 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
             const { pngDataUrl } = result;
 
             // Update image
+            // Height recalculation is handled automatically by the column ResizeObserver
             imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
-
-            // Decode the image to ensure dimensions are ready
-            const img = imageContainer.querySelector('img');
-            if (img) {
-                await img.decode().catch(() => {});
-            }
-
-            // Recalculate stack heights after page change (image dimensions may differ)
-            const stackElement = container.closest('.kanban-column-stack');
-            if (stackElement && typeof window.waitForStackImagesAndRecalculate === 'function') {
-                requestAnimationFrame(() => {
-                    window.waitForStackImagesAndRecalculate(stackElement);
-                });
-            }
 
             // Update state
             currentPage = pageNumber;
@@ -805,6 +792,7 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
 
 /**
  * Process all pending diagram renders in the queue
+ * Height recalculation is handled automatically by the column ResizeObserver
  */
 async function processDiagramQueue() {
     if (diagramQueueProcessing || pendingDiagramQueue.length === 0) {
@@ -812,11 +800,6 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = true;
-
-    // Track which stacks have diagrams inserted (to recalculate heights once per stack)
-    const affectedStacks = new Set();
-    // Track decode promises for all inserted images
-    const decodePromises = [];
 
     while (pendingDiagramQueue.length > 0) {
         const item = pendingDiagramQueue.shift();
@@ -836,12 +819,6 @@ async function processDiagramQueue() {
 
                 // Create slideshow UI
                 await createPDFSlideshow(element, item.filePath, pageCount, fileMtime);
-
-                // Track affected stack for batch recalculation
-                const stackElement = element.closest('.kanban-column-stack');
-                if (stackElement) {
-                    affectedStacks.add(stackElement);
-                }
                 continue;
             }
 
@@ -875,22 +852,9 @@ async function processDiagramQueue() {
 
             // Replace placeholder with rendered image
             // Include data-original-src for alt-click to open in editor
+            // Height recalculation is handled automatically by the column ResizeObserver
             element.innerHTML = `<img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${item.filePath}" />`;
 
-            // Get the inserted image and queue its decode() promise
-            // decode() ensures the image is fully decoded before we measure heights
-            const insertedImg = element.querySelector('img');
-            if (insertedImg) {
-                decodePromises.push(insertedImg.decode().catch(() => {
-                    // Ignore decode errors - image might still render
-                }));
-            }
-
-            // Track affected stack for batch recalculation
-            const stackElement = element.closest('.kanban-column-stack');
-            if (stackElement) {
-                affectedStacks.add(stackElement);
-            }
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
             const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` : `${item.diagramType} diagram`;
@@ -902,20 +866,6 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = false;
-
-    // Recalculate heights ONCE per affected stack after all images are decoded
-    // Wait for all decode() promises to ensure images have their final dimensions
-    if (typeof window.waitForStackImagesAndRecalculate === 'function' && affectedStacks.size > 0) {
-        Promise.all(decodePromises).then(() => {
-            // Use RAF to ensure layout is complete after decode
-            requestAnimationFrame(() => {
-                affectedStacks.forEach(stack => {
-                    window.waitForStackImagesAndRecalculate(stack);
-                });
-                console.log(`[Diagram] Triggered height recalculation for ${affectedStacks.size} stack(s) after ${decodePromises.length} image(s) decoded`);
-            });
-        });
-    }
 }
 
 // Handle PlantUML render responses from backend
