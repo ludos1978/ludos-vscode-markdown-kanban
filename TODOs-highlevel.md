@@ -1,6 +1,10 @@
 - [ ] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
 
-- [x] first we need to figure out on what row we are (vertical), then which stack (horizontal), then in which column (vertical), if we are moving a task we also need to check within the column for the correct position (vertical). use the positions of the elements directly, do not chache anything!
+- [x] the drag & drop system is used by many components. dragging internally, draggin externally, for columns, for tasks. They can be dropped in different rows, stacks of columns and tasks into the columns themself. This system described its functionality. 
+
+The system does not use any caching!
+
+first we need to figure out on what row we are (vertical), then which stack (horizontal), then in which column (vertical), if we are moving a task we also need to check within the column for the correct position (vertical). use the positions of the elements directly, do not chache anything!
 
 the row is split up into areas by the:
   kanban-container > kanban-board multi-row > kanban-row
