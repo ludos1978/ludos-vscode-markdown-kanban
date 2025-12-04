@@ -28,27 +28,24 @@ export class PDFService {
             return this.isCliAvailable;
         }
 
-        // Try to find pdftoppm in common locations
-        const candidates = [
-            'pdftoppm',                           // In PATH
-            '/usr/local/bin/pdftoppm',           // Homebrew (Intel Mac)
-            '/opt/homebrew/bin/pdftoppm',        // Homebrew (Apple Silicon)
-            '/usr/bin/pdftoppm',                 // Linux
-        ];
+        // Check user-configured poppler path first
+        const config = vscode.workspace.getConfiguration('markdown-kanban');
+        const popplerPath = config.get<string>('popplerPath', '');
 
-        for (const cliName of candidates) {
-            if (await this.testCliCommand(cliName)) {
-                this.cliPath = cliName;
-                this.isCliAvailable = true;
-                console.log(`[PDFService] Found pdftoppm CLI: ${cliName}`);
-                this.availabilityChecked = true;
-                return true;
-            }
+        // Use configured path or fall back to PATH
+        const cliName = popplerPath ? path.join(popplerPath, 'pdftoppm') : 'pdftoppm';
+
+        if (await this.testCliCommand(cliName)) {
+            this.cliPath = cliName;
+            this.isCliAvailable = true;
+            console.log(`[PDFService] Found pdftoppm CLI: ${cliName}`);
+            this.availabilityChecked = true;
+            return true;
         }
 
         this.availabilityChecked = true;
         this.isCliAvailable = false;
-        console.warn('[PDFService] pdftoppm CLI not found');
+        console.warn('[PDFService] pdftoppm CLI not found. Configure markdown-kanban.popplerPath in settings.');
         return false;
     }
 
@@ -213,8 +210,18 @@ export class PDFService {
      */
     async getPageCount(filePath: string): Promise<number> {
         return new Promise((resolve, reject) => {
-            // Try to use pdfinfo to get page count
-            const pdfinfoPath = this.cliPath?.replace('pdftoppm', 'pdfinfo') || 'pdfinfo';
+            // Determine pdfinfo path - derive from cliPath or use config/PATH
+            let pdfinfoPath: string;
+
+            if (this.cliPath) {
+                // Derive from pdftoppm path
+                pdfinfoPath = this.cliPath.replace('pdftoppm', 'pdfinfo');
+            } else {
+                // Check user-configured poppler path or use PATH
+                const config = vscode.workspace.getConfiguration('markdown-kanban');
+                const popplerPath = config.get<string>('popplerPath', '');
+                pdfinfoPath = popplerPath ? path.join(popplerPath, 'pdfinfo') : 'pdfinfo';
+            }
 
             const child = spawn(pdfinfoPath, [filePath]);
 
