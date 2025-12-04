@@ -1,5 +1,7 @@
 - [ ] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
 
+- [ ] the drag & drop system can copy media into the media folder if the path to the file is not found. but when the media is very large this might crash the webview. in this case the user should be prompted for the action to take instead. check if the file is larger then 10mb and then ask the user to manually copy the file into the media folder or get a path to the file to paste!
+
 - [x] the drag & drop system is used by many components. dragging internally, draggin externally, for columns, for tasks. They can be dropped in different rows, stacks of columns and tasks into the columns themself. This system described its functionality. 
 
 The system does not use any caching!
