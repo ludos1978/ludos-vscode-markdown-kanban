@@ -40,9 +40,10 @@ if the column is dropped as the first column in the stack dont add a stack tag, 
 
 if we are dragging a tasks, then position must be further calculated using these two rules:
 - determine the current column by checking if we are hovering over the column-title. if this is the case we can directly put the task into at the end of the column.
-- then check if we are hovering over the "top of the column-margin" and the "bottom of the column-footer" . 
+- then check if we are hovering over the "top of the column-header" and the "bottom of the column-footer" . 
 only check it within the previously selected stack!
 all further calculations are only done on this column!
+when hovering over the footer or the header on a folded column, it must highlight the header and put the task as last position in the column.
 
 iteratively go over each task-item in the column and break once you found one that the task is hovered over: 
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
