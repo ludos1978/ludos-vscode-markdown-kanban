@@ -2777,6 +2777,10 @@ function applyStackedColumnStyles(columnId = null) {
 
     // Update only the target stack (or all if columnId is null)
     enforceFoldModesForStacks(targetStack);
+
+    // CRITICAL: Invalidate cache before recalculating
+    // (column heights have changed due to fold/unfold operation)
+    invalidateAllColumnHeightCache();
     recalculateStackHeightsImmediate(targetStack);
 
     // Update bottom drop zones after layout changes
@@ -3339,6 +3343,9 @@ function recalculateStackHeightsDebounced(stackElement = null) {
     }
 
     recalculateStackHeightsTimer = setTimeout(() => {
+        // CRITICAL: Invalidate cache right before recalculating
+        // (cache may have been repopulated by ResizeObserver during debounce delay)
+        invalidateAllColumnHeightCache();
         recalculateStackHeightsImmediate(pendingStackElement);
         recalculateStackHeightsTimer = null;
         pendingStackElement = null;
