@@ -1,21 +1,26 @@
 - [ ] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
 
-- [x] first we need to figure out on what row we are, then which stack, then in which column, if it's a task we are dragging we also need to check within the column. we have calculated all the positions already or we can read them from a few items.
+- [x] first we need to figure out on what row we are (vertical), then which stack (horizontal), then in which column (vertical), if we are moving a task we also need to check within the column for the correct position (vertical). use the positions of the elements directly, do not chache anything!
 
 the row is split up into areas by the:
   kanban-container > kanban-board multi-row > kanban-row
-only check within this row for any further checks!
+when we determined the row, only check within this row for any further checks!
 
 the vertical dividers between stacks are the:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack column-drop-zone-stack
-when on top of one of those, drop the column into the new stack. do not add a #stack tag to it. depending on the row add a row tag.
+when on top of one of those
+- drop the column into the new stack. do not add a #stack tag to it. depending on the row add a row tag. 
+- if a task is dropped here, we dont have a valid solution.
 
-if within a:
-  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack
-we should only check this columns for the right position
+if over a:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack (without column-drop-zone-stack)
+we should only check this stack for the right position
 
-only check within the found kanban-column-stack:
-for the column drop position we need to use the middle of a column, which is defined by:
+only check within the found kanban-column-stack!
+- columns are stacked when there is more then one kanban-full-height-column in a kanban-column-stack
+- if there is only one column in a kanban-column-stack it's a single column stack
+
+if we are dragging a column: we need to use the middle of a column, which is defined by:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-header > the top of it
   +
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-footer > the bottom of it
@@ -27,16 +32,27 @@ to display the position place the marker in:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-margin
 if it's the last position display it at the top of:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > stack-bottom-drop-zone
-if it's a column we have decided for the column position here. a tasks position must be further calculated. if it's dropped as the first collumn in the stack dont add a stack tag, but add a stack tag to the column below. if it's placed anywhere else add a stack tag.
+if it's a column we have determined for the column position here. 
 
 if a vertically folded column is dropped into a stack it must converted to be horizontally folded. also if a column is dropped into a stack with a vertically folded column, it must be converted to horizontally folded.
 
-only check within the found task for the kanban-full-height-column:
-to find the position of a task:
-  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
-take the mid of each : the task should be placed above if above the mid
-othervise check the next task-item, if there are none left, it's the last item.
+if the column is dropped as the first column in the stack dont add a stack tag, but add a stack tag to the column below. if the column is placed anywhere else in the stack then add a stack tag.
 
+if we are dragging a tasks, then position must be further calculated using these two rules:
+- determine the current column by checking if we are hovering over the column-title. if this is the case we can directly put the task into at the end of the column.
+- then check if we are hovering over the "top of the column-margin" and the "bottom of the column-footer" . 
+only check it within the previously selected stack!
+all further calculations are only done on this column!
+
+iteratively go over each task-item in the column and break once you found one that the task is hovered over: 
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
+if it's hovered above a gap, this is the position we want it to drop onto!
+
+the task must be placed above, if above the mid. it should be placed below, if below the mid.
+if no solution is found, drop it at the end of the column.
+
+((( the position of the task is calculated by:
+- if the task is dropped onto the column-title, column-header or column-footer, place it as the last task of the column! )))
 
 
 

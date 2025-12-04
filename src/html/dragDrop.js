@@ -460,6 +460,7 @@ function cleanupDropZoneHighlights() {
     document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
     document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
     document.querySelectorAll('.column-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
+    document.querySelectorAll('.column-title.task-drop-target').forEach(el => el.classList.remove('task-drop-target'));
 }
 
 /**
@@ -3318,6 +3319,18 @@ function setupColumnDragAndDrop() {
             // Clear previous highlights
             cleanupDropZoneHighlights();
 
+            // For task/clipboard/emptycard drags, clear drop target and hide indicator at start
+            // If no valid target is found, task returns to original position with no highlight
+            if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
+                dragState.dropTargetContainer = null;
+                dragState.dropTargetAfterElement = null;
+                // Hide the visual indicator - it will be shown again only if valid target found
+                if (internalDropIndicator) {
+                    internalDropIndicator.classList.remove('active');
+                    internalDropIndicator.style.display = 'none';
+                }
+            }
+
             // STEP 1: Find ROW by Y coordinate (direct DOM query)
             let foundRow = null;
             let foundRowNumber = 1;
@@ -3397,13 +3410,58 @@ function setupColumnDragAndDrop() {
 
             // For TASK/CLIPBOARD/EMPTYCARD drags: find which column we're over, then find task position within it
             if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
-                // Find column by X coordinate (these drags go into columns, not between them)
+                const columnsArray = Array.from(columns);
+
                 let targetColumn = null;
-                for (const col of columns) {
-                    const colRect = col.getBoundingClientRect();
-                    if (mouseX >= colRect.left && mouseX <= colRect.right) {
-                        targetColumn = col;
-                        break;
+                let dropAtEnd = false;
+
+                // RULE 1: Check if hovering over header area (margin, header, or title) → drop at end
+                for (const col of columnsArray) {
+                    const margin = col.querySelector('.column-margin');
+                    const header = col.querySelector('.column-header');
+                    const title = col.querySelector('.column-title');
+
+                    // Check margin
+                    if (margin) {
+                        const marginRect = margin.getBoundingClientRect();
+                        if (mouseY >= marginRect.top && mouseY <= marginRect.bottom) {
+                            targetColumn = col;
+                            dropAtEnd = true;
+                            break;
+                        }
+                    }
+                    // Check header
+                    if (header) {
+                        const headerRect = header.getBoundingClientRect();
+                        if (mouseY >= headerRect.top && mouseY <= headerRect.bottom) {
+                            targetColumn = col;
+                            dropAtEnd = true;
+                            break;
+                        }
+                    }
+                    // Check title
+                    if (title) {
+                        const titleRect = title.getBoundingClientRect();
+                        if (mouseY >= titleRect.top && mouseY <= titleRect.bottom) {
+                            targetColumn = col;
+                            dropAtEnd = true;
+                            break;
+                        }
+                    }
+                }
+
+                // RULE 2: Check if between column-margin.top and column-footer.bottom
+                if (!targetColumn) {
+                    for (const col of columnsArray) {
+                        const margin = col.querySelector('.column-margin');
+                        const footer = col.querySelector('.column-footer');
+                        const marginTop = margin ? margin.getBoundingClientRect().top : col.getBoundingClientRect().top;
+                        const footerBottom = footer ? footer.getBoundingClientRect().bottom : col.getBoundingClientRect().bottom;
+
+                        if (mouseY >= marginTop && mouseY <= footerBottom) {
+                            targetColumn = col;
+                            break;
+                        }
                     }
                 }
 
@@ -3414,10 +3472,26 @@ function setupColumnDragAndDrop() {
                     dragState.draggedTask.classList.add('drag-source');
                 }
 
-                // STEP 4: Within that COLUMN, find TASK position by task midpoint
+                // Get tasks container
                 const tasksContainer = targetColumn.querySelector('.tasks-container');
                 if (!tasksContainer) {return;}
 
+                // If over column-title, highlight column-header and drop at end
+                if (dropAtEnd) {
+                    // Hide line indicator
+                    hideInternalDropIndicator();
+                    // Highlight the column-title with a border
+                    const columnTitle = targetColumn.querySelector('.column-title');
+                    if (columnTitle) {
+                        columnTitle.classList.add('task-drop-target');
+                    }
+                    // Store drop target
+                    dragState.dropTargetContainer = tasksContainer;
+                    dragState.dropTargetAfterElement = null;
+                    return;
+                }
+
+                // Find TASK position by iterating and checking task midpoint
                 const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
                 let afterElement = null;
 
@@ -3426,18 +3500,16 @@ function setupColumnDragAndDrop() {
                     if (stillTaskDrag && task === dragState.draggedTask) {continue;}
 
                     const taskRect = task.getBoundingClientRect();
-                    // Task midpoint: (task.top + task.bottom) / 2
                     const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
 
                     if (mouseY < taskMidpoint) {
-                        // Drop BEFORE this task
+                        // Place ABOVE this task (before it)
                         afterElement = task;
                         break;
                     }
                 }
 
                 // If no task found, afterElement stays null (drop at end)
-                // Show the drop indicator
                 showInternalTaskDropIndicator(tasksContainer, afterElement);
                 return;
             }
@@ -3450,9 +3522,9 @@ function setupColumnDragAndDrop() {
                 // Skip the dragged column
                 if (col === dragState.draggedColumn) {continue;}
 
-                // Get header (column-title) top
-                const columnTitle = col.querySelector('.column-title');
-                const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
+                // Get header (column-header) top
+                const columnHeader = col.querySelector('.column-header');
+                const headerTop = columnHeader ? columnHeader.getBoundingClientRect().top : col.getBoundingClientRect().top;
 
                 // Get footer bottom (column-footer bottom, or column bottom if no footer)
                 const columnFooter = col.querySelector('.column-footer');
@@ -3472,17 +3544,8 @@ function setupColumnDragAndDrop() {
 
             // If no column found (mouse is below all columns), drop at end of stack
             if (!beforeColumn) {
-                // Find last non-dragged column
-                let lastCol = null;
-                for (const col of columns) {
-                    if (col !== dragState.draggedColumn) {
-                        lastCol = col;
-                    }
-                }
-                if (lastCol) {
-                    // Highlight bottom margin or stack-bottom-drop-zone
-                    highlightMargin = lastCol.querySelector('.column-margin-bottom') || foundStack.querySelector('.stack-bottom-drop-zone');
-                }
+                // Highlight stack-bottom-drop-zone for last position
+                highlightMargin = foundStack.querySelector('.stack-bottom-drop-zone');
             }
 
             // Highlight the appropriate margin element

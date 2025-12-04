@@ -2741,6 +2741,14 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border-radius: 4px;
 }
 
+/* Visual feedback when dropping task at end of column (hovering over column-title) */
+.kanban-full-height-column .column-title.task-drop-target {
+  background: var(--vscode-editor-selectionBackground) !important;
+  border: 2px dashed var(--vscode-editor-selectionForeground) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 8px var(--vscode-focusBorder) !important;
+}
+
 /* Visual separation - add padding to content of stacked columns
 .kanban-column-stack .kanban-full-height-column:nth-child(n+2) .column-inner {
   padding-top: var(--whitespace);
