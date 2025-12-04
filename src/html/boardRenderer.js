@@ -2990,7 +2990,11 @@ window.columnHeightCache = window.columnHeightCache || new Map();
 // Invalidate cache for a specific column (call when content changes)
 function invalidateColumnHeightCache(columnId) {
     if (window.columnHeightCache) {
+        const hadCache = window.columnHeightCache.has(columnId);
         window.columnHeightCache.delete(columnId);
+        if (hadCache) {
+            console.log(`[HeightCache] Invalidated cache for column: ${columnId}`);
+        }
     }
 }
 window.invalidateColumnHeightCache = invalidateColumnHeightCache;
@@ -3003,10 +3007,91 @@ function invalidateAllColumnHeightCache() {
 }
 window.invalidateAllColumnHeightCache = invalidateAllColumnHeightCache;
 
+// Debug: Force recalculation of all stack heights (call from console)
+window.debugForceRecalc = () => {
+    console.log('[Debug] Forcing recalculation...');
+    invalidateAllColumnHeightCache();
+    document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+        recalculateStackHeightsImmediate(stack);
+    });
+    console.log('[Debug] Done.');
+};
+
 // COLUMN RESIZE OBSERVER: Automatically recalculates stack heights when column content changes
 // This handles all dynamic content: images, diagrams, text changes, etc.
 let columnResizeObserver = null;
+let columnMutationObserver = null; // Detects DOM changes (innerHTML) that ResizeObserver misses
 let isRecalculatingHeights = false; // Prevent infinite loops
+let pendingRecalcNeeded = false; // Track if recalc was requested during processing
+let heightPollingInterval = null; // Polling interval for delayed content rendering
+let heightPollingEndTime = 0; // When to stop polling
+
+// Baseline heights before DOM changes - used to detect if recalculation is needed
+let baselineHeights = new Map();
+
+// Update baseline heights (call this periodically when heights are stable)
+function updateBaselineHeights() {
+    baselineHeights.clear();
+    document.querySelectorAll('.kanban-full-height-column').forEach(col => {
+        const content = col.querySelector('.column-content');
+        if (content) {
+            baselineHeights.set(col.getAttribute('data-column-id'), content.scrollHeight);
+        }
+    });
+}
+
+// Poll for height changes after content modifications
+// This catches delayed rendering (images, fonts, iframes, etc.)
+function startHeightPolling() {
+    const POLLING_DURATION = 2000; // Poll for 2 seconds
+    const POLLING_INTERVAL = 100; // Check every 100ms (faster polling)
+
+    // Extend polling time if already polling
+    heightPollingEndTime = Date.now() + POLLING_DURATION;
+
+    // Don't start a new interval if one is already running
+    if (heightPollingInterval) {
+        return;
+    }
+
+    console.log('[HeightPolling] Started polling for height changes');
+
+    heightPollingInterval = setInterval(() => {
+        // Check if we should stop polling
+        if (Date.now() > heightPollingEndTime) {
+            console.log('[HeightPolling] Stopped polling, updating baseline');
+            clearInterval(heightPollingInterval);
+            heightPollingInterval = null;
+            updateBaselineHeights(); // Store stable heights for next comparison
+            return;
+        }
+
+        // Check if any heights differ from baseline (before DOM change)
+        let heightChanged = false;
+        document.querySelectorAll('.kanban-full-height-column').forEach(col => {
+            const content = col.querySelector('.column-content');
+            if (content) {
+                const colId = col.getAttribute('data-column-id');
+                const currentHeight = content.scrollHeight;
+                const baselineHeight = baselineHeights.get(colId);
+                if (baselineHeight !== undefined && currentHeight !== baselineHeight) {
+                    console.log(`[HeightPolling] Height differs from baseline for ${colId}: ${baselineHeight} -> ${currentHeight}`);
+                    heightChanged = true;
+                }
+            }
+        });
+
+        // If any height differs from baseline, recalculate and update baseline
+        if (heightChanged) {
+            console.log('[HeightPolling] Triggering recalculation');
+            invalidateAllColumnHeightCache();
+            document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+                recalculateStackHeightsDebounced(stack);
+            });
+            updateBaselineHeights(); // Update baseline after recalculation
+        }
+    }, POLLING_INTERVAL);
+}
 
 function setupColumnResizeObserver() {
     // Disconnect existing observer if any
@@ -3015,8 +3100,15 @@ function setupColumnResizeObserver() {
     }
 
     columnResizeObserver = new ResizeObserver((entries) => {
-        // Skip if we're currently in a recalculation (prevents infinite loops)
+        console.log(`[ResizeObserver] Callback fired with ${entries.length} entries`);
+
+        // If we're currently recalculating, just mark that another recalc is needed
+        // (don't discard the event - schedule follow-up recalculation)
         if (isRecalculatingHeights) {
+            console.log('[ResizeObserver] Queued - recalculation in progress');
+            pendingRecalcNeeded = true;
+            // Invalidate all caches since we don't know which columns changed
+            invalidateAllColumnHeightCache();
             return;
         }
 
@@ -3024,14 +3116,37 @@ function setupColumnResizeObserver() {
 
         entries.forEach(entry => {
             const column = entry.target.closest('.kanban-full-height-column');
-            const stack = entry.target.closest('.kanban-column-stack');
+            let stack = entry.target.closest('.kanban-column-stack');
+            const columnId = column?.getAttribute('data-column-id');
+
+            // If stack not found via closest, try finding it via column's parent
+            // (handles cases where DOM is being modified during diagram rendering)
+            if (column && !stack) {
+                stack = column.parentElement?.closest('.kanban-column-stack');
+            }
+
+            console.log(`[ResizeObserver] Resize detected for column: ${columnId}, has stack: ${!!stack}`);
             if (column && stack) {
-                // Invalidate cache for this column
-                const columnId = column.getAttribute('data-column-id');
-                if (columnId) {
-                    invalidateColumnHeightCache(columnId);
-                }
                 affectedStacks.add(stack);
+
+                // Invalidate cache for this column and all columns AFTER it in the stack
+                // (columns above don't need recalculation, only those below are affected)
+                const allColumns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
+                const changedIndex = allColumns.indexOf(column);
+                console.log(`[ResizeObserver] Column index: ${changedIndex}, invalidating ${allColumns.length - changedIndex} columns`);
+                for (let i = changedIndex; i < allColumns.length; i++) {
+                    const colId = allColumns[i].getAttribute('data-column-id');
+                    if (colId) {
+                        invalidateColumnHeightCache(colId);
+                    }
+                }
+            } else if (column && !stack) {
+                // Column not in a stack (DOM being modified) - invalidate ALL caches
+                // and schedule a deferred recalculation for all stacks
+                console.log(`[ResizeObserver] Column ${columnId} not in stack, invalidating ALL caches`);
+                invalidateAllColumnHeightCache();
+                // Add all stacks for recalculation since we don't know which one
+                document.querySelectorAll('.kanban-column-stack').forEach(s => affectedStacks.add(s));
             }
         });
 
@@ -3039,6 +3154,7 @@ function setupColumnResizeObserver() {
         if (affectedStacks.size > 0) {
             requestAnimationFrame(() => {
                 isRecalculatingHeights = true;
+                pendingRecalcNeeded = false; // Reset before recalculation
                 affectedStacks.forEach(stack => {
                     recalculateStackHeightsImmediate(stack);
                 });
@@ -3046,30 +3162,156 @@ function setupColumnResizeObserver() {
                 if (typeof window.updateStackBottomDropZones === 'function') {
                     window.updateStackBottomDropZones();
                 }
-                // Reset flag after a short delay to allow layout to settle
+                // Reset flag and check if another recalc was requested during processing
                 requestAnimationFrame(() => {
                     isRecalculatingHeights = false;
+                    // If events came in while we were processing, do another full recalc
+                    if (pendingRecalcNeeded) {
+                        console.log('[ResizeObserver] Processing queued recalculation');
+                        pendingRecalcNeeded = false;
+                        // CRITICAL: Invalidate all caches again before recalculating
+                        // (the previous recalc may have refilled with stale values)
+                        invalidateAllColumnHeightCache();
+                        // Recalculate all stacks
+                        document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+                            recalculateStackHeightsImmediate(stack);
+                        });
+                        if (typeof window.updateStackBottomDropZones === 'function') {
+                            window.updateStackBottomDropZones();
+                        }
+                    }
                 });
             });
         }
     });
 
-    // Observe all existing column-inner elements
-    document.querySelectorAll('.column-inner').forEach(columnInner => {
-        columnResizeObserver.observe(columnInner);
+    // Observe all existing tasks-container elements
+    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
+        columnResizeObserver.observe(tasksContainer);
     });
 
-    console.log(`[ResizeObserver] Watching ${document.querySelectorAll('.column-inner').length} column(s) for size changes`);
+    // Also observe all task-item elements (resizes when content like diagrams change)
+    document.querySelectorAll('.task-item').forEach(taskItem => {
+        columnResizeObserver.observe(taskItem);
+    });
+
+    console.log(`[ResizeObserver] Watching ${document.querySelectorAll('.tasks-container').length} tasks-containers and ${document.querySelectorAll('.task-item').length} task-items`);
+
+    // MUTATION OBSERVER: Detects DOM changes (innerHTML) that ResizeObserver doesn't catch
+    // ResizeObserver only fires on size changes, but innerHTML changes don't always trigger it
+    if (columnMutationObserver) {
+        columnMutationObserver.disconnect();
+    }
+
+    columnMutationObserver = new MutationObserver((mutations) => {
+        // Check for structural changes OR class changes
+        const hasRelevantChanges = mutations.some(m => {
+            if (m.type === 'childList' && (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
+                return true;
+            }
+            // Class changes on task-item (task collapse) or column elements (column fold)
+            if (m.type === 'attributes' && m.attributeName === 'class') {
+                const target = m.target;
+                if (target.classList) {
+                    // Task collapse
+                    if (target.classList.contains('task-item')) {
+                        console.log(`[MutationObserver] Task class change: ${target.getAttribute('data-task-id')}`);
+                        return true;
+                    }
+                    // Column fold/unfold
+                    if (target.classList.contains('kanban-full-height-column')) {
+                        console.log(`[MutationObserver] Column class change: ${target.getAttribute('data-column-id')}, classes: ${target.className}`);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+
+        if (!hasRelevantChanges) {
+            return;
+        }
+
+        console.log(`[MutationObserver] Relevant change detected (${mutations.length} mutations, types: ${[...new Set(mutations.map(m => m.type))].join(', ')})`);
+
+        // If we're currently recalculating, just mark that another recalc is needed
+        if (isRecalculatingHeights) {
+            console.log('[MutationObserver] Queued - recalculation in progress');
+            pendingRecalcNeeded = true;
+            invalidateAllColumnHeightCache();
+            return;
+        }
+
+        // Recalculate immediately, then poll for height changes for 2 seconds
+        // This catches delayed rendering (images, fonts, iframes, etc.)
+        invalidateAllColumnHeightCache();
+        document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+            recalculateStackHeightsDebounced(stack);
+        });
+
+        // Start polling for height changes - content might still be loading
+        startHeightPolling();
+    });
+
+    // Observe all tasks-container elements for DOM changes AND class changes
+    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
+        columnMutationObserver.observe(tasksContainer, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'] // Only watch class changes (for task collapse)
+        });
+    });
+
+    // Also observe column elements for fold/unfold class changes
+    const columns = document.querySelectorAll('.kanban-full-height-column');
+    columns.forEach((column, index) => {
+        const columnId = column.getAttribute('data-column-id');
+        console.log(`[MutationObserver] Observing column ${index}: ${columnId}`);
+        columnMutationObserver.observe(column, {
+            attributes: true,
+            attributeFilter: ['class'] // Watch for collapsed-vertical/collapsed-horizontal
+        });
+    });
+
+    console.log(`[MutationObserver] Watching ${document.querySelectorAll('.tasks-container').length} tasks-containers and ${columns.length} columns for changes`);
+
+    // Initialize baseline heights for polling comparison
+    updateBaselineHeights();
+    console.log(`[HeightPolling] Initialized baseline heights for ${baselineHeights.size} columns`);
 }
 
 // Observe a new column when it's added to the DOM
 function observeColumnForResize(columnElement) {
-    if (!columnResizeObserver) {
-        return;
+    const tasksContainer = columnElement.querySelector('.tasks-container');
+
+    // Add to ResizeObserver
+    if (columnResizeObserver) {
+        if (tasksContainer) {
+            columnResizeObserver.observe(tasksContainer);
+        }
+        // Also observe all task-item elements in this column
+        columnElement.querySelectorAll('.task-item').forEach(taskItem => {
+            columnResizeObserver.observe(taskItem);
+        });
     }
-    const columnInner = columnElement.querySelector('.column-inner');
-    if (columnInner) {
-        columnResizeObserver.observe(columnInner);
+
+    // Add to MutationObserver
+    if (columnMutationObserver) {
+        // Observe tasks container for content changes
+        if (tasksContainer) {
+            columnMutationObserver.observe(tasksContainer, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+        // Observe column element for fold/unfold class changes
+        columnMutationObserver.observe(columnElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
     }
 }
 window.observeColumnForResize = observeColumnForResize;
@@ -3151,18 +3393,25 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     contentHeight = cachedHeights.contentHeight;
                     marginHeight = cachedHeights.marginHeight;
                     footerBarsHeight = cachedHeights.footerBarsHeight;
+                    console.log(`[HeightCalc] Using CACHED height for ${columnId}: contentHeight=${contentHeight}`);
                 } else {
                     // Measure heights (expensive - offsetHeight reads cause reflows)
                     columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
                     headerHeight = header ? header.offsetHeight : 0;
                     footerHeight = footer ? footer.offsetHeight : 0;
-                    contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (content ? content.scrollHeight : 0);
+                    // Measure the actual content height - use column-content for more accurate measurement
+                    // .column-inner has flex:1 which can affect scrollHeight
+                    const columnContent = col.querySelector('.column-content');
+                    const tasksContainer = col.querySelector('.tasks-container');
+                    contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
 
                     const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
                     footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
 
                     const columnMargin = col.querySelector('.column-margin');
                     marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
+
+                    console.log(`[HeightCalc] MEASURED for ${columnId}: columnContent.scrollHeight=${columnContent?.scrollHeight}, tasksContainer.scrollHeight=${tasksContainer?.scrollHeight}, columnInner.scrollHeight=${content?.scrollHeight}`);
 
                     // Cache the measured heights for expanded columns only
                     if (!isVerticallyFolded && !isHorizontallyFolded && columnId) {
@@ -3298,6 +3547,10 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                 cumulativePadding += pos.totalHeight + pos.marginHeight;
             });
 
+            // Log calculated paddings for debugging
+            const stackId = stack.getAttribute('data-stack-id') || 'unknown';
+            console.log(`[StackCalc] Stack ${stackId}: ${positions.map((p, i) => `col[${i}]=padding:${p.contentPadding},total:${p.totalHeight}`).join(', ')}`);
+
             // OPTIMIZATION: Batch all DOM writes in requestAnimationFrame to prevent visual flicker
             // This ensures all style changes happen in a single rendering frame
             requestAnimationFrame(() => {
@@ -3388,6 +3641,10 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                 const columnOffset = col.querySelector('.column-offset');
                 if (columnOffset) {
                     columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
+                    if (contentPadding > 0) {
+                        const colId = col.getAttribute('data-column-id');
+                        console.log(`[ContentPadding] Applied ${contentPadding}px to column ${colId}`);
+                    }
                 }
                 });
 

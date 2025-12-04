@@ -868,6 +868,7 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = false;
+    // Height recalculation is handled automatically by the MutationObserver in boardRenderer.js
 }
 
 // Handle PlantUML render responses from backend
