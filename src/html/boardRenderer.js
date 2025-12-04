@@ -1733,10 +1733,11 @@ function renderBoard(options = null) {
             const columns = stack.querySelectorAll('.kanban-full-height-column');
             if (columns.length === 0) {
                 stack.remove();
-            } else {
-                // Add margin after last column in stack (for drop target)
-                addMarginAfterLastColumn(stack, columns);
-            }
+            } 
+            // else {
+            //     // Add margin after last column in stack (for drop target)
+            //     addMarginAfterLastColumn(stack, columns);
+            // }
         });
 
         // 2. Get all remaining children (stacks and single columns)

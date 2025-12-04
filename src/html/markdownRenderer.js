@@ -773,14 +773,16 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
         }
     };
 
-    // Event listeners for navigation
-    prevBtn.addEventListener('click', () => {
+    // Event listeners for navigation (stopPropagation prevents opening editor)
+    prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (currentPage > 1) {
             loadPage(currentPage - 1);
         }
     });
 
-    nextBtn.addEventListener('click', () => {
+    nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (currentPage < pageCount) {
             loadPage(currentPage + 1);
         }

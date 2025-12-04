@@ -1000,8 +1000,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   flex-direction: column;
   /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
 	/* border-radius: 0px 0px 4px 4px; */
   overflow-x: visible;
@@ -1015,8 +1013,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 	position: sticky;
 	/* top: 28px; */
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	/* border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border)); */
 	border-radius: 0px 0px 4px 4px;
 }
 
@@ -1082,9 +1080,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   z-index: 11;
 	padding-bottom: var(--whitespace-div4);
 	position: sticky;
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-radius: 4px 4px 0px 0px;
   background-color: var(--column-background);
 }
@@ -1099,8 +1094,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   z-index: 10;
   background-color: var(--column-background);
   /* Keep your original left and right borders */
-  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
   border-top: none;
   border-bottom: none;
   margin-bottom: 0;
@@ -1139,8 +1132,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   flex-direction: column;
   /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
 	/* border-radius: 0px 0px 4px 4px; */
   overflow-x: visible;
@@ -1156,9 +1147,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   height: 4px;
 	/* top: 28px; */
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-radius: 0px 0px 4px 4px;
 }
 
@@ -2703,6 +2691,46 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   background: transparent;
   transition: min-width 0.15s ease 0.1s, background 0.2s ease, width 0.15s ease 0.1s;
 }
+
+/* BEGIN style with only lines not with borders */
+.column-drop-zone {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 2px 100%;
+}
+
+.kanban-column-stack .kanban-full-height-column .column-margin {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 100% 2px;
+}
+
+.stack-bottom-drop-zone {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat 0 4px / 100% 2px;
+}
+/* END style with only lines not with borders */
+
+/* BEGIN style with borders */
+/* .column-header {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-title {
+  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-inner {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-footer {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
+} */
+/* END style with borders */
+
+
 
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
