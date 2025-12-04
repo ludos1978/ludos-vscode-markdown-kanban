@@ -77,15 +77,6 @@ function moveTaskInDOM(taskId, columnId, newIndex, targetColumnId = null) {
         targetContainer.insertBefore(taskElement, taskItems[newIndex]);
     }
 
-    // Invalidate height cache for affected columns (task moved = content changed)
-    const sourceColId = sourceColumn?.dataset?.columnId;
-    if (sourceColId && typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(sourceColId);
-    }
-    if (targetColId !== sourceColId && typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(targetColId);
-    }
-
     // Recalculate stack heights after task move (use debounced for better performance)
     const targetColumn = targetContainer.closest('.kanban-full-height-column');
     const targetStack = targetColumn?.closest('.kanban-column-stack');
@@ -1774,11 +1765,6 @@ function deleteColumn(columnId) {
 
                 columnElement.remove();
 
-                // Invalidate height cache for deleted column
-                if (typeof invalidateColumnHeightCache === 'function') {
-                    invalidateColumnHeightCache(columnId);
-                }
-
                 // Recalculate stack heights after column deletion
                 if (stack && typeof recalculateStackHeightsDebounced === 'function') {
                     recalculateStackHeightsDebounced(stack);
@@ -2517,11 +2503,6 @@ function deleteTask(taskId, columnId) {
 
                 // Check if column is now empty and add placeholder button (before height recalc)
                 updateColumnEmptyState(foundColumn.id);
-
-                // Invalidate height cache for this column (content changed)
-                if (typeof invalidateColumnHeightCache === 'function') {
-                    invalidateColumnHeightCache(foundColumn.id);
-                }
 
                 // Recalculate stack heights after task deletion and button restoration
                 // Task deletion changes column height, so we need to recalculate positions

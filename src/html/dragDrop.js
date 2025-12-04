@@ -1114,14 +1114,6 @@ function setupGlobalDragAndDrop() {
             markUnsavedChanges();
         }
 
-        // Invalidate height cache for affected columns (content changed)
-        if (typeof window.invalidateColumnHeightCache === 'function') {
-            window.invalidateColumnHeightCache(originalColumnId);
-            if (finalColumnId !== originalColumnId) {
-                window.invalidateColumnHeightCache(finalColumnId);
-            }
-        }
-
         // Recalculate only affected stacks (not entire board)
         const sourceStack = originalColumnElement?.closest('.kanban-column-stack');
         const targetStack = finalColumnElement?.closest('.kanban-column-stack');

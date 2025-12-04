@@ -1600,11 +1600,6 @@ window.updateTemplates = function(templates, showBar = true) {
  */
 function renderBoard(options = null) {
 
-    // Clear height cache on full re-render (heights may change)
-    if (typeof invalidateAllColumnHeightCache === 'function') {
-        invalidateAllColumnHeightCache();
-    }
-
     // Apply tag styles first
     applyTagStyles();
 
@@ -2777,10 +2772,6 @@ function applyStackedColumnStyles(columnId = null) {
 
     // Update only the target stack (or all if columnId is null)
     enforceFoldModesForStacks(targetStack);
-
-    // CRITICAL: Invalidate cache before recalculating
-    // (column heights have changed due to fold/unfold operation)
-    invalidateAllColumnHeightCache();
     recalculateStackHeightsImmediate(targetStack);
 
     // Update bottom drop zones after layout changes
@@ -2987,29 +2978,8 @@ function enforceFoldModesForStacks(stackElement = null) {
 let recalculateStackHeightsTimer = null;
 let pendingStackElement = null;
 
-// HEIGHT CACHE: Store measured column heights to avoid expensive re-measurements
-// Key: columnId, Value: { columnHeaderHeight, headerHeight, footerHeight, contentHeight, marginHeight, totalHeight }
-window.columnHeightCache = window.columnHeightCache || new Map();
-
-// Invalidate cache for a specific column (call when content changes)
-function invalidateColumnHeightCache(columnId) {
-    if (window.columnHeightCache) {
-        window.columnHeightCache.delete(columnId);
-    }
-}
-window.invalidateColumnHeightCache = invalidateColumnHeightCache;
-
-// Invalidate entire cache (call on full re-render)
-function invalidateAllColumnHeightCache() {
-    if (window.columnHeightCache) {
-        window.columnHeightCache.clear();
-    }
-}
-window.invalidateAllColumnHeightCache = invalidateAllColumnHeightCache;
-
 // Debug: Force recalculation of all stack heights (call from console)
 window.debugForceRecalc = () => {
-    invalidateAllColumnHeightCache();
     document.querySelectorAll('.kanban-column-stack').forEach(stack => {
         recalculateStackHeightsImmediate(stack);
     });
@@ -3077,7 +3047,6 @@ function startHeightPolling() {
 
         // If any height differs from baseline, recalculate and update baseline
         if (heightChanged) {
-            invalidateAllColumnHeightCache();
             document.querySelectorAll('.kanban-column-stack').forEach(stack => {
                 recalculateStackHeightsDebounced(stack);
             });
@@ -3096,7 +3065,6 @@ function setupColumnResizeObserver() {
         // If we're currently recalculating, just mark that another recalc is needed
         if (isRecalculatingHeights) {
             pendingRecalcNeeded = true;
-            invalidateAllColumnHeightCache();
             return;
         }
 
@@ -3113,18 +3081,8 @@ function setupColumnResizeObserver() {
 
             if (column && stack) {
                 affectedStacks.add(stack);
-                // Invalidate cache for this column and all columns AFTER it in the stack
-                const allColumns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
-                const changedIndex = allColumns.indexOf(column);
-                for (let i = changedIndex; i < allColumns.length; i++) {
-                    const colId = allColumns[i].getAttribute('data-column-id');
-                    if (colId) {
-                        invalidateColumnHeightCache(colId);
-                    }
-                }
             } else if (column && !stack) {
-                // Column not in a stack - invalidate ALL caches
-                invalidateAllColumnHeightCache();
+                // Column not in a stack - recalculate all stacks
                 document.querySelectorAll('.kanban-column-stack').forEach(s => affectedStacks.add(s));
             }
         });
@@ -3144,7 +3102,6 @@ function setupColumnResizeObserver() {
                     isRecalculatingHeights = false;
                     if (pendingRecalcNeeded) {
                         pendingRecalcNeeded = false;
-                        invalidateAllColumnHeightCache();
                         document.querySelectorAll('.kanban-column-stack').forEach(stack => {
                             recalculateStackHeightsImmediate(stack);
                         });
@@ -3197,12 +3154,10 @@ function setupColumnResizeObserver() {
         // If we're currently recalculating, just mark that another recalc is needed
         if (isRecalculatingHeights) {
             pendingRecalcNeeded = true;
-            invalidateAllColumnHeightCache();
             return;
         }
 
         // Recalculate, then poll for height changes (catches delayed rendering)
-        invalidateAllColumnHeightCache();
         document.querySelectorAll('.kanban-column-stack').forEach(stack => {
             recalculateStackHeightsDebounced(stack);
         });
@@ -3292,9 +3247,6 @@ function recalculateStackHeightsDebounced(stackElement = null) {
     }
 
     recalculateStackHeightsTimer = setTimeout(() => {
-        // CRITICAL: Invalidate cache right before recalculating
-        // (cache may have been repopulated by ResizeObserver during debounce delay)
-        invalidateAllColumnHeightCache();
         recalculateStackHeightsImmediate(pendingStackElement);
         recalculateStackHeightsTimer = null;
         pendingStackElement = null;
@@ -3324,60 +3276,31 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // We now: measure → calculate → apply in one batch (smooth)
 
             // Measure actual content heights
-            // OPTIMIZATION: Use cached heights when available to avoid expensive offsetHeight reads
             const columnData = [];
             columns.forEach((col, idx) => {
-                const columnId = col.getAttribute('data-column-id');
                 const isVerticallyFolded = col.classList.contains('collapsed-vertical');
                 const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
 
-                // Always query DOM elements (needed for style application later)
+                // Query DOM elements for measurement and style application
                 const columnHeader = col.querySelector('.column-header');
                 const header = col.querySelector('.column-title');
                 const footer = col.querySelector('.column-footer');
-                const content = col.querySelector('.column-inner');
 
-                // Check cache first for height values (avoids expensive offsetHeight reads)
-                const cachedHeights = window.columnHeightCache?.get(columnId);
-                let columnHeaderHeight, headerHeight, footerHeight, contentHeight, marginHeight, footerBarsHeight;
+                // Measure heights directly from DOM
+                const columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
+                const headerHeight = header ? header.offsetHeight : 0;
+                const footerHeight = footer ? footer.offsetHeight : 0;
 
-                if (cachedHeights && !isVerticallyFolded && !isHorizontallyFolded) {
-                    // Use cached height values for expanded columns
-                    columnHeaderHeight = cachedHeights.columnHeaderHeight;
-                    headerHeight = cachedHeights.headerHeight;
-                    footerHeight = cachedHeights.footerHeight;
-                    contentHeight = cachedHeights.contentHeight;
-                    marginHeight = cachedHeights.marginHeight;
-                    footerBarsHeight = cachedHeights.footerBarsHeight;
-                } else {
-                    // Measure heights (expensive - offsetHeight reads cause reflows)
-                    columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
-                    headerHeight = header ? header.offsetHeight : 0;
-                    footerHeight = footer ? footer.offsetHeight : 0;
-                    // Measure the actual content height - use column-content for more accurate measurement
-                    // .column-inner has flex:1 which can affect scrollHeight
-                    const columnContent = col.querySelector('.column-content');
-                    const tasksContainer = col.querySelector('.tasks-container');
-                    contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
+                // Measure the actual content height - use column-content for more accurate measurement
+                // .column-inner has flex:1 which can affect scrollHeight
+                const columnContent = col.querySelector('.column-content');
+                const contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
 
-                    const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
-                    footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
+                const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
+                const footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
 
-                    const columnMargin = col.querySelector('.column-margin');
-                    marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
-
-                    // Cache the measured heights for expanded columns only
-                    if (!isVerticallyFolded && !isHorizontallyFolded && columnId) {
-                        window.columnHeightCache?.set(columnId, {
-                            columnHeaderHeight,
-                            headerHeight,
-                            footerHeight,
-                            contentHeight,
-                            marginHeight,
-                            footerBarsHeight
-                        });
-                    }
-                }
+                const columnMargin = col.querySelector('.column-margin');
+                const marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
 
                 const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
 
@@ -5191,11 +5114,6 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
 
     // Update column task count
     updateColumnTaskCount(columnId);
-
-    // Invalidate height cache for this column (content changed)
-    if (typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(columnId);
-    }
 
     return taskElement;
 }
