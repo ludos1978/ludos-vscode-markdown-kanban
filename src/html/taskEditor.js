@@ -1025,11 +1025,23 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-column-tag');
                         }
 
-                        // Update current week / temporal active attribute
-                        if (window.tagUtils && window.tagUtils.isTemporallyActive(column.title)) {
-                            columnElement2.setAttribute('data-current-week', 'true');
-                        } else {
+                        // Update temporal attributes - set the CORRECT attribute for each type
+                        if (window.tagUtils) {
+                            const colText = (column.displayTitle || '') + ' ' + (column.title || '');
+
+                            // Remove all temporal attributes first
+                            columnElement2.removeAttribute('data-current-day');
                             columnElement2.removeAttribute('data-current-week');
+                            columnElement2.removeAttribute('data-current-weekday');
+                            columnElement2.removeAttribute('data-current-hour');
+                            columnElement2.removeAttribute('data-current-time');
+
+                            // Set only the ones that are active
+                            if (window.tagUtils.isCurrentDate(colText)) columnElement2.setAttribute('data-current-day', 'true');
+                            if (window.tagUtils.isCurrentWeek(colText)) columnElement2.setAttribute('data-current-week', 'true');
+                            if (window.tagUtils.isCurrentWeekday(colText)) columnElement2.setAttribute('data-current-weekday', 'true');
+                            if (window.tagUtils.isCurrentTime(colText)) columnElement2.setAttribute('data-current-hour', 'true');
+                            if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement2.setAttribute('data-current-time', 'true');
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)

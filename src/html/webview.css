@@ -4452,13 +4452,50 @@ h6 .kanban-tag {
  * NO CSS :has() rules for numeric badge positioning
  */
 
-/* Current week highlighting for columns and tasks */
+/* Temporal highlighting for columns and tasks */
 /* Border style (default) - apply to column elements, not container */
+/* Week highlighting */
 .kanban-full-height-column[data-current-week="true"] .column-header,
 .kanban-full-height-column[data-current-week="true"] .column-title,
 .kanban-full-height-column[data-current-week="true"] .column-inner,
 .kanban-full-height-column[data-current-week="true"] .column-footer,
 .task-item[data-current-week="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Day/Date highlighting */
+.kanban-full-height-column[data-current-day="true"] .column-header,
+.kanban-full-height-column[data-current-day="true"] .column-title,
+.kanban-full-height-column[data-current-day="true"] .column-inner,
+.kanban-full-height-column[data-current-day="true"] .column-footer,
+.task-item[data-current-day="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Weekday highlighting */
+.kanban-full-height-column[data-current-weekday="true"] .column-header,
+.kanban-full-height-column[data-current-weekday="true"] .column-title,
+.kanban-full-height-column[data-current-weekday="true"] .column-inner,
+.kanban-full-height-column[data-current-weekday="true"] .column-footer,
+.task-item[data-current-weekday="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Time slot highlighting */
+.kanban-full-height-column[data-current-time="true"] .column-header,
+.kanban-full-height-column[data-current-time="true"] .column-title,
+.kanban-full-height-column[data-current-time="true"] .column-inner,
+.kanban-full-height-column[data-current-time="true"] .column-footer,
+.task-item[data-current-time="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Hour highlighting */
+.kanban-full-height-column[data-current-hour="true"] .column-header,
+.kanban-full-height-column[data-current-hour="true"] .column-title,
+.kanban-full-height-column[data-current-hour="true"] .column-inner,
+.kanban-full-height-column[data-current-hour="true"] .column-footer,
+.task-item[data-current-hour="true"] {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
@@ -4779,13 +4816,7 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     opacity: 0.8;
 }
 
-/* Active temporal tag (current date/week/time is now) */
-.kanban-temporal-tag.temporal-active {
-    background-color: rgba(78, 201, 176, 0.25);
-    border-width: 2px;
-    font-weight: 600;
-    box-shadow: 0 0 4px rgba(78, 201, 176, 0.5);
-}
+/* Active temporal tag - NO special highlight, task border is highlighted instead */
 
 /* Type-specific color variations */
 .kanban-temporal-date {
@@ -4794,10 +4825,6 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     border-color: var(--vscode-charts-blue, #007acc);
 }
 
-.kanban-temporal-date.temporal-active {
-    background-color: rgba(0, 122, 204, 0.25);
-    box-shadow: 0 0 4px rgba(0, 122, 204, 0.5);
-}
 
 .kanban-temporal-week {
     color: var(--vscode-charts-blue, #007acc);
@@ -4805,10 +4832,6 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     border-color: var(--vscode-charts-blue, #007acc);
 }
 
-.kanban-temporal-week.temporal-active {
-    background-color: rgba(0, 122, 204, 0.25);
-    box-shadow: 0 0 4px rgba(0, 122, 204, 0.5);
-}
 
 .kanban-temporal-weekday {
     color: var(--vscode-charts-purple, #8a2be2);
@@ -4816,32 +4839,20 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     border-color: var(--vscode-charts-purple, #8a2be2);
 }
 
-.kanban-temporal-weekday.temporal-active {
-    background-color: rgba(138, 43, 226, 0.25);
-    box-shadow: 0 0 4px rgba(138, 43, 226, 0.5);
-}
 
 .kanban-temporal-time {
-    color: var(--vscode-charts-orange, #ce9178);
-    background-color: rgba(206, 145, 120, 0.1);
-    border-color: var(--vscode-charts-orange, #ce9178);
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
 }
 
-.kanban-temporal-time.temporal-active {
-    background-color: rgba(206, 145, 120, 0.25);
-    box-shadow: 0 0 4px rgba(206, 145, 120, 0.5);
-}
 
 .kanban-temporal-timeSlot {
-    color: var(--vscode-charts-yellow, #dcdcaa);
-    background-color: rgba(220, 220, 170, 0.1);
-    border-color: var(--vscode-charts-yellow, #dcdcaa);
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
 }
 
-.kanban-temporal-timeSlot.temporal-active {
-    background-color: rgba(220, 220, 170, 0.25);
-    box-shadow: 0 0 4px rgba(220, 220, 170, 0.5);
-}
 
 /* Ensure temporal tags stay inline in collapsed columns */
 .collapsed .kanban-temporal-tag {
