@@ -971,6 +971,26 @@ export class MessageHandler {
                 );
                 break;
 
+            case 'requestFileDropDialogue':
+                await this.handleRequestFileDropDialogue(message);
+                break;
+
+            case 'executeFileDropCopy':
+                await this.handleExecuteFileDropCopy(message);
+                break;
+
+            case 'executeFileDropLink':
+                await this.handleExecuteFileDropLink(message);
+                break;
+
+            case 'linkExistingFile':
+                await this.handleLinkExistingFile(message);
+                break;
+
+            case 'openMediaFolder':
+                await this.handleOpenMediaFolder();
+                break;
+
             case 'getExportDefaultFolder':
                 await this.handleGetExportDefaultFolder();
                 break;
@@ -2293,6 +2313,165 @@ export class MessageHandler {
         return crypto.createHash('sha256').update(buffer).digest('hex').substring(0, 12);
     }
 
+    private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
+
+    /**
+     * Calculate hash for file - uses partial hash (first 1MB + size) for large files
+     */
+    private _calculatePartialHash(filePath: string): string {
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+
+        if (fileSize <= this.PARTIAL_HASH_SIZE) {
+            // Small file: hash entire content
+            const buffer = fs.readFileSync(filePath);
+            return this._generateHash(buffer);
+        } else {
+            // Large file: hash first 1MB + file size
+            const fd = fs.openSync(filePath, 'r');
+            const buffer = Buffer.alloc(this.PARTIAL_HASH_SIZE);
+            fs.readSync(fd, buffer, 0, this.PARTIAL_HASH_SIZE, 0);
+            fs.closeSync(fd);
+
+            // Combine first 1MB with file size for unique hash
+            const sizeBuffer = Buffer.from(fileSize.toString());
+            const combined = Buffer.concat([buffer, sizeBuffer]);
+            return this._generateHash(combined);
+        }
+    }
+
+    /**
+     * Calculate partial hash from provided buffer and file size (for frontend File objects)
+     */
+    private _calculatePartialHashFromData(partialData: Buffer, fileSize: number): string {
+        if (fileSize <= this.PARTIAL_HASH_SIZE) {
+            return this._generateHash(partialData);
+        } else {
+            const sizeBuffer = Buffer.from(fileSize.toString());
+            const combined = Buffer.concat([partialData, sizeBuffer]);
+            return this._generateHash(combined);
+        }
+    }
+
+    /**
+     * Load hash cache from .hash_cache file in media folder
+     */
+    private _loadHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
+        const cachePath = path.join(mediaFolderPath, '.hash_cache');
+        const cache = new Map<string, { hash: string; mtime: number }>();
+
+        if (fs.existsSync(cachePath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
+                for (const [fileName, entry] of Object.entries(data)) {
+                    cache.set(fileName, entry as { hash: string; mtime: number });
+                }
+            } catch (error) {
+                console.warn('[HASH-CACHE] Failed to load cache:', error);
+            }
+        }
+
+        return cache;
+    }
+
+    /**
+     * Save hash cache to .hash_cache file in media folder
+     */
+    private _saveHashCache(mediaFolderPath: string, cache: Map<string, { hash: string; mtime: number }>): void {
+        const cachePath = path.join(mediaFolderPath, '.hash_cache');
+        const data: Record<string, { hash: string; mtime: number }> = {};
+
+        for (const [fileName, entry] of cache.entries()) {
+            data[fileName] = entry;
+        }
+
+        try {
+            fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+        } catch (error) {
+            console.warn('[HASH-CACHE] Failed to save cache:', error);
+        }
+    }
+
+    /**
+     * Update hash cache for all files in media folder, recalculating stale entries
+     */
+    private _updateHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
+        const cache = this._loadHashCache(mediaFolderPath);
+        let cacheModified = false;
+
+        if (!fs.existsSync(mediaFolderPath)) {
+            return cache;
+        }
+
+        const files = fs.readdirSync(mediaFolderPath);
+        const currentFiles = new Set<string>();
+
+        for (const fileName of files) {
+            if (fileName === '.hash_cache' || fileName.startsWith('.')) {
+                continue;
+            }
+
+            const filePath = path.join(mediaFolderPath, fileName);
+            const stats = fs.statSync(filePath);
+
+            if (!stats.isFile()) {
+                continue;
+            }
+
+            currentFiles.add(fileName);
+            const mtime = stats.mtimeMs;
+            const cached = cache.get(fileName);
+
+            if (!cached || cached.mtime !== mtime) {
+                // Recalculate hash for new or modified file
+                const hash = this._calculatePartialHash(filePath);
+                cache.set(fileName, { hash, mtime });
+                cacheModified = true;
+            }
+        }
+
+        // Remove entries for deleted files
+        for (const fileName of cache.keys()) {
+            if (!currentFiles.has(fileName)) {
+                cache.delete(fileName);
+                cacheModified = true;
+            }
+        }
+
+        if (cacheModified) {
+            this._saveHashCache(mediaFolderPath, cache);
+        }
+
+        return cache;
+    }
+
+    /**
+     * Find matching file in media folder by hash
+     * @returns Relative path to matching file, or null if not found
+     */
+    private _findMatchingFileByHash(mediaFolderPath: string, targetHash: string, originalFileName: string): string | null {
+        if (!fs.existsSync(mediaFolderPath)) {
+            return null;
+        }
+
+        const cache = this._updateHashCache(mediaFolderPath);
+
+        // First check: same filename
+        const cachedEntry = cache.get(originalFileName);
+        if (cachedEntry && cachedEntry.hash === targetHash) {
+            return originalFileName;
+        }
+
+        // Second check: any file with matching hash
+        for (const [fileName, entry] of cache.entries()) {
+            if (entry.hash === targetHash) {
+                return fileName;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Helper: Format image path according to pathGeneration config
      */
@@ -2518,6 +2697,195 @@ export class MessageHandler {
                     dropPosition: dropPosition
                 });
             }
+        }
+    }
+
+    // ============================================================================
+    // File Drop Dialogue Handlers
+    // ============================================================================
+
+    private readonly FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
+
+    /**
+     * Handle request for file drop dialogue - determines available options
+     * Checks media folder for existing matching file by hash
+     */
+    private async handleRequestFileDropDialogue(message: {
+        dropId: string;
+        fileName: string;
+        fileSize?: number;
+        isImage: boolean;
+        fileType?: string;
+        hasSourcePath: boolean;
+        sourcePath?: string;
+        partialHashData?: string; // Base64 encoded first 1MB for File objects
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition } = message;
+        let { fileSize } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+
+            // For URI drops, check if file is in workspace - auto-link without dialogue
+            if (hasSourcePath && sourcePath) {
+                if (this._isFileInWorkspace(sourcePath)) {
+                    // File is in workspace - link directly without dialogue
+                    return this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
+                }
+
+                // Get file size from filesystem for URI drops
+                if (fs.existsSync(sourcePath)) {
+                    const stats = fs.statSync(sourcePath);
+                    fileSize = stats.size;
+                }
+            }
+
+            // Calculate hash for matching
+            let fileHash: string | null = null;
+            if (hasSourcePath && sourcePath && fs.existsSync(sourcePath)) {
+                // URI drop: calculate hash from file
+                fileHash = this._calculatePartialHash(sourcePath);
+            } else if (partialHashData && fileSize !== undefined) {
+                // File object: calculate hash from provided partial data
+                const partialBuffer = Buffer.from(partialHashData, 'base64');
+                fileHash = this._calculatePartialHashFromData(partialBuffer, fileSize);
+            }
+
+            // Check media folder for existing matching file
+            let existingFile: string | null = null;
+            if (fileHash) {
+                const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+                existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
+
+                if (existingFile) {
+                    console.log(`[FILE-DROP] Found existing matching file: ${existingFile}`);
+                }
+            }
+
+            // Send dialogue options to frontend
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'showFileDropDialogue',
+                    dropId: dropId,
+                    fileName: fileName,
+                    fileSize: fileSize,
+                    isImage: isImage,
+                    hasSourcePath: hasSourcePath,
+                    sourcePath: sourcePath,
+                    existingFile: existingFile, // Matching file in media folder
+                    dropPosition: dropPosition
+                });
+            }
+        } catch (error) {
+            console.error('[FILE-DROP-DIALOGUE] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                !hasSourcePath
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to copy file to media folder (for URI drops)
+     */
+    private async handleExecuteFileDropCopy(message: {
+        dropId: string;
+        sourcePath: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { sourcePath, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage);
+        } catch (error) {
+            console.error('[FILE-DROP-COPY] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                false
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to link to original file location
+     */
+    private async handleExecuteFileDropLink(message: {
+        dropId: string;
+        sourcePath: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { sourcePath, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory } = this._getCurrentFilePaths();
+            this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
+        } catch (error) {
+            console.error('[FILE-DROP-LINK] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                false
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to link existing file from media folder
+     */
+    private async handleLinkExistingFile(message: {
+        dropId: string;
+        existingFile: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { existingFile, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const existingFilePath = path.join(mediaFolderPath, existingFile);
+
+            // Send link message for the existing file in media folder
+            this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage);
+            console.log(`[FILE-DROP] Linked existing file from media folder: ${existingFile}`);
+        } catch (error) {
+            console.error('[FILE-DROP-LINK-EXISTING] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                true
+            );
+        }
+    }
+
+    /**
+     * Handle request to open the media folder in OS file explorer
+     */
+    private async handleOpenMediaFolder(): Promise<void> {
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+
+            // Open folder in OS file explorer
+            await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(mediaFolderPath));
+            console.log('[FILE-DROP] Opened media folder:', mediaFolderPath);
+        } catch (error) {
+            console.error('[FILE-DROP] Error opening media folder:', error);
+            vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 

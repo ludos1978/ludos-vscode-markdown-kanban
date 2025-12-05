@@ -3236,6 +3236,15 @@ window.addEventListener('message', event => {
             }
             break;
 
+        case 'showFileDropDialogue':
+            // Show dialogue for file drop options
+            if (typeof window.showFileDropDialogue === 'function') {
+                window.showFileDropDialogue(message);
+            } else {
+                console.error('[File-Drop] showFileDropDialogue function not available');
+            }
+            break;
+
         case 'droppedImageSaved':
             // Handle dropped image save response from backend
             if (message.success) {

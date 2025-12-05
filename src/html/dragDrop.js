@@ -18,6 +18,46 @@ let isProcessingDrop = false; // Prevent multiple simultaneous drops
 let currentExternalDropColumn = null;
 let externalDropIndicator = null;
 
+// File drop dialogue: store pending File objects until user confirms action
+const pendingFileDrops = new Map();
+const FILE_SIZE_LIMIT_MB = 10;
+const FILE_SIZE_LIMIT_BYTES = FILE_SIZE_LIMIT_MB * 1024 * 1024;
+const PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB for partial hash calculation
+
+/**
+ * Read first 1MB of file for hash calculation (safe for large files)
+ * @param {File} file - File object to read
+ * @returns {Promise<string>} Base64 encoded first 1MB (or entire file if smaller)
+ */
+function readPartialFileForHash(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        const bytesToRead = Math.min(file.size, PARTIAL_HASH_SIZE);
+        const blob = file.slice(0, bytesToRead);
+
+        reader.onload = function(event) {
+            try {
+                const arrayBuffer = event.target.result;
+                const uint8Array = new Uint8Array(arrayBuffer);
+                let binary = '';
+                for (let i = 0; i < uint8Array.length; i++) {
+                    binary += String.fromCharCode(uint8Array[i]);
+                }
+                const base64 = btoa(binary);
+                resolve(base64);
+            } catch (error) {
+                reject(error);
+            }
+        };
+
+        reader.onerror = function(error) {
+            reject(error);
+        };
+
+        reader.readAsArrayBuffer(blob);
+    });
+}
+
 // PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag)
 let internalDropIndicator = null;
 
@@ -1875,53 +1915,90 @@ function processImageSave(e, base64Data, imageType, md5Hash) {
     }
 }
 
-function handleVSCodeFileDrop(e, files) {
+async function handleVSCodeFileDrop(e, files) {
     const file = files[0];
     const fileName = file.name;
-
-    // Check if it's an image file
+    const fileSize = file.size;
     const isImage = file.type.startsWith('image/');
 
+    // Generate unique ID for this drop
+    const dropId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Store file object for later use if user chooses to copy
+    pendingFileDrops.set(dropId, {
+        file: file,
+        dropPosition: { x: e.clientX, y: e.clientY }
+    });
+
+    // Read first 1MB for hash calculation (safe even for large files)
+    let partialHashData = null;
+    try {
+        partialHashData = await readPartialFileForHash(file);
+    } catch (error) {
+        console.warn('[File-Drop] Could not read partial hash data:', error);
+    }
+
+    // Request dialogue from backend (backend will respond with available options)
+    vscode.postMessage({
+        type: 'requestFileDropDialogue',
+        dropId: dropId,
+        fileName: fileName,
+        fileSize: fileSize,
+        isImage: isImage,
+        fileType: file.type || 'application/octet-stream',
+        hasSourcePath: false, // File objects don't have accessible paths
+        partialHashData: partialHashData, // First 1MB for hash matching
+        dropPosition: { x: e.clientX, y: e.clientY }
+    });
+}
+
+/**
+ * Execute the file copy after user confirms in dialogue (for File objects)
+ */
+function executeFileObjectCopy(dropId, isImage) {
+    const pending = pendingFileDrops.get(dropId);
+    if (!pending) {
+        console.error('[File-Drop] No pending file found for dropId:', dropId);
+        return;
+    }
+
+    const { file, dropPosition } = pending;
+    const fileName = file.name;
+
+    // Clean up pending entry
+    pendingFileDrops.delete(dropId);
+
     if (isImage) {
-        // Read image file contents and save to MEDIA folder
-        // This works for external drops (Finder/Explorer) where we don't have the path
         const reader = new FileReader();
         reader.onload = function(event) {
             try {
                 const base64Data = event.target.result.split(',')[1];
-
-                // Send to backend to save (reuse clipboard image infrastructure)
                 vscode.postMessage({
                     type: 'saveDroppedImageFromContents',
                     imageData: base64Data,
                     originalFileName: fileName,
                     imageType: file.type,
-                    dropPosition: { x: e.clientX, y: e.clientY }
+                    dropPosition: dropPosition
                 });
             } catch (error) {
                 console.error('[Image-Drop] Failed to process image:', error);
-
-                // Fallback: create task with broken link
                 createNewTaskWithContent(
                     fileName,
-                    { x: e.clientX, y: e.clientY },
+                    dropPosition,
                     `![${fileName}](${fileName}) - Failed to copy image`
                 );
             }
         };
-
         reader.onerror = function(error) {
             console.error('[Image-Drop] FileReader error:', error);
             createNewTaskWithContent(
                 fileName,
-                { x: e.clientX, y: e.clientY },
+                dropPosition,
                 `![${fileName}](${fileName}) - Failed to read image`
             );
         };
-
         reader.readAsDataURL(file);
     } else {
-        // Non-image file - read contents and send to backend to save
         const reader = new FileReader();
         reader.onload = function(event) {
             try {
@@ -1929,38 +2006,132 @@ function handleVSCodeFileDrop(e, files) {
                     new Uint8Array(event.target.result)
                         .reduce((data, byte) => data + String.fromCharCode(byte), '')
                 );
-
-                // Send to backend to save to MEDIA folder
                 vscode.postMessage({
                     type: 'saveDroppedFileFromContents',
                     fileData: base64Data,
                     originalFileName: fileName,
                     fileType: file.type || 'application/octet-stream',
-                    dropPosition: { x: e.clientX, y: e.clientY }
+                    dropPosition: dropPosition
                 });
             } catch (error) {
                 console.error('[File-Drop] Failed to process file:', error);
                 createNewTaskWithContent(
                     fileName,
-                    { x: e.clientX, y: e.clientY },
+                    dropPosition,
                     `[${fileName}](${fileName}) - Failed to copy file`
                 );
             }
         };
-
         reader.onerror = function(error) {
             console.error('[File-Drop] FileReader error:', error);
             createNewTaskWithContent(
                 fileName,
-                { x: e.clientX, y: e.clientY },
+                dropPosition,
                 `[${fileName}](${fileName}) - Failed to read file`
             );
         };
-
         reader.readAsArrayBuffer(file);
     }
 }
 
+/**
+ * Cancel a pending file drop (user cancelled dialogue)
+ */
+function cancelPendingFileDrop(dropId) {
+    pendingFileDrops.delete(dropId);
+}
+
+/**
+ * Format file size for display (e.g., "2.5 MB")
+ */
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+}
+
+/**
+ * Show file drop dialogue with options based on backend response
+ * Options: Link existing file (if found), Open media folder, Cancel
+ * @param {Object} options - Options from backend
+ */
+function showFileDropDialogue(options) {
+    const {
+        dropId,
+        fileName,
+        fileSize,
+        isImage,
+        existingFile,
+        dropPosition
+    } = options;
+
+    const sizeText = fileSize ? ` (${formatFileSize(fileSize)})` : '';
+    const buttons = [];
+
+    // Option 1: Link existing file (if found in media folder - FIRST option)
+    if (existingFile) {
+        buttons.push({
+            text: `Link existing file`,
+            primary: true,
+            action: () => {
+                cancelPendingFileDrop(dropId);
+                vscode.postMessage({
+                    type: 'linkExistingFile',
+                    dropId: dropId,
+                    existingFile: existingFile,
+                    fileName: fileName,
+                    isImage: isImage,
+                    dropPosition: dropPosition
+                });
+            }
+        });
+    }
+
+    // Option 2: Open media folder (always available)
+    buttons.push({
+        text: 'Open media folder',
+        primary: !existingFile, // Primary if no existing file found
+        action: () => {
+            cancelPendingFileDrop(dropId);
+            vscode.postMessage({
+                type: 'openMediaFolder'
+            });
+            // Show instructions
+            modalUtils.showAlert(
+                'Copy file manually',
+                `Please copy "${fileName}" to the media folder that just opened, then drag it from the VS Code Explorer into the kanban.`
+            );
+        }
+    });
+
+    // Cancel button
+    buttons.push({
+        text: 'Cancel',
+        action: () => {
+            cancelPendingFileDrop(dropId);
+        }
+    });
+
+    // Show the modal
+    const message = existingFile
+        ? `File "${existingFile}" already exists in media folder. Link it or copy manually.`
+        : `File not found in media folder${sizeText}. Copy it manually to the media folder.`;
+
+    modalUtils.showConfirmModal(
+        `Add file: ${fileName}`,
+        message,
+        buttons,
+        { maxWidth: '500px' }
+    );
+}
+
+// Make functions globally available
+if (typeof window !== 'undefined') {
+    window.showFileDropDialogue = showFileDropDialogue;
+    window.executeFileObjectCopy = executeFileObjectCopy;
+    window.cancelPendingFileDrop = cancelPendingFileDrop;
+}
 
 function handleVSCodeUriDrop(e, uriData) {
     const uris = uriData.split('\n').filter(uri => uri.trim()).filter(uri => {
@@ -1969,57 +2140,27 @@ function handleVSCodeUriDrop(e, uriData) {
     });
 
     if (uris.length > 0) {
-        // Separate images from other files
-        const imageUris = [];
-        const otherFileUris = [];
-
         uris.forEach(uri => {
-            const filename = uri.split('/').pop() || uri;
-            const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
-
-            if (isImage) {
-                imageUris.push(uri);
-            } else {
-                otherFileUris.push(uri);
-            }
-        });
-
-        // Handle image URIs: copy to MEDIA folder
-        imageUris.forEach(uri => {
             const fullPath = uri.startsWith('file://')
                 ? decodeURIComponent(uri.replace('file://', ''))
                 : uri;
             const filename = fullPath.split('/').pop() || uri;
+            const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
 
+            // Generate unique ID for this drop
+            const dropId = `uri_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            // Ask backend to copy from source path to MEDIA
+            // Request dialogue from backend (backend checks workspace and returns options)
             vscode.postMessage({
-                type: 'copyImageToMedia',
+                type: 'requestFileDropDialogue',
+                dropId: dropId,
+                fileName: filename,
                 sourcePath: fullPath,
-                originalFileName: filename,
+                isImage: isImage,
+                hasSourcePath: true,
                 dropPosition: { x: e.clientX, y: e.clientY }
             });
         });
-
-        // Handle non-image files: send to backend for workspace check
-        if (otherFileUris.length > 0) {
-            otherFileUris.forEach(uri => {
-                const fullPath = uri.startsWith('file://')
-                    ? decodeURIComponent(uri.replace('file://', ''))
-                    : uri;
-                const filename = fullPath.split('/').pop() || uri;
-
-                // Ask backend to check workspace and copy/link appropriately
-                vscode.postMessage({
-                    type: 'handleFileUriDrop',
-                    sourcePath: fullPath,
-                    originalFileName: filename,
-                    dropPosition: { x: e.clientX, y: e.clientY }
-                });
-            });
-        }
-    } else {
-        // Could not process dropped file URIs
     }
 }
 

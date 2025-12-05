@@ -1,6 +1,16 @@
 - [ ] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
 
-- [ ] the drag & drop system can copy media into the media folder if the path to the file is not found. but when the media is very large this might crash the webview. in this case the user should be prompted for the action to take instead. check if the file is larger then 10mb and then ask the user to manually copy the file into the media folder or get a path to the file to paste!
+- [x] if we drag a file into the kanban we check the media folder first. if a file that matches the criteries is found in the media folder (first check same filename and compare the has when also check all files for the first 1mb of the file combined with the filesize) :
+
+to calculate the hash for files < 1mb use the hash, for larger files use the 1mb of t file and the filesize combined to create the hash.
+
+keep the hashes and the last changed time in a .hash_cache file in the media folder. if t last changed date is modified, recalculate the hash for the file
+- we give the user the option to open the media folder (copy it manually)
+- or link the already existing file (if the file is found, as first option)
+- or cancel
+
+- [x] the drag & drop system can copy media into the media folder if the path to the file is not found. but when the media is very large this might crash the webview. in this case the user should be prompted for the action to take instead. check if the file is larger then 10mb and then ask the user to manually copy the file into the media folder or get a path to the file to paste!
+  - COMPLETED 2025-12-05: Dialogue with hash-based matching. Uses partial hash (first 1MB + size) to detect existing files in media folder. Options: Link existing file (if found), Open media folder, Cancel. Hash cache stored in .hash_cache file with mtime tracking for efficient updates.
 
 - [x] the drag & drop system is used by many components. dragging internally, draggin externally, for columns, for tasks. They can be dropped in different rows, stacks of columns and tasks into the columns themself. This system described its functionality. 
 
