@@ -9,8 +9,8 @@
 const TAG_PREFIXES = {
     HASH: '#',      // Regular tags: #todo, #urgent, #row2
     PERSON: '@',    // Person/mention tags: @john, @team-alpha
-    TEMPORAL: '.',  // Temporal tags: .2025.01.28, .w15, .mon, .15:30
-    QUERY: '?'      // Query/gather tags: ?#tag, ?@person, ?.today (gathers cards with matching tags)
+    TEMPORAL: '!',  // Temporal tags: !2025.01.28, !w15, !mon, !15:30
+    QUERY: '$'      // Query/gather tags: $#tag, $@person, $!today (gathers cards with matching tags)
 };
 
 // Helper to escape special regex characters in prefixes

@@ -2462,8 +2462,12 @@ function createTaskElement(task, columnId, taskIndex) {
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
 
-    // Check if task has current week tag or other active temporal tags
-    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isTemporallyActive(task.title)) ? ' data-current-week="true"' : '';
+    // Check if task has current week tag or other active temporal tags (check both title and description)
+    const isTemporallyActive = window.tagUtils && (
+        window.tagUtils.isTemporallyActive(task.title) ||
+        window.tagUtils.isTemporallyActive(task.description || '')
+    );
+    const currentWeekAttribute = isTemporallyActive ? ' data-current-week="true"' : '';
 
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"

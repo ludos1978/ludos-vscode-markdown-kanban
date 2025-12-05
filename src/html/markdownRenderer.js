@@ -290,11 +290,11 @@ function datePersonTagPlugin(md, options = {}) {
 const TEMPORAL_TAG_CONFIG = {
     // Icons for different temporal tag types (can be emoji or text)
     icons: {
-        date: '📅',      // Date tags: .2025.01.28
-        week: '📆',      // Week tags: .w49, .2025.w49
-        weekday: '📅',   // Weekday tags: .mon, .friday
-        time: '🕐',      // Time tags: .15:30, .9am
-        timeSlot: '⏱️',  // Time slot tags: .09:00-17:00
+        date: '📅',      // Date tags: !2025.01.28
+        week: '📆',      // Week tags: !w49, !2025.w49
+        weekday: '📅',   // Weekday tags: !mon, !friday
+        time: '🕐',      // Time tags: !15:30, !9am
+        timeSlot: '⏱️',  // Time slot tags: !09:00-17:00
         generic: '🕐'    // Generic temporal: fallback
     },
     // Whether to show icons (set to false to hide all icons)
@@ -303,15 +303,20 @@ const TEMPORAL_TAG_CONFIG = {
     baseClass: 'kanban-temporal-tag'
 };
 
-// Temporal tag plugin for markdown-it (handles . prefix)
+// Temporal tag plugin for markdown-it (handles temporal prefix from TAG_PREFIXES)
 function temporalTagPlugin(md, options = {}) {
     const config = { ...TEMPORAL_TAG_CONFIG, ...options };
+    // Get temporal prefix from centralized config (defaults to '!' if not available)
+    const TEMPORAL_PREFIX = (typeof window !== 'undefined' && window.TAG_PREFIXES)
+        ? window.TAG_PREFIXES.TEMPORAL
+        : '!';
+    const TEMPORAL_CHAR_CODE = TEMPORAL_PREFIX.charCodeAt(0);
 
     function parseTemporalTag(state, silent) {
         let pos = state.pos;
 
-        // Check for . at word boundary
-        if (state.src.charCodeAt(pos) !== 0x2E /* . */) { return false; }
+        // Check for temporal prefix at word boundary
+        if (state.src.charCodeAt(pos) !== TEMPORAL_CHAR_CODE) { return false; }
 
         // Must be at start or after whitespace
         if (pos > 0) {
@@ -398,6 +403,7 @@ function temporalTagPlugin(md, options = {}) {
         return true;
     }
 
+    // Register before 'emphasis' - temporal prefix must be a markdown-it terminator char
     md.inline.ruler.before('emphasis', 'temporal_tag', parseTemporalTag);
 
     md.renderer.rules.temporal_tag = function(tokens, idx) {
@@ -405,7 +411,7 @@ function temporalTagPlugin(md, options = {}) {
         const tagContent = token.content;
         const tagType = token.meta.type;
         const cfg = token.meta.config;
-        const fullTag = '.' + tagContent;
+        const fullTag = TEMPORAL_PREFIX + tagContent;
 
         // Determine CSS class based on type
         const typeClass = `kanban-temporal-${tagType}`;
@@ -427,9 +433,12 @@ function temporalTagPlugin(md, options = {}) {
         }
 
         const activeClass = isActive ? ' temporal-active' : '';
-        const dataAttr = `data-temporal-type="${tagType}" data-temporal="${escapeHtml(tagContent)}"`;
+        // Use simple HTML escaping inline to avoid dependency issues
+        const escContent = tagContent.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const escFull = fullTag.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const dataAttr = `data-temporal-type="${tagType}" data-temporal="${escContent}"`;
 
-        return `<span class="${classes}${activeClass}" ${dataAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escapeHtml(fullTag)}</span>`;
+        return `<span class="${classes}${activeClass}" ${dataAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escFull}</span>`;
     };
 }
 
@@ -1381,6 +1390,7 @@ function renderMarkdown(text, includeContext) {
     // Store includeContext for use by image renderer
     window.currentTaskIncludeContext = includeContext;
 
+
     // Debug logging to trace include rendering
     const hasInclude = text.includes('!!!include(');
     if (hasInclude) {
@@ -1737,7 +1747,7 @@ function renderMarkdown(text, includeContext) {
         // Add PlantUML renderer
         addPlantUMLRenderer(md);
 
-        const rendered = md.render(text);
+        let rendered = md.render(text);
 
         // Trigger PlantUML queue processing after render completes
         if (pendingPlantUMLQueue.length > 0) {
@@ -1753,12 +1763,12 @@ function renderMarkdown(text, includeContext) {
 
         // Remove paragraph wrapping for single line content
         if (!text.includes('\n') && rendered.startsWith('<p>') && rendered.endsWith('</p>\n')) {
-            return rendered.slice(3, -5);
+            rendered = rendered.slice(3, -5);
         }
 
         return rendered;
     } catch (error) {
-        console.error('Error rendering markdown:', error);
+        console.error('Error rendering markdown:', error?.message || error, error?.stack);
         return escapeHtml(text);
     }
 }
