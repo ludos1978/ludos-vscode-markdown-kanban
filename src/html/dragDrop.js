@@ -1240,6 +1240,14 @@ function setupGlobalDragAndDrop() {
 
                     // Recreate drop zones
                     cleanupAndRecreateDropZones(rowOrBoard);
+
+                    // Recalculate heights for both source and new target stack
+                    if (typeof window.recalculateStackHeightsImmediate === 'function') {
+                        if (currentStack && document.body.contains(currentStack)) {
+                            window.recalculateStackHeightsImmediate(currentStack);
+                        }
+                        window.recalculateStackHeightsImmediate(dropZoneStack);
+                    }
                 }
             }
 
@@ -1355,15 +1363,17 @@ function setupGlobalDragAndDrop() {
         }
 
         // Recalculate only affected stacks (column heights unchanged, just positions)
-        // Cache remains valid - no invalidation needed for column reorder
+        // Use immediate recalculation to ensure correct visual update after drop
         const sourceStack = dragState.originalColumnParent;
         const targetStack = columnElement.closest('.kanban-column-stack');
-        if (typeof window.recalculateStackHeightsDebounced === 'function') {
-            if (sourceStack && sourceStack.classList?.contains('kanban-column-stack')) {
-                window.recalculateStackHeightsDebounced(sourceStack);
+        if (typeof window.recalculateStackHeightsImmediate === 'function') {
+            // Recalculate source stack (column was removed from here)
+            if (sourceStack && sourceStack.classList?.contains('kanban-column-stack') && document.body.contains(sourceStack)) {
+                window.recalculateStackHeightsImmediate(sourceStack);
             }
+            // Recalculate target stack (column was added here)
             if (targetStack && targetStack !== sourceStack) {
-                window.recalculateStackHeightsDebounced(targetStack);
+                window.recalculateStackHeightsImmediate(targetStack);
             }
         }
 
