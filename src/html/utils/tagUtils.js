@@ -469,6 +469,11 @@ class TagUtils {
             const hours = parseInt(hourMatch[1], 10);
             const minutes = hourMatch[2] ? parseInt(hourMatch[2], 10) : 0;
 
+            // Special case: 24:00 means midnight (00:00)
+            if (hours === 24 && minutes === 0) {
+                return 0;
+            }
+
             if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
                 return hours * 60 + minutes;
             }
