@@ -67,6 +67,11 @@ class ColorUtils {
      * @returns {Object|null} RGB object or null if invalid
      */
     parseToRgb(color) {
+        // Guard against undefined/null color
+        if (!color || typeof color !== 'string') {
+            return null;
+        }
+
         // Try hex format
         if (color.startsWith('#')) {
             return this.hexToRgb(color);
