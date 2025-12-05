@@ -592,14 +592,14 @@ export class KanbanFileService {
             this._saveEndVersion = document.version;
             await document.save();
 
-            // Reload the file after successful initialization
-            // Keep SAVING state during reload to prevent undo stack clearing
-            await this.loadMarkdownFile(document);
-
-            // STATE MACHINE: Transition to IDLE
+            // STATE MACHINE: Transition to IDLE before reload
+            // (loadMarkdownFile returns early if state is not IDLE)
             this._saveState = SaveState.IDLE;
             this._saveStartVersion = null;
             this._saveEndVersion = null;
+
+            // Reload the file after successful initialization
+            await this.loadMarkdownFile(document);
 
             vscode.window.showInformationMessage('Kanban board initialized successfully');
         } catch (error) {
