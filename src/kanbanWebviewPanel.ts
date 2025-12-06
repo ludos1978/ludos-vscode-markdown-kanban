@@ -255,24 +255,26 @@ export class KanbanWebviewPanel {
         }
 
         if (documentUri) {
-            try {
-                vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri))
-                    .then(async document => {
-                        try {
-                            await kanbanPanel.loadMarkdownFile(document);
-                        } catch (error) {
-                            console.warn('Failed to load document on panel revival:', error);
-                            // Fallback: try to find an active markdown document
-                            kanbanPanel.tryAutoLoadActiveMarkdown();
-                        }
-                    });
-            } catch (error) {
-                console.warn('Failed to open document URI on panel revival:', error);
-                // Fallback: try to find an active markdown document
-                kanbanPanel.tryAutoLoadActiveMarkdown();
-            }
+            console.log('[Panel Revive] Starting revival with documentUri:', documentUri);
+            // CRITICAL: Use async IIFE to properly handle promise rejections
+            // The revive() method is not async, so we need to handle errors ourselves
+            (async () => {
+                try {
+                    console.log('[Panel Revive] Opening document...');
+                    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+                    console.log('[Panel Revive] Document opened, loading markdown file...');
+                    await kanbanPanel.loadMarkdownFile(document);
+                    console.log('[Panel Revive] Markdown file loaded successfully');
+                } catch (error) {
+                    // This catches both openTextDocument failures (file not found) and loadMarkdownFile failures
+                    console.error('[Panel Revive] Failed to load document:', documentUri, error);
+                    // Fallback: try to find an active markdown document
+                    kanbanPanel.tryAutoLoadActiveMarkdown();
+                }
+            })();
         } else {
             // No state available, try to auto-load active markdown document
+            console.warn('[Panel Revive] No documentUri in state, trying auto-load');
             kanbanPanel.tryAutoLoadActiveMarkdown();
         }
         // Don't store in map yet - will be stored when document is loaded

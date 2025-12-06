@@ -22,7 +22,8 @@
   ],
   "icon": "./imgs/logo.png",
   "activationEvents": [
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onWebviewPanel:markdownKanbanPanel"
   ],
   "main": "./dist/extension.js",
   "repository": {

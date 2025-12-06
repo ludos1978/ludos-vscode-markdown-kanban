@@ -63,11 +63,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {
+		console.log('[Kanban Extension] Registering webview panel serializer');
 		vscode.window.registerWebviewPanelSerializer(KanbanWebviewPanel.viewType, {
 			async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+				console.log('[Kanban Extension] deserializeWebviewPanel called with state:', JSON.stringify(state));
 				KanbanWebviewPanel.revive(webviewPanel, context.extensionUri, context, state);
 			}
 		});
+	} else {
+		console.warn('[Kanban Extension] registerWebviewPanelSerializer not available');
 	}
 
 	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
