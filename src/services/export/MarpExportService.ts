@@ -171,9 +171,6 @@ export class MarpExportService {
                 env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
                 env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
                 env.MARP_HANDOUT_DIRECTION = options.handoutDirection || 'horizontal';
-                console.log(`[kanban.MarpExportService] Handout mode enabled for PDF: layout=${options.handoutLayout}, slidesPerPage=${options.handoutSlidesPerPage}, direction=${options.handoutDirection}`);
-            } else if (options.handout && options.format !== 'pdf') {
-                console.log(`[kanban.MarpExportService] Handout mode skipped for ${options.format} format (only active for PDF)`);
             }
 
             // Spawn Marp as a detached background process
@@ -185,10 +182,10 @@ export class MarpExportService {
                 env: env
             });
 
-            // Log any output or errors from the Marp process
+            // Capture stdout for debugging if needed
             if (marpProcess.stdout) {
-                marpProcess.stdout.on('data', (data) => {
-                    console.log(`[kanban.MarpExportService.stdout] ${data.toString()}`);
+                marpProcess.stdout.on('data', () => {
+                    // Stdout captured but not logged by default
                 });
             }
 
@@ -518,7 +515,6 @@ export class MarpExportService {
     private static async runHandoutPostProcess(options: MarpExportOptions): Promise<void> {
         // Only process HTML outputs
         if (options.format !== 'html') {
-            console.log('[kanban.MarpExportService] Handout post-processing only supported for HTML format');
             return;
         }
 
@@ -532,8 +528,6 @@ export class MarpExportService {
             return;
         }
 
-        console.log(`[kanban.MarpExportService] Running handout post-processor on: ${options.outputPath}`);
-
         const env: NodeJS.ProcessEnv = { ...process.env };
         env.MARP_HANDOUT_LAYOUT = options.handoutLayout || 'portrait';
         env.MARP_HANDOUT_SLIDES_PER_PAGE = String(options.handoutSlidesPerPage || 1);
@@ -543,7 +537,6 @@ export class MarpExportService {
         // Build command arguments - handout always outputs PDF
         const pdfOutputPath = options.outputPath.replace(/\.html?$/i, '-handout.pdf');
         const args = [postProcessorPath, options.outputPath, pdfOutputPath, '--pdf'];
-        console.log(`[kanban.MarpExportService] Handout PDF output: ${pdfOutputPath}`);
 
         return new Promise((resolve, reject) => {
             const postProcess = spawn('node', args, {
@@ -561,10 +554,9 @@ export class MarpExportService {
 
             postProcess.on('exit', (code) => {
                 if (code === 0) {
-                    console.log('[kanban.MarpExportService] Handout post-processing complete');
                     resolve();
                 } else {
-                    console.error(`[kanban.MarpExportService] Handout post-processing failed: ${stderr}`);
+                    console.error(`[MarpExportService] Handout post-processing failed: ${stderr}`);
                     resolve(); // Don't reject, just log the error
                 }
             });

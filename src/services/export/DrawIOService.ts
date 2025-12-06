@@ -31,7 +31,6 @@ export class DrawIOService {
             this.cliPath = cliName;
             this.isCliAvailable = true;
             this.availabilityChecked = true;
-            console.log(`[DrawIOService] Found draw.io CLI: ${cliName}`);
             return true;
         }
 
@@ -105,9 +104,6 @@ export class DrawIOService {
                 args.push('--transparent');
             }
 
-            console.log(`[DrawIOService] Converting: ${path.basename(filePath)}`);
-            console.log(`[DrawIOService] Command: ${this.cliPath} ${args.join(' ')}`);
-
             const child = spawn(this.cliPath!, args);
 
             let stderr = '';
@@ -130,11 +126,6 @@ export class DrawIOService {
 
             child.on('exit', async (code) => {
                 clearTimeout(timer);
-
-                // Log stderr even on success for debugging
-                if (stderr) {
-                    console.log('[DrawIOService] stderr:', stderr);
-                }
 
                 if (code !== 0) {
                     console.error('[DrawIOService] Conversion failed:', stderr);
@@ -165,8 +156,6 @@ export class DrawIOService {
                     const data = format === 'svg'
                         ? await fs.promises.readFile(tempOutputPath, 'utf8')
                         : await fs.promises.readFile(tempOutputPath);
-
-                    console.log(`[DrawIOService] ✅ Converted to ${format.toUpperCase()}: ${path.basename(filePath)} (${data.length} bytes)`);
 
                     // Cleanup temp file
                     await fs.promises.unlink(tempOutputPath);

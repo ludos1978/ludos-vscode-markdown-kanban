@@ -1445,8 +1445,6 @@ export class MessageHandler {
             // Frontend already updated optimistically, so don't send board update back
             this._markUnsavedChanges(true, board);
 
-            console.log(`[MessageHandler] Updated Marp global setting in memory: ${key} = ${value}`);
-
         } catch (error) {
             console.error('[MessageHandler] Error updating Marp global setting:', error);
             vscode.window.showErrorMessage(`Failed to update Marp setting: ${error}`);
@@ -1669,27 +1667,20 @@ export class MessageHandler {
 
     private async handleVSCodeSnippet(message: any): Promise<void> {
         try {
-            console.log(`[MessageHandler] Getting snippet name for shortcut: ${message.shortcut}`);
-
             // Use VS Code's snippet resolution to get the actual snippet content
-            // This leverages VS Code's built-in snippet system
             const snippetName = await this.getSnippetNameForShortcut(message.shortcut);
 
             if (!snippetName) {
-                console.warn(`[MessageHandler] No snippet name found for ${message.shortcut}`);
                 vscode.window.showInformationMessage(
                     `No snippet configured for ${message.shortcut}. Add a keybinding with "editor.action.insertSnippet" command.`
                 );
                 return;
             }
 
-            console.log(`[MessageHandler] Snippet name: ${snippetName}, resolving content...`);
-
             // Resolve the snippet content from VS Code's markdown snippet configuration
             const resolvedContent = await this.resolveSnippetContent(snippetName);
 
             if (resolvedContent) {
-                console.log(`[MessageHandler] Snippet resolved, length: ${resolvedContent.length}, sending to webview`);
                 const panel = this._getWebviewPanel();
                 if (panel) {
                     panel._panel.webview.postMessage({
@@ -1698,12 +1689,7 @@ export class MessageHandler {
                         fieldType: message.fieldType,
                         taskId: message.taskId
                     });
-                    console.log(`[MessageHandler] Snippet content sent to webview`);
-                } else {
-                    console.warn(`[MessageHandler] No webview panel found`);
                 }
-            } else {
-                console.warn(`[MessageHandler] Snippet content is empty for: ${snippetName}`);
             }
 
         } catch (error) {
@@ -1716,31 +1702,22 @@ export class MessageHandler {
 
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
-
             // Use the command sent from frontend (already loaded on view focus)
-            // This avoids reloading shortcuts on every keypress
             const userCommand = message.command;
-
-            console.log(`[MessageHandler] handleEditorShortcut - shortcut: ${message.shortcut}, command: ${userCommand}, type: ${typeof userCommand}`);
 
             // If it's a snippet command, handle it specially
             if (userCommand === 'editor.action.insertSnippet') {
-                console.log(`[MessageHandler] Handling snippet shortcut: ${message.shortcut}`);
                 await this.handleVSCodeSnippet(message);
                 return;
             }
 
             if (userCommand) {
-
                 try {
                     // Simply execute the command - let VSCode handle it with default behavior
-                    // This avoids issues with temp documents closing the wrong view
-                    console.log(`[MessageHandler] Executing command: ${userCommand}`);
                     await vscode.commands.executeCommand(userCommand);
-
                     return;
                 } catch (err) {
-                    console.error(`[MessageHandler] Failed to execute command:`, err);
+                    console.error(`[MessageHandler] Failed to execute command ${userCommand}:`, err);
                 }
             }
 
@@ -1774,13 +1751,9 @@ export class MessageHandler {
                 }
             }
 
-            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} user keybindings`);
-
             // 2. Add VSCode default shortcuts (highest priority - overrides user keybindings)
             const extensionShortcuts = await this.getExtensionShortcuts();
             Object.assign(shortcutMap, extensionShortcuts);
-
-            console.log(`[MessageHandler] Total shortcuts loaded: ${Object.keys(shortcutMap).length}`);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
@@ -1837,11 +1810,6 @@ export class MessageHandler {
             } else {
                 rejectedShortcuts.push(`${shortcut} → ${command}`);
             }
-        }
-
-        console.log(`[MessageHandler] Loaded ${Object.keys(validShortcuts).length} VSCode shortcuts (${Object.keys(extensionShortcuts).length} checked)`);
-        if (rejectedShortcuts.length > 0) {
-            console.log(`[MessageHandler] Rejected shortcuts (command not found):`, rejectedShortcuts);
         }
 
         return validShortcuts;
@@ -2507,12 +2475,10 @@ export class MessageHandler {
 
             // Same hash = same file, reuse it
             if (existingHash === hash) {
-                console.log('[IMAGE-DROP] File with same hash already exists, reusing:', candidateFilename);
                 return candidateFilename;
             }
 
             // Different hash = collision, add timestamp
-            console.log('[IMAGE-DROP] Hash collision detected, adding timestamp');
             const timestamp = Date.now();
             candidateFilename = `${baseName}-${hash}-${timestamp}${extension}`;
         }
@@ -2565,8 +2531,6 @@ export class MessageHandler {
         const formattedPath = isImage
             ? this._formatImagePath(sourcePath, directory)
             : this._fileManager.generateConfiguredPath(sourcePath);
-
-        console.log(`[FILE-DROP] File in workspace, linking: ${formattedPath}`);
 
         const panel = this._getWebviewPanel();
         if (panel && panel._panel) {
@@ -2637,11 +2601,8 @@ export class MessageHandler {
         const targetPath = path.join(mediaFolderPath, targetFileName);
 
         // Write file (images check hash, files overwrite)
-        if (isImage && fs.existsSync(targetPath)) {
-            console.log('[FILE-DROP] Reusing existing image:', targetFileName);
-        } else {
+        if (!isImage || !fs.existsSync(targetPath)) {
             fs.writeFileSync(targetPath, buffer);
-            console.log('[FILE-DROP] Saved file:', targetFileName);
         }
 
         // Format path
@@ -2758,9 +2719,6 @@ export class MessageHandler {
                 const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
                 existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
 
-                if (existingFile) {
-                    console.log(`[FILE-DROP] Found existing matching file: ${existingFile}`);
-                }
             }
 
             // Send dialogue options to frontend
@@ -2860,7 +2818,6 @@ export class MessageHandler {
 
             // Send link message for the existing file in media folder
             this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage);
-            console.log(`[FILE-DROP] Linked existing file from media folder: ${existingFile}`);
         } catch (error) {
             console.error('[FILE-DROP-LINK-EXISTING] Error:', error);
             this._sendFileDropError(
@@ -2882,7 +2839,6 @@ export class MessageHandler {
 
             // Open folder in OS file explorer
             await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(mediaFolderPath));
-            console.log('[FILE-DROP] Opened media folder:', mediaFolderPath);
         } catch (error) {
             console.error('[FILE-DROP] Error opening media folder:', error);
             vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -4164,16 +4120,16 @@ export class MessageHandler {
                         if (firstDiff >= 0) {
                             const start = Math.max(0, firstDiff - 20);
                             const end = Math.min(minLen, firstDiff + 80);
-                            console.log(`[VerifySync] MISMATCH at char ${firstDiff}:`);
-                            console.log(`  Frontend[${start}:${end}]: "${frontendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
-                            console.log(`  Backend [${start}:${end}]: "${backendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
+                            console.warn(`[VerifySync] MISMATCH at char ${firstDiff}:`);
+                            console.warn(`  Frontend[${start}:${end}]: "${frontendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
+                            console.warn(`  Backend [${start}:${end}]: "${backendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
                         } else if (frontendContent.length !== backendContent.length) {
-                            console.log(`[VerifySync] LENGTH MISMATCH: frontend=${frontendContent.length}, backend=${backendContent.length}`);
+                            console.warn(`[VerifySync] LENGTH MISMATCH: frontend=${frontendContent.length}, backend=${backendContent.length}`);
                             // Show the extra content at the end
                             const longer = frontendContent.length > backendContent.length ? frontendContent : backendContent;
                             const shorter = frontendContent.length > backendContent.length ? backendContent : frontendContent;
                             const which = frontendContent.length > backendContent.length ? 'Frontend' : 'Backend';
-                            console.log(`  ${which} has extra: "${longer.substring(shorter.length).replace(/\n/g, '\\n')}"`);
+                            console.warn(`  ${which} has extra: "${longer.substring(shorter.length).replace(/\n/g, '\\n')}"`);
                         }
                     }
                 } else {
@@ -4804,40 +4760,36 @@ export class MessageHandler {
      */
     private async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Called with:', { scope, columnId, taskId, classes });
-
             // Create HTML comment directive
             const classString = classes.join(' ');
             const directive = classes.length > 0 ? `<!-- _class: ${classString} -->\n` : '';
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Directive:', directive);
 
             // Get panel to access board
             const panel = this._getWebviewPanel();
             if (!panel) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No panel found');
+                console.error('[handleSaveMarpClasses] No panel found');
                 return;
             }
 
             // Get current board
             const board = panel.getBoard();
             if (!board) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No board found');
+                console.error('[handleSaveMarpClasses] No board found');
                 return;
             }
 
             // Get current markdown content from main file
             const mainFile = panel._fileRegistry.getMainFile();
             if (!mainFile) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No main file found');
+                console.error('[handleSaveMarpClasses] No main file found');
                 return;
             }
 
             let markdown = mainFile.getContent();
             if (!markdown) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No markdown content found');
+                console.error('[handleSaveMarpClasses] No markdown content found');
                 return;
             }
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Got markdown, length:', markdown.length);
 
             if (scope === 'global') {
                 // For global scope, add directive at the very beginning (or after YAML)
@@ -4860,59 +4812,51 @@ export class MessageHandler {
                 // Find column in board
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (!column) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found:', columnId);
+                    console.error('[handleSaveMarpClasses] Column not found:', columnId);
                     return;
                 }
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found column:', column.title);
 
                 // Find column header and add directive BEFORE it
                 const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const columnRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(## ${titleClean})`, 'm');
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex:', columnRegex);
 
                 const originalMarkdown = markdown;
-                markdown = markdown.replace(columnRegex, (match: string, existingDirective: string, header: string) => {
-                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex matched:', { match, existingDirective, header });
+                markdown = markdown.replace(columnRegex, (_match: string, _existingDirective: string, header: string) => {
                     // Replace or add directive before column header
                     return directive + header;
                 });
                 if (markdown === originalMarkdown) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column regex did not match anything!');
+                    console.error('[handleSaveMarpClasses] Column regex did not match anything!');
                 }
             } else if (scope === 'task' && columnId && taskId) {
                 // Find task in board
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (!column) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found for task:', columnId);
+                    console.error('[handleSaveMarpClasses] Column not found for task:', columnId);
                     return;
                 }
                 const task = column.tasks.find((t: any) => t.id === taskId);
                 if (!task) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task not found:', taskId);
+                    console.error('[handleSaveMarpClasses] Task not found:', taskId);
                     return;
                 }
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found task:', task.title);
 
                 // Find task line and add directive BEFORE it
                 const titleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const taskRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(- \\[[ x]\\] ${titleClean})`, 'm');
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex:', taskRegex);
 
                 const originalMarkdown = markdown;
-                markdown = markdown.replace(taskRegex, (match: string, existingDirective: string, taskLine: string) => {
-                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex matched:', { match, existingDirective, taskLine });
+                markdown = markdown.replace(taskRegex, (_match: string, _existingDirective: string, taskLine: string) => {
                     // Replace or add directive before task
                     return directive + taskLine;
                 });
                 if (markdown === originalMarkdown) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task regex did not match anything!');
+                    console.error('[handleSaveMarpClasses] Task regex did not match anything!');
                 }
             }
 
             // Update file content (marks as unsaved)
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Setting content, changed:', markdown.length);
             mainFile.setContent(markdown, false);
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Content set successfully');
 
             // After saving, send updated directives to frontend
             await this.sendMarpDirectivesToFrontend();
@@ -5349,7 +5293,6 @@ export class MessageHandler {
 
             // Check if cached version exists and is valid
             if (fs.existsSync(cachePath)) {
-                console.log(`[DrawIO Backend] Using cached render: ${cacheFileName}`);
                 const cachedPng = await fs.promises.readFile(cachePath);
                 pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
             } else {
@@ -5362,8 +5305,6 @@ export class MessageHandler {
                     throw new Error('draw.io CLI not installed');
                 }
 
-                console.log(`[DrawIO Backend] Rendering: ${path.basename(absolutePath)}`);
-
                 // Render to PNG (better rendering than SVG in webview)
                 const pngBuffer = await service.renderPNG(absolutePath);
 
@@ -5372,7 +5313,6 @@ export class MessageHandler {
 
                 // Save to cache
                 await fs.promises.writeFile(cachePath, pngBuffer);
-                console.log(`[DrawIO Backend] Cached render: ${cacheFileName}`);
 
                 // Clean up old cache files for this diagram (different mtimes)
                 await this.cleanOldDrawIOCache(cacheDir, absolutePath, cacheFileName);
@@ -5454,7 +5394,6 @@ export class MessageHandler {
                 if (file.startsWith(prefix) && file !== currentCacheFile && file.endsWith('.png')) {
                     const oldPath = path.join(cacheDir, file);
                     await fs.promises.unlink(oldPath);
-                    console.log(`[DrawIO Backend] Cleaned old cache: ${file}`);
                 }
             }
         } catch (error) {
@@ -5501,13 +5440,10 @@ export class MessageHandler {
             try {
                 const pngBuffer = await service.renderPNG(absolutePath);
                 dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-                console.log('[Excalidraw Backend] ✅ Rendered as PNG');
             } catch (pngError) {
-                console.warn('[Excalidraw Backend] PNG conversion failed, falling back to SVG:', pngError);
-                // Fallback to SVG
+                // Fallback to SVG if PNG conversion fails
                 const svg = await service.renderSVG(absolutePath);
                 dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-                console.log('[Excalidraw Backend] ✅ Rendered as SVG (fallback)');
             }
 
             // Send success response to webview with mtime for cache invalidation

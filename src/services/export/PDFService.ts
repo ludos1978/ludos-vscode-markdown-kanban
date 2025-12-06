@@ -38,7 +38,6 @@ export class PDFService {
         if (await this.testCliCommand(cliName)) {
             this.cliPath = cliName;
             this.isCliAvailable = true;
-            console.log(`[PDFService] Found pdftoppm CLI: ${cliName}`);
             this.availabilityChecked = true;
             return true;
         }
@@ -113,9 +112,6 @@ export class PDFService {
                 tempPrefix                  // Output prefix
             ];
 
-            console.log(`[PDFService] Rendering page ${pageNumber} of: ${path.basename(filePath)}`);
-            console.log(`[PDFService] Command: ${this.cliPath} ${args.join(' ')}`);
-
             const child = spawn(this.cliPath!, args);
 
             let stderr = '';
@@ -140,10 +136,6 @@ export class PDFService {
                 clearTimeout(timer);
 
                 try {
-                    if (stderr) {
-                        console.log('[PDFService] stderr:', stderr);
-                    }
-
                     if (code !== 0) {
                         console.error('[PDFService] Conversion failed:', stderr);
                         reject(new Error(`pdftoppm exited with code ${code}`));
@@ -188,7 +180,6 @@ export class PDFService {
 
                     // Read PNG output
                     const png = await fs.promises.readFile(outputPath);
-                    console.log(`[PDFService] ✅ Converted page ${pageNumber} to PNG: ${path.basename(filePath)} (${png.length} bytes)`);
 
                     // Cleanup temp file
                     await fs.promises.unlink(outputPath);
@@ -252,7 +243,6 @@ export class PDFService {
                 const match = stdout.match(/Pages:\s+(\d+)/);
                 if (match) {
                     const pageCount = parseInt(match[1], 10);
-                    console.log(`[PDFService] PDF has ${pageCount} pages`);
                     resolve(pageCount);
                 } else {
                     reject(new Error('Could not determine page count from pdfinfo output'));

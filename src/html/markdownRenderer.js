@@ -759,7 +759,6 @@ function invalidateDiagramCache(filePath, diagramType) {
  */
 function clearDiagramCache() {
     diagramRenderCache.clear();
-    console.log('[Diagram Cache] Cleared all cached diagrams');
 }
 
 /**

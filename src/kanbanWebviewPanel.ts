@@ -255,26 +255,21 @@ export class KanbanWebviewPanel {
         }
 
         if (documentUri) {
-            console.log('[Panel Revive] Starting revival with documentUri:', documentUri);
             // CRITICAL: Use async IIFE to properly handle promise rejections
             // The revive() method is not async, so we need to handle errors ourselves
             (async () => {
                 try {
-                    console.log('[Panel Revive] Opening document...');
                     const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
-                    console.log('[Panel Revive] Document opened, loading markdown file...');
                     await kanbanPanel.loadMarkdownFile(document);
-                    console.log('[Panel Revive] Markdown file loaded successfully');
                 } catch (error) {
                     // This catches both openTextDocument failures (file not found) and loadMarkdownFile failures
-                    console.error('[Panel Revive] Failed to load document:', documentUri, error);
+                    console.warn('[Panel Revive] Failed to load document:', documentUri, error);
                     // Fallback: try to find an active markdown document
                     kanbanPanel.tryAutoLoadActiveMarkdown();
                 }
             })();
         } else {
             // No state available, try to auto-load active markdown document
-            console.warn('[Panel Revive] No documentUri in state, trying auto-load');
             kanbanPanel.tryAutoLoadActiveMarkdown();
         }
         // Don't store in map yet - will be stored when document is loaded
@@ -2223,8 +2218,6 @@ export class KanbanWebviewPanel {
         }
 
         try {
-            console.log('[KanbanWebviewPanel] Refreshing all view configuration...');
-
             // 1. Load keyboard shortcuts
             await this._sendShortcutsToWebview();
 
@@ -2271,8 +2264,6 @@ export class KanbanWebviewPanel {
                 type: 'configurationUpdate',
                 config: config
             } as any);
-
-            console.log('[KanbanWebviewPanel] ✅ Configuration refresh complete');
 
         } catch (error) {
             console.error('[KanbanWebviewPanel] ❌ Failed to refresh view configuration:', error);
@@ -2751,8 +2742,6 @@ export class KanbanWebviewPanel {
      */
     public async saveUnsavedChangesBackup(): Promise<void> {
         try {
-            console.log('[KanbanWebviewPanel] Creating unsaved changes backup...');
-
             // Save main file backup
             const mainFile = this._getMainFile();
             if (mainFile && mainFile.hasUnsavedChanges()) {
@@ -2768,7 +2757,6 @@ export class KanbanWebviewPanel {
                     const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
 
                     fs.writeFileSync(backupPath, content, 'utf8');
-                    console.log(`[KanbanWebviewPanel] ✅ Main file backup saved: ${backupPath}`);
                 }
             }
 
@@ -2792,16 +2780,13 @@ export class KanbanWebviewPanel {
                                 const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
 
                                 fs.writeFileSync(backupPath, content, 'utf8');
-                                console.log(`[KanbanWebviewPanel] ✅ Include file backup saved: ${backupPath}`);
                             }
                         }
                     }
                 }
             }
-
-            console.log('[KanbanWebviewPanel] ✅ Unsaved changes backup complete');
         } catch (error) {
-            console.error('[KanbanWebviewPanel] ❌ Failed to save unsaved changes backup:', error);
+            console.error('[KanbanWebviewPanel] Failed to save unsaved changes backup:', error);
             // Don't throw - we want to continue with the close process even if backup fails
         }
     }

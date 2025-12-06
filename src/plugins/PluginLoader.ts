@@ -33,13 +33,10 @@ export class PluginLoader {
      */
     static loadBuiltinPlugins(): void {
         if (this._loaded) {
-            console.log('[PluginLoader] Built-in plugins already loaded, skipping');
             return;
         }
 
         const registry = PluginRegistry.getInstance();
-
-        console.log('[PluginLoader] Loading built-in plugins...');
 
         // ============= IMPORT PLUGINS =============
         // Order matters: higher priority plugins are checked first
@@ -79,10 +76,6 @@ export class PluginLoader {
         }
 
         this._loaded = true;
-
-        // Log summary
-        const debugInfo = registry.getDebugInfo();
-        console.log(`[PluginLoader] Loaded ${debugInfo.import.length} import plugins, ${debugInfo.export.length} export plugins`);
     }
 
     /**

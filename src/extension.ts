@@ -63,15 +63,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {
-		console.log('[Kanban Extension] Registering webview panel serializer');
 		vscode.window.registerWebviewPanelSerializer(KanbanWebviewPanel.viewType, {
 			async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
-				console.log('[Kanban Extension] deserializeWebviewPanel called with state:', JSON.stringify(state));
 				KanbanWebviewPanel.revive(webviewPanel, context.extensionUri, context, state);
 			}
 		});
-	} else {
-		console.warn('[Kanban Extension] registerWebviewPanelSerializer not available');
 	}
 
 	// Force refresh all existing panels to ensure new compiled code is loaded (dev mode)
@@ -384,8 +380,6 @@ export function activate(context: vscode.ExtensionContext) {
  * ⚠️ CRITICAL: This must check for unsaved changes and prompt user BEFORE allowing close!
  */
 export async function deactivate(): Promise<void> {
-	console.log('[Extension] Deactivating - checking for unsaved changes...');
-
 	// Get all open Kanban panels
 	const panels = KanbanWebviewPanel.getAllPanels();
 
@@ -394,13 +388,9 @@ export async function deactivate(): Promise<void> {
 		const hasUnsaved = await panel.checkUnsavedChanges();
 
 		if (hasUnsaved) {
-			console.log('[Extension] Panel has unsaved changes - creating backup...');
-
 			// First, save a backup file with "-unsavedchanges" suffix
 			// This ensures we don't lose data regardless of user's choice
 			await panel.saveUnsavedChangesBackup();
-
-			console.log('[Extension] Backup created - prompting user...');
 
 			// Show prompt directly here (webview will be disposed soon, can't use panel's method)
 			const saveAndClose = 'Save and close';
@@ -417,8 +407,6 @@ export async function deactivate(): Promise<void> {
 
 			if (!choice || choice === cancel) {
 				// User cancelled - we can't actually prevent VSCode from closing here
-				// But we can at least try to give them a warning
-				console.log('[Extension] User cancelled close - but VSCode will close anyway');
 				// Note: VSCode doesn't support preventing close from deactivate()
 				return;
 			}
@@ -426,21 +414,15 @@ export async function deactivate(): Promise<void> {
 			if (choice === saveAndClose) {
 				// Save changes before closing
 				try {
-					console.log('[Extension] Saving changes before close...');
 					await panel.saveToMarkdown(true, true);
-					console.log('[Extension] ✅ Save succeeded');
 				} catch (error) {
-					console.error('[Extension] ❌ Save failed:', error);
+					console.error('[Extension] Save failed during deactivation:', error);
 					// Continue anyway - VSCode is closing
 				}
-			} else {
-				console.log('[Extension] User chose to discard changes');
 			}
 		}
 	}
 
 	// Clean up context
 	await vscode.commands.executeCommand('setContext', 'markdownKanbanActive', false);
-
-	console.log('[Extension] Deactivation complete');
 }
