@@ -4485,8 +4485,12 @@ h6 .kanban-tag {
 .kanban-full-height-column[data-current-time="true"] .column-header,
 .kanban-full-height-column[data-current-time="true"] .column-title,
 .kanban-full-height-column[data-current-time="true"] .column-inner,
-.kanban-full-height-column[data-current-time="true"] .column-footer,
-.task-item[data-current-time="true"] {
+.kanban-full-height-column[data-current-time="true"] .column-footer {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+.task-item[data-current-time="true"],
+.task-item:not([data-task-tag])[data-current-time="true"] {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 

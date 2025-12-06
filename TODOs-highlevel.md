@@ -1,4 +1,24 @@
-- [ ] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+
+
+- [ ] would it be possible to limit the display of active hours, days etc if the above
+  timeslots (if they are added) are also active.\
+  \
+  so if the column has a !W49 tag, then the hourly tag !09:00-12:00 is only showing if
+  it's Week 49. But if the column has no Weekly tag, the hourly tag shows allways.\
+  \
+  the order date/time would be: Year -> Month -> Week-Numer -> Day or Day-Number ->
+  Hour/Timeframe\
+  \
+  The structure is: Column-Title -> Task-Title -> Task-Content\
+  \
+  if a higher order (for example Year) is in the higher structure (Column-Title), then a
+  lower data/time (for example Time) on a lower structure below it is only highlighted
+  when the higher order one is also active.\
+  \
+  make 3 suggestions how to implement this feature with a quality rating!
+
+- [x] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
 
 - [x] if we drag a file into the kanban we check the media folder first. if a file that matches the criteries is found in the media folder (first check same filename and compare the has when also check all files for the first 1mb of the file combined with the filesize) :
 
@@ -73,7 +93,7 @@ if no solution is found, drop it at the end of the column.
 
 
 
-- [ ] ARCHITECTURE REFACTORING: Event-Driven Component System
+- [x] ARCHITECTURE REFACTORING: Event-Driven Component System
   **Plan:** See `agent/ARCHITECTURE-REFACTORING-PLAN.md` for full details
   **Phase 1 Guide:** See `agent/PHASE1-EVENTBUS-IMPLEMENTATION.md`
 
@@ -101,8 +121,6 @@ if no solution is found, drop it at the end of the column.
 
   **Quality Targets:** All components 95%+ quality rating
   **Risk:** Medium-High (core refactoring), mitigated by incremental migration
-
-- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
 - [ ] I want to be able to add templates for columns. these should be markdown presentation style that create the content of a column with none or some tasks with default content when dragged into the scene. It should also allow a -Media folder with the same name that would be instantiated into the markdown-kanban when instantiated.
 
@@ -137,7 +155,7 @@ or
 
 - [x] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
-- [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
+- [x] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
 
 - [x] "move to column" from a task burger menu doesnt work.
 

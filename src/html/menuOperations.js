@@ -3226,16 +3226,20 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         taskElement.removeAttribute('data-all-tags');
     }
 
-    // Update temporal attributes - set the CORRECT attribute for each type
-    if (window.tagUtils) {
-        // Get task text including description for temporal check
-        let taskText = newTitle || '';
+    // Update temporal attributes with hierarchical gating
+    if (window.tagUtils && window.getActiveTemporalAttributes) {
+        // Find task and column for hierarchical gating
+        let taskTitle = newTitle || '';
+        let taskDescription = '';
+        let columnTitle = '';
         const board = window.currentBoard || window.cachedBoard;
         if (board) {
             for (const column of board.columns) {
                 const task = column.tasks.find(t => t.id === taskId);
                 if (task) {
-                    taskText = (task.title || '') + ' ' + (task.description || '');
+                    taskTitle = task.title || '';
+                    taskDescription = task.description || '';
+                    columnTitle = column.title || '';
                     break;
                 }
             }
@@ -3248,12 +3252,15 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         taskElement.removeAttribute('data-current-hour');
         taskElement.removeAttribute('data-current-time');
 
+        // Get active temporal attributes with hierarchical gating
+        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, taskTitle, taskDescription);
+
         // Set only the ones that are active
-        if (window.tagUtils.isCurrentDate(taskText)) taskElement.setAttribute('data-current-day', 'true');
-        if (window.tagUtils.isCurrentWeek(taskText)) taskElement.setAttribute('data-current-week', 'true');
-        if (window.tagUtils.isCurrentWeekday(taskText)) taskElement.setAttribute('data-current-weekday', 'true');
-        if (window.tagUtils.isCurrentTime(taskText)) taskElement.setAttribute('data-current-hour', 'true');
-        if (window.tagUtils.isCurrentTimeSlot(taskText)) taskElement.setAttribute('data-current-time', 'true');
+        for (const [attr, isActive] of Object.entries(activeAttrs)) {
+            if (isActive) {
+                taskElement.setAttribute(attr, 'true');
+            }
+        }
     }
 
     // Update header bars immediately

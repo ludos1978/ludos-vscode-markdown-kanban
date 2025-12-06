@@ -589,6 +589,110 @@ class TagUtils {
     }
 
     /**
+     * Evaluate temporal tags at a single structural level with gate control.
+     *
+     * Temporal hierarchy (higher to lower): date > week > weekday > hour > timeSlot
+     * A closed gate means higher-order temporals are not active, so lower-order ones shouldn't highlight.
+     *
+     * @param {string} text - Text to evaluate
+     * @param {Object} incomingGate - Gate state from higher structural level
+     * @param {boolean} incomingGate.open - Whether the gate is open
+     * @param {string|null} incomingGate.closedBy - What closed the gate (for debugging)
+     * @param {string} levelName - Name of this level (for debugging)
+     * @returns {Object} { attrs: {attr: boolean}, gate: {open, closedBy} }
+     */
+    evaluateTemporalsAtLevel(text, incomingGate, levelName) {
+        // If no text or gate already closed, return empty
+        if (!text || !incomingGate.open) {
+            return { attrs: {}, gate: incomingGate };
+        }
+
+        const attrs = {};
+        let gate = { ...incomingGate };
+
+        // Temporal checks ordered by hierarchy (higher order first)
+        // Higher-order temporals gate lower-order ones
+        const checks = [
+            { has: this.hasDateTag,     check: this.isCurrentDate,     attr: 'data-current-day',     name: 'date' },
+            { has: this.hasWeekTag,     check: this.isCurrentWeek,     attr: 'data-current-week',    name: 'week' },
+            { has: this.hasWeekdayTag,  check: this.isCurrentWeekday,  attr: 'data-current-weekday', name: 'weekday' },
+            { has: this.hasTimeTag,     check: this.isCurrentTime,     attr: 'data-current-hour',    name: 'hour' },
+            { has: this.hasTimeSlotTag, check: this.isCurrentTimeSlot, attr: 'data-current-time',    name: 'timeSlot' }
+        ];
+
+        for (const { has, check, attr, name } of checks) {
+            if (has.call(this, text)) {
+                // Only check if gate is still open
+                const isActive = gate.open && check.call(this, text);
+                attrs[attr] = isActive;
+
+                // If this temporal exists but isn't active, close the gate for lower levels
+                if (!isActive && gate.open) {
+                    gate = { open: false, closedBy: `${levelName}:${name}` };
+                }
+            }
+        }
+
+        return { attrs, gate };
+    }
+
+    /**
+     * Get active temporal attributes for a task considering hierarchical gating.
+     *
+     * Structural hierarchy: Column > Task Title > Task Content
+     * Temporal hierarchy: date > week > weekday > hour > timeSlot
+     *
+     * A temporal tag at a lower structural level is only highlighted if ALL temporal tags
+     * at higher structural levels are currently active.
+     *
+     * Example: Column has !W49, Task has !09:00-12:00
+     * - If current week is 49 AND current time is in 09:00-12:00 → task highlights
+     * - If current week is NOT 49 → task does NOT highlight (gate closed by column)
+     * - If column has NO week tag → task highlights whenever time matches
+     *
+     * @param {string} columnTitle - Column title text
+     * @param {string} taskTitle - Task title text
+     * @param {string} taskContent - Task description/content text
+     * @returns {Object} Object with data attributes as keys and boolean values
+     */
+    getActiveTemporalAttributes(columnTitle, taskTitle, taskContent) {
+        let gate = { open: true, closedBy: null };
+        const result = {};
+
+        // Evaluate column level (no gating from above)
+        const columnResult = this.evaluateTemporalsAtLevel(columnTitle || '', gate, 'column');
+        Object.assign(result, columnResult.attrs);
+        gate = columnResult.gate;
+
+        // Evaluate task title level (gated by column)
+        const titleResult = this.evaluateTemporalsAtLevel(taskTitle || '', gate, 'taskTitle');
+        // Only add attrs that aren't already set by column
+        for (const [attr, value] of Object.entries(titleResult.attrs)) {
+            if (result[attr] === undefined) {
+                result[attr] = value;
+            }
+        }
+        gate = titleResult.gate;
+
+        // Evaluate task content level (gated by column + title)
+        const contentResult = this.evaluateTemporalsAtLevel(taskContent || '', gate, 'taskContent');
+        // Only add attrs that aren't already set by higher levels
+        for (const [attr, value] of Object.entries(contentResult.attrs)) {
+            if (result[attr] === undefined) {
+                result[attr] = value;
+            }
+        }
+
+        // Debug logging (can be removed later)
+        const hasTemporals = Object.keys(result).length > 0;
+        if (hasTemporals) {
+            console.log('[TEMPORAL-HIERARCHY] gate:', gate.open ? 'OPEN' : `CLOSED by ${gate.closedBy}`, '| attrs:', result);
+        }
+
+        return result;
+    }
+
+    /**
      * Check if a tag is a numeric index tag
      * @param {string} tag - Tag to check (with or without # symbol)
      * @returns {boolean} True if numeric tag
@@ -1400,4 +1504,6 @@ if (typeof window !== 'undefined') {
     window.isCurrentTime = (text) => tagUtils.isCurrentTime(text);
     window.isCurrentTimeSlot = (text) => tagUtils.isCurrentTimeSlot(text);
     window.isTemporallyActive = (text) => tagUtils.isTemporallyActive(text);
+    window.getActiveTemporalAttributes = (colTitle, taskTitle, taskContent) =>
+        tagUtils.getActiveTemporalAttributes(colTitle, taskTitle, taskContent);
 }

@@ -2467,15 +2467,23 @@ function createTaskElement(task, columnId, taskIndex) {
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
 
-    // Check each temporal type separately for granular highlighting
-    const textToCheck = (task.title || '') + ' ' + (task.description || '');
+    // Check temporal tags with hierarchical gating (column > task title > task content)
+    // Higher-order temporals in columns gate lower-order temporals in tasks
     const temporalAttributes = [];
-    if (window.tagUtils) {
-        if (window.tagUtils.isCurrentDate(textToCheck)) temporalAttributes.push('data-current-day="true"');
-        if (window.tagUtils.isCurrentWeek(textToCheck)) temporalAttributes.push('data-current-week="true"');
-        if (window.tagUtils.isCurrentWeekday(textToCheck)) temporalAttributes.push('data-current-weekday="true"');
-        if (window.tagUtils.isCurrentTime(textToCheck)) temporalAttributes.push('data-current-hour="true"');
-        if (window.tagUtils.isCurrentTimeSlot(textToCheck)) temporalAttributes.push('data-current-time="true"');
+    if (window.tagUtils && window.getActiveTemporalAttributes) {
+        // Get column title for hierarchical gating
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const columnTitle = column?.title || '';
+
+        // Get active temporal attributes with hierarchical gating
+        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, task.title || '', task.description || '');
+
+        // Convert to attribute strings
+        for (const [attr, isActive] of Object.entries(activeAttrs)) {
+            if (isActive) {
+                temporalAttributes.push(`${attr}="true"`);
+            }
+        }
     }
     const temporalAttributeString = temporalAttributes.length > 0 ? ' ' + temporalAttributes.join(' ') : '';
 
