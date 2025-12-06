@@ -255,22 +255,19 @@ export class KanbanWebviewPanel {
         }
 
         if (documentUri) {
-            try {
-                vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri))
-                    .then(async document => {
-                        try {
-                            await kanbanPanel.loadMarkdownFile(document);
-                        } catch (error) {
-                            console.warn('Failed to load document on panel revival:', error);
-                            // Fallback: try to find an active markdown document
-                            kanbanPanel.tryAutoLoadActiveMarkdown();
-                        }
-                    });
-            } catch (error) {
-                console.warn('Failed to open document URI on panel revival:', error);
-                // Fallback: try to find an active markdown document
-                kanbanPanel.tryAutoLoadActiveMarkdown();
-            }
+            // CRITICAL: Use async IIFE to properly handle promise rejections
+            // The revive() method is not async, so we need to handle errors ourselves
+            (async () => {
+                try {
+                    const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+                    await kanbanPanel.loadMarkdownFile(document);
+                } catch (error) {
+                    // This catches both openTextDocument failures (file not found) and loadMarkdownFile failures
+                    console.warn('[Panel Revive] Failed to load document:', documentUri, error);
+                    // Fallback: try to find an active markdown document
+                    kanbanPanel.tryAutoLoadActiveMarkdown();
+                }
+            })();
         } else {
             // No state available, try to auto-load active markdown document
             kanbanPanel.tryAutoLoadActiveMarkdown();
@@ -627,6 +624,36 @@ export class KanbanWebviewPanel {
                 mainFile.updateFromBoard(board);
             }
 
+            // OPTIMIZATION: Send targeted update instead of full board redraw
+            if (taskId && columnId) {
+                // Find the updated task and send targeted update
+                const targetColumn = board.columns.find(col => col.id === columnId);
+                const targetTask = targetColumn?.tasks.find(task => task.id === taskId);
+                if (targetTask) {
+                    this._webviewBridge.sendBatched({
+                        type: 'updateTaskContent',
+                        taskId: taskId,
+                        columnId: columnId,
+                        task: targetTask,
+                        imageMappings: {}
+                    });
+                    return;
+                }
+            } else if (columnId && !taskId) {
+                // Find the updated column and send targeted update
+                const targetColumn = board.columns.find(col => col.id === columnId);
+                if (targetColumn) {
+                    this._webviewBridge.sendBatched({
+                        type: 'updateColumnContent',
+                        columnId: columnId,
+                        column: targetColumn,
+                        imageMappings: {}
+                    });
+                    return;
+                }
+            }
+
+            // Fallback to full board update if no specific target
             await this.sendBoardUpdate();
         }
     }
@@ -2191,8 +2218,6 @@ export class KanbanWebviewPanel {
         }
 
         try {
-            console.log('[KanbanWebviewPanel] Refreshing all view configuration...');
-
             // 1. Load keyboard shortcuts
             await this._sendShortcutsToWebview();
 
@@ -2239,8 +2264,6 @@ export class KanbanWebviewPanel {
                 type: 'configurationUpdate',
                 config: config
             } as any);
-
-            console.log('[KanbanWebviewPanel] ✅ Configuration refresh complete');
 
         } catch (error) {
             console.error('[KanbanWebviewPanel] ❌ Failed to refresh view configuration:', error);
@@ -2719,8 +2742,6 @@ export class KanbanWebviewPanel {
      */
     public async saveUnsavedChangesBackup(): Promise<void> {
         try {
-            console.log('[KanbanWebviewPanel] Creating unsaved changes backup...');
-
             // Save main file backup
             const mainFile = this._getMainFile();
             if (mainFile && mainFile.hasUnsavedChanges()) {
@@ -2736,7 +2757,6 @@ export class KanbanWebviewPanel {
                     const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
 
                     fs.writeFileSync(backupPath, content, 'utf8');
-                    console.log(`[KanbanWebviewPanel] ✅ Main file backup saved: ${backupPath}`);
                 }
             }
 
@@ -2760,16 +2780,13 @@ export class KanbanWebviewPanel {
                                 const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
 
                                 fs.writeFileSync(backupPath, content, 'utf8');
-                                console.log(`[KanbanWebviewPanel] ✅ Include file backup saved: ${backupPath}`);
                             }
                         }
                     }
                 }
             }
-
-            console.log('[KanbanWebviewPanel] ✅ Unsaved changes backup complete');
         } catch (error) {
-            console.error('[KanbanWebviewPanel] ❌ Failed to save unsaved changes backup:', error);
+            console.error('[KanbanWebviewPanel] Failed to save unsaved changes backup:', error);
             // Don't throw - we want to continue with the close process even if backup fails
         }
     }

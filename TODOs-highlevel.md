@@ -1,19 +1,117 @@
-- [ ] first we need to figure out on what row we are, then which stack, then in which column, if it's a task we are dragging we also need to check within the column. we have calculated all the positions already or we can read them from a few items.
+
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+
+
+- [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
+
+- [ ] when initializing a file it still does not reload the file immediately after adding the required header.
+
+- [ ] #### Combined Queries
+
+A column can have multiple query tags:
+
+```markdown
+- Reto This Week ?@reto ?.w15
+```
+
+### Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | AND | `#gather_Reto&day<3` |
+| `\|` | OR | `#gather_Reto\|Anita` |
+| `=` | EQUAL | `#gather_day=0` |
+| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
+| `<` | LESS THAN | `#gather_day<7` |
+| `>` | GREATER THAN | `#gather_day>0` |
+
+### Date Properties
+
+| Property | Description | Values |
+|----------|-------------|--------|
+| `day` | Days from today | -2, -1, 0, 1, 2, ... |
+| `weekday` | Day name | mon, tue, wed, ... |
+| `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
+| `month` | Month name | jan, feb, mar, ... |
+| `monthnum` | Month number | 1 to 12 |
+
+### ?ungathered
+
+Collects all cards that didn't match any gather rule:
+
+
+- [x] can we highlight the lines where tags are within the task description as well? also 
+work with the inheritance system we use. for that we should also support minutes. \
+\
+for example the task header might have:\
+!15:00-16:00\
+\
+and the task contents might be\
+\
+!:15-:30 : highlighted between 15:15 to 15:30\
+\
+!:30-:45 : highlighted between 15:30 to 15:45 \
+\
+which would highlight the complete line with a right border as we do with the task. \
+\
+can you integrate that into the existing system? 
+
+- [x] would it be possible to limit the display of active hours, days etc if the above
+  timeslots (if they are added) are also active.\
+  \
+  so if the column has a !W49 tag, then the hourly tag !09:00-12:00 is only showing if
+  it's Week 49. But if the column has no Weekly tag, the hourly tag shows allways.\
+  \
+  the order date/time would be: Year -> Month -> Week-Numer -> Day or Day-Number ->
+  Hour/Timeframe\
+  \
+  The structure is: Column-Title -> Task-Title -> Task-Content\
+  \
+  if a higher order (for example Year) is in the higher structure (Column-Title), then a
+  lower data/time (for example Time) on a lower structure below it is only highlighted
+  when the higher order one is also active.\
+  \
+  make 3 suggestions how to implement this feature with a quality rating!
+
+- [x] when dropping tasks on folded columns it should highlight it's border and be appended to the end of the column. the same applies if the task is dropped on a column but not in a valid position or on the header. this is currently working, but it doesnt highlight the border, it highlights some position in the top of the column.
+
+- [x] if we drag a file into the kanban we check the media folder first. if a file that matches the criteries is found in the media folder (first check same filename and compare the has when also check all files for the first 1mb of the file combined with the filesize) :
+
+to calculate the hash for files < 1mb use the hash, for larger files use the 1mb of t file and the filesize combined to create the hash.
+
+keep the hashes and the last changed time in a .hash_cache file in the media folder. if t last changed date is modified, recalculate the hash for the file
+- we give the user the option to open the media folder (copy it manually)
+- or link the already existing file (if the file is found, as first option)
+- or cancel
+
+- [x] the drag & drop system can copy media into the media folder if the path to the file is not found. but when the media is very large this might crash the webview. in this case the user should be prompted for the action to take instead. check if the file is larger then 10mb and then ask the user to manually copy the file into the media folder or get a path to the file to paste!
+  - COMPLETED 2025-12-05: Dialogue with hash-based matching. Uses partial hash (first 1MB + size) to detect existing files in media folder. Options: Link existing file (if found), Open media folder, Cancel. Hash cache stored in .hash_cache file with mtime tracking for efficient updates.
+
+- [x] the drag & drop system is used by many components. dragging internally, draggin externally, for columns, for tasks. They can be dropped in different rows, stacks of columns and tasks into the columns themself. This system described its functionality. 
+
+The system does not use any caching!
+
+first we need to figure out on what row we are (vertical), then which stack (horizontal), then in which column (vertical), if we are moving a task we also need to check within the column for the correct position (vertical). use the positions of the elements directly, do not chache anything!
 
 the row is split up into areas by the:
   kanban-container > kanban-board multi-row > kanban-row
-only check within this row for any further checks!
+when we determined the row, only check within this row for any further checks!
 
 the vertical dividers between stacks are the:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack column-drop-zone-stack
-when on top of one of those, drop the column into the new stack. do not add a #stack tag to it. depending on the row add a row tag.
+when on top of one of those
+- drop the column into the new stack. do not add a #stack tag to it. depending on the row add a row tag. 
+- if a task is dropped here, we dont have a valid solution.
 
-if within a:
-  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack
-we should only check this columns for the right position
+if over a:
+  kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack (without column-drop-zone-stack)
+we should only check this stack for the right position
 
-only check within the found kanban-column-stack:
-for the column drop position we need to use the middle of a column, which is defined by:
+only check within the found kanban-column-stack!
+- columns are stacked when there is more then one kanban-full-height-column in a kanban-column-stack
+- if there is only one column in a kanban-column-stack it's a single column stack
+
+if we are dragging a column: we need to use the middle of a column, which is defined by:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-header > the top of it
   +
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-footer > the bottom of it
@@ -25,20 +123,32 @@ to display the position place the marker in:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-margin
 if it's the last position display it at the top of:
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > stack-bottom-drop-zone
-if it's a column we have decided for the column position here. a tasks position must be further calculated. if it's dropped as the first collumn in the stack dont add a stack tag, but add a stack tag to the column below. if it's placed anywhere else add a stack tag.
+if it's a column we have determined for the column position here. 
 
 if a vertically folded column is dropped into a stack it must converted to be horizontally folded. also if a column is dropped into a stack with a vertically folded column, it must be converted to horizontally folded.
 
-only check within the found task for the kanban-full-height-column:
-to find the position of a task:
+if the column is dropped as the first column in the stack dont add a stack tag, but add a stack tag to the column below. if the column is placed anywhere else in the stack then add a stack tag.
+
+if we are dragging a tasks, then position must be further calculated using these two rules:
+- determine the current column by checking if we are hovering over the column-title. if this is the case we can directly put the task into at the end of the column.
+- then check if we are hovering over the "top of the column-header" and the "bottom of the column-footer" . 
+only check it within the previously selected stack!
+all further calculations are only done on this column!
+when hovering over the footer or the header on a folded column, it must highlight the header and put the task as last position in the column.
+
+iteratively go over each task-item in the column and break once you found one that the task is hovered over: 
   kanban-container > kanban-board multi-row > kanban-row > kanban-column-stack > kanban-full-height-column (collapsed-horizontal) > column-inner > column-content > tasks-container > task-item
-take the mid of each : the task should be placed above if above the mid
-othervise check the next task-item, if there are none left, it's the last item.
+if it's hovered above a gap, this is the position we want it to drop onto!
+
+the task must be placed above, if above the mid. it should be placed below, if below the mid.
+if no solution is found, drop it at the end of the column.
+
+((( the position of the task is calculated by:
+- if the task is dropped onto the column-title, column-header or column-footer, place it as the last task of the column! )))
 
 
 
-
-- [ ] ARCHITECTURE REFACTORING: Event-Driven Component System
+- [x] ARCHITECTURE REFACTORING: Event-Driven Component System
   **Plan:** See `agent/ARCHITECTURE-REFACTORING-PLAN.md` for full details
   **Phase 1 Guide:** See `agent/PHASE1-EVENTBUS-IMPLEMENTATION.md`
 
@@ -66,8 +176,6 @@ othervise check the next task-item, if there are none left, it's the last item.
 
   **Quality Targets:** All components 95%+ quality rating
   **Risk:** Medium-High (core refactoring), mitigated by incremental migration
-
-- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
 - [ ] I want to be able to add templates for columns. these should be markdown presentation style that create the content of a column with none or some tasks with default content when dragged into the scene. It should also allow a -Media folder with the same name that would be instantiated into the markdown-kanban when instantiated.
 
@@ -102,7 +210,7 @@ or
 
 - [x] currently when i modify a task which contains a drawio it regenerates the image every time, could we cache it somehow? maybe in a subfolder (drawio-cache) of the Media folder of the markdown "{filename}-Media" ? it should be individual for each file, so included files have the media cached in a {include-filename}-Media folder next to the include file.
 
-- [ ] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
+- [x] do another round of code de-duplication! verify the complete code  structure. use the files in the agent folder to search for duplicates. analyze the data and code structure deeply, then suggest improvements you could work on. generate 3 solutions to solve the problem you found and rate  the quality. improve the quality of each solution until all are very high,  then pick the best solution or combine the solution to a final suggestion.  the quality must be above 95% to be allowed to continue working on it! then continue implementing the solution. ultrathink plan
 
 - [x] "move to column" from a task burger menu doesnt work.
 

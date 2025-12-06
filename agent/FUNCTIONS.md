@@ -1036,6 +1036,27 @@ Total functions documented: **523**
 - src/messageHandler-handleCopyImageToMedia - Copy dropped image from file path (VS Code Explorer drops); copies file to [kanban]-MEDIA folder with unique filename
 - src/messageHandler-_sendImageDropError - Helper to send error message to frontend when image drop fails
 
+### New/Modified Functions (2025-12-05 - File Drop Dialogue):
+- src/html/dragDrop-handleVSCodeFileDrop - Modified to show dialogue instead of immediately reading file; calculates partial hash (first 1MB) for matching; stores File object in pendingFileDrops map
+- src/html/dragDrop-handleVSCodeUriDrop - Modified to request dialogue for external files; files in workspace are auto-linked without dialogue
+- src/html/dragDrop-readPartialFileForHash - Read first 1MB of file for hash calculation (safe for large files); returns base64 encoded data
+- src/html/dragDrop-executeFileObjectCopy - Execute file copy after user confirms in dialogue (for File objects); reads file and sends to backend
+- src/html/dragDrop-cancelPendingFileDrop - Cancel pending file drop when user cancels dialogue
+- src/html/dragDrop-formatFileSize - Format bytes to human readable size (KB, MB, GB)
+- src/html/dragDrop-showFileDropDialogue - Show modal with options: Link existing file (if found), Open media folder, Cancel
+- src/messageHandler-handleRequestFileDropDialogue - Backend handler; checks workspace (auto-link), calculates hash, searches media folder for existing matching file
+- src/messageHandler-handleExecuteFileDropCopy - Backend handler for user's copy action (URI drops)
+- src/messageHandler-handleExecuteFileDropLink - Backend handler for user's link action (URI drops)
+- src/messageHandler-handleLinkExistingFile - Backend handler to link existing file found in media folder
+- src/messageHandler-handleOpenMediaFolder - Open media folder in OS file explorer (Finder/Explorer)
+- src/messageHandler-_calculatePartialHash - Calculate hash for file; uses first 1MB + size for large files (>1MB)
+- src/messageHandler-_calculatePartialHashFromData - Calculate hash from provided partial data buffer and file size
+- src/messageHandler-_loadHashCache - Load .hash_cache file from media folder
+- src/messageHandler-_saveHashCache - Save .hash_cache file to media folder
+- src/messageHandler-_updateHashCache - Update cache for all files in media folder; recalculates stale entries (by mtime)
+- src/messageHandler-_findMatchingFileByHash - Search media folder for file with matching hash (checks filename first, then all files)
+- src/html/webview-messageHandler (showFileDropDialogue case) - Handle dialogue options from backend, call showFileDropDialogue
+
 ---
 
 ## Plugin System (2025-11-25)

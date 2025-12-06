@@ -88,8 +88,6 @@ export class PluginRegistry {
         for (const plugin of this._exportPlugins.values()) {
             // Export plugins don't have activate in current interface, but may in future
         }
-
-        console.log('[PluginRegistry] Initialized');
     }
 
     /**
@@ -124,7 +122,6 @@ export class PluginRegistry {
         }
 
         this._importPlugins.set(plugin.metadata.id, plugin);
-        console.log(`[PluginRegistry] Registered import plugin: ${plugin.metadata.id} (priority: ${plugin.metadata.priority})`);
     }
 
     /**
@@ -139,7 +136,6 @@ export class PluginRegistry {
                 );
             }
             this._importPlugins.delete(pluginId);
-            console.log(`[PluginRegistry] Unregistered import plugin: ${pluginId}`);
             return true;
         }
         return false;
@@ -183,18 +179,13 @@ export class PluginRegistry {
         }
 
         this._exportPlugins.set(plugin.metadata.id, plugin);
-        console.log(`[PluginRegistry] Registered export plugin: ${plugin.metadata.id}`);
     }
 
     /**
      * Unregister an export plugin
      */
     unregisterExportPlugin(pluginId: string): boolean {
-        if (this._exportPlugins.delete(pluginId)) {
-            console.log(`[PluginRegistry] Unregistered export plugin: ${pluginId}`);
-            return true;
-        }
-        return false;
+        return this._exportPlugins.delete(pluginId);
     }
 
     /**

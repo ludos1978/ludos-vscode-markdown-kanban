@@ -284,6 +284,184 @@ function datePersonTagPlugin(md, options = {}) {
     };
 }
 
+// =============================================================================
+// TEMPORAL TAG CONFIGURATION - Easy to customize icons and styling
+// =============================================================================
+const TEMPORAL_TAG_CONFIG = {
+    // Icons for different temporal tag types (can be emoji or text)
+    icons: {
+        date: '📅',      // Date tags: !2025.01.28
+        week: '📆',      // Week tags: !w49, !2025.w49
+        weekday: '📅',   // Weekday tags: !mon, !friday
+        time: '🕐',      // Time tags: !15:30, !9am
+        timeSlot: '⏱️',  // Time slot tags: !09:00-17:00
+        minuteSlot: '⏱️', // Minute slot tags: !:15-:30
+        generic: '🕐'    // Generic temporal: fallback
+    },
+    // Whether to show icons (set to false to hide all icons)
+    showIcons: true,
+    // Base CSS class for all temporal tags
+    baseClass: 'kanban-temporal-tag'
+};
+
+// Temporal tag plugin for markdown-it (handles temporal prefix from TAG_PREFIXES)
+function temporalTagPlugin(md, options = {}) {
+    const config = { ...TEMPORAL_TAG_CONFIG, ...options };
+    // Get temporal prefix from centralized config (defaults to '!' if not available)
+    const TEMPORAL_PREFIX = (typeof window !== 'undefined' && window.TAG_PREFIXES)
+        ? window.TAG_PREFIXES.TEMPORAL
+        : '!';
+    const TEMPORAL_CHAR_CODE = TEMPORAL_PREFIX.charCodeAt(0);
+
+    function parseTemporalTag(state, silent) {
+        let pos = state.pos;
+
+        // Check for temporal prefix at word boundary
+        if (state.src.charCodeAt(pos) !== TEMPORAL_CHAR_CODE) { return false; }
+
+        // Must be at start or after whitespace
+        if (pos > 0) {
+            const prevChar = state.src.charCodeAt(pos - 1);
+            if (prevChar !== 0x20 /* space */ && prevChar !== 0x0A /* newline */ && prevChar !== 0x09 /* tab */) {
+                return false;
+            }
+        }
+
+        pos++;
+        if (pos >= state.posMax) { return false; }
+
+        const remaining = state.src.slice(pos);
+        let tagContent = '';
+        let tagType = '';
+
+        // Try matching patterns in order of specificity
+
+        // 1. Time slot: HH:MM-HH:MM or Ham-Hpm
+        const timeSlotMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)-(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
+        if (timeSlotMatch) {
+            tagContent = timeSlotMatch[0];
+            tagType = 'timeSlot';
+            pos += tagContent.length;
+        }
+        // 2. Week with year: YYYY.wNN or YYYY-wNN
+        else {
+            const weekYearMatch = remaining.match(/^(\d{4})[-.]?[wW](\d{1,2})(?=\s|$)/);
+            if (weekYearMatch) {
+                tagContent = weekYearMatch[0];
+                tagType = 'week';
+                pos += tagContent.length;
+            }
+            // 3. Week without year: wNN or WNN
+            else {
+                const weekMatch = remaining.match(/^[wW](\d{1,2})(?=\s|$)/);
+                if (weekMatch) {
+                    tagContent = weekMatch[0];
+                    tagType = 'week';
+                    pos += tagContent.length;
+                }
+                // 4. Date: YYYY.MM.DD or YYYY-MM-DD or YYYY/MM/DD
+                else {
+                    const dateMatch = remaining.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?=\s|$)/);
+                    if (dateMatch) {
+                        tagContent = dateMatch[0];
+                        tagType = 'date';
+                        pos += tagContent.length;
+                    }
+                    // 5. Weekday: mon, monday, tue, tuesday, etc.
+                    else {
+                        const weekdayMatch = remaining.match(/^(mon|monday|tue|tuesday|wed|wednesday|thu|thursday|fri|friday|sat|saturday|sun|sunday)(?=\s|$)/i);
+                        if (weekdayMatch) {
+                            tagContent = weekdayMatch[0];
+                            tagType = 'weekday';
+                            pos += tagContent.length;
+                        }
+                        // 6. Minute slot: :MM-:MM (inherits hour from parent)
+                        else {
+                            const minuteSlotMatch = remaining.match(/^:(\d{1,2})-:(\d{1,2})(?=\s|$)/i);
+                            if (minuteSlotMatch) {
+                                tagContent = minuteSlotMatch[0];
+                                tagType = 'minuteSlot';
+                                pos += tagContent.length;
+                            }
+                            // 7. Time: HH:MM or Ham/Hpm
+                            else {
+                                const timeMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
+                                if (timeMatch) {
+                                    tagContent = timeMatch[0];
+                                    tagType = 'time';
+                                    pos += tagContent.length;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // No match found
+        if (!tagContent) { return false; }
+
+        if (silent) { return true; }
+
+        // Create token
+        const token = state.push('temporal_tag', 'span', 0);
+        token.content = tagContent;
+        token.markup = '.';
+        token.meta = { type: tagType, config };
+
+        state.pos = pos;
+        return true;
+    }
+
+    // Register before 'emphasis' - temporal prefix must be a markdown-it terminator char
+    md.inline.ruler.before('emphasis', 'temporal_tag', parseTemporalTag);
+
+    md.renderer.rules.temporal_tag = function(tokens, idx) {
+        const token = tokens[idx];
+        const tagContent = token.content;
+        const tagType = token.meta.type;
+        const cfg = token.meta.config;
+        const fullTag = TEMPORAL_PREFIX + tagContent;
+
+        // Determine CSS class based on type
+        const typeClass = `kanban-temporal-${tagType}`;
+        const classes = [cfg.baseClass, typeClass].join(' ');
+
+        // Get icon for this type
+        const icon = cfg.showIcons ? (cfg.icons[tagType] || cfg.icons.generic) : '';
+
+        // Check if currently active (for highlighting)
+        let isActive = false;
+        if (typeof window !== 'undefined' && window.tagUtils) {
+            switch (tagType) {
+                case 'date': isActive = window.tagUtils.isCurrentDate(fullTag); break;
+                case 'week': isActive = window.tagUtils.isCurrentWeek(fullTag); break;
+                case 'weekday': isActive = window.tagUtils.isCurrentWeekday(fullTag); break;
+                case 'time': isActive = window.tagUtils.isCurrentTime(fullTag); break;
+                case 'timeSlot': isActive = window.tagUtils.isCurrentTimeSlot(fullTag); break;
+                case 'minuteSlot':
+                    // Minute slots inherit from parent time slot context
+                    // The parent time slot is set before rendering via window.currentRenderingTimeSlot
+                    if (window.currentRenderingTimeSlot) {
+                        isActive = window.tagUtils.isCurrentMinuteSlot(fullTag, window.currentRenderingTimeSlot);
+                    }
+                    break;
+            }
+        }
+
+        const activeClass = isActive ? ' temporal-active' : '';
+        // Use simple HTML escaping inline to avoid dependency issues
+        const escContent = tagContent.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const escFull = fullTag.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const dataAttr = `data-temporal-type="${tagType}" data-temporal="${escContent}"`;
+
+        // For minute slots, add an extra attribute to help with line-level styling
+        const lineActiveAttr = (tagType === 'minuteSlot' && isActive) ? ' data-temporal-line-active="true"' : '';
+
+        return `<span class="${classes}${activeClass}" ${dataAttr}${lineActiveAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escFull}</span>`;
+    };
+}
+
 // Tag extraction functions now in utils/tagUtils.js
 
 // Enhanced strikethrough plugin with delete buttons
@@ -581,7 +759,6 @@ function invalidateDiagramCache(filePath, diagramType) {
  */
 function clearDiagramCache() {
     diagramRenderCache.clear();
-    console.log('[Diagram Cache] Cleared all cached diagrams');
 }
 
 /**
@@ -752,6 +929,7 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
             const { pngDataUrl } = result;
 
             // Update image
+            // Height recalculation is handled automatically by the column ResizeObserver
             imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
 
             // Update state
@@ -772,14 +950,16 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
         }
     };
 
-    // Event listeners for navigation
-    prevBtn.addEventListener('click', () => {
+    // Event listeners for navigation (stopPropagation prevents opening editor)
+    prevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (currentPage > 1) {
             loadPage(currentPage - 1);
         }
     });
 
-    nextBtn.addEventListener('click', () => {
+    nextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (currentPage < pageCount) {
             loadPage(currentPage + 1);
         }
@@ -791,6 +971,7 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
 
 /**
  * Process all pending diagram renders in the queue
+ * Height recalculation is handled automatically by the column ResizeObserver
  */
 async function processDiagramQueue() {
     if (diagramQueueProcessing || pendingDiagramQueue.length === 0) {
@@ -798,9 +979,6 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = true;
-
-    // Track which stacks have diagrams inserted (to recalculate heights once per stack)
-    const affectedStacks = new Set();
 
     while (pendingDiagramQueue.length > 0) {
         const item = pendingDiagramQueue.shift();
@@ -820,12 +998,6 @@ async function processDiagramQueue() {
 
                 // Create slideshow UI
                 await createPDFSlideshow(element, item.filePath, pageCount, fileMtime);
-
-                // Track affected stack for batch recalculation
-                const stackElement = element.closest('.kanban-column-stack');
-                if (stackElement) {
-                    affectedStacks.add(stackElement);
-                }
                 continue;
             }
 
@@ -859,13 +1031,9 @@ async function processDiagramQueue() {
 
             // Replace placeholder with rendered image
             // Include data-original-src for alt-click to open in editor
+            // Height recalculation is handled automatically by the column ResizeObserver
             element.innerHTML = `<img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${item.filePath}" />`;
 
-            // Track affected stack for batch recalculation
-            const stackElement = element.closest('.kanban-column-stack');
-            if (stackElement) {
-                affectedStacks.add(stackElement);
-            }
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);
             const errorLabel = item.diagramType === 'pdf' ? `PDF page ${item.pageNumber}` : `${item.diagramType} diagram`;
@@ -877,21 +1045,7 @@ async function processDiagramQueue() {
     }
 
     diagramQueueProcessing = false;
-
-    // Recalculate heights ONCE per affected stack
-    // Uses existing batching system: waits for ALL images in stack to load, then recalculates
-    // Use requestAnimationFrame to ensure browser has rendered the images before recalculating
-    if (typeof window.waitForStackImagesAndRecalculate === 'function' && affectedStacks.size > 0) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                // Double RAF ensures images are fully decoded and rendered
-                affectedStacks.forEach(stack => {
-                    window.waitForStackImagesAndRecalculate(stack);
-                });
-                console.log(`[Diagram] Triggered height recalculation for ${affectedStacks.size} stack(s)`);
-            });
-        });
-    }
+    // Height recalculation is handled automatically by the MutationObserver in boardRenderer.js
 }
 
 // Handle PlantUML render responses from backend
@@ -1255,6 +1409,7 @@ function renderMarkdown(text, includeContext) {
     // Store includeContext for use by image renderer
     window.currentTaskIncludeContext = includeContext;
 
+
     // Debug logging to trace include rendering
     const hasInclude = text.includes('!!!include(');
     if (hasInclude) {
@@ -1278,7 +1433,8 @@ function renderMarkdown(text, includeContext) {
         .use(tagPlugin, {
             tagColors: window.tagColors || {}
         })
-        .use(datePersonTagPlugin) // Add this line
+        .use(datePersonTagPlugin) // @ prefix: @person, @2025-01-28
+        .use(temporalTagPlugin)  // . prefix: .w49, .2025.12.05, .mon, .15:30, .09:00-17:00
         .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
         .use(speakerNotePlugin) // Speaker notes (;; syntax)
         .use(htmlCommentPlugin, {
@@ -1362,8 +1518,11 @@ function renderMarkdown(text, includeContext) {
         // Helper function to resolve media paths dynamically
         function resolveMediaPath(originalSrc) {
             const includeContext = window.currentTaskIncludeContext;
+            // Check for Windows absolute path (C:/, D:\, etc.)
+            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
             const isRelativePath = originalSrc &&
                                    !originalSrc.startsWith('/') &&
+                                   !isWindowsAbsolute &&
                                    !originalSrc.startsWith('http://') &&
                                    !originalSrc.startsWith('https://') &&
                                    !originalSrc.startsWith('vscode-webview://');
@@ -1392,6 +1551,11 @@ function renderMarkdown(text, includeContext) {
 
                 const resolvedPath = '/' + dirSegments.join('/');
                 const encodedPath = encodeURI(resolvedPath);
+                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (isWindowsAbsolute) {
+                // Windows absolute path (C:/Users/...) - convert to webview URI
+                const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
+                const encodedPath = encodeURI(normalizedPath);
                 return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
             return originalSrc;
@@ -1513,8 +1677,11 @@ function renderMarkdown(text, includeContext) {
 
             // Check if we have includeContext and the path is relative
             const includeContext = window.currentTaskIncludeContext;
+            // Check for Windows absolute path (C:/, D:\, etc.)
+            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
             const isRelativePath = originalSrc &&
                                    !originalSrc.startsWith('/') &&
+                                   !isWindowsAbsolute &&
                                    !originalSrc.startsWith('http://') &&
                                    !originalSrc.startsWith('https://') &&
                                    !originalSrc.startsWith('vscode-webview://');
@@ -1557,13 +1724,30 @@ function renderMarkdown(text, includeContext) {
                 // Format: https://file%2B.vscode-resource.vscode-cdn.net/absolute/path
                 const encodedPath = encodeURI(resolvedPath);
                 displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (isWindowsAbsolute) {
+                // Windows absolute path (C:/Users/...) - convert to webview URI
+                // Normalize backslashes to forward slashes and prepend /
+                const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
+                const encodedPath = encodeURI(normalizedPath);
+                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
 
             // Store original src for click handling
             const originalSrcAttr = ` data-original-src="${escapeHtml(originalSrc)}"`;
             const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
 
-            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" />`;
+            // Skip onerror for data URLs (they don't fail to load)
+            const isDataUrl = displaySrc && displaySrc.startsWith('data:');
+
+            // Add onerror handler to replace broken image with searchable placeholder
+            // The placeholder includes data-original-src so Alt+click search still works
+            let onerrorHandler = '';
+            if (!isDataUrl) {
+                const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
+                onerrorHandler = ` onerror="var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';"`;
+            }
+
+            return `<img src="${displaySrc}" alt="${escapeHtml(alt)}"${titleAttr}${originalSrcAttr} class="markdown-image" loading="lazy"${onerrorHandler} />`;
         };
         
         // Enhanced link renderer
@@ -1599,7 +1783,7 @@ function renderMarkdown(text, includeContext) {
         // Add PlantUML renderer
         addPlantUMLRenderer(md);
 
-        const rendered = md.render(text);
+        let rendered = md.render(text);
 
         // Trigger PlantUML queue processing after render completes
         if (pendingPlantUMLQueue.length > 0) {
@@ -1615,12 +1799,12 @@ function renderMarkdown(text, includeContext) {
 
         // Remove paragraph wrapping for single line content
         if (!text.includes('\n') && rendered.startsWith('<p>') && rendered.endsWith('</p>\n')) {
-            return rendered.slice(3, -5);
+            rendered = rendered.slice(3, -5);
         }
 
         return rendered;
     } catch (error) {
-        console.error('Error rendering markdown:', error);
+        console.error('Error rendering markdown:', error?.message || error, error?.stack);
         return escapeHtml(text);
     }
 }

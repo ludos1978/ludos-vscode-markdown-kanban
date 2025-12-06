@@ -348,15 +348,13 @@ export class DiagramPreprocessor {
                 const filePath = path.join(outputFolder, fileName);
                 await fs.promises.writeFile(filePath, svg, 'utf8');
 
-                console.log(`[DiagramPreprocessor] ✅ Rendered ${diagram.id}`);
-
                 return {
                     id: diagram.id,
                     fileName,
                     originalBlock: diagram.fullMatch
                 };
             } catch (error) {
-                console.error(`[DiagramPreprocessor] ❌ Failed to render ${diagram.id}:`, error);
+                console.error(`[DiagramPreprocessor] Failed to render ${diagram.id}:`, error);
                 return null;
             }
         });
@@ -403,15 +401,13 @@ export class DiagramPreprocessor {
                 const filePath = path.join(outputFolder, fileName);
                 await fs.promises.writeFile(filePath, svg, 'utf8');
 
-                console.log(`[DiagramPreprocessor] ✅ Rendered ${diagram.id}`);
-
                 return {
                     id: diagram.id,
                     fileName,
                     originalBlock: diagram.fullMatch
                 };
             } catch (error) {
-                console.error(`[DiagramPreprocessor] ❌ Failed to render ${diagram.id}:`, error);
+                console.error(`[DiagramPreprocessor] Failed to render ${diagram.id}:`, error);
                 return null;
             }
         });

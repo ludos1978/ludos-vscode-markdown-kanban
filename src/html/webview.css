@@ -1000,8 +1000,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   flex-direction: column;
   /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
 	/* border-radius: 0px 0px 4px 4px; */
   overflow-x: visible;
@@ -1015,8 +1013,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 	position: sticky;
 	/* top: 28px; */
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	/* border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border)); */
 	border-radius: 0px 0px 4px 4px;
 }
 
@@ -1082,9 +1080,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   z-index: 11;
 	padding-bottom: var(--whitespace-div4);
 	position: sticky;
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-radius: 4px 4px 0px 0px;
   background-color: var(--column-background);
 }
@@ -1099,8 +1094,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   z-index: 10;
   background-color: var(--column-background);
   /* Keep your original left and right borders */
-  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
   border-top: none;
   border-bottom: none;
   margin-bottom: 0;
@@ -1139,8 +1132,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   flex-direction: column;
   /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
 	/* border-radius: 0px 0px 4px 4px; */
   overflow-x: visible;
@@ -1156,9 +1147,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   height: 4px;
 	/* top: 28px; */
 	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-radius: 0px 0px 4px 4px;
 }
 
@@ -1292,6 +1280,43 @@ body.small-card-fonts .task-title-container .markdown-content img {
 .strikethrough-content a {
   /* Style for broken links */
   color: var(--vscode-errorForeground, #f48771) !important;
+}
+
+/* Style for images that failed to load (file not found) */
+.image-not-found {
+  /* Show subtle placeholder for missing images with search capability */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 60px;
+  min-height: 20px;
+  padding: 4px 8px;
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.1));
+  border: 1px dashed var(--vscode-inputValidation-warningBorder, #cca700);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  cursor: pointer;
+}
+
+.image-not-found::before {
+  content: '📷 Image not found';
+}
+
+.image-not-found::after {
+  content: '🔍';
+  font-size: 12px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.image-not-found:hover {
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2));
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.image-not-found:hover::after {
+  opacity: 1;
 }
 
 /* Left side controls (drag handle, collapse toggle) */
@@ -2667,23 +2692,61 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   transition: min-width 0.15s ease 0.1s, background 0.2s ease, width 0.15s ease 0.1s;
 }
 
+/* BEGIN style with only lines not with borders */
+.column-drop-zone {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 2px 100%;
+}
+
+.kanban-column-stack .kanban-full-height-column .column-margin {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 100% 2px;
+}
+
+.stack-bottom-drop-zone {
+  background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat 0 4px / 100% 2px;
+}
+/* END style with only lines not with borders */
+
+/* BEGIN style with borders */
+/* .column-header {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-title {
+  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-inner {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+}
+
+.column-footer {
+	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
+	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
+} */
+/* END style with borders */
+
+
+
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
-.stack-bottom-drop-zone.drag-over {
+.stack-bottom-drop-zone.drag-over,
+.column-margin.drag-over {
   background: var(--vscode-editor-selectionBackground);
   border: 2px dashed var(--vscode-editor-selectionForeground);
   border-radius: 4px;
 }
 
-/* Column margin drop indicator - needs to be visible! */
-.column-margin.drag-over {
-  background: var(--vscode-focusBorder) !important;
-  min-height: 8px !important;
-  height: 8px !important;
+/* Visual feedback when dropping task at end of column (hovering over column-title) */
+.column-title.task-drop-target {
+  background: var(--vscode-editor-selectionBackground);
+  outline: 2px dashed var(--vscode-focusBorder);
+  outline-offset: -2px;
   border-radius: 4px;
-  box-shadow: 0 0 6px var(--vscode-focusBorder);
-  z-index: 10000;
-  position: relative;
 }
 
 /* Visual separation - add padding to content of stacked columns
@@ -4389,13 +4452,54 @@ h6 .kanban-tag {
  * NO CSS :has() rules for numeric badge positioning
  */
 
-/* Current week highlighting for columns and tasks */
+/* Temporal highlighting for columns and tasks */
 /* Border style (default) - apply to column elements, not container */
+/* Week highlighting */
 .kanban-full-height-column[data-current-week="true"] .column-header,
 .kanban-full-height-column[data-current-week="true"] .column-title,
 .kanban-full-height-column[data-current-week="true"] .column-inner,
 .kanban-full-height-column[data-current-week="true"] .column-footer,
 .task-item[data-current-week="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Day/Date highlighting */
+.kanban-full-height-column[data-current-day="true"] .column-header,
+.kanban-full-height-column[data-current-day="true"] .column-title,
+.kanban-full-height-column[data-current-day="true"] .column-inner,
+.kanban-full-height-column[data-current-day="true"] .column-footer,
+.task-item[data-current-day="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Weekday highlighting */
+.kanban-full-height-column[data-current-weekday="true"] .column-header,
+.kanban-full-height-column[data-current-weekday="true"] .column-title,
+.kanban-full-height-column[data-current-weekday="true"] .column-inner,
+.kanban-full-height-column[data-current-weekday="true"] .column-footer,
+.task-item[data-current-weekday="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Time slot highlighting */
+.kanban-full-height-column[data-current-time="true"] .column-header,
+.kanban-full-height-column[data-current-time="true"] .column-title,
+.kanban-full-height-column[data-current-time="true"] .column-inner,
+.kanban-full-height-column[data-current-time="true"] .column-footer {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+.task-item[data-current-time="true"],
+.task-item:not([data-task-tag])[data-current-time="true"] {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+}
+
+/* Hour highlighting */
+.kanban-full-height-column[data-current-hour="true"] .column-header,
+.kanban-full-height-column[data-current-hour="true"] .column-title,
+.kanban-full-height-column[data-current-hour="true"] .column-inner,
+.kanban-full-height-column[data-current-hour="true"] .column-footer,
+.task-item[data-current-hour="true"] {
   border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
 }
 
@@ -4423,6 +4527,21 @@ body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] .c
 
 body.week-highlight-glow .task-item[data-current-week="true"] {
   box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
+}
+
+/* Line-level temporal highlighting for minute slots in task descriptions */
+/* When a paragraph contains an active minute slot (!:15-:30), highlight the entire line */
+.task-description-display p:has([data-temporal-line-active="true"]),
+.task-description-display li:has([data-temporal-line-active="true"]) {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+  padding-right: 8px;
+  margin-right: -4px;
+}
+
+/* Fallback for browsers that don't support :has() - highlight the span itself more prominently */
+.kanban-temporal-minuteSlot.temporal-active {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+  padding-right: 4px;
 }
 
 /* Header and footer bars */
@@ -4681,6 +4800,81 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 
 /* Ensure week tags stay inline in folded columns */
 .collapsed .kanban-week-tag {
+    display: inline !important;
+}
+
+/* =============================================================================
+   TEMPORAL TAGS (.prefix) - Dates, Weeks, Weekdays, Times, Time Slots
+   ============================================================================= */
+
+/* Base styling for all temporal tags */
+.kanban-temporal-tag {
+    color: var(--vscode-charts-green, #4ec9b0);
+    background-color: rgba(78, 201, 176, 0.1);
+    padding: 0px 4px;
+    display: inline;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+    user-select: none;
+    border: 1px solid var(--vscode-charts-green, #4ec9b0);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+/* Icon styling */
+.kanban-temporal-tag .temporal-icon {
+    font-size: 0.9em;
+    margin-right: 2px;
+    vertical-align: middle;
+}
+
+/* Hover effect */
+.kanban-temporal-tag:hover {
+    opacity: 0.8;
+}
+
+/* Active temporal tag - NO special highlight, task border is highlighted instead */
+
+/* Type-specific color variations */
+.kanban-temporal-date {
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
+}
+
+
+.kanban-temporal-week {
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
+}
+
+
+.kanban-temporal-weekday {
+    color: var(--vscode-charts-purple, #8a2be2);
+    background-color: rgba(138, 43, 226, 0.1);
+    border-color: var(--vscode-charts-purple, #8a2be2);
+}
+
+
+.kanban-temporal-time {
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
+}
+
+
+.kanban-temporal-timeSlot {
+    color: var(--vscode-charts-blue, #007acc);
+    background-color: rgba(0, 122, 204, 0.1);
+    border-color: var(--vscode-charts-blue, #007acc);
+}
+
+
+/* Ensure temporal tags stay inline in collapsed columns */
+.collapsed .kanban-temporal-tag {
     display: inline !important;
 }
 

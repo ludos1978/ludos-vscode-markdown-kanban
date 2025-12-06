@@ -1,42 +1,133 @@
-# Kanban Markdown for Visual Studio Code & VSCodium
+# Ludos Kanban Editor
 
-A VS Code extension that allows editing Markdown files as an interactive Kanban board. Its made to mimic the functionality of a obsidian markdown editor which allows data handling and link management in kanban format. Using the tags it's more versatile. It should be data compatible with the Kanban Obsidian Markdown format from https://github.com/mgmeyers/obsidian-kanban .
+This is a feature packed kanban editor that runs as an visual studio code editor extension.
 
-## A word of caution
+I started this project to create and maintain lecture presentations for my university lectures. As i have been using marp (markdown based presentation tool) several years, and my structure and plugins got more and more complex i wanted to simplify my work environment. I have been using vscode because it's an versatile editor, has lots of plugins, integrates visual editors and allows moving, renaming files within the workspaces. I have started to create and manage new lectures and i found no good tool to create an extensive research storage with a good overview that is local first and doesnt need any subscription (i would never use a subscription based tool that can lock in my data).
 
-The project is in active use by me. But i have encountered rare data storage and loading problems. But it might habe been just one intermediate version that modified some cards (the last card or the indention of content). So dont handle very important data with it yet. State in 2025-Sept-03.
+This markdown editor contains to many features. 
+- Foremost it's managing columns and tasks. 
+- But you can organize columns as you want into stacks, into multiple rows. 
+- You can fold them, you can make theyr headers sticky (so you can move content into them even outside the view.) . 
+- It has an extensive layout system to customize the viewport with some reasonable defaults. 
+- It has drag & drop features (from desktop with copy, from clipboard to create files from binary data or direct links). 
+- It can embed images (regular image formats, but also excalidraw, drawio, mermaid, plantuml and pdf), videos (mp4, only some audio formats), other markdown files and links. 
+- It can export with marp to create live-presentations, pdf-handouts and also editable pptx (an alpha feature of marp), presentations can in realtime update on kanban board modifications. 
+- It can also pack all or parts of the kanban into data into a single folder including media.
+- It has a extensive Tag system with labels, colors, person and automatic sorting features.
+- draw & drop
+  - from any file on the system (copies the file into a {filename}-Media folder)
+  - from the vscode-explorer (creates a link)
+  - the header has drag sources for
+    - empty tasks
+    - task filled from clipboard
+    - empty column
+    - columns created from templates you can define
 
-## For Developers
+---
 
-This extension uses a **state machine architecture** for handling all file changes. Before contributing:
+## Installation
 
-- **Architecture Overview**: Read [ARCHITECTURE.md](ARCHITECTURE.md) for system design and patterns
-- **State Machine Design**: See [STATE_MACHINE_DESIGN.md](STATE_MACHINE_DESIGN.md) for complete state flow specification
-- **Migration Guide**: Follow [STATE_MACHINE_MIGRATION_GUIDE.md](STATE_MACHINE_MIGRATION_GUIDE.md) when modifying change handling
-- **Development Rules**: Consult [AGENT.md](AGENT.md) for coding guidelines and best practices
-- **Function Catalog**: Check [agent/FUNCTIONS.md](agent/FUNCTIONS.md) before adding new functions
+To use it, install the vsix into the visual studio code editor in the extensions by using the breadcrumbs / burger menu on the top right and select "install from vsix". 
 
-**Key Principle**: All file changes must go through `ChangeStateMachine.processChange()` - never create direct handlers.
+You can use the editor without any of the external dependencies, but some features will not work.
 
-## Features
+For additional features you will need to install other addons as well:
+- marp
+- excalidraw
+- drawio
+- pdf
+- mermaid
+- plantuml
 
-### Basic Features
+(detailed explanation still missing, some require vscode extensions, some require a command line tool to convert)
 
-- **Markdown Parsing**: Automatically parses task lists from Markdown files.
-- **Kanban View**: Displays tasks in a Kanban board format with multi-column layout.
-- **Drag & Drop**: Supports dragging and dropping tasks between different columns. Proper movement and displaying of card and column movements. however they seem to be placed on top/bottom incoherently. Shift to drag from external (will copy the file to the {filename}-Media folder if linking is impossible)
-- **Real-time Sync**: Ensures real-time, two-way synchronization between the Kanban board and the Markdown file.
-- **Undo & Redo**
-- **Image & File dropping** creates new cards
-- **Links** embeds images and allows links to other files. Path resolution is done relatively to file, secondly relatively to the opened workspace folders or absolute depending on the path.
-- **Tags** that color the columns and cards (if used in the title)
-- **Folding** of cards, columns.
-- **Image Pasting** paste an image using meta+shift+v to create a link direclty from an path or an copyied image data.
+### Presentation mode
 
+to create the presentations you will need the marp-engine folder from the sourcecode and install marp <https://github.com/marp-team/marp-cli>
 
-### Supported Formats for Embeddings
+define the paths to these files in the config settings:
 
-\[\]\(\) or \!\[\]\(\) for direct preview
+- markdown-kanban.marp.enginePath
+  - /Users/username/marp-engine/engine.js
+  - c:/users/username/marp-engine/engine.js
+- markdown-kanban.marp.themeFolders
+  - /Users/username/marp-engine/themes
+  - c:/users/username/marp-engine/themes
+- markdown-kanban.marp.defaultTheme
+  - default
+
+### Installation of addons
+
+OSX: 
+  on osx a lot of command line tools can be installed using brew <https://brew.sh/>
+  i am only giving instructions on how to do it using brew
+
+Windows:
+  download the applications from the download and install.
+  i use foremost apple, but i am trying to fix problems i know of under windows
+
+### Excalidraw
+
+install the excalidraw addon from vscode addons
+
+### Drawio
+
+Windows: download from <https://github.com/jgraph/drawio-desktop/releases>
+
+OSX: brew install --cask drawio
+or Download the CLI-capable version from:
+  https://github.com/jgraph/drawio-desktop/releases
+
+define the setting:
+- markdown-kanban.drawioPath
+
+### PDF
+
+OSX: brew install poppler
+
+Windows: https://github.com/oschwartz10612/poppler-windows/releases/tag/v25.12.0-0
+
+define the path of poppler in the setting:
+- markdown-kanban.popplerPath
+
+### Plantuml
+
+is implemented, installations instructions todo
+
+### Mermaid
+
+is implemented, installations instructions todo
+
+### Java
+
+is implemented, installations instructions todo, required for mermaid i think
+
+---
+
+## Markdown features
+
+---:
+Column 1
+:--:
+Column 2
+:---
+
+;; comment 
+
+\[comment\]\(/path/to/file "label"\)
+[comment](/path/to/file "label")
+[[markdown-file-link]]
+<https://url.link.com>
+
+comment[^com]
+
+[^com]: some explanation
+
+comment^[comment]
+
+> indented note
+
+\!\[\]\(\) for direct preview
 - Images
 - Videos (only some mp4 audio formats are supported in vscode)
 - draw.io
@@ -45,81 +136,40 @@ This extension uses a **state machine architecture** for handling all file chang
 \`\`\`mermaid
 \`\`\`
 
-#### To use draw.io
+\`\`\`plantuml
+\`\`\`
 
-  Option 1: Install via Homebrew (Recommended)
+- one (normal dotted list)
+* two (normal dotted list, incremental dispaly in slide)
++ tree (no dot, incremental display in slide)
 
-  brew install --cask drawio
-  This creates a drawio CLI command in your PATH.
+  indented for styles
 
-  Option 2: Add CLI to PATH Manually
+==highlight==
 
-  If you want to keep using the installed app, you need to make the CLI
-  accessible. However, this may still not work because the .app bundle needs a display server.
-
-  Option 3: Use drawio-desktop CLI
-
-  Download the CLI-capable version from:
-  https://github.com/jgraph/drawio-desktop/releases
-
-
-
-### Required Format
-
-Requires a YAML header with 'kanban-plugin: board'
-Add a H2 Title (Boards) and Tasks (Cards) below it.
-
-```
----
-
-kanban-plugin: board
+^^sup^^ __sub__ ~~striketrough~~
+*as well* **as the normal styles**
 
 ---
 
-## Title of Board
-- [ ] Card
-  Text of Card
-- [ ] Next Card
-  Content of Card
-```
-
-### Installation
-
-1. Download the vsix and install
-
-### How to Use
-
-Press the "Kanban" button on the top right.
-Add columns using the buttons.
-Add cards using the buttons.
-
-### Open Issues
-
-Drag & Dropping Files from outside the editor doesnt create a correct path. Caused by https://github.com/microsoft/vscode-discussions/discussions/1663
-
-### Screenshot
-
-![](./imgs/screenshot-20250901.png)
-
-
-## Tag System
+## Tag features
 
 The Kanban board uses a flexible tag system with four distinct tag types, each with its own prefix character. Tags capture everything after the prefix until whitespace (space, tab, or newline).
-
-### Tag Types Overview
 
 | Prefix | Type | Description | Examples |
 |--------|------|-------------|----------|
 | `#` | Hash tags | Regular tags for categorization | `#todo`, `#urgent`, `#feature` |
 | `@` | Person tags | Assign people/mentions | `@john`, `@team-alpha` |
-| `.` | Temporal tags | Dates, times, weeks, weekdays | `.2025.01.28`, `.w15`, `.mon` |
-| `?` | Query tags | Gather cards matching criteria | `?#todo`, `?@reto`, `?.today` |
+| `!` | Temporal tags | Dates, times, weeks, weekdays | `!2025.01.28`, `!w15`, `!mon` |
+| `?` | Query tags | Gather cards matching criteria by putting it into a column header | `?#todo`, `?@reto`, `?.today` |
 
 ---
 
-## Hash Tags (`#`)
+### Hash Tags (`#`)
 
 Regular tags for categorization, status, and layout control.
+
+i added a library of tags which you can use, modify or ignore. additional groups can be added in the config.
 
 ### Basic Tags
 
@@ -135,97 +185,123 @@ Regular tags for categorization, status, and layout control.
 #todo #doing #done #blocked #waiting
 ```
 
-### Layout Tags
+### Numeric Index Tags
+
+For ordering columns/cards:
+
+```markdown
+#1 First Column
+#2 Second Column
+#1.1 Sub-section
+#3.1.4 Deep nesting
+```
+
+### Reserved Tags
+
+some tags are used to save some of the special settings of the kanban such as:
 
 | Tag | Description | Example |
 |-----|-------------|---------|
 | `#row2` | Place column in row 2 | `## Backlog #row2` |
 | `#span2` | Column spans 2 units wide | `## Main #span2` |
 | `#stack` | Stack columns horizontally | `## Week 1 #stack` |
-| `#sticky` | Prevent card from being moved during sorting | `- [ ] Important #sticky` |
-| `#fold` | Collapse column/card by default | `## Archive #fold` |
-| `#archive` | Mark as archived | `## Done #archive` |
-| `#hidden` | Hide from view | `## Hidden #hidden` |
-| `#include:path` | Include content from another file | `## Tasks #include:./tasks.md` |
+| `#sticky` | Prevent card from being moved during sorting | 
 
-### Numeric Index Tags
 
-For ordering columns/cards:
-
-```markdown
-## #1 First Column
-## #2 Second Column
-## #1.1 Sub-section
-## #3.1.4 Deep nesting
-```
 
 ---
 
-## Person Tags (`@`)
+### Person Tags (`@`)
 
 Assign people or teams to cards. Everything after `@` until whitespace is the person/team name.
 
+you could use this with the ?Tag to gather tasks for persons.
+
+This feature has not been extensively used and therefore not been tested largely.
+
 ```markdown
-- [ ] Review PR @reto
-- [ ] Team meeting @team-alpha
-- [ ] Collaboration @johnson&smith
+Review PR @reto
+Team meeting @team-alpha
+Collaboration @johnson&smith
 ```
 
 ---
 
-## Temporal Tags (`.`)
+## Temporal Tags (`!`)
 
-Date and time tags for scheduling. The `.` prefix is followed by various time formats.
+Date and time tags for scheduling. The `!` prefix is followed by various time formats.
 
 ### Date Formats
 
 ```markdown
-.2025.01.28      # Date with dots
-.2025-01-28      # Date with dashes
-.2025/01/28      # Date with slashes
+!2025.01.28      # Date with dots
+!2025-01-28      # Date with dashes
+!2025/01/28      # Date with slashes
 ```
 
 ### Week Tags
 
 ```markdown
-.w15             # Week 15 (current year)
-.W15             # Case insensitive
-.2025.w15        # Week 15 of 2025
-.2025-w15        # Alternative format
+!w15             # Week 15 (current year)
+!W15             # Case insensitive
+!2025.w15        # Week 15 of 2025
+!2025-w15        # Alternative format
 ```
 
 ### Weekday Tags
 
 ```markdown
-.mon .monday     # Monday
-.tue .tuesday    # Tuesday
-.wed .wednesday  # Wednesday
-.thu .thursday   # Thursday
-.fri .friday     # Friday
-.sat .saturday   # Saturday
-.sun .sunday     # Sunday
+!mon !monday     # Monday
+!tue !tuesday    # Tuesday
+!wed !wednesday  # Wednesday
+!thu !thursday   # Thursday
+!fri !friday     # Friday
+!sat !saturday   # Saturday
+!sun !sunday     # Sunday
 ```
 
 ### Time Tags
 
 ```markdown
-.15:30           # 24-hour format
-.9am             # 12-hour format
-.10pm            # Evening
-.22:00           # 24-hour evening
+!15:30           # 24-hour format
+!9am             # 12-hour format
+!10pm            # Evening
+!22:00           # 24-hour evening
 ```
 
 ### Time Slot Tags
 
 ```markdown
-.9am-5pm         # Work hours
-.15:30-17:00     # Meeting slot
-.10am-12pm       # Morning block
+!9am-5pm         # Work hours
+!15:30-17:00     # Meeting slot
+!10am-12pm       # Morning block
 ```
 
 ### Temporal Highlighting
 
 Cards and columns with temporal tags matching the current date/time are automatically highlighted (e.g., today's date, current week, current weekday).
+
+---
+
+### Question-Tags
+
+?#
+
+---
+
+Keyboard Shortcuts:
+- use vscode keyboard shortcuts to paste content ( i recommend to add --: :--: and :--- as shortcuts)
+- paste cmd+shift+v ctrl+shift+v to paste content with link detection
+- drag & drop with shift to embed in the kanban
+  - will detect files and < 10mb copy to a {filename}-Media folder
+
+---
+
+## Screenshot
+
+![](./imgs/screenshot-20250901.png)
+
+---
 
 ---
 
@@ -236,9 +312,9 @@ Query tags gather/collect cards matching specific criteria into a column. The `?
 ### Basic Syntax
 
 ```markdown
-## Reto's Tasks ?@reto
-## Todo Items ?#todo
-## Today ?.today
+Reto's Tasks ?@reto
+Todo Items ?#todo
+Today ?.today
 ```
 
 ### Query Operators
@@ -304,21 +380,10 @@ Use comparison operators with `day` to gather cards relative to today. The `day`
 A column can have multiple query tags:
 
 ```markdown
-## Reto This Week ?@reto ?.w15
+- Reto This Week ?@reto ?.w15
 ```
 
----
-
-## Legacy Gather System
-
-The legacy `#gather_` syntax is still supported for backward compatibility:
-
-```markdown
-## To Do #gather_Reto
-## This Week #gather_day<7
-```
-
-### Legacy Operators
+### Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
@@ -329,7 +394,7 @@ The legacy `#gather_` syntax is still supported for backward compatibility:
 | `<` | LESS THAN | `#gather_day<7` |
 | `>` | GREATER THAN | `#gather_day>0` |
 
-### Legacy Date Properties
+### Date Properties
 
 | Property | Description | Values |
 |----------|-------------|--------|
@@ -339,75 +404,9 @@ The legacy `#gather_` syntax is still supported for backward compatibility:
 | `month` | Month name | jan, feb, mar, ... |
 | `monthnum` | Month number | 1 to 12 |
 
-### #ungathered
+### ?ungathered
 
 Collects all cards that didn't match any gather rule:
 
-```markdown
-## Backlog #ungathered
-```
-
 ---
 
-## Sorting Tags
-
-### Sort Within Column
-
-```markdown
-## Tasks #sort-bydate
-## People #sort-byname
-```
-
-### Sorting Process
-
-1. **Sticky cards** (`#sticky`) stay in place
-2. **Query/gather rules** processed left to right
-3. **First match wins** - card moves to matching column
-4. **#ungathered** processes remaining tagged cards
-5. **Sort rules** applied within each column
-
----
-
-## Complete Example
-
-```markdown
----
-kanban-plugin: board
----
-
-## Today ?.today #sort-bydate
-- [ ] Morning standup .9am @team
-- [ ] Code review #urgent @reto
-
-## This Week ?.w48
-- [ ] Feature implementation #feature .fri
-- [ ] Documentation #docs .thu
-
-## Reto ?@reto
-- [ ] Bug fix #bug
-- [ ] Testing #qa
-
-## Backlog #ungathered #fold
-- [ ] Future task #idea
-```
-
----
-
-## Tips
-
-1. **Order matters**: Place columns with specific queries first
-2. **First match wins**: Cards stop checking after first match
-3. **Use #sticky**: Keep important cards in place during sorting
-4. **Temporal highlighting**: Current date/week/day cards are highlighted
-5. **Combine tags**: Use multiple tag types on same card/column
-
----
-
-## marp
-
-put own themes into one of these folders in your workspace.
-
-.marp/themes/
-themes/
-_themes/
-assets/themes/

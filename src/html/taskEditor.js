@@ -1025,11 +1025,23 @@ class TaskEditor {
                             columnElement2.removeAttribute('data-column-tag');
                         }
 
-                        // Update current week / temporal active attribute
-                        if (window.tagUtils && window.tagUtils.isTemporallyActive(column.title)) {
-                            columnElement2.setAttribute('data-current-week', 'true');
-                        } else {
+                        // Update temporal attributes - set the CORRECT attribute for each type
+                        if (window.tagUtils) {
+                            const colText = column.title || '';
+
+                            // Remove all temporal attributes first
+                            columnElement2.removeAttribute('data-current-day');
                             columnElement2.removeAttribute('data-current-week');
+                            columnElement2.removeAttribute('data-current-weekday');
+                            columnElement2.removeAttribute('data-current-hour');
+                            columnElement2.removeAttribute('data-current-time');
+
+                            // Set only the ones that are active
+                            if (window.tagUtils.isCurrentDate(colText)) columnElement2.setAttribute('data-current-day', 'true');
+                            if (window.tagUtils.isCurrentWeek(colText)) columnElement2.setAttribute('data-current-week', 'true');
+                            if (window.tagUtils.isCurrentWeekday(colText)) columnElement2.setAttribute('data-current-weekday', 'true');
+                            if (window.tagUtils.isCurrentTime(colText)) columnElement2.setAttribute('data-current-hour', 'true');
+                            if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement2.setAttribute('data-current-time', 'true');
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)
@@ -1202,7 +1214,16 @@ class TaskEditor {
                                 displayValue = task.displayTitle || '';
                             }
 
+                            // Set parent time slot context for minute slot inheritance (description only)
+                            if (type === 'task-description' && window.tagUtils && window.tagUtils.extractTimeSlotTag) {
+                                window.currentRenderingTimeSlot = window.tagUtils.extractTimeSlotTag(task.title || '');
+                            }
+
                             let renderedHtml = renderMarkdown(displayValue, task.includeContext);
+
+                            // Clear context after rendering
+                            window.currentRenderingTimeSlot = null;
+
                             // Wrap in sections for keyboard navigation if this is a task description
                             if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
                                 renderedHtml = window.wrapTaskSections(renderedHtml);
@@ -1249,6 +1270,30 @@ class TaskEditor {
                             taskElement.setAttribute('data-task-tag', primaryTag);
                         } else {
                             taskElement.removeAttribute('data-task-tag');
+                        }
+
+                        // Update temporal attributes with hierarchical gating
+                        if (window.tagUtils && window.getActiveTemporalAttributes) {
+                            // Get column title for hierarchical gating
+                            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+                            const columnTitle = column?.title || '';
+
+                            // Remove all temporal attributes first
+                            taskElement.removeAttribute('data-current-day');
+                            taskElement.removeAttribute('data-current-week');
+                            taskElement.removeAttribute('data-current-weekday');
+                            taskElement.removeAttribute('data-current-hour');
+                            taskElement.removeAttribute('data-current-time');
+
+                            // Get active temporal attributes with hierarchical gating
+                            const activeAttrs = window.getActiveTemporalAttributes(columnTitle, task.title || '', task.description || '');
+
+                            // Set only the ones that are active
+                            for (const [attr, isActive] of Object.entries(activeAttrs)) {
+                                if (isActive) {
+                                    taskElement.setAttribute(attr, 'true');
+                                }
+                            }
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)

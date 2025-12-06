@@ -971,6 +971,26 @@ export class MessageHandler {
                 );
                 break;
 
+            case 'requestFileDropDialogue':
+                await this.handleRequestFileDropDialogue(message);
+                break;
+
+            case 'executeFileDropCopy':
+                await this.handleExecuteFileDropCopy(message);
+                break;
+
+            case 'executeFileDropLink':
+                await this.handleExecuteFileDropLink(message);
+                break;
+
+            case 'linkExistingFile':
+                await this.handleLinkExistingFile(message);
+                break;
+
+            case 'openMediaFolder':
+                await this.handleOpenMediaFolder();
+                break;
+
             case 'getExportDefaultFolder':
                 await this.handleGetExportDefaultFolder();
                 break;
@@ -1425,8 +1445,6 @@ export class MessageHandler {
             // Frontend already updated optimistically, so don't send board update back
             this._markUnsavedChanges(true, board);
 
-            console.log(`[MessageHandler] Updated Marp global setting in memory: ${key} = ${value}`);
-
         } catch (error) {
             console.error('[MessageHandler] Error updating Marp global setting:', error);
             vscode.window.showErrorMessage(`Failed to update Marp setting: ${error}`);
@@ -1649,27 +1667,20 @@ export class MessageHandler {
 
     private async handleVSCodeSnippet(message: any): Promise<void> {
         try {
-            console.log(`[MessageHandler] Getting snippet name for shortcut: ${message.shortcut}`);
-
             // Use VS Code's snippet resolution to get the actual snippet content
-            // This leverages VS Code's built-in snippet system
             const snippetName = await this.getSnippetNameForShortcut(message.shortcut);
 
             if (!snippetName) {
-                console.warn(`[MessageHandler] No snippet name found for ${message.shortcut}`);
                 vscode.window.showInformationMessage(
                     `No snippet configured for ${message.shortcut}. Add a keybinding with "editor.action.insertSnippet" command.`
                 );
                 return;
             }
 
-            console.log(`[MessageHandler] Snippet name: ${snippetName}, resolving content...`);
-
             // Resolve the snippet content from VS Code's markdown snippet configuration
             const resolvedContent = await this.resolveSnippetContent(snippetName);
 
             if (resolvedContent) {
-                console.log(`[MessageHandler] Snippet resolved, length: ${resolvedContent.length}, sending to webview`);
                 const panel = this._getWebviewPanel();
                 if (panel) {
                     panel._panel.webview.postMessage({
@@ -1678,12 +1689,7 @@ export class MessageHandler {
                         fieldType: message.fieldType,
                         taskId: message.taskId
                     });
-                    console.log(`[MessageHandler] Snippet content sent to webview`);
-                } else {
-                    console.warn(`[MessageHandler] No webview panel found`);
                 }
-            } else {
-                console.warn(`[MessageHandler] Snippet content is empty for: ${snippetName}`);
             }
 
         } catch (error) {
@@ -1696,31 +1702,22 @@ export class MessageHandler {
 
     private async handleEditorShortcut(message: any): Promise<void> {
         try {
-
             // Use the command sent from frontend (already loaded on view focus)
-            // This avoids reloading shortcuts on every keypress
             const userCommand = message.command;
-
-            console.log(`[MessageHandler] handleEditorShortcut - shortcut: ${message.shortcut}, command: ${userCommand}, type: ${typeof userCommand}`);
 
             // If it's a snippet command, handle it specially
             if (userCommand === 'editor.action.insertSnippet') {
-                console.log(`[MessageHandler] Handling snippet shortcut: ${message.shortcut}`);
                 await this.handleVSCodeSnippet(message);
                 return;
             }
 
             if (userCommand) {
-
                 try {
                     // Simply execute the command - let VSCode handle it with default behavior
-                    // This avoids issues with temp documents closing the wrong view
-                    console.log(`[MessageHandler] Executing command: ${userCommand}`);
                     await vscode.commands.executeCommand(userCommand);
-
                     return;
                 } catch (err) {
-                    console.error(`[MessageHandler] Failed to execute command:`, err);
+                    console.error(`[MessageHandler] Failed to execute command ${userCommand}:`, err);
                 }
             }
 
@@ -1754,13 +1751,9 @@ export class MessageHandler {
                 }
             }
 
-            console.log(`[MessageHandler] Loaded ${Object.keys(shortcutMap).length} user keybindings`);
-
             // 2. Add VSCode default shortcuts (highest priority - overrides user keybindings)
             const extensionShortcuts = await this.getExtensionShortcuts();
             Object.assign(shortcutMap, extensionShortcuts);
-
-            console.log(`[MessageHandler] Total shortcuts loaded: ${Object.keys(shortcutMap).length}`);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
@@ -1817,11 +1810,6 @@ export class MessageHandler {
             } else {
                 rejectedShortcuts.push(`${shortcut} → ${command}`);
             }
-        }
-
-        console.log(`[MessageHandler] Loaded ${Object.keys(validShortcuts).length} VSCode shortcuts (${Object.keys(extensionShortcuts).length} checked)`);
-        if (rejectedShortcuts.length > 0) {
-            console.log(`[MessageHandler] Rejected shortcuts (command not found):`, rejectedShortcuts);
         }
 
         return validShortcuts;
@@ -2293,6 +2281,165 @@ export class MessageHandler {
         return crypto.createHash('sha256').update(buffer).digest('hex').substring(0, 12);
     }
 
+    private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
+
+    /**
+     * Calculate hash for file - uses partial hash (first 1MB + size) for large files
+     */
+    private _calculatePartialHash(filePath: string): string {
+        const stats = fs.statSync(filePath);
+        const fileSize = stats.size;
+
+        if (fileSize <= this.PARTIAL_HASH_SIZE) {
+            // Small file: hash entire content
+            const buffer = fs.readFileSync(filePath);
+            return this._generateHash(buffer);
+        } else {
+            // Large file: hash first 1MB + file size
+            const fd = fs.openSync(filePath, 'r');
+            const buffer = Buffer.alloc(this.PARTIAL_HASH_SIZE);
+            fs.readSync(fd, buffer, 0, this.PARTIAL_HASH_SIZE, 0);
+            fs.closeSync(fd);
+
+            // Combine first 1MB with file size for unique hash
+            const sizeBuffer = Buffer.from(fileSize.toString());
+            const combined = Buffer.concat([buffer, sizeBuffer]);
+            return this._generateHash(combined);
+        }
+    }
+
+    /**
+     * Calculate partial hash from provided buffer and file size (for frontend File objects)
+     */
+    private _calculatePartialHashFromData(partialData: Buffer, fileSize: number): string {
+        if (fileSize <= this.PARTIAL_HASH_SIZE) {
+            return this._generateHash(partialData);
+        } else {
+            const sizeBuffer = Buffer.from(fileSize.toString());
+            const combined = Buffer.concat([partialData, sizeBuffer]);
+            return this._generateHash(combined);
+        }
+    }
+
+    /**
+     * Load hash cache from .hash_cache file in media folder
+     */
+    private _loadHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
+        const cachePath = path.join(mediaFolderPath, '.hash_cache');
+        const cache = new Map<string, { hash: string; mtime: number }>();
+
+        if (fs.existsSync(cachePath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
+                for (const [fileName, entry] of Object.entries(data)) {
+                    cache.set(fileName, entry as { hash: string; mtime: number });
+                }
+            } catch (error) {
+                console.warn('[HASH-CACHE] Failed to load cache:', error);
+            }
+        }
+
+        return cache;
+    }
+
+    /**
+     * Save hash cache to .hash_cache file in media folder
+     */
+    private _saveHashCache(mediaFolderPath: string, cache: Map<string, { hash: string; mtime: number }>): void {
+        const cachePath = path.join(mediaFolderPath, '.hash_cache');
+        const data: Record<string, { hash: string; mtime: number }> = {};
+
+        for (const [fileName, entry] of cache.entries()) {
+            data[fileName] = entry;
+        }
+
+        try {
+            fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+        } catch (error) {
+            console.warn('[HASH-CACHE] Failed to save cache:', error);
+        }
+    }
+
+    /**
+     * Update hash cache for all files in media folder, recalculating stale entries
+     */
+    private _updateHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
+        const cache = this._loadHashCache(mediaFolderPath);
+        let cacheModified = false;
+
+        if (!fs.existsSync(mediaFolderPath)) {
+            return cache;
+        }
+
+        const files = fs.readdirSync(mediaFolderPath);
+        const currentFiles = new Set<string>();
+
+        for (const fileName of files) {
+            if (fileName === '.hash_cache' || fileName.startsWith('.')) {
+                continue;
+            }
+
+            const filePath = path.join(mediaFolderPath, fileName);
+            const stats = fs.statSync(filePath);
+
+            if (!stats.isFile()) {
+                continue;
+            }
+
+            currentFiles.add(fileName);
+            const mtime = stats.mtimeMs;
+            const cached = cache.get(fileName);
+
+            if (!cached || cached.mtime !== mtime) {
+                // Recalculate hash for new or modified file
+                const hash = this._calculatePartialHash(filePath);
+                cache.set(fileName, { hash, mtime });
+                cacheModified = true;
+            }
+        }
+
+        // Remove entries for deleted files
+        for (const fileName of cache.keys()) {
+            if (!currentFiles.has(fileName)) {
+                cache.delete(fileName);
+                cacheModified = true;
+            }
+        }
+
+        if (cacheModified) {
+            this._saveHashCache(mediaFolderPath, cache);
+        }
+
+        return cache;
+    }
+
+    /**
+     * Find matching file in media folder by hash
+     * @returns Relative path to matching file, or null if not found
+     */
+    private _findMatchingFileByHash(mediaFolderPath: string, targetHash: string, originalFileName: string): string | null {
+        if (!fs.existsSync(mediaFolderPath)) {
+            return null;
+        }
+
+        const cache = this._updateHashCache(mediaFolderPath);
+
+        // First check: same filename
+        const cachedEntry = cache.get(originalFileName);
+        if (cachedEntry && cachedEntry.hash === targetHash) {
+            return originalFileName;
+        }
+
+        // Second check: any file with matching hash
+        for (const [fileName, entry] of cache.entries()) {
+            if (entry.hash === targetHash) {
+                return fileName;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Helper: Format image path according to pathGeneration config
      */
@@ -2328,12 +2475,10 @@ export class MessageHandler {
 
             // Same hash = same file, reuse it
             if (existingHash === hash) {
-                console.log('[IMAGE-DROP] File with same hash already exists, reusing:', candidateFilename);
                 return candidateFilename;
             }
 
             // Different hash = collision, add timestamp
-            console.log('[IMAGE-DROP] Hash collision detected, adding timestamp');
             const timestamp = Date.now();
             candidateFilename = `${baseName}-${hash}-${timestamp}${extension}`;
         }
@@ -2386,8 +2531,6 @@ export class MessageHandler {
         const formattedPath = isImage
             ? this._formatImagePath(sourcePath, directory)
             : this._fileManager.generateConfiguredPath(sourcePath);
-
-        console.log(`[FILE-DROP] File in workspace, linking: ${formattedPath}`);
 
         const panel = this._getWebviewPanel();
         if (panel && panel._panel) {
@@ -2458,11 +2601,8 @@ export class MessageHandler {
         const targetPath = path.join(mediaFolderPath, targetFileName);
 
         // Write file (images check hash, files overwrite)
-        if (isImage && fs.existsSync(targetPath)) {
-            console.log('[FILE-DROP] Reusing existing image:', targetFileName);
-        } else {
+        if (!isImage || !fs.existsSync(targetPath)) {
             fs.writeFileSync(targetPath, buffer);
-            console.log('[FILE-DROP] Saved file:', targetFileName);
         }
 
         // Format path
@@ -2522,6 +2662,190 @@ export class MessageHandler {
     }
 
     // ============================================================================
+    // File Drop Dialogue Handlers
+    // ============================================================================
+
+    private readonly FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
+
+    /**
+     * Handle request for file drop dialogue - determines available options
+     * Checks media folder for existing matching file by hash
+     */
+    private async handleRequestFileDropDialogue(message: {
+        dropId: string;
+        fileName: string;
+        fileSize?: number;
+        isImage: boolean;
+        fileType?: string;
+        hasSourcePath: boolean;
+        sourcePath?: string;
+        partialHashData?: string; // Base64 encoded first 1MB for File objects
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition } = message;
+        let { fileSize } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+
+            // For URI drops, check if file is in workspace - auto-link without dialogue
+            if (hasSourcePath && sourcePath) {
+                if (this._isFileInWorkspace(sourcePath)) {
+                    // File is in workspace - link directly without dialogue
+                    return this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
+                }
+
+                // Get file size from filesystem for URI drops
+                if (fs.existsSync(sourcePath)) {
+                    const stats = fs.statSync(sourcePath);
+                    fileSize = stats.size;
+                }
+            }
+
+            // Calculate hash for matching
+            let fileHash: string | null = null;
+            if (hasSourcePath && sourcePath && fs.existsSync(sourcePath)) {
+                // URI drop: calculate hash from file
+                fileHash = this._calculatePartialHash(sourcePath);
+            } else if (partialHashData && fileSize !== undefined) {
+                // File object: calculate hash from provided partial data
+                const partialBuffer = Buffer.from(partialHashData, 'base64');
+                fileHash = this._calculatePartialHashFromData(partialBuffer, fileSize);
+            }
+
+            // Check media folder for existing matching file
+            let existingFile: string | null = null;
+            if (fileHash) {
+                const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+                existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
+
+            }
+
+            // Send dialogue options to frontend
+            const panel = this._getWebviewPanel();
+            if (panel && panel._panel) {
+                panel._panel.webview.postMessage({
+                    type: 'showFileDropDialogue',
+                    dropId: dropId,
+                    fileName: fileName,
+                    fileSize: fileSize,
+                    isImage: isImage,
+                    hasSourcePath: hasSourcePath,
+                    sourcePath: sourcePath,
+                    existingFile: existingFile, // Matching file in media folder
+                    dropPosition: dropPosition
+                });
+            }
+        } catch (error) {
+            console.error('[FILE-DROP-DIALOGUE] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                !hasSourcePath
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to copy file to media folder (for URI drops)
+     */
+    private async handleExecuteFileDropCopy(message: {
+        dropId: string;
+        sourcePath: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { sourcePath, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage);
+        } catch (error) {
+            console.error('[FILE-DROP-COPY] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                false
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to link to original file location
+     */
+    private async handleExecuteFileDropLink(message: {
+        dropId: string;
+        sourcePath: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { sourcePath, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory } = this._getCurrentFilePaths();
+            this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
+        } catch (error) {
+            console.error('[FILE-DROP-LINK] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                false
+            );
+        }
+    }
+
+    /**
+     * Handle user's choice to link existing file from media folder
+     */
+    private async handleLinkExistingFile(message: {
+        dropId: string;
+        existingFile: string;
+        fileName: string;
+        isImage: boolean;
+        dropPosition: { x: number; y: number };
+    }): Promise<void> {
+        const { existingFile, fileName, isImage, dropPosition } = message;
+
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const existingFilePath = path.join(mediaFolderPath, existingFile);
+
+            // Send link message for the existing file in media folder
+            this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage);
+        } catch (error) {
+            console.error('[FILE-DROP-LINK-EXISTING] Error:', error);
+            this._sendFileDropError(
+                error instanceof Error ? error.message : 'Unknown error',
+                dropPosition,
+                isImage,
+                true
+            );
+        }
+    }
+
+    /**
+     * Handle request to open the media folder in OS file explorer
+     */
+    private async handleOpenMediaFolder(): Promise<void> {
+        try {
+            const { directory, baseFileName } = this._getCurrentFilePaths();
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+
+            // Open folder in OS file explorer
+            await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(mediaFolderPath));
+        } catch (error) {
+            console.error('[FILE-DROP] Error opening media folder:', error);
+            vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    // ============================================================================
     // DRY Helper Methods for File Operations
     // ============================================================================
 
@@ -2572,10 +2896,20 @@ export class MessageHandler {
             return false;
         }
 
-        const fileResolved = path.resolve(filePath);
+        // Normalize path: resolve and convert to lowercase on Windows for case-insensitive comparison
+        const isWindows = process.platform === 'win32';
+        let fileResolved = path.resolve(filePath);
+        if (isWindows) {
+            fileResolved = fileResolved.toLowerCase();
+        }
+
         for (const folder of workspaceFolders) {
-            const workspaceResolved = path.resolve(folder.uri.fsPath);
-            if (fileResolved.startsWith(workspaceResolved)) {
+            let workspaceResolved = path.resolve(folder.uri.fsPath);
+            if (isWindows) {
+                workspaceResolved = workspaceResolved.toLowerCase();
+            }
+            // Check if file is within workspace folder (add path separator to avoid partial matches)
+            if (fileResolved === workspaceResolved || fileResolved.startsWith(workspaceResolved + path.sep)) {
                 return true;
             }
         }
@@ -3796,16 +4130,16 @@ export class MessageHandler {
                         if (firstDiff >= 0) {
                             const start = Math.max(0, firstDiff - 20);
                             const end = Math.min(minLen, firstDiff + 80);
-                            console.log(`[VerifySync] MISMATCH at char ${firstDiff}:`);
-                            console.log(`  Frontend[${start}:${end}]: "${frontendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
-                            console.log(`  Backend [${start}:${end}]: "${backendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
+                            console.warn(`[VerifySync] MISMATCH at char ${firstDiff}:`);
+                            console.warn(`  Frontend[${start}:${end}]: "${frontendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
+                            console.warn(`  Backend [${start}:${end}]: "${backendContent.substring(start, end).replace(/\n/g, '\\n')}"`);
                         } else if (frontendContent.length !== backendContent.length) {
-                            console.log(`[VerifySync] LENGTH MISMATCH: frontend=${frontendContent.length}, backend=${backendContent.length}`);
+                            console.warn(`[VerifySync] LENGTH MISMATCH: frontend=${frontendContent.length}, backend=${backendContent.length}`);
                             // Show the extra content at the end
                             const longer = frontendContent.length > backendContent.length ? frontendContent : backendContent;
                             const shorter = frontendContent.length > backendContent.length ? backendContent : frontendContent;
                             const which = frontendContent.length > backendContent.length ? 'Frontend' : 'Backend';
-                            console.log(`  ${which} has extra: "${longer.substring(shorter.length).replace(/\n/g, '\\n')}"`);
+                            console.warn(`  ${which} has extra: "${longer.substring(shorter.length).replace(/\n/g, '\\n')}"`);
                         }
                     }
                 } else {
@@ -4092,10 +4426,12 @@ export class MessageHandler {
                 updateData.title = markdownContent;
             }
 
+            // OPTIMIZATION: Use sendUpdate: false to skip full board redraw
+            // Frontend already has the updated content, we just need to persist the change
             await this.performBoardAction(() =>
-                this._boardOperations.editTask(board, taskId, columnId, updateData)
+                this._boardOperations.editTask(board, taskId, columnId, updateData),
+                { sendUpdate: false }
             );
-
 
         } catch (error) {
             console.error('🗑️ Backend: Error updating task from strikethrough deletion:', error);
@@ -4434,40 +4770,36 @@ export class MessageHandler {
      */
     private async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
         try {
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Called with:', { scope, columnId, taskId, classes });
-
             // Create HTML comment directive
             const classString = classes.join(' ');
             const directive = classes.length > 0 ? `<!-- _class: ${classString} -->\n` : '';
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Directive:', directive);
 
             // Get panel to access board
             const panel = this._getWebviewPanel();
             if (!panel) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No panel found');
+                console.error('[handleSaveMarpClasses] No panel found');
                 return;
             }
 
             // Get current board
             const board = panel.getBoard();
             if (!board) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No board found');
+                console.error('[handleSaveMarpClasses] No board found');
                 return;
             }
 
             // Get current markdown content from main file
             const mainFile = panel._fileRegistry.getMainFile();
             if (!mainFile) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No main file found');
+                console.error('[handleSaveMarpClasses] No main file found');
                 return;
             }
 
             let markdown = mainFile.getContent();
             if (!markdown) {
-                console.error('[kanban.messageHandler.handleSaveMarpClasses] No markdown content found');
+                console.error('[handleSaveMarpClasses] No markdown content found');
                 return;
             }
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Got markdown, length:', markdown.length);
 
             if (scope === 'global') {
                 // For global scope, add directive at the very beginning (or after YAML)
@@ -4490,59 +4822,51 @@ export class MessageHandler {
                 // Find column in board
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (!column) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found:', columnId);
+                    console.error('[handleSaveMarpClasses] Column not found:', columnId);
                     return;
                 }
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found column:', column.title);
 
                 // Find column header and add directive BEFORE it
                 const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const columnRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(## ${titleClean})`, 'm');
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex:', columnRegex);
 
                 const originalMarkdown = markdown;
-                markdown = markdown.replace(columnRegex, (match: string, existingDirective: string, header: string) => {
-                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Column regex matched:', { match, existingDirective, header });
+                markdown = markdown.replace(columnRegex, (_match: string, _existingDirective: string, header: string) => {
                     // Replace or add directive before column header
                     return directive + header;
                 });
                 if (markdown === originalMarkdown) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column regex did not match anything!');
+                    console.error('[handleSaveMarpClasses] Column regex did not match anything!');
                 }
             } else if (scope === 'task' && columnId && taskId) {
                 // Find task in board
                 const column = board.columns.find((c: any) => c.id === columnId);
                 if (!column) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Column not found for task:', columnId);
+                    console.error('[handleSaveMarpClasses] Column not found for task:', columnId);
                     return;
                 }
                 const task = column.tasks.find((t: any) => t.id === taskId);
                 if (!task) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task not found:', taskId);
+                    console.error('[handleSaveMarpClasses] Task not found:', taskId);
                     return;
                 }
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Found task:', task.title);
 
                 // Find task line and add directive BEFORE it
                 const titleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const taskRegex = new RegExp(`(<!-- _class: [^>]+ -->\\n)?(- \\[[ x]\\] ${titleClean})`, 'm');
-                console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex:', taskRegex);
 
                 const originalMarkdown = markdown;
-                markdown = markdown.replace(taskRegex, (match: string, existingDirective: string, taskLine: string) => {
-                    console.log('[kanban.messageHandler.handleSaveMarpClasses] Task regex matched:', { match, existingDirective, taskLine });
+                markdown = markdown.replace(taskRegex, (_match: string, _existingDirective: string, taskLine: string) => {
                     // Replace or add directive before task
                     return directive + taskLine;
                 });
                 if (markdown === originalMarkdown) {
-                    console.error('[kanban.messageHandler.handleSaveMarpClasses] Task regex did not match anything!');
+                    console.error('[handleSaveMarpClasses] Task regex did not match anything!');
                 }
             }
 
             // Update file content (marks as unsaved)
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Setting content, changed:', markdown.length);
             mainFile.setContent(markdown, false);
-            console.log('[kanban.messageHandler.handleSaveMarpClasses] Content set successfully');
 
             // After saving, send updated directives to frontend
             await this.sendMarpDirectivesToFrontend();
@@ -4979,7 +5303,6 @@ export class MessageHandler {
 
             // Check if cached version exists and is valid
             if (fs.existsSync(cachePath)) {
-                console.log(`[DrawIO Backend] Using cached render: ${cacheFileName}`);
                 const cachedPng = await fs.promises.readFile(cachePath);
                 pngDataUrl = `data:image/png;base64,${cachedPng.toString('base64')}`;
             } else {
@@ -4992,8 +5315,6 @@ export class MessageHandler {
                     throw new Error('draw.io CLI not installed');
                 }
 
-                console.log(`[DrawIO Backend] Rendering: ${path.basename(absolutePath)}`);
-
                 // Render to PNG (better rendering than SVG in webview)
                 const pngBuffer = await service.renderPNG(absolutePath);
 
@@ -5002,7 +5323,6 @@ export class MessageHandler {
 
                 // Save to cache
                 await fs.promises.writeFile(cachePath, pngBuffer);
-                console.log(`[DrawIO Backend] Cached render: ${cacheFileName}`);
 
                 // Clean up old cache files for this diagram (different mtimes)
                 await this.cleanOldDrawIOCache(cacheDir, absolutePath, cacheFileName);
@@ -5038,7 +5358,12 @@ export class MessageHandler {
     private getDrawIOCacheDir(diagramPath: string, panel: any): string {
         // Determine which file the diagram belongs to (main kanban or include file)
         const diagramDir = path.dirname(diagramPath);
-        const kanbanPath = panel._documentPath;
+        // Get kanban path from fileManager (not panel._documentPath which doesn't exist)
+        const kanbanPath = this._fileManager.getFilePath() || this._fileManager.getDocument()?.uri.fsPath;
+        if (!kanbanPath) {
+            // Fallback: use diagram directory if no kanban path available
+            return path.join(diagramDir, 'drawio-cache');
+        }
         const kanbanDir = path.dirname(kanbanPath);
         const kanbanBaseName = path.basename(kanbanPath, path.extname(kanbanPath));
 
@@ -5079,7 +5404,6 @@ export class MessageHandler {
                 if (file.startsWith(prefix) && file !== currentCacheFile && file.endsWith('.png')) {
                     const oldPath = path.join(cacheDir, file);
                     await fs.promises.unlink(oldPath);
-                    console.log(`[DrawIO Backend] Cleaned old cache: ${file}`);
                 }
             }
         } catch (error) {
@@ -5126,13 +5450,10 @@ export class MessageHandler {
             try {
                 const pngBuffer = await service.renderPNG(absolutePath);
                 dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-                console.log('[Excalidraw Backend] ✅ Rendered as PNG');
             } catch (pngError) {
-                console.warn('[Excalidraw Backend] PNG conversion failed, falling back to SVG:', pngError);
-                // Fallback to SVG
+                // Fallback to SVG if PNG conversion fails
                 const svg = await service.renderSVG(absolutePath);
                 dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-                console.log('[Excalidraw Backend] ✅ Rendered as SVG (fallback)');
             }
 
             // Send success response to webview with mtime for cache invalidation

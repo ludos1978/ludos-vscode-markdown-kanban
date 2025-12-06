@@ -26,7 +26,6 @@ export class ExcalidrawService {
             // For .excalidraw.svg files, return the SVG directly!
             // Excalidraw already exported these to SVG, no conversion needed
             if (filePath.endsWith('.excalidraw.svg')) {
-                console.log(`[ExcalidrawService] ✅ Using embedded SVG: ${path.basename(filePath)} (${content.length} bytes)`);
                 return content;
             }
 
@@ -46,8 +45,6 @@ export class ExcalidrawService {
 
             // Convert to SVG using excalidraw library
             const svg = await this.convertToSVG(excalidrawData);
-
-            console.log(`[ExcalidrawService] ✅ Converted: ${path.basename(filePath)} (${svg.length} bytes)`);
 
             return svg;
 
@@ -157,7 +154,6 @@ export class ExcalidrawService {
 
         } catch (error) {
             // Library failed (expected in Node.js), use manual SVG generation
-            console.log('[ExcalidrawService] Library conversion not available, using manual SVG generation');
             throw error;
         }
     }
@@ -289,7 +285,6 @@ ${svgElements}</svg>`;
                 // Cleanup temp SVG file
                 await fs.promises.unlink(tempSvgPath);
 
-                console.log(`[ExcalidrawService] ✅ Converted to PNG: ${path.basename(filePath)} (${pngBuffer.length} bytes)`);
                 return pngBuffer;
             } catch (error) {
                 // Cleanup temp file on error

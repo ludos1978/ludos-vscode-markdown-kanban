@@ -11,42 +11,22 @@ export class PlantUMLService {
 
     /**
      * Check if Graphviz is installed on the system
-     * Checks multiple common installation locations since VS Code extension
-     * may not have Homebrew in PATH
+     * Uses configured path or PATH
      * @returns true if Graphviz is available, false otherwise
      */
     private isGraphvizInstalled(): boolean {
-        // Try to execute 'dot -V' with default PATH
+        // Check configured path or use PATH
+        const config = vscode.workspace.getConfiguration('markdown-kanban');
+        const graphvizPath = config.get<string>('graphvizPath', '');
+        const dotCmd = graphvizPath || 'dot';
+
         try {
-            execSync('dot -V', { stdio: 'pipe' });
+            execSync(`${dotCmd} -V`, { stdio: 'pipe' });
             return true;
         } catch (error) {
-            // Not in PATH, check common installation locations
+            console.warn(`[PlantUML Service] Graphviz not found. Configure markdown-kanban.graphvizPath in settings.`);
+            return false;
         }
-
-        // Common Graphviz installation paths
-        const commonPaths = [
-            '/opt/homebrew/bin/dot',      // Homebrew on Apple Silicon
-            '/usr/local/bin/dot',          // Homebrew on Intel Mac
-            '/opt/local/bin/dot',          // MacPorts
-            '/usr/bin/dot',                // System installation
-        ];
-
-        const fs = require('fs');
-        for (const dotPath of commonPaths) {
-            try {
-                if (fs.existsSync(dotPath)) {
-                    // Verify it's executable by running it
-                    execSync(`${dotPath} -V`, { stdio: 'pipe' });
-                    return true;
-                }
-            } catch (error) {
-                // This path doesn't work, try next
-            }
-        }
-
-        console.warn('[PlantUML Service] Graphviz not found in PATH or common locations');
-        return false;
     }
 
     /**
@@ -100,7 +80,12 @@ export class PlantUMLService {
                     '-pipe'   // Read from stdin, write to stdout
                 ];
 
-                const child = spawn('java', args, {
+                // Use configured java path or PATH
+                const config = vscode.workspace.getConfiguration('markdown-kanban');
+                const javaPath = config.get<string>('javaPath', '');
+                const javaCmd = javaPath || 'java';
+
+                const child = spawn(javaCmd, args, {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
 

@@ -28,27 +28,23 @@ export class PDFService {
             return this.isCliAvailable;
         }
 
-        // Try to find pdftoppm in common locations
-        const candidates = [
-            'pdftoppm',                           // In PATH
-            '/usr/local/bin/pdftoppm',           // Homebrew (Intel Mac)
-            '/opt/homebrew/bin/pdftoppm',        // Homebrew (Apple Silicon)
-            '/usr/bin/pdftoppm',                 // Linux
-        ];
+        // Check user-configured poppler path first
+        const config = vscode.workspace.getConfiguration('markdown-kanban');
+        const popplerPath = config.get<string>('popplerPath', '');
 
-        for (const cliName of candidates) {
-            if (await this.testCliCommand(cliName)) {
-                this.cliPath = cliName;
-                this.isCliAvailable = true;
-                console.log(`[PDFService] Found pdftoppm CLI: ${cliName}`);
-                this.availabilityChecked = true;
-                return true;
-            }
+        // Use configured path or fall back to PATH
+        const cliName = popplerPath ? path.join(popplerPath, 'pdftoppm') : 'pdftoppm';
+
+        if (await this.testCliCommand(cliName)) {
+            this.cliPath = cliName;
+            this.isCliAvailable = true;
+            this.availabilityChecked = true;
+            return true;
         }
 
         this.availabilityChecked = true;
         this.isCliAvailable = false;
-        console.warn('[PDFService] pdftoppm CLI not found');
+        console.warn('[PDFService] pdftoppm CLI not found. Configure markdown-kanban.popplerPath in settings.');
         return false;
     }
 
@@ -116,9 +112,6 @@ export class PDFService {
                 tempPrefix                  // Output prefix
             ];
 
-            console.log(`[PDFService] Rendering page ${pageNumber} of: ${path.basename(filePath)}`);
-            console.log(`[PDFService] Command: ${this.cliPath} ${args.join(' ')}`);
-
             const child = spawn(this.cliPath!, args);
 
             let stderr = '';
@@ -143,10 +136,6 @@ export class PDFService {
                 clearTimeout(timer);
 
                 try {
-                    if (stderr) {
-                        console.log('[PDFService] stderr:', stderr);
-                    }
-
                     if (code !== 0) {
                         console.error('[PDFService] Conversion failed:', stderr);
                         reject(new Error(`pdftoppm exited with code ${code}`));
@@ -191,7 +180,6 @@ export class PDFService {
 
                     // Read PNG output
                     const png = await fs.promises.readFile(outputPath);
-                    console.log(`[PDFService] ✅ Converted page ${pageNumber} to PNG: ${path.basename(filePath)} (${png.length} bytes)`);
 
                     // Cleanup temp file
                     await fs.promises.unlink(outputPath);
@@ -213,8 +201,18 @@ export class PDFService {
      */
     async getPageCount(filePath: string): Promise<number> {
         return new Promise((resolve, reject) => {
-            // Try to use pdfinfo to get page count
-            const pdfinfoPath = this.cliPath?.replace('pdftoppm', 'pdfinfo') || 'pdfinfo';
+            // Determine pdfinfo path - derive from cliPath or use config/PATH
+            let pdfinfoPath: string;
+
+            if (this.cliPath) {
+                // Derive from pdftoppm path
+                pdfinfoPath = this.cliPath.replace('pdftoppm', 'pdfinfo');
+            } else {
+                // Check user-configured poppler path or use PATH
+                const config = vscode.workspace.getConfiguration('markdown-kanban');
+                const popplerPath = config.get<string>('popplerPath', '');
+                pdfinfoPath = popplerPath ? path.join(popplerPath, 'pdfinfo') : 'pdfinfo';
+            }
 
             const child = spawn(pdfinfoPath, [filePath]);
 
@@ -245,7 +243,6 @@ export class PDFService {
                 const match = stdout.match(/Pages:\s+(\d+)/);
                 if (match) {
                     const pageCount = parseInt(match[1], 10);
-                    console.log(`[PDFService] PDF has ${pageCount} pages`);
                     resolve(pageCount);
                 } else {
                     reject(new Error('Could not determine page count from pdfinfo output'));

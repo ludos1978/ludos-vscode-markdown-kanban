@@ -77,15 +77,6 @@ function moveTaskInDOM(taskId, columnId, newIndex, targetColumnId = null) {
         targetContainer.insertBefore(taskElement, taskItems[newIndex]);
     }
 
-    // Invalidate height cache for affected columns (task moved = content changed)
-    const sourceColId = sourceColumn?.dataset?.columnId;
-    if (sourceColId && typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(sourceColId);
-    }
-    if (targetColId !== sourceColId && typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(targetColId);
-    }
-
     // Recalculate stack heights after task move (use debounced for better performance)
     const targetColumn = targetContainer.closest('.kanban-full-height-column');
     const targetStack = targetColumn?.closest('.kanban-column-stack');
@@ -1774,11 +1765,6 @@ function deleteColumn(columnId) {
 
                 columnElement.remove();
 
-                // Invalidate height cache for deleted column
-                if (typeof invalidateColumnHeightCache === 'function') {
-                    invalidateColumnHeightCache(columnId);
-                }
-
                 // Recalculate stack heights after column deletion
                 if (stack && typeof recalculateStackHeightsDebounced === 'function') {
                     recalculateStackHeightsDebounced(stack);
@@ -2518,11 +2504,6 @@ function deleteTask(taskId, columnId) {
                 // Check if column is now empty and add placeholder button (before height recalc)
                 updateColumnEmptyState(foundColumn.id);
 
-                // Invalidate height cache for this column (content changed)
-                if (typeof invalidateColumnHeightCache === 'function') {
-                    invalidateColumnHeightCache(foundColumn.id);
-                }
-
                 // Recalculate stack heights after task deletion and button restoration
                 // Task deletion changes column height, so we need to recalculate positions
                 if (columnElement) {
@@ -3144,14 +3125,33 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
     } else {
         columnElement.removeAttribute('data-column-tag');
     }
-    
+
     const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (allTags.length > 0) {
         columnElement.setAttribute('data-all-tags', allTags.join(' '));
     } else {
         columnElement.removeAttribute('data-all-tags');
     }
-    
+
+    // Update temporal attributes - set the CORRECT attribute for each type
+    if (window.tagUtils) {
+        const colText = newTitle || '';
+
+        // Remove all temporal attributes first
+        columnElement.removeAttribute('data-current-day');
+        columnElement.removeAttribute('data-current-week');
+        columnElement.removeAttribute('data-current-weekday');
+        columnElement.removeAttribute('data-current-hour');
+        columnElement.removeAttribute('data-current-time');
+
+        // Set only the ones that are active
+        if (window.tagUtils.isCurrentDate(colText)) columnElement.setAttribute('data-current-day', 'true');
+        if (window.tagUtils.isCurrentWeek(colText)) columnElement.setAttribute('data-current-week', 'true');
+        if (window.tagUtils.isCurrentWeekday(colText)) columnElement.setAttribute('data-current-weekday', 'true');
+        if (window.tagUtils.isCurrentTime(colText)) columnElement.setAttribute('data-current-hour', 'true');
+        if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement.setAttribute('data-current-time', 'true');
+    }
+
     // Update header bars immediately
     if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
         const isCollapsed = columnElement.classList.contains('collapsed');
@@ -3160,7 +3160,7 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
 
     // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
     // No need to call updateCornerBadgesImmediate separately
-    
+
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${columnId}"][data-tag-name="${tagName}"]`);
     if (button) {
@@ -3218,14 +3218,51 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
     } else {
         taskElement.removeAttribute('data-task-tag');
     }
-    
+
     const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (allTags.length > 0) {
         taskElement.setAttribute('data-all-tags', allTags.join(' '));
     } else {
         taskElement.removeAttribute('data-all-tags');
     }
-    
+
+    // Update temporal attributes with hierarchical gating
+    if (window.tagUtils && window.getActiveTemporalAttributes) {
+        // Find task and column for hierarchical gating
+        let taskTitle = newTitle || '';
+        let taskDescription = '';
+        let columnTitle = '';
+        const board = window.currentBoard || window.cachedBoard;
+        if (board) {
+            for (const column of board.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    taskTitle = task.title || '';
+                    taskDescription = task.description || '';
+                    columnTitle = column.title || '';
+                    break;
+                }
+            }
+        }
+
+        // Remove all temporal attributes first
+        taskElement.removeAttribute('data-current-day');
+        taskElement.removeAttribute('data-current-week');
+        taskElement.removeAttribute('data-current-weekday');
+        taskElement.removeAttribute('data-current-hour');
+        taskElement.removeAttribute('data-current-time');
+
+        // Get active temporal attributes with hierarchical gating
+        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, taskTitle, taskDescription);
+
+        // Set only the ones that are active
+        for (const [attr, isActive] of Object.entries(activeAttrs)) {
+            if (isActive) {
+                taskElement.setAttribute(attr, 'true');
+            }
+        }
+    }
+
     // Update header bars immediately
     if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
         const isCollapsed = taskElement.classList.contains('collapsed');

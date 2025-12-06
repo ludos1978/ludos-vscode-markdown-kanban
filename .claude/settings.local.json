@@ -53,7 +53,14 @@
       "Bash(node /tmp/test-board-parsing.js:*)",
       "Bash(node /tmp/test-export-simulation.js:*)",
       "Bash(node /tmp/test-comment-regex.js:*)",
-      "Bash(node /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/esbuild.js:*)"
+      "Bash(node /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/esbuild.js:*)",
+      "Bash(ls:*)",
+      "Bash(node /tmp/test-week-tag.js:*)",
+      "Bash(node /tmp/test-current-week.js:*)",
+      "Bash(node /tmp/test-time-slot.js:*)",
+      "Bash(node /tmp/test-time-debug.js:*)",
+      "Bash(node /tmp/test-time-complete.js:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

@@ -516,13 +516,17 @@ export class KanbanFileService {
         // Update known file content
         this.updateKnownFileContent(markdown);
 
-        // Notify frontend that save is complete
+        // Notify frontend that save is complete (may fail if webview is disposed during close)
         const panelInstance = this.panel();
         if (panelInstance) {
-            panelInstance.webview.postMessage({
-                type: 'saveCompleted',
-                success: true
-            });
+            try {
+                panelInstance.webview.postMessage({
+                    type: 'saveCompleted',
+                    success: true
+                });
+            } catch (e) {
+                // Webview may be disposed during panel close - save already succeeded
+            }
         }
 
     }
@@ -588,14 +592,14 @@ export class KanbanFileService {
             this._saveEndVersion = document.version;
             await document.save();
 
-            // Reload the file after successful initialization
-            // Keep SAVING state during reload to prevent undo stack clearing
-            await this.loadMarkdownFile(document);
-
-            // STATE MACHINE: Transition to IDLE
+            // STATE MACHINE: Transition to IDLE before reload
+            // (loadMarkdownFile returns early if state is not IDLE)
             this._saveState = SaveState.IDLE;
             this._saveStartVersion = null;
             this._saveEndVersion = null;
+
+            // Reload the file after successful initialization (forceReload=true to bypass early-return check)
+            await this.loadMarkdownFile(document, false, true);
 
             vscode.window.showInformationMessage('Kanban board initialized successfully');
         } catch (error) {

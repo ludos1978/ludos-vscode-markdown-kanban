@@ -1600,11 +1600,6 @@ window.updateTemplates = function(templates, showBar = true) {
  */
 function renderBoard(options = null) {
 
-    // Clear height cache on full re-render (heights may change)
-    if (typeof invalidateAllColumnHeightCache === 'function') {
-        invalidateAllColumnHeightCache();
-    }
-
     // Apply tag styles first
     applyTagStyles();
 
@@ -1733,10 +1728,11 @@ function renderBoard(options = null) {
             const columns = stack.querySelectorAll('.kanban-full-height-column');
             if (columns.length === 0) {
                 stack.remove();
-            } else {
-                // Add margin after last column in stack (for drop target)
-                addMarginAfterLastColumn(stack, columns);
-            }
+            } 
+            // else {
+            //     // Add margin after last column in stack (for drop target)
+            //     addMarginAfterLastColumn(stack, columns);
+            // }
         });
 
         // 2. Get all remaining children (stacks and single columns)
@@ -1950,10 +1946,10 @@ function renderBoard(options = null) {
                 });
             }
 
-            // Set up image loading watchers AFTER initial stack calculation
-            // This ensures we only recalculate for images that load after the initial render
-            if (typeof setupImageLoadingWatchers === 'function') {
-                setupImageLoadingWatchers();
+            // Set up column resize observer AFTER initial stack calculation
+            // This automatically recalculates heights when any column content changes (images, diagrams, etc.)
+            if (typeof setupColumnResizeObserver === 'function') {
+                setupColumnResizeObserver();
             }
 
             window.stackedColumnStylesTimeout = null;
@@ -1963,6 +1959,8 @@ function renderBoard(options = null) {
     // Apply immediate visual updates to all elements with tags - done earlier for visual feedback
     setTimeout(() => {
         document.querySelectorAll('[data-all-tags]').forEach(element => {
+            // Safety check - skip null elements
+            if (!element || !element.classList) return;
             const tags = element.getAttribute('data-all-tags').split(' ').filter(tag => tag.trim());
             const elementType = element.classList.contains('kanban-full-height-column') ? 'column' : 'task';
             if (window.updateAllVisualTagElements) {
@@ -1980,87 +1978,6 @@ function renderBoard(options = null) {
     // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
     // Recommendation: Remove entirely OR wait for user request before reimplementing
     // setupCompactViewHandler();
-}
-
-/**
- * Wait for ALL images in a stack to load, then recalculate stack heights ONCE.
- * This ensures final column positions are correct after all images have loaded.
- * Columns may overlap during loading, but will be correctly positioned after.
- *
- * @param {HTMLElement} stackElement - The stack element containing columns to watch
- */
-function waitForStackImagesAndRecalculate(stackElement) {
-    if (!stackElement) {
-        return;
-    }
-
-    const columns = stackElement.querySelectorAll('.kanban-full-height-column:not(.collapsed)');
-    if (columns.length === 0) {
-        return;
-    }
-
-    const allImages = [];
-    columns.forEach((col) => {
-        const images = col.querySelectorAll('img');
-        allImages.push(...Array.from(images));
-    });
-
-    if (allImages.length === 0) {
-        return;
-    }
-
-    const unloadedImages = allImages.filter(img => !img.complete);
-
-    if (unloadedImages.length === 0) {
-        if (typeof recalculateStackHeightsImmediate === 'function') {
-            recalculateStackHeightsImmediate(stackElement);
-        }
-        return;
-    }
-
-    const imagePromises = unloadedImages.map((img) => {
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                resolve('timeout');
-            }, 5000);
-
-            const cleanup = () => {
-                clearTimeout(timeout);
-                img.removeEventListener('load', onLoad);
-                img.removeEventListener('error', onError);
-            };
-
-            const onLoad = () => {
-                cleanup();
-                resolve('loaded');
-            };
-
-            const onError = () => {
-                cleanup();
-                resolve('error');
-            };
-
-            img.addEventListener('load', onLoad, { once: true });
-            img.addEventListener('error', onError, { once: true });
-        });
-    });
-
-    Promise.all(imagePromises).then(() => {
-        if (typeof recalculateStackHeightsImmediate === 'function') {
-            recalculateStackHeightsImmediate(stackElement);
-        }
-    });
-}
-
-/**
- * Set up image loading watchers for all stacks in the board.
- * Each stack waits for ALL its images to load, then recalculates once.
- */
-function setupImageLoadingWatchers() {
-    const allStacks = document.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)');
-    allStacks.forEach((stack) => {
-        waitForStackImagesAndRecalculate(stack);
-    });
 }
 
 function getFoldAllButtonState(columnId) {
@@ -2286,9 +2203,14 @@ function createColumnElement(column, columnIndex) {
         columnDiv.setAttribute('data-all-tags', allTags.join(' '));
     }
 
-    // Check if column has current week tag or other active temporal tags
-    if (window.tagUtils && window.tagUtils.isTemporallyActive(column.title)) {
-        columnDiv.setAttribute('data-current-week', 'true');
+    // Check each temporal type separately for granular column highlighting
+    if (window.tagUtils) {
+        const colText = column.title || '';
+        if (window.tagUtils.isCurrentDate(colText)) columnDiv.setAttribute('data-current-day', 'true');
+        if (window.tagUtils.isCurrentWeek(colText)) columnDiv.setAttribute('data-current-week', 'true');
+        if (window.tagUtils.isCurrentWeekday(colText)) columnDiv.setAttribute('data-current-weekday', 'true');
+        if (window.tagUtils.isCurrentTime(colText)) columnDiv.setAttribute('data-current-hour', 'true');
+        if (window.tagUtils.isCurrentTimeSlot(colText)) columnDiv.setAttribute('data-current-time', 'true');
     }
 
     // Corner badges handled by immediate update system
@@ -2462,7 +2384,20 @@ function createTaskElement(task, columnId, taskIndex) {
         return '';
     }
 
+    // Extract time slot from task title to use as parent context for minute slots in description
+    // This enables hierarchical temporal inheritance: task title !15:00-16:00 -> content !:15-:30
+    window.currentRenderingTimeSlot = null; // Reset first
+    if (task.title && window.tagUtils && typeof window.tagUtils.extractTimeSlotTag === 'function') {
+        const extracted = window.tagUtils.extractTimeSlotTag(task.title);
+        if (extracted) {
+            window.currentRenderingTimeSlot = extracted;
+        }
+    }
+
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description, task.includeContext) : '';
+
+    // Clear the rendering context AFTER description is rendered
+    window.currentRenderingTimeSlot = null;
 
     // Always wrap description in task sections for keyboard navigation
     // Even empty tasks need at least one section to be focusable
@@ -2547,13 +2482,30 @@ function createTaskElement(task, columnId, taskIndex) {
     const loadingClass = task.isLoadingContent ? ' task-loading' : '';
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
 
-    // Check if task has current week tag or other active temporal tags
-    const currentWeekAttribute = (window.tagUtils && window.tagUtils.isTemporallyActive(task.title)) ? ' data-current-week="true"' : '';
+    // Check temporal tags with hierarchical gating (column > task title > task content)
+    // Higher-order temporals in columns gate lower-order temporals in tasks
+    const temporalAttributes = [];
+    if (window.tagUtils && window.getActiveTemporalAttributes) {
+        // Get column title for hierarchical gating
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const columnTitle = column?.title || '';
+
+        // Get active temporal attributes with hierarchical gating
+        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, task.title || '', task.description || '');
+
+        // Convert to attribute strings
+        for (const [attr, isActive] of Object.entries(activeAttrs)) {
+            if (isActive) {
+                temporalAttributes.push(`${attr}="true"`);
+            }
+        }
+    }
+    const temporalAttributeString = temporalAttributes.length > 0 ? ' ' + temporalAttributes.join(' ') : '';
 
     return `
         <div class="${['task-item', isCollapsed ? 'collapsed' : '', headerClasses || '', footerClasses || ''].filter(cls => cls && cls.trim()).join(' ')}${loadingClass}"
              data-task-id="${task.id}"
-             data-task-index="${taskIndex}"${borderTagAttribute}${bgTagAttribute}${allTagsAttribute}${currentWeekAttribute}
+             data-task-index="${taskIndex}"${borderTagAttribute}${bgTagAttribute}${allTagsAttribute}${temporalAttributeString}
              style="${paddingTopStyle} ${paddingBottomStyle}">
             ${loadingOverlay}
             ${headerBarsHtml}
@@ -3063,25 +3015,254 @@ function enforceFoldModesForStacks(stackElement = null) {
 let recalculateStackHeightsTimer = null;
 let pendingStackElement = null;
 
-// HEIGHT CACHE: Store measured column heights to avoid expensive re-measurements
-// Key: columnId, Value: { columnHeaderHeight, headerHeight, footerHeight, contentHeight, marginHeight, totalHeight }
-window.columnHeightCache = window.columnHeightCache || new Map();
+// Debug: Force recalculation of all stack heights (call from console)
+window.debugForceRecalc = () => {
+    document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+        recalculateStackHeightsImmediate(stack);
+    });
+};
 
-// Invalidate cache for a specific column (call when content changes)
-function invalidateColumnHeightCache(columnId) {
-    if (window.columnHeightCache) {
-        window.columnHeightCache.delete(columnId);
+// COLUMN RESIZE OBSERVER: Automatically recalculates stack heights when column content changes
+// This handles all dynamic content: images, diagrams, text changes, etc.
+let columnResizeObserver = null;
+let columnMutationObserver = null; // Detects DOM changes (innerHTML) that ResizeObserver misses
+let isRecalculatingHeights = false; // Prevent infinite loops
+let pendingRecalcNeeded = false; // Track if recalc was requested during processing
+let heightPollingInterval = null; // Polling interval for delayed content rendering
+let heightPollingEndTime = 0; // When to stop polling
+
+// Baseline heights before DOM changes - used to detect if recalculation is needed
+let baselineHeights = new Map();
+
+// Update baseline heights (call this periodically when heights are stable)
+function updateBaselineHeights() {
+    baselineHeights.clear();
+    document.querySelectorAll('.kanban-full-height-column').forEach(col => {
+        const content = col.querySelector('.column-content');
+        if (content) {
+            baselineHeights.set(col.getAttribute('data-column-id'), content.scrollHeight);
+        }
+    });
+}
+
+// Poll for height changes after content modifications
+// This catches delayed rendering (images, fonts, iframes, etc.)
+function startHeightPolling() {
+    const POLLING_DURATION = 2000; // Poll for 2 seconds
+    const POLLING_INTERVAL = 200; // Check every 200ms (reduced from 100ms)
+
+    // Extend polling time if already polling
+    heightPollingEndTime = Date.now() + POLLING_DURATION;
+
+    // Don't start a new interval if one is already running
+    if (heightPollingInterval) {
+        return;
+    }
+
+    heightPollingInterval = setInterval(() => {
+        // Check if we should stop polling
+        if (Date.now() > heightPollingEndTime) {
+            clearInterval(heightPollingInterval);
+            heightPollingInterval = null;
+            updateBaselineHeights();
+            return;
+        }
+
+        // Check if any heights differ from baseline
+        let heightChanged = false;
+        document.querySelectorAll('.kanban-full-height-column').forEach(col => {
+            const content = col.querySelector('.column-content');
+            if (content) {
+                const colId = col.getAttribute('data-column-id');
+                const currentHeight = content.scrollHeight;
+                const baselineHeight = baselineHeights.get(colId);
+                if (baselineHeight !== undefined && currentHeight !== baselineHeight) {
+                    heightChanged = true;
+                }
+            }
+        });
+
+        // If any height differs from baseline, recalculate and update baseline
+        if (heightChanged) {
+            document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+                recalculateStackHeightsDebounced(stack);
+            });
+            updateBaselineHeights();
+        }
+    }, POLLING_INTERVAL);
+}
+
+function setupColumnResizeObserver() {
+    // Disconnect existing observer if any
+    if (columnResizeObserver) {
+        columnResizeObserver.disconnect();
+    }
+
+    columnResizeObserver = new ResizeObserver((entries) => {
+        // If we're currently recalculating, just mark that another recalc is needed
+        if (isRecalculatingHeights) {
+            pendingRecalcNeeded = true;
+            return;
+        }
+
+        const affectedStacks = new Set();
+
+        entries.forEach(entry => {
+            const column = entry.target.closest('.kanban-full-height-column');
+            let stack = entry.target.closest('.kanban-column-stack');
+
+            // If stack not found via closest, try finding it via column's parent
+            if (column && !stack) {
+                stack = column.parentElement?.closest('.kanban-column-stack');
+            }
+
+            if (column && stack) {
+                affectedStacks.add(stack);
+            } else if (column && !stack) {
+                // Column not in a stack - recalculate all stacks
+                document.querySelectorAll('.kanban-column-stack').forEach(s => affectedStacks.add(s));
+            }
+        });
+
+        // Batch recalculate affected stacks
+        if (affectedStacks.size > 0) {
+            requestAnimationFrame(() => {
+                isRecalculatingHeights = true;
+                pendingRecalcNeeded = false;
+                affectedStacks.forEach(stack => {
+                    recalculateStackHeightsImmediate(stack);
+                });
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
+                }
+                requestAnimationFrame(() => {
+                    isRecalculatingHeights = false;
+                    if (pendingRecalcNeeded) {
+                        pendingRecalcNeeded = false;
+                        document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+                            recalculateStackHeightsImmediate(stack);
+                        });
+                        if (typeof window.updateStackBottomDropZones === 'function') {
+                            window.updateStackBottomDropZones();
+                        }
+                    }
+                });
+            });
+        }
+    });
+
+    // Observe all existing tasks-container elements
+    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
+        columnResizeObserver.observe(tasksContainer);
+    });
+
+    // Also observe all task-item elements (resizes when content like diagrams change)
+    document.querySelectorAll('.task-item').forEach(taskItem => {
+        columnResizeObserver.observe(taskItem);
+    });
+
+    // MUTATION OBSERVER: Detects DOM changes (innerHTML) that ResizeObserver doesn't catch
+    if (columnMutationObserver) {
+        columnMutationObserver.disconnect();
+    }
+
+    columnMutationObserver = new MutationObserver((mutations) => {
+        // Check for structural changes OR class changes
+        const hasRelevantChanges = mutations.some(m => {
+            if (m.type === 'childList' && (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
+                return true;
+            }
+            // Class changes on task-item (task collapse) or column elements (column fold)
+            if (m.type === 'attributes' && m.attributeName === 'class') {
+                const target = m.target;
+                if (target.classList) {
+                    if (target.classList.contains('task-item') || target.classList.contains('kanban-full-height-column')) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+
+        if (!hasRelevantChanges) {
+            return;
+        }
+
+        // If we're currently recalculating, just mark that another recalc is needed
+        if (isRecalculatingHeights) {
+            pendingRecalcNeeded = true;
+            return;
+        }
+
+        // Recalculate, then poll for height changes (catches delayed rendering)
+        document.querySelectorAll('.kanban-column-stack').forEach(stack => {
+            recalculateStackHeightsDebounced(stack);
+        });
+
+        // Start polling for height changes - content might still be loading
+        startHeightPolling();
+    });
+
+    // Observe all tasks-container elements for DOM changes AND class changes
+    document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
+        columnMutationObserver.observe(tasksContainer, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    });
+
+    // Also observe column elements for fold/unfold class changes
+    const columns = document.querySelectorAll('.kanban-full-height-column');
+    columns.forEach(column => {
+        columnMutationObserver.observe(column, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    });
+
+    // Initialize baseline heights for polling comparison
+    updateBaselineHeights();
+}
+
+// Observe a new column when it's added to the DOM
+function observeColumnForResize(columnElement) {
+    const tasksContainer = columnElement.querySelector('.tasks-container');
+
+    // Add to ResizeObserver
+    if (columnResizeObserver) {
+        if (tasksContainer) {
+            columnResizeObserver.observe(tasksContainer);
+        }
+        // Also observe all task-item elements in this column
+        columnElement.querySelectorAll('.task-item').forEach(taskItem => {
+            columnResizeObserver.observe(taskItem);
+        });
+    }
+
+    // Add to MutationObserver
+    if (columnMutationObserver) {
+        // Observe tasks container for content changes
+        if (tasksContainer) {
+            columnMutationObserver.observe(tasksContainer, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+        // Observe column element for fold/unfold class changes
+        columnMutationObserver.observe(columnElement, {
+            attributes: true,
+            attributeFilter: ['class']
+        });
     }
 }
-window.invalidateColumnHeightCache = invalidateColumnHeightCache;
+window.observeColumnForResize = observeColumnForResize;
 
-// Invalidate entire cache (call on full re-render)
-function invalidateAllColumnHeightCache() {
-    if (window.columnHeightCache) {
-        window.columnHeightCache.clear();
-    }
-}
-window.invalidateAllColumnHeightCache = invalidateAllColumnHeightCache;
+// Export setup function
+window.setupColumnResizeObserver = setupColumnResizeObserver;
 
 function recalculateStackHeightsDebounced(stackElement = null) {
     // Store the stack element - if null is passed, it will recalculate all
@@ -3132,56 +3313,31 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // We now: measure → calculate → apply in one batch (smooth)
 
             // Measure actual content heights
-            // OPTIMIZATION: Use cached heights when available to avoid expensive offsetHeight reads
             const columnData = [];
             columns.forEach((col, idx) => {
-                const columnId = col.getAttribute('data-column-id');
                 const isVerticallyFolded = col.classList.contains('collapsed-vertical');
                 const isHorizontallyFolded = col.classList.contains('collapsed-horizontal');
 
-                // Always query DOM elements (needed for style application later)
+                // Query DOM elements for measurement and style application
                 const columnHeader = col.querySelector('.column-header');
                 const header = col.querySelector('.column-title');
                 const footer = col.querySelector('.column-footer');
-                const content = col.querySelector('.column-inner');
 
-                // Check cache first for height values (avoids expensive offsetHeight reads)
-                const cachedHeights = window.columnHeightCache?.get(columnId);
-                let columnHeaderHeight, headerHeight, footerHeight, contentHeight, marginHeight, footerBarsHeight;
+                // Measure heights directly from DOM
+                const columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
+                const headerHeight = header ? header.offsetHeight : 0;
+                const footerHeight = footer ? footer.offsetHeight : 0;
 
-                if (cachedHeights && !isVerticallyFolded && !isHorizontallyFolded) {
-                    // Use cached height values for expanded columns
-                    columnHeaderHeight = cachedHeights.columnHeaderHeight;
-                    headerHeight = cachedHeights.headerHeight;
-                    footerHeight = cachedHeights.footerHeight;
-                    contentHeight = cachedHeights.contentHeight;
-                    marginHeight = cachedHeights.marginHeight;
-                    footerBarsHeight = cachedHeights.footerBarsHeight;
-                } else {
-                    // Measure heights (expensive - offsetHeight reads cause reflows)
-                    columnHeaderHeight = columnHeader ? columnHeader.offsetHeight : 0;
-                    headerHeight = header ? header.offsetHeight : 0;
-                    footerHeight = footer ? footer.offsetHeight : 0;
-                    contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (content ? content.scrollHeight : 0);
+                // Measure the actual content height - use column-content for more accurate measurement
+                // .column-inner has flex:1 which can affect scrollHeight
+                const columnContent = col.querySelector('.column-content');
+                const contentHeight = (isVerticallyFolded || isHorizontallyFolded) ? 0 : (columnContent ? columnContent.scrollHeight : 0);
 
-                    const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
-                    footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
+                const footerBarsContainer = footer ? footer.querySelector('.stacked-footer-bars') : null;
+                const footerBarsHeight = footerBarsContainer ? footerBarsContainer.offsetHeight : 0;
 
-                    const columnMargin = col.querySelector('.column-margin');
-                    marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
-
-                    // Cache the measured heights for expanded columns only
-                    if (!isVerticallyFolded && !isHorizontallyFolded && columnId) {
-                        window.columnHeightCache?.set(columnId, {
-                            columnHeaderHeight,
-                            headerHeight,
-                            footerHeight,
-                            contentHeight,
-                            marginHeight,
-                            footerBarsHeight
-                        });
-                    }
-                }
+                const columnMargin = col.querySelector('.column-margin');
+                const marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
 
                 const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
 
@@ -3414,7 +3570,6 @@ window.enforceFoldModesForStacks = enforceFoldModesForStacks;
 // Use debounced version by default for performance, but export immediate version too
 window.recalculateStackHeights = recalculateStackHeightsDebounced;
 window.recalculateStackHeightsImmediate = recalculateStackHeightsImmediate;
-window.waitForStackImagesAndRecalculate = waitForStackImagesAndRecalculate;
 
 /**
  * Setup scroll handler to keep all column headers visible at all times
@@ -3737,6 +3892,7 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
 function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
     const link = target.closest('a');
     const img = target.closest('img');
+    const imageNotFound = target.closest('.image-not-found'); // Handle missing image placeholders
     const wikiLink = target.closest('.wiki-link');
 
     // Function to find the position index of clicked element among similar elements
@@ -3867,7 +4023,29 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
         }
         return true;
     }
-    
+
+    // Handle missing image placeholders (triggers search for alternative image)
+    if (imageNotFound) {
+        event.preventDefault();
+        event.stopPropagation();
+        const originalSrc = imageNotFound.getAttribute('data-original-src');
+
+        if (originalSrc) {
+            // Calculate index for image-not-found placeholders
+            linkIndex = findElementIndex(imageNotFound, containerElement, 'data-original-src');
+
+            vscode.postMessage({
+                type: 'openFileLink',
+                href: originalSrc,
+                linkIndex: linkIndex,
+                taskId: taskId,
+                columnId: columnId,
+                includeContext: includeContext
+            });
+        }
+        return true;
+    }
+
     return false;
 }
 
@@ -4514,6 +4692,8 @@ function generateTagStyles() {
 function injectStackableBars(targetElement = null) {
     let elementsToProcess;
     if (targetElement) {
+        // Safety check - skip if targetElement doesn't have classList
+        if (!targetElement.classList) return;
         // Always process the target element (even without data-all-tags) to clean up existing bars
         elementsToProcess = [targetElement];
     } else {
@@ -4521,6 +4701,9 @@ function injectStackableBars(targetElement = null) {
     }
 
     elementsToProcess.forEach((element, idx) => {
+        // Safety check - skip null elements
+        if (!element || !element.classList) return;
+
         const allTagsAttr = element.getAttribute('data-all-tags');
         let tags = allTagsAttr ? allTagsAttr.split(' ').filter(tag => tag.trim()) : [];
         const isColumn = element.classList.contains('kanban-full-height-column');
@@ -4973,11 +5156,6 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
 
     // Update column task count
     updateColumnTaskCount(columnId);
-
-    // Invalidate height cache for this column (content changed)
-    if (typeof invalidateColumnHeightCache === 'function') {
-        invalidateColumnHeightCache(columnId);
-    }
 
     return taskElement;
 }

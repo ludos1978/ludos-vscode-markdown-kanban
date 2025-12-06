@@ -14,57 +14,29 @@ export class DrawIOService {
 
     /**
      * Check if draw.io CLI is installed on the system
-     * Searches common installation paths across platforms
      */
     async isAvailable(): Promise<boolean> {
         if (this.availabilityChecked) {
             return this.isCliAvailable;
         }
 
-        // Check custom path from configuration first
-        const config = vscode.workspace.getConfiguration('markdownKanban');
-        const customPath = config.get<string>('diagrams.drawio.cliPath');
+        // Check configured path or use PATH
+        const config = vscode.workspace.getConfiguration('markdown-kanban');
+        const customPath = config.get<string>('drawioPath', '');
 
-        if (customPath && fs.existsSync(customPath)) {
-            this.cliPath = customPath;
+        // Use configured path or fall back to PATH
+        const cliName = customPath || 'drawio';
+
+        if (await this.testCliCommand(cliName)) {
+            this.cliPath = cliName;
             this.isCliAvailable = true;
             this.availabilityChecked = true;
-            console.log(`[DrawIOService] Using custom CLI path: ${customPath}`);
             return true;
-        }
-
-        // Common CLI command names across platforms
-        // Note: On macOS, prefer 'drawio' from homebrew over the .app bundle
-        // The .app bundle is a GUI app and may not work properly for CLI operations
-        const cliNames = [
-            'drawio',           // Homebrew or system PATH
-            'draw.io',          // Alternative name
-            '/usr/local/bin/drawio',  // Homebrew install location
-            '/opt/homebrew/bin/drawio',  // Homebrew on Apple Silicon
-            '/Applications/draw.io.app/Contents/MacOS/draw.io'  // GUI app (may not work properly)
-        ];
-
-        // Try each CLI name
-        for (const cliName of cliNames) {
-            if (await this.testCliCommand(cliName)) {
-                this.cliPath = cliName;
-                this.isCliAvailable = true;
-                this.availabilityChecked = true;
-                console.log(`[DrawIOService] Found draw.io CLI: ${cliName}`);
-
-                // Warn if using GUI app
-                if (cliName.includes('.app')) {
-                    console.warn('[DrawIOService] ⚠️ Using GUI app bundle - this may not work properly for CLI operations.');
-                    console.warn('[DrawIOService] ⚠️ Consider installing via homebrew: brew install --cask drawio');
-                }
-
-                return true;
-            }
         }
 
         this.availabilityChecked = true;
         this.isCliAvailable = false;
-        console.warn('[DrawIOService] draw.io CLI not found');
+        console.warn('[DrawIOService] draw.io CLI not found. Configure markdown-kanban.drawioPath in settings.');
         return false;
     }
 
@@ -132,9 +104,6 @@ export class DrawIOService {
                 args.push('--transparent');
             }
 
-            console.log(`[DrawIOService] Converting: ${path.basename(filePath)}`);
-            console.log(`[DrawIOService] Command: ${this.cliPath} ${args.join(' ')}`);
-
             const child = spawn(this.cliPath!, args);
 
             let stderr = '';
@@ -157,11 +126,6 @@ export class DrawIOService {
 
             child.on('exit', async (code) => {
                 clearTimeout(timer);
-
-                // Log stderr even on success for debugging
-                if (stderr) {
-                    console.log('[DrawIOService] stderr:', stderr);
-                }
 
                 if (code !== 0) {
                     console.error('[DrawIOService] Conversion failed:', stderr);
@@ -192,8 +156,6 @@ export class DrawIOService {
                     const data = format === 'svg'
                         ? await fs.promises.readFile(tempOutputPath, 'utf8')
                         : await fs.promises.readFile(tempOutputPath);
-
-                    console.log(`[DrawIOService] ✅ Converted to ${format.toUpperCase()}: ${path.basename(filePath)} (${data.length} bytes)`);
 
                     // Cleanup temp file
                     await fs.promises.unlink(tempOutputPath);

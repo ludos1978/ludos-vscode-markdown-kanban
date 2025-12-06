@@ -3,7 +3,7 @@
   "displayName": "Markdown Kanban Obsidian",
   "description": "Kanban board for Markdown files, compatible with obsidian kanban boards",
   "publisher": "ludos",
-  "version": "0.49.15",
+  "version": "0.57.17",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -22,7 +22,8 @@
   ],
   "icon": "./imgs/logo.png",
   "activationEvents": [
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onWebviewPanel:markdownKanbanPanel"
   ],
   "main": "./dist/extension.js",
   "repository": {
@@ -4261,6 +4262,26 @@
           "minimum": 1,
           "maximum": 50,
           "description": "Maximum number of backups to keep per file (older backups will be deleted)"
+        },
+        "markdown-kanban.popplerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to poppler tools directory (containing pdftoppm and pdfinfo). Leave empty for auto-detection. Example: /opt/homebrew/bin"
+        },
+        "markdown-kanban.drawioPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to draw.io CLI executable. Leave empty for auto-detection. Example: /opt/homebrew/bin/drawio"
+        },
+        "markdown-kanban.graphvizPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Graphviz dot executable (used by PlantUML). Leave empty for auto-detection. Example: /opt/homebrew/bin/dot"
+        },
+        "markdown-kanban.javaPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Java executable (used by PlantUML). Leave empty for auto-detection. Example: /usr/bin/java"
         },
         "markdown-kanban.marp.enginePath": {
           "type": "string",

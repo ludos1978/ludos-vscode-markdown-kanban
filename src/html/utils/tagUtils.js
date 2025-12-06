@@ -9,8 +9,8 @@
 const TAG_PREFIXES = {
     HASH: '#',      // Regular tags: #todo, #urgent, #row2
     PERSON: '@',    // Person/mention tags: @john, @team-alpha
-    TEMPORAL: '.',  // Temporal tags: .2025.01.28, .w15, .mon, .15:30
-    QUERY: '?'      // Query/gather tags: ?#tag, ?@person, ?.today (gathers cards with matching tags)
+    TEMPORAL: '!',  // Temporal tags: !2025.01.28, !w15, !mon, !15:30
+    QUERY: '$'      // Query/gather tags: $#tag, $@person, $!today (gathers cards with matching tags)
 };
 
 // Helper to escape special regex characters in prefixes
@@ -76,6 +76,9 @@ class TagUtils {
 
             // Time slot patterns (.15:30-17:00, .9am-5pm)
             timeSlotTags: new RegExp(`${P.T}(\\d{1,2}(?::\\d{2})?(?:am|pm)?)-(\\d{1,2}(?::\\d{2})?(?:am|pm)?)(?=\\s|$)`, 'gi'),
+
+            // Minute slot patterns (!:15-:30, !:00-:15) - inherit hour from parent time slot
+            minuteSlotTags: new RegExp(`${P.T}:(\\d{1,2})-:(\\d{1,2})(?=\\s|$)`, 'gi'),
 
             // Generic temporal tag - captures everything after . until whitespace (for future extensions)
             temporalTag: new RegExp(`${P.T}([^\\s]+)`, 'g'),
@@ -469,6 +472,11 @@ class TagUtils {
             const hours = parseInt(hourMatch[1], 10);
             const minutes = hourMatch[2] ? parseInt(hourMatch[2], 10) : 0;
 
+            // Special case: 24:00 means midnight (00:00)
+            if (hours === 24 && minutes === 0) {
+                return 0;
+            }
+
             if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
                 return hours * 60 + minutes;
             }
@@ -571,6 +579,87 @@ class TagUtils {
     }
 
     /**
+     * Check if text contains a minute slot tag (!:15-:30)
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains minute slot tag
+     */
+    hasMinuteSlotTag(text) {
+        if (!text) return false;
+        this.patterns.minuteSlotTags.lastIndex = 0;
+        return this.patterns.minuteSlotTags.test(text);
+    }
+
+    /**
+     * Extract minute slot from text
+     * @param {string} text - Text to extract minute slot from
+     * @returns {Object|null} Object with {startMinute, endMinute} or null
+     */
+    extractMinuteSlotTag(text) {
+        if (!text) return null;
+
+        this.patterns.minuteSlotTags.lastIndex = 0;
+        const match = this.patterns.minuteSlotTags.exec(text);
+        if (!match) return null;
+
+        const startMinute = parseInt(match[1], 10);
+        const endMinute = parseInt(match[2], 10);
+
+        if (isNaN(startMinute) || isNaN(endMinute)) return null;
+        if (startMinute < 0 || startMinute > 59) return null;
+        if (endMinute < 0 || endMinute > 59) return null;
+
+        return { startMinute, endMinute };
+    }
+
+    /**
+     * Check if current time falls within a minute slot, given a parent hour context.
+     * The minute slot inherits the hour from the parent time slot.
+     *
+     * Example: Parent has !15:00-16:00, line has !:15-:30
+     * If current time is 15:20 → highlighted (within 15:15-15:30)
+     * If current time is 15:40 → not highlighted (outside 15:15-15:30)
+     *
+     * @param {string} text - Text containing minute slot tag
+     * @param {Object} parentTimeSlot - Parent time slot context {start, end} in minutes since midnight
+     * @returns {boolean} True if current time is within the inherited minute slot
+     */
+    isCurrentMinuteSlot(text, parentTimeSlot) {
+        const minuteSlot = this.extractMinuteSlotTag(text);
+        if (!minuteSlot || !parentTimeSlot) return false;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Check if we're currently within the parent time slot
+        let inParentSlot = false;
+        if (parentTimeSlot.end < parentTimeSlot.start) {
+            // Parent crosses midnight
+            inParentSlot = currentMinutes >= parentTimeSlot.start || currentMinutes <= parentTimeSlot.end;
+        } else {
+            inParentSlot = currentMinutes >= parentTimeSlot.start && currentMinutes <= parentTimeSlot.end;
+        }
+
+        if (!inParentSlot) return false;
+
+        // Get the current hour (the hour we're in within the parent slot)
+        const currentHour = now.getHours();
+
+        // Calculate the absolute minute range for this minute slot
+        // The minute slot applies to the current hour within the parent slot
+        const slotStart = currentHour * 60 + minuteSlot.startMinute;
+        const slotEnd = currentHour * 60 + minuteSlot.endMinute;
+
+        // Check if current time is within this minute slot
+        if (slotEnd < slotStart) {
+            // Minute slot crosses hour boundary (e.g., :45-:15 means 45 to 15 of next hour)
+            // This is a rare case but handle it
+            return currentMinutes >= slotStart || (currentMinutes % 60) <= minuteSlot.endMinute;
+        }
+
+        return currentMinutes >= slotStart && currentMinutes <= slotEnd;
+    }
+
+    /**
      * Check if any temporal tag (date, week, weekday, time, time slot) is currently active
      * @param {string} text - Text to check
      * @returns {boolean} True if any temporal tag matches current time
@@ -581,6 +670,104 @@ class TagUtils {
                this.isCurrentWeekday(text) ||
                this.isCurrentTime(text) ||
                this.isCurrentTimeSlot(text);
+    }
+
+    /**
+     * Evaluate temporal tags at a single structural level with gate control.
+     *
+     * Temporal hierarchy (higher to lower): date > week > weekday > hour > timeSlot
+     * A closed gate means higher-order temporals are not active, so lower-order ones shouldn't highlight.
+     *
+     * @param {string} text - Text to evaluate
+     * @param {Object} incomingGate - Gate state from higher structural level
+     * @param {boolean} incomingGate.open - Whether the gate is open
+     * @param {string|null} incomingGate.closedBy - What closed the gate (for debugging)
+     * @param {string} levelName - Name of this level (for debugging)
+     * @returns {Object} { attrs: {attr: boolean}, gate: {open, closedBy} }
+     */
+    evaluateTemporalsAtLevel(text, incomingGate, levelName) {
+        // If no text or gate already closed, return empty
+        if (!text || !incomingGate.open) {
+            return { attrs: {}, gate: incomingGate };
+        }
+
+        const attrs = {};
+        let gate = { ...incomingGate };
+
+        // Temporal checks ordered by hierarchy (higher order first)
+        // Higher-order temporals gate lower-order ones
+        const checks = [
+            { has: this.hasDateTag,     check: this.isCurrentDate,     attr: 'data-current-day',     name: 'date' },
+            { has: this.hasWeekTag,     check: this.isCurrentWeek,     attr: 'data-current-week',    name: 'week' },
+            { has: this.hasWeekdayTag,  check: this.isCurrentWeekday,  attr: 'data-current-weekday', name: 'weekday' },
+            { has: this.hasTimeTag,     check: this.isCurrentTime,     attr: 'data-current-hour',    name: 'hour' },
+            { has: this.hasTimeSlotTag, check: this.isCurrentTimeSlot, attr: 'data-current-time',    name: 'timeSlot' }
+        ];
+
+        for (const { has, check, attr, name } of checks) {
+            if (has.call(this, text)) {
+                // Only check if gate is still open
+                const isActive = gate.open && check.call(this, text);
+                attrs[attr] = isActive;
+
+                // If this temporal exists but isn't active, close the gate for lower levels
+                if (!isActive && gate.open) {
+                    gate = { open: false, closedBy: `${levelName}:${name}` };
+                }
+            }
+        }
+
+        return { attrs, gate };
+    }
+
+    /**
+     * Get active temporal attributes for a task considering hierarchical gating.
+     *
+     * Structural hierarchy: Column > Task Title > Task Content
+     * Temporal hierarchy: date > week > weekday > hour > timeSlot
+     *
+     * A temporal tag at a lower structural level is only highlighted if ALL temporal tags
+     * at higher structural levels are currently active.
+     *
+     * Example: Column has !W49, Task has !09:00-12:00
+     * - If current week is 49 AND current time is in 09:00-12:00 → task highlights
+     * - If current week is NOT 49 → task does NOT highlight (gate closed by column)
+     * - If column has NO week tag → task highlights whenever time matches
+     *
+     * @param {string} columnTitle - Column title text
+     * @param {string} taskTitle - Task title text
+     * @param {string} taskContent - Task description/content text
+     * @returns {Object} Object with data attributes as keys and boolean values
+     */
+    getActiveTemporalAttributes(columnTitle, taskTitle, taskContent) {
+        let gate = { open: true, closedBy: null };
+        const result = {};
+
+        // Evaluate column level (no gating from above)
+        const columnResult = this.evaluateTemporalsAtLevel(columnTitle || '', gate, 'column');
+        Object.assign(result, columnResult.attrs);
+        gate = columnResult.gate;
+
+        // Evaluate task title level (gated by column)
+        const titleResult = this.evaluateTemporalsAtLevel(taskTitle || '', gate, 'taskTitle');
+        // Only add attrs that aren't already set by column
+        for (const [attr, value] of Object.entries(titleResult.attrs)) {
+            if (result[attr] === undefined) {
+                result[attr] = value;
+            }
+        }
+        gate = titleResult.gate;
+
+        // Evaluate task content level (gated by column + title)
+        const contentResult = this.evaluateTemporalsAtLevel(taskContent || '', gate, 'taskContent');
+        // Only add attrs that aren't already set by higher levels
+        for (const [attr, value] of Object.entries(contentResult.attrs)) {
+            if (result[attr] === undefined) {
+                result[attr] = value;
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -1394,5 +1581,11 @@ if (typeof window !== 'undefined') {
     window.isCurrentWeekday = (text) => tagUtils.isCurrentWeekday(text);
     window.isCurrentTime = (text) => tagUtils.isCurrentTime(text);
     window.isCurrentTimeSlot = (text) => tagUtils.isCurrentTimeSlot(text);
+    window.isCurrentMinuteSlot = (text, parentTimeSlot) => tagUtils.isCurrentMinuteSlot(text, parentTimeSlot);
+    window.hasMinuteSlotTag = (text) => tagUtils.hasMinuteSlotTag(text);
+    window.extractTimeSlotTag = (text) => tagUtils.extractTimeSlotTag(text);
+    window.extractMinuteSlotTag = (text) => tagUtils.extractMinuteSlotTag(text);
     window.isTemporallyActive = (text) => tagUtils.isTemporallyActive(text);
+    window.getActiveTemporalAttributes = (colTitle, taskTitle, taskContent) =>
+        tagUtils.getActiveTemporalAttributes(colTitle, taskTitle, taskContent);
 }
