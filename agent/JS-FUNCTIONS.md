@@ -339,11 +339,17 @@ if (!isEditing) {
 
 ---
 
-## src/html/fileTypeUtils.js - File Type Utilities
+## src/html/utils/fileTypeUtils.js - File Type Utilities
 
-- src_html_fileTypeUtils-getFileType - Get file type from extension
+- src_html_fileTypeUtils-isFilePath - Check if text is a file path (Unix or Windows: /, \, C:\, \\server)
+- src_html_fileTypeUtils-normalizePath - Convert backslashes to forward slashes (call after isFilePath)
+- src_html_fileTypeUtils-getFileName - Extract filename from path (handles both separators)
 - src_html_fileTypeUtils-isImageFile - Check if file is image
+- src_html_fileTypeUtils-isVideoFile - Check if file is video
+- src_html_fileTypeUtils-isAudioFile - Check if file is audio
+- src_html_fileTypeUtils-isMediaFile - Check if file is any media type
 - src_html_fileTypeUtils-isMarkdownFile - Check if file is markdown
+- src_html_fileTypeUtils-isTextFile - Check if file is text
 
 ---
 

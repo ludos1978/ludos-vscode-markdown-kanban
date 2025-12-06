@@ -1,8 +1,44 @@
+
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+
+
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 
 - [ ] when initializing a file it still does not reload the file immediately after adding the required header.
 
-- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
+- [ ] 
+#### Combined Queries
+
+A column can have multiple query tags:
+
+```markdown
+- Reto This Week ?@reto ?.w15
+```
+
+### Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `&` | AND | `#gather_Reto&day<3` |
+| `\|` | OR | `#gather_Reto\|Anita` |
+| `=` | EQUAL | `#gather_day=0` |
+| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
+| `<` | LESS THAN | `#gather_day<7` |
+| `>` | GREATER THAN | `#gather_day>0` |
+
+### Date Properties
+
+| Property | Description | Values |
+|----------|-------------|--------|
+| `day` | Days from today | -2, -1, 0, 1, 2, ... |
+| `weekday` | Day name | mon, tue, wed, ... |
+| `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
+| `month` | Month name | jan, feb, mar, ... |
+| `monthnum` | Month number | 1 to 12 |
+
+### ?ungathered
+
+Collects all cards that didn't match any gather rule:
 
 
 - [x] can we highlight the lines where tags are within the task description as well? also 

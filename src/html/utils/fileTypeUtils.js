@@ -30,7 +30,9 @@ class FileTypeUtils {
     }
 
     /**
-     * Check if text appears to be a file path
+     * Check if text appears to be a file path (Unix or Windows)
+     * Detects: /path/to/file, C:\path\to\file, \\server\share, file:// URIs
+     * Does NOT treat bare filenames (file.txt) as paths - requires path separator or drive letter
      * @param {string} text - Text to check
      * @returns {boolean} True if looks like a file path
      */
@@ -39,17 +41,64 @@ class FileTypeUtils {
             return false;
         }
 
-        // Has file extension
-        if (!/\.[a-zA-Z0-9]{1,10}$/.test(text)) {
-            return false;
+        const trimmed = text.trim();
+
+        // file:// URI is always a path
+        if (trimmed.startsWith('file://')) {
+            return true;
         }
 
-        // Basic checks to avoid false positives
-        if (text.includes('://')) { return false; } // URLs
-        if (text.startsWith('mailto:')) { return false; } // Email links
-        if (text.includes('@') && !text.includes('/') && !text.includes('\\')) { return false; } // Email addresses
+        // Windows drive letter followed by path separator (C:\, C:/, D:\, etc.)
+        // Must have separator after colon to avoid matching "kanban-task:..." or similar
+        if (/^[A-Za-z]:[\\/]/.test(trimmed)) {
+            return true;
+        }
 
-        return true;
+        // Windows network path (\\server\share)
+        if (trimmed.startsWith('\\\\')) {
+            return true;
+        }
+
+        // Has path separator (Unix / or Windows \)
+        if (trimmed.includes('/') || trimmed.includes('\\')) {
+            // Exclude URLs (http://, https://, etc.)
+            if (trimmed.includes('://')) { return false; }
+            // Exclude email links
+            if (trimmed.startsWith('mailto:')) { return false; }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Normalize path separators to forward slashes
+     * Call this AFTER confirming text is a file path with isFilePath()
+     * @param {string} filePath - Path to normalize
+     * @returns {string} Path with forward slashes
+     */
+    normalizePath(filePath) {
+        if (!filePath || typeof filePath !== 'string') {
+            return '';
+        }
+
+        // Replace all backslashes with forward slashes
+        return filePath.replace(/\\/g, '/');
+    }
+
+    /**
+     * Extract filename from a path (handles both Unix and Windows paths)
+     * @param {string} filePath - Full path
+     * @returns {string} Filename with extension
+     */
+    getFileName(filePath) {
+        if (!filePath || typeof filePath !== 'string') {
+            return '';
+        }
+
+        // Split on both path separators and get last part
+        const parts = filePath.split(/[\/\\]/);
+        return parts.pop() || '';
     }
 
     /**

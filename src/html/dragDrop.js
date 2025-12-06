@@ -706,8 +706,8 @@ function setupGlobalDragAndDrop() {
             } else if (textData2.startsWith('CLIPBOARD_IMAGE:')) {
                 const imageData = textData2.substring('CLIPBOARD_IMAGE:'.length);
                 handleClipboardImageDrop(e, imageData);
-            } else if (textData2.includes('/')) {
-                // Looks like a file path
+            } else if (fileTypeUtils.isFilePath(textData2)) {
+                // File path detected (Unix or Windows)
                 handleVSCodeUriDrop(e, textData2);
             } else {
                 // Plain text - create a new card
@@ -2145,16 +2145,18 @@ if (typeof window !== 'undefined') {
 
 function handleVSCodeUriDrop(e, uriData) {
     const uris = uriData.split('\n').filter(uri => uri.trim()).filter(uri => {
-        const isFile = uri.startsWith('file://') || (uri.includes('/') && !uri.includes('task_') && !uri.includes('col_'));
-        return isFile;
+        // Use fileTypeUtils for proper path detection (handles Unix and Windows)
+        return fileTypeUtils.isFilePath(uri);
     });
 
     if (uris.length > 0) {
         uris.forEach(uri => {
-            const fullPath = uri.startsWith('file://')
+            let fullPath = uri.startsWith('file://')
                 ? decodeURIComponent(uri.replace('file://', ''))
                 : uri;
-            const filename = fullPath.split('/').pop() || uri;
+            // Normalize path separators to forward slashes
+            fullPath = fileTypeUtils.normalizePath(fullPath);
+            const filename = fileTypeUtils.getFileName(fullPath);
             const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
 
             // Generate unique ID for this drop
