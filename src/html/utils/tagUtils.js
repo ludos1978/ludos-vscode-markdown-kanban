@@ -77,6 +77,9 @@ class TagUtils {
             // Time slot patterns (.15:30-17:00, .9am-5pm)
             timeSlotTags: new RegExp(`${P.T}(\\d{1,2}(?::\\d{2})?(?:am|pm)?)-(\\d{1,2}(?::\\d{2})?(?:am|pm)?)(?=\\s|$)`, 'gi'),
 
+            // Minute slot patterns (!:15-:30, !:00-:15) - inherit hour from parent time slot
+            minuteSlotTags: new RegExp(`${P.T}:(\\d{1,2})-:(\\d{1,2})(?=\\s|$)`, 'gi'),
+
             // Generic temporal tag - captures everything after . until whitespace (for future extensions)
             temporalTag: new RegExp(`${P.T}([^\\s]+)`, 'g'),
 
@@ -573,6 +576,87 @@ class TagUtils {
         if (!text) return false;
         this.patterns.timeSlotTags.lastIndex = 0;
         return this.patterns.timeSlotTags.test(text);
+    }
+
+    /**
+     * Check if text contains a minute slot tag (!:15-:30)
+     * @param {string} text - Text to check
+     * @returns {boolean} True if contains minute slot tag
+     */
+    hasMinuteSlotTag(text) {
+        if (!text) return false;
+        this.patterns.minuteSlotTags.lastIndex = 0;
+        return this.patterns.minuteSlotTags.test(text);
+    }
+
+    /**
+     * Extract minute slot from text
+     * @param {string} text - Text to extract minute slot from
+     * @returns {Object|null} Object with {startMinute, endMinute} or null
+     */
+    extractMinuteSlotTag(text) {
+        if (!text) return null;
+
+        this.patterns.minuteSlotTags.lastIndex = 0;
+        const match = this.patterns.minuteSlotTags.exec(text);
+        if (!match) return null;
+
+        const startMinute = parseInt(match[1], 10);
+        const endMinute = parseInt(match[2], 10);
+
+        if (isNaN(startMinute) || isNaN(endMinute)) return null;
+        if (startMinute < 0 || startMinute > 59) return null;
+        if (endMinute < 0 || endMinute > 59) return null;
+
+        return { startMinute, endMinute };
+    }
+
+    /**
+     * Check if current time falls within a minute slot, given a parent hour context.
+     * The minute slot inherits the hour from the parent time slot.
+     *
+     * Example: Parent has !15:00-16:00, line has !:15-:30
+     * If current time is 15:20 → highlighted (within 15:15-15:30)
+     * If current time is 15:40 → not highlighted (outside 15:15-15:30)
+     *
+     * @param {string} text - Text containing minute slot tag
+     * @param {Object} parentTimeSlot - Parent time slot context {start, end} in minutes since midnight
+     * @returns {boolean} True if current time is within the inherited minute slot
+     */
+    isCurrentMinuteSlot(text, parentTimeSlot) {
+        const minuteSlot = this.extractMinuteSlotTag(text);
+        if (!minuteSlot || !parentTimeSlot) return false;
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Check if we're currently within the parent time slot
+        let inParentSlot = false;
+        if (parentTimeSlot.end < parentTimeSlot.start) {
+            // Parent crosses midnight
+            inParentSlot = currentMinutes >= parentTimeSlot.start || currentMinutes <= parentTimeSlot.end;
+        } else {
+            inParentSlot = currentMinutes >= parentTimeSlot.start && currentMinutes <= parentTimeSlot.end;
+        }
+
+        if (!inParentSlot) return false;
+
+        // Get the current hour (the hour we're in within the parent slot)
+        const currentHour = now.getHours();
+
+        // Calculate the absolute minute range for this minute slot
+        // The minute slot applies to the current hour within the parent slot
+        const slotStart = currentHour * 60 + minuteSlot.startMinute;
+        const slotEnd = currentHour * 60 + minuteSlot.endMinute;
+
+        // Check if current time is within this minute slot
+        if (slotEnd < slotStart) {
+            // Minute slot crosses hour boundary (e.g., :45-:15 means 45 to 15 of next hour)
+            // This is a rare case but handle it
+            return currentMinutes >= slotStart || (currentMinutes % 60) <= minuteSlot.endMinute;
+        }
+
+        return currentMinutes >= slotStart && currentMinutes <= slotEnd;
     }
 
     /**
@@ -1497,6 +1581,10 @@ if (typeof window !== 'undefined') {
     window.isCurrentWeekday = (text) => tagUtils.isCurrentWeekday(text);
     window.isCurrentTime = (text) => tagUtils.isCurrentTime(text);
     window.isCurrentTimeSlot = (text) => tagUtils.isCurrentTimeSlot(text);
+    window.isCurrentMinuteSlot = (text, parentTimeSlot) => tagUtils.isCurrentMinuteSlot(text, parentTimeSlot);
+    window.hasMinuteSlotTag = (text) => tagUtils.hasMinuteSlotTag(text);
+    window.extractTimeSlotTag = (text) => tagUtils.extractTimeSlotTag(text);
+    window.extractMinuteSlotTag = (text) => tagUtils.extractMinuteSlotTag(text);
     window.isTemporallyActive = (text) => tagUtils.isTemporallyActive(text);
     window.getActiveTemporalAttributes = (colTitle, taskTitle, taskContent) =>
         tagUtils.getActiveTemporalAttributes(colTitle, taskTitle, taskContent);

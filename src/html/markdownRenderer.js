@@ -295,6 +295,7 @@ const TEMPORAL_TAG_CONFIG = {
         weekday: '📅',   // Weekday tags: !mon, !friday
         time: '🕐',      // Time tags: !15:30, !9am
         timeSlot: '⏱️',  // Time slot tags: !09:00-17:00
+        minuteSlot: '⏱️', // Minute slot tags: !:15-:30
         generic: '🕐'    // Generic temporal: fallback
     },
     // Whether to show icons (set to false to hide all icons)
@@ -374,13 +375,22 @@ function temporalTagPlugin(md, options = {}) {
                             tagType = 'weekday';
                             pos += tagContent.length;
                         }
-                        // 6. Time: HH:MM or Ham/Hpm
+                        // 6. Minute slot: :MM-:MM (inherits hour from parent)
                         else {
-                            const timeMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
-                            if (timeMatch) {
-                                tagContent = timeMatch[0];
-                                tagType = 'time';
+                            const minuteSlotMatch = remaining.match(/^:(\d{1,2})-:(\d{1,2})(?=\s|$)/i);
+                            if (minuteSlotMatch) {
+                                tagContent = minuteSlotMatch[0];
+                                tagType = 'minuteSlot';
                                 pos += tagContent.length;
+                            }
+                            // 7. Time: HH:MM or Ham/Hpm
+                            else {
+                                const timeMatch = remaining.match(/^(\d{1,2}(?::\d{2})?(?:am|pm)?)(?=\s|$)/i);
+                                if (timeMatch) {
+                                    tagContent = timeMatch[0];
+                                    tagType = 'time';
+                                    pos += tagContent.length;
+                                }
                             }
                         }
                     }
@@ -429,6 +439,13 @@ function temporalTagPlugin(md, options = {}) {
                 case 'weekday': isActive = window.tagUtils.isCurrentWeekday(fullTag); break;
                 case 'time': isActive = window.tagUtils.isCurrentTime(fullTag); break;
                 case 'timeSlot': isActive = window.tagUtils.isCurrentTimeSlot(fullTag); break;
+                case 'minuteSlot':
+                    // Minute slots inherit from parent time slot context
+                    // The parent time slot is set before rendering via window.currentRenderingTimeSlot
+                    if (window.currentRenderingTimeSlot) {
+                        isActive = window.tagUtils.isCurrentMinuteSlot(fullTag, window.currentRenderingTimeSlot);
+                    }
+                    break;
             }
         }
 
@@ -438,7 +455,10 @@ function temporalTagPlugin(md, options = {}) {
         const escFull = fullTag.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const dataAttr = `data-temporal-type="${tagType}" data-temporal="${escContent}"`;
 
-        return `<span class="${classes}${activeClass}" ${dataAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escFull}</span>`;
+        // For minute slots, add an extra attribute to help with line-level styling
+        const lineActiveAttr = (tagType === 'minuteSlot' && isActive) ? ' data-temporal-line-active="true"' : '';
+
+        return `<span class="${classes}${activeClass}" ${dataAttr}${lineActiveAttr}>${icon ? `<span class="temporal-icon">${icon}</span>` : ''}${escFull}</span>`;
     };
 }
 

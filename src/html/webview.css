@@ -4529,6 +4529,21 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
   box-shadow: var(--current-week-glow-size) var(--current-week-highlight-color) !important;
 }
 
+/* Line-level temporal highlighting for minute slots in task descriptions */
+/* When a paragraph contains an active minute slot (!:15-:30), highlight the entire line */
+.task-description-display p:has([data-temporal-line-active="true"]),
+.task-description-display li:has([data-temporal-line-active="true"]) {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+  padding-right: 8px;
+  margin-right: -4px;
+}
+
+/* Fallback for browsers that don't support :has() - highlight the span itself more prominently */
+.kanban-temporal-minuteSlot.temporal-active {
+  border-right: var(--current-week-border-width) var(--current-week-border-style) var(--current-week-highlight-color) !important;
+  padding-right: 4px;
+}
+
 /* Header and footer bars */
 .header-bar,
 .footer-bar {

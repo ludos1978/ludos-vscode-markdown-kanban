@@ -2384,7 +2384,20 @@ function createTaskElement(task, columnId, taskIndex) {
         return '';
     }
 
+    // Extract time slot from task title to use as parent context for minute slots in description
+    // This enables hierarchical temporal inheritance: task title !15:00-16:00 -> content !:15-:30
+    window.currentRenderingTimeSlot = null; // Reset first
+    if (task.title && window.tagUtils && typeof window.tagUtils.extractTimeSlotTag === 'function') {
+        const extracted = window.tagUtils.extractTimeSlotTag(task.title);
+        if (extracted) {
+            window.currentRenderingTimeSlot = extracted;
+        }
+    }
+
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description, task.includeContext) : '';
+
+    // Clear the rendering context AFTER description is rendered
+    window.currentRenderingTimeSlot = null;
 
     // Always wrap description in task sections for keyboard navigation
     // Even empty tasks need at least one section to be focusable

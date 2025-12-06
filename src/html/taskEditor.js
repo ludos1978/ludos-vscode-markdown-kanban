@@ -1214,7 +1214,16 @@ class TaskEditor {
                                 displayValue = task.displayTitle || '';
                             }
 
+                            // Set parent time slot context for minute slot inheritance (description only)
+                            if (type === 'task-description' && window.tagUtils && window.tagUtils.extractTimeSlotTag) {
+                                window.currentRenderingTimeSlot = window.tagUtils.extractTimeSlotTag(task.title || '');
+                            }
+
                             let renderedHtml = renderMarkdown(displayValue, task.includeContext);
+
+                            // Clear context after rendering
+                            window.currentRenderingTimeSlot = null;
+
                             // Wrap in sections for keyboard navigation if this is a task description
                             if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
                                 renderedHtml = window.wrapTaskSections(renderedHtml);

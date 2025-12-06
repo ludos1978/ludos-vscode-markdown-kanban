@@ -1,7 +1,23 @@
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
 
-- [ ] would it be possible to limit the display of active hours, days etc if the above
+- [x] can we highlight the lines where tags are within the task description as well? also 
+work with the inheritance system we use. for that we should also support minutes. \
+\
+for example the task header might have:\
+!15:00-16:00\
+\
+and the task contents might be\
+\
+!:15-:30 : highlighted between 15:15 to 15:30\
+\
+!:30-:45 : highlighted between 15:30 to 15:45 \
+\
+which would highlight the complete line with a right border as we do with the task. \
+\
+can you integrate that into the existing system? 
+
+- [x] would it be possible to limit the display of active hours, days etc if the above
   timeslots (if they are added) are also active.\
   \
   so if the column has a !W49 tag, then the hourly tag !09:00-12:00 is only showing if
