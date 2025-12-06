@@ -2896,10 +2896,20 @@ export class MessageHandler {
             return false;
         }
 
-        const fileResolved = path.resolve(filePath);
+        // Normalize path: resolve and convert to lowercase on Windows for case-insensitive comparison
+        const isWindows = process.platform === 'win32';
+        let fileResolved = path.resolve(filePath);
+        if (isWindows) {
+            fileResolved = fileResolved.toLowerCase();
+        }
+
         for (const folder of workspaceFolders) {
-            const workspaceResolved = path.resolve(folder.uri.fsPath);
-            if (fileResolved.startsWith(workspaceResolved)) {
+            let workspaceResolved = path.resolve(folder.uri.fsPath);
+            if (isWindows) {
+                workspaceResolved = workspaceResolved.toLowerCase();
+            }
+            // Check if file is within workspace folder (add path separator to avoid partial matches)
+            if (fileResolved === workspaceResolved || fileResolved.startsWith(workspaceResolved + path.sep)) {
                 return true;
             }
         }

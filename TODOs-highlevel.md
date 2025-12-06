@@ -6,8 +6,7 @@
 
 - [ ] when initializing a file it still does not reload the file immediately after adding the required header.
 
-- [ ] 
-#### Combined Queries
+- [ ] #### Combined Queries
 
 A column can have multiple query tags:
 

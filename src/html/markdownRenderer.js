@@ -1518,8 +1518,11 @@ function renderMarkdown(text, includeContext) {
         // Helper function to resolve media paths dynamically
         function resolveMediaPath(originalSrc) {
             const includeContext = window.currentTaskIncludeContext;
+            // Check for Windows absolute path (C:/, D:\, etc.)
+            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
             const isRelativePath = originalSrc &&
                                    !originalSrc.startsWith('/') &&
+                                   !isWindowsAbsolute &&
                                    !originalSrc.startsWith('http://') &&
                                    !originalSrc.startsWith('https://') &&
                                    !originalSrc.startsWith('vscode-webview://');
@@ -1548,6 +1551,11 @@ function renderMarkdown(text, includeContext) {
 
                 const resolvedPath = '/' + dirSegments.join('/');
                 const encodedPath = encodeURI(resolvedPath);
+                return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (isWindowsAbsolute) {
+                // Windows absolute path (C:/Users/...) - convert to webview URI
+                const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
+                const encodedPath = encodeURI(normalizedPath);
                 return `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
             return originalSrc;
@@ -1669,8 +1677,11 @@ function renderMarkdown(text, includeContext) {
 
             // Check if we have includeContext and the path is relative
             const includeContext = window.currentTaskIncludeContext;
+            // Check for Windows absolute path (C:/, D:\, etc.)
+            const isWindowsAbsolute = originalSrc && /^[A-Za-z]:[\/\\]/.test(originalSrc);
             const isRelativePath = originalSrc &&
                                    !originalSrc.startsWith('/') &&
+                                   !isWindowsAbsolute &&
                                    !originalSrc.startsWith('http://') &&
                                    !originalSrc.startsWith('https://') &&
                                    !originalSrc.startsWith('vscode-webview://');
@@ -1712,6 +1723,12 @@ function renderMarkdown(text, includeContext) {
                 // Convert to webview URL format
                 // Format: https://file%2B.vscode-resource.vscode-cdn.net/absolute/path
                 const encodedPath = encodeURI(resolvedPath);
+                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (isWindowsAbsolute) {
+                // Windows absolute path (C:/Users/...) - convert to webview URI
+                // Normalize backslashes to forward slashes and prepend /
+                const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
+                const encodedPath = encodeURI(normalizedPath);
                 displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
 

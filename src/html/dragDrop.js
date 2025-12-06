@@ -2151,11 +2151,11 @@ function handleVSCodeUriDrop(e, uriData) {
 
     if (uris.length > 0) {
         uris.forEach(uri => {
-            let fullPath = uri.startsWith('file://')
+            // Decode file:// URI but keep original path separators for backend filesystem operations
+            const fullPath = uri.startsWith('file://')
                 ? decodeURIComponent(uri.replace('file://', ''))
                 : uri;
-            // Normalize path separators to forward slashes
-            fullPath = fileTypeUtils.normalizePath(fullPath);
+            // Extract filename (handles both / and \ separators)
             const filename = fileTypeUtils.getFileName(fullPath);
             const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i.test(filename);
 
