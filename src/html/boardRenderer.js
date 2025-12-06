@@ -1959,6 +1959,8 @@ function renderBoard(options = null) {
     // Apply immediate visual updates to all elements with tags - done earlier for visual feedback
     setTimeout(() => {
         document.querySelectorAll('[data-all-tags]').forEach(element => {
+            // Safety check - skip null elements
+            if (!element || !element.classList) return;
             const tags = element.getAttribute('data-all-tags').split(' ').filter(tag => tag.trim());
             const elementType = element.classList.contains('kanban-full-height-column') ? 'column' : 'task';
             if (window.updateAllVisualTagElements) {
@@ -4677,6 +4679,8 @@ function generateTagStyles() {
 function injectStackableBars(targetElement = null) {
     let elementsToProcess;
     if (targetElement) {
+        // Safety check - skip if targetElement doesn't have classList
+        if (!targetElement.classList) return;
         // Always process the target element (even without data-all-tags) to clean up existing bars
         elementsToProcess = [targetElement];
     } else {
@@ -4684,6 +4688,9 @@ function injectStackableBars(targetElement = null) {
     }
 
     elementsToProcess.forEach((element, idx) => {
+        // Safety check - skip null elements
+        if (!element || !element.classList) return;
+
         const allTagsAttr = element.getAttribute('data-all-tags');
         let tags = allTagsAttr ? allTagsAttr.split(' ').filter(tag => tag.trim()) : [];
         const isColumn = element.classList.contains('kanban-full-height-column');

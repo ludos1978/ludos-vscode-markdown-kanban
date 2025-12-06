@@ -683,12 +683,6 @@ class TagUtils {
             }
         }
 
-        // Debug logging (can be removed later)
-        const hasTemporals = Object.keys(result).length > 0;
-        if (hasTemporals) {
-            console.log('[TEMPORAL-HIERARCHY] gate:', gate.open ? 'OPEN' : `CLOSED by ${gate.closedBy}`, '| attrs:', result);
-        }
-
         return result;
     }
 
