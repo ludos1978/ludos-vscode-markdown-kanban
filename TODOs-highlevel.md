@@ -1,3 +1,7 @@
+- [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
+
+- [ ] when initializing a file it still does not reload the file immediately after adding the required header.
+
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
 

@@ -1,6 +1,104 @@
-# Kanban Markdown for Visual Studio Code & VSCodium
+# Ludos Kanban Editor
 
-A VS Code extension that allows editing Markdown files as an interactive Kanban board. Its made to mimic the functionality of a obsidian markdown editor which allows data handling and link management in kanban format. Using the tags it's more versatile. It should be data compatible with the Kanban Obsidian Markdown format from https://github.com/mgmeyers/obsidian-kanban .
+This is a feature packed kanban editor that runs as an visual studio code editor extension.
+
+I started this project to create and maintain lecture presentations for my university lectures. As i have been using marp (markdown based presentation tool) several years, and my structure and plugins got more and more complex i wanted to simplify my work environment. I have been using vscode because it's an versatile editor, has lots of plugins, integrates visual editors and allows moving, renaming files within the workspaces. I have started to create and manage new lectures and i found no good tool to create an extensive research storage with a good overview that is local first and doesnt need any subscription (i would never use a subscription based tool that can lock in my data).
+
+This markdown editor contains to many features. 
+- Foremost it's managing columns and tasks. 
+- But you can organize columns as you want into stacks, into multiple rows. 
+- You can fold them, you can make theyr headers sticky (so you can move content into them even outside the view.) . 
+- It has an extensive layout system to customize the viewport with some reasonable defaults. 
+- It has drag & drop features (from desktop with copy, from clipboard to create files from binary data or direct links). 
+- It can embed images (regular image formats, but also excalidraw, drawio, mermaid, plantuml and pdf), videos (mp4, only some audio formats), other markdown files and links. 
+- It can export with marp to create live-presentations, pdf-handouts and also editable pptx (an alpha feature of marp), presentations can in realtime update on kanban board modifications. 
+- It can also pack all or parts of the kanban into data into a single folder including media.
+- It has a extensive Tag system with labels, colors, person and automatic sorting features.
+
+---
+
+To use it, install the vsix into the visual studio code editor in the extensions by using the breadcrumbs / burger menu on the top right and select "install from vsix".
+
+For some features you will need to install other addons as well:
+- marp
+- excalidraw
+- drawio
+- mermaid
+- plantuml
+- pdf
+
+(detailed explanation still missing, some require vscode extensions, some require a command line tool to convert)
+
+---
+
+## Markdown features
+
+---:
+Column 1
+:--:
+Column 2
+:---
+
+;; comment 
+
+[comment](/path/to/file "label")
+[[markdown-file-link]]
+<https://url.link.com>
+
+comment[^com]
+
+[^com]: some explanation
+
+comment^[comment]
+
+> indented note
+
+```mermaid
+```
+
+```plantuml
+```
+
+- one (normal dotted list)
+* two (normal dotted list, incremental dispaly in slide)
++ tree (no dot, incremental display in slide)
+
+  indented for styles
+
+==highlight==
+
+^^sup^^ __sub__ ~~striketrough~~
+*as well* **as the normal styles**
+
+---
+
+## Tag features
+
+### Tags
+
+additional groups can be added in the config
+
+a tag is anything starting with # followed by any text and separated by a space.
+
+#1.1 #green
+
+tags are used to save some of the special settings of the kanban such as #row{number} #stack (so a column is stacked below the last non #stack column)
+
+
+
+
+---
+
+Keyboard Shortcuts:
+- use vscode keyboard shortcuts to paste content ( i recommend to add --: :--: and :--- as shortcuts)
+- paste cmd+shift+v ctrl+shift+v to paste content with link detection
+- drag & drop with shift to embed in the kanban
+  - will detect files and < 10mb copy to a {filename}-Media folder
+
+---
+
+
+Its made to mimic the functionality of a obsidian markdown editor which allows data handling and link management in kanban format. Using the tags it's more versatile. It should be data compatible with the Kanban Obsidian Markdown format from https://github.com/mgmeyers/obsidian-kanban .
 
 ## A word of caution
 
