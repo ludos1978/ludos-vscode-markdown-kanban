@@ -598,8 +598,8 @@ export class KanbanFileService {
             this._saveStartVersion = null;
             this._saveEndVersion = null;
 
-            // Reload the file after successful initialization
-            await this.loadMarkdownFile(document);
+            // Reload the file after successful initialization (forceReload=true to bypass early-return check)
+            await this.loadMarkdownFile(document, false, true);
 
             vscode.window.showInformationMessage('Kanban board initialized successfully');
         } catch (error) {
