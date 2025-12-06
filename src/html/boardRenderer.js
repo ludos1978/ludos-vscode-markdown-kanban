@@ -2202,9 +2202,8 @@ function createColumnElement(column, columnIndex) {
     }
 
     // Check each temporal type separately for granular column highlighting
-    // Use displayTitle (may contain included file content) AND title
     if (window.tagUtils) {
-        const colText = (column.displayTitle || '') + ' ' + (column.title || '');
+        const colText = column.title || '';
         if (window.tagUtils.isCurrentDate(colText)) columnDiv.setAttribute('data-current-day', 'true');
         if (window.tagUtils.isCurrentWeek(colText)) columnDiv.setAttribute('data-current-week', 'true');
         if (window.tagUtils.isCurrentWeekday(colText)) columnDiv.setAttribute('data-current-weekday', 'true');
@@ -2469,41 +2468,14 @@ function createTaskElement(task, columnId, taskIndex) {
     const loadingOverlay = task.isLoadingContent ? '<div class="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Loading...</div></div>' : '';
 
     // Check each temporal type separately for granular highlighting
-    // Use displayTitle (may contain included file content) AND title AND description
-    const textToCheck = (task.displayTitle || '') + ' ' + (task.title || '') + ' ' + (task.description || '');
+    const textToCheck = (task.title || '') + ' ' + (task.description || '');
     const temporalAttributes = [];
-
-    // DEBUG: Always log for tasks with temporal prefix
-    if (textToCheck.includes('!')) {
-        console.log('[TEMPORAL-DEBUG] Task ID:', task.id);
-        console.log('[TEMPORAL-DEBUG] task.title:', task.title);
-        console.log('[TEMPORAL-DEBUG] task.displayTitle:', task.displayTitle);
-        console.log('[TEMPORAL-DEBUG] textToCheck:', textToCheck.substring(0, 200));
-        console.log('[TEMPORAL-DEBUG] window.tagUtils exists:', !!window.tagUtils);
-    }
-
     if (window.tagUtils) {
-        const isDate = window.tagUtils.isCurrentDate(textToCheck);
-        const isWeek = window.tagUtils.isCurrentWeek(textToCheck);
-        const isWeekday = window.tagUtils.isCurrentWeekday(textToCheck);
-        const isTime = window.tagUtils.isCurrentTime(textToCheck);
-        const isTimeSlot = window.tagUtils.isCurrentTimeSlot(textToCheck);
-
-        // DEBUG: Log results
-        if (textToCheck.includes('!')) {
-            console.log('[TEMPORAL-DEBUG] Detection results:', { isDate, isWeek, isWeekday, isTime, isTimeSlot });
-        }
-
-        if (isDate) temporalAttributes.push('data-current-day="true"');
-        if (isWeek) temporalAttributes.push('data-current-week="true"');
-        if (isWeekday) temporalAttributes.push('data-current-weekday="true"');
-        if (isTime) temporalAttributes.push('data-current-hour="true"');
-        if (isTimeSlot) temporalAttributes.push('data-current-time="true"');
-
-        // DEBUG: Log final attributes
-        if (textToCheck.includes('!')) {
-            console.log('[TEMPORAL-DEBUG] temporalAttributes:', temporalAttributes);
-        }
+        if (window.tagUtils.isCurrentDate(textToCheck)) temporalAttributes.push('data-current-day="true"');
+        if (window.tagUtils.isCurrentWeek(textToCheck)) temporalAttributes.push('data-current-week="true"');
+        if (window.tagUtils.isCurrentWeekday(textToCheck)) temporalAttributes.push('data-current-weekday="true"');
+        if (window.tagUtils.isCurrentTime(textToCheck)) temporalAttributes.push('data-current-hour="true"');
+        if (window.tagUtils.isCurrentTimeSlot(textToCheck)) temporalAttributes.push('data-current-time="true"');
     }
     const temporalAttributeString = temporalAttributes.length > 0 ? ' ' + temporalAttributes.join(' ') : '';
 

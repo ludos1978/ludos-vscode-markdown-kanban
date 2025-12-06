@@ -3125,14 +3125,33 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
     } else {
         columnElement.removeAttribute('data-column-tag');
     }
-    
+
     const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (allTags.length > 0) {
         columnElement.setAttribute('data-all-tags', allTags.join(' '));
     } else {
         columnElement.removeAttribute('data-all-tags');
     }
-    
+
+    // Update temporal attributes - set the CORRECT attribute for each type
+    if (window.tagUtils) {
+        const colText = newTitle || '';
+
+        // Remove all temporal attributes first
+        columnElement.removeAttribute('data-current-day');
+        columnElement.removeAttribute('data-current-week');
+        columnElement.removeAttribute('data-current-weekday');
+        columnElement.removeAttribute('data-current-hour');
+        columnElement.removeAttribute('data-current-time');
+
+        // Set only the ones that are active
+        if (window.tagUtils.isCurrentDate(colText)) columnElement.setAttribute('data-current-day', 'true');
+        if (window.tagUtils.isCurrentWeek(colText)) columnElement.setAttribute('data-current-week', 'true');
+        if (window.tagUtils.isCurrentWeekday(colText)) columnElement.setAttribute('data-current-weekday', 'true');
+        if (window.tagUtils.isCurrentTime(colText)) columnElement.setAttribute('data-current-hour', 'true');
+        if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement.setAttribute('data-current-time', 'true');
+    }
+
     // Update header bars immediately
     if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
         const isCollapsed = columnElement.classList.contains('collapsed');
@@ -3141,7 +3160,7 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
 
     // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
     // No need to call updateCornerBadgesImmediate separately
-    
+
     // Update tag chip button state using unique identifiers
     const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${columnId}"][data-tag-name="${tagName}"]`);
     if (button) {
@@ -3199,14 +3218,44 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
     } else {
         taskElement.removeAttribute('data-task-tag');
     }
-    
+
     const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (allTags.length > 0) {
         taskElement.setAttribute('data-all-tags', allTags.join(' '));
     } else {
         taskElement.removeAttribute('data-all-tags');
     }
-    
+
+    // Update temporal attributes - set the CORRECT attribute for each type
+    if (window.tagUtils) {
+        // Get task text including description for temporal check
+        let taskText = newTitle || '';
+        const board = window.currentBoard || window.cachedBoard;
+        if (board) {
+            for (const column of board.columns) {
+                const task = column.tasks.find(t => t.id === taskId);
+                if (task) {
+                    taskText = (task.title || '') + ' ' + (task.description || '');
+                    break;
+                }
+            }
+        }
+
+        // Remove all temporal attributes first
+        taskElement.removeAttribute('data-current-day');
+        taskElement.removeAttribute('data-current-week');
+        taskElement.removeAttribute('data-current-weekday');
+        taskElement.removeAttribute('data-current-hour');
+        taskElement.removeAttribute('data-current-time');
+
+        // Set only the ones that are active
+        if (window.tagUtils.isCurrentDate(taskText)) taskElement.setAttribute('data-current-day', 'true');
+        if (window.tagUtils.isCurrentWeek(taskText)) taskElement.setAttribute('data-current-week', 'true');
+        if (window.tagUtils.isCurrentWeekday(taskText)) taskElement.setAttribute('data-current-weekday', 'true');
+        if (window.tagUtils.isCurrentTime(taskText)) taskElement.setAttribute('data-current-hour', 'true');
+        if (window.tagUtils.isCurrentTimeSlot(taskText)) taskElement.setAttribute('data-current-time', 'true');
+    }
+
     // Update header bars immediately
     if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
         const isCollapsed = taskElement.classList.contains('collapsed');

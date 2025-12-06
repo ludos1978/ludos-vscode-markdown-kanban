@@ -1027,7 +1027,7 @@ class TaskEditor {
 
                         // Update temporal attributes - set the CORRECT attribute for each type
                         if (window.tagUtils) {
-                            const colText = (column.displayTitle || '') + ' ' + (column.title || '');
+                            const colText = column.title || '';
 
                             // Remove all temporal attributes first
                             columnElement2.removeAttribute('data-current-day');
@@ -1261,6 +1261,25 @@ class TaskEditor {
                             taskElement.setAttribute('data-task-tag', primaryTag);
                         } else {
                             taskElement.removeAttribute('data-task-tag');
+                        }
+
+                        // Update temporal attributes - set the CORRECT attribute for each type
+                        if (window.tagUtils) {
+                            const taskText = (task.title || '') + ' ' + (task.description || '');
+
+                            // Remove all temporal attributes first
+                            taskElement.removeAttribute('data-current-day');
+                            taskElement.removeAttribute('data-current-week');
+                            taskElement.removeAttribute('data-current-weekday');
+                            taskElement.removeAttribute('data-current-hour');
+                            taskElement.removeAttribute('data-current-time');
+
+                            // Set only the ones that are active
+                            if (window.tagUtils.isCurrentDate(taskText)) taskElement.setAttribute('data-current-day', 'true');
+                            if (window.tagUtils.isCurrentWeek(taskText)) taskElement.setAttribute('data-current-week', 'true');
+                            if (window.tagUtils.isCurrentWeekday(taskText)) taskElement.setAttribute('data-current-weekday', 'true');
+                            if (window.tagUtils.isCurrentTime(taskText)) taskElement.setAttribute('data-current-hour', 'true');
+                            if (window.tagUtils.isCurrentTimeSlot(taskText)) taskElement.setAttribute('data-current-time', 'true');
                         }
 
                         // Update all visual tag state (attributes, backgrounds, borders, visual elements)
