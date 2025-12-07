@@ -160,63 +160,16 @@ The Kanban board uses a flexible tag system with four distinct tag types, each w
 
 ---
 
-### Hash Tags (`#`)
-
-Regular tags for categorization, status, and layout control.
-
-i added a library of tags which you can use, modify or ignore. additional groups can be added in the config.
-
-### Basic Tags
-
-```markdown
-- [ ] Review code #urgent #frontend
-- [ ] Write tests #todo #backend
-```
-
-### Priority & State Tags
-
-```markdown
-#high #medium #low #urgent
-#todo #doing #done #blocked #waiting
-```
-
-### Numeric Index Tags
-
-For ordering columns/cards:
-
-```markdown
-#1 First Column
-#2 Second Column
-#1.1 Sub-section
-#3.1.4 Deep nesting
-```
-
 ### Reserved Tags
 
 some tags are used to save some of the special settings of the kanban such as:
 
 | Tag | Description | Example |
 |-----|-------------|---------|
-| `#row2` | Place column in row 2 | `## Backlog #row2` |
-| `#span2` | Column spans 2 units wide | `## Main #span2` |
-| `#stack` | Stack columns horizontally | `## Week 1 #stack` |
-| `#sticky` | Prevent card from being moved during sorting |
-
----
-
-### Person Tags (`@`)
-
-Assign people or teams to cards. Everything after `@` until whitespace is the person/team name.
-
-you could use this with the ?Tag to gather tasks for persons.
-
-This feature has not been extensively used and therefore not been tested largely.
-
-```markdown
-Review PR @reto
-Team meeting @team-alpha
-Collaboration @johnson&smith
-```
+| \#row2 | Place column in row 2 | ## Backlog \#row2 |
+| \#span2 | Column spans 2 units wide | ## Main \#span2 |
+| \#stack | Stack columns horizontally | ## Week 1 \#stack |
+| \#stick | Prevent card from being moved during sorting |
 
 ---
 
@@ -224,76 +177,36 @@ Collaboration @johnson&smith
 
 Date and time tags for scheduling. The `!` prefix is followed by various time formats.
 
-### Date Formats
-
-```markdown
-!2025.01.28      # Date with dots
-!2025-01-28      # Date with dashes
-!2025/01/28      # Date with slashes
-```
-
-### Week Tags
-
-```markdown
-!w15             # Week 15 (current year)
-!W15             # Case insensitive
-!2025.w15        # Week 15 of 2025
-!2025-w15        # Alternative format
-```
-
-### Weekday Tags
-
-```markdown
-!mon !monday     # Monday
-!tue !tuesday    # Tuesday
-!wed !wednesday  # Wednesday
-!thu !thursday   # Thursday
-!fri !friday     # Friday
-!sat !saturday   # Saturday
-!sun !sunday     # Sunday
-```
-
-### Time Tags
-
-```markdown
-!15:30           # 24-hour format
-!9am             # 12-hour format
-!10pm            # Evening
-!22:00           # 24-hour evening
-```
-
-### Time Slot Tags
-
-```markdown
-!9am-5pm         # Work hours
-!15:30-17:00     # Meeting slot
-!10am-12pm       # Morning block
-```
+- Date Formats
+  - !2025.01.28      # Date with dots
+  - !2025-01-28      # Date with dashes
+  - !2025/01/28      # Date with slashes
+- Week Tags
+  - !w15             # Week 15 (current year)
+  - !W15             # Case insensitive
+  - !2025.w15        # Week 15 of 2025
+  - !2025-w15        # Alternative format
+- Weekday Tags
+  - !mon !monday     # Monday
+  - !tue !tuesday    # Tuesday
+  - !wed !wednesday  # Wednesday
+  - !thu !thursday   # Thursday
+  - !fri !friday     # Friday
+  - !sat !saturday   # Saturday
+  - !sun !sunday     # Sunday
+- Time Tags
+  - !15:30           # 24-hour format
+  - !9am             # 12-hour format
+  - !10pm            # Evening
+  - !22:00           # 24-hour evening
+- Time Slot Tags
+  - !9am-5pm         # Work hours
+  - !15:30-17:00     # Meeting slot
+  - !10am-12pm       # Morning block
 
 ### Temporal Highlighting
 
 Cards and columns with temporal tags matching the current date/time are automatically highlighted (e.g., today's date, current week, current weekday).
-
----
-
-### Question-Tags
-
-?#
-
----
-
-Keyboard Shortcuts:
-
-- use vscode keyboard shortcuts to paste content ( i recommend to add --: :--: and :--- as shortcuts)
-- paste cmd+shift+v ctrl+shift+v to paste content with link detection
-- drag & drop with shift to embed in the kanban
-  - will detect files and < 10mb copy to a {filename}-Media folder
-
----
-
-## Screenshot
-
-![](./imgs/screenshot-20250901.png)
 
 ---
 
@@ -319,84 +232,95 @@ Today ?.today
 
 ### Query Examples
 
-#### Gather by Person
+- Gather by Person
 
-```markdown
-## Reto's Tasks ?@reto
-## Team Work ?@reto|bruno|anna
-```
+  - Reto's Tasks ?@reto
+  - Team Work ?@reto|bruno|anna
 
-#### Gather by Hash Tag
+- Gather by Hash Tag
 
-```markdown
-## Urgent ?#urgent
-## Features ?#feature&frontend
-## Not Done ?#todo!completed
-```
+  - Urgent ?#urgent
+  - Features ?#feature&frontend
+  - Not Done ?#todo!completed
 
-#### Gather by Temporal
+- Gather by Temporal
 
-```markdown
-## Today ?.today
-## Today (alternate) ?.day=0
-## This Week ?.w15
-## Monday Tasks ?.mon
-```
+  - Today ?.today
+  - Today (alternate) ?.day=0
+  - This Week ?.w15
+  - Monday Tasks ?.mon
 
-#### Gather by Day Offset
+- Gather by Day Offset
 
-Use comparison operators with `day` to gather cards relative to today. The `day` property represents the number of days from today (negative = past, positive = future).
+  * Use comparison operators with `day` to gather cards relative to today. The `day` property represents the number of days from today (negative = past, positive = future).
 
-```markdown
-## Past Due ?.day<0
-## Today ?.day=0
-## Tomorrow ?.day=1
-## Next 7 Days ?.day<7
-## Next 3 Days ?.day>0&day<4
-## Past Week ?.day>-7&day<0
-```
+  - Past Due ?.day<0
+  - Today ?.day=0
+  - Tomorrow ?.day=1
+  - Next 7 Days ?.day<7
+  - Next 3 Days ?.day>0&day<4
+  - Past Week ?.day>-7&day<0
 
 | Expression | Description |
 |------------|-------------|
-| `?.day<0` | Cards with dates before today (overdue) |
-| `?.day=0` | Cards with today's date |
-| `?.day>0` | Cards with future dates |
-| `?.day=1` | Cards with tomorrow's date |
-| `?.day<7` | Cards within the next 7 days (including today) |
-| `?.day>0&day<4` | Cards 1-3 days from now (tomorrow to 3 days out) |
-| `?.day>-7&day<0` | Cards from the past 7 days (not including today) |
-| `?.day>-7&day<7` | Cards within ±7 days of today |
+| ?.day<0 | Cards with dates before today (overdue) |
+| ?.day=0 | Cards with today's date |
+| ?.day>0 | Cards with future dates |
+| ?.day=1 | Cards with tomorrow's date |
+| ?.day<7 | Cards within the next 7 days (including today) |
+| ?.day>0&day<4 | Cards 1-3 days from now (tomorrow to 3 days out) |
+| ?.day>-7&day<0 | Cards from the past 7 days (not including today) |
+| ?.day>-7&day<7 | Cards within ±7 days of today |
 
 #### Combined Queries
 
 A column can have multiple query tags:
 
-```markdown
 - Reto This Week ?@reto ?.w15
-```
 
 ### Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `&` | AND | `#gather_Reto&day<3` |
-| `\|` | OR | `#gather_Reto\|Anita` |
-| `=` | EQUAL | `#gather_day=0` |
-| `!=` | NOT EQUAL | `#gather_weekday!=sat` |
-| `<` | LESS THAN | `#gather_day<7` |
-| `>` | GREATER THAN | `#gather_day>0` |
+| & | AND | \#gather_Reto&day<3 |
+| \| | OR | \#gather_Reto\|Anita |
+| = | EQUAL | \#gather_day=0 |
+| != | NOT EQUAL | \#gather_weekday!=sat |
+| < | LESS THAN | \#gather_day<7 |
+| > | GREATER THAN | \#gather_day>0 |
 
 ### Date Properties
 
 | Property | Description | Values |
 |----------|-------------|--------|
-| `day` | Days from today | -2, -1, 0, 1, 2, ... |
-| `weekday` | Day name | mon, tue, wed, ... |
-| `weekdaynum` | Day number | 1 (Mon) to 7 (Sun) |
-| `month` | Month name | jan, feb, mar, ... |
-| `monthnum` | Month number | 1 to 12 |
+| day | Days from today | -2, -1, 0, 1, 2, ... |
+| weekday | Day name | mon, tue, wed, ... |
+| weekdaynum | Day number | 1 (Mon) to 7 (Sun) |
+| month | Month name | jan, feb, mar, ... |
+| monthnum | Month number | 1 to 12 |
 
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
 
+---
+
+## Keyboard Shortcuts:
+
+- paste cmd+shift+v ctrl+shift+v to paste content with link detection
+- drag & drop with shift to embed in the kanban
+  - will detect files and < 10mb copy to a {filename}-Media folder
+
+I recommend setting up some keyboard shortcuts in vscode for the following structures:
+- \-\-\-\:  \:\-\-\: \:\-\-\-
+- \!\[\]\(\)
+
+---
+
+## Screenshot
+
+![](./imgs/screenshot-20251207-1.png)
+
+![](./imgs/screenshot-20251207-2.png)
+
+---
