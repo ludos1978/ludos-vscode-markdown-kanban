@@ -1,4 +1,9 @@
+
 # Ludos Kanban Editor
+
+---
+
+## Description
 
 This is a feature packed kanban editor that runs as an visual studio code editor extension.
 
@@ -9,19 +14,11 @@ This markdown editor contains to many features.
 - But you can organize columns as you want into stacks, into multiple rows. 
 - You can fold them, you can make theyr headers sticky (so you can move content into them even outside the view.) . 
 - It has an extensive layout system to customize the viewport with some reasonable defaults. 
-- It has drag & drop features (from desktop with copy, from clipboard to create files from binary data or direct links). 
+- It has drag & drop features (from desktop with copy, from clipboard to create files from binary data or direct links from vscode, from clipboard or column templates). 
 - It can embed images (regular image formats, but also excalidraw, drawio, mermaid, plantuml and pdf), videos (mp4, only some audio formats), other markdown files and links. 
 - It can export with marp to create live-presentations, pdf-handouts and also editable pptx (an alpha feature of marp), presentations can in realtime update on kanban board modifications. 
 - It can also pack all or parts of the kanban into data into a single folder including media.
 - It has a extensive Tag system with labels, colors, person and automatic sorting features.
-- draw & drop
-  - from any file on the system (copies the file into a {filename}-Media folder)
-  - from the vscode-explorer (creates a link)
-  - the header has drag sources for
-    - empty tasks
-    - task filled from clipboard
-    - empty column
-    - columns created from templates you can define
 
 ---
 
@@ -41,6 +38,8 @@ For additional features you will need to install other addons as well:
 
 (detailed explanation still missing, some require vscode extensions, some require a command line tool to convert)
 
+---
+
 ### Presentation mode
 
 to create the presentations you will need the marp-engine folder from the sourcecode and install marp <https://github.com/marp-team/marp-cli>
@@ -55,6 +54,8 @@ define the paths to these files in the config settings:
   - c:/users/username/marp-engine/themes
 - markdown-kanban.marp.defaultTheme
   - default
+
+---
 
 ### Installation of addons
 
@@ -106,32 +107,28 @@ is implemented, installations instructions todo, required for mermaid i think
 
 ## Markdown features
 
----:
+\-\-\-\:
 Column 1
-:--:
+\:\-\-\:
 Column 2
-:---
+\:\-\-\-
 
-;; comment 
+\;; comment 
 
 \[comment\]\(/path/to/file "label"\)
-[comment](/path/to/file "label")
-[[markdown-file-link]]
-<https://url.link.com>
+\[comment\]\(/path/to/file "label"\)
+\[\[markdown-file-link\]\]
+\<https://url.link.com\>
 
-comment[^com]
+comment\[^com\]
 
-[^com]: some explanation
+\[^com\]: some explanation
 
-comment^[comment]
+comment^\[comment\]
 
-> indented note
+\> indented note
 
-\!\[\]\(\) for direct preview
-- Images
-- Videos (only some mp4 audio formats are supported in vscode)
-- draw.io
-- excalidraw
+\!\[\]\(\) view images (drawio, excalidraw, jpg etc) and videos
 
 \`\`\`mermaid
 \`\`\`
@@ -139,16 +136,14 @@ comment^[comment]
 \`\`\`plantuml
 \`\`\`
 
-- one (normal dotted list)
-* two (normal dotted list, incremental dispaly in slide)
-+ tree (no dot, incremental display in slide)
+\- one (normal dotted list)
+\* two (normal dotted list, incremental dispaly in slide)
+\+ tree (no dot, incremental display in slide)
 
-  indented for styles
+\=\=highlight\=\=
 
-==highlight==
-
-^^sup^^ __sub__ ~~striketrough~~
-*as well* **as the normal styles**
+\^\^sup\^\^ \_\_sub\_\_ \~\~striketrough\~\~
+\*as well\* \*\*as the normal styles\*\*
 
 ---
 
@@ -158,10 +153,10 @@ The Kanban board uses a flexible tag system with four distinct tag types, each w
 
 | Prefix | Type | Description | Examples |
 |--------|------|-------------|----------|
-| `#` | Hash tags | Regular tags for categorization | `#todo`, `#urgent`, `#feature` |
-| `@` | Person tags | Assign people/mentions | `@john`, `@team-alpha` |
-| `!` | Temporal tags | Dates, times, weeks, weekdays | `!2025.01.28`, `!w15`, `!mon` |
-| `?` | Query tags | Gather cards matching criteria by putting it into a column header | `?#todo`, `?@reto`, `?.today` |
+| # | Hash tags | Regular tags for categorization | #todo , #urgent , #feature |
+| @ | Person tags | Assign people/mentions | @john , @team-alpha |
+| ! | Temporal tags | Dates, times, weeks, weekdays | !2025.01.28 , !w15 , !mon |
+| ? | Query tags | Gather cards matching criteria by putting it into a column header | ?#todo , ?@reto , ?!today |
 
 ---
 
@@ -205,9 +200,7 @@ some tags are used to save some of the special settings of the kanban such as:
 | `#row2` | Place column in row 2 | `## Backlog #row2` |
 | `#span2` | Column spans 2 units wide | `## Main #span2` |
 | `#stack` | Stack columns horizontally | `## Week 1 #stack` |
-| `#sticky` | Prevent card from being moved during sorting | 
-
-
+| `#sticky` | Prevent card from being moved during sorting |
 
 ---
 
@@ -290,6 +283,7 @@ Cards and columns with temporal tags matching the current date/time are automati
 ---
 
 Keyboard Shortcuts:
+
 - use vscode keyboard shortcuts to paste content ( i recommend to add --: :--: and :--- as shortcuts)
 - paste cmd+shift+v ctrl+shift+v to paste content with link detection
 - drag & drop with shift to embed in the kanban
@@ -300,8 +294,6 @@ Keyboard Shortcuts:
 ## Screenshot
 
 ![](./imgs/screenshot-20250901.png)
-
----
 
 ---
 
@@ -407,6 +399,4 @@ A column can have multiple query tags:
 ### ?ungathered
 
 Collects all cards that didn't match any gather rule:
-
----
 
