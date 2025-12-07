@@ -13,12 +13,12 @@ This markdown editor contains to many features.
 - Foremost it's managing columns and tasks. 
 - But you can organize columns as you want into stacks, into multiple rows. 
 - You can fold them, you can make theyr headers sticky (so you can move content into them even outside the view.) . 
-- It has an extensive layout system to customize the viewport with some reasonable defaults. 
+- It has an extensive layout system to customize the viewport with some reasonable defaults. The layout button sets some usable presets i sometimes use.
 - It has drag & drop features (from desktop with copy, from clipboard to create files from binary data or direct links from vscode, from clipboard or column templates). 
 - It can embed images (regular image formats, but also excalidraw, drawio, mermaid, plantuml and pdf), videos (mp4, only some audio formats), other markdown files and links. 
 - It can export with marp to create live-presentations, pdf-handouts and also editable pptx (an alpha feature of marp), presentations can in realtime update on kanban board modifications. 
 - It can also pack all or parts of the kanban into data into a single folder including media.
-- It has a extensive Tag system with labels, colors, person and automatic sorting features.
+- It has a extensive Tag system with labels, colors, person and automatic sorting features. (sorting is WIP)
 
 ---
 
