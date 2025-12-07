@@ -19,6 +19,15 @@ This markdown editor contains to many features.
 - It can export with marp to create live-presentations, pdf-handouts and also editable pptx (an alpha feature of marp), presentations can in realtime update on kanban board modifications. 
 - It can also pack all or parts of the kanban into data into a single folder including media.
 - It has a extensive Tag system with labels, colors, person and automatic sorting features. (sorting is WIP)
+- A separate explorer view to organize kanban boards for quick access.
+
+---
+
+## Screenshot
+
+![](./imgs/screenshot-20251207-1.png)
+
+![](./imgs/screenshot-20251207-2.png)
 
 ---
 
@@ -269,7 +278,7 @@ Today ?!today
 
 A column can have multiple query tags:
 
-- Reto This Week ?@reto ?.w15
+- Reto This Week ?@reto ?!w15
 
 ### Operators
 
@@ -307,12 +316,3 @@ Collects all cards that didn't match any gather rule:
 I recommend setting up some keyboard shortcuts in vscode for the following structures:
 - \-\-\-\:  \:\-\-\: \:\-\-\-
 - \!\[\]\(\)
-
----
-
-## Screenshot
-
-![](./imgs/screenshot-20251207-1.png)
-
-![](./imgs/screenshot-20251207-2.png)
-
