@@ -173,9 +173,9 @@ some tags are used to save some of the special settings of the kanban such as:
 
 ---
 
-## Temporal Tags (`!`)
+## Temporal Tags (!)
 
-Date and time tags for scheduling. The `!` prefix is followed by various time formats.
+Date and time tags for scheduling. The ! prefix is followed by various time formats.
 
 - Date Formats
   - !2025.01.28      # Date with dots
@@ -210,67 +210,60 @@ Cards and columns with temporal tags matching the current date/time are automati
 
 ---
 
-## Query Tags (`?`)
+## Query Tags (?)
 
-Query tags gather/collect cards matching specific criteria into a column. The `?` is followed by a tag type prefix (`#`, `@`, or `.`) and the query content.
+Query tags gather/collect cards matching specific criteria into a column. The \? is followed by a tag type prefix (\#, \@, or \!) and the query content.
 
 ### Basic Syntax
 
-```markdown
 Reto's Tasks ?@reto
 Todo Items ?#todo
-Today ?.today
-```
+Today ?!today
 
 ### Query Operators
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `&` | AND - all conditions must match | `?#urgent&important` |
-| `\|` | OR - any condition matches | `?@reto\|bruno` |
-| `!` | NOT - exclude matches | `?#todo!done` |
+| \& | AND - all conditions must match | \?#urgent&important |
+| \| | OR - any condition matches | \?@reto\|bruno |
+| \! | NOT - exclude matches | \?#todo!done |
 
 ### Query Examples
 
 - Gather by Person
-
   - Reto's Tasks ?@reto
   - Team Work ?@reto|bruno|anna
 
 - Gather by Hash Tag
-
   - Urgent ?#urgent
   - Features ?#feature&frontend
   - Not Done ?#todo!completed
 
 - Gather by Temporal
-
-  - Today ?.today
-  - Today (alternate) ?.day=0
-  - This Week ?.w15
-  - Monday Tasks ?.mon
+  - Today ?!today
+  - Today (alternate) ?!day=0
+  - This Week ?!w15
+  - Monday Tasks ?!mon
 
 - Gather by Day Offset
-
-  * Use comparison operators with `day` to gather cards relative to today. The `day` property represents the number of days from today (negative = past, positive = future).
-
-  - Past Due ?.day<0
-  - Today ?.day=0
-  - Tomorrow ?.day=1
-  - Next 7 Days ?.day<7
-  - Next 3 Days ?.day>0&day<4
-  - Past Week ?.day>-7&day<0
+  * Use comparison operators with *day* to gather cards relative to today. The *day* property represents the number of days from today (negative = past, positive = future).
+  - Past Due ?!day<0
+  - Today ?!day=0
+  - Tomorrow ?!day=1
+  - Next 7 Days ?!day<7
+  - Next 3 Days ?!day>0&day<4
+  - Past Week ?!day>-7&day<0
 
 | Expression | Description |
 |------------|-------------|
-| ?.day<0 | Cards with dates before today (overdue) |
-| ?.day=0 | Cards with today's date |
-| ?.day>0 | Cards with future dates |
-| ?.day=1 | Cards with tomorrow's date |
-| ?.day<7 | Cards within the next 7 days (including today) |
-| ?.day>0&day<4 | Cards 1-3 days from now (tomorrow to 3 days out) |
-| ?.day>-7&day<0 | Cards from the past 7 days (not including today) |
-| ?.day>-7&day<7 | Cards within ±7 days of today |
+| ?!day<0 | Cards with dates before today (overdue) |
+| ?!day=0 | Cards with today's date |
+| ?!day>0 | Cards with future dates |
+| ?!day=1 | Cards with tomorrow's date |
+| ?!day<7 | Cards within the next 7 days (including today) |
+| ?!day>0&day<4 | Cards 1-3 days from now (tomorrow to 3 days out) |
+| ?!day>-7&day<0 | Cards from the past 7 days (not including today) |
+| ?!day>-7&day<7 | Cards within ±7 days of today |
 
 #### Combined Queries
 
