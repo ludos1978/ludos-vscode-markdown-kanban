@@ -659,9 +659,7 @@ body {
 }
 
 .layout-presets-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
+  position: fixed;
   min-width: 200px;
   background: var(--vscode-dropdown-background);
   border: 1px solid var(--vscode-dropdown-border);
@@ -670,7 +668,6 @@ body {
   z-index: 1000;
   display: none;
   padding: 4px 0;
-  margin-top: 2px;
 }
 
 .layout-presets-dropdown.show {
@@ -2083,7 +2080,7 @@ body.vscode-high-contrast-light .task-count {
 /* All active menus need maximum z-index to appear above all interface elements */
 .donut-menu.active,
 .file-bar-menu.active {
-  z-index: 2147483647;
+  z-index: 1000;
   isolation: isolate;
 }
 
@@ -2134,7 +2131,7 @@ body.vscode-high-contrast-light .task-count {
   border: 1px solid var(--vscode-dropdown-border);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 2147483640;
+  z-index: 1000;
   /* Add hover border for easier targeting */
   padding: 3px;
 }
@@ -2273,7 +2270,7 @@ button.file-bar-menu-item {
   max-width: 280px;
 	width: auto;
   max-height: 80vh;
-  z-index: 2147483647;
+  z-index: 1000;
   pointer-events: all !important;
   box-sizing: border-box;
   overflow-x: hidden;

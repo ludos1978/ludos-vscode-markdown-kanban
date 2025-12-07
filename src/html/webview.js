@@ -4833,6 +4833,7 @@ window.updateBorderStyles = updateBorderStyles;
 
 // Make functions globally available
 window.toggleFileBarMenu = toggleFileBarMenu;
+window.toggleLayoutPresetsMenu = toggleLayoutPresetsMenu;
 window.setColumnWidth = setColumnWidth;
 window.applyColumnWidth = applyColumnWidth;
 window.setLayoutRows = setLayoutRows;
@@ -5110,22 +5111,42 @@ function initializeLayoutPresetsMenu() {
 
 /**
  * Toggle the layout presets dropdown menu
+ * @param {Event} event - Click event
  */
-function toggleLayoutPresetsMenu() {
+function toggleLayoutPresetsMenu(event) {
+    console.log('[LayoutPresets] toggleLayoutPresetsMenu called');
+    if (event) {
+        event.stopPropagation();
+    }
+
     const dropdown = document.getElementById('layout-presets-dropdown');
     const button = document.getElementById('layout-presets-btn');
+    console.log('[LayoutPresets] dropdown:', dropdown, 'button:', button);
 
-    if (!dropdown || !button) { return; }
+    if (!dropdown || !button) {
+        console.log('[LayoutPresets] dropdown or button not found, returning');
+        return;
+    }
 
     const isVisible = dropdown.classList.contains('show');
+    console.log('[LayoutPresets] isVisible:', isVisible, 'layoutPresets:', layoutPresets);
 
     // Close all other menus first
     closeAllMenus();
 
     if (!isVisible) {
+        console.log('[LayoutPresets] Opening dropdown');
         dropdown.classList.add('show');
         button.classList.add('active');
+
+        // Position the dropdown below the button (fixed positioning)
+        const buttonRect = button.getBoundingClientRect();
+        dropdown.style.top = (buttonRect.bottom + 2) + 'px';
+        dropdown.style.right = (window.innerWidth - buttonRect.right) + 'px';
+        dropdown.style.left = 'auto';
+
         updateLayoutPresetsActiveState();
+        console.log('[LayoutPresets] Dropdown classes after add:', dropdown.classList.toString());
 
         // Close menu when clicking outside
         setTimeout(() => {
