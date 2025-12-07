@@ -316,4 +316,3 @@ I recommend setting up some keyboard shortcuts in vscode for the following struc
 
 ![](./imgs/screenshot-20251207-2.png)
 
----
