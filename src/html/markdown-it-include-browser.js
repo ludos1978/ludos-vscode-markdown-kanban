@@ -98,9 +98,9 @@
       const content = token.content;
       const filePath = token.filePath || '';
 
-      // If content is null (not loaded yet), show placeholder
+      // If content is null (not loaded yet), show placeholder with data attribute for targeted update
       if (content === null) {
-        return `<div class="include-placeholder-block" title="Loading include file: ${escapeHtml(filePath)}">` +
+        return `<div class="include-placeholder-block" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
                `📄⏳ Loading: ${escapeHtml(filePath)}` +
                `</div>`;
       }
@@ -207,12 +207,12 @@
       }
     };
 
-    // Renderer for include placeholders
+    // Renderer for include placeholders (inline)
     md.renderer.rules.include_placeholder = function(tokens, idx, options, env, renderer) {
       const token = tokens[idx];
       const filePath = token.content;
 
-      return `<span class="include-placeholder" title="Loading include file: ${escapeHtml(filePath)}">` +
+      return `<span class="include-placeholder" data-include-file="${escapeHtml(filePath)}" data-include-pending="true" title="Loading include file: ${escapeHtml(filePath)}">` +
              `📄⏳ Loading: ${escapeHtml(filePath)}` +
              `</span>`;
     };
@@ -255,8 +255,9 @@
     // Remove from pending requests
     pendingRequests.delete(filePath);
 
-    // Check if content actually changed
+    // Check if content was previously cached
     const oldContent = fileCache.get(filePath);
+    const wasNotCached = oldContent === undefined || oldContent === null;
     const contentChanged = oldContent !== content;
 
     // Update cache
@@ -275,14 +276,64 @@
       }
     }
 
-    // Trigger re-render if board already exists
-    // On initial load, board renders first (with null includes), then includes arrive
-    // We need to re-render to show the includes
+    // If this is the first time we're receiving this file's content,
+    // find and update only the task descriptions that have pending placeholders for this file
+    if (wasNotCached) {
+      updatePendingIncludePlaceholders(filePath);
+    }
+  }
 
-    // DON'T trigger re-render here - the backend already sends a boardUpdate message
-    // when a regular include file changes. Calling renderBoard() here causes a race
-    // condition where the frontend render might use stale data before the backend
-    // update arrives.
+  // Function to update only the task descriptions that have pending include placeholders
+  function updatePendingIncludePlaceholders(filePath) {
+    // Find all pending placeholders for this specific file
+    const selector = `[data-include-pending="true"][data-include-file="${CSS.escape(filePath)}"]`;
+    const placeholders = document.querySelectorAll(selector);
+
+    if (placeholders.length === 0) {
+      return;
+    }
+
+    // Find unique task description containers that need re-rendering
+    const taskDescriptionsToUpdate = new Set();
+
+    placeholders.forEach(placeholder => {
+      // Find the closest task-description-display ancestor
+      const taskDescription = placeholder.closest('.task-description-display');
+      if (taskDescription) {
+        taskDescriptionsToUpdate.add(taskDescription);
+      }
+    });
+
+    // Re-render each affected task description
+    taskDescriptionsToUpdate.forEach(taskDescriptionEl => {
+      // Find the task element
+      const taskEl = taskDescriptionEl.closest('.task');
+      if (!taskEl) return;
+
+      const taskId = taskEl.dataset.taskId;
+      if (!taskId) return;
+
+      // Get the task data from the current board data
+      if (typeof window.currentBoardData === 'undefined' || !window.currentBoardData) return;
+
+      // Find the task in board data
+      let taskData = null;
+      for (const column of window.currentBoardData.columns || []) {
+        const found = (column.tasks || []).find(t => t.id === taskId);
+        if (found) {
+          taskData = found;
+          break;
+        }
+      }
+
+      if (!taskData || !taskData.description) return;
+
+      // Re-render just the description using the existing renderMarkdown function
+      if (typeof window.renderMarkdown === 'function') {
+        const renderedHtml = window.renderMarkdown(taskData.description);
+        taskDescriptionEl.innerHTML = renderedHtml;
+      }
+    });
   }
 
   // Helper function to find error location using binary search
