@@ -3569,6 +3569,11 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                     footerHeight: pos.footerHeight,
                     totalHeight: pos.totalHeight
                 }));
+
+                // Update drop zones AFTER column positions are applied
+                if (typeof window.updateStackBottomDropZones === 'function') {
+                    window.updateStackBottomDropZones();
+                }
             }); // End requestAnimationFrame
         }
     });
@@ -4312,9 +4317,9 @@ function generateTagStyles() {
         // Default card border (always allowed if provided)
         if (defaultConfig.card && defaultConfig.card.border) {
             const b = defaultConfig.card.border;
-            const bStyle = b.style || 'solid';
-            const bWidth = b.width || '1px';
-            const bColor = b.color || 'var(--vscode-panel-border)';
+            const bStyle = b.style;
+            const bWidth = b.width;
+            const bColor = b.color;
             if (b.position === 'left') {
                 styles += `.task-item:not([data-task-tag]) { border-left: ${bWidth} ${bStyle} ${bColor} !important; }\n`;
             } else {

@@ -1348,8 +1348,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 /* Task items */
 .task-item {
-  background-color: var(--task-background);
-  border: var(--task-border, 1px solid var(--vscode-panel-border));
+  /* background-color: var(--task-background); */
   border-radius: 4px;
 	gap: var(--whitespace-div2);
   margin-bottom: var(--whitespace-div2);
@@ -2690,21 +2689,40 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 /* BEGIN style with only lines not with borders */
-.column-drop-zone {
+
+.column-drop-zone-stack:not(:first-child) .column-drop-zone {
   background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 2px 100%;
 }
 
-.kanban-column-stack .kanban-full-height-column .column-margin {
+.kanban-column-stack .kanban-full-height-column:not(:first-child) .column-margin {
   background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat center / 100% 2px;
 }
 
 .stack-bottom-drop-zone {
   background: linear-gradient(var(--vscode-panel-border), var(--vscode-panel-border)) no-repeat 0 4px / 100% 2px;
 }
+
+.task-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: var(--vscode-panel-border);
+}
+
 /* END style with only lines not with borders */
 
 /* BEGIN style with borders */
-/* .column-header {
+
+/*
+
+.task-item {
+  border: var(--task-border, 1px solid var(--vscode-panel-border));
+}
+
+.column-header {
 	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
@@ -2724,7 +2742,9 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
 	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
-} */
+} 
+
+*/
 /* END style with borders */
 
 
@@ -3904,13 +3924,13 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   margin: 0.5em 0;
 }
 
-.markdown-content p:first-child {
+/* .markdown-content p:first-child {
   margin-top: 0;
-}
+} */
 
-.markdown-content p:last-child {
+/* .markdown-content p:last-child {
   margin-bottom: 0;
-}
+} */
 
 .markdown-content ul,
 .markdown-content ol {
