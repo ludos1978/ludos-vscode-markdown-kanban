@@ -60,7 +60,10 @@
       "Bash(node /tmp/test-time-slot.js:*)",
       "Bash(node /tmp/test-time-debug.js:*)",
       "Bash(node /tmp/test-time-complete.js:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebFetch(domain:cdnjs.cloudflare.com)",
+      "WebFetch(domain:cdnjs.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ],
     "deny": [],
     "ask": []

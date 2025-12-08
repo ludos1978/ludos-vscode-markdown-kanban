@@ -103,8 +103,19 @@ console.log('Marp watch script placeholder');
 			}				copyDirRecursive(srcHtmlDir, distHtmlDir);
 			}
 
+			// Copy markdown-it 14.x from node_modules to dist/src/html for local loading
+			const markdownItSrc = path.join('node_modules', 'markdown-it', 'dist', 'markdown-it.min.js');
+			const markdownItDist = path.join('dist', 'src', 'html', 'markdown-it.min.js');
+			if (fs.existsSync(markdownItSrc)) {
+				fs.mkdirSync(path.dirname(markdownItDist), { recursive: true });
+				fs.copyFileSync(markdownItSrc, markdownItDist);
+				console.log(`Copied markdown-it 14.x to ${markdownItDist}`);
+			} else {
+				console.warn(`Warning: markdown-it not found at ${markdownItSrc}`);
+			}
+
 			// Convert markdown-it-media-lib CommonJS modules to browser-compatible IIFE format
-			const mediaLibDir = 'markdown-it-media-lib';
+			const mediaLibDir = 'marp-engine/engine/markdown-it-media-lib';
 			
 			if (fs.existsSync(mediaLibDir)) {
 				const modules = ['media-type.js', 'parse.js', 'render.js', 'ruler.js', 'plugin.js'];

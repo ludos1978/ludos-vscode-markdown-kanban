@@ -52,7 +52,6 @@
     // Inline rule for include processing (handles includes within text)
     md.inline.ruler.before('text', 'include_inline', function(state, silent) {
       const start = state.pos;
-      const max = state.posMax;
 
       // Look for include pattern using match() to avoid regex state issues
       const srcSlice = state.src.slice(start);
@@ -61,7 +60,15 @@
         return false;
       }
 
-      if (silent) {return true;}
+      // IMPORTANT: When returning true, state.pos MUST always be incremented
+      // This applies to BOTH silent and non-silent modes!
+      // Failing to do this causes "inline rule didn't increment state.pos" errors
+      state.pos = start + match[0].length;
+
+      // In silent mode, we've matched and advanced pos - just return true
+      if (silent) {
+        return true;
+      }
 
       const filePath = match[1].trim();
 
@@ -82,7 +89,6 @@
         token.attrSet('data-include-file', filePath);
       }
 
-      state.pos = start + match[0].length;
       return true;
     });
 
@@ -101,8 +107,7 @@
 
       // Render the content as markdown
       try {
-        // Render as inline content to avoid nested block issues
-        const rendered = md.renderInline(content);
+        const rendered = md.render(content);
 
         // Create filename display (show just the basename)
         const fileName = filePath.split('/').pop() || filePath;
@@ -122,8 +127,50 @@
           </div>
         </div>`;
       } catch (error) {
-        console.error('Error rendering included content:', error);
-        return `<div class="include-error" title="Error rendering included content">Error including: ${escapeHtml(filePath)}</div>`;
+        console.error('[include-block] Error rendering included content from file:', filePath);
+        console.error('[include-block] Content length:', content ? content.length : 0);
+        console.error('[include-block] Error:', error);
+
+        // Try to find the problematic lines using binary search
+        const errorLocation = findErrorLocation(md, content);
+        if (errorLocation) {
+          console.error('[include-block] Found ' + errorLocation.lines.length + ' problematic line(s):');
+          console.error('[include-block]\n' + errorLocation.summary);
+        }
+
+        // Return the raw content escaped as fallback
+        const fileName = filePath.split('/').pop() || filePath;
+        const errorLinesHtml = errorLocation ? errorLocation.lines.map(l =>
+          `<div style="margin: 4px 0;"><strong>Line ${l.lineNumber}:</strong> <span style="font-family: monospace; background: #5a1d1d !important; color: #fff !important; padding: 2px 6px; border-radius: 3px;">${escapeHtml(l.content)}</span></div>`
+        ).join('') : '';
+
+        const suspectLinesHtml = (errorLocation && errorLocation.suspectLines && errorLocation.suspectLines.length > 0)
+          ? errorLocation.suspectLines.map(l =>
+            `<div style="margin: 4px 0;"><strong>Line ${l.lineNumber}:</strong> <span style="font-family: monospace; background: #4a3d1d !important; color: #fff !important; padding: 2px 6px; border-radius: 3px;">${escapeHtml(l.content)}</span></div>`
+          ).join('')
+          : '';
+
+        return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
+          <div class="include-title-bar">
+            <span class="include-filename-link"
+                  data-file-path="${escapeHtml(filePath)}"
+                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
+                  title="Alt+click to open file: ${escapeHtml(filePath)}">
+              include(${escapeHtml(fileName)}) - PARSE ERROR
+            </span>
+          </div>
+          <div class="include-content-area">
+            ${errorLocation ? `<div class="include-error-info" style="border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100); border-radius: 4px; padding: 8px; margin-bottom: 12px;">
+              <strong style="color: var(--vscode-errorForeground, #f48771);">⚠ Error triggers at:</strong>
+              ${errorLinesHtml}
+              ${suspectLinesHtml ? `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #555;">
+                <strong style="color: #e0a030;">⚠ Possible cause (unclosed brackets):</strong>
+                ${suspectLinesHtml}
+              </div>` : ''}
+            </div>` : ''}
+            <pre style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(content || '')}</pre>
+          </div>
+        </div>`;
       }
     };
 
@@ -135,8 +182,7 @@
 
       // Render the content as markdown
       try {
-        // Render as inline content - markdown-it will handle block/inline context automatically
-        const rendered = md.renderInline(content);
+        const rendered = md.render(content);
 
         // Create filename display (show just the basename)
         const fileName = filePath.split('/').pop() || filePath;
@@ -237,6 +283,90 @@
     // when a regular include file changes. Calling renderBoard() here causes a race
     // condition where the frontend render might use stale data before the backend
     // update arrives.
+  }
+
+  // Helper function to find error location using binary search
+  function findErrorLocation(md, content) {
+    if (!content) return null;
+
+    const lines = content.split('\n');
+    const totalLines = lines.length;
+
+    // Binary search to find the problematic line range
+    let low = 0;
+    let high = totalLines;
+    let lastFailingEnd = totalLines;
+
+    // First, find approximately where the error occurs
+    while (high - low > 10) {
+      const mid = Math.floor((low + high) / 2);
+      const testContent = lines.slice(0, mid).join('\n');
+
+      try {
+        md.render(testContent);
+        // Success - error is in the second half
+        low = mid;
+      } catch (e) {
+        // Failed - error is in the first half
+        lastFailingEnd = mid;
+        high = mid;
+      }
+    }
+
+    // Find the first line that triggers the error
+    let firstErrorLine = -1;
+    for (let i = low; i < Math.min(lastFailingEnd + 1, totalLines); i++) {
+      const testContent = lines.slice(0, i + 1).join('\n');
+      try {
+        md.render(testContent);
+      } catch (e) {
+        firstErrorLine = i;
+        break;
+      }
+    }
+
+    if (firstErrorLine === -1) return null;
+
+    // Now look for unclosed brackets BEFORE the error line
+    // The real cause is often an unclosed [ earlier in the file
+    const suspectLines = [];
+    let bracketBalance = 0;
+
+    for (let i = 0; i < firstErrorLine; i++) {
+      const line = lines[i];
+      const openBrackets = (line.match(/(?<!\\)\[/g) || []).length;
+      const closeBrackets = (line.match(/(?<!\\)\]/g) || []).length;
+      const lineBalance = openBrackets - closeBrackets;
+
+      if (lineBalance !== 0) {
+        bracketBalance += lineBalance;
+        if (lineBalance > 0) {
+          // This line has unclosed brackets - potential cause
+          suspectLines.push({
+            lineNumber: i + 1,
+            content: line,
+            issue: `unclosed bracket (${openBrackets} open, ${closeBrackets} close)`
+          });
+        }
+      }
+    }
+
+    // Build result with both the trigger line and suspect lines
+    const result = {
+      lines: [{
+        lineNumber: firstErrorLine + 1,
+        content: lines[firstErrorLine]
+      }],
+      suspectLines: suspectLines.slice(-5), // Last 5 suspect lines before error
+      summary: `Line ${firstErrorLine + 1}: ${lines[firstErrorLine]}`
+    };
+
+    if (suspectLines.length > 0) {
+      result.summary += '\n\nPossible cause (unclosed brackets before this line):\n' +
+        suspectLines.slice(-5).map(l => `Line ${l.lineNumber}: ${l.content}`).join('\n');
+    }
+
+    return result;
   }
 
   // Helper function for HTML escaping - now using global ValidationUtils.escapeHtml

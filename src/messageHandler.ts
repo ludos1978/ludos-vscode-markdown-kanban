@@ -19,6 +19,7 @@ import { TemplateService } from './templates/TemplateService';
 import { TemplateParser } from './templates/TemplateParser';
 import { VariableProcessor } from './templates/VariableProcessor';
 import { FileCopyService } from './templates/FileCopyService';
+import { safeFileUri } from './utils/uriUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -1472,7 +1473,7 @@ export class MessageHandler {
             }
 
             // Create a VS Code URI
-            const fileUri = vscode.Uri.file(absolutePath);
+            const fileUri = safeFileUri(absolutePath, 'messageHandler-openFile');
 
             // Normalize the path for comparison (resolve symlinks, normalize separators)
             const normalizedPath = path.resolve(absolutePath);
@@ -2838,7 +2839,7 @@ export class MessageHandler {
             const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
 
             // Open folder in OS file explorer
-            await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(mediaFolderPath));
+            await vscode.commands.executeCommand('revealFileInOS', safeFileUri(mediaFolderPath, 'messageHandler-revealMedia'));
         } catch (error) {
             console.error('[FILE-DROP] Error opening media folder:', error);
             vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -3268,7 +3269,7 @@ export class MessageHandler {
                 canSelectFiles: true,
                 canSelectFolders: false,
                 canSelectMany: false,
-                defaultUri: vscode.Uri.file(currentDir),
+                defaultUri: safeFileUri(currentDir, 'messageHandler-selectColumnInclude'),
                 filters: {
                     'Markdown files': ['md']
                 },
@@ -3338,11 +3339,11 @@ export class MessageHandler {
             const currentDir = path.dirname(currentFilePath);
 
             // Set default URI to current file if it exists
-            let defaultUri = vscode.Uri.file(currentDir);
+            let defaultUri = safeFileUri(currentDir, 'messageHandler-changeColumnInclude-dir');
             if (currentFile) {
                 const currentAbsolutePath = path.resolve(currentDir, currentFile);
                 if (fs.existsSync(currentAbsolutePath)) {
-                    defaultUri = vscode.Uri.file(currentAbsolutePath);
+                    defaultUri = safeFileUri(currentAbsolutePath, 'messageHandler-changeColumnInclude-file');
                 }
             }
 
@@ -3428,11 +3429,11 @@ export class MessageHandler {
             const currentDir = path.dirname(currentFilePath);
 
             // Set default URI to current file if it exists
-            let defaultUri = vscode.Uri.file(currentDir);
+            let defaultUri = safeFileUri(currentDir, 'messageHandler-changeTaskInclude-dir');
             if (currentFile) {
                 const currentAbsolutePath = path.resolve(currentDir, currentFile);
                 if (fs.existsSync(currentAbsolutePath)) {
-                    defaultUri = vscode.Uri.file(currentAbsolutePath);
+                    defaultUri = safeFileUri(currentAbsolutePath, 'messageHandler-changeTaskInclude-file');
                 }
             }
 
@@ -3489,7 +3490,7 @@ export class MessageHandler {
                 canSelectFiles: true,
                 canSelectFolders: false,
                 canSelectMany: false,
-                defaultUri: vscode.Uri.file(currentDir),
+                defaultUri: safeFileUri(currentDir, 'messageHandler-selectTaskInclude'),
                 filters: {
                     'Markdown files': ['md']
                 },
@@ -3570,7 +3571,7 @@ export class MessageHandler {
                 canSelectFolders: true,
                 canSelectMany: false,
                 openLabel: 'Select Export Folder',
-                defaultUri: defaultPath ? vscode.Uri.file(defaultPath) : undefined
+                defaultUri: defaultPath ? safeFileUri(defaultPath, 'messageHandler-selectExportFolder') : undefined
             });
 
             if (result && result[0]) {
@@ -3597,7 +3598,7 @@ export class MessageHandler {
             );
 
             if (result === 'Open Export Folder') {
-                await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), true);
+                await vscode.commands.executeCommand('vscode.openFolder', safeFileUri(folderPath, 'messageHandler-openExportFolder'), true);
             }
         } catch (error) {
             console.error('Error handling export folder open request:', error);
@@ -5211,7 +5212,7 @@ export class MessageHandler {
                         const result = await ExportService.export(savedDoc, options, boardForExport);
 
                         if (result.success && options.openAfterExport && result.exportedPath) {
-                            const uri = vscode.Uri.file(result.exportedPath);
+                            const uri = safeFileUri(result.exportedPath, 'messageHandler-openExportedFile');
                             await vscode.env.openExternal(uri);
                         }
 
@@ -6002,7 +6003,7 @@ ${mermaidCode}
         // Check if the file exists on disk to read existing content
         let existingContent = '';
         try {
-            const fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(absoluteIncludePath));
+            const fileContent = await vscode.workspace.fs.readFile(safeFileUri(absoluteIncludePath, 'messageHandler-readIncludeFile'));
             existingContent = Buffer.from(fileContent).toString('utf8');
         } catch {
             // File doesn't exist yet - that's fine, we'll create it with YAML header

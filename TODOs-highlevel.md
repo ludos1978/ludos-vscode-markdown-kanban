@@ -1,6 +1,7 @@
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
+- [ ] add a feature to convert paths in a single or multiple images in the whole document to convert from absolute to relative paths. and from relative to absolute paths. each image should get a button on the top-right (a breadcrumbs menu), with the option to convert the path type. also add the feature to the "File States Overview" system where each file can be individually modified from relative to absolute paths. have a dropdown menu and a convert button.
 
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 

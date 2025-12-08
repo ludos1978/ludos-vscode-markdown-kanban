@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { FileManager, FileResolutionResult } from './fileManager';
 import { FileSearchService } from './fileSearchService';
 import { configService } from './configurationService';
+import { safeFileUri } from './utils/uriUtils';
 
 export class LinkHandler {
     private _fileManager: FileManager;
@@ -102,7 +103,7 @@ export class LinkHandler {
                 const stats = fs.statSync(resolvedPath);
                 
                 if (stats.isDirectory()) {
-                    vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(resolvedPath));
+                    vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolvedPath, 'linkHandler'));
                     return;
                 }
             } catch (error) {
@@ -126,7 +127,7 @@ export class LinkHandler {
                     // Try to open with VS Code's default handler
                     // If draw.io or excalidraw extension is installed, it will use that
                     // Otherwise, VS Code will ask which editor to use
-                    const fileUri = vscode.Uri.file(resolvedPath);
+                    const fileUri = safeFileUri(resolvedPath, 'linkHandler');
                     await vscode.commands.executeCommand('vscode.open', fileUri);
 
                     const diagramType = diagramExtensions.includes(ext) ? 'draw.io' : 'Excalidraw';
@@ -138,7 +139,7 @@ export class LinkHandler {
                     console.warn(`Could not open diagram in VS Code, trying external: ${resolvedPath}`, error);
                     // If VS Code can't open it, try opening externally
                     try {
-                        await vscode.env.openExternal(vscode.Uri.file(resolvedPath));
+                        await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
                         vscode.window.showInformationMessage(
                             `Opened externally: ${path.basename(resolvedPath)}`
                         );
@@ -231,7 +232,7 @@ export class LinkHandler {
                 } catch (error) {
                     console.warn(`VS Code couldn't open file, trying OS default: ${resolvedPath}`, error);
                     try {
-                        await vscode.env.openExternal(vscode.Uri.file(resolvedPath));
+                        await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
                         vscode.window.showInformationMessage(
                             `Opened externally: ${path.basename(resolvedPath)}`
                         );
@@ -241,13 +242,13 @@ export class LinkHandler {
                 }
             } else {
                 try {
-                    await vscode.env.openExternal(vscode.Uri.file(resolvedPath));
+                    await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
                     vscode.window.showInformationMessage(
                         `Opened externally: ${path.basename(resolvedPath)}`
                     );
                 } catch (error) {
                     try {
-                        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(resolvedPath));
+                        await vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolvedPath, 'linkHandler'));
                         vscode.window.showInformationMessage(
                             `Revealed in file explorer: ${path.basename(resolvedPath)}`
                         );
@@ -369,13 +370,13 @@ export class LinkHandler {
                         } else {
                             // For binary files (images, videos, etc.), reveal in file explorer or open with default application
                             try {
-                                await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(resolution.resolvedPath));
+                                await vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolution.resolvedPath, 'linkHandler-resolution'));
                                 vscode.window.showInformationMessage(
                                     `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)} (in default application)`
                                 );
                             } catch (osError) {
                                 // Fallback: try to open with VS Code anyway
-                                await vscode.env.openExternal(vscode.Uri.file(resolution.resolvedPath));
+                                await vscode.env.openExternal(safeFileUri(resolution.resolvedPath, 'linkHandler-resolution'));
                                 vscode.window.showInformationMessage(
                                     `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)}`
                                 );

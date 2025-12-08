@@ -1094,17 +1094,18 @@ export class KanbanWebviewPanel {
             const baseHref = this._panel.webview.asWebviewUri(documentDir).toString() + '/';
             html = html.replace(/<head>/, `<head><base href="${baseHref}">`);
 
-            // Try to use local markdown-it, but keep CDN as fallback
+            // Use local markdown-it from dist/src/html (bundled with extension)
             try {
-                const markdownItPath = vscode.Uri.joinPath(this._extensionUri, 'node_modules', 'markdown-it', 'dist', 'markdown-it.min.js');
+                const markdownItPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'src', 'html', 'markdown-it.min.js');
                 if (fs.existsSync(markdownItPath.fsPath)) {
                     const markdownItUri = this._panel.webview.asWebviewUri(markdownItPath);
-                    html = html.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/markdown-it\/13\.0\.2\/markdown-it\.min\.js"><\/script>/, `<script src="${markdownItUri}"></script>`);
+                    html = html.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/markdown-it\/[^"]+\/markdown-it\.min\.js"><\/script>/, `<script src="${markdownItUri}"></script>`);
+                    console.log('[KanbanWebviewPanel] Using local markdown-it:', markdownItUri.toString());
+                } else {
+                    console.warn('[KanbanWebviewPanel] Local markdown-it not found at:', markdownItPath.fsPath);
                 }
-                // If local file doesn't exist, keep the CDN version in HTML
             } catch (error) {
-                // If there's any error, keep the CDN version in HTML
-                console.warn('Failed to load local markdown-it, using CDN version:', error);
+                console.warn('[KanbanWebviewPanel] Failed to load local markdown-it:', error);
             }
         }
 

@@ -41,23 +41,25 @@ function wikiLinksPlugin(md, options = {}) {
         const title = parts[1] ? parts[1].trim() : document;
         
         if (!document) {return false;}
-        
+
+        // IMPORTANT: When returning true, state.pos MUST always be advanced
+        state.pos = pos + 2; // Skip closing ]]
+
         // Don't process if we're in silent mode
         if (silent) {return true;}
-        
+
         // Create token
         const token_open = state.push('wiki_link_open', 'a', 1);
         token_open.attrSet('href', '#'); // Use # as placeholder
         if (className) {token_open.attrSet('class', className);}
         token_open.attrSet('data-document', document);
         token_open.attrSet('title', `Wiki link: ${document}`);
-        
+
         const token_text = state.push('text', '', 0);
         token_text.content = title;
-        
+
         const token_close = state.push('wiki_link_close', 'a', -1);
-        
-        state.pos = pos + 2; // Skip closing ]]
+
         return true;
     }
 
@@ -160,15 +162,17 @@ function tagPlugin(md, options = {}) {
         }
         
         if (tagContent.length === 0) {return false;}
-        
+
+        // IMPORTANT: When returning true, state.pos MUST always be advanced
+        state.pos = pos;
+
         if (silent) {return true;}
-        
+
         // Create token
         const token = state.push('tag', 'span', 0);
         token.content = tagContent;
         token.markup = '#';
-        
-        state.pos = pos;
+
         return true;
     }
     
@@ -251,16 +255,18 @@ function datePersonTagPlugin(md, options = {}) {
                 tagType = 'person';
             }
         }
-        
+
+        // IMPORTANT: When returning true, state.pos MUST always be advanced
+        state.pos = pos;
+
         if (silent) {return true;}
-        
+
         // Create token
         const token = state.push('date_person_tag', 'span', 0);
         token.content = tagContent;
         token.markup = '@';
         token.meta = { type: tagType };
-        
-        state.pos = pos;
+
         return true;
     }
     
@@ -401,6 +407,9 @@ function temporalTagPlugin(md, options = {}) {
         // No match found
         if (!tagContent) { return false; }
 
+        // IMPORTANT: When returning true, state.pos MUST always be advanced
+        state.pos = pos;
+
         if (silent) { return true; }
 
         // Create token
@@ -409,7 +418,6 @@ function temporalTagPlugin(md, options = {}) {
         token.markup = '.';
         token.meta = { type: tagType, config };
 
-        state.pos = pos;
         return true;
     }
 
@@ -580,6 +588,9 @@ function htmlCommentPlugin(md, options = {}) {
 
         if (!found) {return false;}
 
+        // IMPORTANT: When returning true, state.pos MUST always be advanced
+        state.pos = pos + 3; // Skip closing -->
+
         if (silent) {return true;}
 
         // Create token
@@ -587,7 +598,6 @@ function htmlCommentPlugin(md, options = {}) {
         token.content = content.trim();
         token.markup = '<!--';
 
-        state.pos = pos + 3; // Skip closing -->
         return true;
     }
 

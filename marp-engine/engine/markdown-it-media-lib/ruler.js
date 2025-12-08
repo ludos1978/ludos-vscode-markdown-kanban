@@ -193,7 +193,18 @@ function pushMediaToken(state, media, options) {
 function createMediaRule(options) {
   return function mediaRule(state, silent) {
     const { pos, posMax } = state;
-    const media = parseMedia(state);
+
+    // Wrap parseMedia in try-catch because parseLinkLabel can throw
+    // "inline rule didn't increment state.pos" if state is corrupted
+    let media;
+    try {
+      media = parseMedia(state);
+    } catch (e) {
+      // Parsing failed - restore state and return false
+      state.pos = pos;
+      state.posMax = posMax;
+      return false;
+    }
 
     if (!media) {
       state.pos = pos;
@@ -201,16 +212,21 @@ function createMediaRule(options) {
       return false;
     }
 
+    // IMPORTANT: When returning true, state.pos MUST always be advanced
+    // This applies to BOTH silent and non-silent modes!
     state.pos = media.pos;
 
-    if (!silent) {
-      var retVal = pushMediaToken(state, media.res, options);
-			// abort if pushMediaToken doesnt want to handle the media, such as the image type i disabled...
-			if (!retVal) {
-				state.pos = pos;
-				state.posMax = posMax;
-				return false;
-			}
+    // In silent mode, we've matched and advanced pos - just return true
+    if (silent) {
+      return true;
+    }
+
+    var retVal = pushMediaToken(state, media.res, options);
+    // abort if pushMediaToken doesnt want to handle the media, such as the image type i disabled...
+    if (!retVal) {
+      state.pos = pos;
+      state.posMax = posMax;
+      return false;
     }
 
     return true;
