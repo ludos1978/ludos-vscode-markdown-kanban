@@ -3120,10 +3120,10 @@ window.addEventListener('message', event => {
             break;
 
         case 'includesUpdated':
-            // All includes have been processed and updated - trigger re-render
-            if (typeof window.renderBoard === 'function') {
-                window.renderBoard();
-            }
+            // NOTE: Full re-render is no longer needed here.
+            // updateIncludeFileCache now handles targeted re-rendering of only
+            // the task descriptions containing pending include placeholders.
+            // Keeping this case for backwards compatibility but not triggering renderBoard.
             break;
         case 'enableTaskIncludeMode':
             // Call the enableTaskIncludeMode function with the provided parameters

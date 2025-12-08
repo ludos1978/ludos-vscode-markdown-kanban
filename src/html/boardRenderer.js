@@ -1912,6 +1912,12 @@ function renderBoard(options = null) {
 
     setupDragAndDrop();
 
+    // Initialize all task elements after full board render
+    // This ensures drag handlers, edit handlers, and visual elements are properly set up
+    boardElement.querySelectorAll('.task-item').forEach(taskElement => {
+        initializeTaskElement(taskElement);
+    });
+
     // Inject header/footer bars after DOM is rendered
     // This adds the actual bar elements to the DOM
     if (typeof injectStackableBars === 'function') {

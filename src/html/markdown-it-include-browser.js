@@ -251,6 +251,7 @@
 
   // Function to update cache when file content is received
   function updateFileCache(filePath, content) {
+    console.log('[include-browser] updateFileCache called for:', filePath, 'content length:', content?.length);
 
     // Remove from pending requests
     pendingRequests.delete(filePath);
@@ -259,6 +260,7 @@
     const oldContent = fileCache.get(filePath);
     const wasNotCached = oldContent === undefined || oldContent === null;
     const contentChanged = oldContent !== content;
+    console.log('[include-browser] wasNotCached:', wasNotCached, 'contentChanged:', contentChanged);
 
     // Update cache
     fileCache.set(filePath, content);
@@ -279,17 +281,28 @@
     // If this is the first time we're receiving this file's content,
     // find and update only the task descriptions that have pending placeholders for this file
     if (wasNotCached) {
+      console.log('[include-browser] First time receiving content, calling updatePendingIncludePlaceholders');
       updatePendingIncludePlaceholders(filePath);
     }
   }
 
   // Function to update only the task descriptions that have pending include placeholders
   function updatePendingIncludePlaceholders(filePath) {
+    console.log('[include-browser] updatePendingIncludePlaceholders called for:', filePath);
+
     // Find all pending placeholders for this specific file
     const selector = `[data-include-pending="true"][data-include-file="${CSS.escape(filePath)}"]`;
+    console.log('[include-browser] Looking for placeholders with selector:', selector);
     const placeholders = document.querySelectorAll(selector);
+    console.log('[include-browser] Found', placeholders.length, 'placeholders');
 
     if (placeholders.length === 0) {
+      // Debug: check if there are ANY include placeholders
+      const allPlaceholders = document.querySelectorAll('[data-include-pending="true"]');
+      console.log('[include-browser] Total pending placeholders in DOM:', allPlaceholders.length);
+      if (allPlaceholders.length > 0) {
+        console.log('[include-browser] Their file paths:', Array.from(allPlaceholders).map(p => p.getAttribute('data-include-file')));
+      }
       return;
     }
 
@@ -299,26 +312,39 @@
     placeholders.forEach(placeholder => {
       // Find the closest task-description-display ancestor
       const taskDescription = placeholder.closest('.task-description-display');
+      console.log('[include-browser] Placeholder closest task-description-display:', taskDescription ? 'found' : 'NOT FOUND');
       if (taskDescription) {
         taskDescriptionsToUpdate.add(taskDescription);
       }
     });
 
+    console.log('[include-browser] Task descriptions to update:', taskDescriptionsToUpdate.size);
+
     // Re-render each affected task description
     taskDescriptionsToUpdate.forEach(taskDescriptionEl => {
-      // Find the task element
-      const taskEl = taskDescriptionEl.closest('.task');
-      if (!taskEl) return;
+      // Find the task element (class is 'task-item', not 'task')
+      const taskEl = taskDescriptionEl.closest('.task-item');
+      if (!taskEl) {
+        console.log('[include-browser] No .task-item parent found');
+        return;
+      }
 
       const taskId = taskEl.dataset.taskId;
-      if (!taskId) return;
+      if (!taskId) {
+        console.log('[include-browser] No taskId on task element');
+        return;
+      }
+      console.log('[include-browser] Found taskId:', taskId);
 
-      // Get the task data from the current board data
-      if (typeof window.currentBoardData === 'undefined' || !window.currentBoardData) return;
+      // Get the task data from the current board data (stored in window.cachedBoard)
+      if (typeof window.cachedBoard === 'undefined' || !window.cachedBoard) {
+        console.log('[include-browser] window.cachedBoard not available');
+        return;
+      }
 
       // Find the task in board data
       let taskData = null;
-      for (const column of window.currentBoardData.columns || []) {
+      for (const column of window.cachedBoard.columns || []) {
         const found = (column.tasks || []).find(t => t.id === taskId);
         if (found) {
           taskData = found;
@@ -326,12 +352,21 @@
         }
       }
 
-      if (!taskData || !taskData.description) return;
+      if (!taskData || !taskData.description) {
+        console.log('[include-browser] Task data or description not found. taskData:', !!taskData, 'description:', !!taskData?.description);
+        return;
+      }
+      console.log('[include-browser] Found task description:', taskData.description.substring(0, 100));
 
       // Re-render just the description using the existing renderMarkdown function
       if (typeof window.renderMarkdown === 'function') {
+        console.log('[include-browser] Calling window.renderMarkdown');
         const renderedHtml = window.renderMarkdown(taskData.description);
+        console.log('[include-browser] Rendered HTML length:', renderedHtml?.length);
         taskDescriptionEl.innerHTML = renderedHtml;
+        console.log('[include-browser] Updated task description innerHTML');
+      } else {
+        console.log('[include-browser] window.renderMarkdown is NOT a function:', typeof window.renderMarkdown);
       }
     });
   }

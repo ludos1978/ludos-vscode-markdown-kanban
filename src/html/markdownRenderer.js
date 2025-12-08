@@ -1819,4 +1819,7 @@ function renderMarkdown(text, includeContext) {
     }
 }
 
+// Expose renderMarkdown globally for include placeholder updates
+window.renderMarkdown = renderMarkdown;
+
 // escapeHtml function moved to utils/validationUtils.js
