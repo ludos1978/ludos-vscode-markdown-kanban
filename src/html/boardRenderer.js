@@ -15,11 +15,14 @@ window.showTemplateBar = window.showTemplateBar !== false; // Default to true
 let renderTimeout = null;
 
 /**
- * HYBRID TASK INITIALIZATION SYSTEM
+ * TASK INITIALIZATION
  *
  * Centralized function to initialize task elements with all required event handlers.
- * This ensures tasks are always properly initialized regardless of creation path.
- * Works in conjunction with taskInitializer.js MutationObserver as a safety net.
+ * Called explicitly after:
+ * - Full board render (renderBoard)
+ * - Single column re-render (renderSingleColumn)
+ * - Single task add (addSingleTaskToDOM)
+ * - Drag & drop move (dragDrop.js)
  *
  * @param {HTMLElement} taskElement - The task DOM element to initialize
  * @returns {boolean} - True if initialization succeeded, false otherwise
@@ -1480,7 +1483,7 @@ function renderSingleColumn(columnId, columnData) {
     // Since we replaced the entire column DOM element, we need to re-setup all drag & drop
     // handlers that were attached to the old element and its children
 
-    // HYBRID APPROACH: Initialize all tasks in the new column with centralized function
+    // Initialize all tasks in the new column
     newColumnElement.querySelectorAll('.task-item').forEach(taskElement => {
         initializeTaskElement(taskElement);
     });
@@ -5156,8 +5159,7 @@ function addSingleTaskToDOM(columnId, task, insertIndex = -1) {
         updateImageSources();
     }
 
-    // HYBRID APPROACH: Initialize task with centralized function
-    // This sets up drag handlers, verifies edit handlers, and applies visual elements
+    // Initialize task (drag handlers, edit handlers, visual elements)
     initializeTaskElement(taskElement);
 
     // Update column task count
