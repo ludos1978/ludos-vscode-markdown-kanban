@@ -4208,7 +4208,7 @@ blockquote {
 /* Highlight lines/paragraphs containing tags in description */
 .task-description-display p:has(.kanban-tag),
 .task-description-display li:has(.kanban-tag),
-.task-description-display div:has(.kanban-tag) {
+.task-description-display div:has(.kanban-tag):not(.include-container):not(.task-section):not(.include-content-area) {
   background-color: var(--vscode-list-hoverBackground);
   padding: 2px 4px;
   margin: 2px 0;
