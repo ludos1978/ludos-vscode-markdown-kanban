@@ -8,7 +8,7 @@
 
 - [ ] when initializing a file it still does not reload the file immediately after adding the required header.
 
-- [ ] would it be possible to take a screenshot of a webpage if a link is added to the board? 
+- [ ] would it be possible to take a screenshot of a webpage if a link is added to the board?
 
   1. Open Graph images (simplest) - Fetch og:image meta
   tags from URLs. Most websites provide preview images.

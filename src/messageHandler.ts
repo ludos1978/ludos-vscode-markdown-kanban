@@ -105,8 +105,8 @@ export class MessageHandler {
         this._saveWithBackup = callbacks.saveWithBackup;
         this._markUnsavedChanges = callbacks.markUnsavedChanges;
 
-        // Initialize Command Pattern registry
-        this._commandRegistry = CommandRegistry.getInstance();
+        // Initialize Command Pattern registry (per-instance, not singleton)
+        this._commandRegistry = new CommandRegistry();
         this._initializeCommandRegistry();
     }
 

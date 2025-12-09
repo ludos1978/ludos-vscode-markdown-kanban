@@ -70,7 +70,9 @@
       "Bash(methods=\"endOperation handleAnyFileDrop handleApplyTemplate handleAskOpenExportFolder handleBoardUpdate handleCheckMarpStatus handleClearTrackedFilesCache handleColumnsUnfolded handleConfirmDisableIncludeMode handleConvertMermaidToSVG handleConvertPlantUMLToSVG handleEditColumnTitleUnified handleEditingStarted handleEditingStopped handleEditingStoppedNormal handleEditModeEnd handleEditModeStart handleEditorShortcut handleExecuteFileDropCopy handleExecuteFileDropLink handleExport handleForceWriteAllContent handleGetExportDefaultFolder handleGetMarpAvailableClasses handleGetMarpThemes handleGetPDFInfo handleGetTemplates handleGetTrackedFilesDebugInfo handleLinkExistingFile handleOpenFile handleOpenInMarpPreview handleOpenMediaFolder handlePageHiddenWithUnsavedChanges handlePasteImageIntoField handlePerformSort handlePollMarpThemes handleRegisterInlineInclude handleReloadAllIncludedFiles handleReloadIndividualFile handleRenderCompleted handleRenderDrawIO handleRenderExcalidraw handleRenderPDFPage handleRenderPlantUML handleRenderSkipped handleRequestEditIncludeFileName handleRequestEditTaskIncludeFileName handleRequestFileDropDialogue handleRequestIncludeFile handleRequestIncludeFileName handleRequestTaskIncludeFileName handleSaveClipboardImage handleSaveClipboardImageWithPath handleSaveIndividualFile handleSelectExportFolder handleSelectFile handleStopAutoExport handleSubmitTemplateVariables handleUpdateMarpGlobalSetting handleVerifyContentSync handleVSCodeSnippet requestStopEditing startOperation\")",
       "Bash(__NEW_LINE__ echo \"=== Missing methods in MessageHandler ===\")",
       "Bash(for m in $methods)",
-      "Bash(if ! grep -q \"$m\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)"
+      "Bash(if ! grep -q \"$m\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)",
+      "Bash(while IFS= read -r m)",
+      "Bash(do grep -c $m /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)"
     ],
     "deny": [],
     "ask": []

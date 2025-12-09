@@ -34,46 +34,52 @@ export interface CommandStats {
 }
 
 /**
- * Command Registry - Singleton
+ * Command Registry
  *
- * Central registry for all message commands.
- * Provides discovery, validation, and message routing.
+ * Per-instance registry for message commands.
+ * Each MessageHandler gets its own CommandRegistry instance
+ * to properly isolate context between panels.
+ *
+ * NOT a singleton - each panel needs its own registry with its own context.
  */
 export class CommandRegistry {
-    private static _instance: CommandRegistry;
-
     private _commands: Map<string, MessageCommand> = new Map();
     private _messageTypeToCommand: Map<string, MessageCommand> = new Map();
     private _context?: CommandContext;
     private _initialized: boolean = false;
     private _stats: Map<string, CommandStats> = new Map();
 
-    private constructor() {
-        // Singleton - use getInstance()
+    constructor() {
+        // Per-instance - each MessageHandler gets its own registry
     }
 
     /**
-     * Get singleton instance
+     * Create a new CommandRegistry instance
+     * @deprecated Use `new CommandRegistry()` directly
      */
     static getInstance(): CommandRegistry {
-        if (!CommandRegistry._instance) {
-            CommandRegistry._instance = new CommandRegistry();
-        }
-        return CommandRegistry._instance;
+        // For backwards compatibility, create new instance
+        // This is no longer a singleton!
+        return new CommandRegistry();
     }
 
     /**
-     * Reset the singleton (for testing)
+     * Reset the instance (for testing)
+     */
+    reset(): void {
+        this._commands.clear();
+        this._messageTypeToCommand.clear();
+        this._stats.clear();
+        this._initialized = false;
+        this._context = undefined;
+    }
+
+    /**
+     * @deprecated Use instance.reset() instead
      */
     static resetInstance(): void {
-        if (CommandRegistry._instance) {
-            CommandRegistry._instance._commands.clear();
-            CommandRegistry._instance._messageTypeToCommand.clear();
-            CommandRegistry._instance._stats.clear();
-            CommandRegistry._instance._initialized = false;
-            CommandRegistry._instance._context = undefined;
-        }
-        CommandRegistry._instance = undefined as any;
+        // No-op for backwards compatibility
+        // Each instance should call reset() on itself
     }
 
     // ============= INITIALIZATION =============
