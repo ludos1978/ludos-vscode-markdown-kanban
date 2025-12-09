@@ -20,11 +20,11 @@ export { CommandRegistry, ValidationResult, CommandStats } from './CommandRegist
 
 // Command implementations
 export { TaskCommands } from './TaskCommands';
-// export { ColumnCommands } from './ColumnCommands';
-// export { FileCommands } from './FileCommands';
-// export { ExportCommands } from './ExportCommands';
-// export { ClipboardCommands } from './ClipboardCommands';
-// export { EditCommands } from './EditCommands';
-// export { IncludeCommands } from './IncludeCommands';
-// export { DiagramCommands } from './DiagramCommands';
-// export { UICommands } from './UICommands';
+export { ColumnCommands } from './ColumnCommands';
+export { UICommands } from './UICommands';
+export { FileCommands } from './FileCommands';
+export { ClipboardCommands } from './ClipboardCommands';
+export { ExportCommands } from './ExportCommands';
+export { DiagramCommands } from './DiagramCommands';
+export { IncludeCommands } from './IncludeCommands';
+export { EditModeCommands } from './EditModeCommands';

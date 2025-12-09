@@ -20,6 +20,8 @@ import { TemplateParser } from './templates/TemplateParser';
 import { VariableProcessor } from './templates/VariableProcessor';
 import { FileCopyService } from './templates/FileCopyService';
 import { safeFileUri } from './utils/uriUtils';
+// Command Pattern: Registry and commands for message handling
+import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands } from './commands';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -58,6 +60,10 @@ export class MessageHandler {
     private _previousBoardForFocus?: KanbanBoard;
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
     private _autoExportSettings: any = null;
+
+    // Command Pattern: Registry for message handlers
+    private _commandRegistry: CommandRegistry;
+    private _commandContext: CommandContext | null = null;
 
     // Request-response pattern for stopEditing
     private _pendingStopEditingRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
@@ -98,6 +104,46 @@ export class MessageHandler {
         this._getWebviewPanel = callbacks.getWebviewPanel;
         this._saveWithBackup = callbacks.saveWithBackup;
         this._markUnsavedChanges = callbacks.markUnsavedChanges;
+
+        // Initialize Command Pattern registry
+        this._commandRegistry = CommandRegistry.getInstance();
+        this._initializeCommandRegistry();
+    }
+
+    /**
+     * Initialize the Command Registry with all command handlers
+     */
+    private _initializeCommandRegistry(): void {
+        // Create the command context with all dependencies
+        this._commandContext = {
+            fileManager: this._fileManager,
+            boardStore: this._boardStore,
+            boardOperations: this._boardOperations,
+            linkHandler: this._linkHandler,
+            onBoardUpdate: this._onBoardUpdate,
+            onSaveToMarkdown: this._onSaveToMarkdown,
+            onInitializeFile: this._onInitializeFile,
+            getCurrentBoard: this._getCurrentBoard,
+            setBoard: this._setBoard,
+            setUndoRedoOperation: this._setUndoRedoOperation,
+            getWebviewPanel: this._getWebviewPanel,
+            saveWithBackup: this._saveWithBackup,
+            markUnsavedChanges: this._markUnsavedChanges
+        };
+
+        // Register command handlers
+        this._commandRegistry.register(new TaskCommands());
+        this._commandRegistry.register(new ColumnCommands());
+        this._commandRegistry.register(new UICommands());
+        this._commandRegistry.register(new FileCommands());
+        this._commandRegistry.register(new ClipboardCommands());
+        this._commandRegistry.register(new ExportCommands());
+        this._commandRegistry.register(new DiagramCommands());
+        this._commandRegistry.register(new IncludeCommands());
+        this._commandRegistry.register(new EditModeCommands());
+
+        // Initialize the registry with context
+        this._commandRegistry.initialize(this._commandContext);
     }
 
     /**
@@ -257,6 +303,19 @@ export class MessageHandler {
                 title: message.title,
                 taskDataKeys: Object.keys(message.taskData || {})
             })}`;
+        }
+
+        // Command Pattern: Try registered command handlers first
+        // This enables gradual migration from switch statement to command classes
+        if (this._commandRegistry.canHandle(message.type)) {
+            const result = await this._commandRegistry.execute(message);
+            if (result !== null) {
+                // Command was handled (successfully or with error)
+                if (!result.success) {
+                    console.error(`[MessageHandler] Command failed for ${message.type}:`, result.error);
+                }
+                return; // Don't fall through to switch
+            }
         }
 
         const switchMsg = `🟢 [handleMessage] ENTERING SWITCH for type: "${message.type}"`;
