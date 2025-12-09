@@ -63,7 +63,8 @@
       "Bash(node:*)",
       "WebFetch(domain:cdnjs.cloudflare.com)",
       "WebFetch(domain:cdnjs.com)",
-      "WebFetch(domain:cdn.jsdelivr.net)"
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

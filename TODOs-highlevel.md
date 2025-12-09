@@ -1,3 +1,4 @@
+- [ ] analyze what code design tempaltes would make sense to use in this project. analyze the high level requirements of the code and do a deep analysis of the current state and a optimal state would it have been done by an team of experts in software architecture that both make sure it's strucutred well, but also not overcomplicated!
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
@@ -6,6 +7,17 @@
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 
 - [ ] when initializing a file it still does not reload the file immediately after adding the required header.
+
+- [ ] would it be possible to take a screenshot of a webpage if a link is added to the board? 
+
+  1. Open Graph images (simplest) - Fetch og:image meta
+  tags from URLs. Most websites provide preview images.
+  No screenshot needed, just an HTTP fetch + HTML
+  parsing.
+  2. Puppeteer/Playwright (full screenshots) - Run
+  headless browser in extension backend to capture
+  actual screenshots. Heavier dependency (~100-400MB),
+  slower, but gives real screenshots.
 
 - [ ] #### Combined Queries
 
