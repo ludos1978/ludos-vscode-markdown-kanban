@@ -176,7 +176,7 @@ kanban-plugin: board
   ```
 
 - [ ]  Test 8: Git Graph
-  ```mermaid
+  ```mermaid-disabled
   gitGraph
       commit
       commit
@@ -188,4 +188,7 @@ kanban-plugin: board
       merge develop
       commit
       commit
+
   ```
+
+  ![Mermaid Diagram](Media-kanban-graphs/mermaid-1765231704283.svg)
