@@ -1338,7 +1338,7 @@ async function updateClipboardCardSource(force = false) {
         const iconSpan = clipboardSource.querySelector('.drag-menu-item-icon');
 
         if (clipboardCardData && clipboardCardData.content) {
-            clipboardSource.style.opacity = '1';
+            clipboardSource.classList.remove('faded');
             const escapedTitle = (typeof escapeHtml === 'function') ? escapeHtml(clipboardCardData.title) : clipboardCardData.title;
 
             // Show first 20 characters for menu preview
@@ -1376,7 +1376,7 @@ async function updateClipboardCardSource(force = false) {
                 clipboardMenuText.textContent = menuLabel;
             }
         } else {
-            clipboardSource.style.opacity = '0.5';
+            clipboardSource.classList.add('faded');
 
             if (iconSpan) iconSpan.textContent = '📋';
             if (clipboardMenuText) clipboardMenuText.textContent = 'Clipboard';
@@ -5464,27 +5464,27 @@ function updateLinkHandlingOptionsVisibility() {
         case 'rewrite-only':
         case 'no-modify':
             // No options needed for these modes
-            linkHandlingOptions.style.display = 'none';
-            fileTypeOptions.style.display = 'none';
-            fileSizeOption.style.display = 'none';
+            linkHandlingOptions.classList.add('hidden');
+            fileTypeOptions.classList.add('hidden');
+            fileSizeOption.classList.add('hidden');
             break;
 
         case 'pack-linked':
             // Show only file size limit
-            linkHandlingOptions.style.display = 'block';
-            fileTypeOptions.style.display = 'none';
-            fileSizeOption.style.display = 'block';
+            linkHandlingOptions.classList.remove('hidden');
+            fileTypeOptions.classList.add('hidden');
+            fileSizeOption.classList.remove('hidden');
             break;
 
         case 'pack-all':
             // Show both file type options and file size limit
-            linkHandlingOptions.style.display = 'block';
-            fileTypeOptions.style.display = 'block';
-            fileSizeOption.style.display = 'block';
+            linkHandlingOptions.classList.remove('hidden');
+            fileTypeOptions.classList.remove('hidden');
+            fileSizeOption.classList.remove('hidden');
             break;
 
         default:
-            linkHandlingOptions.style.display = 'none';
+            linkHandlingOptions.classList.add('hidden');
             break;
     }
 }
@@ -5736,38 +5736,32 @@ function handleFormatChange() {
         if (isPresentationFormat) {
             // Enable Use Marp checkbox
             useMarpCheckbox.disabled = false;
-            useMarpHint.style.display = 'none';
+            if (useMarpHint) useMarpHint.classList.add('hidden');
 
             // Show content transformations for presentation format
             if (contentTransformations) {
-                contentTransformations.style.display = 'block';
+                contentTransformations.classList.remove('hidden');
             }
 
             // Check if Use Marp is already checked
             if (useMarpCheckbox.checked) {
-                marpOptions.style.opacity = '1';
-                marpOptions.style.pointerEvents = 'auto';
                 marpOptions.classList.remove('disabled-section');
                 checkMarpStatus();
             } else {
-                marpOptions.style.opacity = '0.5';
-                marpOptions.style.pointerEvents = 'none';
                 marpOptions.classList.add('disabled-section');
             }
         } else {
             // Disable Use Marp checkbox
             useMarpCheckbox.disabled = true;
             useMarpCheckbox.checked = false;
-            useMarpHint.style.display = 'inline';
+            if (useMarpHint) useMarpHint.classList.remove('hidden');
 
             // Hide content transformations for non-presentation formats
             if (contentTransformations) {
-                contentTransformations.style.display = 'none';
+                contentTransformations.classList.add('hidden');
             }
 
             // Disable Marp options
-            marpOptions.style.opacity = '0.5';
-            marpOptions.style.pointerEvents = 'none';
             marpOptions.classList.add('disabled-section');
         }
     }
@@ -5782,16 +5776,12 @@ function handleUseMarpChange() {
 
     if (useMarpCheckbox && marpOptions) {
         if (useMarpCheckbox.checked) {
-            marpOptions.style.opacity = '1';
-            marpOptions.style.pointerEvents = 'auto';
             marpOptions.classList.remove('disabled-section');
             // Check Marp status when enabling Marp
             checkMarpStatus();
             // Update editable checkbox state based on current format
             handleMarpOutputFormatChange();
         } else {
-            marpOptions.style.opacity = '0.5';
-            marpOptions.style.pointerEvents = 'none';
             marpOptions.classList.add('disabled-section');
         }
     }
@@ -5824,13 +5814,13 @@ function handleMarpOutputFormatChange() {
             if (isPdf) {
                 // Enable handout option for PDF format
                 handoutCheckbox.disabled = false;
-                handoutRow.style.opacity = '1';
+                handoutRow.classList.remove('faded');
                 handoutRow.title = '';
             } else {
                 // Disable and uncheck handout for other formats
                 handoutCheckbox.disabled = true;
                 handoutCheckbox.checked = false;
-                handoutRow.style.opacity = '0.5';
+                handoutRow.classList.add('faded');
                 handoutRow.title = 'Handout is only available for PDF format';
                 // Hide the layout/direction options when disabled
                 handleMarpHandoutChange();
@@ -5848,12 +5838,12 @@ function handleMarpHandoutChange() {
     const directionContainer = document.getElementById('handout-direction-container');
 
     if (handoutCheckbox && layoutContainer) {
-        layoutContainer.style.display = handoutCheckbox.checked ? 'block' : 'none';
+        layoutContainer.classList.toggle('hidden', !handoutCheckbox.checked);
         // Also update direction visibility based on preset
         handleMarpHandoutPresetChange();
     }
     if (!handoutCheckbox?.checked && directionContainer) {
-        directionContainer.style.display = 'none';
+        directionContainer.classList.add('hidden');
     }
 }
 
@@ -5868,7 +5858,7 @@ function handleMarpHandoutPresetChange() {
     if (handoutCheckbox && presetSelect && directionContainer) {
         // Show direction option only for 2-slide landscape layout
         const show2SlideOptions = handoutCheckbox.checked && presetSelect.value === 'landscape-2';
-        directionContainer.style.display = show2SlideOptions ? 'block' : 'none';
+        directionContainer.classList.toggle('hidden', !show2SlideOptions);
     }
 }
 

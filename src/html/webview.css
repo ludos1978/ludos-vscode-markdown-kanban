@@ -102,6 +102,16 @@ body {
   container-name: file-info-bar;
 }
 
+/* Hidden utility class */
+.hidden {
+  display: none !important;
+}
+
+/* Faded/disabled visual state */
+.faded {
+  opacity: 0.5;
+}
+
 /* Disabled section styling */
 .disabled-section {
   opacity: 0.5;
