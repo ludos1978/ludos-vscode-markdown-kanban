@@ -2752,11 +2752,16 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
 .column-drop-zone-stack .column-drop-zone.drag-over,
-.stack-bottom-drop-zone.drag-over,
-.column-margin.drag-over {
+.stack-bottom-drop-zone.drag-over {
   background: var(--vscode-editor-selectionBackground) !important;
   border: 2px dashed var(--vscode-editor-selectionForeground);
   border-radius: 4px;
+}
+
+/* Horizontal drop zones between columns in stack - background only, no border */
+.column-margin.drag-over,
+.kanban-column-stack .kanban-full-height-column .column-margin.drag-over {
+  background: var(--vscode-editor-selectionBackground) !important;
 }
 
 /* Visual feedback when dropping task at end of column (hovering over column-title) */

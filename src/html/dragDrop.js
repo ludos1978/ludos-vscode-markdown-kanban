@@ -3514,10 +3514,8 @@ function setupColumnDragAndDrop() {
             // Task/clipboard/emptycard drags skip drop zones - they go INTO columns
             if (foundStack && isDropZoneStack && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {
                 const dropZone = foundStack.querySelector('.column-drop-zone');
-                console.log('[dragDrop] Found drop zone stack, dropZone:', dropZone, 'stillColumnDrag:', stillColumnDrag);
                 if (dropZone) {
                     dropZone.classList.add('drag-over');
-                    console.log('[dragDrop] Added drag-over class to dropZone');
                     dragState.pendingDropZone = dropZone;
 
                     // For template drags, set target position
@@ -3685,8 +3683,14 @@ function setupColumnDragAndDrop() {
                 highlightMargin.classList.add('drag-over');
             }
 
-            // Show the drop indicator and update state
-            showInternalColumnDropIndicator(foundStack, beforeColumn);
+            // Update drop target state
+            dragState.dropTargetStack = foundStack;
+            dragState.dropTargetBeforeColumn = beforeColumn;
+
+            // Only show line indicator for template drags, not column drags
+            if (!stillColumnDrag) {
+                showInternalColumnDropIndicator(foundStack, beforeColumn);
+            }
 
             // For template drags, update target info
             if (stillTemplateDrag) {
