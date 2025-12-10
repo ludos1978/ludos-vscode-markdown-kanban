@@ -14,7 +14,6 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
-import * as vscode from 'vscode';
 
 /**
  * Column Commands Handler

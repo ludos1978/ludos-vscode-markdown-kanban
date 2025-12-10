@@ -54,16 +54,6 @@ export class CommandRegistry {
     }
 
     /**
-     * Create a new CommandRegistry instance
-     * @deprecated Use `new CommandRegistry()` directly
-     */
-    static getInstance(): CommandRegistry {
-        // For backwards compatibility, create new instance
-        // This is no longer a singleton!
-        return new CommandRegistry();
-    }
-
-    /**
      * Reset the instance (for testing)
      */
     reset(): void {
@@ -72,14 +62,6 @@ export class CommandRegistry {
         this._stats.clear();
         this._initialized = false;
         this._context = undefined;
-    }
-
-    /**
-     * @deprecated Use instance.reset() instead
-     */
-    static resetInstance(): void {
-        // No-op for backwards compatibility
-        // Each instance should call reset() on itself
     }
 
     // ============= INITIALIZATION =============

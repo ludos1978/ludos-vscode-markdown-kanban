@@ -7772,15 +7772,6 @@ function submitTemplateVariables(templateInfo, values) {
     }
 }
 
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // Make template dialog functions globally available
 window.showTemplateVariableDialog = showTemplateVariableDialog;
 window.closeTemplateVariableDialog = closeTemplateVariableDialog;

@@ -3891,18 +3891,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   font-style: italic;
 }
 
-.drop-zone-feedback {
-  display: none !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-}
-
-#drop-zone-feedback {
-  display: none !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-}
-
 /* Markdown content */
 .markdown-content {
   word-wrap: break-word;

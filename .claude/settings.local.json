@@ -72,7 +72,9 @@
       "Bash(for m in $methods)",
       "Bash(if ! grep -q \"$m\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)",
       "Bash(while IFS= read -r m)",
-      "Bash(do grep -c $m /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)"
+      "Bash(do grep -c $m /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)",
+      "Bash(for func in \"copyFullPath\" \"copyStoredPath\" \"executeUnifiedExport\" \"kanbanSearch\" \"performSort\" \"redo\" \"selectExportFolder\" \"selectFile\" \"showDebugOverlay\" \"showExportDialog\" \"toggleAllColumns\" \"toggleAutoExport\" \"toggleFileBarMenu\" \"toggleGlobalSticky\" \"toggleLayoutPresetsMenu\" \"toggleMarpGlobalMenu\" \"undo\")",
+      "Bash(do echo \"=== $func ===\" grep -r \"function $func\\|const $func\\|\\.$func\\s*=\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/*.js)"
     ],
     "deny": [],
     "ask": []
