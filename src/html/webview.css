@@ -1827,6 +1827,19 @@ body.section-height-limited .task-section figure img {
   padding: 12px 8px;
 }
 
+/* Initialize board container */
+.initialize-container {
+  text-align: center;
+  padding: 40px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.initialize-container .initialize-message {
+  margin-bottom: 20px;
+  font-size: 16px;
+  text-align: left;
+}
+
 .initialise-btn {
   background: var(--button-background);
   color: var(--button-foreground);
@@ -3826,13 +3839,12 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border-radius: 2px;
   z-index: 1000;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  display: none;
   box-shadow: 0 0 4px rgba(0, 122, 255, 0.5);
 }
 
 .external-drop-indicator.active {
-  opacity: 1;
+  display: block;
 }
 
 .external-drop-indicator::before {
@@ -3855,14 +3867,13 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border-radius: 2px;
   z-index: 10000; /* Above everything */
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease, top 0.1s ease-out;
+  display: none;
   box-shadow: 0 0 6px var(--vscode-focusBorder);
   will-change: transform, opacity, top, left;
 }
 
 .internal-drop-indicator.active {
-  opacity: 1;
+  display: block;
 }
 
 /* Dim the dragged task during drag (stays in original position) */

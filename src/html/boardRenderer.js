@@ -1677,25 +1677,22 @@ function renderBoard(options = null) {
     if (window.cachedBoard.valid === false) {
         // Show initialize button instead of columns
         const initializeContainer = document.createElement('div');
-        initializeContainer.style.cssText = `
-            text-align: center; 
-            padding: 40px; 
-            color: var(--vscode-descriptionForeground);
+        initializeContainer.className = 'initialize-container';
+
+        const message = document.createElement('div');
+        message.className = 'initialize-message';
+        message.innerHTML = `
+            This file is not initialized as a Kanban board.<br><br>
+            Click the button below to add the required header.<br><br>
+            This might overwrite content of the file if not structured correctly!
         `;
-        
-        initializeContainer.innerHTML = `
-            <div style="margin-bottom: 20px; font-size: 16px; text-align: left;">
-                This file is not initialized as a Kanban board.<br><br>
-                Click the button below to add the required header.<br><br>
-                This might overwrite content of the file if not structured correctly!
-            </div>
-        `;
-        
+        initializeContainer.appendChild(message);
+
         const initializeBtn = document.createElement('button');
         initializeBtn.className = 'initialise-btn';
         initializeBtn.textContent = 'Initialize File';
         initializeBtn.onclick = () => initializeFile();
-        
+
         initializeContainer.appendChild(initializeBtn);
         boardElement.appendChild(initializeContainer);
         return;

@@ -159,17 +159,12 @@ function createExternalDropIndicator() {
     if (externalDropIndicator) {
         return externalDropIndicator;
     }
-    
+
     const indicator = document.createElement('div');
     indicator.className = 'external-drop-indicator';
-    indicator.style.display = 'none';
-    indicator.style.pointerEvents = 'none'; // Ensure it doesn't interfere with drops
     document.body.appendChild(indicator);
     externalDropIndicator = indicator;
-    
-    if (DEBUG_DROP) {
-    }
-    
+
     return indicator;
 }
 
@@ -218,9 +213,8 @@ function showExternalDropIndicator(column, clientY) {
     indicator.style.right = 'auto';
     indicator.style.width = (columnRect.width * 0.8) + 'px';
     indicator.style.top = insertionY + 'px';
-    indicator.style.display = 'block';
     indicator.classList.add('active');
-    
+
     // Add highlight to column
     column.classList.add('external-drag-over');
     currentExternalDropColumn = column;
@@ -266,8 +260,6 @@ function createInternalDropIndicator() {
 
     const indicator = document.createElement('div');
     indicator.className = 'internal-drop-indicator';
-    indicator.style.display = 'none';
-    indicator.style.pointerEvents = 'none';
     document.body.appendChild(indicator);
     internalDropIndicator = indicator;
 
@@ -329,7 +321,6 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     indicator.style.left = (containerLeft + 10) + 'px';
     indicator.style.width = (containerWidth - 20) + 'px';
     indicator.style.top = insertionY + 'px';
-    indicator.style.display = 'block';
     indicator.classList.add('active');
 }
 
@@ -370,13 +361,13 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetColumnId = null;
         }
 
-        indicator.style.display = 'none';
+        indicator.classList.remove('active');
         return;
     }
 
     // Handle drop zone stacks (for column drags)
     if (targetStack.classList.contains('column-drop-zone-stack')) {
-        indicator.style.display = 'none';
+        indicator.classList.remove('active');
         dragState.dropTargetStack = targetStack;
         dragState.dropTargetBeforeColumn = beforeColumn;
         return;
@@ -418,7 +409,7 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             insertionY = draggedRect.bottom + 5;
         } else {
             // Empty stack
-            indicator.style.display = 'none';
+            indicator.classList.remove('active');
             dragState.dropTargetStack = targetStack;
             dragState.dropTargetBeforeColumn = beforeColumn;
             return;
@@ -441,12 +432,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
     }
 
     // Show horizontal indicator for column stacking
-    indicator.style.position = 'fixed';
     indicator.style.left = (stackLeft + 10) + 'px';
     indicator.style.width = (stackWidth - 20) + 'px';
     indicator.style.top = insertionY + 'px';
-    indicator.style.height = '3px';
-    indicator.style.display = 'block';
     indicator.classList.add('active');
 
     // CRITICAL: Always store drop target!
@@ -473,7 +461,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 function hideInternalDropIndicator() {
     if (internalDropIndicator) {
         internalDropIndicator.classList.remove('active');
-        internalDropIndicator.style.display = 'none';
     }
 
     // Clear stored drop targets
@@ -3471,7 +3458,6 @@ function setupColumnDragAndDrop() {
                 // Hide the visual indicator - it will be shown again only if valid target found
                 if (internalDropIndicator) {
                     internalDropIndicator.classList.remove('active');
-                    internalDropIndicator.style.display = 'none';
                 }
             }
 

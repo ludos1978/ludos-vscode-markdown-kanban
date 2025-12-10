@@ -993,7 +993,7 @@ window.handleEmptyColumnDragEnd = function(e) {
     // Hide any internal drop indicator
     const indicator = document.querySelector('.internal-drop-indicator');
     if (indicator) {
-        indicator.style.display = 'none';
+        indicator.classList.remove('active');
     }
 };
 
@@ -1088,7 +1088,7 @@ window.handleTemplateMenuDragEnd = function(e) {
     // Hide any internal drop indicator
     const indicator = document.querySelector('.internal-drop-indicator');
     if (indicator) {
-        indicator.style.display = 'none';
+        indicator.classList.remove('active');
     }
 };
 
