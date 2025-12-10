@@ -1319,8 +1319,70 @@ async function processPlantUMLQueue() {
 // ============================================================================
 
 // Initialize Mermaid (browser-based, pure JavaScript)
+// Mermaid is lazy-loaded only when a mermaid block is first encountered
 let mermaidReady = false;
 let mermaidInitialized = false;
+let mermaidLoading = false;
+let mermaidLoadCallbacks = [];
+
+const MERMAID_CDN_URL = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+
+/**
+ * Lazy-load Mermaid library from CDN
+ * @returns {Promise<void>} Resolves when Mermaid is loaded and initialized
+ */
+function loadMermaidLibrary() {
+    return new Promise((resolve, reject) => {
+        // Already loaded and ready
+        if (mermaidReady) {
+            resolve();
+            return;
+        }
+
+        // Already loading - queue the callback
+        if (mermaidLoading) {
+            mermaidLoadCallbacks.push({ resolve, reject });
+            return;
+        }
+
+        // Check if already loaded via script tag (backwards compatibility)
+        if (typeof mermaid !== 'undefined') {
+            initializeMermaid();
+            resolve();
+            return;
+        }
+
+        // Start loading
+        mermaidLoading = true;
+        console.log('[Mermaid] Lazy-loading library from CDN...');
+        const startTime = performance.now();
+
+        const script = document.createElement('script');
+        script.src = MERMAID_CDN_URL;
+        script.async = true;
+
+        script.onload = () => {
+            console.log(`[Mermaid] Library loaded in ${(performance.now() - startTime).toFixed(0)}ms`);
+            initializeMermaid();
+            mermaidLoading = false;
+            resolve();
+            // Resolve all queued callbacks
+            mermaidLoadCallbacks.forEach(cb => cb.resolve());
+            mermaidLoadCallbacks = [];
+        };
+
+        script.onerror = (error) => {
+            console.error('[Mermaid] Failed to load library:', error);
+            mermaidLoading = false;
+            reject(new Error('Failed to load Mermaid library'));
+            // Reject all queued callbacks
+            mermaidLoadCallbacks.forEach(cb => cb.reject(error));
+            mermaidLoadCallbacks = [];
+        };
+
+        document.head.appendChild(script);
+    });
+}
 
 function initializeMermaid() {
     if (mermaidInitialized) {
@@ -1341,17 +1403,13 @@ function initializeMermaid() {
         });
         mermaidReady = true;
         mermaidInitialized = true;
+        console.log('[Mermaid] Initialized successfully');
     } catch (error) {
         console.error('[Mermaid] Initialization error:', error);
     }
 }
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeMermaid);
-} else {
-    initializeMermaid();
-}
+// Don't initialize on load - wait for first mermaid block to be encountered
 
 // Queue for pending Mermaid diagrams
 const pendingMermaidQueue = [];
@@ -1384,6 +1442,11 @@ async function renderMermaid(code) {
         return mermaidRenderCache.get(code);
     }
 
+    // Lazy-load Mermaid if not ready
+    if (!mermaidReady) {
+        await loadMermaidLibrary();
+    }
+
     if (!mermaidReady) {
         throw new Error('Mermaid not initialized');
     }
@@ -1393,7 +1456,6 @@ async function renderMermaid(code) {
 
         // Use mermaid.render() to generate SVG
         const { svg } = await mermaid.render(diagramId, code);
-
 
         // Cache the result
         mermaidRenderCache.set(code, svg);
@@ -1610,6 +1672,10 @@ function renderMarkdown(text, includeContext) {
             }
             return originalSrc;
         }
+
+        // Capture original renderers before overriding
+        const originalVideoRenderer = md.renderer.rules.video;
+        const originalAudioRenderer = md.renderer.rules.audio;
 
         md.renderer.rules.video = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];

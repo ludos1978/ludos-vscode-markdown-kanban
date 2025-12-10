@@ -1,4 +1,5 @@
-- [ ] analyze what code design tempaltes would make sense to use in this project. analyze the high level requirements of the code and do a deep analysis of the current state and a optimal state would it have been done by an team of experts in software architecture that both make sure it's strucutred well, but also not overcomplicated!
+- [ ] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!
+
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
@@ -52,6 +53,7 @@ A column can have multiple query tags:
 
 Collects all cards that didn't match any gather rule:
 
+- [x] analyze what code design tempaltes would make sense to use in this project. analyze the high level requirements of the code and do a deep analysis of the current state and a optimal state would it have been done by an team of experts in software architecture that both make sure it's strucutred well, but also not overcomplicated!
 
 - [x] can we highlight the lines where tags are within the task description as well? also 
 work with the inheritance system we use. for that we should also support minutes. \
