@@ -1605,13 +1605,8 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
-    const renderStart = performance.now();
-    console.log('[PERF] renderBoard started - call stack:', new Error().stack.split('\n').slice(1, 5).join(' <- '));
-
     // Apply tag styles first
-    const tagStylesStart = performance.now();
     applyTagStyles();
-    console.log(`[PERF] applyTagStyles: ${(performance.now() - tagStylesStart).toFixed(1)}ms`);
 
     // Check if we're currently editing - if so, skip the render
     if (window.taskEditor && window.taskEditor.currentEditor) {
@@ -1818,9 +1813,6 @@ function renderBoard(options = null) {
     });
 
     // Create row containers in order
-    const createColumnsStart = performance.now();
-    let totalColumnCreationTime = 0;
-    let columnCount = 0;
     for (let row = 1; row <= numRows; row++) {
             const rowContainer = document.createElement('div');
             rowContainer.className = 'kanban-row';
@@ -1838,10 +1830,7 @@ function renderBoard(options = null) {
 
             // Process columns in the order they appear in the board data
             columnsByRow[row].forEach(({ column, index }) => {
-                const colStart = performance.now();
                 const columnElement = createColumnElement(column, index);
-                totalColumnCreationTime += performance.now() - colStart;
-                columnCount++;
                 const isStacked = /#stack\b/i.test(column.title);
 
                 if (isStacked && lastColumnElement) {
@@ -1889,10 +1878,7 @@ function renderBoard(options = null) {
         }
 
     // Append all rows at once to minimize reflows
-    console.log(`[PERF] createColumnElement (${columnCount} columns): ${totalColumnCreationTime.toFixed(1)}ms (avg: ${(totalColumnCreationTime/columnCount).toFixed(1)}ms/column)`);
-    const appendStart = performance.now();
     boardElement.appendChild(fragment);
-    console.log(`[PERF] appendChild fragment: ${(performance.now() - appendStart).toFixed(1)}ms`);
 
     // Apply folding states after rendering
     setTimeout(() => {
@@ -1926,26 +1912,20 @@ function renderBoard(options = null) {
         }
     }, 10);
 
-    const dragDropStart = performance.now();
     setupDragAndDrop();
-    console.log(`[PERF] setupDragAndDrop: ${(performance.now() - dragDropStart).toFixed(1)}ms`);
 
     // Initialize all task elements after full board render
     // This ensures drag handlers, edit handlers, and visual elements are properly set up
-    const initTasksStart = performance.now();
     const taskItems = boardElement.querySelectorAll('.task-item');
     taskItems.forEach(taskElement => {
         initializeTaskElement(taskElement);
     });
-    console.log(`[PERF] initializeTaskElement (${taskItems.length} tasks): ${(performance.now() - initTasksStart).toFixed(1)}ms`);
 
     // Inject header/footer bars after DOM is rendered
     // This adds the actual bar elements to the DOM
-    const injectBarsStart = performance.now();
     if (typeof injectStackableBars === 'function') {
         injectStackableBars();
     }
-    console.log(`[PERF] injectStackableBars: ${(performance.now() - injectBarsStart).toFixed(1)}ms`);
 
     // Apply stacked column styles AFTER bars are injected
     // Use setTimeout to ensure this happens after any rapid re-renders complete
@@ -1997,8 +1977,6 @@ function renderBoard(options = null) {
             }
         });
     }, 20);
-
-    console.log(`[PERF] renderBoard total (sync): ${(performance.now() - renderStart).toFixed(1)}ms`);
 
     // Setup compact view detection for ALL columns
     // DISABLED: Causes severe performance issues with expensive scroll handlers
@@ -2393,11 +2371,6 @@ function getTaskEditContent(task) {
     // Don't reconstruct - just return description directly!
     const content = task.description || '';
 
-    // DEBUG: Log newline count
-    // const newlineCount = (content.match(/\n/g) || []).length;
-    // console.log(`[getTaskEditContent] Task ${task.id}: ${content.length} chars, ${newlineCount} newlines`);
-    // console.log(`[getTaskEditContent] includeContext:`, task.includeContext ? 'YES' : 'NO');
-
     return content;
 }
 
@@ -2443,8 +2416,6 @@ function createTaskElement(task, columnId, taskIndex) {
     // Check if task has no meaningful title
     const hasNoTitle = !task.title || !task.title.trim();
 
-    // DEBUG: Log ALL tasks to see what's happening
-
     // Generate alternative title when task is folded and has no title
     let renderedTitle;
     if (hasNoTitle && isCollapsed && task.description) {
@@ -2456,8 +2427,6 @@ function createTaskElement(task, columnId, taskIndex) {
             renderedTitle = '';
         }
     } else {
-        if (hasNoTitle && isCollapsed) {
-        }
         // Normal title rendering
         renderedTitle = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) :
             ((task.displayTitle || (task.title ? window.filterTagsFromText(task.title) : '')) &&
@@ -2465,9 +2434,6 @@ function createTaskElement(task, columnId, taskIndex) {
              (task.displayTitle || task.title).trim()) ?
             renderMarkdown(task.displayTitle || task.title, task.includeContext) : '';
     }
-
-    // For editing, always use the full title including include syntax
-    const editTitle = task.title || '';
 
     // Extract ALL tags for stacking features (from the full title)
     const allTags = getActiveTagsInTitle(task.title);
@@ -2724,33 +2690,20 @@ function toggleColumnCollapse(columnId, event) {
     const isCurrentlyCollapsed = column.classList.contains('collapsed-vertical') ||
                                   column.classList.contains('collapsed-horizontal');
 
-    // Determine if column is in a stack (has #stack tag or next column has #stack tag)
-    const columnData = window.cachedBoard?.columns.find(c => c.id === columnId);
-    const columnIndex = window.cachedBoard?.columns.findIndex(c => c.id === columnId);
-    const nextColumn = columnIndex >= 0 ? window.cachedBoard?.columns[columnIndex + 1] : null;
-    const isInStack = columnData?.tags?.includes('stack') || nextColumn?.tags?.includes('stack');
-
-    // Determine default fold mode based on number of columns in stack
+    // Determine default fold mode based on whether column is in a multi-column stack
+    // Use DOM check (same as getDefaultFoldMode) for immediate, accurate detection
     let defaultFoldMode = 'vertical'; // Default for non-stacked columns
     let forceHorizontal = false; // Flag to enforce horizontal folding in multi-column stacks
 
-    if (isInStack) {
-        // Get the actual stack container this column is in
-        const stackElement = column ? column.closest('.kanban-column-stack') : null;
-        if (stackElement) {
-            const columnsInStack = stackElement.querySelectorAll('.kanban-full-height-column').length;
-            // Multiple columns in stack: ONLY allow horizontal folding
-            if (columnsInStack > 1) {
-                defaultFoldMode = 'horizontal';
-                forceHorizontal = true;
-            } else {
-                // Single column in stack: vertical is allowed
-                defaultFoldMode = 'vertical';
-            }
-        } else {
-            // Fallback: if no stack element found, use horizontal for safety
+    const stackElement = column.closest('.kanban-column-stack');
+    if (stackElement) {
+        const columnsInStack = stackElement.querySelectorAll('.kanban-full-height-column').length;
+        // Multiple columns in stack: ONLY allow horizontal folding
+        if (columnsInStack > 1) {
             defaultFoldMode = 'horizontal';
+            forceHorizontal = true;
         }
+        // Single column in stack: vertical is allowed (defaultFoldMode stays 'vertical')
     }
 
     if (isCurrentlyCollapsed) {
@@ -2867,7 +2820,6 @@ function reorganizeStacksForColumn(columnId) {
     const column = window.cachedBoard.columns.find(c => c.id === columnId);
     if (!column) return false;
 
-    const columnIndex = window.cachedBoard.columns.indexOf(column);
     const rowContainer = columnElement.closest('.kanban-row');
     if (!rowContainer) return false;
 
@@ -3407,7 +3359,6 @@ function recalculateStackHeightsImmediate(stackElement = null) {
                 // - If data-column-sticky="false" (no #sticky tag) → behave like old "none" mode (nothing sticky)
                 // - If data-column-sticky="true" (#sticky tag) → use global sticky stack mode (full or titleonly)
                 const isFullMode = isColumnSticky && globalStickyMode === 'full';
-                const isTitleOnlyMode = isColumnSticky && globalStickyMode === 'titleonly';
                 const isNoneMode = !isColumnSticky; // Column has no #sticky tag
 
                 // Margin comes first in HTML
@@ -3495,7 +3446,7 @@ function recalculateStackHeightsImmediate(stackElement = null) {
             // This ensures all style changes happen in a single rendering frame
             requestAnimationFrame(() => {
                 // Apply all calculated positions
-                positions.forEach(({ col, index, columnHeader, header, footer, columnHeaderHeight, headerHeight, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, marginHeight, isVerticallyFolded, isHorizontallyFolded, isColumnSticky, effectiveMode }) => {
+                positions.forEach(({ col, columnHeader, header, footer, marginTop, columnHeaderTop, headerTop, footerTop, marginBottom, columnHeaderBottom, headerBottom, footerBottom, contentPadding, zIndex, isColumnSticky }) => {
                 // Recalculate mode flags from stored values
                 const isFullMode = isColumnSticky && globalStickyMode === 'full';
                 const isNoneMode = !isColumnSticky;
@@ -3628,28 +3579,22 @@ function setupStackedColumnScrollHandler(columnsData) {
         if (!window.stackedColumnsData) return;
 
         const scrollY = window.scrollY || window.pageYOffset;
-        const viewportHeight = window.innerHeight;
-        const viewportBottom = scrollY + viewportHeight;
         const viewportTop = scrollY;
 
-        window.stackedColumnsData.forEach(({ col, headerHeight, footerHeight, totalHeight }, idx) => {
+        window.stackedColumnsData.forEach(({ col, headerHeight }) => {
             const header = col.querySelector('.column-title');
             const footer = col.querySelector('.column-footer');
-            const columnInner = col.querySelector('.column-inner');
 
             if (!header || !footer) return;
 
             const headerBottom = parseFloat(col.dataset.headerBottom || 0);
             const footerBottom = parseFloat(col.dataset.footerBottom || 0);
             const zIndex = parseInt(col.dataset.zIndex || 100);
-            const colIndex = col.dataset.columnIndex;
 
             const rect = col.getBoundingClientRect();
-            const columnInnerPadding = columnInner ? parseFloat(window.getComputedStyle(columnInner).paddingTop) : 0;
 
             // Check if content area (between title bottom and footer top) is still within viewport
             // Use stored absolute positions from when layout was calculated
-            const contentAreaTop = parseFloat(col.dataset.contentAreaTop || 0);
             const contentAreaBottom = parseFloat(col.dataset.contentAreaBottom || 0);
             const contentStillInView = contentAreaBottom >= viewportTop;
 
@@ -3687,30 +3632,8 @@ function setupStackedColumnScrollHandler(columnsData) {
                 footer.style.zIndex = zIndex;
             }
 
-            // Compact view - detect column-inner visibility and apply scale
-            if (columnInner) {
-                const innerRect = columnInner.getBoundingClientRect();
-                const innerTop = innerRect.top;
-                const innerBottom = innerRect.bottom;
-                const innerHeight = innerRect.height;
-
-                // Calculate how much of column-inner is visible in viewport
-                const visibleTop = Math.max(innerTop, viewportTop);
-                const visibleBottom = Math.min(innerBottom, viewportBottom);
-                const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-                const visibilityRatio = innerHeight > 0 ? visibleHeight / innerHeight : 1;
-
-                // Get threshold from CSS variable
-                const threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--compact-visibility-threshold')) || 0.3;
-
-                // Apply compact-view class when less than threshold is visible
-                // DISABLED
-                // if (visibilityRatio < threshold && innerHeight > 0) {
-                //     col.classList.add('compact-view');
-                // } else {
-                //     col.classList.remove('compact-view');
-                // }
-            }
+            // Compact-view feature disabled due to performance issues
+            // See tmp/CLEANUP-2-DEFERRED-ISSUES.md #3 for replacement with IntersectionObserver
         });
 
         ticking = false;
@@ -4351,18 +4274,16 @@ function generateTagStyles() {
     }
     
     // Function to process tags from either grouped or flat structure
-    const processTags = (tags, groupName = null) => {
+    const processTags = (tags) => {
         for (const [tagName, config] of Object.entries(tags)) {
             // Skip the default configuration
             if (tagName === 'default') {continue;}
-            
+
             // Skip if this is a group (has nested objects with light/dark themes)
             if (config.light || config.dark) {
                 const themeColors = config[themeKey] || config.light || {};
                 const lowerTagName = tagName.toLowerCase();
-                const escapedTagName = escapeCSSAttributeValue(lowerTagName);
                 // For attribute selectors: Use unescaped tag name (quoted values are literal)
-                // For class names: Use escaped tag name (special chars must be escaped in identifiers)
                 const attrTagName = lowerTagName;  // Use this in [data-tag="..."]
 
                 // Tag pill styles (the tag text itself) - only if background is configured
@@ -4712,7 +4633,7 @@ function generateTagStyles() {
         ];
         groups.forEach(groupName => {
             if (window.tagColors[groupName]) {
-                processTags(window.tagColors[groupName], groupName);
+                processTags(window.tagColors[groupName]);
             }
         });
     } else {
@@ -4736,7 +4657,7 @@ function injectStackableBars(targetElement = null) {
         elementsToProcess = document.querySelectorAll('[data-all-tags]');
     }
 
-    elementsToProcess.forEach((element, idx) => {
+    elementsToProcess.forEach((element) => {
         // Safety check - skip null elements
         if (!element || !element.classList) return;
 
@@ -4744,7 +4665,6 @@ function injectStackableBars(targetElement = null) {
         let tags = allTagsAttr ? allTagsAttr.split(' ').filter(tag => tag.trim()) : [];
         const isColumn = element.classList.contains('kanban-full-height-column');
         const isCollapsed = isColumn && isColumnCollapsed(element);
-        const isStacked = isColumn && element.closest('.kanban-column-stack');
 
         // Update background and border tag attributes based on title tags
         // Get the element's title to check which tags have background/border properties

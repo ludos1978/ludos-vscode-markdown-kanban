@@ -919,13 +919,10 @@ export class MessageHandler {
      */
     async getAllShortcuts(): Promise<Record<string, string>> {
         const shortcutMap: Record<string, string> = {};
-        const startTime = Date.now();
 
         try {
             // 1. Load user keybindings first (lowest priority)
-            const keybindingsStart = Date.now();
             const keybindings = await this.loadVSCodeKeybindings();
-            console.log(`[PERF] loadVSCodeKeybindings: ${Date.now() - keybindingsStart}ms`);
 
             // Build shortcut map from user keybindings
             // Include ALL commands (including snippets - they're handled by handleVSCodeSnippet)
@@ -941,16 +938,13 @@ export class MessageHandler {
             }
 
             // 2. Add VSCode default shortcuts (highest priority - overrides user keybindings)
-            const extShortcutsStart = Date.now();
             const extensionShortcuts = await this.getExtensionShortcuts();
-            console.log(`[PERF] getExtensionShortcuts: ${Date.now() - extShortcutsStart}ms`);
             Object.assign(shortcutMap, extensionShortcuts);
 
         } catch (error) {
             console.error('[MessageHandler] Failed to load shortcuts:', error);
         }
 
-        console.log(`[PERF] getAllShortcuts total: ${Date.now() - startTime}ms`);
         return shortcutMap;
     }
 
@@ -992,14 +986,10 @@ export class MessageHandler {
         };
 
         // Verify commands actually exist (use cached commands list for performance)
-        const getCommandsStart = Date.now();
         const now = Date.now();
         if (!this._cachedCommands || (now - this._cachedCommandsTimestamp) > MessageHandler.COMMANDS_CACHE_TTL) {
             this._cachedCommands = await vscode.commands.getCommands();
             this._cachedCommandsTimestamp = now;
-            console.log(`[PERF] vscode.commands.getCommands (fresh): ${Date.now() - getCommandsStart}ms (${this._cachedCommands.length} commands)`);
-        } else {
-            console.log(`[PERF] vscode.commands.getCommands (cached): ${Date.now() - getCommandsStart}ms`);
         }
         const allCommands = this._cachedCommands;
         const validShortcuts: Record<string, string> = {};

@@ -996,9 +996,7 @@ export class KanbanWebviewPanel {
 
         // Update webview permissions to include asset directories
         // This ensures the webview can access images from include file directories
-        const permStart = Date.now();
         this._updateWebviewPermissionsForAssets();
-        console.log(`[PERF] _updateWebviewPermissionsForAssets: ${Date.now() - permStart}ms`);
 
         // Get version from package.json
         const packageJson = require('../package.json');
@@ -1007,20 +1005,16 @@ export class KanbanWebviewPanel {
         // Send boardUpdate with includeContext for dynamic image path resolution
         // The board now contains includeContext in tasks from include files,
         // which the frontend will use to dynamically resolve relative image paths
-        const sendStart = Date.now();
         this._sendBoardUpdate(board, {
             isFullRefresh,
             applyDefaultFolding,
             version
         });
-        console.log(`[PERF] _sendBoardUpdate: ${Date.now() - sendStart}ms`);
 
         // REFRESH ALL CONFIGURATION after sending board
         // This loads shortcuts, tag settings, layout settings, etc.
         // Must happen AFTER boardUpdate to prevent premature renders with empty mappings
-        const configStart = Date.now();
         await this._refreshAllViewConfiguration();
-        console.log(`[PERF] _refreshAllViewConfiguration: ${Date.now() - configStart}ms`);
 
         // Send include file contents immediately after board update
         // WebviewBridge batching handles message ordering
@@ -2227,9 +2221,7 @@ export class KanbanWebviewPanel {
 
         try {
             // 1. Load keyboard shortcuts
-            const shortcutsStart = Date.now();
             await this._sendShortcutsToWebview();
-            console.log(`[PERF] _sendShortcutsToWebview: ${Date.now() - shortcutsStart}ms`);
 
             // 2. Load all workspace settings and send to webview
             const config = {

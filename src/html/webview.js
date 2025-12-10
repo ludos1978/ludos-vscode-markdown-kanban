@@ -2613,8 +2613,6 @@ window.addEventListener('message', event => {
             }
             break;
         case 'boardUpdate':
-            const boardUpdateStart = performance.now();
-            console.log('[PERF] boardUpdate message received');
             const previousBoard = window.cachedBoard;
 
             // Clear card focus when board is updated
@@ -2936,10 +2934,7 @@ window.addEventListener('message', event => {
                         applyDefaultFoldingToNewDocument();
                     }, 100); // Wait for render to complete
                 }
-            } else if (shouldSkipRender) {
-            } else {
             }
-            console.log(`[PERF] boardUpdate total: ${(performance.now() - boardUpdateStart).toFixed(1)}ms`);
             break;
         case 'updateFileInfo':
             const previousDocumentPath = currentFileInfo?.documentPath;
