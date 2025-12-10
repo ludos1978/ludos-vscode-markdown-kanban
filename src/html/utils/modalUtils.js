@@ -105,6 +105,7 @@ class ModalUtils {
 
     /**
      * Create and show a custom confirmation modal
+     * CSS styles are in webview.css under "Custom Modal Dialogs" section
      * @param {string} title - Modal title
      * @param {string} message - Modal message
      * @param {Array} buttons - Array of button objects {text, action, primary, variant}
@@ -117,82 +118,41 @@ class ModalUtils {
             className = 'custom-modal'
         } = options;
 
-        // Create modal overlay
+        // Create modal overlay - styles in webview.css
         const modal = document.createElement('div');
         modal.className = `modal ${className}`;
-        modal.style.cssText = `
-            display: flex;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
 
-        // Create dialog
+        // Create dialog - styles in webview.css
         const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            background: var(--vscode-dropdown-background);
-            border: 1px solid var(--vscode-dropdown-border);
-            border-radius: 8px;
-            padding: 20px;
-            max-width: ${maxWidth};
-            min-width: 280px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        `;
+        dialog.className = 'modal-dialog';
+        if (maxWidth !== '400px') {
+            dialog.style.maxWidth = maxWidth;
+        }
 
         // Create content
         const titleElement = document.createElement('h3');
+        titleElement.className = 'modal-dialog-title';
         titleElement.textContent = title;
-        titleElement.style.cssText = `
-            margin: 0 0 15px 0;
-            color: var(--vscode-foreground);
-            font-size: 16px;
-        `;
 
         const messageElement = document.createElement('p');
+        messageElement.className = 'modal-dialog-message';
         messageElement.textContent = message;
-        messageElement.style.cssText = `
-            margin: 0 0 20px 0;
-            color: var(--vscode-descriptionForeground);
-            line-height: 1.4;
-        `;
 
         // Create button container
         const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = `
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        `;
+        buttonContainer.className = 'modal-dialog-buttons';
 
         // Create buttons
-        buttons.forEach((buttonConfig, index) => {
+        buttons.forEach((buttonConfig) => {
             const button = document.createElement('button');
+            button.className = 'modal-dialog-btn';
             button.textContent = buttonConfig.text;
-            button.style.cssText = `
-                padding: 8px 16px;
-                border: 1px solid var(--vscode-button-border);
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: all 0.2s;
-            `;
 
-            // Apply button variant styles
+            // Apply button variant via class
             if (buttonConfig.primary || buttonConfig.variant === 'primary') {
-                button.style.background = 'var(--vscode-button-background)';
-                button.style.color = 'var(--vscode-button-foreground)';
+                button.classList.add('primary');
             } else if (buttonConfig.variant === 'danger') {
-                button.style.background = 'var(--vscode-errorForeground)';
-                button.style.color = 'var(--vscode-button-foreground)';
-            } else {
-                button.style.background = 'var(--vscode-button-secondaryBackground)';
-                button.style.color = 'var(--vscode-button-secondaryForeground)';
+                button.classList.add('danger');
             }
 
             // Add click handler
@@ -297,56 +257,27 @@ class ModalUtils {
 
     /**
      * Show a loading modal
+     * CSS styles are in webview.css under "Custom Modal Dialogs" section
      * @param {string} message - Loading message
      * @returns {HTMLElement} Modal element for later closing
      */
     showLoading(message = 'Loading...') {
         const modal = document.createElement('div');
         modal.className = 'modal loading-modal';
-        modal.style.cssText = `
-            display: flex;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+
+        const spinnerContainer = document.createElement('div');
+        spinnerContainer.className = 'loading-spinner';
 
         const spinner = document.createElement('div');
-        spinner.style.cssText = `
-            background: var(--vscode-dropdown-background);
-            border: 1px solid var(--vscode-dropdown-border);
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            color: var(--vscode-foreground);
-        `;
+        spinner.className = 'spinner';
 
-        spinner.innerHTML = `
-            <div style="
-                width: 20px;
-                height: 20px;
-                border: 2px solid var(--vscode-progressBar-background);
-                border-top: 2px solid var(--vscode-progressBar-foreground);
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-            "></div>
-            <span>${message}</span>
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            </style>
-        `;
+        const text = document.createElement('span');
+        text.textContent = message;
 
-        modal.appendChild(spinner);
+        spinnerContainer.appendChild(spinner);
+        spinnerContainer.appendChild(text);
+        modal.appendChild(spinnerContainer);
+
         document.body.appendChild(modal);
         this.activeModals.add(modal);
 

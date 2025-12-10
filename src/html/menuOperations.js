@@ -298,15 +298,8 @@ class SimpleMenuManager {
         // Create content based on submenu type
         submenu.innerHTML = this.createSubmenuContent(menuItem, id, type, columnId);
 
-        // Style and position of tag submenus
-        submenu.style.cssText = `
-            position: fixed;
-            z-index: 2147483647;
-            pointer-events: all;
-            visibility: hidden;
-            display: flex;
-						flex-wrap: wrap;
-        `;
+        // Base styles from CSS class - positioning is done later
+        submenu.classList.add('donut-submenu');
 
         // Append to body to escape any stacking contexts
         document.body.appendChild(submenu);
@@ -642,26 +635,23 @@ class SimpleMenuManager {
         const rect = menuItem.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
-        
-        // Store original display state
-        const originalDisplay = submenu.style.display;
-        const originalVisibility = submenu.style.visibility;
-        
-        // Get submenu dimensions by temporarily showing it
-        submenu.style.visibility = 'hidden';
-        submenu.style.display = 'flex';
+
+        // Ensure submenu is hidden but measurable (CSS class has visibility:hidden, display:flex)
+        submenu.classList.remove('visible');
+
+        // Get submenu dimensions
         const submenuRect = submenu.getBoundingClientRect();
         const submenuWidth = submenuRect.width || 250;
         const submenuHeight = submenuRect.height || 300;
-        
+
         // Calculate horizontal position
         let left = rect.right - 1; // 1px overlap for easy mouse movement
-        
+
         // If submenu goes off right edge, position to the left of menu item
         if (left + submenuWidth > viewportWidth - 10) {
             left = rect.left - submenuWidth + 1; // 1px overlap on left side
         }
-        
+
         // Final horizontal boundary check
         if (left < 10) {
             left = 10;
@@ -669,27 +659,26 @@ class SimpleMenuManager {
         if (left + submenuWidth > viewportWidth - 10) {
             left = viewportWidth - submenuWidth - 10;
         }
-        
+
         // Calculate vertical position
         let top = rect.top; // Align with menu item top
-        
+
         // If submenu goes off bottom edge, move it up
         if (top + submenuHeight > viewportHeight - 10) {
             top = viewportHeight - submenuHeight - 10;
         }
-        
+
         // If still off top edge (very tall submenu), align with viewport top
         if (top < 10) {
             top = 10;
         }
-        
+
         // Apply final positioning
         submenu.style.left = left + 'px';
         submenu.style.top = top + 'px';
-        
-        // Restore visibility (but keep display as flex)
-        submenu.style.visibility = 'visible';
-        // Note: We keep display as 'flex' since that's what the submenu should be when shown
+
+        // Show submenu via CSS class
+        submenu.classList.add('visible');
     }
 
     // Timeout management
@@ -3180,9 +3169,9 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
     // Visual confirmation that tag was applied
     if (isActive) {
         // Add temporary visual flash to show tag was applied
-        columnElement.style.boxShadow = '0 0 8px rgba(0, 255, 0, 0.5)';
+        columnElement.classList.add('tag-applied-flash');
         setTimeout(() => {
-            columnElement.style.boxShadow = '';
+            columnElement.classList.remove('tag-applied-flash');
         }, 300);
     }
     
@@ -3291,9 +3280,9 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
     // Visual confirmation that tag was applied
     if (isActive) {
         // Add temporary visual flash to show tag was applied
-        taskElement.style.boxShadow = '0 0 8px rgba(0, 255, 0, 0.5)';
+        taskElement.classList.add('tag-applied-flash');
         setTimeout(() => {
-            taskElement.style.boxShadow = '';
+            taskElement.classList.remove('tag-applied-flash');
         }, 300);
     }
     
@@ -4102,21 +4091,21 @@ function updateTagCategoryCounts(id, type, columnId = null) {
                     ).length;
                     
                     // Update or create count badge
-                    let countBadge = menuItem.querySelector('span:last-child');
+                    let countBadge = menuItem.querySelector('.menu-count-badge');
                     if (activeCount > 0) {
-                        if (countBadge && countBadge.style.opacity) {
+                        if (countBadge) {
                             // Update existing badge
                             countBadge.textContent = activeCount;
                         } else {
                             // Create new badge
                             const badge = document.createElement('span');
-                            badge.style.cssText = 'opacity: 0.7; margin-left: auto; padding-left: 10px;';
+                            badge.className = 'menu-count-badge';
                             badge.textContent = activeCount;
                             menuItem.appendChild(badge);
                         }
                     } else {
                         // Remove badge if count is 0
-                        if (countBadge && countBadge.style.opacity) {
+                        if (countBadge) {
                             countBadge.remove();
                         }
                     }
@@ -4133,18 +4122,18 @@ function updateTagCategoryCounts(id, type, columnId = null) {
             activeTags.includes(tag.toLowerCase())
         ).length;
         
-        let customCountBadge = customMenuItem.querySelector('span:last-child');
+        let customCountBadge = customMenuItem.querySelector('.menu-count-badge');
         if (activeCustomCount > 0) {
-            if (customCountBadge && customCountBadge.style.opacity) {
+            if (customCountBadge) {
                 customCountBadge.textContent = activeCustomCount;
             } else {
                 const badge = document.createElement('span');
-                badge.style.cssText = 'opacity: 0.7; margin-left: auto; padding-left: 10px;';
+                badge.className = 'menu-count-badge';
                 badge.textContent = activeCustomCount;
                 customMenuItem.appendChild(badge);
             }
         } else {
-            if (customCountBadge && customCountBadge.style.opacity) {
+            if (customCountBadge) {
                 customCountBadge.remove();
             }
         }

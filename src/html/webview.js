@@ -177,48 +177,8 @@ async function handleMermaidConvert(button) {
 // Font size configuration
 const fontSizeMultipliers = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
 
-// Generate font size CSS dynamically
-function generateFontSizeCSS() {
-    let css = '';
-    fontSizeMultipliers.forEach(multiplier => {
-        const safeName = multiplier.toString().replace('.', '_');
-        const className = `font-size-${safeName}x`;
-        const titleSize = `calc(var(--vscode-font-size, 14px) * ${multiplier})`;
-        const descSize = `calc(var(--vscode-font-size, 14px) * ${multiplier * 0.9})`;
-        const lineHeight = multiplier >= 2 ? '1.1' : (multiplier >= 1.5 ? '1.2' : '1.4');
-
-        css += `
-/* Font Size Classes - ${multiplier}x */
-body.${className} .column-title,
-body.${className} .column-title-edit,
-body.${className} .task-title-display,
-body.${className} .task-title-edit {
-  font-size: ${titleSize} !important;
-  line-height: ${lineHeight} !important;
-}
-
-body.${className} .task-description-display,
-body.${className} .task-description-edit {
-  font-size: ${descSize} !important;
-  line-height: ${lineHeight === '1.1' ? '1.15' : (lineHeight === '1.2' ? '1.3' : '1.4')} !important;
-}
-`;
-    });
-    return css;
-}
-
-// Inject font size CSS into document
-function injectFontSizeCSS() {
-    const existingStyle = document.getElementById('dynamic-font-sizes');
-    if (existingStyle) {
-        existingStyle.remove();
-    }
-
-    const style = document.createElement('style');
-    style.id = 'dynamic-font-sizes';
-    style.textContent = generateFontSizeCSS();
-    document.head.appendChild(style);
-}
+// Font size CSS classes are now pre-defined in webview.css
+// See "Pre-generated Font Size Classes" section
 
 // Base configuration options - single source of truth for all menu items and CSS values
 // This is the ONLY place where option values and their CSS conversions are defined
@@ -5014,10 +4974,7 @@ function initializeVideoLazyLoading() {
 
 // Initialize font size on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Set default font size to small (maintaining current behavior)
-    // Inject dynamic CSS for font sizes
-    injectFontSizeCSS();
-
+    // Set default font size (CSS classes are pre-defined in webview.css)
     setFontSize('1_0x');
 
     // Initialize video lazy loading for better performance with many videos

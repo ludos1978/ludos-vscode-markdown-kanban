@@ -5660,6 +5660,180 @@ figcaption {
     opacity: 0.8;
 }
 
+/* ============================================================================
+   Activity Indicators - Progress notifications for long-running operations
+   ============================================================================ */
+
+#activity-indicators {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 280px;
+}
+
+.activity-indicator {
+  background: var(--vscode-notifications-background);
+  border: 1px solid var(--vscode-notifications-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--vscode-notifications-foreground);
+  font-size: calc(var(--vscode-font-size, 13px) - 1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+  border-left: 3px solid var(--vscode-progressBar-foreground);
+}
+
+.activity-indicator.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.activity-indicator .activity-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-indicator .activity-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--vscode-progressBar-background);
+  border-top: 2px solid var(--vscode-progressBar-foreground);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.activity-indicator .activity-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.activity-indicator .progress-container {
+  height: 4px;
+  background: var(--vscode-progressBar-background);
+  border-radius: 2px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.activity-indicator .progress-container.visible {
+  opacity: 1;
+}
+
+.activity-indicator .progress-bar {
+  height: 100%;
+  background: var(--vscode-progressBar-foreground);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+/* ============================================================================
+   Custom Modal Dialogs - Used by modalUtils.js
+   ============================================================================ */
+
+.modal.custom-modal,
+.modal.loading-modal {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal.loading-modal {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-modal .modal-dialog {
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 400px;
+  min-width: 280px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.custom-modal .modal-dialog-title {
+  margin: 0 0 15px 0;
+  color: var(--vscode-foreground);
+  font-size: 16px;
+}
+
+.custom-modal .modal-dialog-message {
+  margin: 0 0 20px 0;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.4;
+}
+
+.custom-modal .modal-dialog-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.custom-modal .modal-dialog-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--vscode-button-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.custom-modal .modal-dialog-btn.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.custom-modal .modal-dialog-btn.danger {
+  background: var(--vscode-errorForeground);
+  color: var(--vscode-button-foreground);
+}
+
+.loading-modal .loading-spinner {
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--vscode-foreground);
+}
+
+.loading-modal .loading-spinner .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--vscode-progressBar-background);
+  border-top: 2px solid var(--vscode-progressBar-foreground);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 .column-loading {
     position: relative;
 }
@@ -7354,4 +7528,199 @@ figcaption {
 
 .template-dialog-submit:hover {
   background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* ============================================================================
+   Tag Applied Flash Animation
+   Used for visual feedback when a tag is applied to a column or task
+   ============================================================================ */
+@keyframes tag-applied-flash {
+  0% { box-shadow: 0 0 8px rgba(0, 255, 0, 0.5); }
+  100% { box-shadow: none; }
+}
+
+.tag-applied-flash {
+  animation: tag-applied-flash 0.3s ease-out forwards;
+}
+
+/* ============================================================================
+   Menu Count Badges
+   Small count indicators shown in dropdown menus
+   ============================================================================ */
+.menu-count-badge {
+  opacity: 0.7;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+/* ============================================================================
+   Submenu Base Styles
+   Base positioning for tag and other submenus
+   ============================================================================ */
+.donut-submenu {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: all;
+  visibility: hidden;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.donut-submenu.visible {
+  visibility: visible;
+}
+
+/* ============================================================================
+   Pre-generated Font Size Classes
+   Static font size multipliers for UI scaling
+   ============================================================================ */
+
+/* Font Size Classes - 0.5x */
+body.font-size-0_5x .column-title,
+body.font-size-0_5x .column-title-edit,
+body.font-size-0_5x .task-title-display,
+body.font-size-0_5x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 0.5) !important;
+  line-height: 1.4 !important;
+}
+
+body.font-size-0_5x .task-description-display,
+body.font-size-0_5x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 0.45) !important;
+  line-height: 1.4 !important;
+}
+
+/* Font Size Classes - 0.75x */
+body.font-size-0_75x .column-title,
+body.font-size-0_75x .column-title-edit,
+body.font-size-0_75x .task-title-display,
+body.font-size-0_75x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 0.75) !important;
+  line-height: 1.4 !important;
+}
+
+body.font-size-0_75x .task-description-display,
+body.font-size-0_75x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 0.675) !important;
+  line-height: 1.4 !important;
+}
+
+/* Font Size Classes - 1x (default) */
+body.font-size-1x .column-title,
+body.font-size-1x .column-title-edit,
+body.font-size-1x .task-title-display,
+body.font-size-1x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1) !important;
+  line-height: 1.4 !important;
+}
+
+body.font-size-1x .task-description-display,
+body.font-size-1x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 0.9) !important;
+  line-height: 1.4 !important;
+}
+
+/* Font Size Classes - 1.25x */
+body.font-size-1_25x .column-title,
+body.font-size-1_25x .column-title-edit,
+body.font-size-1_25x .task-title-display,
+body.font-size-1_25x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1.25) !important;
+  line-height: 1.4 !important;
+}
+
+body.font-size-1_25x .task-description-display,
+body.font-size-1_25x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1.125) !important;
+  line-height: 1.4 !important;
+}
+
+/* Font Size Classes - 1.5x */
+body.font-size-1_5x .column-title,
+body.font-size-1_5x .column-title-edit,
+body.font-size-1_5x .task-title-display,
+body.font-size-1_5x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1.5) !important;
+  line-height: 1.2 !important;
+}
+
+body.font-size-1_5x .task-description-display,
+body.font-size-1_5x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1.35) !important;
+  line-height: 1.3 !important;
+}
+
+/* Font Size Classes - 2x */
+body.font-size-2x .column-title,
+body.font-size-2x .column-title-edit,
+body.font-size-2x .task-title-display,
+body.font-size-2x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 2) !important;
+  line-height: 1.1 !important;
+}
+
+body.font-size-2x .task-description-display,
+body.font-size-2x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 1.8) !important;
+  line-height: 1.15 !important;
+}
+
+/* Font Size Classes - 2.5x */
+body.font-size-2_5x .column-title,
+body.font-size-2_5x .column-title-edit,
+body.font-size-2_5x .task-title-display,
+body.font-size-2_5x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 2.5) !important;
+  line-height: 1.1 !important;
+}
+
+body.font-size-2_5x .task-description-display,
+body.font-size-2_5x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 2.25) !important;
+  line-height: 1.15 !important;
+}
+
+/* Font Size Classes - 3x */
+body.font-size-3x .column-title,
+body.font-size-3x .column-title-edit,
+body.font-size-3x .task-title-display,
+body.font-size-3x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 3) !important;
+  line-height: 1.1 !important;
+}
+
+body.font-size-3x .task-description-display,
+body.font-size-3x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 2.7) !important;
+  line-height: 1.15 !important;
+}
+
+/* Font Size Classes - 4x */
+body.font-size-4x .column-title,
+body.font-size-4x .column-title-edit,
+body.font-size-4x .task-title-display,
+body.font-size-4x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 4) !important;
+  line-height: 1.1 !important;
+}
+
+body.font-size-4x .task-description-display,
+body.font-size-4x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 3.6) !important;
+  line-height: 1.15 !important;
+}
+
+/* Font Size Classes - 5x */
+body.font-size-5x .column-title,
+body.font-size-5x .column-title-edit,
+body.font-size-5x .task-title-display,
+body.font-size-5x .task-title-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 5) !important;
+  line-height: 1.1 !important;
+}
+
+body.font-size-5x .task-description-display,
+body.font-size-5x .task-description-edit {
+  font-size: calc(var(--vscode-font-size, 14px) * 4.5) !important;
+  line-height: 1.15 !important;
 }
