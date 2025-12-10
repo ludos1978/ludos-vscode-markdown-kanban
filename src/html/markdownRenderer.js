@@ -1,3 +1,106 @@
+// Cached markdown-it instance for performance
+// Creating a new markdown-it instance with all plugins is expensive (~3-5ms per call)
+// With 400+ tasks, this adds up to 2+ seconds of rendering time
+let cachedMarkdownIt = null;
+let cachedHtmlCommentMode = null;
+let cachedHtmlContentMode = null;
+
+// Factory function to create markdown-it instance with all plugins
+// This is called once per configuration change, not per render
+function createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode) {
+    const md = window.markdownit({
+        html: true,
+        linkify: false,
+        typographer: true,
+        breaks: true
+    })
+    .use(wikiLinksPlugin, {
+        className: 'wiki-link'
+    })
+    .use(tagPlugin, {
+        tagColors: window.tagColors || {}
+    })
+    .use(datePersonTagPlugin) // @ prefix: @person, @2025-01-28
+    .use(temporalTagPlugin)  // . prefix: .w49, .2025.12.05, .mon, .15:30, .09:00-17:00
+    .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
+    .use(speakerNotePlugin) // Speaker notes (;; syntax)
+    .use(htmlCommentPlugin, {
+        commentMode: htmlCommentRenderMode,
+        contentMode: htmlContentRenderMode
+    }); // HTML comment and content rendering
+
+    // Add plugins that are available from CDN (CSP-compliant)
+    if (typeof window.markdownitEmoji !== 'undefined') {
+        md.use(window.markdownitEmoji); // :smile: => 😊
+    }
+    if (typeof window.markdownitFootnote !== 'undefined') {
+        md.use(window.markdownitFootnote); // [^1]: footnote
+    }
+    if (typeof window.markdownItMulticolumn !== 'undefined') {
+        md.use(window.markdownItMulticolumn); // Multi-column layout support
+    }
+    if (typeof window.markdownitMark !== 'undefined') {
+        md.use(window.markdownitMark); // ==mark== syntax support
+    }
+    if (typeof window.markdownitSub !== 'undefined') {
+        md.use(window.markdownitSub); // H~2~O subscript support
+    }
+    if (typeof window.markdownitSup !== 'undefined') {
+        md.use(window.markdownitSup); // 29^th^ superscript support
+    }
+    if (typeof window.markdownitIns !== 'undefined') {
+        md.use(window.markdownitIns); // ++inserted++ text support
+    }
+    if (typeof window.markdownitStrikethroughAlt !== 'undefined') {
+        md.use(window.markdownitStrikethroughAlt); // --strikethrough-- support
+    }
+    if (typeof window.markdownitUnderline !== 'undefined') {
+        md.use(window.markdownitUnderline); // _underline_ support
+    }
+    if (typeof window.markdownitAbbr !== 'undefined') {
+        md.use(window.markdownitAbbr); // *[HTML]: Hyper Text Markup Language
+    }
+    if (typeof window.markdownitContainer !== 'undefined') {
+        // Add common container types from engine.js
+        md.use(window.markdownitContainer, 'note');
+        md.use(window.markdownitContainer, 'comment');
+        md.use(window.markdownitContainer, 'highlight');
+        md.use(window.markdownitContainer, 'mark-red');
+        md.use(window.markdownitContainer, 'mark-green');
+        md.use(window.markdownitContainer, 'mark-blue');
+        md.use(window.markdownitContainer, 'mark-cyan');
+        md.use(window.markdownitContainer, 'mark-magenta');
+        md.use(window.markdownitContainer, 'mark-yellow');
+        md.use(window.markdownitContainer, 'center');
+        md.use(window.markdownitContainer, 'center100');
+        md.use(window.markdownitContainer, 'right');
+        md.use(window.markdownitContainer, 'caption');
+    }
+    if (typeof window.markdownItInclude !== 'undefined') {
+        md.use(window.markdownItInclude); // !!!include()!!! file inclusion support
+    }
+    if (typeof window.markdownItImageFigures !== 'undefined') {
+        md.use(window.markdownItImageFigures, {
+            figcaption: 'title'
+        }); // Image figures with captions from title attribute
+    }
+
+    // Note: Most other plugins can't be loaded via CDN due to CSP restrictions
+    // Advanced plugin functionality would need to be bundled or implemented differently
+    if (typeof window.markdownItMediaCustom !== 'undefined') {
+        md.use(window.markdownItMediaCustom, {
+            controls: true,
+            attrs: {
+                image: {},
+                audio: {},
+                video: {}
+            }
+        }); // Custom media plugin for video/audio
+    }
+
+    return md;
+}
+
 // Wiki Links Plugin for markdown-it
 function wikiLinksPlugin(md, options = {}) {
     const {
@@ -1419,111 +1522,48 @@ function renderMarkdown(text, includeContext) {
     // Store includeContext for use by image renderer
     window.currentTaskIncludeContext = includeContext;
 
-
-    // Debug logging to trace include rendering
-    const hasInclude = text.includes('!!!include(');
-    if (hasInclude) {
-    }
-
     try {
         // Get HTML rendering settings
         const htmlCommentRenderMode = window.configManager?.getConfig('htmlCommentRenderMode', 'hidden') ?? 'hidden';
         const htmlContentRenderMode = window.configManager?.getConfig('htmlContentRenderMode', 'html') ?? 'html';
 
-        // Initialize markdown-it with enhanced wiki links and tags plugins
-        const md = window.markdownit({
-            html: true,
-            linkify: false,
-            typographer: true,
-            breaks: true
-        })
-        .use(wikiLinksPlugin, {
-            className: 'wiki-link'
-        })
-        .use(tagPlugin, {
-            tagColors: window.tagColors || {}
-        })
-        .use(datePersonTagPlugin) // @ prefix: @person, @2025-01-28
-        .use(temporalTagPlugin)  // . prefix: .w49, .2025.12.05, .mon, .15:30, .09:00-17:00
-        .use(enhancedStrikethroughPlugin) // Add enhanced strikethrough with delete buttons
-        .use(speakerNotePlugin) // Speaker notes (;; syntax)
-        .use(htmlCommentPlugin, {
-            commentMode: htmlCommentRenderMode,
-            contentMode: htmlContentRenderMode
-        }); // HTML comment and content rendering
+        // Use cached markdown-it instance for performance
+        // Only recreate if settings changed or first call
+        const needsRecreate = !cachedMarkdownIt ||
+                              cachedHtmlCommentMode !== htmlCommentRenderMode ||
+                              cachedHtmlContentMode !== htmlContentRenderMode;
 
-        // Add plugins that are available from CDN (CSP-compliant)
-        if (typeof window.markdownitEmoji !== 'undefined') {
-            md.use(window.markdownitEmoji); // :smile: => 😊
-        }
-        if (typeof window.markdownitFootnote !== 'undefined') {
-            md.use(window.markdownitFootnote); // [^1]: footnote
-        }
-        if (typeof window.markdownItMulticolumn !== 'undefined') {
-            md.use(window.markdownItMulticolumn); // Multi-column layout support
-        }
-        if (typeof window.markdownitMark !== 'undefined') {
-            md.use(window.markdownitMark); // ==mark== syntax support
-        }
-        if (typeof window.markdownitSub !== 'undefined') {
-            md.use(window.markdownitSub); // H~2~O subscript support
-        }
-        if (typeof window.markdownitSup !== 'undefined') {
-            md.use(window.markdownitSup); // 29^th^ superscript support
-        }
-        if (typeof window.markdownitIns !== 'undefined') {
-            md.use(window.markdownitIns); // ++inserted++ text support
-        }
-        if (typeof window.markdownitStrikethroughAlt !== 'undefined') {
-            md.use(window.markdownitStrikethroughAlt); // --strikethrough-- support
-        }
-        if (typeof window.markdownitUnderline !== 'undefined') {
-            md.use(window.markdownitUnderline); // _underline_ support
-        }
-        if (typeof window.markdownitAbbr !== 'undefined') {
-            md.use(window.markdownitAbbr); // *[HTML]: Hyper Text Markup Language
-        }
-        if (typeof window.markdownitContainer !== 'undefined') {
-            // Add common container types from engine.js
-            md.use(window.markdownitContainer, 'note');
-            md.use(window.markdownitContainer, 'comment');
-            md.use(window.markdownitContainer, 'highlight');
-            md.use(window.markdownitContainer, 'mark-red');
-            md.use(window.markdownitContainer, 'mark-green');
-            md.use(window.markdownitContainer, 'mark-blue');
-            md.use(window.markdownitContainer, 'mark-cyan');
-            md.use(window.markdownitContainer, 'mark-magenta');
-            md.use(window.markdownitContainer, 'mark-yellow');
-            md.use(window.markdownitContainer, 'center');
-            md.use(window.markdownitContainer, 'center100');
-            md.use(window.markdownitContainer, 'right');
-            md.use(window.markdownitContainer, 'caption');
-        }
-        if (typeof window.markdownItInclude !== 'undefined') {
-            md.use(window.markdownItInclude); // !!!include()!!! file inclusion support
-        }
-        if (typeof window.markdownItImageFigures !== 'undefined') {
-            md.use(window.markdownItImageFigures, {
-                figcaption: 'title'
-            }); // Image figures with captions from title attribute
+        if (needsRecreate) {
+            cachedMarkdownIt = createMarkdownItInstance(htmlCommentRenderMode, htmlContentRenderMode);
+            cachedHtmlCommentMode = htmlCommentRenderMode;
+            cachedHtmlContentMode = htmlContentRenderMode;
         }
 
-        // Note: Most other plugins can't be loaded via CDN due to CSP restrictions
-        // Advanced plugin functionality would need to be bundled or implemented differently
-        if (typeof window.markdownItMediaCustom !== 'undefined') {
-            md.use(window.markdownItMediaCustom, {
-                controls: true,
-                attrs: {
-                    image: {},
-                    audio: {},
-                    video: {}
-                }
-            }); // Custom media plugin for video/audio
+        const md = cachedMarkdownIt;
+
+        // Skip re-registering custom renderers if already done
+        // The renderers use window.currentTaskIncludeContext which is set per-render
+        if (md._customRenderersRegistered) {
+            // Renderers already registered, proceed to render directly
+            let rendered = md.render(text);
+
+            // Trigger PlantUML queue processing after render completes
+            if (pendingPlantUMLQueue.length > 0) {
+                Promise.resolve().then(() => processPlantUMLQueue());
+            }
+
+            // Trigger diagram queue processing after render completes
+            if (pendingDiagramQueue.length > 0) {
+                Promise.resolve().then(() => processDiagramQueue());
+            }
+
+            // Remove paragraph wrapping for single line content
+            if (!text.includes('\n') && rendered.startsWith('<p>') && rendered.endsWith('</p>\n')) {
+                rendered = rendered.slice(3, -5);
+            }
+
+            return rendered;
         }
-        
-        // Add custom renderer for video and audio to handle dynamic path resolution
-        const originalVideoRenderer = md.renderer.rules.video;
-        const originalAudioRenderer = md.renderer.rules.audio;
 
         // Helper function to resolve media paths dynamically
         function resolveMediaPath(originalSrc) {
@@ -1792,6 +1832,9 @@ function renderMarkdown(text, includeContext) {
 
         // Add PlantUML renderer
         addPlantUMLRenderer(md);
+
+        // Mark that custom renderers have been registered
+        md._customRenderersRegistered = true;
 
         let rendered = md.render(text);
 

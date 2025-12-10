@@ -1611,7 +1611,8 @@ function applyColumnWidth(size, skipRender = false) {
     } else {
         // For pixel widths, re-apply span classes if they exist
         // Trigger a re-render to restore span classes from column titles
-        if (window.cachedBoard && !skipRender) {
+        // Skip during initial config to avoid duplicate renders
+        if (window.cachedBoard && !skipRender && !window.applyingInitialConfig) {
             renderBoard(window.cachedBoard, { skipRender: false });
         }
     }
@@ -1641,8 +1642,8 @@ function applyLayoutRows(rows) {
     // Use styleManager to apply CSS variable
     styleManager.applyLayoutRows(rows);
 
-    // Re-render the board to apply row layout
-    if (currentBoard) {
+    // Re-render the board to apply row layout (skip during initial config to avoid duplicate renders)
+    if (currentBoard && !window.applyingInitialConfig) {
         renderBoard();
     }
 }
@@ -1802,8 +1803,8 @@ function applyTagVisibility(setting) {
     // Add the selected tag visibility class
     document.body.classList.add(`tag-visibility-${setting}`);
 
-    // Trigger re-render to apply text filtering changes
-    if (window.cachedBoard) {
+    // Trigger re-render to apply text filtering changes (skip during initial config to avoid duplicate renders)
+    if (window.cachedBoard && !window.applyingInitialConfig) {
         renderBoard(window.cachedBoard, { skipRender: false });
 
         // Preserve column width after re-render
@@ -1829,8 +1830,8 @@ function applyHtmlCommentRenderMode(mode) {
         window.configManager.cache.set('htmlCommentRenderMode', mode);
     }
 
-    // Trigger re-render to apply changes
-    if (window.cachedBoard) {
+    // Trigger re-render to apply changes (skip during initial config to avoid duplicate renders)
+    if (window.cachedBoard && !window.applyingInitialConfig) {
         renderBoard(window.cachedBoard, { skipRender: false });
 
         // Preserve column width after re-render
@@ -1855,8 +1856,8 @@ function applyHtmlContentRenderMode(mode) {
         window.configManager.cache.set('htmlContentRenderMode', mode);
     }
 
-    // Trigger re-render to apply changes
-    if (window.cachedBoard) {
+    // Trigger re-render to apply changes (skip during initial config to avoid duplicate renders)
+    if (window.cachedBoard && !window.applyingInitialConfig) {
         renderBoard(window.cachedBoard, { skipRender: false });
 
         // Preserve column width after re-render
@@ -2666,6 +2667,13 @@ window.addEventListener('message', event => {
                 }
             }
 
+            // Prevent renderBoard() calls during initial config application
+            // Each apply* function checks this flag and skips its internal renderBoard() call
+            // Set this early before any apply* functions are called
+            if (isInitialLoad) {
+                window.applyingInitialConfig = true;
+            }
+
             // First apply configuration (as fallback)
             if (message.layoutRows) {
                 applyLayoutRows(message.layoutRows);
@@ -2870,6 +2878,9 @@ window.addEventListener('message', event => {
                 if (typeof requestTemplates === 'function') {
                     requestTemplates();
                 }
+
+                // Clear the flag - configuration application is complete
+                window.applyingInitialConfig = false;
             }
 
             // Update max row height

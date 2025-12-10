@@ -1606,7 +1606,7 @@ window.updateTemplates = function(templates, showBar = true) {
  */
 function renderBoard(options = null) {
     const renderStart = performance.now();
-    console.log('[PERF] renderBoard started');
+    console.log('[PERF] renderBoard started - call stack:', new Error().stack.split('\n').slice(1, 5).join(' <- '));
 
     // Apply tag styles first
     const tagStylesStart = performance.now();
@@ -1818,6 +1818,9 @@ function renderBoard(options = null) {
     });
 
     // Create row containers in order
+    const createColumnsStart = performance.now();
+    let totalColumnCreationTime = 0;
+    let columnCount = 0;
     for (let row = 1; row <= numRows; row++) {
             const rowContainer = document.createElement('div');
             rowContainer.className = 'kanban-row';
@@ -1835,7 +1838,10 @@ function renderBoard(options = null) {
 
             // Process columns in the order they appear in the board data
             columnsByRow[row].forEach(({ column, index }) => {
+                const colStart = performance.now();
                 const columnElement = createColumnElement(column, index);
+                totalColumnCreationTime += performance.now() - colStart;
+                columnCount++;
                 const isStacked = /#stack\b/i.test(column.title);
 
                 if (isStacked && lastColumnElement) {
@@ -1883,18 +1889,21 @@ function renderBoard(options = null) {
         }
 
     // Append all rows at once to minimize reflows
+    console.log(`[PERF] createColumnElement (${columnCount} columns): ${totalColumnCreationTime.toFixed(1)}ms (avg: ${(totalColumnCreationTime/columnCount).toFixed(1)}ms/column)`);
+    const appendStart = performance.now();
     boardElement.appendChild(fragment);
+    console.log(`[PERF] appendChild fragment: ${(performance.now() - appendStart).toFixed(1)}ms`);
 
     // Apply folding states after rendering
     setTimeout(() => {
         applyFoldingStates();
-        
+
         // Apply user-configured row height if set
         if (window.currentRowHeight && window.currentRowHeight !== 'auto') {
             window.applyRowHeight(window.currentRowHeight);
         }
         // For 'auto' mode, CSS handles the layout naturally without any JS intervention
-        
+
         // Restore scroll positions
         scrollPositions.forEach((scrollTop, columnId) => {
             const container = document.getElementById(`tasks-${columnId}`);
@@ -1902,7 +1911,7 @@ function renderBoard(options = null) {
                 container.scrollTop = scrollTop;
             }
         });
-        
+
         // Update image sources after rendering
         updateImageSources();
 
@@ -1917,19 +1926,26 @@ function renderBoard(options = null) {
         }
     }, 10);
 
+    const dragDropStart = performance.now();
     setupDragAndDrop();
+    console.log(`[PERF] setupDragAndDrop: ${(performance.now() - dragDropStart).toFixed(1)}ms`);
 
     // Initialize all task elements after full board render
     // This ensures drag handlers, edit handlers, and visual elements are properly set up
-    boardElement.querySelectorAll('.task-item').forEach(taskElement => {
+    const initTasksStart = performance.now();
+    const taskItems = boardElement.querySelectorAll('.task-item');
+    taskItems.forEach(taskElement => {
         initializeTaskElement(taskElement);
     });
+    console.log(`[PERF] initializeTaskElement (${taskItems.length} tasks): ${(performance.now() - initTasksStart).toFixed(1)}ms`);
 
     // Inject header/footer bars after DOM is rendered
     // This adds the actual bar elements to the DOM
+    const injectBarsStart = performance.now();
     if (typeof injectStackableBars === 'function') {
         injectStackableBars();
     }
+    console.log(`[PERF] injectStackableBars: ${(performance.now() - injectBarsStart).toFixed(1)}ms`);
 
     // Apply stacked column styles AFTER bars are injected
     // Use setTimeout to ensure this happens after any rapid re-renders complete
