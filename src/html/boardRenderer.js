@@ -54,30 +54,33 @@ function initializeTaskElement(taskElement) {
     }
 
     // 2. EDIT HANDLER VERIFICATION (defensive check)
-    // Edit handlers are normally attached via inline onclick attributes in HTML,
-    // but we verify they exist and re-attach if missing
+    // Edit handlers are attached via inline onclick attributes in HTML.
+    // We check for both .onclick property AND onclick attribute to avoid false positives.
     const columnEl = taskElement.closest('[data-column-id]');
     if (columnEl) {
         const columnId = columnEl.dataset.columnId;
 
-        // Verify title click handler
-        const titleEl = taskElement.querySelector('.task-title-display');
-        if (titleEl && !titleEl.onclick) {
-            console.warn('[TaskInit] Re-attaching missing title click handler for task:', taskId);
-            titleEl.onclick = (e) => handleTaskTitleClick(e, titleEl, taskId, columnId);
+        // Verify title click handler - check container (where onclick is defined)
+        const titleContainer = taskElement.querySelector('.task-title-container');
+        if (titleContainer && !titleContainer.onclick && !titleContainer.hasAttribute('onclick')) {
+            const titleEl = taskElement.querySelector('.task-title-display');
+            if (titleEl) {
+                titleEl.onclick = (e) => handleTaskTitleClick(e, titleEl, taskId, columnId);
+            }
         }
 
-        // Verify description click handler
-        const descEl = taskElement.querySelector('.task-description-display');
-        if (descEl && !descEl.onclick) {
-            console.warn('[TaskInit] Re-attaching missing description click handler for task:', taskId);
-            descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
+        // Verify description click handler - check container
+        const descContainer = taskElement.querySelector('.task-description-container');
+        if (descContainer && !descContainer.onclick && !descContainer.hasAttribute('onclick')) {
+            const descEl = taskElement.querySelector('.task-description-display');
+            if (descEl) {
+                descEl.onclick = (e) => handleDescriptionClick(e, descEl, taskId, columnId);
+            }
         }
 
         // Verify collapse toggle click handler
         const collapseToggle = taskElement.querySelector('.task-collapse-toggle');
-        if (collapseToggle && !collapseToggle.onclick) {
-            console.warn('[TaskInit] Re-attaching missing collapse toggle handler for task:', taskId);
+        if (collapseToggle && !collapseToggle.onclick && !collapseToggle.hasAttribute('onclick')) {
             collapseToggle.onclick = () => {
                 toggleTaskCollapseById(taskId, columnId);
                 if (typeof updateFoldAllButton === 'function') {
@@ -1602,9 +1605,13 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
+    const renderStart = performance.now();
+    console.log('[PERF] renderBoard started');
 
     // Apply tag styles first
+    const tagStylesStart = performance.now();
     applyTagStyles();
+    console.log(`[PERF] applyTagStyles: ${(performance.now() - tagStylesStart).toFixed(1)}ms`);
 
     // Check if we're currently editing - if so, skip the render
     if (window.taskEditor && window.taskEditor.currentEditor) {
@@ -1974,6 +1981,8 @@ function renderBoard(options = null) {
             }
         });
     }, 20);
+
+    console.log(`[PERF] renderBoard total (sync): ${(performance.now() - renderStart).toFixed(1)}ms`);
 
     // Setup compact view detection for ALL columns
     // DISABLED: Causes severe performance issues with expensive scroll handlers

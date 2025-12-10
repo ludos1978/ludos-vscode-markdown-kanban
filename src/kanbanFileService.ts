@@ -347,7 +347,9 @@ export class KanbanFileService {
             this.updateWebviewPermissions();
 
             // Create initial backup
+            const backupStart = Date.now();
             await this.backupManager.createBackup(document);
+            console.log(`[PERF] Backup creation: ${Date.now() - backupStart}ms`);
 
             // Start periodic backup timer
             this.backupManager.startPeriodicBackup(document);
@@ -355,8 +357,10 @@ export class KanbanFileService {
 
         try {
             // ALLOWED: Loading board (initial load, different document, or force reload)
+            const parseStart = Date.now();
             const basePath = path.dirname(document.uri.fsPath);
             const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
+            console.log(`[PERF] Markdown parsing: ${Date.now() - parseStart}ms`);
 
             // Update version tracking
             this._lastDocumentVersion = document.version;
@@ -386,13 +390,17 @@ export class KanbanFileService {
 
 
             // Initialize content for new files only (preserve existing baselines)
+            const initIncludesStart = Date.now();
             await this.includeFileManager._initializeUnifiedIncludeContents(() => this.fileManager.getDocument());
+            console.log(`[PERF] Initialize includes: ${Date.now() - initIncludesStart}ms`);
 
             // Always send notification to update tracked files list
 
             // ALWAYS re-check for changes after reload
             // This will detect any changes between the preserved baseline and current state
+            const recheckStart = Date.now();
             await this.includeFileManager._recheckIncludeFileChanges();
+            console.log(`[PERF] Recheck includes: ${Date.now() - recheckStart}ms`);
 
             // Only restore the change state if recheck didn't find changes
             // (If recheck found changes, it already set the state)
@@ -430,7 +438,9 @@ export class KanbanFileService {
             });
         }
 
+        const sendUpdateStart = Date.now();
         await this.sendBoardUpdate(false, forceReload);
+        console.log(`[PERF] Send board update: ${Date.now() - sendUpdateStart}ms`);
         this.fileManager.sendFileInfo();
     }
 

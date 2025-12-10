@@ -3171,10 +3171,12 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
         // Add temporary visual flash to show tag was applied
         columnElement.classList.add('tag-applied-flash');
         setTimeout(() => {
-            columnElement.classList.remove('tag-applied-flash');
+            if (columnElement && columnElement.classList) {
+                columnElement.classList.remove('tag-applied-flash');
+            }
         }, 300);
     }
-    
+
 }
 
 // CRITICAL: Always use unique task IDs to prevent targeting wrong tasks with same titles
@@ -3282,7 +3284,9 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         // Add temporary visual flash to show tag was applied
         taskElement.classList.add('tag-applied-flash');
         setTimeout(() => {
-            taskElement.classList.remove('tag-applied-flash');
+            if (taskElement && taskElement.classList) {
+                taskElement.classList.remove('tag-applied-flash');
+            }
         }, 300);
     }
     
