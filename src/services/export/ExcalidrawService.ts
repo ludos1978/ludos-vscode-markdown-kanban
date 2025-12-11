@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { DrawIOService } from './DrawIOService';
+import { JSDOM } from 'jsdom';
 
 /**
  * Service for converting excalidraw diagrams to SVG
- * Uses @excalidraw/excalidraw library for conversion
+ * Uses @excalidraw/utils with jsdom for server-side conversion
  *
  * Supports:
  * - .excalidraw files (standard JSON format)
@@ -96,65 +97,123 @@ export class ExcalidrawService {
     }
 
     /**
-     * Convert excalidraw data to SVG
-     *
-     * NOTE: This is a placeholder implementation.
-     * The actual implementation requires integrating the @excalidraw/excalidraw library
-     * which has browser dependencies. We need to use a server-side compatible approach.
-     *
-     * Options:
-     * 1. Use excalidraw-to-svg if it exists
-     * 2. Use puppeteer to render in headless browser
-     * 3. Implement custom SVG generator based on excalidraw elements
+     * Convert excalidraw data to SVG using @excalidraw/utils with jsdom
+     * This provides full-fidelity rendering including hand-drawn styles, fonts, etc.
      */
     private async convertToSVG(excalidrawData: any): Promise<string> {
-        // TODO: Implement actual conversion
-        // For now, we'll create a simple SVG wrapper with a message
-        // This needs to be replaced with actual excalidraw rendering logic
-
         try {
-            // Attempt to use excalidraw library (if available in Node environment)
-            // This is a placeholder - actual implementation depends on library API
-
-            const svg = await this.attemptLibraryConversion(excalidrawData);
+            const svg = await this.convertWithJsdom(excalidrawData);
             return svg;
-
         } catch (error) {
-            console.warn('[ExcalidrawService] Library conversion failed, using fallback:', error);
+            console.warn('[ExcalidrawService] jsdom conversion failed, using fallback:', error);
             return this.createFallbackSVG(excalidrawData);
         }
     }
 
     /**
-     * Attempt to use @excalidraw/excalidraw library for conversion
-     *
-     * IMPLEMENTATION NOTE:
-     * The @excalidraw/excalidraw package is primarily designed for browser use
-     * and requires DOM APIs. For server-side, we create a simplified SVG representation.
+     * Convert Excalidraw data to SVG using jsdom + @excalidraw/utils
+     * This simulates a browser environment to run Excalidraw's export code
+     * Based on the approach from excalidraw-to-svg library
      */
-    private async attemptLibraryConversion(excalidrawData: any): Promise<string> {
-        try {
-            // The @excalidraw/excalidraw library requires browser APIs (DOM)
-            // For Node.js environment, we'll create a basic SVG representation
+    private async convertWithJsdom(excalidrawData: any): Promise<string> {
+        // Paths to required library files (using UMD build from @excalidraw/utils@0.1.2)
+        const canvasPolyfillPath = path.join(__dirname, '../../../node_modules/canvas-5-polyfill/canvas.js');
+        const excalidrawUtilsPath = path.join(__dirname, '../../../node_modules/@excalidraw/utils/dist/excalidraw-utils.min.js');
 
-            // Import needed functions (this might fail in Node.js)
-            const excalidraw = await import('@excalidraw/excalidraw');
+        // Read library files
+        const canvasPolyfillCode = await fs.promises.readFile(canvasPolyfillPath, 'utf8');
+        const excalidrawUtilsCode = await fs.promises.readFile(excalidrawUtilsPath, 'utf8');
 
-            // Check if exportToSvg is available
-            if (typeof excalidraw.exportToSvg === 'function') {
-                // Try to use it (might fail without DOM)
-                const svgElement = await excalidraw.exportToSvg(excalidrawData);
-                if (svgElement && typeof svgElement.outerHTML === 'string') {
-                    return svgElement.outerHTML;
+        // Prepare the data for export
+        const elements = excalidrawData.elements || [];
+        const appState = excalidrawData.appState || {};
+        const files = excalidrawData.files || {};
+
+        // Create the export script that will run inside jsdom
+        const exportScript = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <script>
+                    // Mock CanvasRenderingContext2D to prevent canvas polyfill errors
+                    class CanvasRenderingContext2D {}
+                    window.devicePixelRatio = 1;
+                </script>
+                <script>${canvasPolyfillCode}</script>
+                <script>${excalidrawUtilsCode}</script>
+                <script>
+                    (async function() {
+                        try {
+                            const elements = ${JSON.stringify(elements)};
+                            const appState = ${JSON.stringify({
+                                ...appState,
+                                exportWithDarkMode: false,
+                                exportBackground: true,
+                            })};
+                            const files = ${JSON.stringify(files)};
+
+                            // Use the excalidraw utils to export to SVG
+                            const svg = await ExcalidrawUtils.exportToSvg({
+                                elements,
+                                appState,
+                                files,
+                            });
+
+                            // Append to body for retrieval
+                            document.body.appendChild(svg);
+                        } catch (error) {
+                            console.error('Excalidraw export error:', error);
+                            const errorDiv = document.createElement('div');
+                            errorDiv.id = 'excalidraw-error';
+                            errorDiv.textContent = error.message || 'Unknown error';
+                            document.body.appendChild(errorDiv);
+                        }
+                    })();
+                </script>
+            </head>
+            <body></body>
+            </html>
+        `;
+
+        // Create jsdom instance with the export script
+        const dom = new JSDOM(exportScript, {
+            runScripts: 'dangerously',
+            resources: 'usable',
+        });
+
+        // Wait for SVG to be created (polling approach)
+        const svgPromise = new Promise<string>(async (resolve, reject) => {
+            let checks = 50; // 50 checks * 20ms = 1 second max wait
+            const sleepTime = 20;
+
+            while (checks > 0) {
+                checks--;
+
+                // Check for error first
+                const errorDiv = dom.window.document.body.querySelector('#excalidraw-error');
+                if (errorDiv) {
+                    reject(new Error(`Excalidraw export failed: ${errorDiv.textContent}`));
+                    return;
                 }
+
+                // Check for SVG
+                const excalidrawSvg = dom.window.document.body.querySelector('svg');
+                if (excalidrawSvg) {
+                    resolve(excalidrawSvg.outerHTML);
+                    return;
+                }
+
+                await new Promise(r => setTimeout(r, sleepTime));
             }
 
-            // If we get here, the library didn't work
-            throw new Error('exportToSvg not available or failed');
+            reject(new Error('SVG was not created after expected period'));
+        });
 
-        } catch (error) {
-            // Library failed (expected in Node.js), use manual SVG generation
-            throw error;
+        try {
+            const svg = await svgPromise;
+            return svg;
+        } finally {
+            dom.window.close();
         }
     }
 

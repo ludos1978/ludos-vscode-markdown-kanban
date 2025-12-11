@@ -226,7 +226,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/extension.js',
-		external: ['vscode', 'tslib', 'emitter'],
+		external: ['vscode', 'tslib', 'emitter', 'jsdom', 'canvas'],
 		logLevel: 'silent',
 		plugins: [
 			copyStaticFilesPlugin,

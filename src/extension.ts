@@ -16,7 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
 	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
 	context.subscriptions.push(outputChannel);
 
-	outputChannel.appendLine('[Extension] Activating markdown-kanban-obsidian extension');
+	outputChannel.appendLine('[Extension] Activating ludos-kanban extension');
 
 	// Initialize plugin system
 	// This loads all built-in import/export plugins

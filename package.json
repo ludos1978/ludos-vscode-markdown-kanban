@@ -1,7 +1,7 @@
 {
-  "name": "markdown-kanban-obsidian",
-  "displayName": "Markdown Kanban Obsidian",
-  "description": "Kanban board for Markdown files, compatible with obsidian kanban boards",
+  "name": "ludos-kanban",
+  "displayName": "Ludos Kanban",
+  "description": "Kanban Board that supports export to markdown / marp",
   "publisher": "ludos",
   "version": "0.61.3",
   "engines": {
@@ -13,12 +13,11 @@
   "keywords": [
     "markdown",
     "kanban",
+    "Marp",
     "task management",
     "project management",
     "todo",
-    "productivity",
-    "cursor available",
-    "obsidian"
+    "productivity"
   ],
   "icon": "./imgs/logo.png",
   "activationEvents": [
@@ -28,7 +27,7 @@
   "main": "./dist/extension.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ludos1978/markdown-kanban-obsidian"
+    "url": "https://github.com/ludos1978/ludos-vscode-markdown-kanban"
   },
   "contributes": {
     "configuration": {
@@ -4629,8 +4628,12 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.17.0",
+    "@excalidraw/utils": "^0.1.2",
     "@marp-team/marp-cli": "^4.2.3",
     "@marp-team/marp-core": "^4.1.0",
+    "canvas": "^3.2.0",
+    "canvas-5-polyfill": "^0.1.5",
+    "jsdom": "^27.3.0",
     "markdown-it": "^14.1.0",
     "markdown-it-abbr": "^2.0.0",
     "markdown-it-container": "^4.0.0",
