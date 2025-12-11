@@ -12,6 +12,8 @@ import { BoardStore } from '../../core/stores';
 import { BoardOperations } from '../../boardOperations';
 import { LinkHandler } from '../../linkHandler';
 import { KanbanBoard } from '../../markdownParser';
+import { PlantUMLService } from '../../plantUMLService';
+import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import * as vscode from 'vscode';
 
 /**
@@ -24,6 +26,8 @@ export interface CommandContext {
     boardStore: BoardStore;
     boardOperations: BoardOperations;
     linkHandler: LinkHandler;
+    plantUMLService: PlantUMLService;
+    getFileRegistry: () => MarkdownFileRegistry | undefined;
 
     // Callbacks for panel operations
     onBoardUpdate: () => Promise<void>;
@@ -35,6 +39,10 @@ export interface CommandContext {
     getWebviewPanel: () => vscode.WebviewPanel | undefined;
     saveWithBackup: () => Promise<void>;
     markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+
+    // Export settings
+    getAutoExportSettings: () => any;
+    setAutoExportSettings: (settings: any) => void;
 }
 
 /**

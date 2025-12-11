@@ -11,7 +11,9 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { PathResolver } from '../services/PathResolver';
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 /**
  * File Commands Handler
@@ -110,14 +112,67 @@ export class FileCommands extends BaseMessageCommand {
     }
 
     /**
-     * Handle openFile command
+     * Handle openFile command - opens a file in VS Code editor
      */
     private async handleOpenFile(message: any, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel();
-        if (panel && (panel as any)._messageHandler?.handleOpenFile) {
-            await (panel as any)._messageHandler.handleOpenFile(message.filePath);
+        const filePath = message.filePath;
+        if (!filePath) {
+            return this.failure('No file path provided');
         }
-        return this.success();
+
+        try {
+            // Resolve the file path to absolute if it's relative
+            let absolutePath = filePath;
+            if (!path.isAbsolute(filePath)) {
+                const document = context.fileManager.getDocument();
+                if (document) {
+                    const currentDir = path.dirname(document.uri.fsPath);
+                    absolutePath = PathResolver.resolve(currentDir, filePath);
+                } else {
+                    return this.failure('Cannot resolve relative path - no current document');
+                }
+            }
+
+            // Normalize the path for comparison
+            const normalizedPath = path.resolve(absolutePath);
+
+            // Check if the file is already open as a document
+            const existingDocument = vscode.workspace.textDocuments.find(doc => {
+                const docPath = path.resolve(doc.uri.fsPath);
+                return docPath === normalizedPath;
+            });
+
+            if (existingDocument) {
+                // Check if it's currently visible
+                const visibleEditor = vscode.window.visibleTextEditors.find(editor =>
+                    path.resolve(editor.document.uri.fsPath) === normalizedPath
+                );
+
+                if (visibleEditor) {
+                    // Already focused, nothing to do
+                    if (vscode.window.activeTextEditor?.document.uri.fsPath === normalizedPath) {
+                        return this.success();
+                    }
+                }
+
+                await vscode.window.showTextDocument(existingDocument, {
+                    preserveFocus: false,
+                    preview: false
+                });
+            } else {
+                // Open the document first, then show it
+                const document = await vscode.workspace.openTextDocument(absolutePath);
+                await vscode.window.showTextDocument(document, {
+                    preserveFocus: false,
+                    preview: false
+                });
+            }
+            return this.success();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[FileCommands] Error opening file ${filePath}:`, error);
+            return this.failure(errorMessage);
+        }
     }
 
     /**
@@ -157,13 +212,12 @@ export class FileCommands extends BaseMessageCommand {
     }
 
     /**
-     * Handle selectFile command
+     * Handle selectFile command - opens file picker dialog
      */
     private async handleSelectFile(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel();
-        if (panel && (panel as any)._messageHandler?.handleSelectFile) {
-            await (panel as any)._messageHandler.handleSelectFile();
-        }
+        const document = await context.fileManager.selectFile();
+        // Note: The selected document is handled by the main panel/extension
+        // The fileManager.selectFile() triggers the appropriate flow
         return this.success();
     }
 

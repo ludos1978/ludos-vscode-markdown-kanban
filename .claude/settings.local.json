@@ -77,7 +77,9 @@
       "Bash(do echo \"=== $func ===\" grep -r \"function $func\\|const $func\\|\\.$func\\s*=\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/*.js)",
       "WebFetch(domain:www.npmjs.com)",
       "Bash(npm view:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(for handler in handleEditModeStart handleEditModeEnd handleEditingStopped _handleColumnsUnfolded handleBoardUpdate handlePageHiddenWithUnsavedChanges handleUpdateMarpGlobalSetting handleVSCodeSnippet handleEditorShortcut handleGetTemplates handleApplyTemplate handleSubmitTemplateVariables requestStopEditing handleEditColumnTitleUnified)",
+      "Bash(if grep -q \"async $handler\\|$handler(\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)"
     ],
     "deny": [],
     "ask": []

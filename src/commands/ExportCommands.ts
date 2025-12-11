@@ -12,6 +12,14 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { ExportService } from '../exportService';
+import { MarpExportService } from '../services/export/MarpExportService';
+import { MarpExtensionService } from '../services/export/MarpExtensionService';
+import { ConfigurationService } from '../configurationService';
+import { SaveEventCoordinator, SaveEventHandler } from '../saveEventCoordinator';
+import { safeFileUri } from '../utils/uriUtils';
+import * as vscode from 'vscode';
+import * as path from 'path';
 
 /**
  * Export Commands Handler
@@ -38,62 +46,58 @@ export class ExportCommands extends BaseMessageCommand {
         priority: 100
     };
 
+    // Track active operations for progress reporting
+    private _activeOperations = new Map<string, { type: string, startTime: number }>();
+
     async execute(message: any, context: CommandContext): Promise<CommandResult> {
         try {
-            const panel = context.getWebviewPanel();
-            const messageHandler = (panel as any)?._messageHandler;
-
-            if (!messageHandler) {
-                return this.failure('No message handler available');
-            }
-
             switch (message.type) {
                 case 'export':
                     const exportId = `export_${Date.now()}`;
-                    await messageHandler.startOperation(exportId, 'export', 'Exporting...');
+                    await this.startOperation(exportId, 'export', 'Exporting...', context);
                     try {
-                        await messageHandler.handleExport(message.options, exportId);
-                        await messageHandler.endOperation(exportId);
+                        await this.handleExport(message.options, context, exportId);
+                        await this.endOperation(exportId, context);
                     } catch (error) {
-                        await messageHandler.endOperation(exportId);
+                        await this.endOperation(exportId, context);
                         throw error;
                     }
                     return this.success();
 
                 case 'stopAutoExport':
-                    await messageHandler.handleStopAutoExport();
+                    await this.handleStopAutoExport(context);
                     return this.success();
 
                 case 'getExportDefaultFolder':
-                    await messageHandler.handleGetExportDefaultFolder();
+                    await this.handleGetExportDefaultFolder(context);
                     return this.success();
 
                 case 'selectExportFolder':
-                    await messageHandler.handleSelectExportFolder(message.defaultPath);
+                    await this.handleSelectExportFolder(context, message.defaultPath);
                     return this.success();
 
                 case 'getMarpThemes':
-                    await messageHandler.handleGetMarpThemes();
+                    await this.handleGetMarpThemes(context);
                     return this.success();
 
                 case 'pollMarpThemes':
-                    await messageHandler.handlePollMarpThemes();
+                    await this.handlePollMarpThemes(context);
                     return this.success();
 
                 case 'openInMarpPreview':
-                    await messageHandler.handleOpenInMarpPreview(message.filePath);
+                    await this.handleOpenInMarpPreview(message.filePath);
                     return this.success();
 
                 case 'checkMarpStatus':
-                    await messageHandler.handleCheckMarpStatus();
+                    await this.handleCheckMarpStatus(context);
                     return this.success();
 
                 case 'getMarpAvailableClasses':
-                    await messageHandler.handleGetMarpAvailableClasses();
+                    await this.handleGetMarpAvailableClasses(context);
                     return this.success();
 
                 case 'askOpenExportFolder':
-                    await messageHandler.handleAskOpenExportFolder(message.path);
+                    await this.handleAskOpenExportFolder(message.path);
                     return this.success();
 
                 default:
@@ -103,6 +107,483 @@ export class ExportCommands extends BaseMessageCommand {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error(`[ExportCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
+        }
+    }
+
+    // ============= OPERATION TRACKING =============
+
+    private async startOperation(operationId: string, type: string, description: string, context: CommandContext) {
+        this._activeOperations.set(operationId, { type, startTime: Date.now() });
+
+        const panel = context.getWebviewPanel();
+        if (panel && panel.webview) {
+            panel.webview.postMessage({
+                type: 'operationStarted',
+                operationId,
+                operationType: type,
+                description
+            });
+        }
+    }
+
+    private async updateOperationProgress(operationId: string, progress: number, context: CommandContext, message?: string) {
+        const panel = context.getWebviewPanel();
+        if (panel && panel.webview) {
+            panel.webview.postMessage({
+                type: 'operationProgress',
+                operationId,
+                progress,
+                message
+            });
+        }
+    }
+
+    private async endOperation(operationId: string, context: CommandContext) {
+        const operation = this._activeOperations.get(operationId);
+        if (operation) {
+            this._activeOperations.delete(operationId);
+
+            const panel = context.getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    type: 'operationCompleted',
+                    operationId
+                });
+            }
+        }
+    }
+
+    // ============= EXPORT HANDLERS =============
+
+    /**
+     * Unified export handler - handles ALL export operations
+     */
+    private async handleExport(options: any, context: CommandContext, operationId?: string): Promise<void> {
+        try {
+            // Get document (with fallback to file path if document is closed)
+            let document = context.fileManager.getDocument();
+            if (!document) {
+                const filePath = context.fileManager.getFilePath();
+                if (filePath) {
+                    try {
+                        document = await vscode.workspace.openTextDocument(filePath);
+                    } catch (error) {
+                        console.error('[ExportCommands.handleExport] Failed to open document from file path:', error);
+                    }
+                }
+            }
+            if (!document) {
+                throw new Error('No document available for export');
+            }
+
+            // Handle AUTO mode specially (register save handler)
+            if (options.mode === 'auto') {
+                return await this.handleAutoExportMode(document, options, context);
+            }
+
+            // Get board for ANY conversion exports (use in-memory board data)
+            const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
+
+            // Handle COPY mode (no progress bar)
+            if (options.mode === 'copy') {
+                const result = await ExportService.export(document, options, board);
+
+                const panel = context.getWebviewPanel();
+                if (panel && (panel as any)._panel) {
+                    (panel as any)._panel.webview.postMessage({
+                        type: 'copyContentResult',
+                        result: result
+                    });
+                }
+
+                if (!result.success) {
+                    vscode.window.showErrorMessage(result.message);
+                }
+                return;
+            }
+
+            // Handle SAVE / PREVIEW modes (with progress bar)
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: `Exporting...`,
+                cancellable: false
+            }, async (progress) => {
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 20, context, 'Processing content...');
+                }
+                progress.report({ increment: 20, message: 'Processing content...' });
+
+                const result = await ExportService.export(document!, options, board);
+
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 90, context, 'Finalizing...');
+                }
+                progress.report({ increment: 80, message: 'Finalizing...' });
+
+                // Send result to webview
+                const panel = context.getWebviewPanel();
+                if (panel && (panel as any)._panel) {
+                    (panel as any)._panel.webview.postMessage({
+                        type: 'exportResult',
+                        result: result
+                    });
+                }
+
+                if (operationId) {
+                    await this.updateOperationProgress(operationId, 100, context);
+                }
+
+                // Show result message
+                if (result.success) {
+                    vscode.window.showInformationMessage(result.message);
+                } else {
+                    vscode.window.showErrorMessage(result.message);
+                }
+            });
+
+        } catch (error) {
+            console.error('[ExportCommands.handleExport] Error:', error);
+            vscode.window.showErrorMessage(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Handle auto-export mode (register save handler)
+     */
+    private async handleAutoExportMode(document: vscode.TextDocument, options: any, context: CommandContext): Promise<void> {
+        // Store settings
+        context.setAutoExportSettings(options);
+
+        // Get board for conversion exports
+        const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
+
+        // Do initial export FIRST (to start Marp if needed)
+        const initialResult = await ExportService.export(document, options, board);
+
+        // NOW stop existing handlers/processes for other files
+        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, context, initialResult.exportedPath);
+
+        const docUri = document.uri;
+        const coordinator = SaveEventCoordinator.getInstance();
+
+        // Register handler
+        const handler: SaveEventHandler = {
+            id: `auto-export-${docUri.fsPath}`,
+            handleSave: async (savedDoc: vscode.TextDocument) => {
+                if (savedDoc.uri.toString() === docUri.toString()) {
+                    // For Marp watch mode, update markdown only
+                    if (options.marpWatch) {
+                        try {
+                            const boardForUpdate = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
+                            await ExportService.export(savedDoc, options, boardForUpdate);
+                        } catch (error) {
+                            console.error('[ExportCommands.autoExport] Markdown update failed:', error);
+                        }
+                        return;
+                    }
+
+                    try {
+                        const boardForExport = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
+                        const result = await ExportService.export(savedDoc, options, boardForExport);
+
+                        if (result.success && options.openAfterExport && result.exportedPath) {
+                            const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');
+                            await vscode.env.openExternal(uri);
+                        }
+                    } catch (error) {
+                        console.error('[ExportCommands.autoExport] Auto-export failed:', error);
+                        vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                }
+            }
+        };
+
+        coordinator.registerHandler(handler);
+    }
+
+    /**
+     * Stop auto-export
+     */
+    private async handleStopAutoExport(context: CommandContext): Promise<void> {
+        try {
+            // Unregister from SaveEventCoordinator
+            const doc = context.fileManager.getDocument();
+            if (doc) {
+                const coordinator = SaveEventCoordinator.getInstance();
+                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
+            }
+
+            // Stop all Marp watch processes
+            MarpExportService.stopAllMarpWatches();
+
+            context.setAutoExportSettings(null);
+
+            // Notify frontend to hide the auto-export button
+            const panel = context.getWebviewPanel();
+            if (panel && panel.webview) {
+                panel.webview.postMessage({
+                    type: 'autoExportStopped'
+                });
+            } else {
+                console.warn('[ExportCommands.handleStopAutoExport] No webview panel available to send message');
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleStopAutoExport] Error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stop auto-export for other kanban files (not generated files from current export)
+     */
+    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, context: CommandContext, protectExportedPath?: string): Promise<void> {
+        try {
+            // Unregister from SaveEventCoordinator
+            const doc = context.fileManager.getDocument();
+            if (doc) {
+                const coordinator = SaveEventCoordinator.getInstance();
+                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
+            }
+
+            // Stop Marp watch processes for OTHER files (not the current export)
+            if (protectExportedPath) {
+                ExportService.stopAllMarpWatchesExcept(protectExportedPath);
+            } else {
+                MarpExportService.stopAllMarpWatches();
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleStopAutoExportForOtherKanbanFiles] Error:', error);
+            throw error;
+        }
+    }
+
+    // ============= EXPORT FOLDER HANDLERS =============
+
+    /**
+     * Get default export folder
+     */
+    private async handleGetExportDefaultFolder(context: CommandContext): Promise<void> {
+        try {
+            let document = context.fileManager.getDocument();
+
+            // If document not available from FileManager, try to get the file path and open it
+            if (!document) {
+                const filePath = context.fileManager.getFilePath();
+
+                if (filePath) {
+                    try {
+                        document = await vscode.workspace.openTextDocument(filePath);
+                    } catch (error) {
+                        console.error('[ExportCommands.getExportDefaultFolder] Failed to open document from file path:', error);
+                    }
+                }
+
+                // If still no document, try active editor as last resort
+                if (!document) {
+                    const activeEditor = vscode.window.activeTextEditor;
+                    if (activeEditor && activeEditor.document.fileName.endsWith('.md')) {
+                        document = activeEditor.document;
+                    }
+                }
+            }
+
+            if (!document) {
+                console.error('[ExportCommands.getExportDefaultFolder] No document available for export');
+                return;
+            }
+
+            const defaultFolder = ExportService.generateDefaultExportFolder(document.uri.fsPath);
+            const panel = context.getWebviewPanel();
+            if (panel && (panel as any)._panel) {
+                (panel as any)._panel.webview.postMessage({
+                    type: 'exportDefaultFolder',
+                    folderPath: defaultFolder
+                });
+            }
+        } catch (error) {
+            console.error('[ExportCommands.getExportDefaultFolder] Error:', error);
+        }
+    }
+
+    /**
+     * Select export folder via dialog
+     */
+    private async handleSelectExportFolder(context: CommandContext, defaultPath?: string): Promise<void> {
+        try {
+            const result = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Export Folder',
+                defaultUri: defaultPath ? safeFileUri(defaultPath, 'ExportCommands-selectExportFolder') : undefined
+            });
+
+            if (result && result[0]) {
+                const panel = context.getWebviewPanel();
+                if (panel && (panel as any)._panel) {
+                    (panel as any)._panel.webview.postMessage({
+                        type: 'exportFolderSelected',
+                        folderPath: result[0].fsPath
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error selecting export folder:', error);
+        }
+    }
+
+    /**
+     * Ask to open export folder after export
+     */
+    private async handleAskOpenExportFolder(exportPath: string): Promise<void> {
+        try {
+            const folderPath = path.dirname(exportPath);
+            const result = await vscode.window.showInformationMessage(
+                'Export completed successfully!',
+                'Open Export Folder',
+                'Dismiss'
+            );
+
+            if (result === 'Open Export Folder') {
+                await vscode.commands.executeCommand('vscode.openFolder', safeFileUri(folderPath, 'ExportCommands-openExportFolder'), true);
+            }
+        } catch (error) {
+            console.error('Error handling export folder open request:', error);
+        }
+    }
+
+    // ============= MARP HANDLERS =============
+
+    /**
+     * Get available Marp themes
+     */
+    private async handleGetMarpThemes(context: CommandContext): Promise<void> {
+        try {
+            const themes = await MarpExportService.getAvailableThemes();
+
+            const panel = context.getWebviewPanel();
+
+            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                const message = {
+                    type: 'marpThemesAvailable',
+                    themes: themes
+                };
+
+                (panel as any)._panel.webview.postMessage(message);
+            } else {
+                console.error('[ExportCommands.handleGetMarpThemes] No webview panel available');
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleGetMarpThemes] Error:', error);
+
+            const panel = context.getWebviewPanel();
+            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                const message = {
+                    type: 'marpThemesAvailable',
+                    themes: ['default'], // Fallback
+                    error: error instanceof Error ? error.message : String(error)
+                };
+                (panel as any)._panel.webview.postMessage(message);
+            }
+        }
+    }
+
+    /**
+     * Poll for Marp themes (fallback mechanism)
+     */
+    private async handlePollMarpThemes(context: CommandContext): Promise<void> {
+        try {
+            // Check if we have cached themes from the previous attempt
+            const cachedThemes = (globalThis as any).pendingMarpThemes;
+            if (cachedThemes) {
+                const panel = context.getWebviewPanel();
+                if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                    (panel as any)._panel.webview.postMessage({
+                        type: 'marpThemesAvailable',
+                        themes: cachedThemes
+                    });
+                    // Clear the cache
+                    delete (globalThis as any).pendingMarpThemes;
+                    return;
+                }
+            }
+
+            // If no cached themes, try to get them again
+            const themes = await MarpExportService.getAvailableThemes();
+
+            const panel = context.getWebviewPanel();
+            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                (panel as any)._panel.webview.postMessage({
+                    type: 'marpThemesAvailable',
+                    themes: themes
+                });
+            } else {
+                console.error('[ExportCommands.handlePollMarpThemes] Still no webview panel available');
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handlePollMarpThemes] Error:', error);
+        }
+    }
+
+    /**
+     * Open a markdown file in Marp preview
+     */
+    private async handleOpenInMarpPreview(filePath: string): Promise<void> {
+        try {
+            await MarpExtensionService.openInMarpPreview(filePath);
+        } catch (error) {
+            console.error('[ExportCommands.handleOpenInMarpPreview] Error:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Check Marp status and send to frontend
+     */
+    private async handleCheckMarpStatus(context: CommandContext): Promise<void> {
+        try {
+            const marpExtensionStatus = MarpExtensionService.getMarpStatus();
+            const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
+            const engineFileExists = MarpExportService.engineFileExists();
+            const enginePath = MarpExportService.getEnginePath();
+
+            const panel = context.getWebviewPanel();
+            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                (panel as any)._panel.webview.postMessage({
+                    type: 'marpStatus',
+                    extensionInstalled: marpExtensionStatus.installed,
+                    extensionVersion: marpExtensionStatus.version,
+                    cliAvailable: marpCliAvailable,
+                    engineFileExists: engineFileExists,
+                    enginePath: enginePath
+                });
+            } else {
+                console.error('[ExportCommands.handleCheckMarpStatus] No webview panel available');
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleCheckMarpStatus] Error:', error);
+        }
+    }
+
+    /**
+     * Get available Marp CSS classes
+     */
+    private async handleGetMarpAvailableClasses(context: CommandContext): Promise<void> {
+        try {
+            const config = ConfigurationService.getInstance();
+            const marpConfig = config.getConfig('marp');
+            const availableClasses = marpConfig.availableClasses || [];
+
+            const panel = context.getWebviewPanel();
+            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
+                (panel as any)._panel.webview.postMessage({
+                    type: 'marpAvailableClasses',
+                    classes: availableClasses
+                });
+            }
+        } catch (error) {
+            console.error('[ExportCommands.handleGetMarpAvailableClasses] Error:', error);
         }
     }
 }
