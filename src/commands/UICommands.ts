@@ -49,7 +49,7 @@ export class UICommands extends BaseMessageCommand {
                 case 'requestBoardUpdate':
                     return await this.handleRequestBoardUpdate(context);
                 case 'saveBoardState':
-                    return await this.handleSaveBoardState(context);
+                    return await this.handleSaveBoardState(message, context);
                 case 'showMessage':
                     return await this.handleShowMessage(message, context);
                 case 'showError':
@@ -141,12 +141,27 @@ export class UICommands extends BaseMessageCommand {
 
     /**
      * Handle saveBoardState command
+     * This is called when user presses Cmd+S to save all changes
      */
-    private async handleSaveBoardState(context: CommandContext): Promise<CommandResult> {
-        const board = context.getCurrentBoard();
-        if (board) {
-            context.boardStore.saveStateForUndo(board);
+    private async handleSaveBoardState(message: any, context: CommandContext): Promise<CommandResult> {
+        const board = message.board;
+        if (!board) {
+            console.warn('[UICommands.saveBoardState] No board data received');
+            return this.success();
         }
+
+        // NOTE: Do not save undo state here - individual operations already saved their undo states
+        // before making changes. Saving here would create duplicate/grouped undo states.
+
+        // Replace the current board with the new one from the frontend
+        context.setBoard(board);
+
+        // Save to markdown file
+        await context.onSaveToMarkdown();
+
+        // Mark as saved (no unsaved changes)
+        context.markUnsavedChanges(false);
+
         return this.success();
     }
 

@@ -704,58 +704,8 @@ export class MessageHandler {
         }
     }
 
-    private async handleSaveBoardState(board: any) {
-        if (!board) {
-            console.warn('❌ No board data received for saving');
-            return;
-        }
-
-
-        // Log each column's includeMode status
-        if (board.columns) {
-            for (const col of board.columns) {
-            }
-        }
-
-        // NOTE: Do not save undo state here - individual operations already saved their undo states
-        // before making changes. Saving here would create duplicate/grouped undo states.
-
-        // Replace the current board with the new one
-        this._setBoard(board);
-
-        // Save to markdown file only - do NOT trigger board update
-        // The webview already has the correct state (it sent us this board)
-        // Triggering _onBoardUpdate() would cause folding state to be lost
-        await this._onSaveToMarkdown();
-
-        // Trigger marpWatch export if active
-        if (this._autoExportSettings?.marpWatch) {
-            // Get document from fileManager, or reopen from file path if needed
-            let document = this._fileManager.getDocument();
-            const filePath = this._fileManager.getFilePath();
-
-            // If document is closed but we have a file path, reopen it
-            if (!document && filePath) {
-                const vscode = require('vscode');
-                try {
-                    document = await vscode.workspace.openTextDocument(filePath);
-                } catch (error) {
-                    console.error(`[MessageHandler.saveBoardState] Failed to reopen document:`, error);
-                }
-            }
-
-            if (document) {
-                const ExportService = require('./exportService').ExportService;
-                try {
-                    await ExportService.export(document, this._autoExportSettings, board);
-                } catch (error) {
-                    console.error('[MessageHandler.saveBoardState] MarpWatch export failed:', error);
-                }
-            }
-        }
-
-        // No board update needed - webview state is already correct
-    }
+    // NOTE: handleSaveBoardState was removed - now handled by UICommands.handleSaveBoardState
+    // which properly receives the board data from the message and saves it via context.onSaveToMarkdown()
 
     /**
      * STATE-3: Unified board action method
