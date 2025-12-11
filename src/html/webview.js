@@ -5802,12 +5802,24 @@ function handleUseMarpChange() {
 function handleMarpOutputFormatChange() {
     const outputFormatSelect = document.getElementById('marp-output-format');
     const pptxEditableCheckbox = document.getElementById('marp-pptx-editable');
+    const previewCheckbox = document.getElementById('marp-preview');
     const handoutCheckbox = document.getElementById('marp-handout');
     const handoutRow = document.getElementById('marp-handout-row');
 
     if (outputFormatSelect && pptxEditableCheckbox) {
+        const isHtml = outputFormatSelect.value === 'html';
         const isPptx = outputFormatSelect.value === 'pptx';
         const isPdf = outputFormatSelect.value === 'pdf';
+
+        // Live preview is only available for HTML format
+        if (previewCheckbox) {
+            if (isHtml) {
+                previewCheckbox.disabled = false;
+            } else {
+                previewCheckbox.disabled = true;
+                previewCheckbox.checked = false;
+            }
+        }
 
         if (isPptx) {
             // Enable checkbox for PowerPoint format

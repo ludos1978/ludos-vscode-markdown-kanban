@@ -28,7 +28,6 @@ import {
     MainKanbanFile,
     IncludeFile
 } from './files';
-import { MainFileCoordinator, ChangeAnalysis, ChangeType } from './core/state-machine';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
@@ -58,9 +57,6 @@ export class KanbanWebviewPanel {
     // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
-
-    // State machine coordinator for unified change handling
-    private _changeCoordinator: MainFileCoordinator | null = null;
 
     private _stateMachine: ChangeStateMachine;
     private _includeSwitchInProgress: boolean = false; // Protects cache during include switches
@@ -1335,15 +1331,6 @@ export class KanbanWebviewPanel {
             mainFile = this._fileFactory.createMainFile(filePath);
             this._fileRegistry.register(mainFile);
             mainFile.startWatching();
-
-            // Initialize change coordinator for this main file
-            if (!this._changeCoordinator) {
-                this._changeCoordinator = new MainFileCoordinator(filePath, {
-                    enableLogging: true,
-                    maxHistorySize: 50,
-                    enableAutoRollback: true
-                });
-            }
         }
 
         // Load content into file instance directly from document/disk
@@ -1623,15 +1610,6 @@ export class KanbanWebviewPanel {
                         this._fileRegistry.register(columnInclude);
                         columnInclude.startWatching();
 
-                        // Register with coordinator
-                        if (this._changeCoordinator) {
-                            this._changeCoordinator.registerIncludeFile(
-                                relativePath,
-                                'column',
-                                columnInclude.getPath()
-                            );
-                        }
-
                         createdCount++;
                     }
                 }
@@ -1669,15 +1647,6 @@ export class KanbanWebviewPanel {
                             this._fileRegistry.register(taskInclude);
                             taskInclude.startWatching();
 
-                            // Register with coordinator
-                            if (this._changeCoordinator) {
-                                this._changeCoordinator.registerIncludeFile(
-                                    relativePath,
-                                    'task',
-                                    taskInclude.getPath()
-                                );
-                            }
-
                             createdCount++;
                         }
                     }
@@ -1709,15 +1678,6 @@ export class KanbanWebviewPanel {
                 // Register and start watching
                 this._fileRegistry.register(regularInclude);
                 regularInclude.startWatching();
-
-                // Register with coordinator
-                if (this._changeCoordinator) {
-                    this._changeCoordinator.registerIncludeFile(
-                        relativePath,
-                        'regular',
-                        regularInclude.getPath()
-                    );
-                }
 
                 createdCount++;
             }
@@ -1776,7 +1736,6 @@ export class KanbanWebviewPanel {
      * UNIFIED CONTENT CHANGE HANDLER (State Machine Integrated)
      *
      * Single entry point for ALL content changes (external, edits, switches)
-     * Now uses MainFileCoordinator for state machine management.
      *
      * Flow: STABLE → DETECTING_CHANGES → ANALYZING → COORDINATING_INCLUDES → UPDATING_UI → STABLE
      *

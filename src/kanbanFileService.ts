@@ -9,7 +9,6 @@ import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
 import { BoardOperations } from './boardOperations';
 import { SaveCoordinator } from './core/SaveCoordinator';
-import { IEventBus } from './core/interfaces/IEventBus';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -69,31 +68,12 @@ export class KanbanFileService {
         private undoRedoManagerClear: () => void,
         private panelStates: Map<string, any>,
         private panels: Map<string, any>,
-        private getPanelInstance: () => any,  // Returns KanbanWebviewPanel instance
-        private eventBus?: IEventBus
+        private getPanelInstance: () => any  // Returns KanbanWebviewPanel instance
     ) {
         this._panelId = Math.random().toString(36).substr(2, 9);
 
         // Initialize new architecture components
         this._saveCoordinator = SaveCoordinator.getInstance();
-    }
-
-    private createMockEventBus(): IEventBus {
-        return {
-            publish: async (event: any) => {
-            },
-            subscribe: (eventType: string, handler: any) => {
-                return {
-                    unsubscribe: () => {},
-                    isActive: () => true
-                };
-            },
-            unsubscribe: (eventType: string, handler: any) => {
-            },
-            getSubscriberCount: (eventType: string) => 0,
-            clear: () => {
-            }
-        };
     }
 
     /**

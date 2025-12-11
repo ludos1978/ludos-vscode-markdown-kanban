@@ -1913,15 +1913,9 @@ export class ExportService {
         // Build output filename
         const sourcePath = sourceDocument.uri.fsPath;
         const sourceBasename = path.basename(sourcePath, '.md');
-        let outputBasename = sourceBasename;
-
-        // Add suffix for partial exports (when specific columns selected)
-        if (options.columnIndexes && options.columnIndexes.length > 0) {
-            outputBasename = `${sourceBasename}-partial`;
-        }
 
         // Write markdown file
-        const markdownPath = path.join(options.targetFolder, `${outputBasename}.md`);
+        const markdownPath = path.join(options.targetFolder, `${sourceBasename}.md`);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
 
         // Handle Marp conversion
