@@ -147,17 +147,18 @@ export class MarpExportService {
             // Build Marp CLI arguments using input file path
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
 
-            // Log for debugging
-
-            // if (options.watchMode) {
-            // WATCH MODE: Run Marp as detached background process
-
             // IMPORTANT: Use the directory of the input file as CWD
             // This ensures markdown-it-include resolves paths relative to the markdown file location
             const inputFileDir = path.dirname(options.inputFilePath);
 
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
+
+            // Debug logging for Marp arguments
+            console.log(`[kanban.MarpExportService] Input file: ${options.inputFilePath}`);
+            console.log(`[kanban.MarpExportService] Input file exists: ${fs.existsSync(options.inputFilePath)}`);
+            console.log(`[kanban.MarpExportService] CWD: ${inputFileDir}`);
+            console.log(`[kanban.MarpExportService] Command: ${command} ${commandArgs.join(' ')}`);
 
             // Build environment with handout settings if enabled
             // Handout mode only applies to PDF output - for HTML, generate normal presentation
@@ -169,79 +170,89 @@ export class MarpExportService {
                 env.MARP_HANDOUT_DIRECTION = options.handoutDirection || 'horizontal';
             }
 
-            // Spawn Marp as a detached background process
-            // Use 'pipe' for stdio to capture errors for debugging
-            const marpProcess = spawn(command, commandArgs, {
-                cwd: inputFileDir,  // Use input file directory, not workspace root
-                detached: true,
-                stdio: ['ignore', 'pipe', 'pipe'], // stdin: ignore, stdout: pipe, stderr: pipe
-                env: env
-            });
-
-            // Capture stdout for debugging if needed
-            if (marpProcess.stdout) {
-                marpProcess.stdout.on('data', () => {
-                    // Stdout captured but not logged by default
+            // WATCH MODE: Spawn detached background process and return immediately
+            // NON-WATCH MODE: Wait for process to complete before returning
+            if (options.watchMode) {
+                // Spawn Marp as a detached background process
+                const marpProcess = spawn(command, commandArgs, {
+                    cwd: inputFileDir,
+                    detached: true,
+                    stdio: ['ignore', 'pipe', 'pipe'],
+                    env: env
                 });
-            }
 
-            if (marpProcess.stderr) {
-                marpProcess.stderr.on('data', (data) => {
-                    console.error(`[kanban.MarpExportService.stderr] ${data.toString()}`);
-                });
-            }
-
-            // Handle process errors
-            marpProcess.on('error', (error) => {
-                console.error(`[kanban.MarpExportService] Process error:`, error);
-            });
-
-            marpProcess.on('exit', async (code, signal) => {
-                if (options.inputFilePath) {
-                    this.marpProcessPids.delete(options.inputFilePath);
+                if (marpProcess.stderr) {
+                    marpProcess.stderr.on('data', (data) => {
+                        const output = data.toString();
+                        // Marp sends all output to stderr - only log errors, not INFO/WARN
+                        if (output.includes('[ERROR]') || output.includes('Error:')) {
+                            console.error(`[kanban.MarpExportService] ${output}`);
+                        }
+                    });
                 }
 
-                // Post-process for handout mode (only for non-watch exports)
-                if (options.handout && !options.watchMode && code === 0) {
-                    await this.runHandoutPostProcess(options);
+                marpProcess.on('error', (error) => {
+                    console.error(`[kanban.MarpExportService] Process error:`, error);
+                });
+
+                marpProcess.on('exit', () => {
+                    if (options.inputFilePath) {
+                        this.marpProcessPids.delete(options.inputFilePath);
+                    }
+                });
+
+                // Detach from parent process to allow it to run independently
+                marpProcess.unref();
+
+                // Store the PID for later termination
+                if (options.inputFilePath && marpProcess.pid) {
+                    this.storeMarpPid(options.inputFilePath, marpProcess.pid);
                 }
-            });
-
-            // Detach from parent process to allow it to run independently
-            marpProcess.unref();
-
-
-            // Store the PID in MarpExportService for later termination
-            if (options.inputFilePath && marpProcess.pid) {
-                this.storeMarpPid(options.inputFilePath, marpProcess.pid);
             } else {
-                console.warn(`[kanban.MarpExportService] Could not store PID - inputFilePath: ${options.inputFilePath}, pid: ${marpProcess.pid}`);
+                // NON-WATCH MODE: Wait for Marp to complete (PDF, PPTX, HTML save)
+                await new Promise<void>((resolve, reject) => {
+                    const marpProcess = spawn(command, commandArgs, {
+                        cwd: inputFileDir,
+                        stdio: ['ignore', 'pipe', 'pipe'],
+                        env: env
+                    });
+
+                    let stderrOutput = '';
+
+                    if (marpProcess.stderr) {
+                        marpProcess.stderr.on('data', (data) => {
+                            const output = data.toString();
+                            stderrOutput += output;
+                            // Marp sends all output to stderr - only log errors, not INFO/WARN
+                            if (output.includes('[ERROR]') || output.includes('Error:')) {
+                                console.error(`[kanban.MarpExportService] ${output}`);
+                            }
+                        });
+                    }
+
+                    marpProcess.on('error', (error) => {
+                        console.error(`[kanban.MarpExportService] Process error:`, error);
+                        reject(error);
+                    });
+
+                    marpProcess.on('exit', async (code) => {
+                        if (code === 0) {
+                            // Post-process for handout mode
+                            if (options.handout) {
+                                await this.runHandoutPostProcess(options);
+                            }
+                            resolve();
+                        } else {
+                            // Check if the error is just a warning (Marp sometimes exits 0 with warnings)
+                            if (stderrOutput.includes('Not found processable Markdown')) {
+                                reject(new Error('Marp could not find processable Markdown file'));
+                            } else {
+                                reject(new Error(`Marp export failed with exit code ${code}`));
+                            }
+                        }
+                    });
+                });
             }
-            // } 
-            // else {
-            //     // NORMAL MODE: Run Marp synchronously and wait for completion
-
-            //     let exitCode: number;
-
-            //     if (workspaceFolders && workspaceFolders.length > 0) {
-            //         const originalCwd = process.cwd();
-            //         const workspaceRoot = workspaceFolders[0].uri.fsPath;
-
-            //         try {
-            //             process.chdir(workspaceRoot);
-            //             exitCode = await marpCli(args);
-            //         } finally {
-            //             process.chdir(originalCwd);
-            //         }
-            //     } else {
-            //         exitCode = await marpCli(args);
-            //     }
-
-            //     if (exitCode !== 0) {
-            //         throw new Error(`Marp export failed with exit code ${exitCode}`);
-            //     }
-
-            // }
 
         } catch (error) {
             console.error('[kanban.MarpExportService] Export failed:', error);
@@ -256,7 +267,8 @@ export class MarpExportService {
      * @returns Array of CLI arguments
      */
     private static buildMarpCliArgs(inputPath: string, options: MarpExportOptions): string[] {
-        const args: string[] = [inputPath];
+        // Build args array - input file will be added at the END (marp [options] <files...>)
+        const args: string[] = [];
 
         // Output format - must be html, pdf, or pptx
         // Format comes from UI dropdown, so should always be valid
@@ -280,7 +292,7 @@ export class MarpExportService {
         }
 
         // Output path (only for non-markdown formats, but not for HTML with preview)
-        if (options.format !== 'markdown' && !(options.format === 'html' && args.includes('--preview'))) {
+        if (options.format !== 'markdown' && !(options.format === 'html' && options.watchMode)) {
             args.push('--output', options.outputPath);
         }
 
@@ -382,7 +394,8 @@ export class MarpExportService {
             args.push(...options.additionalArgs);
         }
 
-        // Final log of all arguments
+        // Input file MUST come at the end (marp [options] <files...>)
+        args.push(inputPath);
 
         return args;
     }

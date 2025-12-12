@@ -2972,11 +2972,13 @@ function enforceFoldModesForStacks(stackElement = null) {
 
         // ENFORCE: Multi-column stacks ONLY allow horizontal folding
         if (columns.length > 1) {
+            let convertedAny = false;
             columns.forEach(col => {
                 if (col.classList.contains('collapsed-vertical')) {
                     // Convert any vertically-folded columns to horizontal
                     col.classList.remove('collapsed-vertical');
                     col.classList.add('collapsed-horizontal');
+                    convertedAny = true;
 
                     // Update stored fold mode
                     const columnId = col.getAttribute('data-column-id');
@@ -2985,6 +2987,11 @@ function enforceFoldModesForStacks(stackElement = null) {
                     }
                 }
             });
+
+            // If we converted any columns, the stack can no longer be all-vertical-folded
+            if (convertedAny) {
+                stack.classList.remove('all-vertical-folded');
+            }
         }
     });
 }
