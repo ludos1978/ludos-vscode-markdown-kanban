@@ -12,6 +12,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getMermaidExportService } from '../services/export/MermaidExportService';
+import { escapeRegExp } from '../utils/stringUtils';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -197,9 +198,7 @@ export class DiagramCommands extends BaseMessageCommand {
         // Split the code into lines to handle per-line matching with indentation
         // NOTE: The frontend sends TRIMMED code, but the file may have indented code
         const codeLines = plantUMLCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line =>
-            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        );
+        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
         // Each line can have any indentation, then the trimmed content
         const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
 
@@ -350,9 +349,7 @@ ${plantUMLCode}
 
         // Split the code into lines to handle per-line matching with indentation
         const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line =>
-            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        );
+        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
         // Each line can have any indentation, then the trimmed content
         const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
 

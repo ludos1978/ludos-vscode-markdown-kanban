@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { escapeRegExp } from './utils/stringUtils';
 
 export class FileSearchService {
     private _extensionUri?: vscode.Uri;
@@ -353,7 +354,6 @@ export class FileSearchService {
                     ? `Searching for "${rawTerm}"…`
                     : 'Type to search by filename';
 
-                const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const makeRegex = (pattern: string): RegExp | undefined => {
                     try {
                         return new RegExp(pattern, caseSensitive ? '' : 'i');

@@ -1847,16 +1847,6 @@ export class KanbanWebviewPanel {
         return this._fileRegistry.saveColumnIncludeChanges(column);
     }
 
-    /**
-     * Save modifications from task includes back to their original files
-     * This enables bidirectional editing for task includes
-     * NOTE: This method is not currently used - task includes are processed automatically by the registry
-     */
-    public async reprocessTaskIncludes(): Promise<void> {
-        // No-op: Registry handles task include processing automatically
-        return Promise.resolve();
-    }
-
     public async checkTaskIncludeUnsavedChanges(task: KanbanTask): Promise<boolean> {
         return this._fileRegistry.checkTaskIncludeUnsavedChanges(task);
     }

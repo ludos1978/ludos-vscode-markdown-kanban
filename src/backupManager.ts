@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { configService } from './configurationService';
+import { escapeRegExp } from './utils/stringUtils';
 
 export interface BackupOptions {
     label?: string;           // 'backup', 'conflict', etc.
@@ -286,7 +287,7 @@ export class BackupManager {
             // Only clean up backup files with timestamps, NOT autosave or conflict files
             // Pattern matches: .basename-backup-YYYYMMDDTHHmmss.md
             // This EXCLUDES: autosave (single file) and conflict files (user-created)
-            const backupPattern = new RegExp(`^\\.${basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-backup-\\d{8}T\\d{6}\\.md$`);
+            const backupPattern = new RegExp(`^\\.${escapeRegExp(basename)}-backup-\\d{8}T\\d{6}\\.md$`);
 
             const files = fs.readdirSync(backupDir);
             const backupFiles = files
@@ -358,7 +359,7 @@ export class BackupManager {
             
             // Match backup files (with timestamp)
             // This includes: .basename-backup-YYYYMMDDTHHmmss.md, .basename-conflict-YYYYMMDDTHHmmss.md
-            const backupPattern = new RegExp(`^\\.${basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(backup|conflict)-(\\d{8}T\\d{6})\\.md$`);
+            const backupPattern = new RegExp(`^\\.${escapeRegExp(basename)}-(backup|conflict)-(\\d{8}T\\d{6})\\.md$`);
 
             const files = fs.readdirSync(dir);
             const backups = files

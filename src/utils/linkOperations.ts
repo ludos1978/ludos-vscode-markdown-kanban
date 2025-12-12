@@ -1,10 +1,12 @@
+import { escapeRegExp } from './stringUtils';
+
 /**
  * LinkOperations - Pure utility functions for link replacement operations
  *
  * This class provides static methods for replacing links in markdown text,
  * handling various link formats including regular links, wiki links, images,
  * and strikethrough links.
- * 
+ *
  * State: manually verified.
  */
 export class LinkOperations {
@@ -56,7 +58,7 @@ export class LinkOperations {
         if (!text) { return text; }
 
         // Escape special regex characters in the original path
-        const escapedPath = originalPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedPath = escapeRegExp(originalPath);
 
         // Define all patterns we need to check
         const patterns = [
@@ -153,7 +155,7 @@ export class LinkOperations {
      */
     public static replaceMatchAtPosition(text: string, matchInfo: any, originalPath: string, encodedNewPath: string): string {
         const { match, type, start, end } = matchInfo;
-        const escapedPath = originalPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedPath = escapeRegExp(originalPath);
 
         let replacement = '';
 

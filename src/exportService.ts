@@ -13,6 +13,7 @@ import { ConfigurationService } from './configurationService';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
 import { AssetHandler } from './services/assets/AssetHandler';
+import { escapeRegExp } from './utils/stringUtils';
 
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
 
@@ -783,7 +784,7 @@ export class ExportService {
      */
     private static replaceAssetPath(content: string, oldPath: string, newPath: string): string {
         // Escape special regex characters in the old path
-        const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedOldPath = escapeRegExp(oldPath);
 
         // Normalize path separators for cross-platform compatibility
         const normalizedNewPath = newPath.replace(/\\/g, '/');
@@ -1276,7 +1277,7 @@ export class ExportService {
         if (board.columns) {
             for (const column of board.columns) {
                 // Find directive before column header
-                const titleClean = column.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const titleClean = escapeRegExp(column.title);
                 const columnRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*## ${titleClean}`, 'm');
                 const columnMatch = markdown.match(columnRegex);
 
@@ -1289,7 +1290,7 @@ export class ExportService {
                 // Extract from tasks
                 if (column.tasks) {
                     for (const task of column.tasks) {
-                        const taskTitleClean = task.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const taskTitleClean = escapeRegExp(task.title);
                         const taskRegex = new RegExp(`<!-- _class: ([^>]+) -->\\s*- \\[[ x]\\] ${taskTitleClean}`, 'm');
                         const taskMatch = markdown.match(taskRegex);
 

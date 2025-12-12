@@ -13,6 +13,7 @@ import { TemplateService } from './templates/TemplateService';
 import { VariableProcessor } from './templates/VariableProcessor';
 import { FileCopyService } from './templates/FileCopyService';
 import { safeFileUri } from './utils/uriUtils';
+import { escapeRegExp } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands } from './commands';
 import * as vscode from 'vscode';
@@ -976,9 +977,7 @@ export class MessageHandler {
         // Split the code into lines to handle per-line matching with indentation
         // NOTE: The frontend sends TRIMMED code, but the file may have indented code
         const codeLines = plantUMLCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line =>
-            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        );
+        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
         // Each line can have any indentation, then the trimmed content
         const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
 
@@ -1178,9 +1177,7 @@ ${plantUMLCode}
 
         // Split the code into lines to handle per-line matching with indentation
         const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line =>
-            line.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        );
+        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
         // Each line can have any indentation, then the trimmed content
         const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
 
