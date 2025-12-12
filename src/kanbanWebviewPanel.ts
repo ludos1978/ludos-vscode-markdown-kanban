@@ -421,9 +421,6 @@ export class KanbanWebviewPanel {
                     this._state.setUndoRedoOperation(isOperation);
                 },
                 getWebviewPanel: () => this,
-                saveWithBackup: async (label?: string) => {
-                    // TODO: Implement backup creation if needed
-                },
                 markUnsavedChanges: async (hasChanges: boolean, cachedBoard?: any) => {
 
                     if (!this._registryAdapter.isReady()) {
@@ -919,9 +916,6 @@ export class KanbanWebviewPanel {
                 if (fs.existsSync(markdownItPath.fsPath)) {
                     const markdownItUri = this._panel.webview.asWebviewUri(markdownItPath);
                     html = html.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/markdown-it\/[^"]+\/markdown-it\.min\.js"><\/script>/, `<script src="${markdownItUri}"></script>`);
-                    console.log('[KanbanWebviewPanel] Using local markdown-it:', markdownItUri.toString());
-                } else {
-                    console.warn('[KanbanWebviewPanel] Local markdown-it not found at:', markdownItPath.fsPath);
                 }
             } catch (error) {
                 console.warn('[KanbanWebviewPanel] Failed to load local markdown-it:', error);

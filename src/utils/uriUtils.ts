@@ -9,9 +9,6 @@ import * as vscode from 'vscode';
 export function safeFileUri(filePath: string, context?: string): vscode.Uri {
     const contextStr = context ? `[${context}]` : '';
 
-    // Log the attempt
-    console.log(`[URI] ${contextStr} Creating URI for path: "${filePath}"`);
-
     // Check for common issues before calling vscode.Uri.file
     if (!filePath) {
         const error = `${contextStr} Cannot create URI: filePath is empty or undefined`;
@@ -27,27 +24,21 @@ export function safeFileUri(filePath: string, context?: string): vscode.Uri {
 
     // Check for URL-encoded paths that might cause issues
     if (filePath.includes('%')) {
-        console.warn(`[URI WARNING] ${contextStr} Path contains URL-encoded characters: "${filePath}"`);
         // Try to decode it
         try {
-            const decoded = decodeURIComponent(filePath);
-            console.log(`[URI] ${contextStr} Decoded path: "${decoded}"`);
-            filePath = decoded;
+            filePath = decodeURIComponent(filePath);
         } catch (decodeError) {
-            console.warn(`[URI WARNING] ${contextStr} Could not decode path, using as-is`);
+            // Could not decode, use as-is
         }
     }
 
     // Check for scheme-like patterns in the path (common error source)
     const schemeMatch = filePath.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);
     if (schemeMatch) {
-        console.warn(`[URI WARNING] ${contextStr} Path looks like a URI with scheme "${schemeMatch[1]}": "${filePath}"`);
         // If it's already a file:// URI, parse it instead
         if (filePath.startsWith('file://')) {
             try {
-                const parsed = vscode.Uri.parse(filePath);
-                console.log(`[URI] ${contextStr} Parsed existing file:// URI successfully`);
-                return parsed;
+                return vscode.Uri.parse(filePath);
             } catch (parseError) {
                 console.error(`[URI ERROR] ${contextStr} Failed to parse file:// URI: ${parseError}`);
             }
@@ -55,12 +46,10 @@ export function safeFileUri(filePath: string, context?: string): vscode.Uri {
     }
 
     try {
-        const uri = vscode.Uri.file(filePath);
-        return uri;
+        return vscode.Uri.file(filePath);
     } catch (error) {
         const errorMsg = `${contextStr} Failed to create URI from path "${filePath}": ${error}`;
         console.error(`[URI ERROR] ${errorMsg}`);
-        console.error(`[URI ERROR] ${contextStr} Path details: length=${filePath.length}, first 100 chars: "${filePath.substring(0, 100)}"`);
         throw new Error(errorMsg);
     }
 }
@@ -74,8 +63,6 @@ export function safeFileUri(filePath: string, context?: string): vscode.Uri {
 export function safeParseUri(uriString: string, context?: string): vscode.Uri {
     const contextStr = context ? `[${context}]` : '';
 
-    console.log(`[URI] ${contextStr} Parsing URI: "${uriString}"`);
-
     if (!uriString) {
         const error = `${contextStr} Cannot parse URI: uriString is empty or undefined`;
         console.error(`[URI ERROR] ${error}`);
@@ -83,12 +70,10 @@ export function safeParseUri(uriString: string, context?: string): vscode.Uri {
     }
 
     try {
-        const uri = vscode.Uri.parse(uriString);
-        return uri;
+        return vscode.Uri.parse(uriString);
     } catch (error) {
         const errorMsg = `${contextStr} Failed to parse URI "${uriString}": ${error}`;
         console.error(`[URI ERROR] ${errorMsg}`);
-        console.error(`[URI ERROR] ${contextStr} URI details: length=${uriString.length}, first 100 chars: "${uriString.substring(0, 100)}"`);
         throw new Error(errorMsg);
     }
 }

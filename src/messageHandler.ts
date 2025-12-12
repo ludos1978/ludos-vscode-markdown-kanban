@@ -47,7 +47,6 @@ export class MessageHandler {
     private _setBoard: (board: KanbanBoard) => void;
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
-    private _saveWithBackup: () => Promise<void>;
     private _markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
     private _autoExportSettings: any = null;
@@ -82,7 +81,6 @@ export class MessageHandler {
             setBoard: (board: KanbanBoard) => void;
             setUndoRedoOperation: (isOperation: boolean) => void;
             getWebviewPanel: () => any;
-            saveWithBackup: () => Promise<void>;
             markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
         }
     ) {
@@ -98,7 +96,6 @@ export class MessageHandler {
         this._setBoard = callbacks.setBoard;
         this._setUndoRedoOperation = callbacks.setUndoRedoOperation;
         this._getWebviewPanel = callbacks.getWebviewPanel;
-        this._saveWithBackup = callbacks.saveWithBackup;
         this._markUnsavedChanges = callbacks.markUnsavedChanges;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
@@ -125,7 +122,6 @@ export class MessageHandler {
             setBoard: this._setBoard,
             setUndoRedoOperation: this._setUndoRedoOperation,
             getWebviewPanel: this._getWebviewPanel,
-            saveWithBackup: this._saveWithBackup,
             markUnsavedChanges: this._markUnsavedChanges,
             getAutoExportSettings: () => this._autoExportSettings,
             setAutoExportSettings: (settings: any) => { this._autoExportSettings = settings; }
