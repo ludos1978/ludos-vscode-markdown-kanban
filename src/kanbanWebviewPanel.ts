@@ -979,7 +979,6 @@ export class KanbanWebviewPanel {
     private async _syncMainFileToRegistry(document: vscode.TextDocument): Promise<void> {
         const filePath = document.uri.fsPath;
 
-
         // Check if MainKanbanFile already exists
         let mainFile = this._fileRegistry.getMainFile();
 
@@ -1273,7 +1272,6 @@ export class KanbanWebviewPanel {
         const relativePath = file.getRelativePath();
         const fileType = file.getFileType();
 
-
         if (fileType === 'include-column') {
             // Find column that uses this include file
             // FOUNDATION-1: Use normalized path comparison instead of === comparison
@@ -1298,8 +1296,6 @@ export class KanbanWebviewPanel {
                     includeMode: true,
                     includeFiles: column.includeFiles
                 } as any);
-
-
             }
         } else if (fileType === 'include-task') {
             // Find task that uses this include file
@@ -1370,7 +1366,6 @@ export class KanbanWebviewPanel {
                     }
                 }
             }
-
 
             // Send targeted updates for each affected task
             // WebviewBridge batching ensures cache update arrives BEFORE task updates

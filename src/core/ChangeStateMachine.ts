@@ -1359,7 +1359,7 @@ export class ChangeStateMachine {
             'OK'
         );
 
-        console.error(`[ChangeStateMachine] Error in state ${context.state}: ${context.result.error}`);
+        console.error(`[ChangeStateMachine] Error: ${context.result.error}`);
 
         // Clear cache protection flag in case it was set
         if (this._webviewPanel) {
