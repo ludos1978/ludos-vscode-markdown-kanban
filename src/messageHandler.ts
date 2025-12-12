@@ -10,7 +10,6 @@ import { MarpExtensionService } from './services/export/MarpExtensionService';
 import { MarpExportService } from './services/export/MarpExportService';
 import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { PlantUMLService } from './plantUMLService';
-import { getMermaidExportService } from './services/export/MermaidExportService';
 import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
@@ -48,7 +47,6 @@ export class MessageHandler {
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
     private _markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
-    private _activeOperations = new Map<string, { type: string, startTime: number }>();
     private _autoExportSettings: any = null;
 
     // Command Pattern: Registry for message handlers
@@ -245,21 +243,6 @@ export class MessageHandler {
         }
     }
 
-    private async startOperation(operationId: string, type: string, description: string) {
-        this._activeOperations.set(operationId, { type, startTime: Date.now() });
-
-        // Send to frontend
-        const panel = this._getWebviewPanel();
-        if (panel && panel.webview) {
-            panel.webview.postMessage({
-                type: 'operationStarted',
-                operationId,
-                operationType: type,
-                description
-            });
-        }
-    }
-
     private async updateOperationProgress(operationId: string, progress: number, message?: string) {
         const panel = this._getWebviewPanel();
         if (panel && panel.webview) {
@@ -272,35 +255,7 @@ export class MessageHandler {
         }
     }
 
-    private async endOperation(operationId: string) {
-        const operation = this._activeOperations.get(operationId);
-        if (operation) {
-            this._activeOperations.delete(operationId);
-
-            // Send to frontend
-            const panel = this._getWebviewPanel();
-            if (panel && panel.webview) {
-                panel.webview.postMessage({
-                    type: 'operationCompleted',
-                    operationId
-                });
-            }
-        }
-    }
-
     public async handleMessage(message: any): Promise<void> {
-        // CRITICAL: Log IMMEDIATELY with zero overhead
-
-        if (message.type?.includes?.('task') || message.type?.includes?.('Task') || message.type === 'editTask') {
-            const detailMsg = `🟢 [handleMessage] TASK MESSAGE: ${JSON.stringify({
-                type: message.type,
-                taskId: message.taskId,
-                columnId: message.columnId,
-                title: message.title,
-                taskDataKeys: Object.keys(message.taskData || {})
-            })}`;
-        }
-
         // Command Pattern: All message handling is done via CommandRegistry
         if (this._commandRegistry.canHandle(message.type)) {
             const result = await this._commandRegistry.execute(message);

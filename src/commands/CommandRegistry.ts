@@ -9,7 +9,7 @@
  * @module commands/CommandRegistry
  */
 
-import { MessageCommand, CommandContext, CommandResult, CommandMetadata } from './interfaces/MessageCommand';
+import { MessageCommand, CommandContext, CommandResult } from './interfaces/MessageCommand';
 
 /**
  * Validation result for command registration

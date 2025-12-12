@@ -3,7 +3,7 @@ import { PresentationParser } from './presentationParser';
 import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
-import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from './constants/IncludeConstants';
+import { createDisplayTitleWithPlaceholders } from './constants/IncludeConstants';
 import { PluginRegistry, IncludeMatch, IncludeContextLocation } from './plugins';
 import * as fs from 'fs';
 import * as path from 'path';

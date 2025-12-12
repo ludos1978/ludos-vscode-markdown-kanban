@@ -4,28 +4,21 @@ import * as fs from 'fs';
 
 import { getOutputChannel } from './extension';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
-import { PresentationParser } from './presentationParser';
 import { FileManager } from './fileManager';
 import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './backupManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
-import { configService, ConfigurationService } from './configurationService';
-import { PathResolver } from './services/PathResolver';
-import { FileWriter } from './services/FileWriter';
-import { FormatConverter } from './services/export/FormatConverter';
+import { configService } from './configurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
-import { FileSaveService } from './core/FileSaveService';
 import { KanbanFileService } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
 import {
     MarkdownFileRegistry,
     FileFactory,
     FileChangeEvent,
-    MarkdownFile,
-    MainKanbanFile,
-    IncludeFile
+    MarkdownFile
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
@@ -74,8 +67,6 @@ export class KanbanWebviewPanel {
     private _lastDocumentVersion: number = -1;  // Track document version
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
     private _lastDocumentUri?: string;  // Track current document for serialization
-    private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
-    private _unsavedFilesToPrompt: string[] = [];  // Files with unsaved changes that need user prompt
 
     private _panelId: string;  // Unique identifier for this panel
     private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management

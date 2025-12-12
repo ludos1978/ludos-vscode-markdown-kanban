@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 
 export type ConflictType = 'panel_close' | 'external_main' | 'external_include' | 'presave_check' | 'watcher_failure' | 'permission_denied' | 'file_missing' | 'circular_dependency' | 'batch_conflict' | 'network_timeout' | 'crash_recovery';
 /**
@@ -64,10 +63,6 @@ export class ConflictResolver {
     private static instance: ConflictResolver | undefined;
     private activeDialogs = new Set<string>();
     private pendingResolutions = new Map<string, Promise<ConflictResolution>>();
-
-    // Merged from ConflictService: Dialog throttling to prevent spam
-    private _lastDialogTimestamp: number = 0;
-    private readonly _MIN_DIALOG_INTERVAL = 2000; // 2 seconds minimum between dialogs
 
     protected constructor() {}
 
