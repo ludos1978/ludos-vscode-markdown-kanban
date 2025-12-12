@@ -10,7 +10,7 @@
   - only do a refactoring if it's really helpful in code organisation.
   - how complex a refactoring is is irrelevant.
   - our focus is keeping the code simple and in a clean structure!
-  - do not stop with the refactoring until you are completely finished. this must include completely removing any old or obsolete code!
+  - do not stop with the refactoring until you are completely finished. this must include completely removing any old or obsolete code! if you need to stop, as the last sentence, mention that you are not finished with the work!
   - only stop for questions that the user must answer.
 
 ## General rules about handling data:

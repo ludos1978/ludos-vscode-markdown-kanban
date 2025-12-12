@@ -19,3 +19,6 @@ export {
 
 // Core Operations (Phase 2)
 export { IncludeFileCoordinator, IncludeCoordinatorDependencies } from './IncludeFileCoordinator';
+
+// Webview Management (Phase 3)
+export { WebviewManager, WebviewManagerDependencies } from './WebviewManager';

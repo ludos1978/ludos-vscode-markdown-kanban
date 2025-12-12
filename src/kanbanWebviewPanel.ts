@@ -31,7 +31,7 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { PanelStateModel, ConcurrencyManager, FileRegistryAdapter, IncludeFileCoordinator } from './panel';
+import { PanelStateModel, ConcurrencyManager, FileRegistryAdapter, IncludeFileCoordinator, WebviewManager } from './panel';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -60,10 +60,11 @@ export class KanbanWebviewPanel {
 
     private _stateMachine: ChangeStateMachine;
 
-    // Panel architecture components (Phase 1 & 2)
+    // Panel architecture components (Phase 1, 2 & 3)
     private _state: PanelStateModel;
     private _concurrency: ConcurrencyManager;
     private _includeCoordinator: IncludeFileCoordinator;
+    private _webviewManager: WebviewManager;
 
     // Public getter for backwards compatibility with external code
     public get _isUpdatingFromPanel(): boolean { return this._state.updatingFromPanel; }
@@ -350,7 +351,17 @@ export class KanbanWebviewPanel {
             state: this._state,
             getPanel: () => this._panel,
             getBoard: () => this.getBoard(),
-            getMainFile: () => this._getMainFile()
+            getMainFile: () => this._registryAdapter.getMainFile()
+        });
+
+        // Initialize webview manager (Phase 3)
+        this._webviewManager = new WebviewManager({
+            extensionUri: this._extensionUri,
+            getPanel: () => this._panel,
+            getDocument: () => this._fileManager.getDocument(),
+            getBoard: () => this.getBoard(),
+            isInitialized: () => this._state.initialized,
+            getHtmlForWebview: () => this._getHtmlForWebview()
         });
 
         // Subscribe to registry change events
@@ -375,7 +386,7 @@ export class KanbanWebviewPanel {
             () => this._panel,
             () => this._context,
             (context) => this.showConflictDialog(context),
-            () => this._updateWebviewPermissions(),
+            () => this._webviewManager.updatePermissions(),
             () => this._boardStore.clearHistory(),
             KanbanWebviewPanel.panelStates,
             KanbanWebviewPanel.panels,
@@ -415,7 +426,7 @@ export class KanbanWebviewPanel {
                 },
                 markUnsavedChanges: async (hasChanges: boolean, cachedBoard?: any) => {
 
-                    if (!this._isRegistryReady()) {
+                    if (!this._registryAdapter.isReady()) {
                         return;
                     }
 
@@ -425,7 +436,7 @@ export class KanbanWebviewPanel {
                         this._boardStore.setBoard(cachedBoard, false);
 
                         // CRITICAL: Also update MainKanbanFile's cached board for conflict detection
-                        const mainFile = this._getMainFile();
+                        const mainFile = this._registryAdapter.getMainFile();
                         if (mainFile) {
                             mainFile.setCachedBoardFromWebview(cachedBoard);
                         }
@@ -438,11 +449,11 @@ export class KanbanWebviewPanel {
                         await this._fileRegistry.trackIncludeFileUnsavedChanges(cachedBoard);
 
                         // Update main file content from board (for verification sync)
-                        const mainFile = this._getMainFile();
-                        if (mainFile) {
+                        const mainFile2 = this._registryAdapter.getMainFile();
+                        if (mainFile2) {
                             // Generate markdown from cached board to keep backend in sync with frontend
                             const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                            mainFile.setContent(markdown, false); // false = mark as unsaved
+                            mainFile2.setContent(markdown, false); // false = mark as unsaved
                         }
 
                         // Track when unsaved changes occur for backup timing
@@ -465,11 +476,11 @@ export class KanbanWebviewPanel {
                         // If we get here, it's a valid state change from frontend (marking something as changed)
                         if (cachedBoard) {
                             // Frontend sent board changes - update main file content and mark as unsaved
-                            const mainFile = this._getMainFile();
-                            if (mainFile) {
+                            const mainFile3 = this._registryAdapter.getMainFile();
+                            if (mainFile3) {
                                 // Generate markdown from cached board to keep backend in sync with frontend
                                 const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                                mainFile.setContent(markdown, false); // false = mark as unsaved
+                                mainFile3.setContent(markdown, false); // false = mark as unsaved
                             }
                         } else if (hasChanges) {
                             // Frontend marking as changed without board (edge case) - should not happen
@@ -604,7 +615,7 @@ export class KanbanWebviewPanel {
         if (modified) {
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
-            const mainFile = this._getMainFile();
+            const mainFile = this._registryAdapter.getMainFile();
             if (mainFile && board) {
                 // CRITICAL: use updateFromBoard to update BOTH content AND board object
                 mainFile.updateFromBoard(board);
@@ -671,169 +682,10 @@ export class KanbanWebviewPanel {
     private _setupWorkspaceChangeListener() {
         // Listen for workspace folder changes
         const workspaceChangeListener = vscode.workspace.onDidChangeWorkspaceFolders(event => {
-                this._updateWebviewPermissions();
+                this._webviewManager.updatePermissions();
         });
         
         this._disposables.push(workspaceChangeListener);
-    }
-
-    /**
-     * Update webview permissions to include all current workspace folders
-     */
-    private _updateWebviewPermissions() {
-        const localResourceRoots = this._buildLocalResourceRoots(false);
-
-        // Update webview options
-        this._panel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: localResourceRoots,
-            enableCommandUris: true
-        };
-
-        // Refresh the webview HTML to apply new permissions
-        if (this._state.initialized) {
-            this._panel.webview.html = this._getHtmlForWebview();
-        }
-    }
-
-    /**
-     * Update webview permissions to include asset directories from the board
-     * This is called before sending board updates to ensure all assets can be loaded
-     */
-    private _updateWebviewPermissionsForAssets() {
-        const localResourceRoots = this._buildLocalResourceRoots(true);
-
-        // Update webview options
-        this._panel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: localResourceRoots,
-            enableCommandUris: true
-        };
-    }
-
-    /**
-     * Build the list of local resource roots for the webview
-     * @param includeAssets - Whether to scan board for asset directories
-     */
-    private _buildLocalResourceRoots(includeAssets: boolean): vscode.Uri[] {
-        const localResourceRoots = [this._extensionUri];
-
-        // Add all current workspace folders
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            workspaceFolders.forEach(folder => {
-                localResourceRoots.push(folder.uri);
-            });
-        }
-
-        // Add document directory if it's outside workspace folders
-        if (this._fileManager.getDocument()) {
-            const document = this._fileManager.getDocument()!;
-            const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-            const isInWorkspace = workspaceFolders?.some(folder =>
-                documentDir.fsPath.startsWith(folder.uri.fsPath)
-            );
-
-            if (!isInWorkspace) {
-                localResourceRoots.push(documentDir);
-            }
-
-            // Scan board for asset directories if requested
-            if (includeAssets) {
-                const assetDirs = this._collectAssetDirectories();
-                for (const dir of assetDirs) {
-                    const dirUri = vscode.Uri.file(dir);
-                    // Check if this exact directory is not already included
-                    const alreadyIncluded = localResourceRoots.some(root =>
-                        root.fsPath === dir
-                    );
-                    if (!alreadyIncluded) {
-                        localResourceRoots.push(dirUri);
-                    }
-                }
-            }
-        }
-
-        return localResourceRoots;
-    }
-
-    private _getLayoutPresetsConfiguration(): any {
-        const userPresets = configService.getConfig('layoutPresets', {});
-
-        // Default presets as fallback
-        const defaultPresets = {
-            overview: {
-                label: "Overview",
-                description: "Compact view for seeing many cards",
-                settings: {
-                    columnWidth: "250px",
-                    cardHeight: "auto",
-										sectionHeight: "auto",
-										taskSectionHeight: "auto",
-                    fontSize: "0_5x",
-                    whitespace: "8px",
-                    tagVisibility: "allexcludinglayout",
-                    arrowKeyFocusScroll: "center"
-                }
-            },
-            normal: {
-                label: "Normal",
-                description: "Default balanced view",
-                settings: {
-                    columnWidth: "350px",
-                    cardHeight: "auto",
-										sectionHeight: "auto",
-										taskSectionHeight: "auto",
-                    fontSize: "1x",
-                    whitespace: "8px",
-                    tagVisibility: "allexcludinglayout",
-                    arrowKeyFocusScroll: "center"
-                }
-            },
-            grid3x: {
-                label: "3x3 Grid",
-                description: "Grid layout for organized viewing",
-                settings: {
-                    columnWidth: "33percent",
-                    cardHeight: "auto",
-										sectionHeight: "auto",
-										taskSectionHeight: "auto",
-                    fontSize: "1x",
-                    whitespace: "12px",
-                    arrowKeyFocusScroll: "nearest"
-                }
-            },
-						twoThirds: {
-							label: "2/3 Grid",
-							description: "Grid layout for organized viewing",
-							settings: {
-									columnWidth: "66percent",
-									cardHeight: "auto",
-									fontSize: "1_5x",
-									whitespace: "12px",
-									sectionHeight: "66percent",
-									taskSectionHeight: "auto",
-                  arrowKeyFocusScroll: "nearest"
-							}
-						},
-            presentation: {
-                label: "Presentation",
-                description: "Full screen view for presentations",
-                settings: {
-                    columnWidth: "100percent",
-                    cardHeight: "100percent",
-                    sectionHeight: "100percent",
-                    taskSectionHeight: "auto",
-                    fontSize: "3x",
-                    tagVisibility: "none",
-                    whitespace: "16px",
-                    arrowKeyFocusScroll: "center"
-                }
-            }
-        };
-
-        // Merge user presets with defaults (user presets override defaults)
-        return { ...defaultPresets, ...userPresets };
     }
 
     // Public methods for external access
@@ -982,7 +834,7 @@ export class KanbanWebviewPanel {
 
         // Update webview permissions to include asset directories
         // This ensures the webview can access images from include file directories
-        this._updateWebviewPermissionsForAssets();
+        this._webviewManager.updatePermissionsForAssets();
 
         // Get version from package.json
         const packageJson = require('../package.json');
@@ -1071,7 +923,7 @@ export class KanbanWebviewPanel {
         }
 
         // Build comprehensive localResourceRoots including asset directories
-        const localResourceRoots = this._buildLocalResourceRoots(true);
+        const localResourceRoots = this._webviewManager.buildLocalResourceRoots(true);
 
         // Add document-specific paths if available
         if (this._fileManager.getDocument()) {
@@ -1161,135 +1013,6 @@ export class KanbanWebviewPanel {
         });
 
         return html;
-    }
-
-    /**
-     * Collect all asset directories from the current board to add to localResourceRoots
-     * This allows images/media from outside the workspace to be displayed
-     */
-    private _collectAssetDirectories(): string[] {
-        const assetDirs = new Set<string>();
-
-        const board = this.getBoard();
-        if (!board) {
-            return [];
-        }
-
-        const document = this._fileManager.getDocument();
-        if (!document) {
-            return [];
-        }
-
-        const documentDir = path.dirname(document.uri.fsPath);
-
-        // Pattern to match markdown images: ![alt](path)
-        // Use lazy matching to handle brackets in alt text
-        const imageRegex = /!\[.*?\]\(([^)]+)\)/g;
-        // Pattern to match HTML img/video/audio tags
-        const htmlMediaRegex = /<(?:img|video|audio)[^>]+src=["']([^"']+)["'][^>]*>/gi;
-
-        // Scan all columns and tasks
-        for (const column of board.columns) {
-            // Determine base directory for column content
-            let columnBaseDir = documentDir;
-            if (column.includeMode && column.includeFiles && column.includeFiles.length > 0) {
-                const includeFile = column.includeFiles[0];
-                const includeFilePath = path.isAbsolute(includeFile)
-                    ? includeFile
-                    : path.resolve(documentDir, includeFile);
-                columnBaseDir = path.dirname(includeFilePath);
-            }
-
-            // Check column title with appropriate base directory
-            this._extractAssetDirs(column.title, columnBaseDir, assetDirs, imageRegex, htmlMediaRegex);
-
-            // Check all tasks in column
-            for (const task of column.tasks) {
-                // Determine base directory for task content
-                let taskBaseDir = documentDir;
-
-                // First check if task has includeContext (for tasks from column includes)
-                if (task.includeContext && task.includeContext.includeDir) {
-                    taskBaseDir = task.includeContext.includeDir;
-                }
-                // Otherwise check if it's a task include file
-                else if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
-                    const includeFile = task.includeFiles[0];
-                    const includeFilePath = path.isAbsolute(includeFile)
-                        ? includeFile
-                        : path.resolve(documentDir, includeFile);
-                    taskBaseDir = path.dirname(includeFilePath);
-                }
-
-                // Extract assets with appropriate base directory
-                this._extractAssetDirs(task.title, taskBaseDir, assetDirs, imageRegex, htmlMediaRegex);
-                if (task.description) {
-                    this._extractAssetDirs(task.description, taskBaseDir, assetDirs, imageRegex, htmlMediaRegex);
-                }
-            }
-        }
-
-        return Array.from(assetDirs);
-    }
-
-    /**
-     * Extract asset directories from content
-     */
-    private _extractAssetDirs(content: string, basePath: string, assetDirs: Set<string>, ...regexes: RegExp[]): void {
-        if (!content) {
-            return;
-        }
-
-        for (const regex of regexes) {
-            let match;
-            regex.lastIndex = 0; // Reset regex state
-            while ((match = regex.exec(content)) !== null) {
-                const assetPath = match[1].trim();
-
-                // Skip URLs (http://, https://, data:, etc.)
-                if (/^(https?|data|blob):/.test(assetPath)) {
-                    continue;
-                }
-
-                // Skip anchor links
-                if (assetPath.startsWith('#')) {
-                    continue;
-                }
-
-                // Remove query params and anchors
-                const cleanPath = assetPath.split(/[?#]/)[0];
-
-                try {
-                    // Decode URL-encoded paths
-                    let decodedPath = cleanPath;
-                    if (cleanPath.includes('%')) {
-                        try {
-                            decodedPath = decodeURIComponent(cleanPath);
-                        } catch (e) {
-                            // Use original if decode fails
-                        }
-                    }
-
-                    // Unescape backslash-escaped characters (e.g., \' -> ')
-                    decodedPath = decodedPath.replace(/\\(.)/g, '$1');
-
-                    // Resolve to absolute path
-                    let absolutePath: string;
-                    if (path.isAbsolute(decodedPath)) {
-                        absolutePath = decodedPath;
-                    } else {
-                        absolutePath = path.resolve(basePath, decodedPath);
-                    }
-
-                    // Check if file exists
-                    if (fs.existsSync(absolutePath)) {
-                        const dir = path.dirname(absolutePath);
-                        assetDirs.add(dir);
-                    }
-                } catch (error) {
-                }
-            }
-        }
     }
 
     private _getNonce() {
@@ -1798,7 +1521,7 @@ export class KanbanWebviewPanel {
                 layoutRows: configService.getConfig('layoutRows'),
                 rowHeight: configService.getConfig('rowHeight'),
                 layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                layoutPresets: this._getLayoutPresetsConfiguration(),
+                layoutPresets: this._webviewManager.getLayoutPresetsConfiguration(),
                 maxRowHeight: configService.getConfig('maxRowHeight', 0),
 
                 // Task/Content settings
@@ -1858,7 +1581,7 @@ export class KanbanWebviewPanel {
             layoutRows: configService.getConfig('layoutRows'),
             rowHeight: configService.getConfig('rowHeight'),
             layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-            layoutPresets: this._getLayoutPresetsConfiguration(),
+            layoutPresets: this._webviewManager.getLayoutPresetsConfiguration(),
             maxRowHeight: configService.getConfig('maxRowHeight', 0),
             columnBorder: configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)'),
             taskBorder: configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)'),
@@ -1878,47 +1601,6 @@ export class KanbanWebviewPanel {
     }
 
     // OLD HANDLERS REMOVED - All include switches now route through ChangeStateMachine via handleIncludeSwitch()
-
-    // ============= FILE REGISTRY HELPER METHODS =============
-
-    /**
-     * Get the main kanban file instance from registry
-     */
-    private _getMainFile(): MainKanbanFile | undefined {
-        return this._fileRegistry.getMainFile();
-    }
-
-    /**
-     * Get an include file instance by relative path
-     */
-    private _getIncludeFileByPath(relativePath: string): IncludeFile | undefined {
-        const file = this._fileRegistry.getByRelativePath(relativePath);
-        if (file && file.getFileType() !== 'main') {
-            return file as IncludeFile;
-        }
-        return undefined;
-    }
-
-    /**
-     * Get all column include files
-     */
-    private _getColumnIncludeFiles(): IncludeFile[] {
-        return this._fileRegistry.getColumnIncludeFiles();
-    }
-
-    /**
-     * Get all task include files
-     */
-    private _getTaskIncludeFiles(): IncludeFile[] {
-        return this._fileRegistry.getTaskIncludeFiles();
-    }
-
-    /**
-     * Check if registry is initialized with a main file
-     */
-    private _isRegistryReady(): boolean {
-        return this._fileRegistry.getMainFile() !== undefined;
-    }
 
     /**
      * Get board (single source of truth)
@@ -1977,132 +1659,6 @@ export class KanbanWebviewPanel {
         this._state.setIncludeSwitchInProgress(inProgress);
     }
 
-    /**
-     * Get all files with conflicts from registry
-     */
-    private _getFilesWithConflicts(): MarkdownFile[] {
-        return this._fileRegistry.getFilesWithConflicts();
-    }
-
-    /**
-     * Get all files with unsaved changes from registry
-     */
-    private _getFilesWithUnsavedChanges(): MarkdownFile[] {
-        return this._fileRegistry.getFilesWithUnsavedChanges();
-    }
-
-    /**
-     * Get all files that need reload from registry
-     */
-    private _getFilesThatNeedReload(): MarkdownFile[] {
-        return this._fileRegistry.getFilesThatNeedReload();
-    }
-
-    /**
-     * Get include files unsaved status (for main file conflict context)
-     */
-    private _getIncludeFilesUnsavedStatus(): { hasChanges: boolean; changedFiles: string[] } {
-        const includeFiles = this._fileRegistry.getAll().filter(f => f.getFileType() !== 'main');
-        const changedFiles = includeFiles
-            .filter(f => f.hasUnsavedChanges())
-            .map(f => f.getRelativePath());
-
-        return {
-            hasChanges: changedFiles.length > 0,
-            changedFiles: changedFiles
-        };
-    }
-
-    /**
-     * Get file content from registry
-     */
-    private _getFileContent(relativePath: string): string | undefined {
-        const file = relativePath === '.'
-            ? this._getMainFile()
-            : this._getIncludeFileByPath(relativePath);
-
-        return file?.getContent();
-    }
-
-    /**
-     * Check if file has unsaved changes
-     */
-    private _fileHasUnsavedChanges(relativePath: string): boolean {
-        const file = relativePath === '.'
-            ? this._getMainFile()
-            : this._getIncludeFileByPath(relativePath);
-
-        return file?.hasUnsavedChanges() || false;
-    }
-
-    /**
-     * Check if file has conflicts
-     */
-    private _fileHasConflict(relativePath: string): boolean {
-        const file = relativePath === '.'
-            ? this._getMainFile()
-            : this._getIncludeFileByPath(relativePath);
-
-        return file?.hasConflict() || false;
-    }
-
-    /**
-     * Check if file needs reload
-     */
-    private _fileNeedsReload(relativePath: string): boolean {
-        const file = relativePath === '.'
-            ? this._getMainFile()
-            : this._getIncludeFileByPath(relativePath);
-
-        return file?.needsReload() || false;
-    }
-
-    /**
-     * Check if file needs save
-     */
-    private _fileNeedsSave(relativePath: string): boolean {
-        const file = relativePath === '.'
-            ? this._getMainFile()
-            : this._getIncludeFileByPath(relativePath);
-
-        return file?.needsSave() || false;
-    }
-
-    /**
-     * Get unified unsaved changes state from registry
-     */
-    private _getUnifiedUnsavedChangesState(): { hasUnsavedChanges: boolean; details: string } {
-        const filesWithChanges = this._getFilesWithUnsavedChanges();
-
-        if (filesWithChanges.length === 0) {
-            return { hasUnsavedChanges: false, details: 'No unsaved changes' };
-        }
-
-        const details = filesWithChanges.map(f => f.getRelativePath()).join(', ');
-        return {
-            hasUnsavedChanges: true,
-            details: `Unsaved changes in: ${details}`
-        };
-    }
-
-    /**
-     * Get files that need attention (conflicts, unsaved changes, external changes)
-     */
-    private _getFilesThatNeedAttention(): {
-        conflicts: MarkdownFile[];
-        unsaved: MarkdownFile[];
-        needReload: MarkdownFile[];
-    } {
-        return {
-            conflicts: this._getFilesWithConflicts(),
-            unsaved: this._getFilesWithUnsavedChanges(),
-            needReload: this._getFilesThatNeedReload()
-        };
-    }
-
-
-    // ============= END FILE REGISTRY HELPER METHODS =============
-
     private async _handlePanelClose() {
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse during disposal
         // Panel is already disposed by VS Code when onDidDispose fires
@@ -2118,11 +1674,11 @@ export class KanbanWebviewPanel {
         }
 
         // Query current unsaved changes state from MarkdownFile
-        const mainFile = this._getMainFile();
+        const mainFile = this._registryAdapter.getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
 
         // Get include files unsaved status
-        const includeStatus = this._getIncludeFilesUnsavedStatus();
+        const includeStatus = this._registryAdapter.getIncludeFilesUnsavedStatus();
 
         // If no unsaved changes, allow close
         if (!hasUnsavedChanges && !includeStatus.hasChanges) {
@@ -2214,13 +1770,7 @@ export class KanbanWebviewPanel {
      * Used by extension deactivate() to prompt before VSCode closes
      */
     public async checkUnsavedChanges(): Promise<boolean> {
-        const mainFile = this._getMainFile();
-        const hasMainFileChanges = mainFile?.hasUnsavedChanges() || false;
-
-        const includeStatus = this._getIncludeFilesUnsavedStatus();
-        const hasIncludeChanges = includeStatus.hasChanges;
-
-        return hasMainFileChanges || hasIncludeChanges;
+        return this._registryAdapter.hasAnyUnsavedChanges();
     }
 
     /**
@@ -2231,7 +1781,7 @@ export class KanbanWebviewPanel {
     public async saveUnsavedChangesBackup(): Promise<void> {
         try {
             // Save main file backup
-            const mainFile = this._getMainFile();
+            const mainFile = this._registryAdapter.getMainFile();
             if (mainFile && mainFile.hasUnsavedChanges()) {
                 const uri = this.getCurrentDocumentUri();
                 if (uri) {
@@ -2249,10 +1799,10 @@ export class KanbanWebviewPanel {
             }
 
             // Save include files backups
-            const includeStatus = this._getIncludeFilesUnsavedStatus();
+            const includeStatus = this._registryAdapter.getIncludeFilesUnsavedStatus();
             if (includeStatus.hasChanges) {
                 for (const fileWithChanges of includeStatus.changedFiles) {
-                    const includeFile = this._fileRegistry.getByRelativePath(fileWithChanges);
+                    const includeFile = this._registryAdapter.getIncludeFile(fileWithChanges);
                     if (includeFile && includeFile.hasUnsavedChanges()) {
                         const fileManager = (includeFile as any)._fileManager;
                         if (fileManager) {
@@ -2300,11 +1850,11 @@ export class KanbanWebviewPanel {
         }
 
         // Clear unsaved changes flag and prevent closing flags
-        const mainFile = this._getMainFile();
-        if (mainFile) {
+        const mainFileForDispose = this._registryAdapter.getMainFile();
+        if (mainFileForDispose) {
             // Always discard to reset state on dispose
             // discardChanges() internally checks if content changed before emitting events
-            mainFile.discardChanges();
+            mainFileForDispose.discardChanges();
         }
         this._state.setClosingPrevented(false);
 
