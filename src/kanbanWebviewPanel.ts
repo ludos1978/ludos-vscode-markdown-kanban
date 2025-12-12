@@ -708,6 +708,22 @@ export class KanbanWebviewPanel {
         }
     }
 
+    /**
+     * Sync state from file service to panel state
+     * Called after any file service operation to keep states in sync
+     */
+    private _syncStateFromFileService(): void {
+        const state = this._fileService.getState();
+        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
+        // STATE-2: Cache board if available
+        if (state.cachedBoardFromWebview) {
+            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
+        }
+        this._lastDocumentVersion = state.lastDocumentVersion;
+        this._lastDocumentUri = state.lastDocumentUri;
+        this._trackedDocumentUri = state.trackedDocumentUri;
+    }
+
     private _setupEventListeners() {
         // Handle panel disposal - check for unsaved changes first
         this._panel.onDidDispose(async () => {
@@ -766,16 +782,7 @@ export class KanbanWebviewPanel {
 
     private async _ensureBoardAndSendUpdate() {
         await this._fileService.ensureBoardAndSendUpdate();
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+        this._syncStateFromFileService();
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
@@ -788,16 +795,7 @@ export class KanbanWebviewPanel {
             this._eventBus.emit('board:loading', { path: document.uri.fsPath }).catch(() => {});
 
             await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
-            // Sync state back from file service
-            const state = this._fileService.getState();
-            this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-            // STATE-2: Cache board if available
-            if (state.cachedBoardFromWebview) {
-                this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-            }
-            this._lastDocumentVersion = state.lastDocumentVersion;
-            this._lastDocumentUri = state.lastDocumentUri;
-            this._trackedDocumentUri = state.trackedDocumentUri;
+            this._syncStateFromFileService();
 
             // Phase 1: Create or update MainKanbanFile instance
             await this._syncMainFileToRegistry(document);
@@ -875,16 +873,7 @@ export class KanbanWebviewPanel {
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
         await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+        this._syncStateFromFileService();
 
         const document = this._fileManager.getDocument();
         if (document) {
@@ -897,16 +886,7 @@ export class KanbanWebviewPanel {
 
     private async initializeFile() {
         await this._fileService.initializeFile();
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+        this._syncStateFromFileService();
     }
 
     private _getHtmlForWebview() {
@@ -1513,42 +1493,9 @@ export class KanbanWebviewPanel {
             await this._sendShortcutsToWebview();
 
             // 2. Load all workspace settings and send to webview
-            const config = {
-                // Layout settings
-                columnWidth: configService.getConfig('columnWidth', '350px'),
-                columnBorder: configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)'),
-                taskBorder: configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)'),
-                layoutRows: configService.getConfig('layoutRows'),
-                rowHeight: configService.getConfig('rowHeight'),
-                layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-                layoutPresets: this._webviewManager.getLayoutPresetsConfiguration(),
-                maxRowHeight: configService.getConfig('maxRowHeight', 0),
-
-                // Task/Content settings
-                taskMinHeight: configService.getConfig('taskMinHeight'),
-                sectionHeight: configService.getConfig('sectionHeight'),
-                taskSectionHeight: configService.getConfig('taskSectionHeight'),
-                fontSize: configService.getConfig('fontSize'),
-                fontFamily: configService.getConfig('fontFamily'),
-                whitespace: configService.getConfig('whitespace', '8px'),
-
-                // Rendering settings
-                htmlCommentRenderMode: configService.getConfig('htmlCommentRenderMode', 'hidden'),
-                htmlContentRenderMode: configService.getConfig('htmlContentRenderMode', 'html'),
-
-                // Tag settings (CRITICAL: These change frequently!)
-                tagColors: configService.getConfig('tagColors', {}),
-                enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-                enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-                customTagCategories: configService.getCustomTagCategories(),
-                tagVisibility: configService.getConfig('tagVisibility'),
-                exportTagVisibility: configService.getConfig('exportTagVisibility'),
-
-                // Other settings
-                arrowKeyFocusScroll: configService.getConfig('arrowKeyFocusScroll'),
-                openLinksInNewTab: configService.getConfig('openLinksInNewTab'),
-                pathGeneration: configService.getConfig('pathGeneration')
-            };
+            // Uses centralized getBoardViewConfig() - single source of truth
+            const layoutPresets = this._webviewManager.getLayoutPresetsConfiguration();
+            const config = configService.getBoardViewConfig(layoutPresets);
 
             // Send configuration to webview
             this._webviewBridge.send({
@@ -1568,29 +1515,14 @@ export class KanbanWebviewPanel {
     } = {}): void {
         if (!this._panel) return;
 
+        // Use centralized getBoardViewConfig() - single source of truth
+        const layoutPresets = this._webviewManager.getLayoutPresetsConfiguration();
+        const viewConfig = configService.getBoardViewConfig(layoutPresets);
+
         const message = {
             type: 'boardUpdate',
             board: board,
-            columnWidth: configService.getConfig('columnWidth', '350px'),
-            taskMinHeight: configService.getConfig('taskMinHeight'),
-            sectionHeight: configService.getConfig('sectionHeight'),
-            taskSectionHeight: configService.getConfig('taskSectionHeight'),
-            fontSize: configService.getConfig('fontSize'),
-            fontFamily: configService.getConfig('fontFamily'),
-            whitespace: configService.getConfig('whitespace', '8px'),
-            layoutRows: configService.getConfig('layoutRows'),
-            rowHeight: configService.getConfig('rowHeight'),
-            layoutPreset: configService.getConfig('layoutPreset', 'normal'),
-            layoutPresets: this._webviewManager.getLayoutPresetsConfiguration(),
-            maxRowHeight: configService.getConfig('maxRowHeight', 0),
-            columnBorder: configService.getConfig('columnBorder', '1px solid var(--vscode-panel-border)'),
-            taskBorder: configService.getConfig('taskBorder', '1px solid var(--vscode-panel-border)'),
-            htmlCommentRenderMode: configService.getConfig('htmlCommentRenderMode', 'hidden'),
-            htmlContentRenderMode: configService.getConfig('htmlContentRenderMode', 'html'),
-            tagColors: configService.getConfig('tagColors', {}),
-            enabledTagCategoriesColumn: configService.getEnabledTagCategoriesColumn(),
-            enabledTagCategoriesTask: configService.getEnabledTagCategoriesTask(),
-            customTagCategories: configService.getCustomTagCategories(),
+            ...viewConfig,
             // Optional fields for full board loads
             ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
             ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
@@ -1930,29 +1862,12 @@ export class KanbanWebviewPanel {
         this._fileService.setupDocumentChangeListener(this._disposables);
     }
 
-
-    /**
-     * Update the known file content baseline
-     */
-    private updateKnownFileContent(content: string): void {
-        this._fileService.updateKnownFileContent(content);
-    }
-
     /**
      * Force reload the board from file (user-initiated)
      */
     public async forceReloadFromFile(): Promise<void> {
         await this._fileService.forceReloadFromFile();
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+        this._syncStateFromFileService();
     }
 
     /**
@@ -2030,56 +1945,11 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Save main kanban changes (used when user chooses to overwrite external include changes)
-     */
-    private async saveMainKanbanChanges(): Promise<void> {
-        await this._fileService.saveMainKanbanChanges();
-        // Sync state back from file service
-        const state = this._fileService.getState();
-        this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
-        }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
-    }
-
-    /**
-     * Open a file with reuse check - focuses existing editor if already open
-     */
-    private async openFileWithReuseCheck(filePath: string): Promise<void> {
-        await this._fileService.openFileWithReuseCheck(filePath);
-    }
-
-    /**
-     * Set file as hidden on Windows using attrib command
-     * On Unix systems, files starting with . are already hidden
-     */
-    private async setFileHidden(filePath: string): Promise<void> {
-        await this._fileService.setFileHidden(filePath);
-    }
-
-    /**
      * Show conflict dialog to user
      */
     public async showConflictDialog(context: ConflictContext): Promise<ConflictResolution> {
         // Use ConflictResolver to handle the dialog
         return await this._conflictResolver.resolveConflict(context);
-    }
-
-    /**
-     * Notify about external changes - simplified implementation
-     */
-    public async notifyExternalChanges(
-        document: vscode.TextDocument,
-        getUnifiedFileState: () => any,
-        undoRedoManager: any,
-        board: KanbanBoard | undefined
-    ): Promise<void> {
-        // This method is now handled by the unified conflict resolution system
-        // External changes are detected and handled by file watchers and the registry
     }
 
     /**

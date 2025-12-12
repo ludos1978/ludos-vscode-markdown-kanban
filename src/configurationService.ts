@@ -97,26 +97,28 @@ export class ConfigurationService {
     private readonly CONFIGURATION_SECTION = 'markdown-kanban';
 
     // Default configuration values
+    // NOTE: These are the SINGLE SOURCE OF TRUTH for all configuration defaults
+    // Do not override these with different defaults at call sites!
     private readonly defaults: ConfigurationDefaults = {
         enableBackups: true,
         backupInterval: 15,
-        backupLocation: '',
+        backupLocation: 'same-folder',
         openLinksInNewTab: false,
         pathGeneration: 'relative' as 'relative' | 'absolute',
-        whitespace: 'normal',
+        whitespace: '8px',
         maxRowHeight: 0,
         taskMinHeight: 'auto',
         sectionHeight: 'auto',
         taskSectionHeight: 'auto',
-        fontSize: 'medium',
+        fontSize: '1x',
         fontFamily: 'default',
-        columnWidth: 'auto',
+        columnWidth: '350px',
         columnBorder: '1px solid var(--vscode-panel-border)',
         taskBorder: '1px solid var(--vscode-panel-border)',
         layoutRows: 1,
         rowHeight: 'auto',
-        layoutPreset: 'default',
-        tagVisibility: 'visible',
+        layoutPreset: 'normal',
+        tagVisibility: 'allexcludinglayout',
         exportTagVisibility: true,
         htmlCommentRenderMode: 'hidden',
         htmlContentRenderMode: 'html',
@@ -330,6 +332,52 @@ export class ConfigurationService {
     // Path generation configuration
     public getPathGenerationMode(): 'relative' | 'absolute' {
         return this.getConfig('pathGeneration');
+    }
+
+    /**
+     * Get complete board view configuration for sending to webview
+     * This is the SINGLE SOURCE OF TRUTH for board view config
+     * Used by both _refreshAllViewConfiguration() and _sendBoardUpdate()
+     *
+     * @param layoutPresets - Layout presets from WebviewManager (merged with user config)
+     */
+    public getBoardViewConfig(layoutPresets: Record<string, any>): Record<string, any> {
+        return {
+            // Layout settings
+            columnWidth: this.getConfig('columnWidth'),
+            columnBorder: this.getConfig('columnBorder'),
+            taskBorder: this.getConfig('taskBorder'),
+            layoutRows: this.getConfig('layoutRows'),
+            rowHeight: this.getConfig('rowHeight'),
+            layoutPreset: this.getConfig('layoutPreset'),
+            layoutPresets: layoutPresets,
+            maxRowHeight: this.getConfig('maxRowHeight'),
+
+            // Task/Content settings
+            taskMinHeight: this.getConfig('taskMinHeight'),
+            sectionHeight: this.getConfig('sectionHeight'),
+            taskSectionHeight: this.getConfig('taskSectionHeight'),
+            fontSize: this.getConfig('fontSize'),
+            fontFamily: this.getConfig('fontFamily'),
+            whitespace: this.getConfig('whitespace'),
+
+            // Rendering settings
+            htmlCommentRenderMode: this.getConfig('htmlCommentRenderMode'),
+            htmlContentRenderMode: this.getConfig('htmlContentRenderMode'),
+
+            // Tag settings
+            tagColors: this.getConfig('tagColors'),
+            enabledTagCategoriesColumn: this.getEnabledTagCategoriesColumn(),
+            enabledTagCategoriesTask: this.getEnabledTagCategoriesTask(),
+            customTagCategories: this.getCustomTagCategories(),
+            tagVisibility: this.getConfig('tagVisibility'),
+            exportTagVisibility: this.getConfig('exportTagVisibility'),
+
+            // Other settings
+            arrowKeyFocusScroll: this.getConfig('arrowKeyFocusScroll'),
+            openLinksInNewTab: this.getConfig('openLinksInNewTab'),
+            pathGeneration: this.getConfig('pathGeneration')
+        };
     }
 
     /**

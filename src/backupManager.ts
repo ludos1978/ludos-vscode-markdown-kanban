@@ -51,7 +51,7 @@ export class BackupManager {
             }
 
             const enableBackups = configService.getConfig('enableBackups');
-            const defaultIntervalMinutes = configService.getConfig('backupInterval', 15);
+            const defaultIntervalMinutes = configService.getConfig('backupInterval');
 
             if (!enableBackups && !options.forceCreate) {
                 return false;
@@ -115,7 +115,7 @@ export class BackupManager {
         const dir = path.dirname(originalPath);
         const basename = path.basename(originalPath, '.md');
 
-        const backupLocation = configService.getConfig('backupLocation', 'same-folder');
+        const backupLocation = configService.getConfig('backupLocation');
 
         let backupDir = dir;
 
@@ -201,7 +201,7 @@ export class BackupManager {
         const ext = path.extname(filePath);
         const basename = path.basename(filePath, ext);
 
-        const backupLocation = configService.getConfig('backupLocation', 'same-folder');
+        const backupLocation = configService.getConfig('backupLocation');
 
         let backupDir = dir;
 
