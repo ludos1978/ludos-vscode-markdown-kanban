@@ -35,10 +35,6 @@ export class UnifiedChangeHandler {
         file: MarkdownFile,
         changeType: 'modified' | 'deleted' | 'created'
     ): Promise<void> {
-        const fileType = file.getFileType();
-        const filePath = file.getPath();
-
-
         // Handle file deletion
         if (changeType === 'deleted') {
             await this.handleFileDeleted(file);
@@ -89,7 +85,6 @@ export class UnifiedChangeHandler {
      */
     private async handleFileModified(file: MarkdownFile): Promise<void> {
         const hasUnsavedChanges = file.hasUnsavedChanges();
-        const isInEditMode = file.isInEditMode();
         const hasConflict = file.hasConflict(); // Use the file's conflict detection logic
         const hasFileSystemChanges = file['_hasFileSystemChanges'];
 
@@ -97,14 +92,6 @@ export class UnifiedChangeHandler {
         const hasAnyUnsavedChanges = file.getFileType() === 'main'
             ? this.hasAnyUnsavedChangesInRegistry(file)
             : hasUnsavedChanges;
-
-
-        // Additional debugging for MainKanbanFile
-        if (file.getFileType() === 'main') {
-            const mainFile = file as any;
-            const document = mainFile._fileManager?.getDocument();
-            const documentIsDirty = document ? document.isDirty : 'no document';
-        }
 
         // NOTE: Legitimate saves are already filtered out by _onFileSystemChange()
         // If _skipNextReloadDetection flag was set, the watcher returns early

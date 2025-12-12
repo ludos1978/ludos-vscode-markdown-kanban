@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { PathResolver } from './PathResolver';
 
 /**
  * Unified file writing utility

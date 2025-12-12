@@ -1,6 +1,5 @@
 import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
-import { MarkdownFile } from './MarkdownFile';
 import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { FileManager } from '../fileManager';
 import { ConflictResolver } from '../conflictResolver';

@@ -16,7 +16,7 @@
  */
 
 import * as vscode from 'vscode';
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
+import { KanbanBoard } from '../../markdownParser';
 import { PanelEventBus } from '../events';
 
 // ============= TYPES =============

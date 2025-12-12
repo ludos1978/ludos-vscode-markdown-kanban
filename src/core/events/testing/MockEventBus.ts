@@ -6,7 +6,7 @@
  */
 
 import { PanelEventBus, PanelEvent } from '../PanelEventBus';
-import { EventDefinitions, EventType, EventPayload } from '../EventDefinitions';
+import { EventType, EventPayload } from '../EventDefinitions';
 
 export interface EmittedEvent {
     type: EventType;

@@ -356,11 +356,10 @@ export class BackupManager {
             const dir = path.dirname(originalPath);
             const basename = path.basename(originalPath, '.md');
             
-            // Match backup files (with timestamp) and autosave file (without timestamp)
-            // This includes: .basename-backup-YYYYMMDDTHHmmss.md, .basename-conflict-YYYYMMDDTHHmmss.md, .basename-autosave.md
+            // Match backup files (with timestamp)
+            // This includes: .basename-backup-YYYYMMDDTHHmmss.md, .basename-conflict-YYYYMMDDTHHmmss.md
             const backupPattern = new RegExp(`^\\.${basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(backup|conflict)-(\\d{8}T\\d{6})\\.md$`);
-            const autosavePattern = new RegExp(`^\\.${basename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-autosave\\.md$`);
-            
+
             const files = fs.readdirSync(dir);
             const backups = files
                 .filter(file => backupPattern.test(file))
@@ -368,7 +367,6 @@ export class BackupManager {
                     const match = file.match(backupPattern);
                     if (!match) {return null;}
 
-                    const backupType = match[1]; // backup or auto
                     const timestamp = match[2]; // YYYYMMDDTHHmmss
 
                     // Parse date from timestamp

@@ -16,7 +16,7 @@
  */
 
 import * as vscode from 'vscode';
-import { EventDefinitions, EventType, EventPayload } from './EventDefinitions';
+import { EventType, EventPayload } from './EventDefinitions';
 
 // ============= TYPES =============
 

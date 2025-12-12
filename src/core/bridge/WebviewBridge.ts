@@ -16,7 +16,6 @@
 import * as vscode from 'vscode';
 import { PanelEventBus } from '../events';
 import {
-    BaseMessage,
     RequestMessage,
     ResponseMessage,
     OutgoingMessage,

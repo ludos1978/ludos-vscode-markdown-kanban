@@ -1,5 +1,4 @@
 import { MarkdownFile } from '../files/MarkdownFile';
-import * as vscode from 'vscode';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 
 /**
@@ -293,7 +292,6 @@ export class ChangeStateMachine {
      * Transition to a new state and execute its handler
      */
     private async _transitionTo(newState: ChangeState, context: ChangeContext): Promise<void> {
-        const oldState = this._currentState;
         this._currentState = newState;
         context.currentState = newState;
         context.stateHistory.push(newState);

@@ -8,7 +8,7 @@
  * Events will be emitted IN PARALLEL with existing behavior during migration.
  */
 
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
+import { KanbanBoard } from '../../markdownParser';
 import * as vscode from 'vscode';
 
 // ============= EVENT PAYLOAD TYPES =============

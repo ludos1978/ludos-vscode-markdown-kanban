@@ -1,4 +1,3 @@
-import { marpCli } from '@marp-team/marp-cli';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
@@ -149,9 +148,6 @@ export class MarpExportService {
             const args = this.buildMarpCliArgs(options.inputFilePath, options);
 
             // Log for debugging
-
-            // Execute Marp CLI with proper working directory
-            const workspaceFolders = vscode.workspace.workspaceFolders;
 
             // if (options.watchMode) {
             // WATCH MODE: Run Marp as detached background process

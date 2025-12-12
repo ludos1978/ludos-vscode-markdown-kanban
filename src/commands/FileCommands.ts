@@ -215,7 +215,7 @@ export class FileCommands extends BaseMessageCommand {
      * Handle selectFile command - opens file picker dialog
      */
     private async handleSelectFile(context: CommandContext): Promise<CommandResult> {
-        const document = await context.fileManager.selectFile();
+        await context.fileManager.selectFile();
         // Note: The selected document is handled by the main panel/extension
         // The fileManager.selectFile() triggers the appropriate flow
         return this.success();

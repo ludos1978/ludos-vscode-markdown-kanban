@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { FileManager, FileResolutionResult } from './fileManager';
+import { FileManager } from './fileManager';
 import { FileSearchService } from './fileSearchService';
 import { configService } from './configurationService';
 import { safeFileUri } from './utils/uriUtils';
@@ -9,19 +9,17 @@ import { safeFileUri } from './utils/uriUtils';
 export class LinkHandler {
     private _fileManager: FileManager;
     private _fileSearchService: FileSearchService;
-    private _webview: vscode.Webview;
-    private _onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void>; // ADD THIS
+    private _onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void>;
 
     constructor(
-        fileManager: FileManager, 
-        webview: vscode.Webview,
-        onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void> // ADD THIS
+        fileManager: FileManager,
+        _webview: vscode.Webview,
+        onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void>
     ) {
         this._fileManager = fileManager;
         // Provide extension root so FileSearchService can load icon assets
         this._fileSearchService = new FileSearchService(this._fileManager.getExtensionUri());
-        this._webview = webview;
-        this._onRequestLinkReplacement = onRequestLinkReplacement; // ADD THIS
+        this._onRequestLinkReplacement = onRequestLinkReplacement;
     }
     /**
      * Enhanced file link handler with workspace-relative path support

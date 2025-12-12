@@ -1,4 +1,4 @@
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
+import { KanbanBoard, KanbanTask } from '../../markdownParser';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 
 /**
