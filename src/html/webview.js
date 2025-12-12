@@ -5616,8 +5616,8 @@ function executeUnifiedExport() {
         // SELECTION: Column indexes to export
         columnIndexes: selectedItems,
 
-        // MODE
-        mode: 'save',
+        // MODE: Use 'auto' for Marp live preview to enable auto-refresh on save
+        mode: (useMarp && marpPreview) ? 'auto' : 'save',
 
         // FORMAT
         format: useMarp && format === 'presentation' ? 'marp' : format,

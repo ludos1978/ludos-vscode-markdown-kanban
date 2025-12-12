@@ -1664,7 +1664,10 @@ export class ExportService {
 
         // Write markdown file
         const markdownPath = path.join(options.targetFolder, `${sourceBasename}.md`);
+        console.log('[ExportService] Writing markdown to:', markdownPath);
+        console.log('[ExportService] Content length:', transformed.content.length);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
+        console.log('[ExportService] Markdown written successfully');
 
         // Handle Marp conversion
         if (options.format === 'marp') {
@@ -1733,7 +1736,6 @@ export class ExportService {
 
             // If diagrams were processed, write to temp file
             if (preprocessResult.diagramFiles.length > 0) {
-
                 // Write processed markdown to temp file
                 const tempFile = path.join(dir, `${baseName}.preprocessed.md`);
                 await fs.promises.writeFile(tempFile, preprocessResult.processedMarkdown, 'utf8');
@@ -1748,7 +1750,6 @@ export class ExportService {
                         // Ignore cleanup errors
                     }
                 };
-            } else {
             }
         } catch (error) {
             console.error('[ExportService] Diagram preprocessing failed:', error);
@@ -1867,6 +1868,14 @@ export class ExportService {
         options: NewExportOptions,
         board?: any
     ): Promise<ExportResult> {
+        console.log('[ExportService.export] Called with:');
+        console.log('  - sourceDocument:', sourceDocument.uri.fsPath);
+        console.log('  - options.mode:', options.mode);
+        console.log('  - options.format:', options.format);
+        console.log('  - options.marpWatch:', options.marpWatch);
+        console.log('  - options.targetFolder:', options.targetFolder);
+        console.log('  - board provided:', !!board);
+
         try {
             // Clear tracking maps for new export
             this.fileHashMap.clear();

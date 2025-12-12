@@ -18,8 +18,12 @@ import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../configurationService';
 import { SaveEventDispatcher, SaveEventHandler } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
+import { FileChangeEvent } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
 import * as path from 'path';
+
+// Track auto-export subscriptions (file path -> disposable)
+const autoExportSubscriptions = new Map<string, vscode.Disposable>();
 
 /**
  * Export Commands Handler
@@ -263,42 +267,55 @@ export class ExportCommands extends BaseMessageCommand {
         // NOW stop existing handlers/processes for other files
         await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, context, initialResult.exportedPath);
 
-        const docUri = document.uri;
-        const coordinator = SaveEventDispatcher.getInstance();
+        const docPath = document.uri.fsPath;
 
-        // Register handler
-        const handler: SaveEventHandler = {
-            id: `auto-export-${docUri.fsPath}`,
-            handleSave: async (savedDoc: vscode.TextDocument) => {
-                if (savedDoc.uri.toString() === docUri.toString()) {
-                    // For Marp watch mode, update markdown only
-                    if (options.marpWatch) {
-                        try {
-                            const boardForUpdate = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
-                            await ExportService.export(savedDoc, options, boardForUpdate);
-                        } catch (error) {
-                            console.error('[ExportCommands.autoExport] Markdown update failed:', error);
-                        }
-                        return;
-                    }
+        // Clean up any existing subscription for this file
+        const existingSubscription = autoExportSubscriptions.get(docPath);
+        if (existingSubscription) {
+            existingSubscription.dispose();
+            autoExportSubscriptions.delete(docPath);
+        }
 
-                    try {
-                        const boardForExport = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
-                        const result = await ExportService.export(savedDoc, options, boardForExport);
+        // Get the main kanban file from the file registry
+        const fileRegistry = context.getFileRegistry();
+        if (!fileRegistry) {
+            console.error('[ExportCommands] No file registry available for auto-export');
+            return;
+        }
 
-                        if (result.success && options.openAfterExport && result.exportedPath) {
-                            const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');
-                            await vscode.env.openExternal(uri);
-                        }
-                    } catch (error) {
-                        console.error('[ExportCommands.autoExport] Auto-export failed:', error);
-                        vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
-                    }
-                }
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            console.error('[ExportCommands] No main kanban file found for auto-export');
+            return;
+        }
+
+        console.log('[ExportCommands] Setting up auto-export listener for:', mainFile.getPath());
+
+        // Subscribe to the kanban file's onDidChange event
+        const subscription = mainFile.onDidChange(async (event: FileChangeEvent) => {
+            // Only trigger export on 'saved' events
+            if (event.changeType !== 'saved') {
+                return;
             }
-        };
 
-        coordinator.registerHandler(handler);
+            try {
+                // Re-read the document to get fresh content
+                const freshDoc = await vscode.workspace.openTextDocument(document.uri);
+                const result = await ExportService.export(freshDoc, options, undefined);
+
+                if (result.success && options.openAfterExport && result.exportedPath && !options.marpWatch) {
+                    const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');
+                    await vscode.env.openExternal(uri);
+                }
+            } catch (error) {
+                console.error('[ExportCommands.autoExport] Auto-export failed:', error);
+                vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        });
+
+        // Store the subscription for cleanup
+        autoExportSubscriptions.set(docPath, subscription);
+        console.log('[ExportCommands] Auto-export listener registered');
     }
 
     /**
@@ -306,11 +323,20 @@ export class ExportCommands extends BaseMessageCommand {
      */
     private async handleStopAutoExport(context: CommandContext): Promise<void> {
         try {
-            // Unregister from SaveEventDispatcher
+            // Unregister from SaveEventDispatcher (legacy)
             const doc = context.fileManager.getDocument();
             if (doc) {
                 const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
+
+                // Also dispose the onDidChange subscription
+                const docPath = doc.uri.fsPath;
+                const subscription = autoExportSubscriptions.get(docPath);
+                if (subscription) {
+                    subscription.dispose();
+                    autoExportSubscriptions.delete(docPath);
+                    console.log('[ExportCommands] Disposed auto-export subscription for:', docPath);
+                }
             }
 
             // Stop all Marp watch processes

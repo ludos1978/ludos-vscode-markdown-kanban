@@ -307,8 +307,26 @@ export class DiagramPreprocessor {
     }
 
     /**
+     * Check if output SVG is up-to-date with source file
+     * Returns true if SVG exists and is newer than source
+     */
+    private async isOutputUpToDate(sourcePath: string, outputPath: string): Promise<boolean> {
+        try {
+            if (!fs.existsSync(outputPath)) {
+                return false;
+            }
+            const sourceStat = await fs.promises.stat(sourcePath);
+            const outputStat = await fs.promises.stat(outputPath);
+            return outputStat.mtime >= sourceStat.mtime;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Render draw.io diagrams in parallel
      * Similar to PlantUML batch rendering (CLI-based)
+     * Skips diagrams whose source files haven't changed
      */
     private async renderDrawIOBatch(
         diagrams: DiagramBlock[],
@@ -334,13 +352,25 @@ export class DiagramPreprocessor {
                     return null;
                 }
 
+                const fileName = `${baseFileName}-${diagram.id}.svg`;
+                const outputPath = path.join(outputFolder, fileName);
+
+                // Check if output is up-to-date (skip re-rendering unchanged diagrams)
+                if (await this.isOutputUpToDate(absolutePath, outputPath)) {
+                    console.log(`[DiagramPreprocessor] ✓ Skipping ${diagram.id} (unchanged)`);
+                    return {
+                        id: diagram.id,
+                        fileName,
+                        originalBlock: diagram.fullMatch
+                    };
+                }
+
                 // Render using draw.io service
+                console.log(`[DiagramPreprocessor] Rendering ${diagram.id}...`);
                 const svg = await this.drawioService.renderSVG(absolutePath);
 
                 // Save SVG file
-                const fileName = `${baseFileName}-${diagram.id}.svg`;
-                const filePath = path.join(outputFolder, fileName);
-                await fs.promises.writeFile(filePath, svg, 'utf8');
+                await fs.promises.writeFile(outputPath, svg, 'utf8');
 
                 return {
                     id: diagram.id,
@@ -362,6 +392,7 @@ export class DiagramPreprocessor {
     /**
      * Render excalidraw diagrams in parallel
      * Similar to PlantUML batch rendering (library-based)
+     * Skips diagrams whose source files haven't changed
      */
     private async renderExcalidrawBatch(
         diagrams: DiagramBlock[],
@@ -387,13 +418,25 @@ export class DiagramPreprocessor {
                     return null;
                 }
 
+                const fileName = `${baseFileName}-${diagram.id}.svg`;
+                const outputPath = path.join(outputFolder, fileName);
+
+                // Check if output is up-to-date (skip re-rendering unchanged diagrams)
+                if (await this.isOutputUpToDate(absolutePath, outputPath)) {
+                    console.log(`[DiagramPreprocessor] ✓ Skipping ${diagram.id} (unchanged)`);
+                    return {
+                        id: diagram.id,
+                        fileName,
+                        originalBlock: diagram.fullMatch
+                    };
+                }
+
                 // Render using excalidraw service
+                console.log(`[DiagramPreprocessor] Rendering ${diagram.id}...`);
                 const svg = await this.excalidrawService.renderSVG(absolutePath);
 
                 // Save SVG file
-                const fileName = `${baseFileName}-${diagram.id}.svg`;
-                const filePath = path.join(outputFolder, fileName);
-                await fs.promises.writeFile(filePath, svg, 'utf8');
+                await fs.promises.writeFile(outputPath, svg, 'utf8');
 
                 return {
                     id: diagram.id,
