@@ -1,19 +1,21 @@
-import * as vscode from 'vscode';
 import * as path from 'path';
 import { KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
-import { PresentationParser } from './presentationParser';
 import { BackupManager } from './backupManager';
 import { ConflictResolver } from './conflictResolver';
-import { MarkdownFileRegistry, IncludeFile, FileState, FileFactory } from './files';
+import { MarkdownFileRegistry, IncludeFile, FileState, FileFactory, MarkdownFile } from './files';
 
 /**
  * IncludeFileManager - Thin wrapper around MarkdownFileRegistry
- * Delegates all file operations to the registry
+ *
+ * This class exists for backward compatibility. New code should use
+ * MarkdownFileRegistry directly where possible.
+ *
+ * Key responsibilities that remain:
+ * - trackIncludeFileUnsavedChanges: Sync board state to file instances
+ * - saveColumnIncludeChanges/saveTaskIncludeChanges: Save include files
+ * - ensureIncludeFileRegistered: Lazy file registration
  */
 export class IncludeFileManager {
-    private _recentlyReloadedFiles: Set<string> = new Set();
-    private _filesToRemoveAfterSave: string[] = [];
-    private _unsavedFilesToPrompt: string[] = [];
 
     constructor(
         private fileRegistry: MarkdownFileRegistry,
@@ -350,39 +352,49 @@ export class IncludeFileManager {
         this.updateIncludeContentUnified(relativePath, content);
     }
 
-    // Internal/private methods - mostly no-ops now since registry handles everything
+    // ============= PATH UTILITIES =============
 
-    public _handleUnsavedIncludeFileChanges(): Promise<void> {
-        return Promise.resolve();
-    }
-
-    public _initializeUnifiedIncludeContents(documentGetter: any): Promise<void> {
-        return Promise.resolve();
-    }
-
-    // FOUNDATION-1: Use MarkdownFile helpers instead of manual normalization
+    /**
+     * Compare two paths for equality (case-insensitive, platform-independent)
+     * @deprecated Use MarkdownFile.isSameFile() directly
+     */
     public _isSameIncludePath(path1: string, path2: string): boolean {
-        // Import MarkdownFile at top if not already imported
-        const { MarkdownFile } = require('./files/MarkdownFile');
         return MarkdownFile.isSameFile(path1, path2);
     }
 
     /**
      * Normalize include paths for consistent registry lookups
-     * CRITICAL: Registry does NOT normalize internally - we MUST normalize before ALL registry lookups!
+     * @deprecated Use MarkdownFile.normalizeRelativePath() directly
      */
     public normalizeIncludePath(includePath: string): string {
-        return includePath.trim().toLowerCase().replace(/\\/g, '/');
+        return MarkdownFile.normalizeRelativePath(includePath);
     }
 
+    // ============= LEGACY NO-OP METHODS =============
+    // These methods exist for backward compatibility with kanbanFileService.ts
+    // They do nothing because the registry now handles these concerns automatically
+
+    /** @deprecated No-op - registry handles this automatically */
+    public _handleUnsavedIncludeFileChanges(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    /** @deprecated No-op - registry handles this automatically */
+    public _initializeUnifiedIncludeContents(_documentGetter: any): Promise<void> {
+        return Promise.resolve();
+    }
+
+    /** @deprecated No-op - registry handles this automatically */
     public _recheckIncludeFileChanges(): void {
         // Registry tracks changes automatically
     }
 
-    public _updateUnifiedIncludeSystem(board: KanbanBoard, documentGetter: any): Promise<void> {
+    /** @deprecated No-op - registry handles this automatically */
+    public _updateUnifiedIncludeSystem(_board: KanbanBoard, _documentGetter: any): Promise<void> {
         return Promise.resolve();
     }
 
+    /** @deprecated No-op - registry handles this automatically */
     public _removeTrackedFiles(): void {
         // No-op - registry manages lifecycle
     }
