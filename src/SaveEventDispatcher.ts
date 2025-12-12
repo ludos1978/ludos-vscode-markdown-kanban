@@ -23,15 +23,19 @@ export interface SaveEventHandler {
 }
 
 /**
- * Centralized coordinator for all document save events.
+ * SaveEventDispatcher - Centralized dispatcher for VS Code document save events
+ *
  * Replaces multiple individual onDidSaveTextDocument listeners with a single
  * unified system that dispatches to registered handlers.
  *
  * This eliminates duplication where ExternalFileWatcher, KanbanWebviewPanel,
  * and MessageHandler (auto-export) all had separate listeners.
+ *
+ * NOTE: This handles VS Code SAVE EVENTS (onDidSaveTextDocument).
+ * For actual file save operations, see FileSaveService in core/FileSaveService.ts
  */
-export class SaveEventCoordinator implements vscode.Disposable {
-    private static instance: SaveEventCoordinator | undefined;
+export class SaveEventDispatcher implements vscode.Disposable {
+    private static instance: SaveEventDispatcher | undefined;
 
     private saveListener: vscode.Disposable | null = null;
     private handlers: Map<string, SaveEventHandler> = new Map();
@@ -39,11 +43,11 @@ export class SaveEventCoordinator implements vscode.Disposable {
     /**
      * Get or create the singleton instance
      */
-    public static getInstance(): SaveEventCoordinator {
-        if (!SaveEventCoordinator.instance) {
-            SaveEventCoordinator.instance = new SaveEventCoordinator();
+    public static getInstance(): SaveEventDispatcher {
+        if (!SaveEventDispatcher.instance) {
+            SaveEventDispatcher.instance = new SaveEventDispatcher();
         }
-        return SaveEventCoordinator.instance;
+        return SaveEventDispatcher.instance;
     }
 
     private constructor() {
@@ -67,7 +71,7 @@ export class SaveEventCoordinator implements vscode.Disposable {
                 try {
                     await handler.handleSave(document);
                 } catch (error) {
-                    console.error(`[SaveEventCoordinator] Handler '${handler.id}' failed:`, error);
+                    console.error(`[SaveEventDispatcher] Handler '${handler.id}' failed:`, error);
                     // Continue to other handlers even if one fails
                 }
             }
@@ -81,7 +85,7 @@ export class SaveEventCoordinator implements vscode.Disposable {
      */
     public registerHandler(handler: SaveEventHandler): void {
         if (this.handlers.has(handler.id)) {
-            console.warn(`[SaveEventCoordinator] Handler '${handler.id}' already registered, replacing`);
+            console.warn(`[SaveEventDispatcher] Handler '${handler.id}' already registered, replacing`);
         }
         this.handlers.set(handler.id, handler);
     }
@@ -110,7 +114,7 @@ export class SaveEventCoordinator implements vscode.Disposable {
     }
 
     /**
-     * Dispose the coordinator and clean up
+     * Dispose the dispatcher and clean up
      */
     public dispose(): void {
         if (this.saveListener) {
@@ -120,8 +124,8 @@ export class SaveEventCoordinator implements vscode.Disposable {
         this.handlers.clear();
 
         // Clear singleton instance
-        if (SaveEventCoordinator.instance === this) {
-            SaveEventCoordinator.instance = undefined;
+        if (SaveEventDispatcher.instance === this) {
+            SaveEventDispatcher.instance = undefined;
         }
     }
 }

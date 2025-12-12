@@ -1,35 +1,35 @@
-import * as vscode from 'vscode';
-import { SaveEventCoordinator } from '../saveEventCoordinator';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { SaveOptions } from '../files/SaveOptions';
 
 /**
- * Unified Save Coordinator - Single source for all save operations
+ * FileSaveService - Unified service for all file save operations
  *
  * Uses SaveOptions interface for consistent, parameter-based save handling.
  * NO timing-based heuristics - uses instance-level flags instead (SaveOptions.skipReloadDetection).
  *
  * ARCHITECTURE:
- * - All saves go through SaveCoordinator.saveFile()
- * - SaveCoordinator calls file.save(SaveOptions)
+ * - All saves go through FileSaveService.saveFile()
+ * - FileSaveService calls file.save(SaveOptions)
  * - SaveOptions.skipReloadDetection (default: true) sets instance flag _skipNextReloadDetection
  * - File watcher checks instance flag and skips reload if true
  * - No global state, no timing windows, just clean parameter-based design
+ *
+ * NOTE: This handles actual FILE SAVE OPERATIONS.
+ * For VS Code save events (onDidSaveTextDocument), see SaveEventDispatcher.
  */
-export class SaveCoordinator {
-    private static instance: SaveCoordinator | undefined;
-    private saveCoordinator: SaveEventCoordinator;
+export class FileSaveService {
+    private static instance: FileSaveService | undefined;
     private activeSaves = new Map<string, Promise<void>>();
 
     public constructor() {
-        this.saveCoordinator = SaveEventCoordinator.getInstance();
+        // No initialization needed
     }
 
-    public static getInstance(): SaveCoordinator {
-        if (!SaveCoordinator.instance) {
-            SaveCoordinator.instance = new SaveCoordinator();
+    public static getInstance(): FileSaveService {
+        if (!FileSaveService.instance) {
+            FileSaveService.instance = new FileSaveService();
         }
-        return SaveCoordinator.instance;
+        return FileSaveService.instance;
     }
 
     /**
@@ -60,10 +60,6 @@ export class SaveCoordinator {
      * Perform the actual save operation using SaveOptions
      */
     private async performSave(file: MarkdownFile, content?: string, options?: SaveOptions): Promise<void> {
-        const filePath = file.getPath();
-        const fileType = file.getFileType();
-
-
         try {
             // If content is provided, update file content first
             // Use updateBaseline=true to prevent emitting 'content' event and triggering save loop
@@ -84,10 +80,8 @@ export class SaveCoordinator {
 
             // Perform the save using the file's save method with SaveOptions
             await file.save(saveOptions);
-
-
         } catch (error) {
-            console.error(`[SaveCoordinator] Save failed: ${fileType} - ${filePath}`, error);
+            console.error(`[FileSaveService] Save failed: ${file.getFileType()} - ${file.getPath()}`, error);
             throw error;
         }
     }

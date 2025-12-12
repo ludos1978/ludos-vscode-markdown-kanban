@@ -474,8 +474,8 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error('Main file not found in registry');
                 }
 
-                const saveCoordinator = fileService._saveCoordinator;
-                await saveCoordinator.saveFile(mainFile, markdown);
+                const fileSaveService = fileService._fileSaveService;
+                await fileSaveService.saveFile(mainFile, markdown);
                 mainFile.updateFromBoard(board, true, true);
 
                 // Trigger marpWatch export if active

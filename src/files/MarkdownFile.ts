@@ -4,7 +4,6 @@ import * as path from 'path';
 import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
-import { SaveCoordinator } from '../core/SaveCoordinator';
 import { SaveOptions } from './SaveOptions';
 
 /**

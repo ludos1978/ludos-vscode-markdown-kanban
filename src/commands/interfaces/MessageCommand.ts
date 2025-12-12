@@ -9,7 +9,7 @@
 
 import { FileManager } from '../../fileManager';
 import { BoardStore } from '../../core/stores';
-import { BoardOperations } from '../../boardOperations';
+import { BoardOperations } from '../../board';
 import { LinkHandler } from '../../linkHandler';
 import { KanbanBoard } from '../../markdownParser';
 import { PlantUMLService } from '../../plantUMLService';

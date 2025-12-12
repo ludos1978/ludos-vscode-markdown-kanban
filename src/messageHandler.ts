@@ -1,6 +1,6 @@
 import { FileManager } from './fileManager';
 import { BoardStore } from './core/stores';
-import { BoardOperations } from './boardOperations';
+import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
@@ -8,7 +8,7 @@ import { configService, ConfigurationService } from './configurationService';
 import { ExportService } from './exportService';
 import { MarpExtensionService } from './services/export/MarpExtensionService';
 import { MarpExportService } from './services/export/MarpExportService';
-import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
+import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { PlantUMLService } from './plantUMLService';
 import { getMermaidExportService } from './services/export/MermaidExportService';
 import { PresentationGenerator } from './services/export/PresentationGenerator';
@@ -2601,10 +2601,10 @@ export class MessageHandler {
     private async handleStopAutoExport(): Promise<void> {
         try {
 
-            // Unregister from SaveEventCoordinator
+            // Unregister from SaveEventDispatcher
             const doc = this._fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventCoordinator.getInstance();
+                const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
@@ -2637,10 +2637,10 @@ export class MessageHandler {
             if (protectExportedPath) {
             }
 
-            // Unregister from SaveEventCoordinator
+            // Unregister from SaveEventDispatcher
             const doc = this._fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventCoordinator.getInstance();
+                const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
@@ -2663,10 +2663,10 @@ export class MessageHandler {
     private async handleStopAutoExportForFile(excludeFilePath?: string): Promise<void> {
         try {
 
-            // Unregister from SaveEventCoordinator
+            // Unregister from SaveEventDispatcher
             const doc = this._fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventCoordinator.getInstance();
+                const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
@@ -2807,7 +2807,7 @@ export class MessageHandler {
         await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, initialResult.exportedPath);
 
         const docUri = document.uri;
-        const coordinator = SaveEventCoordinator.getInstance();
+        const coordinator = SaveEventDispatcher.getInstance();
 
         // Register handler
         const handler: SaveEventHandler = {

@@ -6,7 +6,7 @@ import { getOutputChannel } from './extension';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { PresentationParser } from './presentationParser';
 import { FileManager } from './fileManager';
-import { BoardOperations } from './boardOperations';
+import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './backupManager';
@@ -15,8 +15,8 @@ import { configService, ConfigurationService } from './configurationService';
 import { PathResolver } from './services/PathResolver';
 import { FileWriter } from './services/FileWriter';
 import { FormatConverter } from './services/export/FormatConverter';
-import { SaveEventCoordinator } from './saveEventCoordinator';
-import { SaveCoordinator } from './core/SaveCoordinator';
+import { SaveEventDispatcher } from './SaveEventDispatcher';
+import { FileSaveService } from './core/FileSaveService';
 import { KanbanFileService } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
 import {
@@ -1798,11 +1798,11 @@ export class KanbanWebviewPanel {
         // Dispose concurrency manager (handles RACE-3 and RACE-4 cleanup)
         this._concurrency.dispose();
 
-        // Unregister from SaveEventCoordinator
+        // Unregister from SaveEventDispatcher
         const document = this._fileManager.getDocument();
         if (document) {
-            const coordinator = SaveEventCoordinator.getInstance();
-            coordinator.unregisterHandler(`panel-${document.uri.fsPath}`);
+            const dispatcher = SaveEventDispatcher.getInstance();
+            dispatcher.unregisterHandler(`panel-${document.uri.fsPath}`);
         }
 
         // Stop backup timer

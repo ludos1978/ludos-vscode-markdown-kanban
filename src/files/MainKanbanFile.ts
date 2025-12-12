@@ -8,7 +8,6 @@ import { ConflictResolver, ConflictContext, ConflictResolution } from '../confli
 import { BackupManager } from '../backupManager';
 import { FileManager } from '../fileManager';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
-import { SaveCoordinator } from '../core/SaveCoordinator';
 
 /**
  * Represents the main kanban markdown file.

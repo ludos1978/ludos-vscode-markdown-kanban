@@ -16,7 +16,7 @@ import { ExportService } from '../exportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../configurationService';
-import { SaveEventCoordinator, SaveEventHandler } from '../saveEventCoordinator';
+import { SaveEventDispatcher, SaveEventHandler } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -264,7 +264,7 @@ export class ExportCommands extends BaseMessageCommand {
         await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, context, initialResult.exportedPath);
 
         const docUri = document.uri;
-        const coordinator = SaveEventCoordinator.getInstance();
+        const coordinator = SaveEventDispatcher.getInstance();
 
         // Register handler
         const handler: SaveEventHandler = {
@@ -306,10 +306,10 @@ export class ExportCommands extends BaseMessageCommand {
      */
     private async handleStopAutoExport(context: CommandContext): Promise<void> {
         try {
-            // Unregister from SaveEventCoordinator
+            // Unregister from SaveEventDispatcher
             const doc = context.fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventCoordinator.getInstance();
+                const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 
@@ -338,10 +338,10 @@ export class ExportCommands extends BaseMessageCommand {
      */
     private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, context: CommandContext, protectExportedPath?: string): Promise<void> {
         try {
-            // Unregister from SaveEventCoordinator
+            // Unregister from SaveEventDispatcher
             const doc = context.fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventCoordinator.getInstance();
+                const coordinator = SaveEventDispatcher.getInstance();
                 coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
             }
 

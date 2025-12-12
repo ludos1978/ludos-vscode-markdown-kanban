@@ -4,10 +4,10 @@ import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
 import { MarkdownFileRegistry, FileFactory } from './files';
 import { BackupManager } from './backupManager';
-import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
+import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
-import { BoardOperations } from './boardOperations';
-import { SaveCoordinator } from './core/SaveCoordinator';
+import { BoardOperations } from './board';
+import { FileSaveService } from './core/FileSaveService';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -49,7 +49,7 @@ export class KanbanFileService {
     private _trackedDocumentUri: string | undefined;
 
     // NEW ARCHITECTURE COMPONENTS
-    private _saveCoordinator: SaveCoordinator;
+    private _fileSaveService: FileSaveService;
 
     constructor(
         private fileManager: FileManager,
@@ -72,7 +72,7 @@ export class KanbanFileService {
         this._panelId = Math.random().toString(36).substr(2, 9);
 
         // Initialize new architecture components
-        this._saveCoordinator = SaveCoordinator.getInstance();
+        this._fileSaveService = FileSaveService.getInstance();
     }
 
     /**
@@ -395,7 +395,7 @@ export class KanbanFileService {
     }
 
     /**
-     * Save board to markdown file using unified SaveCoordinator
+     * Save board to markdown file using unified FileSaveService
      */
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
 
@@ -409,15 +409,15 @@ export class KanbanFileService {
         // Generate markdown content
         const markdown = MarkdownKanbanParser.generateMarkdown(this.board()!);
 
-        // Use SaveCoordinator for unified save handling
-        await this._saveCoordinator.saveFile(mainFile, markdown);
+        // Use FileSaveService for unified save handling
+        await this._fileSaveService.saveFile(mainFile, markdown);
 
         // Save include files that have unsaved changes
         const unsavedIncludes = this.fileRegistry.getFilesWithUnsavedChanges().filter(f => f.getFileType() !== 'main');
         if (unsavedIncludes.length > 0) {
             // Save each include file individually, handling validation errors gracefully
             const saveResults = await Promise.allSettled(
-                unsavedIncludes.map(f => this._saveCoordinator.saveFile(f))
+                unsavedIncludes.map(f => this._fileSaveService.saveFile(f))
             );
 
             // Log any files that failed to save due to validation
@@ -588,15 +588,15 @@ export class KanbanFileService {
         });
         disposables.push(changeDisposable);
 
-        // NOTE: SaveEventCoordinator registration moved to loadMarkdownFile()
+        // NOTE: SaveEventDispatcher registration moved to loadMarkdownFile()
         // because document is not available yet when this method is called in constructor
     }
 
     /**
-     * Register handler with SaveEventCoordinator for version tracking
+     * Register handler with SaveEventDispatcher for version tracking
      */
     public registerSaveHandler(): void {
-        const coordinator = SaveEventCoordinator.getInstance();
+        const dispatcher = SaveEventDispatcher.getInstance();
         const document = this.fileManager.getDocument();
         if (!document) return;
 
@@ -662,7 +662,7 @@ export class KanbanFileService {
                         }
 
                         // NOTE: External change handling is now handled EXCLUSIVELY by ExternalFileWatcher
-                        // which is also registered with SaveEventCoordinator.
+                        // which is also registered with SaveEventDispatcher.
                         // REMOVED duplicate handling here to prevent race conditions and double-reload bugs.
                         // ExternalFileWatcher will fire the event and handleExternalFileChange will be called.
 
@@ -672,7 +672,7 @@ export class KanbanFileService {
             }
         };
 
-        coordinator.registerHandler(handler);
+        dispatcher.registerHandler(handler);
     }
 
     /**
