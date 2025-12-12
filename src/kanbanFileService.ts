@@ -41,7 +41,6 @@ export class KanbanFileService {
     private _saveState: SaveState = SaveState.IDLE;
     private _saveStartVersion: number | null = null;
     private _saveEndVersion: number | null = null;
-    private _saveOperationTimestamp: Date | null = null;
 
     private _cachedBoardFromWebview: any = null;
     private _lastDocumentUri?: string;
@@ -741,45 +740,5 @@ export class KanbanFileService {
             // Silently fail - file is still created with . prefix
         }
     }
-
-    /**
-     * Compare two board objects to determine if they are different
-     * Used for detecting unsaved Kanban changes during external saves
-     */
-    private _boardsAreDifferent(board1: KanbanBoard, board2: KanbanBoard): boolean {
-        // Normalize both boards for comparison (remove volatile fields)
-        const normalized1 = this._normalizeBoardForComparison(board1);
-        const normalized2 = this._normalizeBoardForComparison(board2);
-
-        // Compare the normalized boards
-        return JSON.stringify(normalized1) !== JSON.stringify(normalized2);
-    }
-
-    /**
-     * Normalize a board for comparison by removing volatile fields
-     */
-    private _normalizeBoardForComparison(board: KanbanBoard): any {
-        // Deep clone to avoid modifying original
-        const normalized = JSON.parse(JSON.stringify(board));
-
-        // Remove volatile fields that don't affect content
-        if (normalized.columns) {
-            for (const column of normalized.columns) {
-                // Remove any volatile column properties
-                delete column.isLoadingContent;
-
-                if (column.tasks) {
-                    for (const task of column.tasks) {
-                        // Remove volatile task properties
-                        delete task.isLoadingContent;
-                        // Keep essential content: title, description, includeFiles, etc.
-                    }
-                }
-            }
-        }
-
-        return normalized;
-    }
-
 
 }

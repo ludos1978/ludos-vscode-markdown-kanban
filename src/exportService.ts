@@ -5,7 +5,6 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { TagUtils, TagVisibility } from './utils/tagUtils';
 import { PresentationParser } from './presentationParser';
-import { OperationOptionsBuilder, OperationOptions, FormatStrategy } from './services/OperationOptions';
 import { PathResolver } from './services/PathResolver';
 import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
 import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
@@ -16,8 +15,6 @@ import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
 import { AssetHandler } from './services/assets/AssetHandler';
 
 export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
-
-// Note: ExportScope type is defined in './services/OperationOptions' for unified usage
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -107,12 +104,6 @@ export interface ExportAssetInfo {
     size: number;
     exists: boolean;
     md5?: string;
-}
-
-interface ProcessedAsset {
-    original: ExportAssetInfo;
-    exportedPath: string;
-    exportedRelativePath: string;
 }
 
 export class ExportService {
@@ -274,24 +265,6 @@ export class ExportService {
         }
 
         return result;
-    }
-
-    /**
-     * Ensure YAML frontmatter exists in kanban content
-     * Adds standard kanban YAML header if not present
-     */
-    private static ensureYamlFrontmatter(content: string): string {
-        // Check if content already has YAML frontmatter
-        const hasYaml = content.trim().startsWith('---');
-
-        if (hasYaml) {
-            // Already has YAML, return as-is
-            return content;
-        }
-
-        // Add standard kanban YAML frontmatter
-        const yamlHeader = '---\n\nkanban-plugin: board\n\n---\n\n';
-        return yamlHeader + content;
     }
 
     /**
@@ -1020,59 +993,6 @@ export class ExportService {
     }
 
     /**
-     * Create _not_included.md file with excluded assets
-     */
-    private static async createNotIncludedFile(notIncludedAssets: ExportAssetInfo[], targetFolder: string): Promise<void> {
-        // Ensure target folder exists
-        if (!fs.existsSync(targetFolder)) {
-            fs.mkdirSync(targetFolder, { recursive: true });
-        }
-
-        const content = [
-            '# Assets Not Included in Export',
-            '',
-            'The following assets were not included in this export:',
-            ''
-        ];
-
-        // Group by reason for exclusion
-        const missingAssets = notIncludedAssets.filter(a => !a.exists);
-        const oversizedAssets = notIncludedAssets.filter(a => a.exists && a.size > 100 * 1024 * 1024);
-        const excludedByType = notIncludedAssets.filter(a => a.exists && a.size <= 100 * 1024 * 1024);
-
-        if (missingAssets.length > 0) {
-            content.push('## Missing Files');
-            content.push('');
-            missingAssets.forEach(asset => {
-                content.push(`- [${path.basename(asset.originalPath)}](${asset.originalPath}) - File not found`);
-            });
-            content.push('');
-        }
-
-        if (oversizedAssets.length > 0) {
-            content.push('## Files Too Large');
-            content.push('');
-            oversizedAssets.forEach(asset => {
-                const sizeMB = Math.round(asset.size / (1024 * 1024) * 100) / 100;
-                content.push(`- [${path.basename(asset.originalPath)}](${asset.originalPath}) - ${sizeMB} MB`);
-            });
-            content.push('');
-        }
-
-        if (excludedByType.length > 0) {
-            content.push('## Excluded by Type');
-            content.push('');
-            excludedByType.forEach(asset => {
-                content.push(`- [${path.basename(asset.originalPath)}](${asset.originalPath}) - ${asset.type}`);
-            });
-            content.push('');
-        }
-
-        const notIncludedPath = path.join(targetFolder, '_not_included.md');
-        fs.writeFileSync(notIncludedPath, content.join('\n'), 'utf8');
-    }
-
-    /**
      * Generate default export folder name based on source filename and timestamp
      * Format: {filename}-YYYYMMDD-HHmm (using local time)
      */
@@ -1241,177 +1161,6 @@ export class ExportService {
         // Return the content of the requested column
         const selectedColumn = columns[columnIndex];
         return selectedColumn.content.join('\n');
-    }
-
-    /**
-     * Sanitize column name for use in filename
-     */
-    private static sanitizeColumnName(columnTitle: string | undefined, columnIndex: number): string {
-        if (columnTitle) {
-            // Remove special characters and spaces, replace with underscores
-            return columnTitle
-                .replace(/[^a-zA-Z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '')
-                .toLowerCase();
-        } else {
-            return `Row${columnIndex}`;
-        }
-    }
-
-    /**
-     * Get row number from column title (defaults to 1)
-     */
-    private static getColumnRow(title: string): number {
-        if (!title) { return 1; }
-        const rowMatches = title.match(/#row(\d+)\b/gi);
-        if (rowMatches && rowMatches.length > 0) {
-            const lastMatch = rowMatches[rowMatches.length - 1];
-            const num = parseInt(lastMatch.replace(/#row/i, ''), 10);
-            return isNaN(num) ? 1 : num;
-        }
-        return 1;
-    }
-
-    /**
-     * Check if column has #stack tag
-     */
-    private static isColumnStacked(title: string): boolean {
-        return /#stack\b/i.test(title);
-    }
-
-    /**
-     * Extract all columns content from a specific row
-     */
-    private static extractRowContent(markdownContent: string, rowNumber: number): string | null {
-        const isKanban = markdownContent.includes('kanban-plugin: board');
-        if (!isKanban) { return null; }
-
-        const lines = markdownContent.split('\n');
-        const rowColumns: string[] = [];
-        let currentColumn: { content: string[]; row: number } | null = null;
-
-        for (const line of lines) {
-            if (line.startsWith('## ')) {
-                // Save previous column if it's in the target row
-                if (currentColumn && currentColumn.row === rowNumber) {
-                    rowColumns.push(currentColumn.content.join('\n'));
-                }
-                // Start new column
-                const columnRow = this.getColumnRow(line);
-                currentColumn = { content: [line], row: columnRow };
-            } else if (currentColumn) {
-                currentColumn.content.push(line);
-            }
-        }
-
-        // Don't forget the last column
-        if (currentColumn && currentColumn.row === rowNumber) {
-            rowColumns.push(currentColumn.content.join('\n'));
-        }
-
-        return rowColumns.length > 0 ? rowColumns.join('\n\n') : null;
-    }
-
-    /**
-     * Extract stack content (consecutive stacked columns in same row)
-     * A stack includes: base column (without #stack) + all consecutive #stack columns after it
-     */
-    private static extractStackContent(markdownContent: string, rowNumber: number, stackIndex: number): string | null {
-
-        const isKanban = markdownContent.includes('kanban-plugin: board');
-        if (!isKanban) { return null; }
-
-        const lines = markdownContent.split('\n');
-
-        // First, collect all columns in the target row
-        const rowColumns: { content: string; stacked: boolean; title: string }[] = [];
-        let currentColumn: { content: string[]; row: number; stacked: boolean } | null = null;
-
-        for (const line of lines) {
-            if (line.startsWith('## ')) {
-                // Save previous column if it's in the target row
-                if (currentColumn && currentColumn.row === rowNumber) {
-                    rowColumns.push({
-                        content: currentColumn.content.join('\n'),
-                        stacked: currentColumn.stacked,
-                        title: currentColumn.content[0]
-                    });
-                }
-
-                // Start new column
-                const columnRow = this.getColumnRow(line);
-                const isStacked = this.isColumnStacked(line);
-                currentColumn = { content: [line], row: columnRow, stacked: isStacked };
-            } else if (currentColumn) {
-                currentColumn.content.push(line);
-            }
-        }
-
-        // Don't forget the last column
-        if (currentColumn && currentColumn.row === rowNumber) {
-            rowColumns.push({
-                content: currentColumn.content.join('\n'),
-                stacked: currentColumn.stacked,
-                title: currentColumn.content[0]
-            });
-        }
-
-        // Now group columns into stacks (matching frontend logic)
-        // A stack is: base column + all consecutive #stack columns
-        const stacks: string[][] = [];
-        let i = 0;
-
-        while (i < rowColumns.length) {
-            const currentStack = [rowColumns[i].content]; // Start with base column
-            i++;
-
-            // Add all consecutive #stack columns to this stack
-            while (i < rowColumns.length && rowColumns[i].stacked) {
-                currentStack.push(rowColumns[i].content);
-                i++;
-            }
-
-            stacks.push(currentStack);
-        }
-
-        if (stackIndex >= stacks.length) {
-            return null;
-        }
-
-        const result = stacks[stackIndex].join('\n\n');
-        return result;
-    }
-
-    /**
-     * Extract single task content from a column
-     */
-    private static extractTaskContent(columnContent: string, taskId?: string): string | null {
-        const lines = columnContent.split('\n');
-        const tasks: string[] = [];
-        let currentTask: string[] = [];
-        let inTask = false;
-
-        for (const line of lines) {
-            if (line.trim().startsWith('---')) {
-                // Task separator
-                if (currentTask.length > 0) {
-                    tasks.push(currentTask.join('\n'));
-                    currentTask = [];
-                }
-                inTask = true;
-            } else if (inTask) {
-                currentTask.push(line);
-            }
-        }
-
-        // Don't forget the last task
-        if (currentTask.length > 0) {
-            tasks.push(currentTask.join('\n'));
-        }
-
-        // If taskId provided, find specific task; otherwise return first
-        return tasks.length > 0 ? tasks[0] : null;
     }
 
     /**
@@ -2123,13 +1872,8 @@ export class ExportService {
             this.exportedFiles.clear();
 
             // PHASE 1: EXTRACTION
-            // Determine if we need to extract content from file
-            // Skip extraction only when using board-based conversion (mergeIncludes: true)
-            const mergeIncludes = options.mergeIncludes ?? false;
-            let extracted: string;
-
-            // Extract content from file (needed for file-based pipeline)
-            extracted = await this.extractContent(
+            // Extract content from file
+            const extracted = await this.extractContent(
                 sourceDocument,
                 options.columnIndexes
             );

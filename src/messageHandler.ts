@@ -4,7 +4,7 @@ import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
-import { configService, ConfigurationService } from './configurationService';
+import { ConfigurationService } from './configurationService';
 import { ExportService } from './exportService';
 import { MarpExtensionService } from './services/export/MarpExtensionService';
 import { MarpExportService } from './services/export/MarpExportService';
@@ -23,7 +23,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import * as crypto from 'crypto';
 
 // Helper function to log to both console and output channel
 function log(...args: any[]) {
@@ -56,10 +55,6 @@ export class MessageHandler {
     // Request-response pattern for stopEditing
     private _pendingStopEditingRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
     private _stopEditingRequestCounter = 0;
-
-    // Request-response pattern for unfoldColumns
-    private _pendingUnfoldRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
-    private _unfoldRequestCounter = 0;
 
     // Cache for vscode.commands.getCommands() - refreshed every 5 minutes
     private _cachedCommands: string[] | null = null;
@@ -174,75 +169,6 @@ export class MessageHandler {
         });
     }
 
-    /**
-     * Handle response from frontend that editing has stopped (with captured value)
-     */
-    private _handleEditingStopped(requestId: string, capturedEdit: any): void {
-        const pending = this._pendingStopEditingRequests.get(requestId);
-
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this._pendingStopEditingRequests.delete(requestId);
-            pending.resolve(capturedEdit);  // Resolve with captured edit value
-
-            // RACE-2: Sync dirty items after editing stops
-            // When user was editing, frontend skipped rendering updateColumnContent.
-            // Backend marked those items as dirty. Now apply all skipped updates.
-            const panel = this._getWebviewPanel();
-            panel.syncDirtyItems();
-        } else {
-            console.warn(`[_handleEditingStopped] No pending request found for: ${requestId}`);
-        }
-    }
-
-    /**
-     * Request frontend to unfold columns and wait for response
-     * Returns a Promise that resolves when frontend confirms columns are unfolded
-     */
-    private async _requestUnfoldColumns(columnIds: string[]): Promise<void> {
-        const requestId = `unfold-${++this._unfoldRequestCounter}`;
-        const panel = this._getWebviewPanel();
-
-        if (!panel || !panel.webview) {
-            console.warn('[_requestUnfoldColumns] No panel or webview available');
-            return;
-        }
-
-        return new Promise<void>((resolve, reject) => {
-            // Set timeout in case frontend doesn't respond
-            const timeout = setTimeout(() => {
-                this._pendingUnfoldRequests.delete(requestId);
-                console.warn('[_requestUnfoldColumns] Timeout waiting for frontend response');
-                resolve(); // Don't reject, just continue
-            }, 2000);
-
-            // Store promise resolver
-            this._pendingUnfoldRequests.set(requestId, { resolve, reject, timeout });
-
-            // Send request to frontend
-            panel.webview.postMessage({
-                type: 'unfoldColumnsBeforeUpdate',
-                requestId,
-                columnIds
-            });
-        });
-    }
-
-    /**
-     * Handle response from frontend that columns have been unfolded
-     */
-    private _handleColumnsUnfolded(requestId: string): void {
-        const pending = this._pendingUnfoldRequests.get(requestId);
-
-        if (pending) {
-            clearTimeout(pending.timeout);
-            this._pendingUnfoldRequests.delete(requestId);
-            pending.resolve();
-        } else {
-            console.warn(`[_handleColumnsUnfolded] No pending request found for: ${requestId}`);
-        }
-    }
-
     private async updateOperationProgress(operationId: string, progress: number, message?: string) {
         const panel = this._getWebviewPanel();
         if (panel && panel.webview) {
@@ -270,148 +196,6 @@ export class MessageHandler {
         // Fallback for unregistered message types (should not happen in normal operation)
         console.error(`[MessageHandler] Unknown message type: ${message.type}`);
     }
-
-    /**
-     * Handle edit mode start message from frontend
-     */
-    private async handleEditModeStart(message: any) {
-        const filePath = message.filePath;
-        const fileType = message.fileType;
-
-
-        // Resolve to absolute path
-        const currentDocument = this._fileManager.getDocument();
-        if (!currentDocument) {
-            console.warn('[MessageHandler.handleEditModeStart] No current document');
-            return;
-        }
-
-        let absolutePath: string;
-        if (fileType === 'main') {
-            absolutePath = currentDocument.uri.fsPath;
-        } else {
-            // For includes, filePath is relative - resolve it
-            const basePath = path.dirname(currentDocument.uri.fsPath);
-            absolutePath = path.resolve(basePath, filePath);
-        }
-
-        // Mark edit mode start in file registry
-        const panel = this._getWebviewPanel();
-        if (panel && panel.fileRegistry) {
-            const file = panel.fileRegistry.getByPath(absolutePath);
-            if (file) {
-                file.setEditMode(true);
-            }
-        }
-    }
-
-    /**
-     * Handle edit mode end message from frontend
-     */
-    private async handleEditModeEnd(message: any) {
-        const filePath = message.filePath;
-        const fileType = message.fileType;
-
-
-        // Resolve to absolute path
-        const currentDocument = this._fileManager.getDocument();
-        if (!currentDocument) {
-            console.warn('[MessageHandler.handleEditModeEnd] No current document');
-            return;
-        }
-
-        let absolutePath: string;
-        if (fileType === 'main') {
-            absolutePath = currentDocument.uri.fsPath;
-        } else {
-            // For includes, filePath is relative - resolve it
-            const basePath = path.dirname(currentDocument.uri.fsPath);
-            absolutePath = path.resolve(basePath, filePath);
-        }
-
-        // Mark edit mode end in file registry
-        const panel2 = this._getWebviewPanel();
-        if (panel2 && panel2.fileRegistry) {
-            const file = panel2.fileRegistry.getByPath(absolutePath);
-            if (file) {
-                file.setEditMode(false);
-            }
-        }
-    }
-
-    /**
-     * Handle updating a Marp global setting in the YAML frontmatter
-     * This updates the board's yamlHeader in memory and marks as unsaved
-     * The actual file write happens when user saves (Ctrl+S)
-     */
-    private async handleUpdateMarpGlobalSetting(key: string, value: string): Promise<void> {
-        try {
-            const board = this._getCurrentBoard();
-            if (!board) {
-                console.error('[MessageHandler] No board to update Marp setting');
-                return;
-            }
-
-            // Get current YAML header or create new one
-            let yamlHeader = board.yamlHeader || '';
-            const lines = yamlHeader.split('\n');
-
-            // Find YAML frontmatter boundaries (without the --- delimiters)
-            let keyFound = false;
-
-            // If empty, initialize with kanban-plugin marker
-            if (!yamlHeader || yamlHeader.trim() === '') {
-                yamlHeader = 'kanban-plugin: board';
-                lines.length = 0;
-                lines.push('kanban-plugin: board');
-            }
-
-            // Update or add the key
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const keyMatch = line.match(/^(\s*)([a-zA-Z0-9_-]+):\s*.*/);
-                if (keyMatch && keyMatch[2] === key) {
-                    // Update existing key or remove if empty
-                    if (value === '' || value === null || value === undefined) {
-                        lines.splice(i, 1);
-                    } else {
-                        lines[i] = `${keyMatch[1]}${key}: ${value}`;
-                    }
-                    keyFound = true;
-                    break;
-                }
-            }
-
-            // If key not found and value is not empty, add it
-            if (!keyFound && value !== '' && value !== null && value !== undefined) {
-                lines.push(`${key}: ${value}`);
-            }
-
-            // Update board's yamlHeader
-            board.yamlHeader = lines.filter(line => line.trim() !== '').join('\n');
-
-            // CRITICAL: Also update the frontmatter object that frontend reads from
-            if (!board.frontmatter) {
-                board.frontmatter = {};
-            }
-            if (value === '' || value === null || value === undefined) {
-                delete board.frontmatter[key];
-            } else {
-                board.frontmatter[key] = value;
-            }
-
-            // Mark as unsaved changes (will be written when user saves)
-            // Frontend already updated optimistically, so don't send board update back
-            this._markUnsavedChanges(true, board);
-
-        } catch (error) {
-            console.error('[MessageHandler] Error updating Marp global setting:', error);
-            vscode.window.showErrorMessage(`Failed to update Marp setting: ${error}`);
-        }
-    }
-
-    // NOTE: handleSaveBoardState was removed - now handled by UICommands.handleSaveBoardState
-    // which properly receives the board data from the message and saves it via context.onSaveToMarkdown()
 
     /**
      * STATE-3: Unified board action method
@@ -453,119 +237,6 @@ export class MessageHandler {
                 // CRITICAL: Pass the current board so that trackIncludeFileUnsavedChanges is called
                 this._markUnsavedChanges(true, this._getCurrentBoard());
             }
-        }
-    }
-
-    private async handlePageHiddenWithUnsavedChanges(): Promise<void> {
-
-        try {
-            const document = this._fileManager.getDocument();
-            const fileName = document ? path.basename(document.fileName) : 'kanban board';
-
-            // Only create backup if 5+ minutes have passed since unsaved changes
-            // This uses the BackupManager to check timing and creates a regular backup
-            const webviewPanel = this._getWebviewPanel();
-            if (document && webviewPanel?.backupManager && webviewPanel.backupManager.shouldCreatePageHiddenBackup()) {
-                await webviewPanel.backupManager.createBackup(document, { label: 'backup' });
-            } else {
-            }
-
-            // Reset the close prompt flag in webview (with null check)
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel && panel._panel.webview) {
-                panel._panel.webview.postMessage({
-                    type: 'resetClosePromptFlag'
-                });
-            }
-
-        } catch (error) {
-            console.error('Error handling page hidden backup:', error);
-            // Reset flag even if there was an error (with null check)
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel && panel._panel.webview) {
-                panel._panel.webview.postMessage({
-                    type: 'resetClosePromptFlag'
-                });
-            }
-        }
-    }
-
-    private async handleSetPreference(key: string, value: string): Promise<void> {
-        try {
-            await configService.updateConfig(key as any, value, vscode.ConfigurationTarget.Workspace);
-        } catch (error) {
-            console.error(`Failed to update preference ${key}:`, error);
-            vscode.window.showErrorMessage(`Failed to update ${key} preference: ${error}`);
-        }
-    }
-
-    private async handleSetContext(contextVariable: string, value: boolean): Promise<void> {
-        try {
-            await vscode.commands.executeCommand('setContext', contextVariable, value);
-        } catch (error) {
-            console.error(`Failed to set context variable ${contextVariable}:`, error);
-        }
-    }
-
-    private async handleVSCodeSnippet(message: any): Promise<void> {
-        try {
-            // Use VS Code's snippet resolution to get the actual snippet content
-            const snippetName = await this.getSnippetNameForShortcut(message.shortcut);
-
-            if (!snippetName) {
-                vscode.window.showInformationMessage(
-                    `No snippet configured for ${message.shortcut}. Add a keybinding with "editor.action.insertSnippet" command.`
-                );
-                return;
-            }
-
-            // Resolve the snippet content from VS Code's markdown snippet configuration
-            const resolvedContent = await this.resolveSnippetContent(snippetName);
-
-            if (resolvedContent) {
-                const panel = this._getWebviewPanel();
-                if (panel) {
-                    panel._panel.webview.postMessage({
-                        type: 'insertSnippetContent',
-                        content: resolvedContent,
-                        fieldType: message.fieldType,
-                        taskId: message.taskId
-                    });
-                }
-            }
-
-        } catch (error) {
-            console.error('[MessageHandler] Failed to handle VS Code snippet:', error);
-            vscode.window.showInformationMessage(
-                `Use Ctrl+Space in the kanban editor for snippet picker.`
-            );
-        }
-    }
-
-    private async handleEditorShortcut(message: any): Promise<void> {
-        try {
-            // Use the command sent from frontend (already loaded on view focus)
-            const userCommand = message.command;
-
-            // If it's a snippet command, handle it specially
-            if (userCommand === 'editor.action.insertSnippet') {
-                await this.handleVSCodeSnippet(message);
-                return;
-            }
-
-            if (userCommand) {
-                try {
-                    // Simply execute the command - let VSCode handle it with default behavior
-                    await vscode.commands.executeCommand(userCommand);
-                    return;
-                } catch (err) {
-                    console.error(`[MessageHandler] Failed to execute command ${userCommand}:`, err);
-                }
-            }
-
-
-        } catch (error) {
-            console.error(`Failed to handle editor shortcut ${message.shortcut}:`, error);
         }
     }
 
@@ -662,73 +333,6 @@ export class MessageHandler {
         return validShortcuts;
     }
 
-    private async getExtensionCommandForShortcut(shortcut: string): Promise<string | null> {
-
-        const extensionShortcuts = await this.getExtensionShortcuts();
-        const command = extensionShortcuts[shortcut];
-
-        if (command) {
-            return command;
-        }
-
-        return null;
-    }
-
-    private async getCommandForShortcut(shortcut: string): Promise<string | null> {
-        try {
-            // Read VS Code's keybindings configuration
-            const keybindings = await this.loadVSCodeKeybindings();
-
-
-            // Debug: Show all keybindings that contain 'alt' or match the letter
-            const shortcutLetter = shortcut.split('+').pop();
-            const relevantBindings = keybindings.filter(b =>
-                b.key && (b.key.includes('alt') || b.key.includes(shortcutLetter || ''))
-            );
-
-            // Find keybinding that matches our shortcut
-            for (const binding of keybindings) {
-                if (this.matchesShortcut(binding.key, shortcut) && binding.command) {
-                    // Skip negative bindings (commands starting with -)
-                    if (binding.command.startsWith('-')) {
-                        continue;
-                    }
-
-                    return binding.command;
-                }
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('Failed to find command for shortcut:', error);
-            return null;
-        }
-    }
-
-    private async getSnippetNameForShortcut(shortcut: string): Promise<string | null> {
-        try {
-            // Read VS Code's actual keybindings configuration
-            const keybindings = await this.loadVSCodeKeybindings();
-
-            // Find keybinding that matches our shortcut and uses editor.action.insertSnippet
-            for (const binding of keybindings) {
-                if (this.matchesShortcut(binding.key, shortcut) &&
-                    binding.command === 'editor.action.insertSnippet' &&
-                    binding.args?.name) {
-
-                    return binding.args.name;
-                }
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('Failed to read VS Code keybindings:', error);
-            return null;
-        }
-    }
-
     private async loadVSCodeKeybindings(): Promise<any[]> {
         try {
             // Load user keybindings
@@ -790,109 +394,6 @@ export class MessageHandler {
         }
     }
 
-    private matchesShortcut(keybindingKey: string, shortcut: string): boolean {
-        // Normalize the keybinding format
-        // VS Code uses "cmd+6" on Mac, we use "meta+6"
-        const normalizedKeybinding = keybindingKey
-            .toLowerCase()
-            .replace(/cmd/g, 'meta')
-            .replace(/ctrl/g, 'ctrl')
-            .replace(/\s+/g, '');
-
-        const normalizedShortcut = shortcut
-            .toLowerCase()
-            .replace(/\s+/g, '');
-
-        return normalizedKeybinding === normalizedShortcut;
-    }
-
-    private async resolveSnippetContent(snippetName: string): Promise<string> {
-        try {
-            // Load all markdown snippets from VS Code's configuration
-            const allSnippets = await this.loadMarkdownSnippets();
-
-            // Find the specific snippet
-            const snippet = allSnippets[snippetName];
-            if (!snippet) {
-                return '';
-            }
-
-            // Process the snippet body
-            let body = '';
-            if (Array.isArray(snippet.body)) {
-                body = snippet.body.join('\n');
-            } else if (typeof snippet.body === 'string') {
-                body = snippet.body;
-            } else {
-                return '';
-            }
-
-            // Process VS Code snippet variables and syntax
-            return this.processSnippetBody(body);
-
-        } catch (error) {
-            console.error(`Failed to resolve snippet "${snippetName}":`, error);
-            return '';
-        }
-    }
-
-    private async loadMarkdownSnippets(): Promise<any> {
-        const allSnippets: any = {};
-
-        try {
-            // 1. Load user snippets from VS Code user directory
-            const userSnippetsPath = this.getUserSnippetsPath();
-            if (userSnippetsPath && fs.existsSync(userSnippetsPath)) {
-                const userSnippets = await this.loadSnippetsFromFile(userSnippetsPath);
-                Object.assign(allSnippets, userSnippets);
-            }
-
-            // 2. Load workspace snippets if in a workspace
-            const workspaceSnippetsPath = this.getWorkspaceSnippetsPath();
-            if (workspaceSnippetsPath && fs.existsSync(workspaceSnippetsPath)) {
-                const workspaceSnippets = await this.loadSnippetsFromFile(workspaceSnippetsPath);
-                Object.assign(allSnippets, workspaceSnippets);
-            }
-
-            // 3. Load extension snippets (built-in markdown snippets)
-            const extensionSnippets = await this.loadExtensionSnippets();
-            Object.assign(allSnippets, extensionSnippets);
-
-            return allSnippets;
-
-        } catch (error) {
-            console.error('Failed to load markdown snippets:', error);
-            return {};
-        }
-    }
-
-    private getUserSnippetsPath(): string | null {
-        try {
-            // VS Code user snippets are stored in different locations per platform
-            const userDataDir = this.getVSCodeUserDataDir();
-            if (userDataDir) {
-                return path.join(userDataDir, 'User', 'snippets', 'markdown.json');
-            }
-            return null;
-        } catch (error) {
-            console.error('Failed to get user snippets path:', error);
-            return null;
-        }
-    }
-
-    private getWorkspaceSnippetsPath(): string | null {
-        try {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders && workspaceFolders.length > 0) {
-                return path.join(workspaceFolders[0].uri.fsPath, '.vscode', 'snippets', 'markdown.json');
-            }
-            return null;
-        } catch (error) {
-            console.error('Failed to get workspace snippets path:', error);
-            return null;
-        }
-    }
-
     private getVSCodeUserDataDir(): string | null {
         const platform = os.platform();
         const homeDir = os.homedir();
@@ -909,961 +410,7 @@ export class MessageHandler {
         }
     }
 
-    private async loadSnippetsFromFile(filePath: string): Promise<any> {
-        try {
-            const content = fs.readFileSync(filePath, 'utf8');
-            // Handle JSON with comments (VS Code snippets support comments)
-            const jsonContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
-            return JSON.parse(jsonContent);
-        } catch (error) {
-            console.error(`Failed to load snippets from ${filePath}:`, error);
-            return {};
-        }
-    }
-
-    private async loadExtensionSnippets(): Promise<any> {
-        // VS Code built-in markdown snippets are not easily accessible from extensions
-        // For now, return empty object. Users should define their own snippets.
-        return {};
-    }
-
-    private processSnippetBody(body: string): string {
-        // Process VS Code snippet variables
-        const now = new Date();
-
-        return body
-            // Date/time variables
-            .replace(/\$CURRENT_YEAR/g, now.getFullYear().toString())
-            .replace(/\$CURRENT_MONTH/g, (now.getMonth() + 1).toString().padStart(2, '0'))
-            .replace(/\$CURRENT_DATE/g, now.getDate().toString().padStart(2, '0'))
-            .replace(/\$CURRENT_HOUR/g, now.getHours().toString().padStart(2, '0'))
-            .replace(/\$CURRENT_MINUTE/g, now.getMinutes().toString().padStart(2, '0'))
-            .replace(/\$CURRENT_SECOND/g, now.getSeconds().toString().padStart(2, '0'))
-
-            // Workspace variables
-            .replace(/\$WORKSPACE_NAME/g, vscode.workspace.name || 'workspace')
-            .replace(/\$WORKSPACE_FOLDER/g, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '')
-
-            // File variables (using placeholder since we're in webview)
-            .replace(/\$TM_FILENAME/g, 'untitled.md')
-            .replace(/\$TM_FILENAME_BASE/g, 'untitled')
-            .replace(/\$TM_DIRECTORY/g, '')
-            .replace(/\$TM_FILEPATH/g, 'untitled.md')
-
-            // Process placeholders: ${1:default} -> default, ${1} -> empty
-            .replace(/\$\{(\d+):([^}]*)\}/g, '$2') // ${1:default} -> default
-            .replace(/\$\{\d+\}/g, '') // ${1} -> empty
-            .replace(/\$\d+/g, '') // $1 -> empty
-            .replace(/\$0/g, ''); // Final cursor position -> empty
-    }
-
-
-
-    private async handleRuntimeTrackingReport(report: any): Promise<void> {
-
-        try {
-            // Save runtime report to file
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `runtime-tracking-${report.metadata.sessionId}-${timestamp}.json`;
-            const reportPath = path.join(__dirname, '..', '..', 'tools', 'reports', filename);
-
-            // Ensure reports directory exists
-            const reportsDir = path.dirname(reportPath);
-            if (!fs.existsSync(reportsDir)) {
-                fs.mkdirSync(reportsDir, { recursive: true });
-            }
-
-            // Write report
-            fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-
-
-            // Log summary
-            if (report.summary) {
-            }
-
-        } catch (error) {
-            console.error('[MESSAGE HANDLER] Error saving runtime tracking report:', error);
-        }
-    }
-
-    private async handleSaveClipboardImage(
-        imageData: string,
-        imagePath: string,
-        mediaFolderPath: string,
-        dropPosition: { x: number; y: number },
-        imageFileName: string,
-        mediaFolderName: string
-    ): Promise<void> {
-        try {
-
-            // Ensure the media folder exists
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
-
-            // Convert base64 to buffer
-            const buffer = Buffer.from(imageData, 'base64');
-
-            // Write the image file
-            fs.writeFileSync(imagePath, buffer);
-
-            // Notify the webview that the image was saved successfully
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                const message = {
-                    type: 'clipboardImageSaved',
-                    success: true,
-                    imagePath: imagePath,
-                    relativePath: `./${mediaFolderName}/${imageFileName}`,
-                    dropPosition: dropPosition
-                };
-                panel._panel.webview.postMessage(message);
-            }
-
-        } catch (error) {
-            console.error('[MESSAGE HANDLER] Error saving clipboard image:', error);
-
-            // Notify the webview that there was an error
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'clipboardImageSaved',
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    dropPosition: dropPosition
-                });
-            }
-        }
-    }
-
-    private async handleSaveClipboardImageWithPath(
-        imageData: string,
-        imageType: string,
-        dropPosition: { x: number; y: number },
-        md5Hash?: string
-    ): Promise<void> {
-        try {
-            // Get current file path from the file manager (use preserved path if document is closed)
-            const document = this._fileManager.getDocument();
-            const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
-            if (!currentFilePath) {
-                console.error('[MESSAGE HANDLER] No current file path available');
-
-                // Notify the webview that there was an error
-                const panel = this._getWebviewPanel();
-                if (panel && panel._panel) {
-                    panel._panel.webview.postMessage({
-                        type: 'clipboardImageSaved',
-                        success: false,
-                        error: 'No current file path available',
-                        dropPosition: dropPosition
-                    });
-                }
-                return;
-            }
-
-
-            // Extract base filename without extension
-            const pathParts = currentFilePath.split(/[\/\\]/);
-            const fileName = pathParts.pop() || 'kanban';
-            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-            const directory = pathParts.join('/'); // Always use forward slash for consistency
-
-            // Generate filename from MD5 hash if available, otherwise use timestamp
-            const extension = imageType.split('/')[1] || 'png';
-            const imageFileName = md5Hash ? `${md5Hash}.${extension}` : `clipboard-image-${Date.now()}.${extension}`;
-
-            // Create the media folder path
-            const mediaFolderName = `${baseFileName}-MEDIA`;
-            const mediaFolderPath = `${directory}/${mediaFolderName}`;
-            const imagePath = `${mediaFolderPath}/${imageFileName}`;
-
-            // Ensure the media folder exists
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
-
-            // Convert base64 to buffer (remove data URL prefix if present)
-            const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
-            const buffer = Buffer.from(base64Only, 'base64');
-
-            // Write the image file
-            fs.writeFileSync(imagePath, buffer);
-
-            // Notify the webview that the image was saved successfully
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                const message = {
-                    type: 'clipboardImageSaved',
-                    success: true,
-                    imagePath: imagePath,
-                    relativePath: `./${mediaFolderName}/${imageFileName}`,
-                    dropPosition: dropPosition
-                };
-                panel._panel.webview.postMessage(message);
-            } else {
-                console.error('[DEBUG] Cannot send clipboardImageSaved message - no webview panel available');
-            }
-
-        } catch (error) {
-            console.error('[MESSAGE HANDLER] Error saving clipboard image with path:', error);
-
-            // Notify the webview that there was an error
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'clipboardImageSaved',
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    dropPosition: dropPosition
-                });
-            }
-        }
-    }
-
-    /**
-     * Helper: Generate SHA256 hash from buffer
-     */
-    private _generateHash(buffer: Buffer): string {
-        return crypto.createHash('sha256').update(buffer).digest('hex').substring(0, 12);
-    }
-
-    private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
-
-    /**
-     * Calculate hash for file - uses partial hash (first 1MB + size) for large files
-     */
-    private _calculatePartialHash(filePath: string): string {
-        const stats = fs.statSync(filePath);
-        const fileSize = stats.size;
-
-        if (fileSize <= this.PARTIAL_HASH_SIZE) {
-            // Small file: hash entire content
-            const buffer = fs.readFileSync(filePath);
-            return this._generateHash(buffer);
-        } else {
-            // Large file: hash first 1MB + file size
-            const fd = fs.openSync(filePath, 'r');
-            const buffer = Buffer.alloc(this.PARTIAL_HASH_SIZE);
-            fs.readSync(fd, buffer, 0, this.PARTIAL_HASH_SIZE, 0);
-            fs.closeSync(fd);
-
-            // Combine first 1MB with file size for unique hash
-            const sizeBuffer = Buffer.from(fileSize.toString());
-            const combined = Buffer.concat([buffer, sizeBuffer]);
-            return this._generateHash(combined);
-        }
-    }
-
-    /**
-     * Calculate partial hash from provided buffer and file size (for frontend File objects)
-     */
-    private _calculatePartialHashFromData(partialData: Buffer, fileSize: number): string {
-        if (fileSize <= this.PARTIAL_HASH_SIZE) {
-            return this._generateHash(partialData);
-        } else {
-            const sizeBuffer = Buffer.from(fileSize.toString());
-            const combined = Buffer.concat([partialData, sizeBuffer]);
-            return this._generateHash(combined);
-        }
-    }
-
-    /**
-     * Load hash cache from .hash_cache file in media folder
-     */
-    private _loadHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
-        const cachePath = path.join(mediaFolderPath, '.hash_cache');
-        const cache = new Map<string, { hash: string; mtime: number }>();
-
-        if (fs.existsSync(cachePath)) {
-            try {
-                const data = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-                for (const [fileName, entry] of Object.entries(data)) {
-                    cache.set(fileName, entry as { hash: string; mtime: number });
-                }
-            } catch (error) {
-                console.warn('[HASH-CACHE] Failed to load cache:', error);
-            }
-        }
-
-        return cache;
-    }
-
-    /**
-     * Save hash cache to .hash_cache file in media folder
-     */
-    private _saveHashCache(mediaFolderPath: string, cache: Map<string, { hash: string; mtime: number }>): void {
-        const cachePath = path.join(mediaFolderPath, '.hash_cache');
-        const data: Record<string, { hash: string; mtime: number }> = {};
-
-        for (const [fileName, entry] of cache.entries()) {
-            data[fileName] = entry;
-        }
-
-        try {
-            fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
-        } catch (error) {
-            console.warn('[HASH-CACHE] Failed to save cache:', error);
-        }
-    }
-
-    /**
-     * Update hash cache for all files in media folder, recalculating stale entries
-     */
-    private _updateHashCache(mediaFolderPath: string): Map<string, { hash: string; mtime: number }> {
-        const cache = this._loadHashCache(mediaFolderPath);
-        let cacheModified = false;
-
-        if (!fs.existsSync(mediaFolderPath)) {
-            return cache;
-        }
-
-        const files = fs.readdirSync(mediaFolderPath);
-        const currentFiles = new Set<string>();
-
-        for (const fileName of files) {
-            if (fileName === '.hash_cache' || fileName.startsWith('.')) {
-                continue;
-            }
-
-            const filePath = path.join(mediaFolderPath, fileName);
-            const stats = fs.statSync(filePath);
-
-            if (!stats.isFile()) {
-                continue;
-            }
-
-            currentFiles.add(fileName);
-            const mtime = stats.mtimeMs;
-            const cached = cache.get(fileName);
-
-            if (!cached || cached.mtime !== mtime) {
-                // Recalculate hash for new or modified file
-                const hash = this._calculatePartialHash(filePath);
-                cache.set(fileName, { hash, mtime });
-                cacheModified = true;
-            }
-        }
-
-        // Remove entries for deleted files
-        for (const fileName of cache.keys()) {
-            if (!currentFiles.has(fileName)) {
-                cache.delete(fileName);
-                cacheModified = true;
-            }
-        }
-
-        if (cacheModified) {
-            this._saveHashCache(mediaFolderPath, cache);
-        }
-
-        return cache;
-    }
-
-    /**
-     * Find matching file in media folder by hash
-     * @returns Relative path to matching file, or null if not found
-     */
-    private _findMatchingFileByHash(mediaFolderPath: string, targetHash: string, originalFileName: string): string | null {
-        if (!fs.existsSync(mediaFolderPath)) {
-            return null;
-        }
-
-        const cache = this._updateHashCache(mediaFolderPath);
-
-        // First check: same filename
-        const cachedEntry = cache.get(originalFileName);
-        if (cachedEntry && cachedEntry.hash === targetHash) {
-            return originalFileName;
-        }
-
-        // Second check: any file with matching hash
-        for (const [fileName, entry] of cache.entries()) {
-            if (entry.hash === targetHash) {
-                return fileName;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Helper: Format image path according to pathGeneration config
-     */
-    private _formatImagePath(absolutePath: string, kanbanDir: string): string {
-        const pathMode = configService.getPathGenerationMode();
-        if (pathMode === 'absolute') {
-            return absolutePath;
-        }
-        const relativePath = path.relative(kanbanDir, absolutePath);
-        return `./${relativePath.replace(/\\/g, '/')}`;
-    }
-
-    /**
-     * Helper: Generate unique filename with hash, handling collisions
-     */
-    private _generateUniqueImageFilename(
-        mediaFolderPath: string,
-        originalFileName: string,
-        fileBuffer: Buffer
-    ): string {
-        const extension = path.extname(originalFileName) || '.png';
-        const baseName = path.basename(originalFileName, extension);
-        const hash = this._generateHash(fileBuffer);
-
-        // Try hash-based filename first
-        let candidateFilename = `${baseName}-${hash}${extension}`;
-        let candidatePath = path.join(mediaFolderPath, candidateFilename);
-
-        // Check if file exists with same name
-        if (fs.existsSync(candidatePath)) {
-            const existingBuffer = fs.readFileSync(candidatePath);
-            const existingHash = this._generateHash(existingBuffer);
-
-            // Same hash = same file, reuse it
-            if (existingHash === hash) {
-                return candidateFilename;
-            }
-
-            // Different hash = collision, add timestamp
-            const timestamp = Date.now();
-            candidateFilename = `${baseName}-${hash}-${timestamp}${extension}`;
-        }
-
-        return candidateFilename;
-    }
-
-    /**
-     * Unified handler for ALL file drops (images and non-images, URI or File object)
-     * @param sourcePath File path for URI drops, null for File object drops
-     * @param fileData Base64 data for File object drops, null for URI drops
-     * @param originalFileName Original filename
-     * @param dropPosition Drop position in webview
-     * @param isImage Whether this is an image file (affects filename generation and message type)
-     */
-    private async handleAnyFileDrop(
-        sourcePath: string | null,
-        fileData: string | null,
-        originalFileName: string,
-        dropPosition: { x: number; y: number },
-        isImage: boolean
-    ): Promise<void> {
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-
-            // URI drop with path - check if in workspace
-            if (sourcePath && this._isFileInWorkspace(sourcePath)) {
-                return this._sendLinkMessage(sourcePath, originalFileName, dropPosition, directory, isImage);
-            }
-
-            // File outside workspace or File object - copy to MEDIA
-            return this._copyToMediaFolder(sourcePath, fileData, originalFileName, dropPosition, directory, baseFileName, isImage);
-
-        } catch (error) {
-            console.error('[FILE-DROP] Error handling file:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, fileData !== null);
-        }
-    }
-
-    /**
-     * Send link message for file already in workspace
-     */
-    private _sendLinkMessage(
-        sourcePath: string,
-        originalFileName: string,
-        dropPosition: { x: number; y: number },
-        directory: string,
-        isImage: boolean
-    ): void {
-        const formattedPath = isImage
-            ? this._formatImagePath(sourcePath, directory)
-            : this._fileManager.generateConfiguredPath(sourcePath);
-
-        const panel = this._getWebviewPanel();
-        if (panel && panel._panel) {
-            if (isImage) {
-                panel._panel.webview.postMessage({
-                    type: 'droppedImageSaved',
-                    success: true,
-                    relativePath: formattedPath,
-                    originalFileName: originalFileName,
-                    dropPosition: dropPosition,
-                    wasLinked: true
-                });
-            } else {
-                panel._panel.webview.postMessage({
-                    type: 'fileUriDropped',
-                    success: true,
-                    filePath: formattedPath,
-                    originalFileName: originalFileName,
-                    dropPosition: dropPosition,
-                    wasLinked: true
-                });
-            }
-        }
-    }
-
-    /**
-     * Copy file to MEDIA folder (from source path or base64 data)
-     */
-    private async _copyToMediaFolder(
-        sourcePath: string | null,
-        fileData: string | null,
-        originalFileName: string,
-        dropPosition: { x: number; y: number },
-        directory: string,
-        baseFileName: string,
-        isImage: boolean
-    ): Promise<void> {
-        // Verify source exists (for URI drops)
-        if (sourcePath && !fs.existsSync(sourcePath)) {
-            throw new Error(`Source file not found: ${sourcePath}`);
-        }
-
-        if (!sourcePath && !fileData) {
-            throw new Error('No source path or file data provided');
-        }
-
-        const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-
-        // Get buffer (from file or base64)
-        let buffer: Buffer;
-        if (fileData) {
-            const base64Only = isImage && fileData.includes(',') ? fileData.split(',')[1] : fileData;
-            buffer = Buffer.from(base64Only, 'base64');
-        } else if (sourcePath) {
-            buffer = fs.readFileSync(sourcePath);
-        } else {
-            throw new Error('No source path or file data provided');
-        }
-
-        // Generate filename (different strategies for images vs files)
-        let targetFileName: string;
-        if (isImage) {
-            targetFileName = this._generateUniqueImageFilename(mediaFolderPath, originalFileName, buffer);
-        } else {
-            targetFileName = this._generateUniqueFilename(mediaFolderPath, originalFileName);
-        }
-
-        const targetPath = path.join(mediaFolderPath, targetFileName);
-
-        // Write file (images check hash, files overwrite)
-        if (!isImage || !fs.existsSync(targetPath)) {
-            fs.writeFileSync(targetPath, buffer);
-        }
-
-        // Format path
-        const formattedPath = isImage
-            ? this._formatImagePath(targetPath, directory)
-            : this._fileManager.generateConfiguredPath(targetPath);
-
-        // Send success message
-        const panel = this._getWebviewPanel();
-        if (panel && panel._panel) {
-            if (isImage) {
-                panel._panel.webview.postMessage({
-                    type: 'droppedImageSaved',
-                    success: true,
-                    relativePath: formattedPath,
-                    originalFileName: originalFileName,
-                    dropPosition: dropPosition,
-                    wasCopied: sourcePath ? true : undefined
-                });
-            } else {
-                const messageType = fileData ? 'fileContentsDropped' : 'fileUriDropped';
-                panel._panel.webview.postMessage({
-                    type: messageType,
-                    success: true,
-                    filePath: formattedPath,
-                    originalFileName: originalFileName,
-                    dropPosition: dropPosition,
-                    wasCopied: sourcePath ? true : undefined
-                });
-            }
-        }
-    }
-
-    /**
-     * Send error message for file drop failures
-     */
-    private _sendFileDropError(error: string, dropPosition: { x: number; y: number }, isImage: boolean, isFileObject: boolean): void {
-        const panel = this._getWebviewPanel();
-        if (panel && panel._panel) {
-            if (isImage) {
-                panel._panel.webview.postMessage({
-                    type: 'droppedImageSaved',
-                    success: false,
-                    error: error,
-                    dropPosition: dropPosition
-                });
-            } else {
-                const messageType = isFileObject ? 'fileContentsDropped' : 'fileUriDropped';
-                panel._panel.webview.postMessage({
-                    type: messageType,
-                    success: false,
-                    error: error,
-                    dropPosition: dropPosition
-                });
-            }
-        }
-    }
-
-    // ============================================================================
-    // File Drop Dialogue Handlers
-    // ============================================================================
-
-    private readonly FILE_SIZE_LIMIT_BYTES = 10 * 1024 * 1024; // 10MB
-
-    /**
-     * Handle request for file drop dialogue - determines available options
-     * Checks media folder for existing matching file by hash
-     */
-    private async handleRequestFileDropDialogue(message: {
-        dropId: string;
-        fileName: string;
-        fileSize?: number;
-        isImage: boolean;
-        fileType?: string;
-        hasSourcePath: boolean;
-        sourcePath?: string;
-        partialHashData?: string; // Base64 encoded first 1MB for File objects
-        dropPosition: { x: number; y: number };
-    }): Promise<void> {
-        const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition } = message;
-        let { fileSize } = message;
-
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-
-            // For URI drops, check if file is in workspace - auto-link without dialogue
-            if (hasSourcePath && sourcePath) {
-                if (this._isFileInWorkspace(sourcePath)) {
-                    // File is in workspace - link directly without dialogue
-                    return this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
-                }
-
-                // Get file size from filesystem for URI drops
-                if (fs.existsSync(sourcePath)) {
-                    const stats = fs.statSync(sourcePath);
-                    fileSize = stats.size;
-                }
-            }
-
-            // Calculate hash for matching
-            let fileHash: string | null = null;
-            if (hasSourcePath && sourcePath && fs.existsSync(sourcePath)) {
-                // URI drop: calculate hash from file
-                fileHash = this._calculatePartialHash(sourcePath);
-            } else if (partialHashData && fileSize !== undefined) {
-                // File object: calculate hash from provided partial data
-                const partialBuffer = Buffer.from(partialHashData, 'base64');
-                fileHash = this._calculatePartialHashFromData(partialBuffer, fileSize);
-            }
-
-            // Check media folder for existing matching file
-            let existingFile: string | null = null;
-            if (fileHash) {
-                const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-                existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
-
-            }
-
-            // Send dialogue options to frontend
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'showFileDropDialogue',
-                    dropId: dropId,
-                    fileName: fileName,
-                    fileSize: fileSize,
-                    isImage: isImage,
-                    hasSourcePath: hasSourcePath,
-                    sourcePath: sourcePath,
-                    existingFile: existingFile, // Matching file in media folder
-                    dropPosition: dropPosition
-                });
-            }
-        } catch (error) {
-            console.error('[FILE-DROP-DIALOGUE] Error:', error);
-            this._sendFileDropError(
-                error instanceof Error ? error.message : 'Unknown error',
-                dropPosition,
-                isImage,
-                !hasSourcePath
-            );
-        }
-    }
-
-    /**
-     * Handle user's choice to copy file to media folder (for URI drops)
-     */
-    private async handleExecuteFileDropCopy(message: {
-        dropId: string;
-        sourcePath: string;
-        fileName: string;
-        isImage: boolean;
-        dropPosition: { x: number; y: number };
-    }): Promise<void> {
-        const { sourcePath, fileName, isImage, dropPosition } = message;
-
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-            await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage);
-        } catch (error) {
-            console.error('[FILE-DROP-COPY] Error:', error);
-            this._sendFileDropError(
-                error instanceof Error ? error.message : 'Unknown error',
-                dropPosition,
-                isImage,
-                false
-            );
-        }
-    }
-
-    /**
-     * Handle user's choice to link to original file location
-     */
-    private async handleExecuteFileDropLink(message: {
-        dropId: string;
-        sourcePath: string;
-        fileName: string;
-        isImage: boolean;
-        dropPosition: { x: number; y: number };
-    }): Promise<void> {
-        const { sourcePath, fileName, isImage, dropPosition } = message;
-
-        try {
-            const { directory } = this._getCurrentFilePaths();
-            this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage);
-        } catch (error) {
-            console.error('[FILE-DROP-LINK] Error:', error);
-            this._sendFileDropError(
-                error instanceof Error ? error.message : 'Unknown error',
-                dropPosition,
-                isImage,
-                false
-            );
-        }
-    }
-
-    /**
-     * Handle user's choice to link existing file from media folder
-     */
-    private async handleLinkExistingFile(message: {
-        dropId: string;
-        existingFile: string;
-        fileName: string;
-        isImage: boolean;
-        dropPosition: { x: number; y: number };
-    }): Promise<void> {
-        const { existingFile, fileName, isImage, dropPosition } = message;
-
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-            const existingFilePath = path.join(mediaFolderPath, existingFile);
-
-            // Send link message for the existing file in media folder
-            this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage);
-        } catch (error) {
-            console.error('[FILE-DROP-LINK-EXISTING] Error:', error);
-            this._sendFileDropError(
-                error instanceof Error ? error.message : 'Unknown error',
-                dropPosition,
-                isImage,
-                true
-            );
-        }
-    }
-
-    /**
-     * Handle request to open the media folder in OS file explorer
-     */
-    private async handleOpenMediaFolder(): Promise<void> {
-        try {
-            const { directory, baseFileName } = this._getCurrentFilePaths();
-            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
-
-            // Open folder in OS file explorer
-            await vscode.commands.executeCommand('revealFileInOS', safeFileUri(mediaFolderPath, 'messageHandler-revealMedia'));
-        } catch (error) {
-            console.error('[FILE-DROP] Error opening media folder:', error);
-            vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-
-    // ============================================================================
-    // DRY Helper Methods for File Operations
-    // ============================================================================
-
-    /**
-     * Gets current file path information
-     * @returns Object with currentFilePath, directory, fileName, baseFileName
-     * @throws Error if no current file path is available
-     */
-    private _getCurrentFilePaths(): { currentFilePath: string; directory: string; fileName: string; baseFileName: string } {
-        const document = this._fileManager.getDocument();
-        const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
-        if (!currentFilePath) {
-            throw new Error('No current file path available');
-        }
-
-        const directory = path.dirname(currentFilePath);
-        const fileName = path.basename(currentFilePath);
-        const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-
-        return { currentFilePath, directory, fileName, baseFileName };
-    }
-
-    /**
-     * Gets the MEDIA folder path for the current kanban, creating it if needed
-     * @param directory The directory containing the kanban file
-     * @param baseFileName The base name of the kanban file (without extension)
-     * @returns The absolute path to the MEDIA folder
-     */
-    private _getMediaFolderPath(directory: string, baseFileName: string): string {
-        const mediaFolderName = `${baseFileName}-MEDIA`;
-        const mediaFolderPath = path.join(directory, mediaFolderName);
-
-        if (!fs.existsSync(mediaFolderPath)) {
-            fs.mkdirSync(mediaFolderPath, { recursive: true });
-        }
-
-        return mediaFolderPath;
-    }
-
-    /**
-     * Checks if a file path is within any workspace folder
-     * @param filePath The file path to check
-     * @returns true if file is in workspace, false otherwise
-     */
-    private _isFileInWorkspace(filePath: string): boolean {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            return false;
-        }
-
-        // Normalize path: resolve and convert to lowercase on Windows for case-insensitive comparison
-        const isWindows = process.platform === 'win32';
-        let fileResolved = path.resolve(filePath);
-        if (isWindows) {
-            fileResolved = fileResolved.toLowerCase();
-        }
-
-        for (const folder of workspaceFolders) {
-            let workspaceResolved = path.resolve(folder.uri.fsPath);
-            if (isWindows) {
-                workspaceResolved = workspaceResolved.toLowerCase();
-            }
-            // Check if file is within workspace folder (add path separator to avoid partial matches)
-            if (fileResolved === workspaceResolved || fileResolved.startsWith(workspaceResolved + path.sep)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Generates a unique filename in the target directory, handling collisions
-     * @param targetDir Directory where file will be saved
-     * @param originalFileName Original filename
-     * @returns Unique filename (may have counter suffix if collision)
-     */
-    private _generateUniqueFilename(targetDir: string, originalFileName: string): string {
-        const ext = path.extname(originalFileName);
-        const baseName = path.basename(originalFileName, ext);
-        let targetFileName = originalFileName;
-        let counter = 1;
-
-        while (fs.existsSync(path.join(targetDir, targetFileName))) {
-            targetFileName = `${baseName}_${counter}${ext}`;
-            counter++;
-        }
-
-        return targetFileName;
-    }
-
-    private async handlePasteImageIntoField(
-        imageData: string,
-        imageType: string,
-        md5Hash: string,
-        cursorPosition: number
-    ): Promise<void> {
-        try {
-            // Get current file path
-            const document = this._fileManager.getDocument();
-            const currentFilePath = this._fileManager.getFilePath() || document?.uri.fsPath;
-            if (!currentFilePath) {
-                console.error('[MESSAGE HANDLER] No current file path available for paste image');
-                const panel = this._getWebviewPanel();
-                if (panel && panel._panel) {
-                    panel._panel.webview.postMessage({
-                        type: 'imagePastedIntoField',
-                        success: false,
-                        error: 'No current file path available',
-                        cursorPosition: cursorPosition
-                    });
-                }
-                return;
-            }
-
-            // Extract base filename without extension
-            const pathParts = currentFilePath.split(/[\/\\]/);
-            const fileName = pathParts.pop() || 'kanban';
-            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-            const directory = pathParts.join('/');
-
-            // Generate filename from MD5 hash
-            const extension = imageType.split('/')[1] || 'png';
-            const imageFileName = `${md5Hash}.${extension}`;
-
-            // Create the media folder path
-            const mediaFolderName = `${baseFileName}-MEDIA`;
-            const mediaFolderPath = `${directory}/${mediaFolderName}`;
-            const imagePath = `${mediaFolderPath}/${imageFileName}`;
-
-            // Ensure the media folder exists
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
-
-            // Convert base64 to buffer (remove data URL prefix if present)
-            const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
-            const buffer = Buffer.from(base64Only, 'base64');
-
-            // Write the image file
-            fs.writeFileSync(imagePath, buffer);
-
-            // Notify the webview that the image was saved successfully
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'imagePastedIntoField',
-                    success: true,
-                    imagePath: imagePath,
-                    relativePath: `./${mediaFolderName}/${imageFileName}`,
-                    cursorPosition: cursorPosition
-                });
-            }
-
-        } catch (error) {
-            console.error('[MESSAGE HANDLER] Error pasting image into field:', error);
-
-            // Notify the webview that there was an error
-            const panel = this._getWebviewPanel();
-            if (panel && panel._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'imagePastedIntoField',
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    cursorPosition: cursorPosition
-                });
-            }
-        }
-    }
-
-    private async handleBoardUpdate(message: any): Promise<void> {
+    async handleBoardUpdate(message: any): Promise<void> {
         try {
             const board = message.board;
             if (!board) {
@@ -1982,7 +529,7 @@ export class MessageHandler {
     /**
      * Handle updating task content after strikethrough deletion
      */
-    private async handleUpdateTaskFromStrikethroughDeletion(message: any): Promise<void> {
+    async handleUpdateTaskFromStrikethroughDeletion(message: any): Promise<void> {
         const { taskId, columnId, newContent, contentType } = message;
 
         try {
@@ -2024,7 +571,7 @@ export class MessageHandler {
      * Unified handler for column title edits (handles both normal edits and strikethrough deletions)
      * Detects include syntax and routes through state machine or regular edit
      */
-    private async handleEditColumnTitleUnified(columnId: string, newTitle: string): Promise<void> {
+    async handleEditColumnTitleUnified(columnId: string, newTitle: string): Promise<void> {
         const currentBoard = this._getCurrentBoard();
         log(`[editColumnTitle] Board has ${currentBoard?.columns?.length || 0} columns`);
         log(`[editColumnTitle] Looking for column ID: ${columnId}`);
@@ -2208,7 +755,7 @@ export class MessageHandler {
     /**
      * Handle get Marp themes request
      */
-    private async handleGetMarpThemes(): Promise<void> {
+    async handleGetMarpThemes(): Promise<void> {
         try {
             const themes = await MarpExportService.getAvailableThemes();
             
@@ -2245,7 +792,7 @@ export class MessageHandler {
     /**
      * Handle poll for Marp themes (fallback mechanism)
      */
-    private async handlePollMarpThemes(): Promise<void> {
+    async handlePollMarpThemes(): Promise<void> {
         try {
             // Check if we have cached themes from the previous attempt
             const cachedThemes = (globalThis as any).pendingMarpThemes;
@@ -2283,7 +830,7 @@ export class MessageHandler {
     /**
      * Open a markdown file in Marp preview
      */
-    private async handleOpenInMarpPreview(filePath: string): Promise<void> {
+    async handleOpenInMarpPreview(filePath: string): Promise<void> {
 
         try {
             await MarpExtensionService.openInMarpPreview(filePath);
@@ -2299,7 +846,7 @@ export class MessageHandler {
     /**
      * Check Marp status and send to frontend
      */
-    private async handleCheckMarpStatus(): Promise<void> {
+    async handleCheckMarpStatus(): Promise<void> {
         try {
             const marpExtensionStatus = MarpExtensionService.getMarpStatus();
             const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
@@ -2327,7 +874,7 @@ export class MessageHandler {
     /**
      * Get available Marp CSS classes
      */
-    private async handleGetMarpAvailableClasses(): Promise<void> {
+    async handleGetMarpAvailableClasses(): Promise<void> {
         try {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
@@ -2349,7 +896,7 @@ export class MessageHandler {
      * Save Marp CSS classes as HTML comment directives in markdown
      * Format: <!-- _class: font24 center -->
      */
-    private async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
+    async handleSaveMarpClasses(scope: string, columnId: string | null, taskId: string | null, classes: string[]): Promise<void> {
         try {
             // Create HTML comment directive
             const classString = classes.join(' ');
@@ -2553,7 +1100,7 @@ export class MessageHandler {
     /**
      * Stop auto-export
      */
-    private async handleStopAutoExport(): Promise<void> {
+    async handleStopAutoExport(): Promise<void> {
         try {
 
             // Unregister from SaveEventDispatcher
@@ -2587,7 +1134,7 @@ export class MessageHandler {
     /**
      * Stop auto-export for other kanban files (not generated files from current export)
      */
-    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, protectExportedPath?: string): Promise<void> {
+    async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, protectExportedPath?: string): Promise<void> {
         try {
             if (protectExportedPath) {
             }
@@ -2615,7 +1162,7 @@ export class MessageHandler {
     /**
      * Stop auto-export for a specific file (used during restart)
      */
-    private async handleStopAutoExportForFile(excludeFilePath?: string): Promise<void> {
+    async handleStopAutoExportForFile(excludeFilePath?: string): Promise<void> {
         try {
 
             // Unregister from SaveEventDispatcher
@@ -2646,7 +1193,7 @@ export class MessageHandler {
      * Unified export handler - handles ALL export operations
      * This single handler replaces 7 old handlers with a clean, consistent interface
      */
-    private async handleExport(options: any, operationId?: string): Promise<void> {
+    async handleExport(options: any, operationId?: string): Promise<void> {
         try {
 
             // Get document (with fallback to file path if document is closed)
@@ -2811,7 +1358,7 @@ export class MessageHandler {
      * Handle PlantUML rendering request from webview
      * Uses backend Node.js PlantUML service for completely offline rendering
      */
-    private async handleRenderPlantUML(message: any): Promise<void> {
+    async handleRenderPlantUML(message: any): Promise<void> {
         const { requestId, code } = message;
         const panel = this._getWebviewPanel();
 
@@ -2850,7 +1397,7 @@ export class MessageHandler {
      * Uses backend DrawIOService with CLI for conversion
      * Implements file-based caching to avoid re-rendering unchanged diagrams
      */
-    private async handleRenderDrawIO(message: any): Promise<void> {
+    async handleRenderDrawIO(message: any): Promise<void> {
         const { requestId, filePath } = message;
         const panel = this._getWebviewPanel();
 
@@ -2997,7 +1544,7 @@ export class MessageHandler {
      * Handle excalidraw diagram rendering request from webview
      * Uses backend ExcalidrawService with library for conversion
      */
-    private async handleRenderExcalidraw(message: any): Promise<void> {
+    async handleRenderExcalidraw(message: any): Promise<void> {
         const { requestId, filePath } = message;
         const panel = this._getWebviewPanel();
 
@@ -3065,7 +1612,7 @@ export class MessageHandler {
      * Request format: { type: 'requestPDFPageRender', requestId, filePath, pageNumber }
      * Response format: { type: 'pdfPageRenderSuccess', requestId, pngDataUrl, fileMtime }
      */
-    private async handleRenderPDFPage(message: any): Promise<void> {
+    async handleRenderPDFPage(message: any): Promise<void> {
         const { requestId, filePath, pageNumber } = message;
         const panel = this._getWebviewPanel();
 
@@ -3122,7 +1669,7 @@ export class MessageHandler {
      * Request format: { type: 'requestPDFInfo', requestId, filePath }
      * Response format: { type: 'pdfInfoSuccess', requestId, pageCount, fileMtime }
      */
-    private async handleGetPDFInfo(message: any): Promise<void> {
+    async handleGetPDFInfo(message: any): Promise<void> {
         const { requestId, filePath } = message;
         const panel = this._getWebviewPanel();
 
@@ -3174,7 +1721,7 @@ export class MessageHandler {
     /**
      * Handle PlantUML to SVG conversion
      */
-    private async handleConvertPlantUMLToSVG(message: any): Promise<void> {
+    async handleConvertPlantUMLToSVG(message: any): Promise<void> {
         try {
             const { filePath, plantUMLCode, svgContent } = message;
 
@@ -3239,9 +1786,6 @@ export class MessageHandler {
         plantUMLCode: string,
         svgRelativePath: string
     ): string {
-
-        // Escape special regex characters in code, accounting for indentation
-        const escapedCode = plantUMLCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         // Split the code into lines to handle per-line matching with indentation
         // NOTE: The frontend sends TRIMMED code, but the file may have indented code
@@ -3380,7 +1924,7 @@ ${plantUMLCode}
     /**
      * Handle Mermaid to SVG conversion
      */
-    private async handleConvertMermaidToSVG(message: any): Promise<void> {
+    async handleConvertMermaidToSVG(message: any): Promise<void> {
         try {
             const { filePath, mermaidCode, svgContent } = message;
 
@@ -3445,9 +1989,6 @@ ${plantUMLCode}
         mermaidCode: string,
         svgRelativePath: string
     ): string {
-
-        // Escape special regex characters in code
-        const escapedCode = mermaidCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         // Split the code into lines to handle per-line matching with indentation
         const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
@@ -3565,14 +2106,6 @@ ${mermaidCode}
             ? includeFilePath
             : path.resolve(mainFileDir, includeFilePath);
 
-        // Use the relative path as-is for registry lookup
-        // IMPORTANT: Do NOT normalize by removing ./ prefix - the registry uses the path
-        // exactly as it appears in the include syntax, just lowercased
-        let relativePath = includeFilePath;
-        if (path.isAbsolute(includeFilePath)) {
-            relativePath = path.relative(mainFileDir, includeFilePath);
-        }
-
         // Generate presentation format content from the column's tasks
         // This uses PresentationGenerator to create proper Marp slides (each task = one slide)
         const tasksContent = PresentationGenerator.fromTasks(column.tasks, {
@@ -3617,7 +2150,7 @@ ${tasksContent}`;
     /**
      * Handle request for available templates
      */
-    private async handleGetTemplates(): Promise<void> {
+    async handleGetTemplates(): Promise<void> {
         const panel = this._getWebviewPanel();
         if (!panel || !panel._panel) {
             return;
@@ -3645,7 +2178,7 @@ ${tasksContent}`;
      * Handle initial template application request (before variables)
      * This loads the template and sends variable definitions to frontend
      */
-    private async handleApplyTemplate(message: any): Promise<void> {
+    async handleApplyTemplate(message: any): Promise<void> {
         const panel = this._getWebviewPanel();
         if (!panel || !panel._panel) {
             return;
@@ -3789,7 +2322,7 @@ ${tasksContent}`;
     /**
      * Handle template variable submission
      */
-    private async handleSubmitTemplateVariables(message: any): Promise<void> {
+    async handleSubmitTemplateVariables(message: any): Promise<void> {
         await this.applyTemplateWithVariables(message, message.variables || {});
     }
 

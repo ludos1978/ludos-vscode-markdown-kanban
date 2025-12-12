@@ -65,12 +65,6 @@ export class DiagramPreprocessor {
             return { processedMarkdown: markdown, diagramFiles: [] };
         }
 
-        // Log diagram breakdown
-        const plantUMLCount = diagrams.filter(d => d.type === 'plantuml').length;
-        const mermaidCount = diagrams.filter(d => d.type === 'mermaid').length;
-        const drawioCount = diagrams.filter(d => d.type === 'drawio').length;
-        const excalidrawCount = diagrams.filter(d => d.type === 'excalidraw').length;
-
         // Render all diagrams
         const rendered = await this.renderAllDiagrams(
             diagrams,

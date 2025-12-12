@@ -800,7 +800,6 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        const startTime = Date.now();
         if (!this._panel.webview) { return; }
 
         let board = this.getBoard() || {
@@ -853,10 +852,6 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Create cache file for crash recovery (only for valid boards with actual content)
-        if (board.valid && board.columns && board.columns.length > 0) {
-            const document = this._fileManager.getDocument();
-        }
     }
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
@@ -881,7 +876,6 @@ export class KanbanWebviewPanel {
         const filePath = vscode.Uri.file(path.join(this._context.extensionPath, 'src', 'html', 'webview.html'));
         let html = fs.readFileSync(filePath.fsPath, 'utf8');
 
-        const nonce = this._getNonce();
         const cspSource = this._panel.webview.cspSource;
 
         const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none'; worker-src blob:; child-src blob:;">`;
@@ -978,15 +972,6 @@ export class KanbanWebviewPanel {
         });
 
         return html;
-    }
-
-    private _getNonce() {
-        let text = '';
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        for (let i = 0; i < 32; i++) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
     }
 
     /**
@@ -1835,9 +1820,7 @@ export class KanbanWebviewPanel {
      *  context.subscriptions.push(debugCommand);
      */
     public debugWebviewPermissions() {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        const currentDocument = this._fileManager.getDocument();
-
+        // Debug method stub - can be expanded as needed
     }
 
     /**

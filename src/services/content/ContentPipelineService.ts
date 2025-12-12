@@ -1,6 +1,5 @@
 import * as path from 'path';
-import { PathResolver } from '../PathResolver';
-import { FileWriter, FileToWrite } from '../FileWriter';
+import { FileWriter } from '../FileWriter';
 import { FormatConverter } from '../export/FormatConverter';
 import { IncludeProcessor } from './IncludeProcessor';
 import { AssetHandler } from '../assets/AssetHandler';
@@ -64,11 +63,9 @@ export class ContentPipelineService {
         options: OperationOptions,
         startTime: number
     ): Promise<OperationResult> {
-        const basePath = path.dirname(options.sourcePath);
-
         // Create backup if requested
         if (options.createBackup) {
-            const backupPath = await this.createBackupFile(options.sourcePath);
+            await this.createBackupFile(options.sourcePath);
         }
 
         // Write the file
