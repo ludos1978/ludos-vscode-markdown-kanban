@@ -33,6 +33,8 @@ This markdown editor contains to many features.
 
 ## Installation
 
+If you installed a version before 0.61.1 please remove the old one before installing the new one.
+
 To use it, install the vsix into the visual studio code editor in the extensions by using the breadcrumbs / burger menu on the top right and select "install from vsix". 
 
 You can use the editor without any of the external dependencies, but some features will not work.

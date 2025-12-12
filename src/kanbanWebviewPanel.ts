@@ -17,7 +17,6 @@ import { FileWriter } from './services/FileWriter';
 import { FormatConverter } from './services/export/FormatConverter';
 import { SaveEventCoordinator } from './saveEventCoordinator';
 import { SaveCoordinator } from './core/SaveCoordinator';
-import { IncludeFileManager } from './includeFileManager';
 import { KanbanFileService } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
 import {
@@ -32,6 +31,29 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
+
+/**
+ * Consolidated panel state flags
+ * Groups all boolean flags that control panel behavior for easier state management
+ */
+interface PanelStateFlags {
+    /** Panel has completed initial setup */
+    initialized: boolean;
+    /** Currently applying changes from webview (prevents re-parsing) */
+    updatingFromPanel: boolean;
+    /** Currently performing undo/redo operation */
+    undoRedoOperation: boolean;
+    /** Prevents recursive close attempts during cleanup */
+    closingPrevented: boolean;
+    /** Panel has been disposed, all operations should be skipped */
+    disposed: boolean;
+    /** User is actively editing in the webview */
+    editingInProgress: boolean;
+    /** Initial include file loading is in progress */
+    initialBoardLoad: boolean;
+    /** Include switch operation is in progress (protects cache) */
+    includeSwitchInProgress: boolean;
+}
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -51,7 +73,6 @@ export class KanbanWebviewPanel {
     private _messageHandler: MessageHandler;
 
     private _backupManager: BackupManager;
-    private _includeFileManager: IncludeFileManager;
     private _fileService: KanbanFileService;
 
     // File abstraction system
@@ -59,7 +80,22 @@ export class KanbanWebviewPanel {
     private _fileFactory: FileFactory;
 
     private _stateMachine: ChangeStateMachine;
-    private _includeSwitchInProgress: boolean = false; // Protects cache during include switches
+
+    // Consolidated panel state flags (see PanelStateFlags interface)
+    private _state: PanelStateFlags = {
+        initialized: false,
+        updatingFromPanel: false,
+        undoRedoOperation: false,
+        closingPrevented: false,
+        disposed: false,
+        editingInProgress: false,
+        initialBoardLoad: false,
+        includeSwitchInProgress: false
+    };
+
+    // Public getter for backwards compatibility with external code
+    public get _isUpdatingFromPanel(): boolean { return this._state.updatingFromPanel; }
+    public set _isUpdatingFromPanel(value: boolean) { this._state.updatingFromPanel = value; }
 
     // RACE-3: Track last processed timestamp per file to prevent stale updates
     private _lastProcessedTimestamps: Map<string, Date> = new Map();
@@ -68,14 +104,9 @@ export class KanbanWebviewPanel {
     private _operationInProgress: string | null = null;  // Track which operation is running
     private _pendingOperations: Array<{name: string; operation: () => Promise<void>}> = [];  // Queue
 
-    // State
-    private _isInitialized: boolean = false;
-    public _isUpdatingFromPanel: boolean = false;  // Made public for external access
+    // Non-flag state values
     private _lastDocumentVersion: number = -1;  // Track document version
-    private _isUndoRedoOperation: boolean = false;  // Track undo/redo operations
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
-    private _isClosingPrevented: boolean = false;  // Flag to prevent recursive closing attempts
-    private _isDisposed: boolean = false;  // Flag to prevent operations on disposed panel
     private _lastDocumentUri?: string;  // Track current document for serialization
     private _filesToRemoveAfterSave: string[] = [];  // Files to remove after unsaved changes are handled
     private _unsavedFilesToPrompt: string[] = [];  // Files with unsaved changes that need user prompt
@@ -86,12 +117,6 @@ export class KanbanWebviewPanel {
     // Unified include file tracking system - single source of truth
     private _recentlyReloadedFiles: Set<string> = new Set(); // Track files that were just reloaded from external
     private _conflictResolver: ConflictResolver;
-
-    // CRITICAL: Prevent board regeneration during editing
-    private _isEditingInProgress: boolean = false;  // Track if user is actively editing
-
-    // CRITICAL: Prevent board regeneration during initial include file loading
-    private _isInitialBoardLoad: boolean = false;  // Track if we're loading include files for first time
 
     private _eventBus: PanelEventBus;
 
@@ -332,7 +357,7 @@ export class KanbanWebviewPanel {
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
 
-        // Get the conflict resolver instance (needed before IncludeFileManager)
+        // Get the conflict resolver instance
         this._conflictResolver = ConflictResolver.getInstance();
 
         // Initialize file abstraction system
@@ -355,26 +380,11 @@ export class KanbanWebviewPanel {
             })
         );
 
-        // Initialize IncludeFileManager
-        this._includeFileManager = new IncludeFileManager(
-            this._fileRegistry,
-            this._fileFactory,
-            this._conflictResolver,
-            this._backupManager,
-            () => this._fileManager.getFilePath(),
-            () => this.getBoard(),
-            (message) => this._panel?.webview.postMessage(message),
-            () => this._isUpdatingFromPanel,
-            () => this.getBoard()
-        );
-
-
-
         // Initialize KanbanFileService
         this._fileService = new KanbanFileService(
             this._fileManager,
             this._fileRegistry,
-            this._includeFileManager,
+            this._fileFactory,
             this._backupManager,
             this._boardOperations,
             () => this.getBoard(),
@@ -417,7 +427,7 @@ export class KanbanWebviewPanel {
                     this._boardStore.setBoard(board, true);
                 },
                 setUndoRedoOperation: (isOperation: boolean) => {
-                    this._isUndoRedoOperation = isOperation;
+                    this._state.undoRedoOperation = isOperation;
                 },
                 getWebviewPanel: () => this,
                 saveWithBackup: async (label?: string) => {
@@ -445,7 +455,7 @@ export class KanbanWebviewPanel {
                         // User edited the board - mark as having unsaved changes
 
                         // Track changes in include files (updates their cache)
-                        await this._includeFileManager.trackIncludeFileUnsavedChanges(cachedBoard, () => this._fileManager.getDocument(), () => this._fileManager.getFilePath());
+                        await this._fileRegistry.trackIncludeFileUnsavedChanges(cachedBoard);
 
                         // Update main file content from board (for verification sync)
                         const mainFile = this._getMainFile();
@@ -701,7 +711,7 @@ export class KanbanWebviewPanel {
         };
 
         // Refresh the webview HTML to apply new permissions
-        if (this._isInitialized) {
+        if (this._state.initialized) {
             this._panel.webview.html = this._getHtmlForWebview();
         }
     }
@@ -860,9 +870,9 @@ export class KanbanWebviewPanel {
     }
 
     private _initialize() {
-        if (!this._isInitialized) {
+        if (!this._state.initialized) {
             this._panel.webview.html = this._getHtmlForWebview();
-            this._isInitialized = true;
+            this._state.initialized = true;
         }
     }
 
@@ -894,7 +904,7 @@ export class KanbanWebviewPanel {
                         // 1. Board hasn't been initialized yet, OR
                         // 2. Board is null/undefined (needs initialization)
                         // Don't refresh just because the panel regained visibility after showing a message
-                        if (!this.getBoard() || !this._isInitialized) {
+                        if (!this.getBoard() || !this._state.initialized) {
                             this._ensureBoardAndSendUpdate();
                         }
                     }
@@ -941,7 +951,7 @@ export class KanbanWebviewPanel {
         return this._withLock('loadMarkdownFile', async () => {
             // CRITICAL: Set initial board load flag BEFORE loading main file
             // This prevents the main file's 'reloaded' event from triggering board regeneration
-            this._isInitialBoardLoad = true;
+            this._state.initialBoardLoad = true;
 
             this._eventBus.emit('board:loading', { path: document.uri.fsPath }).catch(() => {});
 
@@ -1355,11 +1365,11 @@ export class KanbanWebviewPanel {
 
             this._loadIncludeContentAsync(board)
                 .then(() => {
-                    this._isInitialBoardLoad = false;
+                    this._state.initialBoardLoad = false;
                 })
                 .catch(error => {
                     console.error('[_syncMainFileToRegistry] Error loading include content:', error);
-                    this._isInitialBoardLoad = false;
+                    this._state.initialBoardLoad = false;
                 });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
@@ -1416,7 +1426,7 @@ export class KanbanWebviewPanel {
 
                             // CRITICAL FIX: Don't send updates during include switch
                             // The state machine handles all updates during switches
-                            if (this._includeSwitchInProgress) {
+                            if (this._state.includeSwitchInProgress) {
                                 continue;
                             }
 
@@ -1485,7 +1495,7 @@ export class KanbanWebviewPanel {
 
                                 // CRITICAL FIX: Don't send updates during include switch
                                 // The state machine handles all updates during switches
-                                if (this._includeSwitchInProgress) {
+                                if (this._state.includeSwitchInProgress) {
                                     continue;
                                 }
 
@@ -1751,7 +1761,7 @@ export class KanbanWebviewPanel {
      * Set editing in progress flag to block board regenerations
      */
     public setEditingInProgress(isEditing: boolean): void {
-        this._isEditingInProgress = isEditing;
+        this._state.editingInProgress = isEditing;
     }
 
     /**
@@ -1792,7 +1802,7 @@ export class KanbanWebviewPanel {
         // CRITICAL FIX: Don't sync during include switches - state machine sends correct updates
         // During include switch, board might be regenerated with empty descriptions (before async load completes)
         // This would send stale/empty data and cause content flapping
-        if (this._includeSwitchInProgress) {
+        if (this._state.includeSwitchInProgress) {
             return;
         }
 
@@ -1945,7 +1955,7 @@ export class KanbanWebviewPanel {
         if (fileType === 'main') {
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
-                if (this._isInitialBoardLoad) {
+                if (this._state.initialBoardLoad) {
                     return;
                 }
 
@@ -1962,7 +1972,7 @@ export class KanbanWebviewPanel {
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
                 // These are just loading content for the first time, not actual changes
-                if (this._isInitialBoardLoad) {
+                if (this._state.initialBoardLoad) {
                     return;
                 }
 
@@ -2433,7 +2443,7 @@ export class KanbanWebviewPanel {
     public invalidateBoardCache(): void {
         // CRITICAL FIX: Block invalidation during include switches
         // This prevents column/task IDs from regenerating mid-switch
-        if (this._includeSwitchInProgress) {
+        if (this._state.includeSwitchInProgress) {
             return;
         }
 
@@ -2447,7 +2457,7 @@ export class KanbanWebviewPanel {
      * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
      */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
-        this._includeSwitchInProgress = inProgress;
+        this._state.includeSwitchInProgress = inProgress;
     }
 
     /**
@@ -2754,10 +2764,10 @@ export class KanbanWebviewPanel {
 
     public async dispose() {
         // Prevent double disposal
-        if (this._isDisposed) {
+        if (this._state.disposed) {
             return;
         }
-        this._isDisposed = true;
+        this._state.disposed = true;
 
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse of disposing panel
         // This must happen BEFORE any async operations or cleanup
@@ -2779,7 +2789,7 @@ export class KanbanWebviewPanel {
             // discardChanges() internally checks if content changed before emitting events
             mainFile.discardChanges();
         }
-        this._isClosingPrevented = false;
+        this._state.closingPrevented = false;
 
         // Stop unsaved changes monitoring
         if (this._unsavedChangesCheckInterval) {
@@ -2887,7 +2897,7 @@ export class KanbanWebviewPanel {
      * This enables bidirectional editing
      */
     public async saveColumnIncludeChanges(column: KanbanColumn): Promise<boolean> {
-        return this._includeFileManager.saveColumnIncludeChanges(column, () => this._fileManager.getDocument());
+        return this._fileRegistry.saveColumnIncludeChanges(column);
     }
 
     /**
@@ -2901,14 +2911,14 @@ export class KanbanWebviewPanel {
     }
 
     public async checkTaskIncludeUnsavedChanges(task: KanbanTask): Promise<boolean> {
-        return this._includeFileManager.checkTaskIncludeUnsavedChanges(task);
+        return this._fileRegistry.checkTaskIncludeUnsavedChanges(task);
     }
 
     /**
      * Check if a column's include files have unsaved changes
      */
     public async checkColumnIncludeUnsavedChanges(column: KanbanColumn): Promise<boolean> {
-        return this._includeFileManager.checkColumnIncludeUnsavedChanges(column);
+        return this._fileRegistry.checkColumnIncludeUnsavedChanges(column);
     }
 
     /**
@@ -2920,7 +2930,7 @@ export class KanbanWebviewPanel {
     }
 
     public async saveTaskIncludeChanges(task: KanbanTask): Promise<boolean> {
-        return this._includeFileManager.saveTaskIncludeChanges(task, () => this._fileManager.getDocument());
+        return this._fileRegistry.saveTaskIncludeChanges(task);
     }
 
     /**
@@ -2937,9 +2947,9 @@ export class KanbanWebviewPanel {
 
         // SOLUTION 3: NUCLEAR OPTION - Always create fresh file instances, never reuse
         // Normalize all paths for consistent operations
-        const normalizedNewFiles = newIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
+        const normalizedNewFiles = newIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
         const oldIncludeFiles = column.includeFiles || [];
-        const normalizedOldFiles = oldIncludeFiles.map(f => this._includeFileManager.normalizeIncludePath(f));
+        const normalizedOldFiles = oldIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
 
         const filesToRemove = normalizedOldFiles.filter((old: string) =>
             !normalizedNewFiles.includes(old)
@@ -3039,12 +3049,12 @@ export class KanbanWebviewPanel {
             return !col.includeFiles.some(file => {
                 // Use helper method for consistent path comparison
                 return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                    this._includeFileManager._isSameIncludePath(file, reloadedPath)
+                    MarkdownFile.isSameFile(file, reloadedPath)
                 );
             });
         });
 
-        const savePromises = columnsToSave.map(col => this._includeFileManager.saveColumnIncludeChanges(col, () => this._fileManager.getDocument()));
+        const savePromises = columnsToSave.map(col => this._fileRegistry.saveColumnIncludeChanges(col));
 
         try {
             await Promise.all(savePromises);
@@ -3071,7 +3081,7 @@ export class KanbanWebviewPanel {
                     const shouldSkip = task.includeFiles?.some(file => {
                         // Use helper method for consistent path comparison
                         return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                            this._includeFileManager._isSameIncludePath(file, reloadedPath)
+                            MarkdownFile.isSameFile(file, reloadedPath)
                         );
                     });
 
@@ -3086,7 +3096,7 @@ export class KanbanWebviewPanel {
             return;
         }
 
-        const savePromises = includeTasks.map(task => this._includeFileManager.saveTaskIncludeChanges(task, () => this._fileManager.getDocument()));
+        const savePromises = includeTasks.map(task => this._fileRegistry.saveTaskIncludeChanges(task));
 
         try {
             await Promise.all(savePromises);
@@ -3099,7 +3109,7 @@ export class KanbanWebviewPanel {
      * Ensure an include file is registered in the unified system for conflict resolution
      */
     public ensureIncludeFileRegistered(relativePath: string, type: 'regular' | 'column' | 'task'): void {
-        this._includeFileManager.ensureIncludeFileRegistered(relativePath, type, () => this._fileManager.getDocument());
+        this._fileRegistry.ensureIncludeFileRegistered(relativePath, type, this._fileFactory);
     }
 
     /**

@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 import { MainKanbanFile } from './MainKanbanFile';
-import { IncludeFile } from './IncludeFile';
-import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
+import { IncludeFile, IncludeFileType } from './IncludeFile';
+import type { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser'; // STATE-2: For generateBoard()
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -504,6 +505,236 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
 
         return board;
+    }
+
+    // ============= INCLUDE FILE OPERATIONS =============
+    // (Migrated from IncludeFileManager - these are the active methods)
+
+    /**
+     * Track unsaved changes in include files by syncing board state to file instances.
+     * Updates IncludeFile content from board data WITHOUT saving to disk.
+     *
+     * @param board - Current board state to sync from
+     * @returns false (main file also needs saving)
+     */
+    public async trackIncludeFileUnsavedChanges(board: KanbanBoard): Promise<boolean> {
+        // Update IncludeFile instances (type=include-column) with current task content
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    const file = this.getByRelativePath(relativePath) as IncludeFile;
+                    if (file && file.getFileType() === 'include-column') {
+                        const content = file.generateFromTasks(column.tasks);
+                        const currentContent = file.getContent();
+
+                        // CRITICAL PROTECTION: Never replace existing content with empty
+                        if (!content.trim() && currentContent.trim()) {
+                            console.warn(`[MarkdownFileRegistry] ⚠️ PROTECTED: Refusing to wipe column content to empty`);
+                            file.setContent(currentContent, false);
+                            continue;
+                        }
+
+                        // Only update if content actually changed
+                        if (content !== currentContent) {
+                            file.setContent(content, false); // false = NOT saved yet
+                        } else {
+                            file.setContent(currentContent, false); // Force hasUnsavedChanges = true
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update IncludeFile instances (type=include-task) with current task content
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this.getByRelativePath(relativePath) as IncludeFile;
+                        if (file && file.getFileType() === 'include-task') {
+                            const fullContent = task.description || '';
+                            const currentContent = file.getContent();
+
+                            // CRITICAL PROTECTION: Never replace existing content with empty
+                            if (!fullContent.trim() && currentContent.trim()) {
+                                console.warn(`[MarkdownFileRegistry] ⚠️ PROTECTED: Refusing to wipe task content to empty`);
+                                file.setContent(currentContent, false);
+                                continue;
+                            }
+
+                            if (fullContent !== currentContent) {
+                                file.setTaskDescription(fullContent);
+                            } else {
+                                file.setContent(currentContent, false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return false; // Return false = main file also needs saving
+    }
+
+    /**
+     * Save column include file changes
+     */
+    public async saveColumnIncludeChanges(column: KanbanColumn): Promise<boolean> {
+        if (!column.includeFiles || column.includeFiles.length === 0) return true;
+
+        for (const relativePath of column.includeFiles) {
+            const file = this.getByRelativePath(relativePath) as IncludeFile;
+            if (file && file.getFileType() === 'include-column') {
+                const content = file.generateFromTasks(column.tasks);
+                file.setContent(content);
+                await file.save();
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Save task include file changes
+     */
+    public async saveTaskIncludeChanges(task: KanbanTask): Promise<boolean> {
+        if (!task.includeFiles || task.includeFiles.length === 0) return true;
+
+        for (const relativePath of task.includeFiles) {
+            const file = this.getByRelativePath(relativePath) as IncludeFile;
+            if (file && file.getFileType() === 'include-task') {
+                const fullContent = task.description || '';
+                if (fullContent.trim()) {
+                    file.setTaskDescription(fullContent);
+                    await file.save();
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Check if a column has unsaved include file changes
+     */
+    public checkColumnIncludeUnsavedChanges(column: KanbanColumn): boolean {
+        if (!column.includeFiles) return false;
+
+        for (const relativePath of column.includeFiles) {
+            const file = this.getByRelativePath(relativePath);
+            if (file?.hasUnsavedChanges()) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if a task has unsaved include file changes
+     */
+    public checkTaskIncludeUnsavedChanges(task: KanbanTask): boolean {
+        if (!task.includeFiles) return false;
+
+        for (const relativePath of task.includeFiles) {
+            const file = this.getByRelativePath(relativePath);
+            if (file?.hasUnsavedChanges()) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Ensure an include file is registered (lazy registration)
+     *
+     * @param relativePath - Relative path to the include file
+     * @param type - Include type ('regular', 'column', 'task')
+     * @param fileFactory - FileFactory instance for creating files
+     */
+    public ensureIncludeFileRegistered(
+        relativePath: string,
+        type: 'regular' | 'column' | 'task',
+        fileFactory: any
+    ): void {
+        // Convert absolute path to relative if needed
+        if (path.isAbsolute(relativePath)) {
+            const mainFile = this.getMainFile();
+            if (!mainFile) {
+                console.error(`[MarkdownFileRegistry] Cannot convert absolute to relative - no main file`);
+                return;
+            }
+            const baseDir = path.dirname(mainFile.getPath());
+            relativePath = path.relative(baseDir, relativePath);
+        }
+
+        // Normalize ./ prefix
+        if (relativePath.startsWith('./')) {
+            relativePath = relativePath.substring(2);
+        }
+
+        // Fast check using registration cache
+        if (this.isBeingRegistered(relativePath)) {
+            return;
+        }
+
+        // Check if file is already registered
+        if (this.hasByRelativePath(relativePath)) {
+            return;
+        }
+
+        // Schedule actual registration for next tick (lazy loading)
+        setTimeout(() => {
+            this._performLazyRegistration(relativePath, type, fileFactory);
+        }, 0);
+    }
+
+    /**
+     * Perform the actual lazy registration
+     */
+    private async _performLazyRegistration(
+        relativePath: string,
+        type: 'regular' | 'column' | 'task',
+        fileFactory: any
+    ): Promise<void> {
+        try {
+            // Double-check if file is still needed
+            if (this.hasByRelativePath(relativePath)) {
+                return;
+            }
+
+            const mainFile = this.getMainFile();
+            if (!mainFile) {
+                console.error(`[MarkdownFileRegistry] Cannot lazy-register - no main file`);
+                return;
+            }
+
+            // Map type to IncludeFileType
+            const fileType: IncludeFileType = type === 'column' ? 'include-column'
+                : type === 'task' ? 'include-task'
+                : 'include-regular';
+
+            // Create and register
+            const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, true);
+            this.register(includeFile);
+            includeFile.startWatching();
+        } catch (error) {
+            console.error(`[MarkdownFileRegistry] Error during lazy registration:`, error);
+        }
+    }
+
+    /**
+     * Get include files by type
+     */
+    public getIncludeFilesByType(type: 'regular' | 'column' | 'task'): string[] {
+        const files = this.getIncludeFiles();
+        return files
+            .filter(file => {
+                if (type === 'column') return file.getFileType() === 'include-column';
+                if (type === 'task') return file.getFileType() === 'include-task';
+                return file.getFileType() === 'include-regular';
+            })
+            .map(file => file.getRelativePath());
+    }
+
+    /**
+     * Get all include file paths
+     */
+    public getAllIncludeFilePaths(): string[] {
+        return this.getIncludeFiles().map(f => f.getRelativePath());
     }
 
     // ============= CLEANUP =============

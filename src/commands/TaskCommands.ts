@@ -215,10 +215,10 @@ export class TaskCommands extends BaseMessageCommand {
 
             if (task && task.includeMode && task.includeFiles && !columnHasInclude) {
                 const panel = context.getWebviewPanel();
+                const fileRegistry = (panel as any)?._fileRegistry;
 
                 for (const relativePath of task.includeFiles) {
-                    const normalizedPath = (panel as any)?._includeFileManager?.normalizeIncludePath(relativePath);
-                    const file = (panel as any)?.fileRegistry?.getByRelativePath(normalizedPath);
+                    const file = fileRegistry?.getByRelativePath(relativePath);
 
                     if (file) {
                         const fullFileContent = message.taskData.description || '';

@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
-import { MarkdownFileRegistry } from './files';
-import { IncludeFileManager } from './includeFileManager';
+import { MarkdownFileRegistry, FileFactory } from './files';
 import { BackupManager } from './backupManager';
 import { SaveEventCoordinator, SaveEventHandler } from './saveEventCoordinator';
 import { ConflictContext, ConflictResolution } from './conflictResolver';
@@ -55,7 +54,7 @@ export class KanbanFileService {
     constructor(
         private fileManager: FileManager,
         private fileRegistry: MarkdownFileRegistry,
-        private includeFileManager: IncludeFileManager,
+        private fileFactory: FileFactory,
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
         private board: () => KanbanBoard | undefined,
@@ -181,32 +180,8 @@ export class KanbanFileService {
                     const basePath = path.dirname(document.uri.fsPath);
                     const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
                     this.setBoard(parseResult.board);
-                    // Update the unified include system
-                    this.includeFileManager._updateUnifiedIncludeSystem(parseResult.board, () => this.fileManager.getDocument());
+                    // Registry now handles include content automatically via generateBoard()
                 }
-
-                // Register included files with the external file watcher
-                // Preserve existing change state
-                const preservedChangeState = this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main");
-
-
-                // Initialize content for new files only (preserve existing baselines)
-                await this.includeFileManager._initializeUnifiedIncludeContents(() => this.fileManager.getDocument());
-
-                // ALWAYS re-check for changes after reload
-                // This will detect any changes between the preserved baseline and current state
-                await this.includeFileManager._recheckIncludeFileChanges();
-
-                // Only restore the change state if recheck didn't find changes
-                // (If recheck found changes, it already set the state)
-                if (!this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main") && preservedChangeState) {
-
-
-                }
-
-                // Send notification again in case it was lost
-                if (this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main")) {
-                        }
 
                 const currentBoard = this.board();
                 if (currentBoard) {
@@ -351,37 +326,10 @@ export class KanbanFileService {
 
             // Update the board
             this.setBoard(parseResult.board);
-            // Update the unified include system
-            this.includeFileManager._updateUnifiedIncludeSystem(parseResult.board, () => this.fileManager.getDocument());
-
-            // Handle any unsaved changes in files that need to be removed
-            await this.includeFileManager._handleUnsavedIncludeFileChanges();
+            // Registry now handles include content automatically via generateBoard()
 
             // Update our baseline of known file content
             this.updateKnownFileContent(document.getText());
-
-            // Update included files with the external file watcher
-            // Preserve existing change state
-            const preservedChangeState = this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main");
-
-
-            // Initialize content for new files only (preserve existing baselines)
-            await this.includeFileManager._initializeUnifiedIncludeContents(() => this.fileManager.getDocument());
-
-            // Always send notification to update tracked files list
-
-            // ALWAYS re-check for changes after reload
-            // This will detect any changes between the preserved baseline and current state
-            await this.includeFileManager._recheckIncludeFileChanges();
-
-            // Only restore the change state if recheck didn't find changes
-            // (If recheck found changes, it already set the state)
-            if (!this.fileRegistry.getFilesWithUnsavedChanges().some(f => f.getFileType() !== "main") && preservedChangeState) {
-
-
-            }
-
-            // Send notification after recheck to ensure UI is updated with current state
 
             // Clean up any duplicate row tags
             const currentBoard = this.board();

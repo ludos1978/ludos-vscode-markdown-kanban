@@ -34,12 +34,6 @@ function log(...args: any[]) {
     getOutputChannel()?.appendLine(message);
 }
 
-interface FocusTarget {
-    type: 'task' | 'column';
-    id: string;
-    operation: 'created' | 'modified' | 'deleted' | 'moved';
-}
-
 export class MessageHandler {
     private _fileManager: FileManager;
     private _boardStore: BoardStore;
@@ -55,7 +49,6 @@ export class MessageHandler {
     private _getWebviewPanel: () => any;
     private _saveWithBackup: () => Promise<void>;
     private _markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
-    private _previousBoardForFocus?: KanbanBoard;
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
     private _autoExportSettings: any = null;
 
@@ -325,173 +318,6 @@ export class MessageHandler {
 
         // Fallback for unregistered message types (should not happen in normal operation)
         console.error(`[MessageHandler] Unknown message type: ${message.type}`);
-    }
-
-    private async handleUndo() {
-        const currentBoard = this._getCurrentBoard();
-        const restoredBoard = this._boardStore.undo();
-        
-        if (restoredBoard) {
-            // Detect changes for focusing
-            const focusTargets = this.detectBoardChanges(currentBoard, restoredBoard);
-            this._previousBoardForFocus = JSON.parse(JSON.stringify(currentBoard));
-            
-            // Unfold columns BEFORE board update if cards are being added to collapsed columns
-            if (focusTargets.length > 0) {
-                await this.unfoldColumnsForFocusTargets(focusTargets, restoredBoard);
-            }
-            
-            this._setUndoRedoOperation(true);
-            this._setBoard(restoredBoard);
-            this._boardOperations.setOriginalTaskOrder(restoredBoard);
-            
-            // Use cache-first architecture: mark as unsaved instead of direct save
-            this._markUnsavedChanges(true);
-            await this._onBoardUpdate();
-            
-            // Send focus information to webview after board update
-            if (focusTargets.length > 0) {
-                this.sendFocusTargets(focusTargets);
-            } else {
-            }
-
-            // Reset flag immediately after operations complete (no delay needed)
-            this._setUndoRedoOperation(false);
-        }
-    }
-
-    private detectBoardChanges(oldBoard: KanbanBoard | undefined, newBoard: KanbanBoard): FocusTarget[] {
-        if (!oldBoard) {
-            return [];
-        }
-        
-        const focusTargets: FocusTarget[] = [];
-        
-        // Create maps for efficient lookup
-        const oldColumns = new Map(oldBoard.columns.map(col => [col.id, col]));
-        const newColumns = new Map(newBoard.columns.map(col => [col.id, col]));
-        
-        const oldTasks = new Map();
-        const newTasks = new Map();
-        
-        // Build task maps
-        oldBoard.columns.forEach(col => {
-            col.tasks.forEach(task => {
-                oldTasks.set(task.id, { task, columnId: col.id });
-            });
-        });
-        
-        newBoard.columns.forEach(col => {
-            col.tasks.forEach(task => {
-                newTasks.set(task.id, { task, columnId: col.id });
-            });
-        });
-        
-        // Check for column changes
-        for (const [columnId, newColumn] of newColumns) {
-            const oldColumn = oldColumns.get(columnId);
-            if (!oldColumn) {
-                focusTargets.push({ type: 'column', id: columnId, operation: 'created' });
-            } else if (JSON.stringify(oldColumn) !== JSON.stringify(newColumn)) {
-                focusTargets.push({ type: 'column', id: columnId, operation: 'modified' });
-            }
-        }
-        
-        // Check for deleted columns
-        for (const columnId of oldColumns.keys()) {
-            if (!newColumns.has(columnId)) {
-                focusTargets.push({ type: 'column', id: columnId, operation: 'deleted' });
-            }
-        }
-        
-        // Check for task changes
-        for (const [taskId, newTaskData] of newTasks) {
-            const oldTaskData = oldTasks.get(taskId);
-            if (!oldTaskData) {
-                focusTargets.push({ type: 'task', id: taskId, operation: 'created' });
-            } else if (oldTaskData.columnId !== newTaskData.columnId) {
-                focusTargets.push({ type: 'task', id: taskId, operation: 'moved' });
-            } else if (JSON.stringify(oldTaskData.task) !== JSON.stringify(newTaskData.task)) {
-                focusTargets.push({ type: 'task', id: taskId, operation: 'modified' });
-            }
-        }
-        
-        // Check for deleted tasks
-        for (const taskId of oldTasks.keys()) {
-            if (!newTasks.has(taskId)) {
-                focusTargets.push({ type: 'task', id: taskId, operation: 'deleted' });
-            }
-        }
-        
-        return focusTargets;
-    }
-
-    private async unfoldColumnsForFocusTargets(focusTargets: FocusTarget[], restoredBoard: KanbanBoard) {
-        const columnsToUnfold = new Set<string>();
-        
-        focusTargets.forEach(target => {
-            if (target.type === 'task' && (target.operation === 'created' || target.operation === 'moved')) {
-                // For task operations, check the restored board to find which column the task will be in
-                for (const column of restoredBoard.columns) {
-                    if (column.tasks.some(task => task.id === target.id)) {
-                        columnsToUnfold.add(column.id);
-                        break;
-                    }
-                }
-            } else if (target.type === 'column' && target.operation === 'created') {
-                columnsToUnfold.add(target.id);
-            }
-        });
-        
-        if (columnsToUnfold.size > 0) {
-            // Use request-response pattern to ensure columns are unfolded before proceeding
-            await this._requestUnfoldColumns(Array.from(columnsToUnfold));
-        }
-    }
-
-    private sendFocusTargets(focusTargets: FocusTarget[]) {
-        const webviewPanel = this._getWebviewPanel();
-        if (webviewPanel && webviewPanel._panel && webviewPanel._panel.webview) {
-            // Send focus message immediately - webview will wait for rendering to complete
-            webviewPanel._panel.webview.postMessage({
-                type: 'focusAfterUndoRedo',
-                focusTargets: focusTargets
-            });
-        } else {
-        }
-    }
-
-    private async handleRedo() {
-        const currentBoard = this._getCurrentBoard();
-        const restoredBoard = this._boardStore.redo();
-        
-        if (restoredBoard) {
-            // Detect changes for focusing
-            const focusTargets = this.detectBoardChanges(currentBoard, restoredBoard);
-            this._previousBoardForFocus = JSON.parse(JSON.stringify(currentBoard));
-            
-            // Unfold columns BEFORE board update if cards are being added to collapsed columns
-            if (focusTargets.length > 0) {
-                await this.unfoldColumnsForFocusTargets(focusTargets, restoredBoard);
-            }
-            
-            this._setUndoRedoOperation(true);
-            this._setBoard(restoredBoard);
-            this._boardOperations.setOriginalTaskOrder(restoredBoard);
-            
-            // Use cache-first architecture: mark as unsaved instead of direct save
-            this._markUnsavedChanges(true);
-            await this._onBoardUpdate();
-            
-            // Send focus information to webview after board update
-            if (focusTargets.length > 0) {
-                this.sendFocusTargets(focusTargets);
-            } else {
-            }
-
-            // Reset flag immediately after operations complete (no delay needed)
-            this._setUndoRedoOperation(false);
-        }
     }
 
     /**
