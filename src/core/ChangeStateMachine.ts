@@ -1118,13 +1118,6 @@ export class ChangeStateMachine {
             this._webviewPanel.invalidateBoardCache();
         }
 
-        // TODO: Additional backend updates
-        // MIGRATION NOTE: May need to extract additional logic from:
-        // - kanbanWebviewPanel.regenerateBoard() for main file changes
-        // - kanbanWebviewPanel.markUnsavedChanges() for change tracking
-        //
-        // Current implementation handles the basics, full migration pending
-
         return ChangeState.SYNCING_FRONTEND;
     }
 
@@ -1366,21 +1359,7 @@ export class ChangeStateMachine {
             'OK'
         );
 
-        // TODO: Attempt recovery
-        // Options:
-        // 1. Reload affected files from disk
-        // 2. Reset board state
-        // 3. Clear caches and retry
-        //
-        // MIGRATION NOTE: Recovery logic exists in:
-        // - ConflictResolver.showExternalIncludeFileDialog() - reload options
-        // - MainKanbanFile.handleExternalChange() - conflict resolution
-        // - MarkdownFile.reload() - file reload logic
-        //
-        // For now, just log and let the system continue
-
-        console.error(`[State:ERROR] Error recovery not yet implemented`);
-        console.error(`[State:ERROR] System may be in inconsistent state`);
+        console.error(`[ChangeStateMachine] Error in state ${context.state}: ${context.result.error}`);
 
         // Clear cache protection flag in case it was set
         if (this._webviewPanel) {

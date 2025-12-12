@@ -83,13 +83,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         // FOUNDATION-1: Check for duplicates BEFORE registering (collision detection)
         const existingFile = this._filesByRelativePath.get(normalizedRelativePath);
         if (existingFile && existingFile !== file) {
-            console.warn(`[MarkdownFileRegistry] ⚠️  Duplicate file detected!`);
-            console.warn(`  Normalized path: ${normalizedRelativePath}`);
-            console.warn(`  Existing original: ${existingFile.getRelativePath()}`);
-            console.warn(`  New original: ${relativePath}`);
-            console.warn(`  Action: Overwriting existing file`);
-
-            // Dispose old file to prevent memory leak
+            console.warn(`[MarkdownFileRegistry] Duplicate file detected: ${normalizedRelativePath} (overwriting)`);
             existingFile.dispose();
         }
 

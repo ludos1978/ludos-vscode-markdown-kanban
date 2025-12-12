@@ -154,12 +154,6 @@ export class MarpExportService {
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
-            // Debug logging for Marp arguments
-            console.log(`[kanban.MarpExportService] Input file: ${options.inputFilePath}`);
-            console.log(`[kanban.MarpExportService] Input file exists: ${fs.existsSync(options.inputFilePath)}`);
-            console.log(`[kanban.MarpExportService] CWD: ${inputFileDir}`);
-            console.log(`[kanban.MarpExportService] Command: ${command} ${commandArgs.join(' ')}`);
-
             // Build environment with handout settings if enabled
             // Handout mode only applies to PDF output - for HTML, generate normal presentation
             const env: NodeJS.ProcessEnv = { ...process.env };

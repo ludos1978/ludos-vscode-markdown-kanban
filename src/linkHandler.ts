@@ -86,13 +86,7 @@ export class LinkHandler {
                     );
                 }
                 
-                console.warn(`File not found: ${href}`);
-                console.warn('Attempted paths:');
-                attemptedPaths.forEach((path, i) => console.warn(`  ${i + 1}. ${path}`));
-                if (workspaceFolders) {
-                    console.warn('Available workspace folders:', workspaceFolders.map(f => path.basename(f.uri.fsPath)).join(', '));
-                }
-                
+                console.warn(`[LinkHandler] File not found: ${href} (tried ${attemptedPaths.length} paths)`);
                 return;
             }
 
@@ -428,14 +422,7 @@ export class LinkHandler {
             { modal: false }
         );
         
-        // Enhanced console logging
-        console.warn(`Wiki link not found: [[${documentName}]]`);
-        console.warn('Tried filenames:', triedFilenames);
-        console.warn('All attempted paths:');
-        allAttemptedPaths.forEach((path, i) => console.warn(`  ${i + 1}. ${path}`));
-        if (workspaceFolders) {
-            console.warn('Available workspace folders:', workspaceFolders.map(f => path.basename(f.uri.fsPath)).join(', '));
-        }
+        console.warn(`[LinkHandler] Wiki link not found: [[${documentName}]] (tried ${allAttemptedPaths.length} paths)`);
     }
 
     public async handleExternalLink(href: string) {

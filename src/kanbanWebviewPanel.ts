@@ -507,8 +507,6 @@ export class KanbanWebviewPanel {
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
-    // ============= END UNIFIED INCLUDE FILE SYSTEM METHODS =============
-
     private async handleLinkReplacement(originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) {
         const board = this.getBoard();
         if (!board || !board.valid) { return; }
@@ -1302,10 +1300,6 @@ export class KanbanWebviewPanel {
                 } as any);
 
 
-                // DON'T invalidate cache for include files - state machine already updated it
-                // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
-                // NOTE: Even if this were called, the _includeSwitchInProgress flag would block it
-                // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-task') {
             // Find task that uses this include file
@@ -1345,12 +1339,6 @@ export class KanbanWebviewPanel {
                     includeMode: true,
                     includeFiles: foundTask.includeFiles
                 } as any);
-
-
-                // DON'T invalidate cache for include files - state machine already updated it
-                // Cache MUST stay in sync with loaded content. Invalidating would cause IDs to regenerate.
-                // NOTE: Even if this were called, the _includeSwitchInProgress flag would block it
-                // this.invalidateBoardCache(); // REMOVED - breaks include switching
             }
         } else if (fileType === 'include-regular') {
             // Regular include - find and update only affected tasks
@@ -1502,8 +1490,6 @@ export class KanbanWebviewPanel {
 
         this._webviewBridge.send(message as any);
     }
-
-    // OLD HANDLERS REMOVED - All include switches now route through ChangeStateMachine via handleIncludeSwitch()
 
     /**
      * Get board (single source of truth)
@@ -1804,24 +1790,6 @@ export class KanbanWebviewPanel {
 
     public get fileRegistry(): MarkdownFileRegistry {
         return this._fileRegistry;
-    }
-
-    /**
-     * Debug method to check webview permissions and image resolution
-     * ---
-     * You can call this method from the VS Code command palette or after loading a document
-     * Add to your extension.ts if you want a debug command:
-     *  const debugCommand = vscode.commands.registerCommand('markdown-kanban.debugPermissions', () => {
-     *      if (KanbanWebviewPanel.currentPanel) {
-     *          KanbanWebviewPanel.currentPanel.debugWebviewPermissions();
-     *      } else {
-     *          vscode.window.showWarningMessage('No kanban panel is open');
-     *      }
-     *  });
-     *  context.subscriptions.push(debugCommand);
-     */
-    public debugWebviewPermissions() {
-        // Debug method stub - can be expanded as needed
     }
 
     /**

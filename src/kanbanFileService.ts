@@ -660,11 +660,7 @@ export class KanbanFileService {
                             });
                         }
 
-                        // NOTE: External change handling is now handled EXCLUSIVELY by ExternalFileWatcher
-                        // which is also registered with SaveEventDispatcher.
-                        // REMOVED duplicate handling here to prevent race conditions and double-reload bugs.
-                        // ExternalFileWatcher will fire the event and handleExternalFileChange will be called.
-
+                        // External changes are handled by ExternalFileWatcher (registered with SaveEventDispatcher)
                         break;
                     }
                 }

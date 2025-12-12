@@ -60,9 +60,6 @@ export interface HandlerOptions {
     timeout?: number;
     /** How to handle errors (default: 'log') */
     errorStrategy?: 'throw' | 'log' | 'ignore';
-    // TODO: Add WeakRef support when upgrading to ES2021+
-    // /** Use WeakRef for automatic cleanup */
-    // weak?: boolean;
 }
 
 /**
@@ -89,8 +86,6 @@ type Handler<K extends EventType> = (event: PanelEvent<K>) => void | Promise<voi
  */
 interface RegisteredHandler<K extends EventType> {
     handler: Handler<K>;
-    // TODO: Add WeakRef support when upgrading to ES2021+
-    // handler: Handler<K> | WeakRef<Handler<K>>;
     options: Required<HandlerOptions>;
     name: string;
 }
@@ -173,8 +168,6 @@ export class PanelEventBus implements vscode.Disposable {
             once: options.once ?? false,
             timeout: options.timeout ?? this.options.defaultTimeout,
             errorStrategy: options.errorStrategy ?? 'log'
-            // TODO: Add WeakRef support when upgrading to ES2021+
-            // weak: options.weak ?? false
         };
 
         if (!this.handlers.has(type)) {
@@ -182,8 +175,6 @@ export class PanelEventBus implements vscode.Disposable {
         }
 
         const registered: RegisteredHandler<K> = {
-            // TODO: Add WeakRef support when upgrading to ES2021+
-            // handler: fullOptions.weak ? new WeakRef(handler) : handler,
             handler: handler,
             options: fullOptions,
             name: handler.name || 'anonymous'
@@ -211,18 +202,6 @@ export class PanelEventBus implements vscode.Disposable {
     ): vscode.Disposable {
         return this.on(type, handler, { ...options, once: true });
     }
-
-    // TODO: Add WeakRef support when upgrading to ES2021+
-    // /**
-    //  * Subscribe with WeakRef (auto-cleanup when handler is garbage collected)
-    //  */
-    // onWeak<K extends EventType>(
-    //     type: K,
-    //     handler: Handler<K>,
-    //     options: Omit<HandlerOptions, 'weak'> = {}
-    // ): vscode.Disposable {
-    //     return this.on(type, handler, { ...options, weak: true });
-    // }
 
     // ============= EMISSION =============
 
@@ -314,20 +293,7 @@ export class PanelEventBus implements vscode.Disposable {
         const toRemove: RegisteredHandler<K>[] = [];
 
         for (const registered of registeredHandlers) {
-            // Get handler (WeakRef support disabled for ES2020 compatibility)
             const handler: Handler<K> = registered.handler;
-
-            // TODO: Add WeakRef support when upgrading to ES2021+
-            // if (registered.handler instanceof WeakRef) {
-            //     handler = registered.handler.deref();
-            //     if (!handler) {
-            //         // Handler was garbage collected
-            //         toRemove.push(registered);
-            //         continue;
-            //     }
-            // } else {
-            //     handler = registered.handler;
-            // }
 
             // Execute with timeout
             const startTime = Date.now();
