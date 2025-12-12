@@ -25,6 +25,7 @@ import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
 import { PanelStateModel, ConcurrencyManager, FileRegistryAdapter, IncludeFileCoordinator, WebviewManager } from './panel';
+import { KeybindingService } from './services/KeybindingService';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -1414,7 +1415,7 @@ export class KanbanWebviewPanel {
         if (!this._panel) return;
 
         try {
-            const shortcuts = await this._messageHandler.getAllShortcuts();
+            const shortcuts = await KeybindingService.getInstance().getAllShortcuts();
             this._webviewBridge.send({
                 type: 'updateShortcuts',
                 shortcuts: shortcuts

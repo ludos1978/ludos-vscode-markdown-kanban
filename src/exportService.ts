@@ -1532,7 +1532,7 @@ export class ExportService {
 
         // Check if we need to process includes
         // When mergeIncludes is false, we need file-based pipeline to copy include files
-        const hasIncludes = result.includes('!!!include(');
+        const hasIncludes = result.includes(INCLUDE_SYNTAX.PREFIX);
         const needsIncludeProcessing = hasIncludes && !mergeIncludes;
 
         // Use board-based conversion ONLY when:

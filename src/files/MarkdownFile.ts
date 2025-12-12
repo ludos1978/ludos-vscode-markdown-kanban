@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileState } from './FileState';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { SaveOptions } from './SaveOptions';
@@ -1004,54 +1003,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
             changeType,
             timestamp: new Date()
         });
-    }
-
-    // ============= COMPATIBILITY WITH EXISTING CODE =============
-
-    /**
-     * Convert to FileState interface for compatibility with existing code
-     */
-    public toFileState(): FileState {
-        return {
-            path: this._path,
-            relativePath: this._relativePath,
-            isMainFile: this.getFileType() === 'main',
-            fileType: this.getFileType(),
-            backend: {
-                exists: this._exists,
-                lastModified: this._lastModified,
-                isDirtyInEditor: this._isDirtyInEditor,
-                documentVersion: this._documentVersion,
-                lastDocumentVersion: this._documentVersion - 1, // Approximation for compatibility
-                hasFileSystemChanges: this._hasFileSystemChanges
-            },
-            frontend: {
-                hasUnsavedChanges: this.hasUnsavedChanges(), // Computed from (_content !== _baseline)
-                content: this._content,
-                baseline: this._baseline,
-                isInEditMode: this._isInEditMode
-            },
-            needsReload: this.needsReload(),
-            needsSave: this.needsSave(),
-            hasConflict: this.hasConflict()
-        };
-    }
-
-    /**
-     * Update from FileState interface (for compatibility)
-     */
-    public fromFileState(state: FileState): void {
-        this._path = state.path;
-        this._relativePath = state.relativePath;
-        this._exists = state.backend.exists;
-        this._lastModified = state.backend.lastModified;
-        this._isDirtyInEditor = state.backend.isDirtyInEditor;
-        this._documentVersion = state.backend.documentVersion;
-        this._hasFileSystemChanges = state.backend.hasFileSystemChanges;
-        // NOTE: No need to set _hasUnsavedChanges - it's computed from (_content !== _baseline)
-        this._content = state.frontend.content;
-        this._baseline = state.frontend.baseline;
-        this._isInEditMode = state.frontend.isInEditMode;
     }
 
     // ============= CLEANUP =============

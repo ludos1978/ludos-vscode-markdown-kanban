@@ -1,5 +1,6 @@
 import { KanbanBoard, KanbanTask } from '../../markdownParser';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
+import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
 /**
  * Options for presentation generation
@@ -136,7 +137,7 @@ export class PresentationGenerator {
             let columnTitle = column.displayTitle || column.title;
 
             if (options.stripIncludes) {
-                columnTitle = columnTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
 
             if (columnTitle) {
@@ -160,7 +161,7 @@ export class PresentationGenerator {
                 }
 
                 if (options.stripIncludes) {
-                    taskTitle = taskTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                    taskTitle = taskTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
                 }
 
                 let slideContent = taskTitle;

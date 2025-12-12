@@ -811,12 +811,12 @@ export class ChangeStateMachine {
                     targetColumn.includeFiles = [];
                     targetColumn.includeMode = false;
                     // Clean displayTitle by removing any !!!include()!!! syntax
-                    targetColumn.displayTitle = targetColumn.title.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                    targetColumn.displayTitle = targetColumn.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
                 } else if (targetTask) {
                     targetTask.includeFiles = [];
                     targetTask.includeMode = false;
                     // Clean displayTitle by removing any !!!include()!!! syntax
-                    targetTask.displayTitle = targetTask.title.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+                    targetTask.displayTitle = targetTask.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
                     targetTask.originalTitle = targetTask.title;
                     targetTask.description = '';
                 }

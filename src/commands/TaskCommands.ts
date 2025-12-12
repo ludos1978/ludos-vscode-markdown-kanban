@@ -438,7 +438,7 @@ export class TaskCommands extends BaseMessageCommand {
                 const newIncludeFiles: string[] = [];
                 if (hasTaskIncludeMatches) {
                     hasTaskIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(/!!!include\(([^)]+)\)!!!/, '$1').trim();
+                        const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
                         newIncludeFiles.push(filePath);
                     });
                 }

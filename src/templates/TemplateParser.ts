@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 
 /**
  * Variable definition from template YAML frontmatter
@@ -318,7 +319,7 @@ export class TemplateParser {
      */
     private static extractIncludes(text: string): string[] {
         const includes: string[] = [];
-        const matches = text.matchAll(/!!!include\(([^)]+)\)!!!/g);
+        const matches = text.matchAll(INCLUDE_SYNTAX.REGEX);
         for (const match of matches) {
             includes.push(match[1]);
         }

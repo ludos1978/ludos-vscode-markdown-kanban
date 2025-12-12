@@ -31,6 +31,3 @@ export { IncludeFile, IncludeFileType } from './IncludeFile';
 // Registry and factory
 export { MarkdownFileRegistry } from './MarkdownFileRegistry';
 export { FileFactory } from './FileFactory';
-
-// FileState interface for compatibility with legacy code
-export { FileState } from './FileState';
