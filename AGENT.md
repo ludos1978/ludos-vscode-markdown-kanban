@@ -5,9 +5,13 @@
 - for any new function you want to create, explain why you need to add a new one and why you cannot modify the most similar ones to be reused. You must verify all functions for similar features and logic before adding any new function. This is very important!
 - if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
 - You may not add any functions, except if have not checked all the existing functions before for similar functionality or ones that might easily be extended to cover the feature. There must absoletely be no multiple functions that handle similar functions. Check the full code before you add any a new function.
-- Never do any lazy refactorings. Eighter we optimize the code or we leave it, but dont add any additional wrappers and leave the code untouched!
+- Never do any lazy refactorings. Eighter we optimize the code or we leave it, but dont add any additional wrappers and leave the code it executes untouched!
   - when migrating, copy the complete code and verify line by line that it's functionality is retained, fixed and migrated.
   - only do a refactoring if it's really helpful in code organisation.
+  - how complex a refactoring is is irrelevant.
+  - our focus is keeping the code simple and in a clean structure!
+  - do not stop with the refactoring until you are completely finished. this must include completely removing any old or obsolete code!
+  - only stop for questions that the user must answer.
 
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.

@@ -31,29 +31,7 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-
-/**
- * Consolidated panel state flags
- * Groups all boolean flags that control panel behavior for easier state management
- */
-interface PanelStateFlags {
-    /** Panel has completed initial setup */
-    initialized: boolean;
-    /** Currently applying changes from webview (prevents re-parsing) */
-    updatingFromPanel: boolean;
-    /** Currently performing undo/redo operation */
-    undoRedoOperation: boolean;
-    /** Prevents recursive close attempts during cleanup */
-    closingPrevented: boolean;
-    /** Panel has been disposed, all operations should be skipped */
-    disposed: boolean;
-    /** User is actively editing in the webview */
-    editingInProgress: boolean;
-    /** Initial include file loading is in progress */
-    initialBoardLoad: boolean;
-    /** Include switch operation is in progress (protects cache) */
-    includeSwitchInProgress: boolean;
-}
+import { PanelStateModel, ConcurrencyManager, FileRegistryAdapter, IncludeFileCoordinator } from './panel';
 
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
@@ -78,31 +56,18 @@ export class KanbanWebviewPanel {
     // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
+    private _registryAdapter: FileRegistryAdapter;
 
     private _stateMachine: ChangeStateMachine;
 
-    // Consolidated panel state flags (see PanelStateFlags interface)
-    private _state: PanelStateFlags = {
-        initialized: false,
-        updatingFromPanel: false,
-        undoRedoOperation: false,
-        closingPrevented: false,
-        disposed: false,
-        editingInProgress: false,
-        initialBoardLoad: false,
-        includeSwitchInProgress: false
-    };
+    // Panel architecture components (Phase 1 & 2)
+    private _state: PanelStateModel;
+    private _concurrency: ConcurrencyManager;
+    private _includeCoordinator: IncludeFileCoordinator;
 
     // Public getter for backwards compatibility with external code
     public get _isUpdatingFromPanel(): boolean { return this._state.updatingFromPanel; }
-    public set _isUpdatingFromPanel(value: boolean) { this._state.updatingFromPanel = value; }
-
-    // RACE-3: Track last processed timestamp per file to prevent stale updates
-    private _lastProcessedTimestamps: Map<string, Date> = new Map();
-
-    // RACE-4: Operation locking to prevent concurrent operations from interfering
-    private _operationInProgress: string | null = null;  // Track which operation is running
-    private _pendingOperations: Array<{name: string; operation: () => Promise<void>}> = [];  // Queue
+    public set _isUpdatingFromPanel(value: boolean) { this._state.setUpdatingFromPanel(value); }
 
     // Non-flag state values
     private _lastDocumentVersion: number = -1;  // Track document version
@@ -114,8 +79,6 @@ export class KanbanWebviewPanel {
     private _panelId: string;  // Unique identifier for this panel
     private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management
 
-    // Unified include file tracking system - single source of truth
-    private _recentlyReloadedFiles: Set<string> = new Set(); // Track files that were just reloaded from external
     private _conflictResolver: ConflictResolver;
 
     private _eventBus: PanelEventBus;
@@ -326,13 +289,17 @@ export class KanbanWebviewPanel {
         this._panelId = `panel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Generate unique ID
         this._context = context;
 
+        // Initialize panel architecture components (Phase 1)
+        const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
+        this._state = new PanelStateModel(isDevelopment);
+        this._concurrency = new ConcurrencyManager(isDevelopment);
+
         this._eventBus = new PanelEventBus({
             enableTracing: true, // Enable during development for debugging
             defaultTimeout: 5000
         });
 
         // Add logging middleware in development mode
-        const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
         if (isDevelopment) {
             this._eventBus.use(createLoggingMiddleware({
                 excludeTypes: ['debug:event_slow', 'debug:handler_error'],
@@ -368,10 +335,23 @@ export class KanbanWebviewPanel {
             this._backupManager,
             this._fileRegistry
         );
+        this._registryAdapter = new FileRegistryAdapter(this._fileRegistry, this._fileFactory);
 
         // Initialize unified change state machine (Phase 6)
         this._stateMachine = ChangeStateMachine.getInstance();
         this._stateMachine.initialize(this._fileRegistry, this);
+
+        // Initialize include file coordinator (Phase 2)
+        this._includeCoordinator = new IncludeFileCoordinator({
+            fileRegistry: this._fileRegistry,
+            fileFactory: this._fileFactory,
+            webviewBridge: this._webviewBridge,
+            stateMachine: this._stateMachine,
+            state: this._state,
+            getPanel: () => this._panel,
+            getBoard: () => this.getBoard(),
+            getMainFile: () => this._getMainFile()
+        });
 
         // Subscribe to registry change events
         this._disposables.push(
@@ -427,7 +407,7 @@ export class KanbanWebviewPanel {
                     this._boardStore.setBoard(board, true);
                 },
                 setUndoRedoOperation: (isOperation: boolean) => {
-                    this._state.undoRedoOperation = isOperation;
+                    this._state.setUndoRedoOperation(isOperation);
                 },
                 getWebviewPanel: () => this,
                 saveWithBackup: async (label?: string) => {
@@ -872,7 +852,7 @@ export class KanbanWebviewPanel {
     private _initialize() {
         if (!this._state.initialized) {
             this._panel.webview.html = this._getHtmlForWebview();
-            this._state.initialized = true;
+            this._state.setInitialized(true);
         }
     }
 
@@ -948,10 +928,10 @@ export class KanbanWebviewPanel {
 
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
         // RACE-4: Wrap entire operation with lock to prevent concurrent file loads
-        return this._withLock('loadMarkdownFile', async () => {
+        return this._concurrency.withLock('loadMarkdownFile', async () => {
             // CRITICAL: Set initial board load flag BEFORE loading main file
             // This prevents the main file's 'reloaded' event from triggering board regeneration
-            this._state.initialBoardLoad = true;
+            this._state.setInitialBoardLoad(true);
 
             this._eventBus.emit('board:loading', { path: document.uri.fsPath }).catch(() => {});
 
@@ -1354,22 +1334,22 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (board && board.valid) {
             // Step 1: Create include file instances in registry
-            this.syncIncludeFilesWithRegistry(board);
+            this._includeCoordinator.syncIncludeFilesWithRegistry(board);
 
             // Step 2: Mark includes as loading (sets loading flags on columns/tasks)
-            this._markIncludesAsLoading(board);
+            this._includeCoordinator.markIncludesAsLoading(board);
 
             // Step 3: Load content asynchronously (will send updates as each include loads)
             // Don't await - let it run in background while we send initial board
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
 
-            this._loadIncludeContentAsync(board)
+            this._includeCoordinator.loadIncludeContentAsync(board)
                 .then(() => {
-                    this._state.initialBoardLoad = false;
+                    this._state.setInitialBoardLoad(false);
                 })
                 .catch(error => {
                     console.error('[_syncMainFileToRegistry] Error loading include content:', error);
-                    this._state.initialBoardLoad = false;
+                    this._state.setInitialBoardLoad(false);
                 });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
@@ -1378,369 +1358,6 @@ export class KanbanWebviewPanel {
         // Log registry statistics
         this._fileRegistry.logStatistics();
     }
-
-    /**
-     * Mark all columns/tasks with includes as loading
-     */
-    private _markIncludesAsLoading(board: KanbanBoard): void {
-
-        // Mark column includes as loading
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                column.isLoadingContent = true;
-            }
-        }
-
-        // Mark task includes as loading
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    task.isLoadingContent = true;
-                }
-            }
-        }
-    }
-
-    /**
-     * Load and parse content from all include files, sending incremental updates
-     * Runs asynchronously in background, sending updates as each include loads
-     */
-    private async _loadIncludeContentAsync(board: KanbanBoard): Promise<void> {
-
-        const mainFilePath = this._getMainFile()?.getPath();
-
-        // Load column includes - send update for each one
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const relativePath of column.includeFiles) {
-                    // FOUNDATION-1: Registry handles normalization internally
-                    const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                    if (file) {
-                        try {
-                            // Reload from disk and parse to tasks
-                            await file.reload();
-                            const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
-                            column.tasks = tasks;
-                            column.isLoadingContent = false; // Clear loading flag
-
-
-                            // CRITICAL FIX: Don't send updates during include switch
-                            // The state machine handles all updates during switches
-                            if (this._state.includeSwitchInProgress) {
-                                continue;
-                            }
-
-                            // Send update to frontend
-                            if (this._panel) {
-                                this._webviewBridge.sendBatched({
-                                    type: 'updateColumnContent',
-                                    columnId: column.id,
-                                    tasks: tasks,
-                                    columnTitle: column.title,
-                                    displayTitle: column.displayTitle,
-                                    includeMode: true,
-                                    includeFiles: column.includeFiles,
-                                    isLoadingContent: false
-                                } as any);
-                            }
-                        } catch (error) {
-                            console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
-                            column.isLoadingContent = false; // Clear loading flag even on error
-
-                            // Send error state to frontend
-                            if (this._panel) {
-                                this._webviewBridge.send({
-                                    type: 'updateColumnContent',
-                                    columnId: column.id,
-                                    tasks: [],
-                                    columnTitle: column.title,
-                                    displayTitle: column.displayTitle,
-                                    includeMode: true,
-                                    includeFiles: column.includeFiles,
-                                    isLoadingContent: false,
-                                    loadError: true
-                                } as any);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Load task includes - send update for each one
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        // FOUNDATION-1: Registry handles normalization internally
-                        const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                        if (file) {
-                            try {
-                                // Reload from disk and get content
-                                await file.reload();
-                                const fullFileContent = file.getContent();
-
-                                // FIX BUG #4: No-parsing approach
-                                // Load COMPLETE file content into task.description (no parsing!)
-                                // displayTitle is just a UI indicator showing which file is included
-                                const displayTitle = `# include in ${relativePath}`;
-
-                                task.displayTitle = displayTitle;  // UI indicator only
-                                task.description = fullFileContent;  // COMPLETE file content!
-                                task.isLoadingContent = false; // Clear loading flag
-
-                                // Sync baseline to prevent false "unsaved" detection
-                                file.setContent(fullFileContent, true);
-
-
-                                // CRITICAL FIX: Don't send updates during include switch
-                                // The state machine handles all updates during switches
-                                if (this._state.includeSwitchInProgress) {
-                                    continue;
-                                }
-
-                                // Send update to frontend
-                                if (this._panel) {
-                                    this._webviewBridge.send({
-                                        type: 'updateTaskContent',
-                                        columnId: column.id,
-                                        taskId: task.id,
-                                        description: fullFileContent,
-                                        displayTitle: displayTitle,
-                                        taskTitle: task.title,
-                                        originalTitle: task.originalTitle,
-                                        includeMode: true,
-                                        includeFiles: task.includeFiles,
-                                        isLoadingContent: false
-                                    } as any);
-                                }
-                            } catch (error) {
-                                console.error(`[_loadIncludeContentAsync] Failed to load ${relativePath}:`, error);
-                                task.isLoadingContent = false; // Clear loading flag even on error
-
-                                // Send error state to frontend
-                                if (this._panel) {
-                                    this._webviewBridge.send({
-                                        type: 'updateTaskContent',
-                                        columnId: column.id,
-                                        taskId: task.id,
-                                        description: '',
-                                        displayTitle: task.displayTitle || '',
-                                        taskTitle: task.title,
-                                        originalTitle: task.originalTitle,
-                                        includeMode: true,
-                                        includeFiles: task.includeFiles,
-                                        isLoadingContent: false,
-                                        loadError: true
-                                    } as any);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Load regular includes - send update for each one
-        const mainFile = this._fileRegistry.getMainFile();
-        if (mainFile) {
-            const regularIncludes = mainFile.getIncludedFiles();
-
-            for (const relativePath of regularIncludes) {
-                const file = this._fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                if (file) {
-                    try {
-                        // Reload from disk
-                        await file.reload();
-                        const content = file.getContent();
-
-
-                        // Send update to frontend
-                        if (this._panel) {
-                            this._webviewBridge.sendBatched({
-                                type: 'updateIncludeContent',
-                                filePath: relativePath,
-                                content: content
-                            } as any);
-                        }
-                    } catch (error) {
-                        console.error(`[_loadIncludeContentAsync] Failed to load regular include ${relativePath}:`, error);
-                    }
-                }
-            }
-
-            // Trigger re-render after all regular includes are loaded
-            if (regularIncludes.length > 0 && this._panel) {
-                this._webviewBridge.sendBatched({
-                    type: 'includesUpdated'
-                } as any);
-            }
-        }
-
-    }
-
-    /**
-     * Phase 1: Sync include files with registry (create instances for all includes in the board)
-     */
-    private syncIncludeFilesWithRegistry(board: KanbanBoard): void {
-        const mainFile = this._fileRegistry.getMainFile();
-        if (!mainFile) {
-            console.warn(`[KanbanWebviewPanel] Cannot sync include files - no main file in registry`);
-            return;
-        }
-
-        let createdCount = 0;
-
-        // Sync column includes
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const relativePath of column.includeFiles) {
-                    const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-
-                    // Check if file exists with WRONG type - this can happen if inline includes register before board sync
-                    if (existingFile && existingFile.getFileType() !== 'include-column') {
-                        console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-column! Replacing...`);
-                        this._fileRegistry.unregister(relativePath);
-                    }
-
-                    if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-
-                        const columnInclude = this._fileFactory.createIncludeDirect(
-                            relativePath,
-                            mainFile,
-                            'include-column',
-                            false
-                        );
-
-                        // Set column association
-                        columnInclude.setColumnId(column.id);
-                        columnInclude.setColumnTitle(column.title);
-
-                        // Register and start watching
-                        this._fileRegistry.register(columnInclude);
-                        columnInclude.startWatching();
-
-                        createdCount++;
-                    }
-                }
-            }
-        }
-
-        // Sync task includes
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-
-                        // Check if file exists with WRONG type - this can happen if inline includes register before board sync
-                        if (existingFile && existingFile.getFileType() !== 'include-task') {
-                            console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-task! Replacing...`);
-                            this._fileRegistry.unregister(relativePath);
-                        }
-
-                        if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-
-                            const taskInclude = this._fileFactory.createIncludeDirect(
-                                relativePath,
-                                mainFile,
-                                'include-task',
-                                false
-                            );
-
-                            // Set task association
-                            taskInclude.setTaskId(task.id);
-                            taskInclude.setTaskTitle(task.title);
-                            taskInclude.setColumnId(column.id);
-
-                            // Register and start watching
-                            this._fileRegistry.register(taskInclude);
-                            taskInclude.startWatching();
-
-                            createdCount++;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Sync regular includes (!!!include(path)!!! in task descriptions)
-        const regularIncludes = mainFile.getIncludedFiles();
-
-        for (const relativePath of regularIncludes) {
-            const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-
-            // Check if file exists with WRONG type
-            if (existingFile && existingFile.getFileType() !== 'include-regular') {
-                console.warn(`[KanbanWebviewPanel] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-regular! Replacing...`);
-                this._fileRegistry.unregister(relativePath);
-            }
-
-            if (!this._fileRegistry.hasByRelativePath(relativePath)) {
-
-                const regularInclude = this._fileFactory.createIncludeDirect(
-                    relativePath,
-                    mainFile,
-                    'include-regular',
-                    true // Regular includes are inline
-                );
-
-                // Register and start watching
-                this._fileRegistry.register(regularInclude);
-                regularInclude.startWatching();
-
-                createdCount++;
-            }
-        }
-
-
-        // CRITICAL FIX: Also UPDATE content of existing include files with board changes
-        this._updateIncludeFilesContent(board);
-    }
-
-    /**
-     * CRITICAL: Update content of existing include files with board changes
-     * This ensures that when you edit tasks/columns in the Kanban, the include files are updated
-     */
-    private _updateIncludeFilesContent(board: KanbanBoard): void {
-
-        // Update column include files
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const relativePath of column.includeFiles) {
-                    const file = this._fileRegistry.getByRelativePath(relativePath);
-                    if (file && file.getFileType() === 'include-column') {
-                        // CRITICAL: Use the IncludeFile's updateTasks() method
-                        // which generates the correct PRESENTATION format (slides with --- separators)
-                        // NOT task list markdown!
-                        const columnIncludeFile = file as IncludeFile;
-                        columnIncludeFile.updateTasks(column.tasks);
-
-                    }
-                }
-            }
-        }
-
-        // Update task include files
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        const file = this._fileRegistry.getByRelativePath(relativePath);
-                        if (file && file.getFileType() === 'include-task') {
-                            // For task includes, the description IS the file content
-                            const taskContent = task.description || '';
-
-                            // Update file content (marks as having unsaved changes)
-                            file.setContent(taskContent, false);  // false = don't update baseline, mark as unsaved
-
-                        }
-                    }
-                }
-            }
-        }
-    }
-
 
     /**
      * UNIFIED CONTENT CHANGE HANDLER (State Machine Integrated)
@@ -1761,7 +1378,7 @@ export class KanbanWebviewPanel {
      * Set editing in progress flag to block board regenerations
      */
     public setEditingInProgress(isEditing: boolean): void {
-        this._state.editingInProgress = isEditing;
+        this._state.setEditingInProgress(isEditing);
     }
 
     /**
@@ -1875,28 +1492,8 @@ export class KanbanWebviewPanel {
         /** Pre-loaded content for include files (bypasses registry caching) */
         preloadedContent?: Map<string, string>;
     }): Promise<void> {
-
-        // Route through unified change state machine
-        const board = this.getBoard();
-        const column = params.columnId ? board?.columns.find((c: any) => c.id === params.columnId) :
-                       board?.columns.find((c: any) => c.tasks.some((t: any) => t.id === params.taskId));
-
-        const result = await this._stateMachine.processChange({
-            type: 'include_switch',
-            target: params.columnId ? 'column' : 'task',
-            targetId: params.columnId || params.taskId!,
-            columnIdForTask: params.columnId ? undefined : column?.id,
-            oldFiles: params.oldFiles,
-            newFiles: params.newFiles,
-            newTitle: params.newTitle,
-            preloadedContent: params.preloadedContent
-        });
-
-        if (!result.success) {
-            console.error('[handleIncludeSwitch] State machine failed:', result.error);
-            throw result.error || new Error('Include switch failed');
-        }
-
+        // Delegate to include coordinator
+        return this._includeCoordinator.handleIncludeSwitch(params);
     }
 
     /**
@@ -1979,7 +1576,7 @@ export class KanbanWebviewPanel {
                 // RACE-3: Only process if this event is newer than last processed
                 // When multiple external changes happen rapidly, reloads can complete out of order.
                 // This ensures only the newest data is applied to the frontend.
-                if (!this._isEventNewer(file, event.timestamp)) {
+                if (!this._concurrency.isEventNewer(file.getRelativePath(), event.timestamp)) {
                     return;
                 }
 
@@ -2280,86 +1877,6 @@ export class KanbanWebviewPanel {
         this._webviewBridge.send(message as any);
     }
 
-    /**
-     * RACE-4: Execute operation with exclusive lock
-     *
-     * Prevents concurrent operations from interfering with each other.
-     * If an operation is already running, queues the new operation.
-     *
-     * @param operationName Name for logging
-     * @param operation The async operation to execute
-     */
-    private async _withLock<T>(operationName: string, operation: () => Promise<T>): Promise<T> {
-        // If operation already in progress, queue this one
-        if (this._operationInProgress) {
-
-            return new Promise((resolve, reject) => {
-                this._pendingOperations.push({
-                    name: operationName,
-                    operation: async () => {
-                        try {
-                            const result = await operation();
-                            resolve(result);
-                        } catch (error) {
-                            reject(error);
-                        }
-                    }
-                });
-            });
-        }
-
-        // Acquire lock
-        this._operationInProgress = operationName;
-
-        try {
-            const result = await operation();
-            return result;
-        } finally {
-            // Release lock
-            this._operationInProgress = null;
-
-            // Process next queued operation
-            const next = this._pendingOperations.shift();
-            if (next) {
-                // Run next operation (it will acquire lock)
-                next.operation().catch(error => {
-                    console.error(`[RACE-4] Queued operation "${next.name}" failed:`, error);
-                });
-            }
-        }
-    }
-
-    /**
-     * RACE-3: Check if event is newer than last processed event for this file
-     *
-     * Prevents old events from overriding newer ones. When multiple external changes
-     * happen rapidly, reloads can complete out of order. This ensures only the newest
-     * data is applied to the frontend.
-     *
-     * @param file The file that emitted the event
-     * @param eventTimestamp The timestamp from the event
-     * @returns true if event should be processed, false if it's stale
-     */
-    private _isEventNewer(file: MarkdownFile, eventTimestamp: Date): boolean {
-        const relativePath = file.getRelativePath();
-        const lastProcessed = this._lastProcessedTimestamps.get(relativePath);
-
-        if (!lastProcessed) {
-            // First event for this file - accept it
-            this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
-            return true;
-        }
-
-        if (eventTimestamp > lastProcessed) {
-            // Newer event - accept and update timestamp
-            this._lastProcessedTimestamps.set(relativePath, eventTimestamp);
-            return true;
-        }
-
-        // Older or same timestamp - reject
-        return false;
-    }
-
     // OLD HANDLERS REMOVED - All include switches now route through ChangeStateMachine via handleIncludeSwitch()
 
     // ============= FILE REGISTRY HELPER METHODS =============
@@ -2457,7 +1974,7 @@ export class KanbanWebviewPanel {
      * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
      */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
-        this._state.includeSwitchInProgress = inProgress;
+        this._state.setIncludeSwitchInProgress(inProgress);
     }
 
     /**
@@ -2767,7 +2284,7 @@ export class KanbanWebviewPanel {
         if (this._state.disposed) {
             return;
         }
-        this._state.disposed = true;
+        this._state.setDisposed(true);
 
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse of disposing panel
         // This must happen BEFORE any async operations or cleanup
@@ -2789,7 +2306,7 @@ export class KanbanWebviewPanel {
             // discardChanges() internally checks if content changed before emitting events
             mainFile.discardChanges();
         }
-        this._state.closingPrevented = false;
+        this._state.setClosingPrevented(false);
 
         // Stop unsaved changes monitoring
         if (this._unsavedChangesCheckInterval) {
@@ -2802,12 +2319,8 @@ export class KanbanWebviewPanel {
         // Clear panel state
         KanbanWebviewPanel.panelStates.delete(this._panelId);
 
-        // RACE-3: Clear timestamp tracking
-        this._lastProcessedTimestamps.clear();
-
-        // RACE-4: Clear operation queue and lock
-        this._pendingOperations = [];
-        this._operationInProgress = null;
+        // Dispose concurrency manager (handles RACE-3 and RACE-4 cleanup)
+        this._concurrency.dispose();
 
         // Unregister from SaveEventCoordinator
         const document = this._fileManager.getDocument();
@@ -2942,167 +2455,21 @@ export class KanbanWebviewPanel {
         newIncludeFiles: string[],
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
-
-        // Note: Unsaved changes check happens in handleBoardUpdate BEFORE this is called
-
-        // SOLUTION 3: NUCLEAR OPTION - Always create fresh file instances, never reuse
-        // Normalize all paths for consistent operations
-        const normalizedNewFiles = newIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
-        const oldIncludeFiles = column.includeFiles || [];
-        const normalizedOldFiles = oldIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
-
-        const filesToRemove = normalizedOldFiles.filter((old: string) =>
-            !normalizedNewFiles.includes(old)
-        );
-
-
-        // STEP 1: Cleanup old files
-        for (const oldFilePath of filesToRemove) {
-            const oldFile = this._fileRegistry.getByRelativePath(oldFilePath);
-            if (oldFile) {
-                oldFile.stopWatching();
-                this._fileRegistry.unregister(oldFile.getPath());
-            }
-        }
-
-        // STEP 2: ALWAYS unregister existing files (even if we're switching back)
-        // This ensures fresh state and prevents stale baseline issues
-        for (const newFilePath of normalizedNewFiles) {
-            const existingFile = this._fileRegistry.getByRelativePath(newFilePath);
-            if (existingFile) {
-                existingFile.stopWatching();
-                this._fileRegistry.unregister(existingFile.getPath());
-            }
-        }
-
-        // Store normalized paths
-        column.includeFiles = normalizedNewFiles;
-
-        // Keep existing tasks to preserve IDs during re-parse
-        const existingTasks = column.tasks;
-
-        // STEP 3: ALWAYS create new file instances (never reuse)
-        const allTasks: KanbanTask[] = [];
-        for (const relativePath of normalizedNewFiles) {
-            const mainFile = this._fileRegistry.getMainFile();
-            if (!mainFile) {
-                console.error('[updateIncludeContentUnified] ❌ No main file found!');
-                continue;
-            }
-
-            // ALWAYS create fresh instance (Solution 3)
-            const columnInclude = this._fileFactory.createIncludeDirect(
-                relativePath,
-                mainFile,
-                'include-column',
-                false
-            );
-            columnInclude.setColumnId(column.id);
-            columnInclude.setColumnTitle(column.title);
-            this._fileRegistry.register(columnInclude);
-            columnInclude.startWatching();
-
-            // Reload the file content from disk before parsing
-            await columnInclude.reload();
-
-            // Pass existing tasks to preserve IDs during re-parse
-            const mainFilePath = mainFile.getPath();
-            const tasks = columnInclude.parseToTasks(existingTasks, column.id, mainFilePath);
-            allTasks.push(...tasks);
-        }
-
-        // Update the column with the loaded tasks
-        column.tasks = allTasks;
-
-        // Send update to frontend (use normalized paths)
-        if (this._panel) {
-            this._webviewBridge.send({
-                type: 'updateColumnContent',
-                columnId: column.id,
-                tasks: allTasks,
-                columnTitle: column.title,
-                displayTitle: column.displayTitle,
-                includeMode: true,
-                includeFiles: normalizedNewFiles
-            } as any);
-        }
+        return this._includeCoordinator.updateIncludeContentUnified(column, newIncludeFiles, source);
     }
 
     /**
      * Save all modified column includes when the board is saved
      */
     public async saveAllColumnIncludeChanges(): Promise<void> {
-        const board = this.getBoard();
-        if (!board) {
-            return;
-        }
-
-        const includeColumns = board.columns.filter(col => col.includeMode);
-
-        // Filter out columns whose include files were recently reloaded from external
-        const columnsToSave = includeColumns.filter(col => {
-            if (!col.includeFiles || col.includeFiles.length === 0) {
-                return true; // No include files to check
-            }
-
-            // Check if any of the column's include files were recently reloaded
-            return !col.includeFiles.some(file => {
-                // Use helper method for consistent path comparison
-                return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                    MarkdownFile.isSameFile(file, reloadedPath)
-                );
-            });
-        });
-
-        const savePromises = columnsToSave.map(col => this._fileRegistry.saveColumnIncludeChanges(col));
-
-        try {
-            await Promise.all(savePromises);
-        } catch (error) {
-            console.error('[Column Include] Error saving column include changes:', error);
-        }
+        return this._includeCoordinator.saveAllColumnIncludeChanges();
     }
 
     /**
      * Save all modified task includes when the board is saved
      */
     public async saveAllTaskIncludeChanges(): Promise<void> {
-        const board = this.getBoard();
-        if (!board) {
-            return;
-        }
-
-        // Collect all tasks with include mode from all columns
-        const includeTasks: KanbanTask[] = [];
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeMode) {
-                    // Check if any of the task's include files were recently reloaded
-                    const shouldSkip = task.includeFiles?.some(file => {
-                        // Use helper method for consistent path comparison
-                        return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                            MarkdownFile.isSameFile(file, reloadedPath)
-                        );
-                    });
-
-                    if (!shouldSkip) {
-                        includeTasks.push(task);
-                    }
-                }
-            }
-        }
-
-        if (includeTasks.length === 0) {
-            return;
-        }
-
-        const savePromises = includeTasks.map(task => this._fileRegistry.saveTaskIncludeChanges(task));
-
-        try {
-            await Promise.all(savePromises);
-        } catch (error) {
-            console.error('[Task Include] Error saving task include changes:', error);
-        }
+        return this._includeCoordinator.saveAllTaskIncludeChanges();
     }
 
     /**

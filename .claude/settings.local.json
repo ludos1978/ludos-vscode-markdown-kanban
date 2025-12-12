@@ -80,7 +80,8 @@
       "Bash(sort:*)",
       "Bash(for handler in handleEditModeStart handleEditModeEnd handleEditingStopped _handleColumnsUnfolded handleBoardUpdate handlePageHiddenWithUnsavedChanges handleUpdateMarpGlobalSetting handleVSCodeSnippet handleEditorShortcut handleGetTemplates handleApplyTemplate handleSubmitTemplateVariables requestStopEditing handleEditColumnTitleUnified)",
       "Bash(if grep -q \"async $handler\\|$handler(\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
