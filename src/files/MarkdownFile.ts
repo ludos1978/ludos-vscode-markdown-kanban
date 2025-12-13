@@ -4,6 +4,8 @@ import * as path from 'path';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { SaveOptions } from './SaveOptions';
+import { SaveTransactionManager, TransactionState } from './SaveTransactionManager';
+import { WatcherCoordinator } from './WatcherCoordinator';
 
 /**
  * File change event emitted when file state changes
@@ -58,164 +60,15 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // PERFORMANCE: Shared watcher registry to prevent duplicates
     private static _activeWatchers = new Map<string, { watcher: vscode.FileSystemWatcher; refCount: number; lastActivity: Date }>();
 
-    // PERFORMANCE: Transaction-based save operations
-    private static _saveTransactionManager = {
-        // Track active save transactions
-        activeTransactions: new Map<string, {
-            transactionId: string;
-            startTime: Date;
-            originalState: {
-                content: string;
-                baseline: string;
-                // NOTE: hasUnsavedChanges removed - it's now computed from (content !== baseline)
-                hasFileSystemChanges: boolean;
-                lastModified: Date | null;
-            };
-            timeout: NodeJS.Timeout;
-        }>(),
+    // PERFORMANCE: Transaction-based save operations (extracted to SaveTransactionManager.ts)
+    protected static get _saveTransactionManager(): SaveTransactionManager {
+        return SaveTransactionManager.getInstance();
+    }
 
-        // Start a save transaction
-        beginTransaction: function(filePath: string, originalState: any): string {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            const transactionId = `save_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-            // Set timeout for transaction (30 seconds)
-            const timeout = setTimeout(() => {
-                console.error(`[SaveTransaction] Transaction ${transactionId} timed out for ${normalizedPath}`);
-                this.rollbackTransaction(filePath, transactionId);
-            }, 30000);
-
-            this.activeTransactions.set(normalizedPath, {
-                transactionId,
-                startTime: new Date(),
-                originalState,
-                timeout
-            });
-
-            return transactionId;
-        },
-
-        // Commit a save transaction
-        commitTransaction: function(filePath: string, transactionId: string): boolean {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            const transaction = this.activeTransactions.get(normalizedPath);
-
-            if (!transaction || transaction.transactionId !== transactionId) {
-                console.error(`[SaveTransaction] Cannot commit - transaction ${transactionId} not found for ${normalizedPath}`);
-                return false;
-            }
-
-            clearTimeout(transaction.timeout);
-            this.activeTransactions.delete(normalizedPath);
-            return true;
-        },
-
-        // Rollback a save transaction
-        rollbackTransaction: function(filePath: string, transactionId: string): boolean {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            const transaction = this.activeTransactions.get(normalizedPath);
-
-            if (!transaction || transaction.transactionId !== transactionId) {
-                console.error(`[SaveTransaction] Cannot rollback - transaction ${transactionId} not found for ${normalizedPath}`);
-                return false;
-            }
-
-            clearTimeout(transaction.timeout);
-            this.activeTransactions.delete(normalizedPath);
-            return true;
-        },
-
-        // Get active transaction for debugging
-        getActiveTransaction: function(filePath: string): any {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            return this.activeTransactions.get(normalizedPath);
-        }
-    };
-
-    // PERFORMANCE: Centralized watcher coordination
-    private static _watcherCoordinator = {
-        // Track active operations per file to prevent conflicts
-        activeOperations: new Map<string, { operation: string; startTime: Date; timeout: NodeJS.Timeout }>(),
-
-        // Queue operations when conflicts occur
-        operationQueue: new Map<string, Array<{ operation: string; callback: () => Promise<void> }>>(),
-
-        // Start an operation with conflict detection
-        startOperation: function(filePath: string, operation: string, timeoutMs: number = 5000): Promise<void> {
-            return new Promise((resolve, reject) => {
-                const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-                const existing = this.activeOperations.get(normalizedPath);
-
-                if (existing) {
-
-                    // Queue the operation
-                    if (!this.operationQueue.has(normalizedPath)) {
-                        this.operationQueue.set(normalizedPath, []);
-                    }
-                    this.operationQueue.get(normalizedPath)!.push({
-                        operation,
-                        callback: async () => {
-                            try {
-                                await this.startOperation(filePath, operation, timeoutMs);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    });
-                    return;
-                }
-
-                // Start the operation
-                const timeout = setTimeout(() => {
-                    console.error(`[WatcherCoordinator] Operation "${operation}" timed out on ${normalizedPath}`);
-                    this.endOperation(filePath, operation);
-                    reject(new Error(`Operation timeout: ${operation}`));
-                }, timeoutMs);
-
-                this.activeOperations.set(normalizedPath, {
-                    operation,
-                    startTime: new Date(),
-                    timeout
-                });
-
-                resolve();
-            });
-        },
-
-        // End an operation and process queued operations
-        endOperation: function(filePath: string, operation: string): void {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            const existing = this.activeOperations.get(normalizedPath);
-
-            if (existing && existing.operation === operation) {
-                clearTimeout(existing.timeout);
-                this.activeOperations.delete(normalizedPath);
-
-                // Process next queued operation
-                const queue = this.operationQueue.get(normalizedPath);
-                if (queue && queue.length > 0) {
-                    const next = queue.shift()!;
-                    next.callback().catch(error => {
-                        console.error(`[WatcherCoordinator] Queued operation failed:`, error);
-                    });
-                }
-            }
-        },
-
-        // Check if file has active operations
-        hasActiveOperations: function(filePath: string): boolean {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            return this.activeOperations.has(normalizedPath);
-        },
-
-        // Get active operation info for debugging
-        getActiveOperation: function(filePath: string): { operation: string; startTime: Date } | undefined {
-            const normalizedPath = MarkdownFile.normalizeRelativePath(filePath);
-            const active = this.activeOperations.get(normalizedPath);
-            return active ? { operation: active.operation, startTime: active.startTime } : undefined;
-        }
-    };
+    // PERFORMANCE: Centralized watcher coordination (extracted to WatcherCoordinator.ts)
+    protected static get _watcherCoordinator(): WatcherCoordinator {
+        return WatcherCoordinator.getInstance();
+    }
 
     // ============= EVENT EMITTER =============
     protected _onDidChange = new vscode.EventEmitter<FileChangeEvent>();

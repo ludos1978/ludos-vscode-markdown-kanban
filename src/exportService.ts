@@ -266,6 +266,7 @@ export class ExportService {
 
     /**
      * Process a markdown file and its assets
+     * Delegates to processMarkdownContent after reading file from disk
      */
     private static async processMarkdownFile(
         markdownPath: string,
@@ -281,62 +282,17 @@ export class ExportService {
     }> {
         const content = fs.readFileSync(markdownPath, 'utf8');
         const sourceDir = path.dirname(markdownPath);
-        const mediaFolder = path.join(exportFolder, `${fileBasename}-Media`);
 
-        // Find all assets in the markdown
-        const assets = this.findAssets(content, sourceDir);
-
-        // Find and process included markdown files
-        const { processedContent, includeStats } = await this.processIncludedFiles(
+        return this.processMarkdownContent(
             content,
             sourceDir,
+            fileBasename,
             exportFolder,
             options,
             processedIncludes,
-            convertToPresentation
+            convertToPresentation,
+            false  // mergeIncludes defaults to false for file-based processing
         );
-
-        // Rewrite links based on linkHandlingMode (BEFORE processing assets)
-        // processAssets will ALSO rewrite paths for files it packs, but this handles unpacked links
-        const shouldRewriteLinks = options.linkHandlingMode !== 'no-modify';
-        const rewrittenContent = shouldRewriteLinks ? this.rewriteLinksForExport(
-            processedContent,
-            sourceDir,
-            exportFolder,
-            fileBasename,
-            true
-        ) : processedContent;
-
-        // Filter assets based on options
-        const assetsToInclude = this.filterAssets(assets, options);
-
-        // Process assets and update content (this also rewrites paths for packed assets)
-        const { modifiedContent, notIncludedAssets } = await this.processAssets(
-            rewrittenContent,
-            assetsToInclude,
-            assets,
-            mediaFolder,
-            fileBasename
-        );
-
-        const stats = {
-            includedCount: assetsToInclude.length,
-            excludedCount: notIncludedAssets.length,
-            includeFiles: includeStats
-        };
-
-        // Apply tag filtering to the content if specified
-        // This ensures all markdown files (main and included) get tag filtering
-        let filteredContent = this.applyTagFiltering(modifiedContent, options.tagVisibility);
-
-        // Apply content transformations (speaker notes, HTML comments, HTML content)
-        filteredContent = this.applyContentTransformations(filteredContent, options);
-
-        return {
-            exportedContent: filteredContent,
-            notIncludedAssets,
-            stats
-        };
     }
 
     /**
