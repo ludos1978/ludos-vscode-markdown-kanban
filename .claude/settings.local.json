@@ -82,7 +82,8 @@
       "Bash(if grep -q \"async $handler\\|$handler(\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/messageHandler.ts)",
       "Bash(mkdir:*)",
       "Bash(tree:*)",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

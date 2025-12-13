@@ -120,6 +120,37 @@ export class MarpExportService {
     }
 
     /**
+     * Stop all Marp watch processes except for a specific file
+     * @param excludeFilePath Path to the file whose Marp process should NOT be stopped
+     */
+    public static stopAllMarpWatchesExcept(excludeFilePath?: string): void {
+        const fs = require('fs');
+
+        for (const [filePath, pid] of this.marpProcessPids.entries()) {
+            if (filePath !== excludeFilePath) {
+                try {
+                    process.kill(pid);
+                } catch (error) {
+                    console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
+                }
+
+                // Cleanup preprocessed markdown file if it exists
+                if (filePath.endsWith('.preprocessed.md')) {
+                    try {
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                        }
+                    } catch (error) {
+                        console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
+                    }
+                }
+
+                this.marpProcessPids.delete(filePath);
+            }
+        }
+    }
+
+    /**
      * Export markdown file using Marp CLI
      * @param options - Export options
      * @returns Promise that resolves when export is complete

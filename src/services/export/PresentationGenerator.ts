@@ -49,10 +49,9 @@ interface Slide {
 /**
  * Unified presentation generator
  *
- * Replaces 7 duplicate functions across the codebase:
+ * Replaces duplicate functions across the codebase:
  * - ExportService.boardToPresentation()
  * - ExportService.convertToPresentationFormat()
- * - FormatConverter.kanbanToPresentation()
  * - PresentationParser.tasksToPresentation()
  * - MarpConverter.kanbanToMarp()
  * - MarpConverter.convertMarkdownToMarp()

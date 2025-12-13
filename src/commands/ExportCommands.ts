@@ -373,7 +373,7 @@ export class ExportCommands extends BaseMessageCommand {
 
             // Stop Marp watch processes for OTHER files (not the current export)
             if (protectExportedPath) {
-                ExportService.stopAllMarpWatchesExcept(protectExportedPath);
+                MarpExportService.stopAllMarpWatchesExcept(protectExportedPath);
             } else {
                 MarpExportService.stopAllMarpWatches();
             }

@@ -125,10 +125,6 @@ export class ExportService {
     // Track MD5 hashes to detect duplicates
     private static fileHashMap = new Map<string, string>();
     private static exportedFiles = new Map<string, string>(); // MD5 -> exported path
-    
-    // Track Marp watch processes to avoid multiple instances
-    private static marpWatchProcesses = new Map<string, boolean>(); // markdownPath -> isWatching
-    private static marpProcessPids = new Map<string, number>(); // markdownPath -> process PID
 
     /**
      * Apply tag filtering to content based on export options
@@ -1354,107 +1350,6 @@ export class ExportService {
         }
 
         return board;
-    }
-
-
-
-
-    /**
-     * Add Marp process PID for tracking
-     * @param markdownPath Path to the markdown file being watched
-     * @param pid Process ID of the Marp process
-     */
-    public static addMarpProcessPid(markdownPath: string, pid: number): void {
-        this.marpProcessPids.set(markdownPath, pid);
-    }
-
-    /**
-     * Stop Marp watch process for a specific file
-     * @param markdownPath Path to the markdown file being watched
-     */
-    public static stopMarpWatch(markdownPath: string): void {
-        const pid = this.marpProcessPids.get(markdownPath);
-        if (pid) {
-            try {
-                // Kill the Marp process
-                process.kill(pid, 'SIGTERM');
-            } catch (error) {
-                console.error(`[kanban.exportService.stopMarpWatch] Failed to kill process ${pid}:`, error);
-            }
-            this.marpProcessPids.delete(markdownPath);
-        }
-
-        if (this.marpWatchProcesses.has(markdownPath)) {
-            this.marpWatchProcesses.delete(markdownPath);
-        }
-    }
-
-    /**
-     * Stop all Marp watch processes except for generated files from a specific kanban file
-     * @param kanbanFilePath Path to the kanban file whose generated files should NOT be stopped
-     */
-    public static stopAllMarpWatchesExceptKanbanFile(kanbanFilePath: string): void {
-        // Get the base name of the kanban file without extension
-        const kanbanBaseName = path.basename(kanbanFilePath, '.md');
-        const kanbanDir = path.dirname(kanbanFilePath);
-
-        // Kill all tracked Marp processes except those generated from the current kanban file
-        for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
-            const markdownBaseName = path.basename(markdownPath, '.md');
-            const markdownDir = path.dirname(markdownPath);
-
-            // Check if this markdown file is a generated file from the current kanban
-            const isGeneratedFromCurrentKanban =
-                markdownDir.startsWith(kanbanDir) &&
-                (markdownBaseName.startsWith(kanbanBaseName) ||
-                 markdownBaseName.includes(kanbanBaseName));
-
-            if (!isGeneratedFromCurrentKanban) {
-                try {
-                    process.kill(pid, 'SIGTERM');
-                } catch (error) {
-                    console.error(`[kanban.exportService.stopAllMarpWatchesExceptKanbanFile] Failed to kill process ${pid}:`, error);
-                }
-                this.marpProcessPids.delete(markdownPath);
-                this.marpWatchProcesses.delete(markdownPath);
-            }
-        }
-    }
-
-    /**
-     * Stop all Marp watch processes except for a specific file
-     * @param excludeFilePath Path to the file whose Marp process should NOT be stopped
-     */
-    public static stopAllMarpWatchesExcept(excludeFilePath?: string): void {
-        // Kill all tracked Marp processes except the excluded one
-        for (const [markdownPath, pid] of this.marpProcessPids.entries()) {
-            if (markdownPath !== excludeFilePath) {
-                try {
-                    process.kill(pid, 'SIGTERM');
-                } catch (error) {
-                    console.error(`[kanban.exportService.stopAllMarpWatchesExcept] Failed to kill process ${pid}:`, error);
-                }
-                this.marpProcessPids.delete(markdownPath);
-                this.marpWatchProcesses.delete(markdownPath);
-            }
-        }
-    }
-
-    /**
-     * Stop all Marp watch processes
-     */
-    public static stopAllMarpWatches(): void {
-        // Kill all tracked Marp processes
-        for (const [, pid] of this.marpProcessPids.entries()) {
-            try {
-                process.kill(pid, 'SIGTERM');
-            } catch (error) {
-                console.error(`[kanban.exportService.stopAllMarpWatches] Failed to kill process ${pid}:`, error);
-            }
-        }
-
-        this.marpProcessPids.clear();
-        this.marpWatchProcesses.clear();
     }
 
     /**

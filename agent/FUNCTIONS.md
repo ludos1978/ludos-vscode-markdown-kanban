@@ -676,16 +676,6 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - src/services/FileWriter-FileWriter_readFile - Read file content
 - src/services/FileWriter-FileWriter_ensureDirectory - Create directory if needed
 
-## src/services/ContentPipelineService.ts - ContentPipelineService
-
-- src/services/ContentPipelineService-ContentPipelineService_execute - Execute save/backup/export operation
-- src/services/ContentPipelineService-ContentPipelineService_executeSave - Execute save operation
-- src/services/ContentPipelineService-ContentPipelineService_executeBackup - Execute backup operation
-- src/services/ContentPipelineService-ContentPipelineService_executeExport - Execute export operation
-- src/services/ContentPipelineService-ContentPipelineService_createBackupFile - Create backup file
-- src/services/ContentPipelineService-ContentPipelineService_batchExport - Batch export multiple items
-- src/services/ContentPipelineService-ContentPipelineService_validateContent - Validate content before operation
-
 ## src/services/OperationOptions.ts - OperationOptionsBuilder
 
 - src/services/OperationOptions-OperationOptionsBuilder_operation - Set operation type
@@ -747,6 +737,7 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - src/services/MarpExportService-MarpExportService_stopMarpWatch - Stop Marp watch process
 - src/services/MarpExportService-MarpExportService_isWatching - Check if file is being watched
 - src/services/MarpExportService-MarpExportService_stopAllMarpWatches - Stop all Marp watch processes
+- src/services/MarpExportService-MarpExportService_stopAllMarpWatchesExcept - Stop all Marp watch processes except specified file
 - src/services/MarpExportService-MarpExportService_export - Export markdown using Marp CLI
 - src/services/MarpExportService-MarpExportService_buildMarpCliArgs - Build Marp CLI arguments
 - src/services/MarpExportService-MarpExportService_getDefaultEnginePath - Get default engine path
@@ -769,42 +760,15 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
   - REGEX_SINGLE: Non-global regex for single match
 - **FILE_TYPES** - File type constants (MAIN, INCLUDE_COLUMN, INCLUDE_TASK, INCLUDE_REGULAR)
 - **Purpose**: Eliminates 783+ duplicate string instances across the codebase
-- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts, IncludeProcessor.ts
+- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts
 
 **Note**: All include syntax pattern matching should use INCLUDE_SYNTAX constants instead of hardcoded strings.
-
-## src/services/IncludeProcessor.ts - IncludeProcessor
-
-- src/services/IncludeProcessor-IncludeProcessor_processIncludes - Process all include markers in content (uses INCLUDE_SYNTAX constants)
-- src/services/IncludeProcessor-IncludeProcessor_processIncludeType - Process specific type of include
-- src/services/IncludeProcessor-IncludeProcessor_processIncludeContent - Process include content recursively
-- src/services/IncludeProcessor-IncludeProcessor_detectIncludes - Detect all include files without processing (uses INCLUDE_SYNTAX.REGEX)
-- src/services/IncludeProcessor-IncludeProcessor_detectIncludeType - Detect includes of specific type
-- src/services/IncludeProcessor-IncludeProcessor_convertIncludeContent - Convert include content based on format
-- src/services/IncludeProcessor-IncludeProcessor_getPatternForType - Get regex pattern for include type (uses INCLUDE_SYNTAX constants)
-- src/services/IncludeProcessor-IncludeProcessor_detectIncludeFormat - Detect format of include file
-- src/services/IncludeProcessor-IncludeProcessor_createMarker - Create include marker for file (uses INCLUDE_SYNTAX.PREFIX and SUFFIX)
-- src/services/IncludeProcessor-IncludeProcessor_hasIncludes - Check if content has include markers (uses INCLUDE_SYNTAX.REGEX)
-- src/services/IncludeProcessor-IncludeProcessor_stripIncludes - Remove all include markers (uses INCLUDE_SYNTAX.REGEX)
-
-## src/services/FormatConverter.ts - FormatConverter
-
-- src/services/FormatConverter-FormatConverter_kanbanToPresentation - Convert kanban to presentation format
-- src/services/FormatConverter-FormatConverter_taskToPresentation - Convert task to presentation slide
-- src/services/FormatConverter-FormatConverter_presentationToKanban - Convert presentation to kanban format
-- src/services/FormatConverter-FormatConverter_columnToMarkdown - Convert column to markdown
-- src/services/FormatConverter-FormatConverter_taskToMarkdown - Convert task to markdown
-- src/services/FormatConverter-FormatConverter_detectFormat - Detect format of markdown content
-- src/services/FormatConverter-FormatConverter_convert - Convert content to specific format
-- src/services/FormatConverter-FormatConverter_stripYaml - Remove YAML frontmatter
-- src/services/FormatConverter-FormatConverter_extractYaml - Extract YAML frontmatter
-- src/services/FormatConverter-FormatConverter_addYaml - Add or replace YAML frontmatter
 
 ---
 
 ## Summary
 
-Total functions documented: **523**
+Total functions documented: **495**
 
 ### Files analyzed:
 1. kanbanWebviewPanel.ts - 39 methods (reduced from 93)
@@ -833,14 +797,11 @@ Total functions documented: **523**
 24. utils/columnUtils.ts - 2 functions
 25. services/PathResolver.ts - 14 methods
 26. services/FileWriter.ts - 9 methods
-27. services/ContentPipelineService.ts - 7 methods
-28. services/OperationOptions.ts - 16 methods
-29. services/MarpConverter.ts - 6 methods
-30. services/MarpExtensionService.ts - 8 methods
-31. services/AssetHandler.ts - 11 methods
-32. services/MarpExportService.ts - 16 methods
-33. services/IncludeProcessor.ts - 11 methods
-34. services/FormatConverter.ts - 10 methods
+27. services/OperationOptions.ts - 16 methods
+28. services/MarpConverter.ts - 6 methods
+29. services/MarpExtensionService.ts - 8 methods
+30. services/AssetHandler.ts - 11 methods
+31. services/MarpExportService.ts - 17 methods
 
 ### Refactoring Summary:
 - **kanbanWebviewPanel.ts**: Reduced from 93 to 39 methods (54 methods extracted)
