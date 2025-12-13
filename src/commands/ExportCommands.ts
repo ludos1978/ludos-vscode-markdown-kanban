@@ -16,7 +16,7 @@ import { ExportService } from '../exportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../configurationService';
-import { SaveEventDispatcher, SaveEventHandler } from '../SaveEventDispatcher';
+import { SaveEventDispatcher } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
@@ -520,22 +520,6 @@ export class ExportCommands extends BaseMessageCommand {
      */
     private async handlePollMarpThemes(context: CommandContext): Promise<void> {
         try {
-            // Check if we have cached themes from the previous attempt
-            const cachedThemes = (globalThis as any).pendingMarpThemes;
-            if (cachedThemes) {
-                const panel = context.getWebviewPanel();
-                if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                    (panel as any)._panel.webview.postMessage({
-                        type: 'marpThemesAvailable',
-                        themes: cachedThemes
-                    });
-                    // Clear the cache
-                    delete (globalThis as any).pendingMarpThemes;
-                    return;
-                }
-            }
-
-            // If no cached themes, try to get them again
             const themes = await MarpExportService.getAvailableThemes();
 
             const panel = context.getWebviewPanel();

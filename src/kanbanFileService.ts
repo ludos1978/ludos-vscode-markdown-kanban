@@ -37,10 +37,8 @@ export class KanbanFileService {
     private _lastKnownFileContent: string = '';
     private _hasExternalUnsavedChanges: boolean = false;
 
-    // HYBRID STATE MACHINE: State + Version tracking for defense-in-depth
+    // State machine for tracking save operations
     private _saveState: SaveState = SaveState.IDLE;
-    private _saveStartVersion: number | null = null;
-    private _saveEndVersion: number | null = null;
 
     private _cachedBoardFromWebview: any = null;
     private _lastDocumentUri?: string;
@@ -351,28 +349,6 @@ export class KanbanFileService {
     }
 
     /**
-     * Helper: Check if a document change is from our save operation
-     * Uses hybrid state + version tracking for defense-in-depth
-     */
-    private isOurChange(documentVersion: number): boolean {
-        // Primary check: State machine
-        const isSaving = this._saveState === SaveState.SAVING;
-
-        // Backup check: Version range tracking
-        const isInVersionRange =
-            this._saveEndVersion !== null &&
-            documentVersion <= this._saveEndVersion;
-
-        // Defense in depth: Either check passes = our change
-        const result = isSaving || isInVersionRange;
-
-        if (result) {
-        }
-
-        return result;
-    }
-
-    /**
      * Save board to markdown file using unified FileSaveService
      */
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
@@ -480,7 +456,6 @@ export class KanbanFileService {
 
         // STATE MACHINE: Transition to SAVING
         this._saveState = SaveState.SAVING;
-        this._saveStartVersion = document.version;
 
         const kanbanHeader = "---\n\nkanban-plugin: board\n\n---\n\n";
         const currentContent = document.getText();
@@ -495,14 +470,10 @@ export class KanbanFileService {
 
         try {
             await vscode.workspace.applyEdit(edit);
-            this._saveEndVersion = document.version;
             await document.save();
 
             // STATE MACHINE: Transition to IDLE before reload
-            // (loadMarkdownFile returns early if state is not IDLE)
             this._saveState = SaveState.IDLE;
-            this._saveStartVersion = null;
-            this._saveEndVersion = null;
 
             // Reload the file after successful initialization (forceReload=true to bypass early-return check)
             await this.loadMarkdownFile(document, false, true);
@@ -511,8 +482,6 @@ export class KanbanFileService {
         } catch (error) {
             // STATE MACHINE: Error recovery
             this._saveState = SaveState.IDLE;
-            this._saveStartVersion = null;
-            this._saveEndVersion = null;
             vscode.window.showErrorMessage(`Failed to initialize file: ${error}`);
         }
     }
@@ -526,18 +495,8 @@ export class KanbanFileService {
             const currentDocument = this.fileManager.getDocument();
             if (currentDocument && event.document === currentDocument) {
                 // Registry tracks editor changes automatically via file watchers
-
-                // HYBRID STATE MACHINE: Check if this change is from our save operation
-                // Uses defense-in-depth: both state check AND version tracking
-                const isOurChange = this.isOurChange(event.document.version);
-
-                // NOTE: We do NOT track unsaved external changes
-                // Only SAVED external changes are tracked via file watcher
-                // This prevents noise from user typing in text editor
-                if (!isOurChange) {
-                    // Don't set _hasExternalUnsavedChanges - only track SAVED changes
-                } else {
-                }
+                // NOTE: We do NOT track unsaved external changes - only SAVED external changes
+                // are tracked via file watcher. This prevents noise from user typing in text editor.
 
                 // Notify debug overlay of document state change so it can update editor state
                 const currentPanel = this.panel();
