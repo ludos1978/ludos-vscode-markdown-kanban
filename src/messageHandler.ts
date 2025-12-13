@@ -539,49 +539,12 @@ export class MessageHandler {
         }
     }
 
-    /**
-     * Handle PlantUML rendering request from webview
-     * Uses backend Node.js PlantUML service for completely offline rendering
-     */
-    async handleRenderPlantUML(message: any): Promise<void> {
-        const { requestId, code } = message;
-        const panel = this._getWebviewPanel();
+    // NOTE: All diagram render handlers (PlantUML, DrawIO, Excalidraw, PDF) and
+    // diagram-to-SVG conversion handlers have been moved to DiagramCommands.ts.
+    // The dead code was removed as part of cleanup.
 
-        if (!panel || !panel.webview) {
-            console.error('[handleRenderPlantUML] No panel or webview available');
-            return;
-        }
-
-        try {
-
-            // Render using backend service (Java + PlantUML JAR)
-            const svg = await this._plantUMLService.renderSVG(code);
-
-            // Send success response to webview
-            panel.webview.postMessage({
-                type: 'plantUMLRenderSuccess',
-                requestId,
-                svg
-            });
-
-        } catch (error) {
-            console.error('[PlantUML Backend] Render error:', error);
-
-            // Send error response to webview
-            panel.webview.postMessage({
-                type: 'plantUMLRenderError',
-                requestId,
-                error: error instanceof Error ? error.message : String(error)
-            });
-        }
-    }
-
-    /**
-     * Handle draw.io diagram rendering request from webview
-     * Uses backend DrawIOService with CLI for conversion
-     * Implements file-based caching to avoid re-rendering unchanged diagrams
-     */
-    async handleRenderDrawIO(message: any): Promise<void> {
+    // DEAD CODE REMOVED: handleRenderDrawIO
+    private async _deadCode_handleRenderDrawIO(message: any): Promise<void> {
         const { requestId, filePath } = message;
         const panel = this._getWebviewPanel();
 
@@ -1092,6 +1055,15 @@ ${diagramCode}
         console.warn(`[${capitalizedType}] No fuzzy match found, content unchanged`);
         return content;
     }
+
+    // ========================================================================
+    // NOTE: The following diagram handlers have been moved to DiagramCommands.ts:
+    // - handleRenderPlantUML, handleRenderDrawIO, handleRenderExcalidraw
+    // - handleRenderPDFPage, handleGetPDFInfo
+    // - handleConvertPlantUMLToSVG, handleConvertMermaidToSVG
+    // - convertDiagramToSVG, findAndReplaceWithFuzzyMatch, calculateSimilarity
+    // All diagram message types are now routed through CommandRegistry → DiagramCommands.
+    // ========================================================================
 
     /**
      * Generate content for appending tasks from a column to an include file.
