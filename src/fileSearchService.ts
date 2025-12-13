@@ -40,11 +40,9 @@ export class FileSearchService {
         try {
             // Workspace-wide search focusing on basename matches, with or without extension
             const patterns = [`**/${nameRoot}`, `**/${nameRoot}.*`];
-            let total = 0;
             for (const pattern of patterns) {
                 const workspaceResults = await vscode.workspace.findFiles(pattern, excludePattern, 100);
                 workspaceResults.forEach(addResult);
-                total += workspaceResults.length;
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);

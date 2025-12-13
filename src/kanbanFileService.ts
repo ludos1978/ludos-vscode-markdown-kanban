@@ -358,7 +358,7 @@ export class KanbanFileService {
     /**
      * Save board to markdown file using unified FileSaveService
      */
-    public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true): Promise<void> {
+    public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true): Promise<void> {
 
         // Check for main file and valid board (document is NOT required - panel can stay open without it)
         const mainFile = this.fileRegistry.getMainFile();

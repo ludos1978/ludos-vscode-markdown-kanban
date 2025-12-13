@@ -478,6 +478,3 @@ export class GatherQueryEngine {
         return { baseTag, conditions };
     }
 }
-
-// Export singleton instance for convenience
-export const gatherQueryEngine = new GatherQueryEngine();

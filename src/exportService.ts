@@ -15,8 +15,6 @@ import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
 import { AssetHandler } from './services/assets/AssetHandler';
 import { escapeRegExp } from './utils/stringUtils';
 
-export type ExportFormat = 'keep' | 'kanban' | 'presentation' | 'marp-markdown' | 'marp-pdf' | 'marp-pptx' | 'marp-html';
-
 /**
  * Export options - SINGLE unified system for ALL exports
  */
@@ -321,14 +319,14 @@ export class ExportService {
         const includePatterns = [
             {
                 pattern: INCLUDE_SYNTAX.REGEX,
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
+                replacement: (filename: string, _prefixTitle: string = '', _suffix: string = '') => `${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'include'
             },
             {
                 pattern: this.TASK_INCLUDE_PATTERN,
                 // UNIFIED SYNTAX: Use !!!include()!!! (position determines it's a task include)
-                replacement: (filename: string, prefixTitle: string = '', suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
+                replacement: (filename: string, prefixTitle: string = '', _suffix: string = '') => `${prefixTitle}- [ ] ${INCLUDE_SYNTAX.PREFIX}${filename}${INCLUDE_SYNTAX.SUFFIX}`,
                 shouldWriteSeparateFile: !mergeIncludes,
                 includeType: 'taskinclude'
             },
@@ -920,7 +918,7 @@ export class ExportService {
         oldPath: string,
         sourceDir: string,
         exportFolder: string,
-        fileBasename: string
+        _fileBasename: string
     ): string {
         const absoluteSourcePath = path.resolve(sourceDir, oldPath);
         const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');

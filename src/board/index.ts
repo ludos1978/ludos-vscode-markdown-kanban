@@ -10,16 +10,7 @@ import { BoardCrudOperations } from './BoardCrudOperations';
 import { GatherQueryEngine } from './GatherQueryEngine';
 
 export { BoardCrudOperations } from './BoardCrudOperations';
-export { GatherQueryEngine, gatherQueryEngine } from './GatherQueryEngine';
-export {
-    extractDate,
-    extractPersonNames,
-    hasSticky,
-    getTodayString,
-    isWithinDays,
-    isOverdue,
-    getDatePropertyValue
-} from './DateTimeUtils';
+export { GatherQueryEngine } from './GatherQueryEngine';
 
 /**
  * BoardOperations - Unified board operations class
