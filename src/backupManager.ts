@@ -47,7 +47,7 @@ export class BackupManager {
         try {
             // Safety check: ensure document is valid
             if (!document) {
-                console.warn('BackupManager: Cannot create backup - document is undefined');
+                console.warn('[BackupManager] Cannot create backup - document is undefined');
                 return false;
             }
 
@@ -102,7 +102,7 @@ export class BackupManager {
             
             return true;
         } catch (error) {
-            console.error('Failed to create backup:', error);
+            console.error('[BackupManager] Failed to create backup:', error);
             vscode.window.showWarningMessage(`Failed to create backup: ${error}`);
             return false;
         }
@@ -189,7 +189,7 @@ export class BackupManager {
             return backupPath;
 
         } catch (error) {
-            console.error('Error creating file backup:', error);
+            console.error('[BackupManager] Error creating file backup:', error);
             return null;
         }
     }
@@ -307,12 +307,12 @@ export class BackupManager {
                     try {
                         fs.unlinkSync(file.path);
                     } catch (error) {
-                        console.error(`Failed to delete backup ${file.name}:`, error);
+                        console.error(`[BackupManager] Failed to delete backup ${file.name}:`, error);
                     }
                 }
             }
         } catch (error) {
-            console.error('Failed to cleanup old backups:', error);
+            console.error('[BackupManager] Failed to cleanup old backups:', error);
         }
     }
 
@@ -391,7 +391,7 @@ export class BackupManager {
             
             return backups as Array<{name: string, path: string, date: Date}>;
         } catch (error) {
-            console.error('Failed to get backup list:', error);
+            console.error('[BackupManager] Failed to get backup list:', error);
             return [];
         }
     }

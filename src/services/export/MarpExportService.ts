@@ -59,29 +59,40 @@ export class MarpExportService {
     }
 
     /**
+     * Kill a process by PID with error handling
+     */
+    private static killProcess(pid: number): void {
+        try {
+            process.kill(pid);
+        } catch (error) {
+            console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
+        }
+    }
+
+    /**
+     * Cleanup preprocessed markdown file if it exists
+     */
+    private static cleanupPreprocessedFile(filePath: string): void {
+        if (filePath.endsWith('.preprocessed.md')) {
+            try {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (error) {
+                console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
+            }
+        }
+    }
+
+    /**
      * Stop Marp watch process for a file
      */
     public static stopMarpWatch(filePath: string): void {
         const pid = this.marpProcessPids.get(filePath);
         if (pid) {
-            try {
-                process.kill(pid);
-            } catch (error) {
-                console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
-            }
+            this.killProcess(pid);
             this.marpProcessPids.delete(filePath);
-
-            // Cleanup preprocessed markdown file if it exists
-            if (filePath.endsWith('.preprocessed.md')) {
-                const fs = require('fs');
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                } catch (error) {
-                    console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
-                }
-            }
+            this.cleanupPreprocessedFile(filePath);
         }
     }
 
@@ -96,25 +107,9 @@ export class MarpExportService {
      * Stop all Marp watch processes
      */
     public static stopAllMarpWatches(): void {
-        const fs = require('fs');
-
         for (const [filePath, pid] of this.marpProcessPids.entries()) {
-            try {
-                process.kill(pid);
-            } catch (error) {
-                console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
-            }
-
-            // Cleanup preprocessed markdown file if it exists
-            if (filePath.endsWith('.preprocessed.md')) {
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                    }
-                } catch (error) {
-                    console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
-                }
-            }
+            this.killProcess(pid);
+            this.cleanupPreprocessedFile(filePath);
         }
         this.marpProcessPids.clear();
     }
@@ -124,27 +119,10 @@ export class MarpExportService {
      * @param excludeFilePath Path to the file whose Marp process should NOT be stopped
      */
     public static stopAllMarpWatchesExcept(excludeFilePath?: string): void {
-        const fs = require('fs');
-
         for (const [filePath, pid] of this.marpProcessPids.entries()) {
             if (filePath !== excludeFilePath) {
-                try {
-                    process.kill(pid);
-                } catch (error) {
-                    console.error(`[kanban.MarpExportService] Failed to kill process ${pid}:`, error);
-                }
-
-                // Cleanup preprocessed markdown file if it exists
-                if (filePath.endsWith('.preprocessed.md')) {
-                    try {
-                        if (fs.existsSync(filePath)) {
-                            fs.unlinkSync(filePath);
-                        }
-                    } catch (error) {
-                        console.warn(`[kanban.MarpExportService] Failed to cleanup preprocessed file:`, error);
-                    }
-                }
-
+                this.killProcess(pid);
+                this.cleanupPreprocessedFile(filePath);
                 this.marpProcessPids.delete(filePath);
             }
         }
