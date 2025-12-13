@@ -28,3 +28,4 @@ export { ExportCommands } from './ExportCommands';
 export { DiagramCommands } from './DiagramCommands';
 export { IncludeCommands } from './IncludeCommands';
 export { EditModeCommands } from './EditModeCommands';
+export { TemplateCommands } from './TemplateCommands';

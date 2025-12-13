@@ -97,22 +97,22 @@ export class ConfigurationService {
     private readonly CONFIGURATION_SECTION = 'markdown-kanban';
 
     // Default configuration values
-    // NOTE: These are the SINGLE SOURCE OF TRUTH for all configuration defaults
-    // Do not override these with different defaults at call sites!
+    // NOTE: These must match package.json contributes.configuration defaults!
+    // VS Code uses package.json as the source of truth, these are fallbacks.
     private readonly defaults: ConfigurationDefaults = {
         enableBackups: true,
         backupInterval: 15,
         backupLocation: 'same-folder',
         openLinksInNewTab: false,
-        pathGeneration: 'relative' as 'relative' | 'absolute',
-        whitespace: '8px',
+        pathGeneration: 'absolute' as 'relative' | 'absolute',  // matches package.json
+        whitespace: '4px',          // matches package.json
         maxRowHeight: 0,
         taskMinHeight: 'auto',
         sectionHeight: 'auto',
         taskSectionHeight: 'auto',
-        fontSize: '1x',
-        fontFamily: 'default',
-        columnWidth: '350px',
+        fontSize: 'small',          // matches package.json
+        fontFamily: 'system',       // matches package.json
+        columnWidth: 'medium',      // matches package.json
         columnBorder: '1px solid var(--vscode-panel-border)',
         taskBorder: '1px solid var(--vscode-panel-border)',
         layoutRows: 1,
