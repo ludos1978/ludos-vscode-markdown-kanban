@@ -90,6 +90,7 @@ export interface ExportResult {
     message: string;
     content?: string;                   // For mode: 'copy'
     exportedPath?: string;              // For mode: 'save'
+    marpWatchPath?: string;             // Path that Marp is watching (for process protection)
 }
 
 /**
@@ -1585,6 +1586,11 @@ export class ExportService {
         sourceFilePath: string,
         options: NewExportOptions
     ): Promise<ExportResult> {
+        console.log('[ExportService.runMarpConversion] Called with:');
+        console.log('  - markdownPath:', markdownPath);
+        console.log('  - sourceFilePath:', sourceFilePath);
+        console.log('  - options.marpWatch:', options.marpWatch);
+        console.log('  - options.marpFormat:', options.marpFormat);
 
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
@@ -1660,17 +1666,25 @@ export class ExportService {
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
         // MODE: PREVIEW (watch mode) - run Marp in watch mode
+        console.log('[ExportService.runMarpConversion] marpWatch check:');
+        console.log('  - options.marpWatch:', options.marpWatch);
         if (options.marpWatch) {
             // Check if Marp is already watching this file (check PREPROCESSED path, not original)
-            if (MarpExportService.isWatching(processedMarkdownPath)) {
+            const isAlreadyWatching = MarpExportService.isWatching(processedMarkdownPath);
+            console.log('[ExportService.runMarpConversion] isAlreadyWatching:', isAlreadyWatching, 'path:', processedMarkdownPath);
+            if (isAlreadyWatching) {
                 // DON'T cleanup - Marp is still watching the preprocessed file
+                console.log('[ExportService.runMarpConversion] Already watching, returning early');
                 return {
                     success: true,
                     message: 'Markdown updated, Marp watch active',
-                    exportedPath: outputPath
+                    exportedPath: outputPath,
+                    // CRITICAL: Must return marpWatchPath to protect the Marp process
+                    marpWatchPath: processedMarkdownPath
                 };
             }
 
+            console.log('[ExportService.runMarpConversion] Starting Marp in watch mode...');
             try {
                 await MarpExportService.export({
                     inputFilePath: processedMarkdownPath, // Use preprocessed markdown
@@ -1687,13 +1701,17 @@ export class ExportService {
                     handoutPdf: options.marpHandoutPdf
                 });
 
+                console.log('[ExportService.runMarpConversion] MarpExportService.export completed (watch mode)');
+
                 // DON'T cleanup in watch mode - Marp needs the preprocessed file to continue watching
                 // The file will be cleaned up when watch mode is stopped
 
                 return {
                     success: true,
                     message: 'Marp preview started',
-                    exportedPath: outputPath
+                    exportedPath: outputPath,
+                    // Return the path that Marp is actually watching (for stopAllMarpWatchesExcept protection)
+                    marpWatchPath: processedMarkdownPath
                 };
             } catch (error) {
                 console.error(`[kanban.exportService.runMarpConversionNew] Realtime export failed:`, error);

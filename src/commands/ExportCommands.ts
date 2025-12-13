@@ -265,7 +265,8 @@ export class ExportCommands extends BaseMessageCommand {
         const initialResult = await ExportService.export(document, options, board);
 
         // NOW stop existing handlers/processes for other files
-        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, context, initialResult.exportedPath);
+        // Use marpWatchPath (the file Marp is watching) for protection, fallback to exportedPath
+        await this.handleStopAutoExportForOtherKanbanFiles(document.uri.fsPath, context, initialResult.marpWatchPath || initialResult.exportedPath);
 
         const docPath = document.uri.fsPath;
 
