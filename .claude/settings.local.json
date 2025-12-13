@@ -83,7 +83,8 @@
       "Bash(mkdir:*)",
       "Bash(tree:*)",
       "Bash(cut:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

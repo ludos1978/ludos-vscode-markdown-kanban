@@ -13,7 +13,6 @@ import { TemplateService } from './templates/TemplateService';
 import { VariableProcessor } from './templates/VariableProcessor';
 import { FileCopyService } from './templates/FileCopyService';
 import { safeFileUri } from './utils/uriUtils';
-import { escapeRegExp } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands } from './commands';
 import * as vscode from 'vscode';

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
 import { BackupManager } from '../backupManager';
 import { SaveOptions } from './SaveOptions';
-import { SaveTransactionManager, TransactionState } from './SaveTransactionManager';
+import { SaveTransactionManager } from './SaveTransactionManager';
 import { WatcherCoordinator } from './WatcherCoordinator';
 
 /**
