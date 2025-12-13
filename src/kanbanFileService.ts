@@ -21,6 +21,21 @@ enum SaveState {
 }
 
 /**
+ * Panel callbacks interface - groups all callbacks from panel to reduce constructor parameters
+ */
+export interface KanbanFileServiceCallbacks {
+    getBoard: () => KanbanBoard | undefined;
+    setBoard: (board: KanbanBoard) => void;
+    sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>;
+    getPanel: () => vscode.WebviewPanel | undefined;
+    getContext: () => vscode.ExtensionContext;
+    showConflictDialog: (context: ConflictContext) => Promise<ConflictResolution | null>;
+    updateWebviewPermissions: () => void;
+    clearUndoRedo: () => void;
+    getPanelInstance: () => any;
+}
+
+/**
  * KanbanFileService
  *
  * Handles all file operations for the Kanban board including:
@@ -54,23 +69,26 @@ export class KanbanFileService {
         private fileFactory: FileFactory,
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
-        private board: () => KanbanBoard | undefined,
-        private setBoard: (board: KanbanBoard) => void,
-        private sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>,
-        private panel: () => vscode.WebviewPanel | undefined,
-        private context: () => vscode.ExtensionContext,
-        private showConflictDialog: (context: ConflictContext) => Promise<ConflictResolution | null>,
-        private updateWebviewPermissions: () => void,
-        private undoRedoManagerClear: () => void,
+        private callbacks: KanbanFileServiceCallbacks,
         private panelStates: Map<string, any>,
-        private panels: Map<string, any>,
-        private getPanelInstance: () => any  // Returns KanbanWebviewPanel instance
+        private panels: Map<string, any>
     ) {
         this._panelId = Math.random().toString(36).substr(2, 9);
 
         // Initialize new architecture components
         this._fileSaveService = FileSaveService.getInstance();
     }
+
+    // Convenience accessors for callbacks (maintains backwards compatibility internally)
+    private get board() { return this.callbacks.getBoard; }
+    private get setBoard() { return this.callbacks.setBoard; }
+    private get sendBoardUpdate() { return this.callbacks.sendBoardUpdate; }
+    private get panel() { return this.callbacks.getPanel; }
+    private get context() { return this.callbacks.getContext; }
+    private get showConflictDialog() { return this.callbacks.showConflictDialog; }
+    private get updateWebviewPermissions() { return this.callbacks.updateWebviewPermissions; }
+    private get undoRedoManagerClear() { return this.callbacks.clearUndoRedo; }
+    private get getPanelInstance() { return this.callbacks.getPanelInstance; }
 
     /**
      * Initialize state tracking values

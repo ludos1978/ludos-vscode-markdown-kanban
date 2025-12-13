@@ -12,7 +12,7 @@ import { BackupManager } from './backupManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './conflictResolver';
 import { configService } from './configurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
-import { KanbanFileService } from './kanbanFileService';
+import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
 import {
     MarkdownFileRegistry,
@@ -363,26 +363,28 @@ export class KanbanWebviewPanel {
             })
         );
 
-        // Initialize KanbanFileService
+        // Initialize KanbanFileService with grouped callbacks
+        const fileServiceCallbacks: KanbanFileServiceCallbacks = {
+            getBoard: () => this.getBoard(),
+            setBoard: (board) => this._boardStore.setBoard(board, false),
+            sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
+            getPanel: () => this._panel,
+            getContext: () => this._context,
+            showConflictDialog: (context) => this.showConflictDialog(context),
+            updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
+            clearUndoRedo: () => this._boardStore.clearHistory(),
+            getPanelInstance: () => this
+        };
+
         this._fileService = new KanbanFileService(
             this._fileManager,
             this._fileRegistry,
             this._fileFactory,
             this._backupManager,
             this._boardOperations,
-            () => this.getBoard(),
-            (board) => {
-                this._boardStore.setBoard(board, false);
-            },
-            (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
-            () => this._panel,
-            () => this._context,
-            (context) => this.showConflictDialog(context),
-            () => this._webviewManager.updatePermissions(),
-            () => this._boardStore.clearHistory(),
+            fileServiceCallbacks,
             KanbanWebviewPanel.panelStates,
-            KanbanWebviewPanel.panels,
-            () => this
+            KanbanWebviewPanel.panels
         );
 
         // Initialize LinkHandler
