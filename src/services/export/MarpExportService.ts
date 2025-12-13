@@ -451,67 +451,6 @@ export class MarpExportService {
     }
 
     /**
-     * Export to PDF using Marp
-     * @param markdownContent - Markdown content
-     * @param outputPath - Output PDF path
-     * @param enginePath - Optional custom engine path
-     * @returns Promise that resolves when export is complete
-     */
-    static async testPdfExport(inputFilePath: string, outputPath: string, enginePath?: string): Promise<void> {
-        try {
-            await this.export({
-                inputFilePath,
-                format: 'pdf',
-                outputPath,
-                enginePath
-            });
-        } catch (error) {
-            console.error('[kanban.MarpExportService] PDF test export failed:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Export to PPTX using Marp
-     * @param inputFilePath - Input markdown file path
-     * @param outputPath - Output PPTX path
-     * @param enginePath - Optional custom engine path
-     * @returns Promise that resolves when export is complete
-     */
-    static async exportToPptx(
-        inputFilePath: string,
-        outputPath: string,
-        enginePath?: string
-    ): Promise<void> {
-        await this.export({
-            inputFilePath,
-            format: 'pptx',
-            outputPath,
-            enginePath
-        });
-    }
-
-    /**
-     * Export to HTML using Marp
-     * @param inputFilePath - Input markdown file path
-     * @param outputPath - Output HTML path
-     * @param enginePath - Optional custom engine path
-     * @returns Promise that resolves when export is complete
-     */
-    static async exportToHtml(
-        inputFilePath: string,
-        outputPath: string,
-        enginePath?: string
-    ): Promise<void> {
-        await this.export({
-            inputFilePath,
-            format: 'html',
-            outputPath,
-            enginePath
-        });
-    }
-
-    /**
      * Ensure required build files exist in dist directory for Marp CLI
      */
     private static async ensureMarpBuildFiles(): Promise<void> {

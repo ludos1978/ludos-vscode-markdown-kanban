@@ -741,9 +741,6 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 - src/services/MarpExportService-MarpExportService_export - Export markdown using Marp CLI
 - src/services/MarpExportService-MarpExportService_buildMarpCliArgs - Build Marp CLI arguments
 - src/services/MarpExportService-MarpExportService_getDefaultEnginePath - Get default engine path
-- src/services/MarpExportService-MarpExportService_testPdfExport - Export to PDF for testing
-- src/services/MarpExportService-MarpExportService_exportToPptx - Export to PPTX
-- src/services/MarpExportService-MarpExportService_exportToHtml - Export to HTML
 - src/services/MarpExportService-MarpExportService_ensureMarpBuildFiles - Ensure required build files exist
 - src/services/MarpExportService-MarpExportService_isMarpCliAvailable - Check if Marp CLI is available
 - src/services/MarpExportService-MarpExportService_engineFileExists - Check if engine file exists

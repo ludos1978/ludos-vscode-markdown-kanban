@@ -124,7 +124,6 @@ export class ExportService {
     private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\(([^)]+)\)!!!(.*?)$/gm;
 
     // Track MD5 hashes to detect duplicates
-    private static fileHashMap = new Map<string, string>();
     private static exportedFiles = new Map<string, string>(); // MD5 -> exported path
 
     /**
@@ -1759,8 +1758,7 @@ export class ExportService {
         board?: any
     ): Promise<ExportResult> {
         try {
-            // Clear tracking maps for new export
-            this.fileHashMap.clear();
+            // Clear tracking map for new export
             this.exportedFiles.clear();
 
             // PHASE 1: EXTRACTION
