@@ -677,15 +677,15 @@ export class KanbanWebviewPanel {
 
     // Public methods for external access
     public isFileLocked(): boolean {
-        return this._fileService.isFileLocked();
+        return this._fileManager.isFileLocked();
     }
 
     public toggleFileLock(): void {
-        this._fileService.toggleFileLock();
+        this._fileManager.toggleFileLock();
     }
 
     public getCurrentDocumentUri(): vscode.Uri | undefined {
-        return this._fileService.getCurrentDocumentUri();
+        return this._fileManager.getCurrentDocumentUri();
     }
 
     private _initialize() {

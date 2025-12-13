@@ -266,7 +266,6 @@ export class ExportService {
 
     /**
      * Process a markdown file and its assets
-     * uses obsolete data structures: ExportOptions
      */
     private static async processMarkdownFile(
         markdownPath: string,
@@ -342,7 +341,6 @@ export class ExportService {
 
     /**
      * Process included markdown files
-     * uses obsolete data structures: ExportOptions
      */
     private static async processIncludedFiles(
         content: string,
@@ -645,7 +643,6 @@ export class ExportService {
 
     /**
      * Filter assets based on export options
-     * uses obsolete data structures: ExportOptions
      */
     private static filterAssets(assets: ExportAssetInfo[], options: NewExportOptions): ExportAssetInfo[] {
         // If packing is disabled or no pack options, return empty array

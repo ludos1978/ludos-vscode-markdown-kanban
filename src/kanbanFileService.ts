@@ -140,27 +140,6 @@ export class KanbanFileService {
     }
 
     /**
-     * Check if file is locked
-     */
-    public isFileLocked(): boolean {
-        return this.fileManager.isFileLocked();
-    }
-
-    /**
-     * Toggle file lock state
-     */
-    public toggleFileLock(): void {
-        this.fileManager.toggleFileLock();
-    }
-
-    /**
-     * Get current document URI
-     */
-    public getCurrentDocumentUri(): vscode.Uri | undefined {
-        return this.fileManager.getCurrentDocumentUri();
-    }
-
-    /**
      * Ensure board is loaded and send update to webview
      */
     public async ensureBoardAndSendUpdate(): Promise<void> {
@@ -710,30 +689,6 @@ export class KanbanFileService {
             }
         } catch (error) {
             console.error(`[KanbanFileService] Error opening file ${filePath}:`, error);
-        }
-    }
-
-    /**
-     * Set file as hidden on Windows using attrib command
-     * On Unix systems, files starting with . are already hidden
-     */
-    public async setFileHidden(filePath: string): Promise<void> {
-        try {
-            // Only need to set hidden attribute on Windows
-            if (process.platform === 'win32') {
-                const { exec } = await import('child_process');
-                const util = await import('util');
-                const execPromise = util.promisify(exec);
-
-                try {
-                    await execPromise(`attrib +H "${filePath}"`);
-                } catch (error) {
-                    // Silently fail if attrib command fails
-                    // The . prefix will still make it hidden in most file managers
-                }
-            }
-        } catch (error) {
-            // Silently fail - file is still created with . prefix
         }
     }
 
