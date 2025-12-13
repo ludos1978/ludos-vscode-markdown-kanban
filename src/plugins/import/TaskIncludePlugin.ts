@@ -13,28 +13,25 @@
  * @module plugins/import/TaskIncludePlugin
  */
 
-import {
-    ImportPlugin,
-    ImportPluginMetadata,
-    ImportContext,
-    IncludeMatch,
-    PluginDependencies,
-    ParseOptions,
-    ParseResult,
-    PluginContext
-} from '../interfaces';
+import { ImportPluginMetadata, PluginDependencies } from '../interfaces';
+import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
-import { FileTypeUtils } from '../../utils/fileTypeUtils';
 
 /**
  * Task Include Plugin
  *
  * Creates IncludeFile instances with fileType='include-task'.
  * Task includes store raw markdown that becomes the task description.
+ *
+ * Inherits from AbstractImportPlugin:
+ * - canHandle() - checks 'task-title' context
+ * - detectIncludes() - regex matching
+ * - parseContent() - returns raw content (default)
+ * - activate/deactivate - standard lifecycle
  */
-export class TaskIncludePlugin implements ImportPlugin {
+export class TaskIncludePlugin extends AbstractImportPlugin {
     readonly metadata: ImportPluginMetadata = {
         id: 'task-include',
         name: 'Task Include (Markdown Content)',
@@ -45,52 +42,6 @@ export class TaskIncludePlugin implements ImportPlugin {
         includePattern: INCLUDE_SYNTAX.REGEX,
         contextLocation: 'task-title'
     };
-
-    /**
-     * Check if this plugin can handle the file
-     *
-     * Task includes are ONLY valid in task titles.
-     */
-    canHandle(path: string, context: ImportContext): boolean {
-        // Must be in a task title context
-        if (context.location !== 'task-title') {
-            return false;
-        }
-
-        // Check file extension
-        const ext = FileTypeUtils.getExtensionWithDot(path);
-        return this.metadata.extensions.includes(ext);
-    }
-
-    /**
-     * Detect includes in content
-     *
-     * Only detects in task-title context.
-     */
-    detectIncludes(content: string, context: ImportContext): IncludeMatch[] {
-        // Only detect in task titles
-        if (context.location !== 'task-title') {
-            return [];
-        }
-
-        const matches: IncludeMatch[] = [];
-        // Create a fresh regex to avoid lastIndex issues
-        const regex = new RegExp(this.metadata.includePattern.source, 'g');
-        let match;
-
-        while ((match = regex.exec(content)) !== null) {
-            matches.push({
-                pluginId: this.metadata.id,
-                filePath: match[1].trim(),
-                fullMatch: match[0],
-                startIndex: match.index,
-                endIndex: match.index + match[0].length,
-                context: 'task-title'
-            });
-        }
-
-        return matches;
-    }
 
     /**
      * Create an IncludeFile instance with fileType='include-task'
@@ -109,33 +60,4 @@ export class TaskIncludePlugin implements ImportPlugin {
             dependencies.isInline ?? false
         );
     }
-
-    /**
-     * Parse content (task includes use raw content)
-     *
-     * For task includes, the content is used as-is for the task description.
-     * No structural parsing is performed.
-     */
-    parseContent(content: string, options: ParseOptions): ParseResult {
-        // Task includes don't parse content - it's used directly as description
-        return {
-            success: true,
-            data: content  // Raw content becomes task description
-        };
-    }
-
-    /**
-     * Plugin activation
-     */
-    async activate(context: PluginContext): Promise<void> {
-        context.logger?.info(`[${this.metadata.id}] Plugin activated`);
-    }
-
-    /**
-     * Plugin deactivation
-     */
-    async deactivate(): Promise<void> {
-        // No cleanup needed
-    }
-
 }

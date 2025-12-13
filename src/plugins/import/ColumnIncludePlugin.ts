@@ -15,30 +15,35 @@
  */
 
 import {
-    ImportPlugin,
     ImportPluginMetadata,
-    ImportContext,
-    IncludeMatch,
     PluginDependencies,
     ParseOptions,
     ParseResult,
-    GenerateOptions,
-    PluginContext
+    GenerateOptions
 } from '../interfaces';
+import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { PresentationParser } from '../../presentationParser';
 import { KanbanTask } from '../../markdownParser';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
-import { FileTypeUtils } from '../../utils/fileTypeUtils';
 
 /**
  * Column Include Plugin
  *
  * Creates IncludeFile instances with fileType='include-column'.
  * All column-specific functionality is in the unified IncludeFile class.
+ *
+ * Inherits from AbstractImportPlugin:
+ * - canHandle() - checks 'column-header' context
+ * - detectIncludes() - regex matching
+ * - activate/deactivate - standard lifecycle
+ *
+ * Overrides:
+ * - parseContent() - parses presentation format to tasks
+ * - generateContent() - generates presentation from tasks
  */
-export class ColumnIncludePlugin implements ImportPlugin {
+export class ColumnIncludePlugin extends AbstractImportPlugin {
     readonly metadata: ImportPluginMetadata = {
         id: 'column-include',
         name: 'Column Include (Marp Presentation)',
@@ -49,52 +54,6 @@ export class ColumnIncludePlugin implements ImportPlugin {
         includePattern: INCLUDE_SYNTAX.REGEX,
         contextLocation: 'column-header'
     };
-
-    /**
-     * Check if this plugin can handle the file
-     *
-     * Column includes are ONLY valid in column headers.
-     */
-    canHandle(path: string, context: ImportContext): boolean {
-        // Must be in a column header context
-        if (context.location !== 'column-header') {
-            return false;
-        }
-
-        // Check file extension
-        const ext = FileTypeUtils.getExtensionWithDot(path);
-        return this.metadata.extensions.includes(ext);
-    }
-
-    /**
-     * Detect includes in content
-     *
-     * Only detects in column-header context.
-     */
-    detectIncludes(content: string, context: ImportContext): IncludeMatch[] {
-        // Only detect in column headers
-        if (context.location !== 'column-header') {
-            return [];
-        }
-
-        const matches: IncludeMatch[] = [];
-        // Create a fresh regex to avoid lastIndex issues
-        const regex = new RegExp(this.metadata.includePattern.source, 'g');
-        let match;
-
-        while ((match = regex.exec(content)) !== null) {
-            matches.push({
-                pluginId: this.metadata.id,
-                filePath: match[1].trim(),
-                fullMatch: match[0],
-                startIndex: match.index,
-                endIndex: match.index + match[0].length,
-                context: 'column-header'
-            });
-        }
-
-        return matches;
-    }
 
     /**
      * Create an IncludeFile instance with fileType='include-column'
@@ -120,7 +79,7 @@ export class ColumnIncludePlugin implements ImportPlugin {
      * Delegates to PresentationParser for actual parsing.
      * Preserves task IDs by position matching with existingTasks.
      */
-    parseContent(content: string, options: ParseOptions): ParseResult {
+    override parseContent(content: string, options: ParseOptions): ParseResult {
         try {
             // Use PresentationParser for slide parsing
             const slides = PresentationParser.parsePresentation(content);
@@ -174,19 +133,4 @@ export class ColumnIncludePlugin implements ImportPlugin {
             includeMarpDirectives: options.includeMarpDirectives ?? false
         });
     }
-
-    /**
-     * Plugin activation (optional initialization)
-     */
-    async activate(context: PluginContext): Promise<void> {
-        context.logger?.info(`[${this.metadata.id}] Plugin activated`);
-    }
-
-    /**
-     * Plugin deactivation (cleanup)
-     */
-    async deactivate(): Promise<void> {
-        // No cleanup needed
-    }
-
 }

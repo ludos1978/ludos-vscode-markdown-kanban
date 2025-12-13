@@ -1,5 +1,6 @@
 import { MarkdownFile } from '../files/MarkdownFile';
-import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
+import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 
 /**
  * Unified Change State Machine
@@ -181,6 +182,7 @@ export class ChangeStateMachine {
     // Dependencies (injected)
     private _fileRegistry: any; // MarkdownFileRegistry
     private _webviewPanel: any; // KanbanWebviewPanel
+    private _includeProcessor: IncludeLoadingProcessor | null = null;
 
     private constructor() {}
 
@@ -197,6 +199,10 @@ export class ChangeStateMachine {
     public initialize(fileRegistry: any, webviewPanel: any): void {
         this._fileRegistry = fileRegistry;
         this._webviewPanel = webviewPanel;
+        this._includeProcessor = new IncludeLoadingProcessor({
+            fileRegistry,
+            webviewPanel
+        });
     }
 
     /**
@@ -735,7 +741,6 @@ export class ChangeStateMachine {
 
     private async _handleLoadingNew(context: ChangeContext): Promise<ChangeState> {
         // CRITICAL FIX: Set flag to block cache invalidation during include switch
-        // This prevents column/task IDs from regenerating while we're updating the board
         if (context.impact.includesSwitched && this._webviewPanel) {
             (this._webviewPanel as any).setIncludeSwitchInProgress?.(true);
         }
@@ -745,319 +750,51 @@ export class ChangeStateMachine {
             return ChangeState.UPDATING_BACKEND;
         }
 
-        const loadingFiles = context.switches.loadingFiles;
-        const event = context.event;
-
-        // Get board and store in context so we use the SAME instance throughout
-        // This prevents SYNCING_FRONTEND from fetching a stale board after cache invalidation
+        // Get board and store in context (prevents stale board after cache invalidation)
         const board = this._webviewPanel?.getBoard();
         context.modifiedBoard = board;
 
-        if (!board) {
+        if (!board || !this._includeProcessor) {
             return ChangeState.UPDATING_BACKEND;
         }
 
-        // Determine target column/task based on event type
-        let targetColumn: any = null;
-        let targetTask: any = null;
-        let isColumnSwitch = false;
+        const event = context.event;
+        const loadingFiles = context.switches.loadingFiles;
 
-        if (event.type === 'include_switch') {
-            if (event.target === 'column') {
-                targetColumn = board.columns.find((c: any) => c.id === event.targetId);
-                isColumnSwitch = true;
-            } else if (event.target === 'task') {
-                targetColumn = board.columns.find((c: any) => c.id === event.columnIdForTask);
-                targetTask = targetColumn?.tasks.find((t: any) => t.id === event.targetId);
-            }
-        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
-            if (event.editType === 'column_title') {
-                targetColumn = board.columns.find((c: any) => c.id === event.params.columnId);
-                isColumnSwitch = true;
-            } else if (event.editType === 'task_title') {
-                targetColumn = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
-                targetTask = targetColumn?.tasks.find((t: any) => t.id === event.params.taskId);
-            }
-        }
-
-        if (!targetColumn && !targetTask) {
+        // Resolve target column/task
+        const target = this._includeProcessor.resolveTarget(event as any, board);
+        if (!target.found) {
             console.error(`[State:LOADING_NEW] Could not find target column/task`);
             return ChangeState.UPDATING_BACKEND;
         }
 
-        // BUGFIX: Update title even when removing all includes (loadingFiles.length === 0)
-        // This ensures the column/task title is updated to reflect the removal
-        // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            if (isColumnSwitch && targetColumn) {
-                targetColumn.title = event.newTitle;
-                targetColumn.originalTitle = event.newTitle;
-            } else if (targetTask) {
-                targetTask.title = event.newTitle;
-                targetTask.originalTitle = event.newTitle;
-            }
-        }
+        const { targetColumn, targetTask, isColumnSwitch } = target;
 
-        // CRITICAL FIX: Distinguish between "includes removed" vs "includes already loaded"
-        // loadingFiles = newFiles that aren't in oldFiles
-        // If loadingFiles is empty, check if newFiles is also empty (truly removed) or not (already loaded)
+        // Update title if provided in event
+        this._includeProcessor.updateTargetTitle(event as any, targetColumn, targetTask, isColumnSwitch);
+
+        // Handle empty loadingFiles (removal or already-loaded)
         if (loadingFiles.length === 0) {
             const newFiles = context.switches.newFiles;
 
             if (newFiles.length === 0) {
-                // TRUE REMOVAL: newFiles is empty - user removed all includes
-                // Clear include properties when removing all includes
-                if (isColumnSwitch && targetColumn) {
-                    targetColumn.includeFiles = [];
-                    targetColumn.includeMode = false;
-                    // Clean displayTitle by removing any !!!include()!!! syntax
-                    targetColumn.displayTitle = targetColumn.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-                } else if (targetTask) {
-                    targetTask.includeFiles = [];
-                    targetTask.includeMode = false;
-                    // Clean displayTitle by removing any !!!include()!!! syntax
-                    targetTask.displayTitle = targetTask.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-                    targetTask.originalTitle = targetTask.title;
-                    targetTask.description = '';
-                }
+                // TRUE REMOVAL: user removed all includes
+                this._includeProcessor.handleIncludeRemoval(targetColumn, targetTask, isColumnSwitch);
             } else {
-                // FILES ALREADY LOADED: newFiles has content but all are already in oldFiles
-                // CRITICAL FIX: CLEARING_CACHE cleared all properties, we must RESTORE them from loaded files!
-                // Otherwise the task/column will have includeMode=false and empty content
-
-                if (targetTask) {
-                    // Restore task include properties from already-loaded file
-                    const relativePath = newFiles[0];
-                    const file = this._fileRegistry.getByRelativePath(relativePath);
-
-                    if (file) {
-                        const fullFileContent = file.getContent();
-
-                        if (fullFileContent && fullFileContent.length > 0) {
-                            // Restore all properties
-                            targetTask.includeMode = true;
-                            targetTask.includeFiles = newFiles;
-                            targetTask.displayTitle = `# include in ${relativePath}`;
-                            targetTask.description = fullFileContent;
-
-                            // Update title if provided in event
-                            if (event.type === 'include_switch' && event.newTitle !== undefined) {
-                                targetTask.title = event.newTitle;
-                                targetTask.originalTitle = event.newTitle;
-                            }
-                        } else {
-                            console.error(`[State:LOADING_NEW] File has no content: ${relativePath}`);
-                        }
-                    } else {
-                        console.error(`[State:LOADING_NEW] File not found in registry: ${relativePath}`);
-                    }
-                } else if (isColumnSwitch && targetColumn) {
-                    // Restore column include properties from already-loaded files
-                    targetColumn.includeFiles = newFiles;
-                    targetColumn.includeMode = true;
-
-                    // Update title if provided
-                    if (event.type === 'include_switch' && event.newTitle !== undefined) {
-                        targetColumn.title = event.newTitle;
-                        targetColumn.originalTitle = event.newTitle;
-
-                        // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
-                        // SINGLE SOURCE OF TRUTH: Use shared utility function
-                        const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
-                        if (includeMatches && includeMatches.length > 0) {
-                            let displayTitle = createDisplayTitleWithPlaceholders(event.newTitle, newFiles);
-
-                            if (!displayTitle && newFiles.length > 0) {
-                                const path = require('path');
-                                displayTitle = path.basename(newFiles[0], path.extname(newFiles[0]));
-                            }
-
-                            targetColumn.displayTitle = displayTitle || 'Included Column';
-                        } else {
-                            targetColumn.displayTitle = event.newTitle;
-                        }
-                    }
-
-                    // Re-load tasks from already-loaded files
-                    const mainFile = this._fileRegistry.getMainFile();
-                    const mainFilePath = mainFile?.getPath();
-                    const tasks: any[] = [];
-                    for (const relativePath of newFiles) {
-                        const file = this._fileRegistry.getByRelativePath(relativePath);
-                        if (file) {
-                            const fileTasks = file.parseToTasks([], targetColumn.id, mainFilePath);
-                            tasks.push(...fileTasks);
-                        }
-                    }
-                    targetColumn.tasks = tasks;
-                }
+                // ALREADY LOADED: restore from loaded files
+                this._includeProcessor.handleAlreadyLoadedIncludes(
+                    event as any, targetColumn, targetTask, isColumnSwitch, newFiles
+                );
             }
 
             return ChangeState.UPDATING_BACKEND;
         }
 
-        // Get file factory and main file
-        const fileFactory = (this._webviewPanel as any)._fileFactory;
-        const mainFile = this._fileRegistry.getMainFile();
-
-        if (!fileFactory || !mainFile) {
-            console.error(`[State:LOADING_NEW] Missing dependencies (fileFactory or mainFile)`);
-            return ChangeState.UPDATING_BACKEND;
-        }
-
+        // Load new include files
         if (isColumnSwitch && targetColumn) {
-            // Column include switch - load and parse presentation files
-            // Update column properties
-            targetColumn.includeFiles = loadingFiles;
-            targetColumn.includeMode = loadingFiles.length > 0;
-
-            // Update title if provided in event
-            // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
-            if (event.type === 'include_switch' && event.newTitle !== undefined) {
-                targetColumn.title = event.newTitle;
-                targetColumn.originalTitle = event.newTitle;
-
-                // Generate displayTitle by replacing !!!include()!!! with %INCLUDE_BADGE:filepath% placeholders
-                // SINGLE SOURCE OF TRUTH: Use shared utility function
-                const includeMatches = event.newTitle.match(INCLUDE_SYNTAX.REGEX);
-                if (includeMatches && includeMatches.length > 0) {
-                    let displayTitle = createDisplayTitleWithPlaceholders(event.newTitle, loadingFiles);
-
-                    // If no display title after stripping, use filename as title
-                    if (!displayTitle && loadingFiles.length > 0) {
-                        const path = require('path');
-                        displayTitle = path.basename(loadingFiles[0], path.extname(loadingFiles[0]));
-                    }
-
-                    targetColumn.displayTitle = displayTitle || 'Included Column';
-                } else {
-                    // No include syntax - just copy the title
-                    targetColumn.displayTitle = event.newTitle;
-                }
-            }
-
-            // Create/register file instances and load content
-            const tasks: any[] = [];
-
-            // Get preloaded content map if this is an include_switch event
-            const preloadedContentMap = event.type === 'include_switch' ? event.preloadedContent : undefined;
-
-            for (const relativePath of loadingFiles) {
-                // Check if we have preloaded content for this file (from "append tasks to include file" flow)
-                const preloadedContent = preloadedContentMap?.get(relativePath);
-
-                // Check if file exists and verify it's the correct type
-                const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-                const isCorrectType = existingFile?.getFileType() === 'include-column';
-
-                // Create/recreate file instance if not exists or wrong type
-                if (!existingFile || !isCorrectType) {
-                    if (existingFile && !isCorrectType) {
-                        // Unregister old file
-                        existingFile.stopWatching();
-                        this._fileRegistry.unregister(existingFile);
-                    }
-
-                    const columnInclude = fileFactory.createIncludeDirect(relativePath, mainFile, 'include-column', false);
-                    columnInclude.setColumnId(targetColumn.id);
-                    columnInclude.setColumnTitle(targetColumn.title);
-                    this._fileRegistry.register(columnInclude);
-                    columnInclude.startWatching();
-                }
-
-                // Load content
-                const file = this._fileRegistry.getByRelativePath(relativePath);
-
-                if (file) {
-                    // PRIORITY: Use preloaded content if available (bypasses registry caching issues)
-                    // This is used when "append tasks to include file" was selected
-                    if (preloadedContent !== undefined) {
-                        // Set the preloaded content on the file (marks as unsaved)
-                        file.setContent(preloadedContent, false);
-                    } else {
-                        // No preloaded content - check if file has cached unsaved changes
-                        const hasUnsaved = file.hasUnsavedChanges();
-                        if (!hasUnsaved) {
-                            // Only reload from disk if there are no unsaved changes
-                            await file.reload();
-                        }
-                    }
-
-                    // Parse tasks from file content
-                    if (file.parseToTasks) {
-                        const mainFilePath = mainFile.getPath();
-                        const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
-                        tasks.push(...fileTasks);
-                    } else {
-                        console.error(`[State:LOADING_NEW] File has no parseToTasks method: ${relativePath}`);
-                    }
-                } else {
-                    console.error(`[State:LOADING_NEW] File not found in registry after creation: ${relativePath}`);
-                }
-            }
-
-            // Update column with loaded tasks
-            targetColumn.tasks = tasks;
-            context.result.updatedFiles.push(...loadingFiles);
-
+            await this._includeProcessor.loadColumnIncludes(event as any, targetColumn, loadingFiles, context);
         } else if (targetTask) {
-            // Task include switch - load raw content
-            const relativePath = loadingFiles[0]; // Task includes are single file
-
-            // Check if file exists and verify it's the correct type
-            const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-            const isCorrectType = existingFile?.getFileType() === 'include-task';
-
-            // Create/recreate file instance if not exists or wrong type
-            if (!existingFile || !isCorrectType) {
-                if (existingFile && !isCorrectType) {
-                    // Unregister old file
-                    existingFile.stopWatching();
-                    this._fileRegistry.unregister(existingFile);
-                }
-
-                const taskInclude = fileFactory.createInclude(relativePath, mainFile, 'include-task', false);
-                taskInclude.setTaskId(targetTask.id);
-                taskInclude.setTaskTitle(targetTask.title);
-                taskInclude.setColumnId(targetColumn.id);
-                this._fileRegistry.register(taskInclude);
-                taskInclude.startWatching();
-            }
-
-            // Load content
-            const file = this._fileRegistry.getByRelativePath(relativePath);
-
-            if (file) {
-                // ALWAYS reload from disk when switching includes to ensure fresh content
-                await file.reload();
-
-                const fullFileContent = file.getContent();
-
-                if (fullFileContent && fullFileContent.length > 0) {
-                    // displayTitle is metadata (file path indicator), description contains full file content
-                    const displayTitle = `# include in ${relativePath}`;
-
-                    // Update task properties
-                    targetTask.includeMode = true;
-                    targetTask.includeFiles = loadingFiles;
-                    targetTask.displayTitle = displayTitle; // UI metadata (not file content)
-                    targetTask.description = fullFileContent; // COMPLETE file content
-
-                    // Update title if provided in event
-                    // CRITICAL: Check !== undefined, not just truthy, because empty string "" is valid!
-                    if (event.type === 'include_switch' && event.newTitle !== undefined) {
-                        targetTask.title = event.newTitle;
-                        targetTask.originalTitle = event.newTitle;
-                    }
-
-                    // Sync file baseline with task content
-                    file.setContent(fullFileContent, true);
-
-                    context.result.updatedFiles.push(relativePath);
-                } else {
-                    console.error(`[State:LOADING_NEW] Failed to load content for ${relativePath}`);
-                }
-            }
+            await this._includeProcessor.loadTaskInclude(event as any, targetColumn, targetTask, loadingFiles, context);
         }
 
         return ChangeState.UPDATING_BACKEND;

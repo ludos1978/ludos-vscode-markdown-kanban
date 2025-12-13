@@ -16,6 +16,7 @@ export { PluginRegistry, ValidationResult } from './registry';
 export { PluginLoader } from './PluginLoader';
 
 // Import Plugins
+export { AbstractImportPlugin } from './import/AbstractImportPlugin';
 export { ColumnIncludePlugin } from './import/ColumnIncludePlugin';
 export { TaskIncludePlugin } from './import/TaskIncludePlugin';
 export { RegularIncludePlugin } from './import/RegularIncludePlugin';
