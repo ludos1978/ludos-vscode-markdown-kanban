@@ -538,17 +538,6 @@ export class MessageHandler {
         }
     }
 
-    // ========================================================================
-    // DEAD CODE REMOVED - Diagram handlers moved to DiagramCommands.ts
-    // Removed: handleRenderDrawIO, getDrawIOCacheDir, getDrawIOCacheFileName,
-    //          cleanOldDrawIOCache, handleRenderExcalidraw, handleRenderPDFPage,
-    //          handleGetPDFInfo, handleConvertPlantUMLToSVG, calculateSimilarity,
-    //          handleConvertMermaidToSVG, convertDiagramToSVG, replaceDiagramWithSVG,
-    //          replaceDiagramWithSVGFuzzy
-    // ========================================================================
-
-    // (Dead code removed: getDrawIOCacheDir, getDrawIOCacheFileName, cleanOldDrawIOCache)
-
     /**
      * Generate content for appending tasks from a column to an include file.
      * Returns the content and relative path to be passed through the include switch event.

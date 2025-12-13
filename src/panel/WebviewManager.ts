@@ -29,69 +29,6 @@ export interface WebviewManagerDependencies {
 }
 
 /**
- * Default layout presets
- */
-const DEFAULT_LAYOUT_PRESETS = {
-    overview: {
-        label: "Overview",
-        description: "Compact view for seeing many cards",
-        settings: {
-            columnWidth: "250px",
-            cardHeight: "auto",
-            sectionHeight: "auto",
-            taskSectionHeight: "auto",
-            fontSize: "0_5x",
-            whitespace: "8px",
-            tagVisibility: "allexcludinglayout",
-            arrowKeyFocusScroll: "center"
-        }
-    },
-    normal: {
-        label: "Normal",
-        description: "Default balanced view",
-        settings: {
-            columnWidth: "350px",
-            cardHeight: "auto",
-            sectionHeight: "auto",
-            taskSectionHeight: "auto",
-            fontSize: "1x",
-            whitespace: "8px",
-            tagVisibility: "allexcludinglayout",
-            arrowKeyFocusScroll: "center"
-        }
-    },
-    grid3x: {
-        label: "3x3 Grid",
-        description: "Grid layout for organized viewing",
-        settings: {
-            columnWidth: "33percent",
-            cardHeight: "auto",
-            sectionHeight: "auto",
-            taskSectionHeight: "auto",
-            fontSize: "1x",
-            whitespace: "8px",
-            rowHeight: "50vh",
-            tagVisibility: "allexcludinglayout",
-            arrowKeyFocusScroll: "center"
-        }
-    },
-    focused: {
-        label: "Focused",
-        description: "Large cards for detailed work",
-        settings: {
-            columnWidth: "500px",
-            cardHeight: "auto",
-            sectionHeight: "auto",
-            taskSectionHeight: "auto",
-            fontSize: "1_25x",
-            whitespace: "16px",
-            tagVisibility: "allexcludinglayout",
-            arrowKeyFocusScroll: "center"
-        }
-    }
-};
-
-/**
  * WebviewManager - Single-responsibility module for webview management
  */
 export class WebviewManager {
@@ -285,16 +222,11 @@ export class WebviewManager {
     // ============= LAYOUT PRESETS =============
 
     /**
-     * Get layout presets configuration (user presets merged with defaults)
+     * Get layout presets configuration from VS Code settings
+     * Default presets are defined in package.json contributes.configuration
      */
     getLayoutPresetsConfiguration(): Record<string, any> {
-        const userPresets = configService.getConfig('layoutPresets', {});
-
-        // Merge user presets with defaults (user presets take precedence)
-        return {
-            ...DEFAULT_LAYOUT_PRESETS,
-            ...userPresets
-        };
+        return configService.getConfig('layoutPresets', {});
     }
 
     /**

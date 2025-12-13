@@ -334,8 +334,66 @@
         },
         "markdown-kanban.layoutPresets": {
           "type": "object",
-          "default": {},
-          "description": "Custom layout presets configuration. Each preset should contain a 'label', 'description', and 'settings' object with layout options.",
+          "default": {
+            "overview": {
+              "label": "Overview",
+              "description": "Compact view for seeing many cards",
+              "settings": {
+                "columnWidth": "250px",
+                "cardHeight": "auto",
+                "sectionHeight": "auto",
+                "taskSectionHeight": "auto",
+                "fontSize": "0_5x",
+                "whitespace": "8px",
+                "tagVisibility": "allexcludinglayout",
+                "arrowKeyFocusScroll": "center"
+              }
+            },
+            "normal": {
+              "label": "Normal",
+              "description": "Default balanced view",
+              "settings": {
+                "columnWidth": "350px",
+                "cardHeight": "auto",
+                "sectionHeight": "auto",
+                "taskSectionHeight": "auto",
+                "fontSize": "1x",
+                "whitespace": "8px",
+                "tagVisibility": "allexcludinglayout",
+                "arrowKeyFocusScroll": "center"
+              }
+            },
+            "grid3x": {
+              "label": "3x3 Grid",
+              "description": "Grid layout for organized viewing",
+              "settings": {
+                "columnWidth": "33percent",
+                "cardHeight": "auto",
+                "sectionHeight": "auto",
+                "taskSectionHeight": "auto",
+                "fontSize": "1x",
+                "whitespace": "8px",
+                "rowHeight": "50vh",
+                "tagVisibility": "allexcludinglayout",
+                "arrowKeyFocusScroll": "center"
+              }
+            },
+            "focused": {
+              "label": "Focused",
+              "description": "Large cards for detailed work",
+              "settings": {
+                "columnWidth": "500px",
+                "cardHeight": "auto",
+                "sectionHeight": "auto",
+                "taskSectionHeight": "auto",
+                "fontSize": "1_25x",
+                "whitespace": "16px",
+                "tagVisibility": "allexcludinglayout",
+                "arrowKeyFocusScroll": "center"
+              }
+            }
+          },
+          "description": "Layout presets configuration. Each preset should contain a 'label', 'description', and 'settings' object with layout options. Default presets (overview, normal, grid3x, focused) can be customized or overridden.",
           "additionalProperties": {
             "type": "object",
             "properties": {

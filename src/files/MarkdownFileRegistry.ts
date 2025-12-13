@@ -163,13 +163,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public getByRelativePath(relativePath: string): MarkdownFile | undefined {
         const normalized = MarkdownFile.normalizeRelativePath(relativePath);
-        const file = this._filesByRelativePath.get(normalized);
-
-        // Debug logging for lookup misses (helps catch issues)
-        if (!file && relativePath) {
-        }
-
-        return file;
+        return this._filesByRelativePath.get(normalized);
     }
 
     /**

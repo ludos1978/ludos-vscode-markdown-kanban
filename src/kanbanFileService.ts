@@ -205,19 +205,8 @@ export class KanbanFileService {
             panelId: this._panelId  // Store for cleanup but don't use for lookup
         });
 
-        // Ensure file watcher is always set up for the current document
         const currentDocumentUri = this.fileManager.getDocument()?.uri.toString();
         const isDifferentDocument = currentDocumentUri !== document.uri.toString();
-        const isFirstFileLoad = !this.fileManager.getDocument();
-
-        // Set up file watcher if needed (first load or different document)
-        if (isFirstFileLoad || isDifferentDocument) {
-
-            // Clean up old watcher if switching documents
-            if (isDifferentDocument && currentDocumentUri) {
-                // Note: We'll clean this up in the document changed section below
-            }
-        }
 
         // STRICT POLICY: Only reload board in these specific cases:
         // 1. Initial panel creation (no existing board)
@@ -545,40 +534,10 @@ export class KanbanFileService {
                 const currentDocument = this.fileManager.getDocument();
 
                 if (currentDocument && savedDocument === currentDocument) {
-                    // Registry tracks saves automatically
-
-                    // Document was saved, update our version tracking to match (legacy compatibility)
+                    // Document was saved, update version tracking (legacy compatibility)
                     this._lastDocumentVersion = savedDocument.version;
                     this._hasExternalUnsavedChanges = false;
-
-                    // CRITICAL: Check if we have unsaved Kanban changes before clearing external changes
-                    // Add a small delay to allow any pending markUnsavedChanges callbacks to complete
-                    await new Promise(resolve => setTimeout(resolve, 50));
-
-                    const mainFile = this.fileRegistry.getMainFile();
-                    if (mainFile) {
-                        const hasUnsavedKanbanChanges = mainFile.hasUnsavedChanges();
-                        const hasIncludeFileChanges = this.fileRegistry.getIncludeFiles().some(f => f.hasUnsavedChanges());
-                        const cachedBoard = mainFile.getCachedBoardFromWebview();
-
-                        // If there's a cached board from webview, it means user has edited in UI
-                        const hasCachedBoardChanges = !!cachedBoard;
-
-
-                        // Debug: Check each include file individually
-                        const includeFiles = this.fileRegistry.getIncludeFiles();
-                        includeFiles.forEach((f, i) => {
-                        });
-
-                        // Check if there are unsaved Kanban changes (main file, include files, or UI edited board)
-                        if (hasUnsavedKanbanChanges || hasIncludeFileChanges || hasCachedBoardChanges) {
-                            // User saved externally (Ctrl+S) while having unsaved Kanban changes
-                            // File watcher will trigger conflict detection automatically
-                        } else {
-                            // No unsaved Kanban changes - safe save, watcher will auto-reload
-                        }
-                        // NOTE: No need to call markSaveAsLegitimate - watcher handles everything via SaveOptions
-                    }
+                    // NOTE: Watcher handles conflict detection and auto-reload via SaveOptions
                 }
 
                 // Check if this is an included file
