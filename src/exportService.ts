@@ -1557,10 +1557,7 @@ export class ExportService {
 
         // Write markdown file
         const markdownPath = path.join(options.targetFolder, `${sourceBasename}.md`);
-        console.log('[ExportService] Writing markdown to:', markdownPath);
-        console.log('[ExportService] Content length:', transformed.content.length);
         fs.writeFileSync(markdownPath, transformed.content, 'utf8');
-        console.log('[ExportService] Markdown written successfully');
 
         // Handle Marp conversion
         if (options.format === 'marp') {
@@ -1586,12 +1583,6 @@ export class ExportService {
         sourceFilePath: string,
         options: NewExportOptions
     ): Promise<ExportResult> {
-        console.log('[ExportService.runMarpConversion] Called with:');
-        console.log('  - markdownPath:', markdownPath);
-        console.log('  - sourceFilePath:', sourceFilePath);
-        console.log('  - options.marpWatch:', options.marpWatch);
-        console.log('  - options.marpFormat:', options.marpFormat);
-
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
         // Build output path
@@ -1616,10 +1607,6 @@ export class ExportService {
                 // Set up Mermaid export service with webview
                 const mermaidService = getMermaidExportService();
                 mermaidService.setWebviewPanel(webviewPanel.getPanel());
-            } else {
-                console.warn('[ExportService] ⚠️ No webview panel found for document. Mermaid diagrams will not be converted.');
-                console.warn('[ExportService] Document URI:', docUri);
-                console.warn('[ExportService] Available panels:', KanbanWebviewPanel.getAllPanels().length);
             }
 
             // Create diagram preprocessor
@@ -1666,15 +1653,11 @@ export class ExportService {
         const outputPath = path.join(dir, `${baseName}${ext}`);
 
         // MODE: PREVIEW (watch mode) - run Marp in watch mode
-        console.log('[ExportService.runMarpConversion] marpWatch check:');
-        console.log('  - options.marpWatch:', options.marpWatch);
         if (options.marpWatch) {
             // Check if Marp is already watching this file (check PREPROCESSED path, not original)
             const isAlreadyWatching = MarpExportService.isWatching(processedMarkdownPath);
-            console.log('[ExportService.runMarpConversion] isAlreadyWatching:', isAlreadyWatching, 'path:', processedMarkdownPath);
             if (isAlreadyWatching) {
                 // DON'T cleanup - Marp is still watching the preprocessed file
-                console.log('[ExportService.runMarpConversion] Already watching, returning early');
                 return {
                     success: true,
                     message: 'Markdown updated, Marp watch active',
@@ -1684,7 +1667,6 @@ export class ExportService {
                 };
             }
 
-            console.log('[ExportService.runMarpConversion] Starting Marp in watch mode...');
             try {
                 await MarpExportService.export({
                     inputFilePath: processedMarkdownPath, // Use preprocessed markdown
@@ -1700,8 +1682,6 @@ export class ExportService {
                     handoutDirection: options.marpHandoutDirection,
                     handoutPdf: options.marpHandoutPdf
                 });
-
-                console.log('[ExportService.runMarpConversion] MarpExportService.export completed (watch mode)');
 
                 // DON'T cleanup in watch mode - Marp needs the preprocessed file to continue watching
                 // The file will be cleaned up when watch mode is stopped
@@ -1778,14 +1758,6 @@ export class ExportService {
         options: NewExportOptions,
         board?: any
     ): Promise<ExportResult> {
-        console.log('[ExportService.export] Called with:');
-        console.log('  - sourceDocument:', sourceDocument.uri.fsPath);
-        console.log('  - options.mode:', options.mode);
-        console.log('  - options.format:', options.format);
-        console.log('  - options.marpWatch:', options.marpWatch);
-        console.log('  - options.targetFolder:', options.targetFolder);
-        console.log('  - board provided:', !!board);
-
         try {
             // Clear tracking maps for new export
             this.fileHashMap.clear();

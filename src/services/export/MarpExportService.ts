@@ -156,26 +156,16 @@ export class MarpExportService {
      * @returns Promise that resolves when export is complete
      */
     static async export(options: MarpExportOptions): Promise<void> {
-        console.log('[MarpExportService.export] Called with:');
-        console.log('  - inputFilePath:', options.inputFilePath);
-        console.log('  - format:', options.format);
-        console.log('  - watchMode:', options.watchMode);
-        console.log('  - outputPath:', options.outputPath);
-
         // Check if a Marp process is already running for this file (watch mode only)
         if (options.watchMode) {
             const existingPid = this.getMarpPid(options.inputFilePath);
-            console.log('[MarpExportService.export] watchMode check - existingPid:', existingPid);
             if (existingPid) {
-                console.log('[MarpExportService.export] Already has PID, returning early');
                 return;
             }
         }
 
         // Validate Marp CLI availability
-        console.log('[MarpExportService.export] Checking Marp CLI availability...');
         const isAvailable = await this.isMarpCliAvailable();
-        console.log('[MarpExportService.export] Marp CLI available:', isAvailable);
         if (!isAvailable) {
             throw new Error('Marp CLI is not available. Please ensure @marp-team/marp-cli is installed.');
         }
@@ -194,11 +184,6 @@ export class MarpExportService {
             const command = 'npx';
             const commandArgs = ['@marp-team/marp-cli', ...args];
 
-            console.log('[MarpExportService.export] Spawning Marp:');
-            console.log('  - command:', command);
-            console.log('  - args:', commandArgs.join(' '));
-            console.log('  - cwd:', inputFileDir);
-
             // Build environment with handout settings if enabled
             // Handout mode only applies to PDF output - for HTML, generate normal presentation
             const env: NodeJS.ProcessEnv = { ...process.env };
@@ -211,9 +196,7 @@ export class MarpExportService {
 
             // WATCH MODE: Spawn detached background process and return immediately
             // NON-WATCH MODE: Wait for process to complete before returning
-            console.log('[MarpExportService.export] options.watchMode:', options.watchMode);
             if (options.watchMode) {
-                console.log('[MarpExportService.export] Spawning Marp in WATCH mode...');
                 // Spawn Marp as a detached background process
                 const marpProcess = spawn(command, commandArgs, {
                     cwd: inputFileDir,
@@ -221,28 +204,22 @@ export class MarpExportService {
                     stdio: ['ignore', 'pipe', 'pipe'],
                     env: env
                 });
-                console.log('[MarpExportService.export] Marp process spawned, pid:', marpProcess.pid);
 
                 if (marpProcess.stderr) {
                     marpProcess.stderr.on('data', (data) => {
                         const output = data.toString();
-                        // Log ALL stderr output for debugging
-                        console.log(`[MarpExportService] stderr: ${output.trim()}`);
-                    });
-                }
-
-                if (marpProcess.stdout) {
-                    marpProcess.stdout.on('data', (data) => {
-                        console.log(`[MarpExportService] stdout: ${data.toString().trim()}`);
+                        // Marp sends all output to stderr - only log errors
+                        if (output.includes('[ERROR]') || output.includes('Error:')) {
+                            console.error(`[kanban.MarpExportService] ${output}`);
+                        }
                     });
                 }
 
                 marpProcess.on('error', (error) => {
-                    console.error(`[MarpExportService] Process error:`, error);
+                    console.error(`[kanban.MarpExportService] Process error:`, error);
                 });
 
-                marpProcess.on('exit', (code, signal) => {
-                    console.log(`[MarpExportService] Process exited with code: ${code}, signal: ${signal}`);
+                marpProcess.on('exit', () => {
                     if (options.inputFilePath) {
                         this.marpProcessPids.delete(options.inputFilePath);
                     }
@@ -254,12 +231,8 @@ export class MarpExportService {
                 // Store the PID for later termination
                 if (options.inputFilePath && marpProcess.pid) {
                     this.storeMarpPid(options.inputFilePath, marpProcess.pid);
-                    console.log('[MarpExportService.export] PID stored:', marpProcess.pid, 'for path:', options.inputFilePath);
-                } else {
-                    console.log('[MarpExportService.export] WARNING: Could not store PID - inputFilePath:', options.inputFilePath, 'pid:', marpProcess.pid);
                 }
             } else {
-                console.log('[MarpExportService.export] Spawning Marp in NON-WATCH mode...');
                 // NON-WATCH MODE: Wait for Marp to complete (PDF, PPTX, HTML save)
                 await new Promise<void>((resolve, reject) => {
                     const marpProcess = spawn(command, commandArgs, {
