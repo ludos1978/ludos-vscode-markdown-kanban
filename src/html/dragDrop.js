@@ -781,10 +781,7 @@ function setupGlobalDragAndDrop() {
             cleanupDropZoneHighlights();
         }
     }, false);
-    
-    // Removed duplicate drop handler that was causing double card creation
-    // The main handler at line 305 already handles all external drops
-    
+
     // Document level handlers
     document.addEventListener('dragover', function(e) {
         // If we left the view and now dragover is firing, we're back!

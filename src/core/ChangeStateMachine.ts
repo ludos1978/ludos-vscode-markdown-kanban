@@ -1459,7 +1459,3 @@ export class ChangeStateMachine {
         return this._createInitialContext(event);
     }
 }
-
-// ============= SINGLETON EXPORT =============
-
-export const changeStateMachine = ChangeStateMachine.getInstance();

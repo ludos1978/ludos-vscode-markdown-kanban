@@ -10,8 +10,6 @@ window.globalColumnFoldState = window.globalColumnFoldState || 'fold-mixed'; // 
 window.availableTemplates = window.availableTemplates || [];
 window.showTemplateBar = window.showTemplateBar !== false; // Default to true
 
-// Use global window.window.cachedBoard instead of local variable
-// let window.cachedBoard = null; // Removed to avoid conflicts
 let renderTimeout = null;
 
 /**

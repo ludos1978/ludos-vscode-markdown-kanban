@@ -84,7 +84,8 @@
       "Bash(tree:*)",
       "Bash(cut:*)",
       "Bash(xargs:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(npx ts-prune:*)"
     ],
     "deny": [],
     "ask": []

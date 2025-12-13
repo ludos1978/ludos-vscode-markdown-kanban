@@ -4,7 +4,6 @@ import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
-import { ConfigurationService } from './configurationService';
 import { PlantUMLService } from './plantUMLService';
 import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
@@ -14,7 +13,6 @@ import { safeFileUri } from './utils/uriUtils';
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands } from './commands';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 
 // Helper function to log to both console and output channel
 function log(...args: any[]) {

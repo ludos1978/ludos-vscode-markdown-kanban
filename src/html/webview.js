@@ -1384,9 +1384,6 @@ async function updateClipboardCardSource(force = false) {
     }
 }
 
-// Removed conflicting initializeClipboardCardSource function
-// HTML element already has ondragstart="handleClipboardDragStart(event)" and ondragend="handleClipboardDragEnd(event)"
-
 // Function to position file bar dropdown
 function positionFileBarDropdown(triggerButton, dropdown) {
     const rect = triggerButton.getBoundingClientRect();
@@ -2367,9 +2364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(async () => {
         await updateClipboardCardSource();
     }, 1000); // Delay to ensure everything is initialized
-    
-    // Removed test code - clipboard should work automatically
-    
+
     // Add click handler to read clipboard (user interaction required for clipboard API)
     const clipboardSource = document.getElementById('clipboard-card-source');
     if (clipboardSource) {
