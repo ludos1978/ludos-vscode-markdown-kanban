@@ -24,7 +24,7 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { PanelStateModel, ConcurrencyManager, FileRegistryAdapter, IncludeFileCoordinator, WebviewManager } from './panel';
+import { PanelStateModel, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
 
 export class KanbanWebviewPanel {
@@ -50,7 +50,6 @@ export class KanbanWebviewPanel {
     // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
-    private _registryAdapter: FileRegistryAdapter;
 
     private _stateMachine: ChangeStateMachine;
 
@@ -328,7 +327,6 @@ export class KanbanWebviewPanel {
             this._backupManager,
             this._fileRegistry
         );
-        this._registryAdapter = new FileRegistryAdapter(this._fileRegistry, this._fileFactory);
 
         // Initialize unified change state machine (Phase 6)
         this._stateMachine = ChangeStateMachine.getInstance();
@@ -343,7 +341,7 @@ export class KanbanWebviewPanel {
             state: this._state,
             getPanel: () => this._panel,
             getBoard: () => this.getBoard(),
-            getMainFile: () => this._registryAdapter.getMainFile()
+            getMainFile: () => this._fileRegistry.getMainFile()
         });
 
         // Initialize webview manager (Phase 3)
@@ -417,7 +415,7 @@ export class KanbanWebviewPanel {
                 getWebviewPanel: () => this,
                 markUnsavedChanges: async (hasChanges: boolean, cachedBoard?: any) => {
 
-                    if (!this._registryAdapter.isReady()) {
+                    if (!this._fileRegistry.isReady()) {
                         return;
                     }
 
@@ -427,7 +425,7 @@ export class KanbanWebviewPanel {
                         this._boardStore.setBoard(cachedBoard, false);
 
                         // CRITICAL: Also update MainKanbanFile's cached board for conflict detection
-                        const mainFile = this._registryAdapter.getMainFile();
+                        const mainFile = this._fileRegistry.getMainFile();
                         if (mainFile) {
                             mainFile.setCachedBoardFromWebview(cachedBoard);
                         }
@@ -440,7 +438,7 @@ export class KanbanWebviewPanel {
                         await this._fileRegistry.trackIncludeFileUnsavedChanges(cachedBoard);
 
                         // Update main file content from board (for verification sync)
-                        const mainFile2 = this._registryAdapter.getMainFile();
+                        const mainFile2 = this._fileRegistry.getMainFile();
                         if (mainFile2) {
                             // Generate markdown from cached board to keep backend in sync with frontend
                             const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
@@ -467,7 +465,7 @@ export class KanbanWebviewPanel {
                         // If we get here, it's a valid state change from frontend (marking something as changed)
                         if (cachedBoard) {
                             // Frontend sent board changes - update main file content and mark as unsaved
-                            const mainFile3 = this._registryAdapter.getMainFile();
+                            const mainFile3 = this._fileRegistry.getMainFile();
                             if (mainFile3) {
                                 // Generate markdown from cached board to keep backend in sync with frontend
                                 const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
@@ -604,7 +602,7 @@ export class KanbanWebviewPanel {
         if (modified) {
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
-            const mainFile = this._registryAdapter.getMainFile();
+            const mainFile = this._fileRegistry.getMainFile();
             if (mainFile && board) {
                 // CRITICAL: use updateFromBoard to update BOTH content AND board object
                 mainFile.updateFromBoard(board);
@@ -1560,11 +1558,11 @@ export class KanbanWebviewPanel {
         }
 
         // Query current unsaved changes state from MarkdownFile
-        const mainFile = this._registryAdapter.getMainFile();
+        const mainFile = this._fileRegistry.getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
 
         // Get include files unsaved status
-        const includeStatus = this._registryAdapter.getIncludeFilesUnsavedStatus();
+        const includeStatus = this._fileRegistry.getIncludeFilesUnsavedStatus();
 
         // If no unsaved changes, allow close
         if (!hasUnsavedChanges && !includeStatus.hasChanges) {
@@ -1656,7 +1654,7 @@ export class KanbanWebviewPanel {
      * Used by extension deactivate() to prompt before VSCode closes
      */
     public async checkUnsavedChanges(): Promise<boolean> {
-        return this._registryAdapter.hasAnyUnsavedChanges();
+        return this._fileRegistry.hasAnyUnsavedChanges();
     }
 
     /**
@@ -1667,7 +1665,7 @@ export class KanbanWebviewPanel {
     public async saveUnsavedChangesBackup(): Promise<void> {
         try {
             // Save main file backup
-            const mainFile = this._registryAdapter.getMainFile();
+            const mainFile = this._fileRegistry.getMainFile();
             if (mainFile && mainFile.hasUnsavedChanges()) {
                 const uri = this.getCurrentDocumentUri();
                 if (uri) {
@@ -1685,10 +1683,10 @@ export class KanbanWebviewPanel {
             }
 
             // Save include files backups
-            const includeStatus = this._registryAdapter.getIncludeFilesUnsavedStatus();
+            const includeStatus = this._fileRegistry.getIncludeFilesUnsavedStatus();
             if (includeStatus.hasChanges) {
                 for (const fileWithChanges of includeStatus.changedFiles) {
-                    const includeFile = this._registryAdapter.getIncludeFile(fileWithChanges);
+                    const includeFile = this._fileRegistry.getIncludeFile(fileWithChanges);
                     if (includeFile && includeFile.hasUnsavedChanges()) {
                         const fileManager = (includeFile as any)._fileManager;
                         if (fileManager) {
@@ -1736,7 +1734,7 @@ export class KanbanWebviewPanel {
         }
 
         // Clear unsaved changes flag and prevent closing flags
-        const mainFileForDispose = this._registryAdapter.getMainFile();
+        const mainFileForDispose = this._fileRegistry.getMainFile();
         if (mainFileForDispose) {
             // Always discard to reset state on dispose
             // discardChanges() internally checks if content changed before emitting events

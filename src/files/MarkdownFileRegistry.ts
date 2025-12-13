@@ -378,6 +378,52 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         await Promise.all(filesToBackup.map(f => f.createBackup(label)));
     }
 
+    // ============= CONVENIENCE METHODS (merged from FileRegistryAdapter) =============
+
+    /**
+     * Check if registry has a main file (is ready for operations)
+     */
+    public isReady(): boolean {
+        return this.getMainFile() !== undefined;
+    }
+
+    /**
+     * Get an include file by relative path (convenience method)
+     */
+    public getIncludeFile(relativePath: string): IncludeFile | undefined {
+        const file = this.getByRelativePath(relativePath);
+        if (file && file.getFileType() !== 'main') {
+            return file as IncludeFile;
+        }
+        return undefined;
+    }
+
+    /**
+     * Get include files unsaved status
+     */
+    public getIncludeFilesUnsavedStatus(): { hasChanges: boolean; changedFiles: string[] } {
+        const includeFiles = this.getAll().filter(f => f.getFileType() !== 'main');
+        const changedFiles = includeFiles
+            .filter(f => f.hasUnsavedChanges())
+            .map(f => f.getRelativePath());
+
+        return {
+            hasChanges: changedFiles.length > 0,
+            changedFiles
+        };
+    }
+
+    /**
+     * Check if any file has unsaved changes (main or includes)
+     */
+    public hasAnyUnsavedChanges(): boolean {
+        const mainFile = this.getMainFile();
+        const mainHasChanges = mainFile?.hasUnsavedChanges() || false;
+        const includeStatus = this.getIncludeFilesUnsavedStatus();
+
+        return mainHasChanges || includeStatus.hasChanges;
+    }
+
     // ============= STATISTICS =============
 
     /**

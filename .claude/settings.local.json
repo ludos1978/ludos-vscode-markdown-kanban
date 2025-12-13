@@ -85,7 +85,8 @@
       "Bash(cut:*)",
       "Bash(xargs:*)",
       "Bash(npx eslint:*)",
-      "Bash(npx ts-prune:*)"
+      "Bash(npx ts-prune:*)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": []
