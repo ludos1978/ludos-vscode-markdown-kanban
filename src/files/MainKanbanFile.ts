@@ -22,8 +22,6 @@ import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 export class MainKanbanFile extends MarkdownFile {
     // ============= BOARD STATE =============
     private _board?: KanbanBoard;
-    private _yamlHeader: string | null = null;
-    private _kanbanFooter: string | null = null;
     private _includedFiles: string[] = []; // Regular includes (!!!include(file)!!!)
     private _cachedBoardFromWebview?: KanbanBoard; // Cached board from webview for conflict detection
 
@@ -187,34 +185,6 @@ export class MainKanbanFile extends MarkdownFile {
     }
 
     /**
-     * Get YAML frontmatter
-     */
-    public getYamlHeader(): string | null {
-        return this._yamlHeader;
-    }
-
-    /**
-     * Set YAML frontmatter
-     */
-    public setYamlHeader(yaml: string | null): void {
-        this._yamlHeader = yaml;
-    }
-
-    /**
-     * Get kanban footer
-     */
-    public getKanbanFooter(): string | null {
-        return this._kanbanFooter;
-    }
-
-    /**
-     * Set kanban footer
-     */
-    public setKanbanFooter(footer: string | null): void {
-        this._kanbanFooter = footer;
-    }
-
-    /**
      * Update cached board from webview (for conflict detection)
      */
     public setCachedBoardFromWebview(board: KanbanBoard | undefined): void {
@@ -285,112 +255,6 @@ export class MainKanbanFile extends MarkdownFile {
     public async handleExternalChange(changeType: 'modified' | 'deleted' | 'created'): Promise<void> {
         const changeHandler = UnifiedChangeHandler.getInstance();
         await changeHandler.handleExternalChange(this, changeType);
-    }
-
-    /**
-     * Ultra-comprehensive conflict analysis
-     * Checks EVERY possible source of unsaved changes to prevent data loss
-     */
-    private async _analyzeConflictSituation(): Promise<{
-        hasAnyUnsavedChanges: boolean;
-        reasons: string[];
-        details: {
-            internalState: boolean;
-            editMode: boolean;
-            documentDirty: boolean;
-            documentOpen: boolean;
-            boardModified: boolean;
-            cacheModified: boolean;
-        };
-    }> {
-        const reasons: string[] = [];
-        const details = {
-            internalState: false,
-            editMode: false,
-            documentDirty: false,
-            documentOpen: false,
-            boardModified: false,
-            cacheModified: false
-        };
-
-        // 1. Internal state flag (kanban UI modifications) - computed from content comparison
-        if (this.hasUnsavedChanges()) {
-            details.internalState = true;
-            reasons.push('Internal unsaved changes flag is true');
-        }
-
-        // 2. Edit mode (user actively editing)
-        if (this._isInEditMode) {
-            details.editMode = true;
-            reasons.push('User is in edit mode');
-        }
-
-        // 3. VSCode document dirty status (text editor has unsaved changes)
-        const document = this._fileManager.getDocument();
-        if (document && document.uri.fsPath === this._path) {
-            details.documentOpen = true;
-            if (document.isDirty) {
-                details.documentDirty = true;
-                reasons.push('VSCode document is dirty (unsaved text editor changes)');
-            }
-        }
-
-        // 4. Document is open but we can't access it (be safe)
-        const allDocs = vscode.workspace.textDocuments;
-        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
-        if (docOpen && !document) {
-            details.documentOpen = true;
-            reasons.push('Document is open but inaccessible (assuming unsaved changes)');
-        }
-
-        // 5. Board state differs from baseline (extra safety check)
-        if (this._board) {
-            // Generate what the content SHOULD be from current board
-            const expectedContent = this._generateMarkdownFromBoard(this._board);
-            if (expectedContent !== this._baseline) {
-                details.boardModified = true;
-                reasons.push('Board state differs from saved baseline');
-            }
-        }
-
-        // 6. Check if there's a cached board that differs from current board
-        // This would indicate unsaved kanban changes
-        const currentBoard = this._board;
-        if (currentBoard && this._cachedBoardFromWebview) {
-            // Deep comparison of board structure (excluding volatile fields like timestamps)
-            const currentNormalized = this._normalizeBoardForComparison(currentBoard);
-            const cachedNormalized = this._normalizeBoardForComparison(this._cachedBoardFromWebview);
-
-            if (JSON.stringify(currentNormalized) !== JSON.stringify(cachedNormalized)) {
-                details.cacheModified = true;
-                reasons.push('Cached board differs from current board (unsaved kanban changes)');
-            }
-        } else if (!this._cachedBoardFromWebview) {
-        }
-
-        // 7. Check file registry for any unsaved include files
-        const includeFiles = this._fileRegistry.getIncludeFiles();
-        const unsavedIncludes = includeFiles.filter(f => f.hasUnsavedChanges());
-        if (unsavedIncludes.length > 0) {
-            reasons.push(`${unsavedIncludes.length} include files have unsaved changes`);
-        }
-
-        // 8. Time-based safety check: If external change happened very recently,
-        // it might be concurrent editing
-        const now = Date.now();
-        const lastModified = this._lastModified?.getTime() || 0;
-        const timeSinceChange = now - lastModified;
-        if (timeSinceChange < 2000) { // Less than 2 seconds ago
-            reasons.push(`External change very recent (${timeSinceChange}ms ago) - possible concurrent editing`);
-        }
-
-        const hasAnyUnsavedChanges = reasons.length > 0;
-
-        return {
-            hasAnyUnsavedChanges,
-            reasons,
-            details
-        };
     }
 
     // ============= VALIDATION =============
@@ -501,22 +365,6 @@ export class MainKanbanFile extends MarkdownFile {
         }
 
         return false;
-    }
-
-    /**
-     * Get detailed reasons for unsaved changes (for logging)
-     */
-    private _getUnsavedChangesReasons(): { [key: string]: boolean } {
-        const document = this._fileManager.getDocument();
-        const allDocs = vscode.workspace.textDocuments;
-        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
-
-        return {
-            hasUnsavedChanges_flag: this.hasUnsavedChanges(), // Computed from content comparison
-            isInEditMode_flag: this._isInEditMode,
-            documentIsDirty: !!(document && document.uri.fsPath === this._path && document.isDirty),
-            documentOpenButInaccessible: docOpen && !document
-        };
     }
 
     // ============= OVERRIDES =============
@@ -670,32 +518,5 @@ export class MainKanbanFile extends MarkdownFile {
         // Use the existing markdown generation logic from MarkdownKanbanParser
         // This ensures consistency with how the main save process generates markdown
         return this._parser.generateMarkdown(board);
-    }
-
-    /**
-     * Normalize board for comparison by removing volatile fields
-     * This ensures consistent comparison of board state for conflict detection
-     */
-    private _normalizeBoardForComparison(board: KanbanBoard): any {
-        // Deep clone to avoid modifying original
-        const normalized = JSON.parse(JSON.stringify(board));
-
-        // Remove volatile fields that don't affect content
-        if (normalized.columns) {
-            for (const column of normalized.columns) {
-                // Remove any volatile column properties
-                delete column.isLoadingContent;
-
-                if (column.tasks) {
-                    for (const task of column.tasks) {
-                        // Remove volatile task properties
-                        delete task.isLoadingContent;
-                        // Keep essential content: title, description, includeFiles, etc.
-                    }
-                }
-            }
-        }
-
-        return normalized;
     }
 }

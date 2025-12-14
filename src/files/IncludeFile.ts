@@ -91,27 +91,6 @@ export class IncludeFile extends MarkdownFile {
     }
 
     /**
-     * Get the parent file path
-     */
-    public getParentPath(): string {
-        return this._parentFile.getPath();
-    }
-
-    /**
-     * Get the absolute path (cached)
-     */
-    public getAbsolutePath(): string {
-        return this._absolutePath;
-    }
-
-    /**
-     * Check if this is an inline include (embedded in parent)
-     */
-    public isInline(): boolean {
-        return this._isInline;
-    }
-
-    /**
      * Resolve relative path to absolute path
      */
     private static _resolveAbsolutePath(relativePath: string, parentPath: string): string {
@@ -186,13 +165,6 @@ export class IncludeFile extends MarkdownFile {
     }
 
     // ============= CONTENT OPERATIONS (for include-task) =============
-
-    /**
-     * Get task description content (for include-task)
-     */
-    public getTaskDescription(): string {
-        return this._content;
-    }
 
     /**
      * Set task description content (for include-task)
@@ -415,22 +387,6 @@ export class IncludeFile extends MarkdownFile {
         // No need for additional safety check here
 
         return false;
-    }
-
-    /**
-     * Get detailed reasons for unsaved changes (for logging)
-     */
-    private _getUnsavedChangesReasons(): { [key: string]: boolean } {
-        const openDocuments = vscode.workspace.textDocuments;
-        const documentIsDirty = openDocuments.some(doc =>
-            doc.uri.fsPath === this._path && doc.isDirty
-        );
-
-        return {
-            hasUnsavedChanges_flag: this.hasUnsavedChanges(), // Computed from content comparison
-            isInEditMode_flag: this._isInEditMode,
-            documentIsDirty: documentIsDirty
-        };
     }
 
     // ============= CONFLICT DETECTION =============
