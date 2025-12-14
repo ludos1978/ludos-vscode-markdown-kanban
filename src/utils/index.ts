@@ -23,3 +23,6 @@ export { safeFileUri } from './uriUtils';
 
 // String utilities
 export { escapeRegExp, getErrorMessage, normalizePathForLookup, toForwardSlashes } from './stringUtils';
+
+// File dialog utilities
+export { selectMarkdownFile, type SelectMarkdownFileOptions } from './fileDialogUtils';

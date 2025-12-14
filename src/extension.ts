@@ -3,6 +3,7 @@ import { KanbanWebviewPanel } from './kanbanWebviewPanel';
 import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { PluginLoader } from './plugins';
+import { selectMarkdownFile } from './utils';
 
 // Global output channel for extension logging
 let outputChannel: vscode.OutputChannel | undefined;
@@ -95,15 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// If still no URI, let user select file
 		if (!targetUri) {
-			const fileUris = await vscode.window.showOpenDialog({
-				canSelectFiles: true,
-				canSelectFolders: false,
-				canSelectMany: false,
-				filters: {
-					'Markdown files': ['md']
-				}
-			});
-
+			const fileUris = await selectMarkdownFile();
 			if (fileUris && fileUris.length > 0) {
 				targetUri = fileUris[0];
 			} else {
