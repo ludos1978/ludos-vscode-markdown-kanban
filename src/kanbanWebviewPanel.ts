@@ -796,6 +796,7 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
+        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, stack=${new Error().stack?.split('\n').slice(1, 4).join(' <- ')}`);
         if (!this._panel.webview) { return; }
 
         let board = this.getBoard() || {

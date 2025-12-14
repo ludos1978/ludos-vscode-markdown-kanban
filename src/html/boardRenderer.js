@@ -1596,6 +1596,7 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
+    console.log(`[kanban.renderBoard] Called - options=${JSON.stringify(options)}, stack=${new Error().stack?.split('\n').slice(1, 4).join(' <- ')}`);
     // Apply tag styles first
     applyTagStyles();
 

@@ -2608,6 +2608,7 @@ window.addEventListener('message', event => {
             }
             break;
         case 'boardUpdate':
+            console.log(`[kanban.webview.boardUpdate] Received - isFullRefresh=${message.isFullRefresh}, applyDefaultFolding=${message.applyDefaultFolding}`);
             const previousBoard = window.cachedBoard;
 
             // Clear card focus when board is updated
@@ -2920,6 +2921,7 @@ window.addEventListener('message', event => {
             if (!isEditing && !shouldSkipRender) {
                 // Only render if not editing and not explicitly skipping
                 if (typeof window.renderBoard === 'function') {
+                    console.log(`[kanban.webview.boardUpdate] Calling renderBoard()`);
                     window.renderBoard();
                 }
                 
