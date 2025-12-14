@@ -76,17 +76,18 @@ export class EditModeCommands extends BaseMessageCommand {
 
                 case 'editingStarted':
                     // User started editing - block board regenerations
-                    (panel as any).setEditingInProgress?.(true);
+                    context.setEditingInProgress(true);
                     // Set edit mode flag on main file for conflict detection
                     {
-                        const mainFile = (panel as any).fileRegistry?.getMainFile();
+                        const fileRegistry = context.getFileRegistry();
+                        const mainFile = fileRegistry?.getMainFile();
                         if (mainFile) {
                             mainFile.setEditMode(true);
                         }
                         // Also set edit mode on include files if editing within an include
-                        const board = (panel as any).getBoard?.();
+                        const board = context.getCurrentBoard();
                         if (board && (message.taskId || message.columnId)) {
-                            const allFiles = (panel as any).fileRegistry?.getAll() || [];
+                            const allFiles = fileRegistry?.getAll() || [];
                             for (const file of allFiles) {
                                 if (file.getFileType?.() !== 'main') {
                                     file.setEditMode(true);
@@ -102,15 +103,16 @@ export class EditModeCommands extends BaseMessageCommand {
 
                 case 'editingStoppedNormal':
                     // User finished editing normally (not via backend request)
-                    (panel as any).setEditingInProgress?.(false);
+                    context.setEditingInProgress(false);
                     // Clear edit mode flag on ALL files (main + includes)
                     {
-                        const mainFile = (panel as any).fileRegistry?.getMainFile();
+                        const fileRegistry = context.getFileRegistry();
+                        const mainFile = fileRegistry?.getMainFile();
                         if (mainFile) {
                             mainFile.setEditMode(false);
                         }
                         // Also clear edit mode on all include files
-                        const allFiles = (panel as any).fileRegistry?.getAll() || [];
+                        const allFiles = fileRegistry?.getAll() || [];
                         for (const file of allFiles) {
                             if (file.getFileType?.() !== 'main') {
                                 file.setEditMode(false);
@@ -123,18 +125,18 @@ export class EditModeCommands extends BaseMessageCommand {
                 case 'renderSkipped':
                     // Frontend reports it skipped a render - mark as dirty
                     if (message.itemType === 'column') {
-                        (panel as any).markColumnDirty?.(message.itemId);
+                        context.markColumnDirty(message.itemId);
                     } else if (message.itemType === 'task') {
-                        (panel as any).markTaskDirty?.(message.itemId);
+                        context.markTaskDirty(message.itemId);
                     }
                     return this.success();
 
                 case 'renderCompleted':
                     // Frontend successfully rendered - clear dirty flag
                     if (message.itemType === 'column') {
-                        (panel as any).clearColumnDirty?.(message.itemId);
+                        context.clearColumnDirty(message.itemId);
                     } else if (message.itemType === 'task') {
-                        (panel as any).clearTaskDirty?.(message.itemId);
+                        context.clearTaskDirty(message.itemId);
                     }
                     return this.success();
 

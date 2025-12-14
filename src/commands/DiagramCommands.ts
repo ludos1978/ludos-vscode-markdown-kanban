@@ -12,7 +12,8 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getMermaidExportService } from '../services/export/MermaidExportService';
-import { escapeRegExp, getErrorMessage } from '../utils/stringUtils';
+import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -130,150 +131,14 @@ export class DiagramCommands extends BaseMessageCommand {
      * Handle PlantUML to SVG conversion
      */
     private async handleConvertPlantUMLToSVG(message: any, context: CommandContext): Promise<void> {
-        try {
-            const { filePath, plantUMLCode, svgContent } = message;
-
-            // Get file info
-            const fileDir = path.dirname(filePath);
-            const fileName = path.basename(filePath, path.extname(filePath));
-
-            // Create Media folder
-            const mediaFolder = path.join(fileDir, `Media-${fileName}`);
-            await fs.promises.mkdir(mediaFolder, { recursive: true });
-
-            // Generate unique SVG filename
-            const timestamp = Date.now();
-            const svgFileName = `plantuml-${timestamp}.svg`;
-            const svgFilePath = path.join(mediaFolder, svgFileName);
-
-            // Save SVG file
-            await fs.promises.writeFile(svgFilePath, svgContent, 'utf8');
-
-            // Calculate relative path for markdown
-            const relativePath = path.join(`Media-${fileName}`, svgFileName);
-
-            // Read current file content
-            const currentContent = await fs.promises.readFile(filePath, 'utf8');
-
-            // Find and replace PlantUML block with commented version + image
-            const updatedContent = this.replacePlantUMLWithSVG(
-                currentContent,
-                plantUMLCode,
-                relativePath
-            );
-
-            // Write updated content
-            await fs.promises.writeFile(filePath, updatedContent, 'utf8');
-
-            // Notify success
-            const panel = context.getWebviewPanel();
-            if (panel && panel.webview) {
-                panel.webview.postMessage({
-                    type: 'plantUMLConvertSuccess',
-                    svgPath: relativePath
-                });
-            }
-
-        } catch (error) {
-            console.error('[PlantUML] Conversion failed:', error);
-            const panel = context.getWebviewPanel();
-            if (panel && panel.webview) {
-                panel.webview.postMessage({
-                    type: 'plantUMLConvertError',
-                    error: getErrorMessage(error)
-                });
-            }
-        }
-    }
-
-    /**
-     * Replace PlantUML code block with commented version + SVG image
-     */
-    private replacePlantUMLWithSVG(
-        content: string,
-        plantUMLCode: string,
-        svgRelativePath: string
-    ): string {
-
-        // Split the code into lines to handle per-line matching with indentation
-        // NOTE: The frontend sends TRIMMED code, but the file may have indented code
-        const codeLines = plantUMLCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
-        // Each line can have any indentation, then the trimmed content
-        const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
-
-        // Create regex to match ```plantuml ... ``` block with any indentation
-        const regexPattern = '([ \\t]*)```plantuml\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
-        const regex = new RegExp(regexPattern, 'g');
-
-        // Replace with custom function to preserve indentation
-        let updatedContent = content.replace(regex, (_match, indent) => {
-            // Indent each line of the code
-            const indentedCode = plantUMLCode.split('\n').map(line =>
-                line ? `${indent}${line}` : indent.trimEnd()
-            ).join('\n');
-
-            // Create replacement with disabled PlantUML block + image, preserving indentation
-            return `${indent}\`\`\`plantuml-disabled
-${indentedCode}
-${indent}\`\`\`
-
-${indent}![PlantUML Diagram](${svgRelativePath})`;
-        });
-
-        // Check if replacement happened
-        if (updatedContent === content) {
-            console.warn('[PlantUML] No matching PlantUML block found for replacement');
-            // Try fuzzy matching as fallback
-            return this.replacePlantUMLWithSVGFuzzy(content, plantUMLCode, svgRelativePath);
-        }
-
-        return updatedContent;
-    }
-
-    /**
-     * Fuzzy matching fallback for PlantUML replacement
-     */
-    private replacePlantUMLWithSVGFuzzy(
-        content: string,
-        plantUMLCode: string,
-        svgRelativePath: string
-    ): string {
-        const fuzzyRegex = /```plantuml\s*\n([\s\S]*?)\n```/g;
-        let match;
-        let bestMatch = null;
-        let bestMatchIndex = -1;
-        let similarity = 0;
-
-        while ((match = fuzzyRegex.exec(content)) !== null) {
-            const blockCode = match[1].trim();
-            const targetCode = plantUMLCode.trim();
-
-            // Calculate simple similarity
-            const matchRatio = this.calculateSimilarity(blockCode, targetCode);
-
-            if (matchRatio > similarity && matchRatio > 0.8) { // 80% similarity threshold
-                similarity = matchRatio;
-                bestMatch = match;
-                bestMatchIndex = match.index;
-            }
-        }
-
-        if (bestMatch) {
-            const replacement = `\`\`\`plantuml-disabled
-${plantUMLCode}
-\`\`\`
-
-![PlantUML Diagram](${svgRelativePath})`;
-
-            const beforeMatch = content.substring(0, bestMatchIndex);
-            const afterMatch = content.substring(bestMatchIndex + bestMatch[0].length);
-            return beforeMatch + replacement + afterMatch;
-        }
-
-        // If no fuzzy match found, return original content unchanged
-        console.warn('[PlantUML] No fuzzy match found, content unchanged');
-        return content;
+        await this.convertDiagramToSVG(
+            message.filePath,
+            message.plantUMLCode,
+            message.svgContent,
+            'plantuml',
+            'PlantUML Diagram',
+            context
+        );
     }
 
     // ============= MERMAID HANDLERS =============
@@ -282,9 +147,31 @@ ${plantUMLCode}
      * Handle Mermaid to SVG conversion
      */
     private async handleConvertMermaidToSVG(message: any, context: CommandContext): Promise<void> {
-        try {
-            const { filePath, mermaidCode, svgContent } = message;
+        await this.convertDiagramToSVG(
+            message.filePath,
+            message.mermaidCode,
+            message.svgContent,
+            'mermaid',
+            'Mermaid Diagram',
+            context
+        );
+    }
 
+    /**
+     * Unified diagram to SVG conversion for PlantUML and Mermaid
+     * Saves the SVG file and replaces the code block in the source markdown
+     */
+    private async convertDiagramToSVG(
+        filePath: string,
+        diagramCode: string,
+        svgContent: string,
+        diagramType: 'plantuml' | 'mermaid',
+        altText: string,
+        context: CommandContext
+    ): Promise<void> {
+        const capitalizedType = diagramType === 'plantuml' ? 'PlantUML' : 'Mermaid';
+
+        try {
             // Get file info
             const fileDir = path.dirname(filePath);
             const fileName = path.basename(filePath, path.extname(filePath));
@@ -295,7 +182,7 @@ ${plantUMLCode}
 
             // Generate unique SVG filename
             const timestamp = Date.now();
-            const svgFileName = `mermaid-${timestamp}.svg`;
+            const svgFileName = `${diagramType}-${timestamp}.svg`;
             const svgFilePath = path.join(mediaFolder, svgFileName);
 
             // Save SVG file
@@ -307,11 +194,12 @@ ${plantUMLCode}
             // Read current file content
             const currentContent = await fs.promises.readFile(filePath, 'utf8');
 
-            // Find and replace Mermaid block with commented version + image
-            const updatedContent = this.replaceMermaidWithSVG(
+            // Find and replace code block with disabled version + image
+            const updatedContent = replaceCodeBlockWithSVG(
                 currentContent,
-                mermaidCode,
-                relativePath
+                diagramCode,
+                relativePath,
+                { blockType: diagramType, altText }
             );
 
             // Write updated content
@@ -321,110 +209,21 @@ ${plantUMLCode}
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
                 panel.webview.postMessage({
-                    type: 'mermaidConvertSuccess',
+                    type: `${diagramType}ConvertSuccess`,
                     svgPath: relativePath
                 });
             }
 
         } catch (error) {
-            console.error('[Mermaid] Conversion failed:', error);
+            console.error(`[${capitalizedType}] Conversion failed:`, error);
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
                 panel.webview.postMessage({
-                    type: 'mermaidConvertError',
+                    type: `${diagramType}ConvertError`,
                     error: getErrorMessage(error)
                 });
             }
         }
-    }
-
-    /**
-     * Replace Mermaid code block with commented version + SVG image
-     */
-    private replaceMermaidWithSVG(
-        content: string,
-        mermaidCode: string,
-        svgRelativePath: string
-    ): string {
-
-        // Split the code into lines to handle per-line matching with indentation
-        const codeLines = mermaidCode.split('\n').filter(line => line.trim().length > 0);
-        const escapedLines = codeLines.map(line => escapeRegExp(line.trim()));
-        // Each line can have any indentation, then the trimmed content
-        const codePattern = escapedLines.map(line => '[ \\t]*' + line).join('\\s*\\n');
-
-        // Create regex to match ```mermaid ... ``` block with any indentation
-        const regexPattern = '([ \\t]*)```mermaid\\s*\\n' + codePattern + '\\s*\\n[ \\t]*```';
-        const regex = new RegExp(regexPattern, 'g');
-
-        // Replace with custom function to preserve indentation
-        let updatedContent = content.replace(regex, (_match, indent) => {
-            // Indent each line of the code
-            const indentedCode = mermaidCode.split('\n').map(line =>
-                line ? `${indent}${line}` : indent.trimEnd()
-            ).join('\n');
-
-            // Create replacement with disabled Mermaid block + image, preserving indentation
-            return `${indent}\`\`\`mermaid-disabled
-${indentedCode}
-${indent}\`\`\`
-
-${indent}![Mermaid Diagram](${svgRelativePath})`;
-        });
-
-        // Check if replacement happened
-        if (updatedContent === content) {
-            console.warn('[Mermaid] No matching Mermaid block found for replacement');
-            // Try fuzzy matching as fallback
-            return this.replaceMermaidWithSVGFuzzy(content, mermaidCode, svgRelativePath);
-        }
-
-        return updatedContent;
-    }
-
-    /**
-     * Fuzzy matching fallback for Mermaid replacement
-     */
-    private replaceMermaidWithSVGFuzzy(
-        content: string,
-        mermaidCode: string,
-        svgRelativePath: string
-    ): string {
-        const fuzzyRegex = /```mermaid\s*\n([\s\S]*?)\n```/g;
-        let match;
-        let bestMatch = null;
-        let bestMatchIndex = -1;
-        let similarity = 0;
-
-        while ((match = fuzzyRegex.exec(content)) !== null) {
-            const blockCode = match[1].trim();
-            const targetCode = mermaidCode.trim();
-
-            // Calculate simple similarity
-            const matchRatio = this.calculateSimilarity(blockCode, targetCode);
-
-            if (matchRatio > similarity && matchRatio > 0.8) { // 80% similarity threshold
-                similarity = matchRatio;
-                bestMatch = match;
-                bestMatchIndex = match.index;
-            }
-        }
-
-        if (bestMatch) {
-            const replacement = `\`\`\`mermaid-disabled
-${mermaidCode}
-\`\`\`
-
-![Mermaid Diagram](${svgRelativePath})`;
-
-            const beforeMatch = content.substring(0, bestMatchIndex);
-            const afterMatch = content.substring(bestMatchIndex + bestMatch[0].length);
-            return beforeMatch + replacement + afterMatch;
-        }
-
-        // If no fuzzy match found, return original content unchanged
-        console.warn('[Mermaid] No fuzzy match found, content unchanged');
-        return content;
     }
 
     // ============= DRAW.IO HANDLERS =============
@@ -748,54 +547,5 @@ ${mermaidCode}
                 error: getErrorMessage(error)
             });
         }
-    }
-
-    // ============= UTILITY METHODS =============
-
-    /**
-     * Calculate similarity between two strings (0 = no match, 1 = exact match)
-     */
-    private calculateSimilarity(str1: string, str2: string): number {
-        if (str1 === str2) return 1.0;
-        if (str1.length === 0 || str2.length === 0) return 0.0;
-
-        const longer = str1.length > str2.length ? str1 : str2;
-        const shorter = str1.length > str2.length ? str2 : str1;
-
-        const longerLength = longer.length;
-        if (longerLength === 0) return 1.0;
-
-        return (longerLength - this.editDistance(longer, shorter)) / longerLength;
-    }
-
-    /**
-     * Calculate Levenshtein edit distance between two strings
-     */
-    private editDistance(str1: string, str2: string): number {
-        const matrix: number[][] = [];
-
-        for (let i = 0; i <= str2.length; i++) {
-            matrix[i] = [i];
-        }
-
-        for (let j = 0; j <= str1.length; j++) {
-            matrix[0][j] = j;
-        }
-
-        for (let i = 1; i <= str2.length; i++) {
-            for (let j = 1; j <= str1.length; j++) {
-                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                    matrix[i][j] = matrix[i - 1][j - 1];
-                } else {
-                    matrix[i][j] = Math.min(
-                        matrix[i - 1][j - 1] + 1,
-                        matrix[i][j - 1] + 1,
-                        matrix[i - 1][j] + 1
-                    );
-                }
-            }
-        }
-
-        return matrix[str2.length][str1.length];
     }
 }

@@ -18,6 +18,18 @@ import { FileSaveService } from '../../core/FileSaveService';
 import * as vscode from 'vscode';
 
 /**
+ * Parameters for include switch operations
+ */
+export interface IncludeSwitchParams {
+    taskId?: string;
+    columnId?: string;
+    oldFiles: string[];
+    newFiles: string[];
+    newTitle: string;
+    preloadedContent?: Map<string, string>;
+}
+
+/**
  * Context provided to command handlers
  * Contains all dependencies needed to process messages
  */
@@ -45,6 +57,32 @@ export interface CommandContext {
     // Export settings
     getAutoExportSettings: () => any;
     setAutoExportSettings: (settings: any) => void;
+
+    // Editing state management
+    /** Set whether editing is in progress (blocks board regenerations) */
+    setEditingInProgress: (value: boolean) => void;
+
+    // Dirty tracking for unsaved changes
+    /** Mark a task as having unsaved changes */
+    markTaskDirty: (taskId: string) => void;
+    /** Clear dirty flag for a task */
+    clearTaskDirty: (taskId: string) => void;
+    /** Mark a column as having unsaved changes */
+    markColumnDirty: (columnId: string) => void;
+    /** Clear dirty flag for a column */
+    clearColumnDirty: (columnId: string) => void;
+
+    // Include file operations
+    /** Handle switching include files for a task or column */
+    handleIncludeSwitch: (params: IncludeSwitchParams) => Promise<void>;
+    /** Request frontend to stop editing and capture current value */
+    requestStopEditing: () => Promise<any>;
+    /** Handle unified column title edit (with include detection) */
+    handleEditColumnTitleUnified: (columnId: string, title: string) => Promise<void>;
+
+    // Configuration
+    /** Refresh configuration from VS Code settings */
+    refreshConfiguration: () => Promise<void>;
 }
 
 /**
@@ -188,5 +226,47 @@ export abstract class BaseMessageCommand implements MessageCommand {
      */
     protected getCurrentBoard(): KanbanBoard | undefined {
         return this._context?.getCurrentBoard();
+    }
+
+    /**
+     * Perform a board action with undo support and update handling.
+     * Common pattern for board modifications with proper state management.
+     *
+     * @param context - Command execution context (passed from execute)
+     * @param action - The action to perform (returns true on success)
+     * @param options.saveUndo - Whether to save undo state (default: true)
+     * @param options.sendUpdate - Whether to send board update to frontend (default: true)
+     *                            Set to false when frontend already has the change (e.g., live editing)
+     * @returns true if action succeeded
+     */
+    protected async performBoardAction(
+        context: CommandContext,
+        action: () => boolean,
+        options: { saveUndo?: boolean; sendUpdate?: boolean } = {}
+    ): Promise<boolean> {
+        const { saveUndo = true, sendUpdate = true } = options;
+
+        const board = context.getCurrentBoard();
+        if (!board) {
+            return false;
+        }
+
+        if (saveUndo) {
+            context.boardStore.saveStateForUndo(board);
+        }
+
+        const success = action();
+
+        if (success) {
+            const currentBoard = context.getCurrentBoard();
+            if (currentBoard) {
+                context.syncBoardToBackend(currentBoard);
+            }
+            if (sendUpdate) {
+                await context.onBoardUpdate();
+            }
+        }
+
+        return success;
     }
 }

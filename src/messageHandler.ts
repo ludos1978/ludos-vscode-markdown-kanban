@@ -107,7 +107,24 @@ export class MessageHandler {
             getWebviewPanel: this._getWebviewPanel,
             syncBoardToBackend: this._syncBoardToBackend,
             getAutoExportSettings: () => this._autoExportSettings,
-            setAutoExportSettings: (settings: any) => { this._autoExportSettings = settings; }
+            setAutoExportSettings: (settings: any) => { this._autoExportSettings = settings; },
+
+            // Editing state management
+            setEditingInProgress: (value: boolean) => this._getWebviewPanel()?.setEditingInProgress(value),
+
+            // Dirty tracking
+            markTaskDirty: (taskId: string) => this._getWebviewPanel()?.markTaskDirty?.(taskId),
+            clearTaskDirty: (taskId: string) => this._getWebviewPanel()?.clearTaskDirty?.(taskId),
+            markColumnDirty: (columnId: string) => this._getWebviewPanel()?.markColumnDirty?.(columnId),
+            clearColumnDirty: (columnId: string) => this._getWebviewPanel()?.clearColumnDirty?.(columnId),
+
+            // Include file operations
+            handleIncludeSwitch: (params) => this._getWebviewPanel()?.handleIncludeSwitch(params),
+            requestStopEditing: () => this.requestStopEditing(),
+            handleEditColumnTitleUnified: (columnId: string, title: string) => this.handleEditColumnTitleUnified(columnId, title),
+
+            // Configuration
+            refreshConfiguration: () => this._getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve()
         };
 
         // Register command handlers
@@ -318,46 +335,6 @@ export class MessageHandler {
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);
-        }
-    }
-
-    /**
-     * Handle updating task content after strikethrough deletion
-     */
-    async handleUpdateTaskFromStrikethroughDeletion(message: any): Promise<void> {
-        const { taskId, columnId, newContent, contentType } = message;
-
-        try {
-            const board = this._getCurrentBoard();
-            if (!board) {
-                console.error('🗑️ Backend: No current board available for strikethrough deletion');
-                return;
-            }
-
-            // Content is already in markdown format from frontend
-            const markdownContent = newContent;
-
-            // Update the appropriate field based on content type
-            const updateData: any = {};
-            if (contentType === 'title') {
-                updateData.title = markdownContent;
-            } else if (contentType === 'description') {
-                updateData.description = markdownContent;
-            } else {
-                console.warn('🗑️ Backend: Unknown content type, defaulting to title');
-                updateData.title = markdownContent;
-            }
-
-            // OPTIMIZATION: Use sendUpdate: false to skip full board redraw
-            // Frontend already has the updated content, we just need to persist the change
-            await this.performBoardAction(() =>
-                this._boardOperations.editTask(board, taskId, columnId, updateData),
-                { sendUpdate: false }
-            );
-
-        } catch (error) {
-            console.error('🗑️ Backend: Error updating task from strikethrough deletion:', error);
-            vscode.window.showErrorMessage('Failed to update task content');
         }
     }
 

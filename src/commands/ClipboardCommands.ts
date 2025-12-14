@@ -51,16 +51,6 @@ export class ClipboardCommands extends BaseMessageCommand {
 
     private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
 
-    // ============= WEBVIEW MESSAGING HELPER =============
-
-    /**
-     * Send a message to the webview panel
-     * Centralizes null checks and panel access pattern
-     */
-    private _sendToWebview(_context: CommandContext, type: string, data: Record<string, any>): void {
-        this.postMessage({ type, ...data });
-    }
-
     async execute(message: any, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
@@ -189,7 +179,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             const buffer = Buffer.from(imageData, 'base64');
             fs.writeFileSync(imagePath, buffer);
 
-            this._sendToWebview(context, 'clipboardImageSaved', {
+            this.postMessage({ type: 'clipboardImageSaved',
                 success: true,
                 imagePath: imagePath,
                 relativePath: `./${mediaFolderName}/${imageFileName}`,
@@ -197,9 +187,9 @@ export class ClipboardCommands extends BaseMessageCommand {
             });
         } catch (error) {
             console.error('[ClipboardCommands] Error saving clipboard image:', error);
-            this._sendToWebview(context, 'clipboardImageSaved', {
+            this.postMessage({ type: 'clipboardImageSaved',
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: getErrorMessage(error),
                 dropPosition: dropPosition
             });
         }
@@ -213,38 +203,20 @@ export class ClipboardCommands extends BaseMessageCommand {
         md5Hash?: string
     ): Promise<void> {
         try {
-            const document = context.fileManager.getDocument();
-            const currentFilePath = context.fileManager.getFilePath() || document?.uri.fsPath;
-            if (!currentFilePath) {
-                this._sendToWebview(context, 'clipboardImageSaved', {
-                    success: false,
-                    error: 'No current file path available',
-                    dropPosition: dropPosition
-                });
-                return;
-            }
-
-            const pathParts = currentFilePath.split(/[\/\\]/);
-            const fileName = pathParts.pop() || 'kanban';
-            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-            const directory = pathParts.join('/');
+            const { directory, baseFileName } = this._getCurrentFilePaths(context);
 
             const extension = imageType.split('/')[1] || 'png';
             const imageFileName = md5Hash ? `${md5Hash}.${extension}` : `clipboard-image-${Date.now()}.${extension}`;
 
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
             const mediaFolderName = `${baseFileName}-MEDIA`;
-            const mediaFolderPath = `${directory}/${mediaFolderName}`;
-            const imagePath = `${mediaFolderPath}/${imageFileName}`;
-
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
 
             const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
             const buffer = Buffer.from(base64Only, 'base64');
             fs.writeFileSync(imagePath, buffer);
 
-            this._sendToWebview(context, 'clipboardImageSaved', {
+            this.postMessage({ type: 'clipboardImageSaved',
                 success: true,
                 imagePath: imagePath,
                 relativePath: `./${mediaFolderName}/${imageFileName}`,
@@ -252,9 +224,9 @@ export class ClipboardCommands extends BaseMessageCommand {
             });
         } catch (error) {
             console.error('[ClipboardCommands] Error saving clipboard image with path:', error);
-            this._sendToWebview(context, 'clipboardImageSaved', {
+            this.postMessage({ type: 'clipboardImageSaved',
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: getErrorMessage(error),
                 dropPosition: dropPosition
             });
         }
@@ -268,38 +240,20 @@ export class ClipboardCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<void> {
         try {
-            const document = context.fileManager.getDocument();
-            const currentFilePath = context.fileManager.getFilePath() || document?.uri.fsPath;
-            if (!currentFilePath) {
-                this._sendToWebview(context, 'imagePastedIntoField', {
-                    success: false,
-                    error: 'No current file path available',
-                    cursorPosition: cursorPosition
-                });
-                return;
-            }
-
-            const pathParts = currentFilePath.split(/[\/\\]/);
-            const fileName = pathParts.pop() || 'kanban';
-            const baseFileName = fileName.replace(/\.[^/.]+$/, '');
-            const directory = pathParts.join('/');
+            const { directory, baseFileName } = this._getCurrentFilePaths(context);
 
             const extension = imageType.split('/')[1] || 'png';
             const imageFileName = `${md5Hash}.${extension}`;
 
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const imagePath = path.join(mediaFolderPath, imageFileName);
             const mediaFolderName = `${baseFileName}-MEDIA`;
-            const mediaFolderPath = `${directory}/${mediaFolderName}`;
-            const imagePath = `${mediaFolderPath}/${imageFileName}`;
-
-            if (!fs.existsSync(mediaFolderPath)) {
-                fs.mkdirSync(mediaFolderPath, { recursive: true });
-            }
 
             const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
             const buffer = Buffer.from(base64Only, 'base64');
             fs.writeFileSync(imagePath, buffer);
 
-            this._sendToWebview(context, 'imagePastedIntoField', {
+            this.postMessage({ type: 'imagePastedIntoField',
                 success: true,
                 imagePath: imagePath,
                 relativePath: `./${mediaFolderName}/${imageFileName}`,
@@ -307,9 +261,9 @@ export class ClipboardCommands extends BaseMessageCommand {
             });
         } catch (error) {
             console.error('[ClipboardCommands] Error pasting image into field:', error);
-            this._sendToWebview(context, 'imagePastedIntoField', {
+            this.postMessage({ type: 'imagePastedIntoField',
                 success: false,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: getErrorMessage(error),
                 cursorPosition: cursorPosition
             });
         }
@@ -335,7 +289,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             return this._copyToMediaFolder(sourcePath, fileData, originalFileName, dropPosition, directory, baseFileName, isImage, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error handling file:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, fileData !== null, context);
+            this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, fileData !== null, context);
         }
     }
 
@@ -371,7 +325,7 @@ export class ClipboardCommands extends BaseMessageCommand {
                 existingFile = this._findMatchingFileByHash(mediaFolderPath, fileHash, fileName);
             }
 
-            this._sendToWebview(context, 'showFileDropDialogue', {
+            this.postMessage({ type: 'showFileDropDialogue',
                 dropId: dropId,
                 fileName: fileName,
                 fileSize: fileSize,
@@ -383,7 +337,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             });
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop dialogue:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, !hasSourcePath, context);
+            this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, !hasSourcePath, context);
         }
     }
 
@@ -395,7 +349,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             await this._copyToMediaFolder(sourcePath, null, fileName, dropPosition, directory, baseFileName, isImage, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop copy:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, false, context);
+            this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, false, context);
         }
     }
 
@@ -407,7 +361,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             this._sendLinkMessage(sourcePath, fileName, dropPosition, directory, isImage, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error in file drop link:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, false, context);
+            this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, false, context);
         }
     }
 
@@ -422,7 +376,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             this._sendLinkMessage(existingFilePath, fileName, dropPosition, directory, isImage, context);
         } catch (error) {
             console.error('[ClipboardCommands] Error linking existing file:', error);
-            this._sendFileDropError(error instanceof Error ? error.message : 'Unknown error', dropPosition, isImage, true, context);
+            this._sendFileDropError(getErrorMessage(error), dropPosition, isImage, true, context);
         }
     }
 
@@ -434,7 +388,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             await vscode.commands.executeCommand('revealFileInOS', safeFileUri(mediaFolderPath, 'ClipboardCommands-revealMedia'));
         } catch (error) {
             console.error('[ClipboardCommands] Error opening media folder:', error);
-            vscode.window.showErrorMessage(`Failed to open media folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            vscode.window.showErrorMessage(`Failed to open media folder: ${getErrorMessage(error)}`);
         }
     }
 
@@ -684,7 +638,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             : context.fileManager.generateConfiguredPath(sourcePath);
 
         if (isImage) {
-            this._sendToWebview(context, 'droppedImageSaved', {
+            this.postMessage({ type: 'droppedImageSaved',
                 success: true,
                 relativePath: formattedPath,
                 originalFileName: originalFileName,
@@ -692,7 +646,7 @@ export class ClipboardCommands extends BaseMessageCommand {
                 wasLinked: true
             });
         } else {
-            this._sendToWebview(context, 'fileUriDropped', {
+            this.postMessage({ type: 'fileUriDropped',
                 success: true,
                 filePath: formattedPath,
                 originalFileName: originalFileName,
@@ -750,7 +704,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             : context.fileManager.generateConfiguredPath(targetPath);
 
         if (isImage) {
-            this._sendToWebview(context, 'droppedImageSaved', {
+            this.postMessage({ type: 'droppedImageSaved',
                 success: true,
                 relativePath: formattedPath,
                 originalFileName: originalFileName,
@@ -759,7 +713,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             });
         } else {
             const messageType = fileData ? 'fileContentsDropped' : 'fileUriDropped';
-            this._sendToWebview(context, messageType, {
+            this.postMessage({ type: messageType,
                 success: true,
                 filePath: formattedPath,
                 originalFileName: originalFileName,
@@ -771,14 +725,14 @@ export class ClipboardCommands extends BaseMessageCommand {
 
     private _sendFileDropError(error: string, dropPosition: { x: number; y: number }, isImage: boolean, isFileObject: boolean, context: CommandContext): void {
         if (isImage) {
-            this._sendToWebview(context, 'droppedImageSaved', {
+            this.postMessage({ type: 'droppedImageSaved',
                 success: false,
                 error: error,
                 dropPosition: dropPosition
             });
         } else {
             const messageType = isFileObject ? 'fileContentsDropped' : 'fileUriDropped';
-            this._sendToWebview(context, messageType, {
+            this.postMessage({ type: messageType,
                 success: false,
                 error: error,
                 dropPosition: dropPosition

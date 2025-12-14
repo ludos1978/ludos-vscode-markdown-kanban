@@ -73,44 +73,6 @@ export class ColumnCommands extends BaseMessageCommand {
         }
     }
 
-    // ============= HELPER METHODS =============
-
-    /**
-     * Perform a board action with undo support and update handling
-     */
-    private async performBoardAction(
-        context: CommandContext,
-        action: () => boolean,
-        options: { saveUndo?: boolean; sendUpdate?: boolean } = {}
-    ): Promise<boolean> {
-        const { saveUndo = true, sendUpdate = true } = options;
-
-        const board = context.getCurrentBoard();
-        if (!board) {
-            return false;
-        }
-
-        if (saveUndo) {
-            context.boardStore.saveStateForUndo(board);
-        }
-
-        const success = action();
-
-        if (success) {
-            const board = context.getCurrentBoard();
-            if (board) {
-                // Sync board state to backend (updates _content for unsaved detection)
-                context.syncBoardToBackend(board);
-            }
-            if (sendUpdate) {
-                // Backend-initiated change: also send update to frontend
-                await context.onBoardUpdate();
-            }
-        }
-
-        return success;
-    }
-
     // ============= COLUMN HANDLERS =============
 
     /**
@@ -238,32 +200,11 @@ export class ColumnCommands extends BaseMessageCommand {
 
     /**
      * Handle editColumnTitle message - complex with include handling
-     * Routes to the unified handler in MessageHandler for include detection
+     * Routes to the unified handler for include detection
      */
     private async handleEditColumnTitle(message: any, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel();
-        if (!panel) {
-            return this.failure('No panel available');
-        }
-
-        // SWITCH-2: Route through MessageHandler's unified column include switch function
-        // This is necessary because the include handling requires access to MessageHandler's
-        // handleEditColumnTitleUnified method which has complex include file management
-        if ((panel as any)._messageHandler?.handleEditColumnTitleUnified) {
-            await (panel as any)._messageHandler.handleEditColumnTitleUnified(message.columnId, message.title);
-        } else {
-            // Fallback: simple title edit without include handling
-            await this.performBoardAction(
-                context,
-                () => context.boardOperations.editColumnTitle(
-                    context.getCurrentBoard()!,
-                    message.columnId,
-                    message.title
-                ),
-                { sendUpdate: false }
-            );
-        }
-
+        // Route through unified column title handler which handles include detection
+        await context.handleEditColumnTitleUnified(message.columnId, message.title);
         return this.success();
     }
 
@@ -272,16 +213,8 @@ export class ColumnCommands extends BaseMessageCommand {
      * Routes through the same unified handler as editColumnTitle
      */
     private async handleUpdateColumnTitleFromStrikethroughDeletion(message: any, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel();
-        if (!panel) {
-            return this.failure('No panel available');
-        }
-
         // Route through unified handler
-        if ((panel as any)._messageHandler?.handleEditColumnTitleUnified) {
-            await (panel as any)._messageHandler.handleEditColumnTitleUnified(message.columnId, message.newTitle);
-        }
-
+        await context.handleEditColumnTitleUnified(message.columnId, message.newTitle);
         return this.success();
     }
 }

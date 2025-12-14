@@ -228,10 +228,7 @@ export class UICommands extends BaseMessageCommand {
      * Handle requestConfigurationRefresh command
      */
     private async handleRequestConfigurationRefresh(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel();
-        if (panel && typeof (panel as any).refreshConfiguration === 'function') {
-            await (panel as any).refreshConfiguration();
-        }
+        await context.refreshConfiguration();
         return this.success();
     }
 }

@@ -91,39 +91,59 @@ export class TaskCommands extends BaseMessageCommand {
     // ============= HELPER METHODS =============
 
     /**
-     * Perform a board action with undo support and update handling
+     * Extract include file paths from a title string
+     * Returns array of file paths found in !!!include(path)!!! syntax
      */
-    private async performBoardAction(
-        context: CommandContext,
-        action: () => boolean,
-        options: { saveUndo?: boolean; sendUpdate?: boolean } = {}
-    ): Promise<boolean> {
-        const { saveUndo = true, sendUpdate = true } = options;
+    private extractIncludeFiles(title: string): string[] {
+        const includeFiles: string[] = [];
+        const matches = title.match(INCLUDE_SYNTAX.REGEX);
+        if (matches) {
+            matches.forEach((match: string) => {
+                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+                includeFiles.push(filePath);
+            });
+        }
+        return includeFiles;
+    }
 
-        const board = context.getCurrentBoard();
-        if (!board) {
+    /**
+     * Handle include switch for a task title change
+     * Performs the include switch if the title contains or contained include syntax
+     * @returns true if include switch was performed, false otherwise
+     */
+    private async handleTaskIncludeSwitch(
+        taskId: string,
+        newTitle: string,
+        oldIncludeFiles: string[],
+        context: CommandContext
+    ): Promise<boolean> {
+        const hasNewInclude = INCLUDE_SYNTAX.REGEX_SINGLE.test(newTitle);
+        const hadOldInclude = oldIncludeFiles.length > 0;
+
+        if (!hasNewInclude && !hadOldInclude) {
             return false;
         }
 
-        if (saveUndo) {
-            context.boardStore.saveStateForUndo(board);
+        const newIncludeFiles = this.extractIncludeFiles(newTitle);
+
+        // Clear dirty flag before stopping edit
+        context.clearTaskDirty(taskId);
+
+        // Stop editing before switch
+        await context.requestStopEditing();
+
+        try {
+            await context.handleIncludeSwitch({
+                taskId,
+                oldFiles: oldIncludeFiles,
+                newFiles: newIncludeFiles,
+                newTitle
+            });
+        } finally {
+            context.setEditingInProgress(false);
         }
 
-        const success = action();
-
-        if (success) {
-            const board = context.getCurrentBoard();
-            if (board) {
-                // Sync board state to backend (updates _content for unsaved detection)
-                context.syncBoardToBackend(board);
-            }
-            if (sendUpdate) {
-                // Backend-initiated change: also send update to frontend
-                await context.onBoardUpdate();
-            }
-        }
-
-        return success;
+        return true;
     }
 
     // ============= TASK HANDLERS =============
@@ -135,57 +155,24 @@ export class TaskCommands extends BaseMessageCommand {
         // Check if this is a title change with include syntax (add/remove/change)
         if (message.taskData?.title !== undefined) {
             const newTitle = message.taskData.title;
-            const hasNewInclude = INCLUDE_SYNTAX.REGEX_SINGLE.test(newTitle);
-
             const board = context.getCurrentBoard();
             const column = board?.columns.find((c: any) => c.id === message.columnId);
             const task = column?.tasks.find((t: any) => t.id === message.taskId);
 
             if (task) {
-                // CRITICAL FIX: Skip include detection for column-generated tasks
+                // CRITICAL: Skip include detection for column-generated tasks
                 const columnHasInclude = column?.includeMode === true;
 
                 if (!columnHasInclude) {
                     try {
                         const oldIncludeFiles = task.includeFiles || [];
-                        const hadOldInclude = oldIncludeFiles.length > 0;
-
-                        if (hasNewInclude || hadOldInclude) {
-                            const panel = context.getWebviewPanel();
-                            if (!panel) {
-                                return this.failure('No panel available');
-                            }
-
-                            // Extract new include files from title
-                            const newIncludeFiles: string[] = [];
-                            const matches = newTitle.match(INCLUDE_SYNTAX.REGEX);
-                            if (matches) {
-                                matches.forEach((match: string) => {
-                                    const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                                    newIncludeFiles.push(filePath);
-                                });
-                            }
-
-                            // Clear dirty flag before stopping edit
-                            if ((panel as any).clearTaskDirty) {
-                                (panel as any).clearTaskDirty(message.taskId);
-                            }
-
-                            // Stop editing before switch
-                            // Note: requestStopEditing is on MessageHandler, need different approach
-                            // For now, we'll handle this by calling through the panel
-                            if ((panel as any)._messageHandler?.requestStopEditing) {
-                                await (panel as any)._messageHandler.requestStopEditing();
-                            }
-
-                            await (panel as any).handleIncludeSwitch({
-                                taskId: message.taskId,
-                                oldFiles: oldIncludeFiles,
-                                newFiles: newIncludeFiles,
-                                newTitle: newTitle
-                            });
-
-                            (panel as any).setEditingInProgress(false);
+                        const handled = await this.handleTaskIncludeSwitch(
+                            message.taskId,
+                            newTitle,
+                            oldIncludeFiles,
+                            context
+                        );
+                        if (handled) {
                             return this.success();
                         }
                     } catch (error) {
@@ -216,8 +203,7 @@ export class TaskCommands extends BaseMessageCommand {
             const columnHasInclude = column?.includeMode === true;
 
             if (task && task.includeMode && task.includeFiles && !columnHasInclude) {
-                const panel = context.getWebviewPanel();
-                const fileRegistry = (panel as any)?._fileRegistry;
+                const fileRegistry = context.getFileRegistry();
 
                 for (const relativePath of task.includeFiles) {
                     const file = fileRegistry?.getByRelativePath(relativePath);
@@ -430,51 +416,20 @@ export class TaskCommands extends BaseMessageCommand {
         const columnHasTaskInclude = targetColumn?.includeMode === true;
 
         if (!columnHasTaskInclude && task) {
-            // Check if the new title contains include syntax
-            const hasTaskIncludeMatches = message.title.match(INCLUDE_SYNTAX.REGEX);
-            const oldTaskIncludeMatches = (task.title || '').match(INCLUDE_SYNTAX.REGEX);
-            const hasTaskIncludeChanges = hasTaskIncludeMatches || oldTaskIncludeMatches;
-
-            if (hasTaskIncludeChanges) {
-                // Extract the include files from the new title
-                const newIncludeFiles: string[] = [];
-                if (hasTaskIncludeMatches) {
-                    hasTaskIncludeMatches.forEach((match: string) => {
-                        const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                        newIncludeFiles.push(filePath);
-                    });
+            const oldIncludeFiles = task.includeFiles || [];
+            try {
+                const handled = await this.handleTaskIncludeSwitch(
+                    message.taskId,
+                    message.title,
+                    oldIncludeFiles,
+                    context
+                );
+                if (handled) {
+                    return this.success();
                 }
-
-                const panel = context.getWebviewPanel();
-                if (panel) {
-                    const oldTaskIncludeFiles = task.includeFiles || [];
-
-                    // Clear dirty flag BEFORE stopping editing
-                    if ((panel as any).clearTaskDirty) {
-                        (panel as any).clearTaskDirty(message.taskId);
-                    }
-
-                    // Stop editing before switch
-                    if ((panel as any)._messageHandler?.requestStopEditing) {
-                        await (panel as any)._messageHandler.requestStopEditing();
-                    }
-
-                    try {
-                        await (panel as any).handleIncludeSwitch({
-                            taskId: message.taskId,
-                            oldFiles: oldTaskIncludeFiles,
-                            newFiles: newIncludeFiles,
-                            newTitle: message.title
-                        });
-
-                        (panel as any).setEditingInProgress(false);
-                    } catch (error) {
-                        (panel as any).setEditingInProgress(false);
-
-                        if (getErrorMessage(error) !== 'USER_CANCELLED') {
-                            throw error;
-                        }
-                    }
+            } catch (error) {
+                if (getErrorMessage(error) !== 'USER_CANCELLED') {
+                    throw error;
                 }
                 return this.success();
             }
@@ -492,10 +447,7 @@ export class TaskCommands extends BaseMessageCommand {
             { sendUpdate: false }
         );
 
-        const panel = context.getWebviewPanel();
-        if (panel) {
-            (panel as any).setEditingInProgress(false);
-        }
+        context.setEditingInProgress(false);
 
         return this.success();
     }

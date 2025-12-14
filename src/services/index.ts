@@ -34,5 +34,8 @@ export {
 // Asset services
 export * from './assets';
 
+// Diagram services
+export * from './diagram';
+
 // Export services
 export * from './export';
