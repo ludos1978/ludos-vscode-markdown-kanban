@@ -12,7 +12,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
-import { ExportService } from '../exportService';
+import { ExportService } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../configurationService';

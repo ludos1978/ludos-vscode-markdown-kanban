@@ -66,7 +66,7 @@ export class PlantUMLService {
 
                 // Bypass node-plantuml and spawn Java directly
                 // node-plantuml doesn't work in VS Code extension context
-                const vendorPath = path.join(__dirname, '../node_modules/node-plantuml/vendor');
+                const vendorPath = path.join(__dirname, '../../node_modules/node-plantuml/vendor');
                 const plantumlJar = path.join(vendorPath, 'plantuml-modern.jar');  // Use modern v1.2024.7
 
 

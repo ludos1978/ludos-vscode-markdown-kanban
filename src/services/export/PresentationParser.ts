@@ -1,5 +1,5 @@
-import { KanbanTask } from './markdownParser';
-import { IdGenerator } from './utils/idGenerator';
+import { KanbanTask } from '../../markdownParser';
+import { IdGenerator } from '../../utils/idGenerator';
 
 export interface PresentationSlide {
   title?: string;

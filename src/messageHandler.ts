@@ -4,7 +4,7 @@ import { BoardOperations } from './board';
 import { LinkHandler } from './linkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
-import { PlantUMLService } from './plantUMLService';
+import { PlantUMLService } from './services/export/PlantUMLService';
 import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';

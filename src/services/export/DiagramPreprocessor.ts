@@ -1,4 +1,4 @@
-import { PlantUMLService } from '../../plantUMLService';
+import { PlantUMLService } from './PlantUMLService';
 import { getMermaidExportService, MermaidExportService } from './MermaidExportService';
 import { DrawIOService } from './DrawIOService';
 import { ExcalidrawService } from './ExcalidrawService';

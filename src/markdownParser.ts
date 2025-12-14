@@ -1,5 +1,5 @@
 import { IdGenerator } from './utils/idGenerator';
-import { PresentationParser } from './presentationParser';
+import { PresentationParser } from './services/export/PresentationParser';
 import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison

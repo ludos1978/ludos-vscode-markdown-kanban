@@ -3,17 +3,17 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { TagUtils, TagVisibility } from './utils/tagUtils';
-import { PresentationParser } from './presentationParser';
-import { PathResolver } from './services/PathResolver';
-import { MarpExportService, MarpOutputFormat } from './services/export/MarpExportService';
-import { DiagramPreprocessor } from './services/export/DiagramPreprocessor';
-import { getMermaidExportService } from './services/export/MermaidExportService';
-import { ConfigurationService } from './configurationService';
-import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
-import { DOTTED_EXTENSIONS } from './shared/fileTypeDefinitions';
-import { AssetHandler } from './services/assets/AssetHandler';
-import { escapeRegExp } from './utils/stringUtils';
+import { TagUtils, TagVisibility } from '../../utils/tagUtils';
+import { PresentationParser } from './PresentationParser';
+import { PathResolver } from '../PathResolver';
+import { MarpExportService, MarpOutputFormat } from './MarpExportService';
+import { DiagramPreprocessor } from './DiagramPreprocessor';
+import { getMermaidExportService } from './MermaidExportService';
+import { ConfigurationService } from '../../configurationService';
+import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
+import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
+import { AssetHandler } from '../assets/AssetHandler';
+import { escapeRegExp } from '../../utils/stringUtils';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -922,7 +922,7 @@ export class ExportService {
     ): string {
         const absoluteSourcePath = path.resolve(sourceDir, oldPath);
         const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
-        
+
         return tag.replace(/src=["'][^"']+["']/i, `src="${relativePath}"`);
     }
 
@@ -1034,7 +1034,7 @@ export class ExportService {
 
         // Convert to presentation format if requested
         if (convertToPresentation) {
-            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            const { PresentationGenerator } = require('./PresentationGenerator');
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
@@ -1397,7 +1397,7 @@ export class ExportService {
             const filteredBoard = this.filterBoard(board, options);
 
             // Use unified presentation generator
-            const { PresentationGenerator } = require('./services/export/PresentationGenerator');
+            const { PresentationGenerator } = require('./PresentationGenerator');
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
@@ -1552,7 +1552,7 @@ export class ExportService {
             // NOTE: Use sourceFilePath, not markdownPath (which is the exported file)
             const docUri = vscode.Uri.file(sourceFilePath).toString();
 
-            const { KanbanWebviewPanel } = await import('./kanbanWebviewPanel');
+            const { KanbanWebviewPanel } = await import('../../kanbanWebviewPanel');
             const webviewPanel = KanbanWebviewPanel.getPanelForDocument(docUri);
 
 

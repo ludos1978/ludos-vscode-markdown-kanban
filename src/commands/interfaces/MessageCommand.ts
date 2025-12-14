@@ -12,7 +12,7 @@ import { BoardStore } from '../../core/stores';
 import { BoardOperations } from '../../board';
 import { LinkHandler } from '../../linkHandler';
 import { KanbanBoard } from '../../markdownParser';
-import { PlantUMLService } from '../../plantUMLService';
+import { PlantUMLService } from '../../services/export/PlantUMLService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import * as vscode from 'vscode';
 

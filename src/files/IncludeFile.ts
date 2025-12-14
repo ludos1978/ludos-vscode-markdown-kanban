@@ -7,7 +7,7 @@ import { BackupManager } from '../backupManager';
 import { MainKanbanFile } from './MainKanbanFile';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 import { KanbanTask } from '../markdownParser';
-import { PresentationParser } from '../presentationParser';
+import { PresentationParser } from '../services/export/PresentationParser';
 
 /**
  * Include file types supported by the plugin system
