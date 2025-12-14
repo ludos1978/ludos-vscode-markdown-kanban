@@ -27,6 +27,8 @@ export interface PanelStateFlags {
     initialBoardLoad: boolean;
     /** Include switch operation is in progress (protects cache) */
     includeSwitchInProgress: boolean;
+    /** Webview has sent ready message and can receive board updates */
+    webviewReady: boolean;
 }
 
 /**
@@ -40,7 +42,8 @@ const DEFAULT_STATE: PanelStateFlags = {
     disposed: false,
     editingInProgress: false,
     initialBoardLoad: false,
-    includeSwitchInProgress: false
+    includeSwitchInProgress: false,
+    webviewReady: false
 };
 
 /**
@@ -71,6 +74,7 @@ export class PanelStateModel {
     get editingInProgress(): boolean { return this._state.editingInProgress; }
     get initialBoardLoad(): boolean { return this._state.initialBoardLoad; }
     get includeSwitchInProgress(): boolean { return this._state.includeSwitchInProgress; }
+    get webviewReady(): boolean { return this._state.webviewReady; }
 
     // ============= SETTERS WITH VALIDATION =============
 
@@ -110,6 +114,7 @@ export class PanelStateModel {
             this._state.editingInProgress = false;
             this._state.initialBoardLoad = false;
             this._state.includeSwitchInProgress = false;
+            this._state.webviewReady = false;
         }
     }
 
@@ -132,6 +137,13 @@ export class PanelStateModel {
             return;
         }
         this._setState('includeSwitchInProgress', value);
+    }
+
+    setWebviewReady(value: boolean): void {
+        if (this._state.disposed) {
+            return;
+        }
+        this._setState('webviewReady', value);
     }
 
     // ============= PRIVATE HELPERS =============

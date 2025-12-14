@@ -69,6 +69,9 @@ export class KanbanWebviewPanel {
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
     private _lastDocumentUri?: string;  // Track current document for serialization
 
+    // Queued board update - sent when webview becomes ready
+    private _pendingBoardUpdate: { applyDefaultFolding: boolean; isFullRefresh: boolean } | null = null;
+
     private _panelId: string;  // Unique identifier for this panel
     private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management
 
@@ -88,13 +91,12 @@ export class KanbanWebviewPanel {
     public async refreshWebviewContent() {
         const board = this.getBoard();
         if (this._panel && board) {
+            // Reset webviewReady since HTML reload will create new webview context
+            this._state.setWebviewReady(false);
+
             this._panel.webview.html = this._getHtmlForWebview();
 
-            // Send the board data to the refreshed webview
-            // Note: There's a race condition where the webview JavaScript might not be ready yet.
-            // Ideally the webview should send a 'ready' message and we wait for that (request-response pattern).
-            // For now, sending immediately and the webview should handle late-arriving messages gracefully.
-            // Use sendBoardUpdate to ensure image mappings are generated
+            // Queue board update - will be sent when webview sends 'webviewReady'
             this.sendBoardUpdate(false, true);
         }
     }
@@ -749,6 +751,11 @@ export class KanbanWebviewPanel {
 
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
+                // Handle webviewReady at panel level - controls when board updates are sent
+                if (message.type === 'webviewReady') {
+                    this._handleWebviewReady();
+                    return;
+                }
 
                 try {
                     await this._messageHandler.handleMessage(message);
@@ -762,6 +769,22 @@ export class KanbanWebviewPanel {
             null,
             this._disposables
         );
+    }
+
+    /**
+     * Handle webviewReady message - webview is ready to receive board updates
+     */
+    private _handleWebviewReady(): void {
+        console.log('[kanban.handleWebviewReady] Webview is ready');
+        this._state.setWebviewReady(true);
+
+        // Send any pending board update
+        if (this._pendingBoardUpdate) {
+            console.log('[kanban.handleWebviewReady] Sending pending board update');
+            const { applyDefaultFolding, isFullRefresh } = this._pendingBoardUpdate;
+            this._pendingBoardUpdate = null;
+            this.sendBoardUpdate(applyDefaultFolding, isFullRefresh);
+        }
     }
 
     private async _ensureBoardAndSendUpdate() {
@@ -796,8 +819,15 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, stack=${new Error().stack?.split('\n').slice(1, 4).join(' <- ')}`);
+        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, webviewReady=${this._state.webviewReady}`);
         if (!this._panel.webview) { return; }
+
+        // Queue update if webview not ready yet
+        if (!this._state.webviewReady) {
+            console.log('[kanban.sendBoardUpdate] Webview not ready, queuing update');
+            this._pendingBoardUpdate = { applyDefaultFolding, isFullRefresh };
+            return;
+        }
 
         let board = this.getBoard() || {
             valid: false,

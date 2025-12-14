@@ -245,6 +245,13 @@ export interface RedoMessage extends BaseMessage {
 }
 
 /**
+ * Webview ready notification - sent by frontend when DOM is loaded and ready to receive messages
+ */
+export interface WebviewReadyMessage extends BaseMessage {
+    type: 'webviewReady';
+}
+
+/**
  * Request board update
  */
 export interface RequestBoardUpdateMessage extends BaseMessage {
