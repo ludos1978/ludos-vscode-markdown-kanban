@@ -120,30 +120,6 @@ export class PluginRegistry {
     }
 
     /**
-     * Unregister an import plugin
-     */
-    unregisterImportPlugin(pluginId: string): boolean {
-        const plugin = this._importPlugins.get(pluginId);
-        if (plugin) {
-            if (plugin.deactivate) {
-                plugin.deactivate().catch(err =>
-                    console.error(`[PluginRegistry] Error deactivating plugin ${pluginId}:`, err)
-                );
-            }
-            this._importPlugins.delete(pluginId);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Get an import plugin by ID
-     */
-    getImportPlugin(pluginId: string): ImportPlugin | undefined {
-        return this._importPlugins.get(pluginId);
-    }
-
-    /**
      * Get all registered import plugins
      */
     getAllImportPlugins(): ImportPlugin[] {
@@ -174,20 +150,6 @@ export class PluginRegistry {
         }
 
         this._exportPlugins.set(plugin.metadata.id, plugin);
-    }
-
-    /**
-     * Unregister an export plugin
-     */
-    unregisterExportPlugin(pluginId: string): boolean {
-        return this._exportPlugins.delete(pluginId);
-    }
-
-    /**
-     * Get an export plugin by ID
-     */
-    getExportPlugin(pluginId: string): ExportPlugin | undefined {
-        return this._exportPlugins.get(pluginId);
     }
 
     /**
