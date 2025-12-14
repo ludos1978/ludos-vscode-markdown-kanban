@@ -251,7 +251,7 @@ export class ChangeStateMachine {
                 duration: duration
             };
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('[ChangeStateMachine] Fatal error:', error);
 
             // CRITICAL: Clear flag on fatal error to prevent cache lock
@@ -261,7 +261,7 @@ export class ChangeStateMachine {
 
             return {
                 success: false,
-                error: error,
+                error: error instanceof Error ? error : new Error(String(error)),
                 context: this._currentContext || this._createEmptyContext(event),
                 duration: Date.now() - (this._currentContext?.startTime || Date.now())
             };
@@ -298,10 +298,10 @@ export class ChangeStateMachine {
                 await this._transitionTo(nextState, context);
             }
 
-        } catch (error: any) {
+        } catch (error) {
             console.error(`[ChangeStateMachine] Error in state ${newState}:`, error);
             context.result.success = false;
-            context.result.error = error;
+            context.result.error = error instanceof Error ? error : new Error(String(error));
             await this._transitionTo(ChangeState.ERROR, context);
         }
     }

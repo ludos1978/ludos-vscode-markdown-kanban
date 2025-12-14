@@ -183,8 +183,8 @@ export class IncludeFile extends MarkdownFile {
         try {
             const content = await fs.promises.readFile(this._absolutePath, 'utf-8');
             return content;
-        } catch (error: any) {
-            if (error.code === 'ENOENT') {
+        } catch (error) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
                 console.warn(`[${this.getFileType()}] File not found: ${this._absolutePath}`);
                 this._exists = false;
             } else {

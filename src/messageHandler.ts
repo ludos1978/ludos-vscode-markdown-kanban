@@ -9,6 +9,7 @@ import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import { safeFileUri } from './utils/uriUtils';
+import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
@@ -456,9 +457,9 @@ export class MessageHandler {
                             log(`[editColumnTitle] Generated content for ${column.tasks.length} tasks`);
                             log(`[editColumnTitle] Map key (absolutePath): "${absolutePath}"`);
                             log(`[editColumnTitle] Content length: ${content.length}`);
-                        } catch (error: any) {
+                        } catch (error) {
                             log(`[editColumnTitle] Error generating tasks content:`, error);
-                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${error.message}`);
+                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${getErrorMessage(error)}`);
                             // Revert the title change
                             const panel = this._getWebviewPanel();
                             if (panel && panel._panel && panel._panel.webview) {
@@ -511,15 +512,16 @@ export class MessageHandler {
                 // Clear editing flag after completion
                 log(`[editColumnTitle] Edit completed - allowing board regenerations`);
                 this._getWebviewPanel().setEditingInProgress(false);
-            } catch (error: any) {
+            } catch (error) {
                 // RACE-1: On error, still clear editing flag
                 this._getWebviewPanel().setEditingInProgress(false);
 
-                if (error.message === 'USER_CANCELLED') {
+                const errorMsg = getErrorMessage(error);
+                if (errorMsg === 'USER_CANCELLED') {
                     log(`[editColumnTitle] User cancelled switch, no changes made`);
                 } else {
                     log(`[editColumnTitle] Error during column include switch:`, error);
-                    vscode.window.showErrorMessage(`Failed to switch column include: ${error.message}`);
+                    vscode.window.showErrorMessage(`Failed to switch column include: ${errorMsg}`);
                 }
             }
         } else {

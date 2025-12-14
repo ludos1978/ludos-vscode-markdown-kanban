@@ -467,10 +467,10 @@ export class TaskCommands extends BaseMessageCommand {
                         });
 
                         (panel as any).setEditingInProgress(false);
-                    } catch (error: any) {
+                    } catch (error) {
                         (panel as any).setEditingInProgress(false);
 
-                        if (error.message !== 'USER_CANCELLED') {
+                        if (getErrorMessage(error) !== 'USER_CANCELLED') {
                             throw error;
                         }
                     }

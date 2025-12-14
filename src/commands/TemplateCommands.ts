@@ -136,10 +136,11 @@ export class TemplateCommands extends BaseMessageCommand {
                 // No variables - apply immediately
                 return await this.applyTemplateWithVariables(message, {}, context);
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error('[TemplateCommands.handleApplyTemplate] Error:', error);
-            vscode.window.showErrorMessage(`Failed to load template: ${error.message}`);
-            return this.failure(error.message);
+            const errorMsg = getErrorMessage(error);
+            vscode.window.showErrorMessage(`Failed to load template: ${errorMsg}`);
+            return this.failure(errorMsg);
         }
     }
 
@@ -241,10 +242,11 @@ export class TemplateCommands extends BaseMessageCommand {
 
             return this.success({ columnId: emptyColumn.id });
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('[TemplateCommands.createEmptyColumn] Error:', error);
-            vscode.window.showErrorMessage(`Failed to create empty column: ${error.message}`);
-            return this.failure(error.message);
+            const errorMsg = getErrorMessage(error);
+            vscode.window.showErrorMessage(`Failed to create empty column: ${errorMsg}`);
+            return this.failure(errorMsg);
         }
     }
 
@@ -360,10 +362,11 @@ export class TemplateCommands extends BaseMessageCommand {
 
             return this.success({ columnsAdded: columnsWithRow.length });
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('[TemplateCommands.applyTemplateWithVariables] Error:', error);
-            vscode.window.showErrorMessage(`Failed to apply template: ${error.message}`);
-            return this.failure(error.message);
+            const errorMsg = getErrorMessage(error);
+            vscode.window.showErrorMessage(`Failed to apply template: ${errorMsg}`);
+            return this.failure(errorMsg);
         }
     }
 
