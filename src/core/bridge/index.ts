@@ -74,7 +74,5 @@ export {
 // WebviewBridge
 export {
     WebviewBridge,
-    WebviewBridgeOptions,
-    WebviewBridgeState,
-    PendingRequest
+    WebviewBridgeOptions
 } from './WebviewBridge';

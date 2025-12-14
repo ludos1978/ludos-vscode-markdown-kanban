@@ -4,83 +4,9 @@ kanban-plugin: board
 
 ---
 
-## PlantUML Diagram Tests
-- [ ] Test 1: Simple Sequence Diagram
-  ```plantuml
-  Alice -> Bob: Authentication Request
-  Bob -> Alice: Authentication Response
-  ```
-
-- [ ] Test 2: Class Diagram
-
-  ```plantuml
-  class User {
-    +name: string
-    +email: string
-    +login()
-    +logout()
-  }
-  
-  class Admin {
-    +permissions: string[]
-    +grantAccess()
-  }
-  
-  User <|-- Admin
-  ```
-  
-
-- [ ] Test 3: Activity Diagram
-  ```plantuml
-  start
-  :Read markdown file;
-  if (Contains PlantUML?) then (yes)
-    :Render PlantUML diagrams;
-    :Show Convert button;
-  else (no)
-    :Skip PlantUML processing;
-  endif
-  :Display markdown;
-  stop
-  ```
-
-- [ ] Test 4: Component Diagram
-  ```plantuml
-  [Frontend] --> [Markdown Renderer]
-  [Markdown Renderer] --> [PlantUML.js]
-  [PlantUML.js] --> [WASM Engine]
-  [Frontend] --> [Backend]
-  [Backend] --> [File System]
-  ```
-
-- [ ] Test 5: State Diagram
-  ```plantuml
-  [*] --> Placeholder
-  Placeholder --> Rendering: Queue Processing
-  Rendering --> Rendered: SVG Ready
-  Rendering --> Error: Render Failed
-  Rendered --> [*]
-  Error --> [*]
-  ```
-
-- [ ] Expected Behavior
-  1. All diagrams should render with a brief placeholder flash
-  2. Each diagram should have a "💾 Convert to SVG" button
-  3. Clicking the button should:
-    - Create `Media-test-plantuml/` folder
-    - Save SVG file as `plantuml-{timestamp}.svg`
-    - Comment out PlantUML code
-    - Replace with `![PlantUML Diagram](Media-test-plantuml/plantuml-{timestamp}.svg)`
-    - Reload the file
-  4. Second render should be instant (cache hit)
-
-
-
-## Mermaid Diagram Tests
-
-- [ ] 
-  This file tests various Mermaid diagram types for the Markdown Kanban extension.
-
+## Mermaid Diagram Tests 13
+- [ ] ## graph styles
+  This file tests various Mermaid diagram types for the Markdown Kanban extension. 
 - [ ] Test 1: Simple Flowchart
   ```mermaid
   graph TD
@@ -90,7 +16,6 @@ kanban-plugin: board
     D --> B
     C --> E[End]
   ```
-
 - [ ] Test 2: Sequence Diagram
   ```mermaid
   sequenceDiagram
@@ -101,7 +26,6 @@ kanban-plugin: board
   Alice->>Bob: Let's work together
   Bob-->>Alice: Sure!
   ```
-
 - [ ]  Test 3: Class Diagram
   ```mermaid
   classDiagram
@@ -121,7 +45,6 @@ kanban-plugin: board
       Animal <|-- Dog
       Animal <|-- Cat
   ```
-
 - [ ] Test 4: State Diagram
   ```mermaid
   stateDiagram-v2
@@ -133,7 +56,6 @@ kanban-plugin: board
       Paused --> Stopped: Stop
       Stopped --> [*]
   ```
-
 - [ ] Test 5: Entity Relationship Diagram
   ```mermaid
   erDiagram
@@ -149,7 +71,6 @@ kanban-plugin: board
           date orderDate
       }
   ```
-
 - [ ] Test 6: Gantt Chart
   ```mermaid
   gantt
@@ -165,7 +86,6 @@ kanban-plugin: board
       Integration     :a5, after a3, 3d
       UAT             :a6, after a5, 2d
   ```
-
 - [ ] Test 7: Pie Chart
   ```mermaid
   pie title Browser Usage
@@ -174,7 +94,6 @@ kanban-plugin: board
       "Safari" : 12
       "Edge" : 8
   ```
-
 - [ ]  Test 8: Git Graph
   ```mermaid-disabled
   gitGraph
@@ -188,7 +107,100 @@ kanban-plugin: board
       merge develop
       commit
       commit
-
+  
   ```
-
+  
   ![Mermaid Diagram](Media-kanban-graphs/mermaid-1765231704283.svg)
+  
+  
+
+## PlantUML Diagram Tests
+- [ ] Test 1: Simple Sequence Diagram
+  ```plantuml
+  Alice -> Bob: Authentication Request
+  Bob -> Alice: Authentication Response
+  ```
+- [ ] Test 2: Class Diagram
+  ```plantuml
+  class User {
+    +name: string
+    +email: string
+    +login()
+    +logout()
+  }
+  
+  class Admin {
+    +permissions: string[]
+    +grantAccess()
+  }
+  
+  User <|-- Admin
+  ```
+- [ ] Test 3: Activity Diagram
+  ```plantuml
+  start
+  :Read markdown file;
+  if (Contains PlantUML?) then (yes)
+    :Render PlantUML diagrams;
+    :Show Convert button;
+  else (no)
+    :Skip PlantUML processing;
+  endif
+  :Display markdown;
+  stop
+  ```
+- [ ] Test 4: Component Diagram
+  ```plantuml
+  [Frontend] --> [Markdown Renderer]
+  [Markdown Renderer] --> [PlantUML.js]
+  [PlantUML.js] --> [WASM Engine]
+  [Frontend] --> [Backend]
+  [Backend] --> [File System]
+  ```
+- [ ] Test 5: State Diagram
+  ```plantuml
+  [*] --> Placeholder
+  Placeholder --> Rendering: Queue Processing
+  Rendering --> Rendered: SVG Ready
+  Rendering --> Error: Render Failed
+  Rendered --> [*]
+  Error --> [*]
+  ```
+- [ ] Expected Behavior
+  1. All diagrams should render with a brief placeholder flash
+  2. Each diagram should have a "💾 Convert to SVG" button
+  3. Clicking the button should:
+    - Create `Media-test-plantuml/` folder
+    - Save SVG file as `plantuml-{timestamp}.svg`
+    - Comment out PlantUML code
+    - Replace with `![PlantUML Diagram](Media-test-plantuml/plantuml-{timestamp}.svg)`
+    - Reload the file
+  4. Second render should be instant (cache hit)
+  
+  
+
+## includes
+- [ ] excali
+  ![excali.excalidraw](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-graph-tools/excali.excalidraw)
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+- [ ] draw
+  ![draw.drawio](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-graph-tools/draw.drawio)
+
+

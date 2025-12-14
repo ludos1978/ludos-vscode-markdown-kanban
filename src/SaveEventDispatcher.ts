@@ -100,20 +100,6 @@ export class SaveEventDispatcher implements vscode.Disposable {
     }
 
     /**
-     * Get count of registered handlers
-     */
-    public getHandlerCount(): number {
-        return this.handlers.size;
-    }
-
-    /**
-     * Get list of registered handler IDs
-     */
-    public getHandlerIds(): string[] {
-        return Array.from(this.handlers.keys());
-    }
-
-    /**
      * Dispose the dispatcher and clean up
      */
     public dispose(): void {

@@ -305,7 +305,6 @@ export class KanbanWebviewPanel {
         });
 
         this._webviewBridge = new WebviewBridge(this._eventBus, {
-            defaultTimeout: 5000,
             maxBatchSize: 10,
             batchFlushDelay: 50,
             debug: isDevelopment
