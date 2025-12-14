@@ -6,7 +6,7 @@ import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path c
 import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
-import { getOutputChannel } from './extension';
+import { getOutputChannel } from './services/OutputChannelService';
 import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';

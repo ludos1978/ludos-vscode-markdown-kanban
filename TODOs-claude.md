@@ -84,6 +84,18 @@
 - [x] Removed stale EventBus reference from WebviewBridge properties
 - **Impact:** Documentation now matches actual code
 
+### 9. Fix Circular Dependencies (13 → 7)
+- [x] Created `src/services/OutputChannelService.ts` - extracted from extension.ts
+- [x] Updated kanbanWebviewPanel.ts and messageHandler.ts to use new service
+- [x] Created `src/core/ChangeTypes.ts` - extracted types from ChangeStateMachine
+- [x] Updated IncludeLoadingProcessor.ts to import from ChangeTypes
+- [x] Created `src/board/KanbanTypes.ts` - extracted interfaces from markdownParser
+- [x] Updated 4 plugin files to import from KanbanTypes
+- [x] Updated board/index.ts to export KanbanTypes
+- **Impact:** 46% reduction in circular dependencies (13 → 7)
+
+**Remaining 7 cycles:** Architectural (files/* mutual refs, command pattern)
+
 ## Additional Analysis (No Changes Needed)
 
 ### Final Codebase Check
@@ -93,7 +105,7 @@
 - [x] Console.log statements appropriately gated by debug flags
 - [x] Command files well-organized (Command Pattern)
 - [x] Services properly structured
-- [x] 13 circular dependencies exist (legacy, separate concern)
+- [x] Circular dependencies reduced from 13 to 7 (remaining are architectural)
 
 **Codebase Status:** Clean, well-structured, ~30k lines TypeScript
 
@@ -101,5 +113,7 @@
 
 **Total Lines Removed:** ~590+ lines
 **Files Deleted:** 6 files
-**Files Modified:** 10+ files
+**Files Created:** 4 files (PanelContext.ts, OutputChannelService.ts, ChangeTypes.ts, KanbanTypes.ts)
+**Files Modified:** 15+ files
+**Circular Dependencies:** 13 → 7 (46% reduction)
 **Documentation Updated:** agent/FUNCTIONS.md

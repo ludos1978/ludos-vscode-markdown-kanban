@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-import { getOutputChannel } from './extension';
+import { getOutputChannel } from './services/OutputChannelService';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { FileManager } from './fileManager';
 import { BoardOperations } from './board';

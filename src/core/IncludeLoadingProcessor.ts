@@ -10,7 +10,7 @@
 
 import * as path from 'path';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
-import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeStateMachine';
+import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeTypes';
 
 /**
  * Result of resolving the target column/task for an include switch

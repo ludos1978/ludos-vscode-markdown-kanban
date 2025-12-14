@@ -7,7 +7,7 @@
  * @module plugins/interfaces/ExportPlugin
  */
 
-import { KanbanBoard } from '../../markdownParser';
+import { KanbanBoard } from '../../board/KanbanTypes';
 
 /**
  * Describes a single export format supported by a plugin

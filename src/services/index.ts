@@ -31,6 +31,9 @@ export {
     ConfigurationDefaults
 } from './ConfigurationService';
 
+// Output channel
+export { getOutputChannel, initializeOutputChannel } from './OutputChannelService';
+
 // Asset services
 export * from './assets';
 

@@ -25,7 +25,7 @@ import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { PresentationParser } from '../../services/export/PresentationParser';
-import { KanbanTask } from '../../markdownParser';
+import { KanbanTask } from '../../board/KanbanTypes';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
 /**

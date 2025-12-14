@@ -5,9 +5,12 @@
  * Import { BoardOperations } from './board' for the unified class.
  */
 
-import { KanbanBoard, KanbanTask } from '../markdownParser';
+import { KanbanBoard, KanbanTask } from './KanbanTypes';
 import { BoardCrudOperations } from './BoardCrudOperations';
 import { GatherQueryEngine } from './GatherQueryEngine';
+
+// Export core types
+export { KanbanBoard, KanbanColumn, KanbanTask } from './KanbanTypes';
 
 export { BoardCrudOperations } from './BoardCrudOperations';
 export { GatherQueryEngine } from './GatherQueryEngine';

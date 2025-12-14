@@ -11,7 +11,7 @@ import { MarkdownFile } from '../../files/MarkdownFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
 import { ConflictResolver } from '../../services/ConflictResolver';
 import { BackupManager } from '../../services/BackupManager';
-import { KanbanTask } from '../../markdownParser';
+import { KanbanTask } from '../../board/KanbanTypes';
 
 /**
  * Metadata describing an import plugin's capabilities

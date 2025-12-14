@@ -4,18 +4,14 @@ import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
+import { initializeOutputChannel, getOutputChannel } from './services/OutputChannelService';
 
-// Global output channel for extension logging
-let outputChannel: vscode.OutputChannel | undefined;
-
-export function getOutputChannel(): vscode.OutputChannel | undefined {
-	return outputChannel;
-}
+// Re-export for backwards compatibility
+export { getOutputChannel } from './services/OutputChannelService';
 
 export function activate(context: vscode.ExtensionContext) {
 	// Create output channel for debugging
-	outputChannel = vscode.window.createOutputChannel('Markdown Kanban');
-	context.subscriptions.push(outputChannel);
+	const outputChannel = initializeOutputChannel(context);
 
 	outputChannel.appendLine('[Extension] Activating ludos-kanban extension');
 

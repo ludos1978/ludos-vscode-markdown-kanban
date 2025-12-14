@@ -24,7 +24,7 @@ import {
 } from '../interfaces';
 import { MarpExportService, MarpExportOptions } from '../../services/export/MarpExportService';
 import { getErrorMessage } from '../../utils/stringUtils';
-import { KanbanBoard } from '../../markdownParser';
+import { KanbanBoard } from '../../board/KanbanTypes';
 
 /**
  * Marp Export Plugin
