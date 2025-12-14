@@ -342,17 +342,41 @@ export class PresentationGenerator {
             return content;
         });
 
-        // CRITICAL: Format slides according to specification
-        // Each slide ends with 1 blank line before ---
-        // After --- comes 2 newlines (1 blank line), then the next slide content
+        // ═══════════════════════════════════════════════════════════════════════════
+        // CRITICAL: Column Include Format - DO NOT MODIFY THIS LOGIC
+        // ═══════════════════════════════════════════════════════════════════════════
+        //
+        // The column include file format is:
+        //
+        //   ## Title
+        //
+        //   content
+        //   content
+        //
+        //   ---
+        //
+        //   ## Title2
+        //   ...
+        //
+        // When WRITING:
+        //   - Add '\n' after each slide content (creates blank line before ---)
+        //   - Join with '\n---\n\n' (newline + separator + blank line after)
+        //
+        // When READING (in PresentationParser.parsePresentation):
+        //   - We pop exactly TWO trailing empty lines per slide
+        //
+        // This ensures perfect round-trip: read → parse → generate → write = identical
+        //
+        // DO NOT CHANGE THIS WITHOUT UPDATING PresentationParser.parsePresentation!
+        // ═══════════════════════════════════════════════════════════════════════════
+
         const formattedSlides = filteredSlides.map((slide, i) => {
             const slideContent = slideContents[i];
-
-            // Add 1 blank line after content (before ---)
+            // Add blank line after content (before ---) - paired with pop in parser
             return slideContent + '\n';
         });
 
-        // Join slides with --- separator followed by 2 newlines (1 blank line)
+        // Join: newline before ---, then ---, then blank line after
         const content = formattedSlides.join('\n---\n\n');
 
         // Combine YAML and content

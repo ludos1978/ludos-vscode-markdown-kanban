@@ -63,7 +63,7 @@ export class IncludeFileCoordinator {
                     // Check if file exists with WRONG type
                     if (existingFile && existingFile.getFileType() !== 'include-column') {
                         console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-column! Replacing...`);
-                        this._deps.fileRegistry.unregister(relativePath);
+                        this._deps.fileRegistry.unregister(existingFile.getPath());
                     }
 
                     if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {
@@ -93,7 +93,7 @@ export class IncludeFileCoordinator {
 
                         if (existingFile && existingFile.getFileType() !== 'include-task') {
                             console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-task! Replacing...`);
-                            this._deps.fileRegistry.unregister(relativePath);
+                            this._deps.fileRegistry.unregister(existingFile.getPath());
                         }
 
                         if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {
@@ -123,7 +123,7 @@ export class IncludeFileCoordinator {
 
             if (existingFile && existingFile.getFileType() !== 'include-regular') {
                 console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-regular! Replacing...`);
-                this._deps.fileRegistry.unregister(relativePath);
+                this._deps.fileRegistry.unregister(existingFile.getPath());
             }
 
             if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {

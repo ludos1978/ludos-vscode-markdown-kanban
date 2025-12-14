@@ -69,11 +69,40 @@ export class PresentationParser {
 
       const lines = slideContent.split('\n');
 
-      // Remove trailing empty from split (after last \n)
+      // ═══════════════════════════════════════════════════════════════════════════
+      // CRITICAL: Column Include Format - DO NOT MODIFY THIS LOGIC
+      // ═══════════════════════════════════════════════════════════════════════════
+      //
+      // The column include file format is:
+      //
+      //   ## Title
+      //
+      //   content
+      //   content
+      //
+      //   ---
+      //
+      //   ## Title2
+      //   ...
+      //
+      // When READING, we pop exactly TWO trailing empty lines:
+      //   1. The empty string after the last \n (artifact of split)
+      //   2. The blank line before --- (formatting, not content)
+      //
+      // When WRITING (in PresentationGenerator.formatSlides):
+      //   - We add '\n' after each slide content (restores the blank before ---)
+      //   - We join with '\n---\n\n' (separator + blank after)
+      //
+      // This ensures perfect round-trip: read → parse → generate → write = identical
+      //
+      // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatSlides!
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      // Pop 1: Remove trailing empty from split (after last \n)
       if (lines.length > 0 && lines[lines.length - 1] === '') {
         lines.pop();
       }
-      // Remove the blank line before --- (we add it back when writing)
+      // Pop 2: Remove the blank line before --- (we add it back when writing)
       if (lines.length > 0 && lines[lines.length - 1] === '') {
         lines.pop();
       }
