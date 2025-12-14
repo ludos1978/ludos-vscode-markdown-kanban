@@ -291,14 +291,14 @@ export class PresentationGenerator {
                 const hasTitle = !!(task.title && task.title.trim());
 
                 if (hasTitle) {
-                    content = task.title.trim();
+                    content = task.title;
                 }
 
-                if (task.description && task.description.trim()) {
+                if (task.description) {
                     if (content) {
-                        content += '\n\n' + task.description.trim();
+                        content += '\n\n' + task.description;
                     } else {
-                        content = task.description.trim();
+                        content = task.description;
                     }
                 }
 
@@ -343,29 +343,17 @@ export class PresentationGenerator {
         });
 
         // CRITICAL: Format slides according to specification
-        // WITH title:    [1 blank] Title [1 blank] Description [1 blank] ---
-        // WITHOUT title: [3 blanks] Description [1 blank] ---
+        // Each slide ends with 1 blank line before ---
+        // After --- comes 2 newlines (1 blank line), then the next slide content
         const formattedSlides = filteredSlides.map((slide, i) => {
             const slideContent = slideContents[i];
 
-            // Add leading blank lines based on whether slide has title
-            let formatted = '';
-            if (slide.hasTitle) {
-                // 1 blank line before title
-                formatted = '\n' + slideContent;
-            } else {
-                // 3 blank lines before content (no title)
-                formatted = '\n\n\n' + slideContent;
-            }
-
             // Add 1 blank line after content (before ---)
-            formatted += '\n';
-
-            return formatted;
+            return slideContent + '\n';
         });
 
-        // Join slides with --- separator (which has newline after it by default)
-        const content = formattedSlides.join('\n---\n');
+        // Join slides with --- separator followed by 2 newlines (1 blank line)
+        const content = formattedSlides.join('\n---\n\n');
 
         // Combine YAML and content
         if (yaml) {

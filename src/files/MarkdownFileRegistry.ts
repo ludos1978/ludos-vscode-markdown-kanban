@@ -537,20 +537,20 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                     if (file && file.getFileType() === 'include-column') {
                         const content = file.generateFromTasks(column.tasks);
                         const currentContent = file.getContent();
+                        const baseline = file.getBaseline();
 
                         // CRITICAL PROTECTION: Never replace existing content with empty
                         if (!content.trim() && currentContent.trim()) {
                             console.warn(`[MarkdownFileRegistry] ⚠️ PROTECTED: Refusing to wipe column content to empty`);
-                            file.setContent(currentContent, false);
-                            continue;
+                            continue; // Don't modify file at all
                         }
 
-                        // Only update if content actually changed
-                        if (content !== currentContent) {
+                        // Only update if content differs from what's on disk (baseline)
+                        // This prevents false "unsaved changes" from formatting differences
+                        if (content !== baseline) {
                             file.setContent(content, false); // false = NOT saved yet
-                        } else {
-                            file.setContent(currentContent, false); // Force hasUnsavedChanges = true
                         }
+                        // If content === baseline, file already has correct hasUnsavedChanges state
                     }
                 }
             }
@@ -565,19 +565,19 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         if (file && file.getFileType() === 'include-task') {
                             const fullContent = task.description || '';
                             const currentContent = file.getContent();
+                            const baseline = file.getBaseline();
 
                             // CRITICAL PROTECTION: Never replace existing content with empty
                             if (!fullContent.trim() && currentContent.trim()) {
                                 console.warn(`[MarkdownFileRegistry] ⚠️ PROTECTED: Refusing to wipe task content to empty`);
-                                file.setContent(currentContent, false);
-                                continue;
+                                continue; // Don't modify file at all
                             }
 
-                            if (fullContent !== currentContent) {
+                            // Only update if content differs from what's on disk (baseline)
+                            if (fullContent !== baseline) {
                                 file.setTaskDescription(fullContent);
-                            } else {
-                                file.setContent(currentContent, false);
                             }
+                            // If fullContent === baseline, file already has correct hasUnsavedChanges state
                         }
                     }
                 }
