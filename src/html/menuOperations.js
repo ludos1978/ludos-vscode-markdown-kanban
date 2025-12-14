@@ -1838,376 +1838,167 @@ function copyToClipboard(text) {
 
 // Column include mode operations
 function toggleColumnIncludeMode(columnId) {
-    // Close all menus properly
     closeAllMenus();
 
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) {
         console.error('Column not found:', columnId);
         return;
     }
 
-    if (column.includeMode) {
-        // Disable include mode - convert included tasks to regular tasks
-        // Send confirmation request to VS Code since webview is sandboxed
+    if (found.column.includeMode) {
         vscode.postMessage({
             type: 'confirmDisableIncludeMode',
             columnId: columnId,
             message: 'Disable include mode? This will convert all included slides to regular cards. The original presentation file will not be modified.'
         });
-        return; // Exit here, the backend will handle the confirmation and response
     } else {
-        // Enable include mode - request file path via VS Code dialog
-        vscode.postMessage({
-            type: 'requestIncludeFileName',
-            columnId: columnId
-        });
-        return; // Exit here, the backend will handle the input and response
+        vscode.postMessage({ type: 'requestIncludeFileName', columnId });
     }
 }
 
 // Function called from backend after user provides include file name
 function enableColumnIncludeMode(columnId, fileName) {
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) {
         console.error('Column not found:', columnId);
         return;
     }
 
-    // Update column title to include the syntax (location-based column include)
-    const currentTitle = column.title || '';
-    const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
-
-    // UNIFIED PATH: Use editColumnTitle message (same as updateColumnIncludeFile)
-    // Backend's handleEditColumnTitleUnified() will detect include syntax and route to state machine
-    vscode.postMessage({
-        type: 'editColumnTitle',
-        columnId: columnId,
-        title: newTitle
-    });
-
-    // Update button state to show unsaved changes
+    const newTitle = window.menuUtils.addIncludeSyntax(found.column.title, fileName);
+    window.menuUtils.postEditMessage('column', columnId, null, newTitle);
     updateRefreshButtonState('unsaved', 1);
 }
 
 // Edit column include file
 function editColumnIncludeFile(columnId) {
-    // Close all menus properly
     closeAllMenus();
 
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) {
         console.error('Column not found:', columnId);
         return;
     }
 
-    if (!column.includeMode || !column.includeFiles || column.includeFiles.length === 0) {
-        vscode.postMessage({
-            type: 'showMessage',
-            text: 'This column is not in include mode or has no include files.'
-        });
+    const currentFile = window.menuUtils.getIncludeFile(found.column);
+    if (!currentFile) {
+        vscode.postMessage({ type: 'showMessage', text: 'This column is not in include mode or has no include files.' });
         return;
     }
 
-    // Get current include file path
-    const currentFile = column.includeFiles[0]; // For now, handle single file includes
-
-
-    // Request new file path via VS Code dialog
-    vscode.postMessage({
-        type: 'requestEditIncludeFileName',
-        columnId: columnId,
-        currentFile: currentFile
-    });
-    return; // Exit here, the backend will handle the input and response
+    vscode.postMessage({ type: 'requestEditIncludeFileName', columnId, currentFile });
 }
 
 // Function called from backend after user provides edited include file name
 function updateColumnIncludeFile(columnId, newFileName, currentFile) {
-    if (!window.cachedBoard) {
-        console.error('[updateColumnIncludeFile] No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) {
         console.error('[updateColumnIncludeFile] Column not found:', columnId);
         return;
     }
 
-    if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
-        // Extract the clean title (without include syntax)
-        let cleanTitle = column.title || '';
-
-        // Remove all existing include patterns (location-based column include)
-        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-
-        // Create new title with updated include syntax
-        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
-
-        // SWITCH-4: Use editColumnTitle message (unified path)
-        // Backend's updateColumnIncludeFile() handles: undo, unsaved prompts, cleanup, loading, updates
-        vscode.postMessage({
-            type: 'editColumnTitle',
-            columnId: columnId,
-            title: newTitle
-        });
-
-        // Update button state to show unsaved changes (path changed but not saved to main file yet)
+    if (newFileName?.trim() && newFileName.trim() !== currentFile) {
+        const newTitle = window.menuUtils.updateIncludeInTitle(found.column.title, newFileName);
+        window.menuUtils.postEditMessage('column', columnId, null, newTitle);
         updateRefreshButtonState('unsaved', 1);
     }
 }
 
 // Function called from backend after user confirms disable include mode
 function disableColumnIncludeMode(columnId) {
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) {
         console.error('Column not found:', columnId);
         return;
     }
 
-    // Extract the clean title (without include syntax)
-    let cleanTitle = column.title || '';
-    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
+    let cleanTitle = window.menuUtils.removeIncludeSyntax(found.column.title);
 
     // If no clean title remains, use the filename
-    if (!cleanTitle && column.includeFiles && column.includeFiles.length > 0) {
-        const fileName = column.includeFiles[0].split('/').pop().replace(/\.[^/.]+$/, '');
-        cleanTitle = fileName;
+    if (!cleanTitle && found.column.includeFiles?.length > 0) {
+        cleanTitle = found.column.includeFiles[0].split('/').pop().replace(/\.[^/.]+$/, '');
     }
 
-    const finalTitle = cleanTitle || 'Untitled Column';
-
-    // UNIFIED PATH: Removing include is just editing title without include syntax
-    vscode.postMessage({
-        type: 'editColumnTitle',
-        columnId: columnId,
-        title: finalTitle
-    });
-
-    // Update button state to show unsaved changes
+    window.menuUtils.postEditMessage('column', columnId, null, cleanTitle || 'Untitled Column');
     updateRefreshButtonState('unsaved', 1);
-
-    vscode.postMessage({
-        type: 'showMessage',
-        text: 'Include mode disabled. Tasks converted to regular cards.'
-    });
+    vscode.postMessage({ type: 'showMessage', text: 'Include mode disabled. Tasks converted to regular cards.' });
 }
 
 // Task include operations
 function enableTaskIncludeMode(taskId, columnId, fileName) {
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
-        console.error('Column not found:', columnId);
-        return;
-    }
-
-    const task = column.tasks.find(t => t.id === taskId);
-    if (!task) {
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) {
         console.error('Task not found:', taskId);
         return;
     }
 
-    // Update task title to include the syntax (location-based task include)
-    const currentTitle = task.title || '';
-    const newTitle = `${currentTitle} !!!include(${fileName.trim()})!!!`.trim();
-
-    // UNIFIED PATH: Use editTask message (same as updateTaskIncludeFile)
-    // Backend will detect include syntax and route to appropriate handler
-    vscode.postMessage({
-        type: 'editTask',
-        taskId: taskId,
-        columnId: columnId,
-        taskData: { title: newTitle }
-    });
-
-    // Update button state to show unsaved changes
+    const newTitle = window.menuUtils.addIncludeSyntax(found.task.title, fileName);
+    window.menuUtils.postEditMessage('task', taskId, found.column.id, newTitle);
     updateRefreshButtonState('unsaved', 1);
 }
 
 // Edit task include file
 function editTaskIncludeFile(taskId, columnId) {
-    // Close all menus properly
     closeAllMenus();
 
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
-        console.error('Column not found:', columnId);
-        return;
-    }
-
-    const task = column.tasks.find(t => t.id === taskId);
-    if (!task) {
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) {
         console.error('Task not found:', taskId);
         return;
     }
 
-    if (!task.includeMode || !task.includeFiles || task.includeFiles.length === 0) {
-        vscode.postMessage({
-            type: 'showMessage',
-            text: 'This task is not in include mode or has no include files.'
-        });
+    const currentFile = window.menuUtils.getIncludeFile(found.task);
+    if (!currentFile) {
+        vscode.postMessage({ type: 'showMessage', text: 'This task is not in include mode or has no include files.' });
         return;
     }
 
-    // Get current include file path
-    const currentFile = task.includeFiles[0]; // For now, handle single file includes
-
-    // Request new file path via VS Code dialog (with unsaved changes check in backend)
-    vscode.postMessage({
-        type: 'requestEditTaskIncludeFileName',
-        taskId: taskId,
-        columnId: columnId,
-        currentFile: currentFile
-    });
-    return; // Exit here, the backend will handle the input and response
+    vscode.postMessage({ type: 'requestEditTaskIncludeFileName', taskId, columnId: found.column.id, currentFile });
 }
 
 // Function called from backend after user provides new include file name
 function updateTaskIncludeFile(taskId, columnId, newFileName, currentFile) {
-    if (!window.cachedBoard) {
-        console.error('[updateTaskIncludeFile] No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
-        console.error('[updateTaskIncludeFile] Column not found:', columnId);
-        return;
-    }
-
-    const task = column.tasks.find(t => t.id === taskId);
-    if (!task) {
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) {
         console.error('[updateTaskIncludeFile] Task not found:', taskId);
         return;
     }
 
-    if (newFileName && newFileName.trim() && newFileName.trim() !== currentFile) {
-        // Update task title with new include file
-        let cleanTitle = task.title || '';
-
-        // Remove all existing include patterns (location-based task include)
-        cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-
-        // Add new include pattern
-        const newTitle = `${cleanTitle} !!!include(${newFileName.trim()})!!!`.trim();
-
-        // SOLUTION 2: Use editTask message type (same as taskEditor fix)
-        // editTaskTitle appears to be broken, use editTask instead
-        vscode.postMessage({
-            type: 'editTask',  // Changed from editTaskTitle
-            taskId: taskId,
-            columnId: columnId,
-            taskData: { title: newTitle }  // Pass as taskData object
-        });
-
-        // Update button state to show unsaved changes (path changed but not saved to main file yet)
+    if (newFileName?.trim() && newFileName.trim() !== currentFile) {
+        const newTitle = window.menuUtils.updateIncludeInTitle(found.task.title, newFileName);
+        window.menuUtils.postEditMessage('task', taskId, found.column.id, newTitle);
         updateRefreshButtonState('unsaved', 1);
     }
 }
 
 // Disable task include mode
 function disableTaskIncludeMode(taskId, columnId) {
-    // Close all menus properly
     closeAllMenus();
 
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
-        console.error('Column not found:', columnId);
-        return;
-    }
-
-    const task = column.tasks.find(t => t.id === taskId);
-    if (!task) {
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) {
         console.error('Task not found:', taskId);
         return;
     }
 
-    // Clean title to remove include syntax
-    let cleanTitle = task.title || '';
-    cleanTitle = cleanTitle.replace(/!!!include\([^)]+\)!!!/g, '').trim();
-
-    // UNIFIED PATH: Removing include is just editing title without include syntax
-    vscode.postMessage({
-        type: 'editTask',
-        taskId: taskId,
-        columnId: columnId,
-        taskData: { title: cleanTitle }
-    });
-
-    // Update button state to show unsaved changes
+    const cleanTitle = window.menuUtils.removeIncludeSyntax(found.task.title);
+    window.menuUtils.postEditMessage('task', taskId, found.column.id, cleanTitle);
     updateRefreshButtonState('unsaved', 1);
-
-    vscode.postMessage({
-        type: 'showMessage',
-        text: 'Task include mode disabled. Content converted to regular description.'
-    });
+    vscode.postMessage({ type: 'showMessage', text: 'Task include mode disabled. Content converted to regular description.' });
 }
 
 // Main toggle function for task include mode
 function toggleTaskIncludeMode(taskId, columnId) {
-    if (!window.cachedBoard) {
-        console.error('No cached board available');
-        return;
-    }
-
-    const column = window.cachedBoard.columns.find(col => col.id === columnId);
-    if (!column) {
-        console.error('Column not found:', columnId);
-        return;
-    }
-
-    const task = column.tasks.find(t => t.id === taskId);
-    if (!task) {
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) {
         console.error('Task not found:', taskId);
         return;
     }
 
-    if (task.includeMode) {
-        // Disable include mode
-        disableTaskIncludeMode(taskId, columnId);
+    if (found.task.includeMode) {
+        disableTaskIncludeMode(taskId, found.column.id);
     } else {
-        // Enable include mode - request filename from backend
-        vscode.postMessage({
-            type: 'requestTaskIncludeFileName',
-            taskId: taskId,
-            columnId: columnId
-        });
+        vscode.postMessage({ type: 'requestTaskIncludeFileName', taskId, columnId: found.column.id });
     }
 }
 
@@ -2732,161 +2523,72 @@ function addColumn(rowNumber) {
  * Side effects: Updates pending changes, triggers visual updates
  */
 function toggleColumnTag(columnId, tagName, event) {
-    // Enhanced duplicate prevention with stronger key and longer timeout
-    const key = `column-${columnId}-${tagName}`;
-    const now = Date.now();
-    if (!window._lastTagExecution) {
-        window._lastTagExecution = {};
-    }
-
-    if (window._lastTagExecution[key] && now - window._lastTagExecution[key] < 500) {
+    // Throttle duplicate calls
+    if (!window.menuUtils.shouldExecute(`column-${columnId}-${tagName}`)) {
         return;
     }
-    window._lastTagExecution[key] = now;
 
     if (event) {
         event.stopPropagation();
         event.preventDefault();
     }
 
-    // Try to find the column in the best available board data
-    let boardToUse = null;
-    let column = null;
+    // Find column in board data
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) return;
+    const { column } = found;
 
-    // First try cachedBoard (most current)
-    if (window.cachedBoard?.columns) {
-        column = window.cachedBoard.columns.find(c => c.id === columnId);
-        if (column) {
-            boardToUse = window.cachedBoard;
-        }
-    }
-
-    // If not found, try currentBoard
-    if (!column && window.cachedBoard?.columns) {
-        column = window.cachedBoard.columns.find(c => c.id === columnId);
-        if (column) {
-            boardToUse = window.cachedBoard;
-        }
-    }
-
-    if (!column) {
-        if (window.cachedBoard?.columns) {
-        }
-        if (window.cachedBoard?.columns) {
-        }
-        return;
-    }
-
-
-    // Also check DOM element
+    // Check DOM element exists
     const domElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
-    if (!domElement) {
-        return;
-    }
+    if (!domElement) return;
 
+    // Toggle tag in title (preserving row tags for columns)
+    const oldTitle = column.title || '';
+    const { newTitle, wasActive } = window.menuUtils.toggleTagInTitle(oldTitle, tagName, true);
 
-    const tagWithHash = `#${tagName}`;
-    let title = column.title || '';
+    // Sync to all board references
+    window.menuUtils.syncTitleToBoards('column', columnId, null, newTitle);
 
-    // Escape special regex characters in tag name
-    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
-    // Word boundary \b doesn't work with non-word characters
-    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
-    const pattern = isSpecialTag
-        ? `#${escapedTagName}(?=\\s|$)`
-        : `#${escapedTagName}\\b`;
-    const wasActive = new RegExp(pattern, 'gi').test(title);
-
-
-    if (wasActive) {
-        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
-    } else {
-        const rowMatch = title.match(/(#row\d+)$/i);
-        if (rowMatch) {
-            const beforeRow = title.substring(0, title.length - rowMatch[0].length).trim();
-            title = `${beforeRow} ${tagWithHash} ${rowMatch[0]}`;
-        } else {
-            title = `${title} ${tagWithHash}`.trim();
-        }
-    }
-    
-    // Update the board data - make sure both boards are updated
-    const oldTitle = column.title;
-    column.title = title;
-
-    // Ensure both currentBoard and cachedBoard are updated if they exist and are different
-    if (window.cachedBoard && window.cachedBoard !== boardToUse) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (currentColumn) {
-            currentColumn.title = title;
-        }
-    }
-
-    if (window.cachedBoard && window.cachedBoard !== boardToUse) {
-        const cachedColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-        if (cachedColumn) {
-            cachedColumn.title = title;
-        }
-    }
-
-    // Add to pending column changes so it gets saved to the backend
+    // Add to pending changes
     if (!window.pendingColumnChanges) {
         window.pendingColumnChanges = new Map();
     }
-    window.pendingColumnChanges.set(columnId, { columnId, title });
+    window.pendingColumnChanges.set(columnId, { columnId, title: newTitle });
 
-    // Mark as unsaved since we made a change
+    // Mark as unsaved
     markUnsavedChanges();
 
-    // Check if element is visible BEFORE any layout changes
+    // Check visibility before layout changes
     const rect = domElement.getBoundingClientRect();
     const isVisible = rect.left >= 0 && rect.right <= window.innerWidth;
 
-    // Update DOM immediately using unique ID
-    updateColumnDisplayImmediate(columnId, title, !wasActive, tagName);
-
-    // Update tag button appearance immediately
+    // Update DOM immediately
+    updateColumnDisplayImmediate(columnId, newTitle, !wasActive, tagName);
     updateTagButtonAppearance(columnId, 'column', tagName, !wasActive);
-
-    // Update tag category counts in menu
     updateTagCategoryCounts(columnId, 'column');
 
-    // Note: updateColumnDisplayImmediate already calls updateVisualTagState which handles badges
-    // No need to call updateCornerBadgesImmediate separately
-
-    // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
-    // that change the column height
+    // Recalculate stack heights if visual tags changed
     const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
-    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(title) : [];
-
-    // If the number of visual tags changed, heights may have changed
+    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (visualTagsBefore.length !== visualTagsAfter.length) {
         if (typeof window.applyStackedColumnStyles === 'function') {
             window.applyStackedColumnStyles();
         }
     }
 
-    // Check if we need to scroll to element (only if it was not visible)
+    // Scroll to element if needed
     if (!isVisible) {
         requestAnimationFrame(() => {
             scrollToElementIfNeeded(domElement, 'column');
         });
     }
-
-    // NEW CACHE SYSTEM: Changes are already in cachedBoard, mark as unsaved
-
-    // Mark board as having unsaved changes
-    markUnsavedChanges();
-
 }
 
 // IMPORTANT: This function correctly uses unique task.id and column.id
 // Never modify to use titles - this would break with duplicate titles
 /**
  * Toggles a tag on/off for a task
- * Purpose: Add or remove tags from task titles  
+ * Purpose: Add or remove tags from task titles
  * Used by: Tag menu clicks for tasks
  * @param {string} taskId - Task to modify
  * @param {string} columnId - Parent column ID
@@ -2895,174 +2597,59 @@ function toggleColumnTag(columnId, tagName, event) {
  * Side effects: Updates pending changes, triggers visual updates
  */
 function toggleTaskTag(taskId, columnId, tagName, event) {
-
-    // Enhanced duplicate prevention with stronger key and longer timeout
-    const key = `task-${taskId}-${tagName}`;
-    const now = Date.now();
-    if (!window._lastTagExecution) {
-        window._lastTagExecution = {};
-    }
-
-    if (window._lastTagExecution[key] && now - window._lastTagExecution[key] < 500) {
+    // Throttle duplicate calls
+    if (!window.menuUtils.shouldExecute(`task-${taskId}-${tagName}`)) {
         return;
     }
-    window._lastTagExecution[key] = now;
 
     if (event) {
         event.stopPropagation();
         event.preventDefault();
     }
 
-    // Try to find the task in the best available board data
-    let boardToUse = null;
-    let column = null;
-    let task = null;
+    // Find task in board data
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) return;
+    const { column, task } = found;
 
-    // First try cachedBoard (most current)
-    if (window.cachedBoard?.columns) {
-        column = window.cachedBoard.columns.find(c => c.id === columnId);
-        task = column?.tasks.find(t => t.id === taskId);
-
-        // If task not found in expected column, search all columns
-        if (!task) {
-            for (const col of window.cachedBoard.columns) {
-                const foundTask = col.tasks.find(t => t.id === taskId);
-                if (foundTask) {
-                    column = col;
-                    task = foundTask;
-                    break;
-                }
-            }
-        }
-
-        if (task) {
-            boardToUse = window.cachedBoard;
-        }
-    }
-
-    // If not found, try currentBoard
-    if (!task && window.cachedBoard?.columns) {
-        column = window.cachedBoard.columns.find(c => c.id === columnId);
-        task = column?.tasks.find(t => t.id === taskId);
-
-        // If task not found in expected column, search all columns
-        if (!task) {
-            for (const col of window.cachedBoard.columns) {
-                const foundTask = col.tasks.find(t => t.id === taskId);
-                if (foundTask) {
-                    column = col;
-                    task = foundTask;
-                    break;
-                }
-            }
-        }
-
-        if (task) {
-            boardToUse = window.cachedBoard;
-        }
-    }
-
-    if (!column || !task) {
-        return;
-    }
-
-    
-    
-    // Also check DOM element
+    // Check DOM element exists
     const domElement = document.querySelector(`[data-task-id="${taskId}"]`);
-    if (!domElement) {
-        return;
-    }
+    if (!domElement) return;
 
-    const tagWithHash = `#${tagName}`;
-    let title = task.title || '';
+    // Toggle tag in title (no row tag preservation for tasks)
+    const oldTitle = task.title || '';
+    const { newTitle, wasActive } = window.menuUtils.toggleTagInTitle(oldTitle, tagName, false);
 
-    // Escape special regex characters in tag name
-    const escapedTagName = tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Sync to all board references
+    window.menuUtils.syncTitleToBoards('task', taskId, column.id, newTitle);
 
-    // For special character tags (++, +, ø, -, --), use (?=\s|$) instead of \b
-    // Word boundary \b doesn't work with non-word characters
-    const isSpecialTag = /^[\+\-øØ]+$/.test(tagName);
-    const pattern = isSpecialTag
-        ? `#${escapedTagName}(?=\\s|$)`
-        : `#${escapedTagName}\\b`;
-    const wasActive = new RegExp(pattern, 'gi').test(title);
-
-
-    if (wasActive) {
-        title = title.replace(new RegExp(pattern, 'gi'), '').replace(/\s+/g, ' ').trim();
-    } else {
-        title = `${title} ${tagWithHash}`.trim();
-    }
-
-    // Update the task in the found board
-    const oldTitle = task.title;
-    task.title = title;
-
-    // Ensure both currentBoard and cachedBoard are updated if they exist and are different
-    if (window.cachedBoard && window.cachedBoard !== boardToUse) {
-        const currentColumn = window.cachedBoard.columns.find(col => col.id === column.id);
-        if (currentColumn) {
-            const currentTask = currentColumn.tasks.find(t => t.id === taskId);
-            if (currentTask) {
-                currentTask.title = title;
-            }
-        }
-    }
-
-    if (window.cachedBoard && window.cachedBoard !== boardToUse) {
-        const cachedColumn = window.cachedBoard.columns.find(col => col.id === column.id);
-        if (cachedColumn) {
-            const cachedTask = cachedColumn.tasks.find(t => t.id === taskId);
-            if (cachedTask) {
-                cachedTask.title = title;
-            }
-        }
-    }
-    
-    // Mark as unsaved since we made a change
+    // Mark as unsaved
     markUnsavedChanges();
 
-    // Check if element is visible BEFORE any layout changes
+    // Check visibility before layout changes
     const rect = domElement.getBoundingClientRect();
     const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
 
-    // Update DOM immediately using unique ID
-    updateTaskDisplayImmediate(taskId, title, !wasActive, tagName);
-
-    // Update tag button appearance immediately
+    // Update DOM immediately
+    updateTaskDisplayImmediate(taskId, newTitle, !wasActive, tagName);
     updateTagButtonAppearance(taskId, 'task', tagName, !wasActive);
-
-    // Update tag category counts in menu
     updateTagCategoryCounts(taskId, 'task', columnId);
 
-    // Note: updateTaskDisplayImmediate already calls updateVisualTagState which handles badges
-    // No need to call updateCornerBadgesImmediate separately
-
-    // Only recalculate stack heights if this tag change affects visual elements (headers/footers)
-    // that change the task height
+    // Recalculate stack heights if visual tags changed
     const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
-    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(title) : [];
-
-    // If the number of visual tags changed, heights may have changed
+    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (visualTagsBefore.length !== visualTagsAfter.length) {
         if (typeof window.applyStackedColumnStyles === 'function') {
             window.applyStackedColumnStyles();
         }
     }
 
-    // Check if we need to scroll to element (only if it was not visible)
+    // Scroll to element if needed
     if (!isVisible) {
         requestAnimationFrame(() => {
             scrollToElementIfNeeded(domElement, 'task');
         });
     }
-
-    // NEW CACHE SYSTEM: Changes are already in cachedBoard, mark as unsaved
-
-    // Mark board as having unsaved changes
-    markUnsavedChanges();
-
 }
 
 // Enhanced DOM update functions using unique IDs
@@ -3077,219 +2664,94 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
  * @param {string} tagName - Tag being modified
  */
 function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
-    // Use unique ID to find column element - NEVER use titles for selection
     const columnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
-    if (!columnElement) {
-        return;
-    }
-    
-    // Update cached board data first
+    if (!columnElement) return;
+
+    // Update cached board data
     if (window.cachedBoard) {
         const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
-        if (columnData) {
-            columnData.title = newTitle;
-        }
+        if (columnData) columnData.title = newTitle;
     }
 
-    // Update title display using shared function
+    // Update title display
     const titleElement = columnElement.querySelector('.column-title-text');
     if (titleElement && window.cachedBoard) {
         const columnData = window.cachedBoard.columns.find(c => c.id === columnId);
         if (columnData) {
-            const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
-            titleElement.innerHTML = renderedTitle;
+            titleElement.innerHTML = window.tagUtils
+                ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText)
+                : (columnData.title || '');
         }
     }
-    
-    // Update edit field if it exists
+
+    // Update edit field
     const editElement = columnElement.querySelector('.column-title-edit');
-    if (editElement) {
-        editElement.value = newTitle;
-    }
-    
-    // Update data attributes for styling
-    const firstTag = window.extractFirstTag ? window.extractFirstTag(newTitle) : null;
-    if (firstTag) {
-        columnElement.setAttribute('data-column-tag', firstTag);
-    } else {
-        columnElement.removeAttribute('data-column-tag');
-    }
+    if (editElement) editElement.value = newTitle;
 
-    const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
-    if (allTags.length > 0) {
-        columnElement.setAttribute('data-all-tags', allTags.join(' '));
-    } else {
-        columnElement.removeAttribute('data-all-tags');
-    }
+    // Update data attributes (tag, all-tags) using shared utility
+    const allTags = window.menuUtils.updateTagDataAttributes(columnElement, newTitle, 'column');
 
-    // Update temporal attributes - set the CORRECT attribute for each type
-    if (window.tagUtils) {
-        const colText = newTitle || '';
+    // Update temporal attributes using shared utility
+    window.menuUtils.updateTemporalAttributes(columnElement, newTitle, 'column');
 
-        // Remove all temporal attributes first
-        columnElement.removeAttribute('data-current-day');
-        columnElement.removeAttribute('data-current-week');
-        columnElement.removeAttribute('data-current-weekday');
-        columnElement.removeAttribute('data-current-hour');
-        columnElement.removeAttribute('data-current-time');
-
-        // Set only the ones that are active
-        if (window.tagUtils.isCurrentDate(colText)) columnElement.setAttribute('data-current-day', 'true');
-        if (window.tagUtils.isCurrentWeek(colText)) columnElement.setAttribute('data-current-week', 'true');
-        if (window.tagUtils.isCurrentWeekday(colText)) columnElement.setAttribute('data-current-weekday', 'true');
-        if (window.tagUtils.isCurrentTime(colText)) columnElement.setAttribute('data-current-hour', 'true');
-        if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement.setAttribute('data-current-time', 'true');
-    }
-
-    // Update header bars immediately
-    if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
+    // Update visual tag state
+    if (window.updateVisualTagState) {
         const isCollapsed = columnElement.classList.contains('collapsed');
         window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
     }
 
-    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
-    // No need to call updateCornerBadgesImmediate separately
+    // Update tag chip button using shared utility
+    window.menuUtils.updateTagChipButton(columnId, tagName, isActive);
 
-    // Update tag chip button state using unique identifiers
-    const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${columnId}"][data-tag-name="${tagName}"]`);
-    if (button) {
-        button.classList.toggle('active', isActive);
-        const checkbox = button.querySelector('.tag-chip-check');
-        if (checkbox) {
-            checkbox.textContent = isActive ? '✓' : '';
-        }
-        updateTagChipStyle(button, tagName, isActive);
-    }
-    
-    // Ensure the style for this specific tag exists without regenerating all styles
-    if (window.ensureTagStyleExists) {
-        window.ensureTagStyleExists(tagName);
-    }
-    
-    // Visual confirmation that tag was applied
-    if (isActive) {
-        // Add temporary visual flash to show tag was applied
-        columnElement.classList.add('tag-applied-flash');
-        setTimeout(() => {
-            if (columnElement && columnElement.classList) {
-                columnElement.classList.remove('tag-applied-flash');
-            }
-        }, 300);
-    }
+    // Ensure tag style exists
+    if (window.ensureTagStyleExists) window.ensureTagStyleExists(tagName);
 
+    // Apply visual flash using shared utility
+    window.menuUtils.applyTagFlash(columnElement, isActive);
 }
 
 // CRITICAL: Always use unique task IDs to prevent targeting wrong tasks with same titles
 function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
-    // Use unique ID to find task element - NEVER use titles for selection
     const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-    if (!taskElement) {
-        return;
-    }
-    
+    if (!taskElement) return;
+
     // Update title display
     const titleElement = taskElement.querySelector('.task-title-display');
     if (titleElement) {
-        const renderedTitle = newTitle ? 
-            (window.renderMarkdown ? window.renderMarkdown(newTitle) : newTitle) :
-            '';
-        titleElement.innerHTML = renderedTitle;
+        titleElement.innerHTML = newTitle
+            ? (window.renderMarkdown ? window.renderMarkdown(newTitle) : newTitle)
+            : '';
     }
-    
-    // Update edit field if it exists
+
+    // Update edit field
     const editElement = taskElement.querySelector('.task-title-edit');
-    if (editElement) {
-        editElement.value = newTitle;
-    }
-    
-    // Update data attributes for styling
-    const firstTag = window.extractFirstTag ? window.extractFirstTag(newTitle) : null;
-    if (firstTag) {
-        taskElement.setAttribute('data-task-tag', firstTag);
-    } else {
-        taskElement.removeAttribute('data-task-tag');
-    }
+    if (editElement) editElement.value = newTitle;
 
-    const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
-    if (allTags.length > 0) {
-        taskElement.setAttribute('data-all-tags', allTags.join(' '));
-    } else {
-        taskElement.removeAttribute('data-all-tags');
-    }
+    // Update data attributes (tag, all-tags) using shared utility
+    const allTags = window.menuUtils.updateTagDataAttributes(taskElement, newTitle, 'task');
 
-    // Update temporal attributes with hierarchical gating
-    if (window.tagUtils && window.getActiveTemporalAttributes) {
-        // Find task and column for hierarchical gating
-        let taskTitle = newTitle || '';
-        let taskDescription = '';
-        let columnTitle = '';
-        const board = window.currentBoard || window.cachedBoard;
-        if (board) {
-            for (const column of board.columns) {
-                const task = column.tasks.find(t => t.id === taskId);
-                if (task) {
-                    taskTitle = task.title || '';
-                    taskDescription = task.description || '';
-                    columnTitle = column.title || '';
-                    break;
-                }
-            }
-        }
+    // Update temporal attributes with hierarchical gating using shared utility
+    const found = window.menuUtils.findTaskInBoard(taskId);
+    const context = found ? {
+        columnTitle: found.column.title || '',
+        taskDescription: found.task.description || ''
+    } : {};
+    window.menuUtils.updateTemporalAttributes(taskElement, newTitle, 'task', context);
 
-        // Remove all temporal attributes first
-        taskElement.removeAttribute('data-current-day');
-        taskElement.removeAttribute('data-current-week');
-        taskElement.removeAttribute('data-current-weekday');
-        taskElement.removeAttribute('data-current-hour');
-        taskElement.removeAttribute('data-current-time');
-
-        // Get active temporal attributes with hierarchical gating
-        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, taskTitle, taskDescription);
-
-        // Set only the ones that are active
-        for (const [attr, isActive] of Object.entries(activeAttrs)) {
-            if (isActive) {
-                taskElement.setAttribute(attr, 'true');
-            }
-        }
-    }
-
-    // Update header bars immediately
-    if (window.updateVisualTagState && typeof window.updateVisualTagState === 'function') {
+    // Update visual tag state
+    if (window.updateVisualTagState) {
         const isCollapsed = taskElement.classList.contains('collapsed');
         window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
     }
 
-    // Note: updateVisualTagState already calls updateAllVisualTagElements which handles badges
-    // No need to call updateCornerBadgesImmediate separately
-    
-    // Update tag chip button state using unique identifiers
-    const button = document.querySelector(`.donut-menu-tag-chip[data-element-id="${taskId}"][data-tag-name="${tagName}"]`);
-    if (button) {
-        button.classList.toggle('active', isActive);
-        const checkbox = button.querySelector('.tag-chip-check');
-        if (checkbox) {
-            checkbox.textContent = isActive ? '✓' : '';
-        }
-        updateTagChipStyle(button, tagName, isActive);
-    }
-    
-    // Ensure the style for this specific tag exists without regenerating all styles
-    if (window.ensureTagStyleExists) {
-        window.ensureTagStyleExists(tagName);
-    }
-    
-    // Visual confirmation that tag was applied
-    if (isActive) {
-        // Add temporary visual flash to show tag was applied
-        taskElement.classList.add('tag-applied-flash');
-        setTimeout(() => {
-            if (taskElement && taskElement.classList) {
-                taskElement.classList.remove('tag-applied-flash');
-            }
-        }, 300);
-    }
-    
+    // Update tag chip button using shared utility
+    window.menuUtils.updateTagChipButton(taskId, tagName, isActive);
+
+    // Ensure tag style exists
+    if (window.ensureTagStyleExists) window.ensureTagStyleExists(tagName);
+
+    // Apply visual flash using shared utility
+    window.menuUtils.applyTagFlash(taskElement, isActive);
 }
 
 function updateTagChipStyle(button, tagName, isActive) {
