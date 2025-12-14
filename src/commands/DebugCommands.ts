@@ -14,6 +14,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as fs from 'fs';
 
 /**
@@ -54,7 +55,7 @@ export class DebugCommands extends BaseMessageCommand {
                     return this.failure(`Unknown debug command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[DebugCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -73,6 +74,7 @@ export class DebugCommands extends BaseMessageCommand {
         let backupPath: string | undefined;
         try {
             const document = context.fileManager.getDocument();
+            // Note: _conflictService is panel-internal, needs 'as any' access
             if (document && panel._conflictService) {
                 backupPath = await panel._conflictService.createUnifiedBackup(
                     document.uri.fsPath,
@@ -85,14 +87,14 @@ export class DebugCommands extends BaseMessageCommand {
         }
 
         try {
-            const fileRegistry = panel._fileRegistry;
+            const fileRegistry = this.getFileRegistry();
             if (!fileRegistry?.forceWriteAll) {
                 throw new Error('File registry not available or forceWriteAll method not found');
             }
 
             const result = await fileRegistry.forceWriteAll();
 
-            panel._panel.webview.postMessage({
+            this.postMessage({
                 type: 'forceWriteAllResult',
                 success: result.errors.length === 0,
                 filesWritten: result.filesWritten,
@@ -102,11 +104,11 @@ export class DebugCommands extends BaseMessageCommand {
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
-            panel._panel?.webview.postMessage({
+            this.postMessage({
                 type: 'forceWriteAllResult',
                 success: false,
                 filesWritten: 0,
-                errors: [error instanceof Error ? error.message : String(error)],
+                errors: [getErrorMessage(error)],
                 backupCreated: false,
                 timestamp: new Date().toISOString()
             });
@@ -115,8 +117,7 @@ export class DebugCommands extends BaseMessageCommand {
     }
 
     private async handleVerifyContentSync(frontendBoard: any, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
+        if (!this.getPanel()) {
             return this.success();
         }
 
@@ -125,7 +126,7 @@ export class DebugCommands extends BaseMessageCommand {
                 throw new Error('Frontend board data not provided');
             }
 
-            const fileRegistry = panel._fileRegistry;
+            const fileRegistry = this.getFileRegistry();
             if (!fileRegistry) {
                 throw new Error('File registry not available');
             }
@@ -137,7 +138,7 @@ export class DebugCommands extends BaseMessageCommand {
             let matchingFiles = 0;
             let mismatchedFiles = 0;
 
-            const backendBoard = panel.getBoard ? panel.getBoard() : undefined;
+            const backendBoard = this.getCurrentBoard();
 
             for (const file of allFiles) {
                 let backendContent: string;
@@ -194,7 +195,7 @@ export class DebugCommands extends BaseMessageCommand {
                 });
             }
 
-            panel._panel.webview.postMessage({
+            this.postMessage({
                 type: 'verifyContentSyncResult',
                 success: true,
                 timestamp: new Date().toISOString(),
@@ -206,7 +207,7 @@ export class DebugCommands extends BaseMessageCommand {
                 summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
             });
         } catch (error) {
-            panel._panel?.webview.postMessage({
+            this.postMessage({
                 type: 'verifyContentSyncResult',
                 success: false,
                 timestamp: new Date().toISOString(),
@@ -215,7 +216,7 @@ export class DebugCommands extends BaseMessageCommand {
                 mismatchedFiles: 0,
                 missingFiles: 0,
                 fileResults: [],
-                summary: `Verification failed: ${error instanceof Error ? error.message : String(error)}`
+                summary: `Verification failed: ${getErrorMessage(error)}`
             });
         }
         return this.success();
@@ -224,13 +225,12 @@ export class DebugCommands extends BaseMessageCommand {
     // ============= DEBUG INFO HANDLERS =============
 
     private async handleGetTrackedFilesDebugInfo(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
+        if (!this.getPanel()) {
             return this.success();
         }
 
         const debugData = await this.collectTrackedFilesDebugInfo(context);
-        panel._panel?.webview.postMessage({
+        this.postMessage({
             type: 'trackedFilesDebugInfo',
             data: debugData
         });
@@ -238,6 +238,7 @@ export class DebugCommands extends BaseMessageCommand {
     }
 
     private async handleClearTrackedFilesCache(context: CommandContext): Promise<CommandResult> {
+        // Note: This method needs panel-internal access for cache clearing
         const panel = context.getWebviewPanel() as any;
         if (!panel) {
             return this.success();
@@ -259,7 +260,7 @@ export class DebugCommands extends BaseMessageCommand {
             console.warn('[DebugCommands] Error clearing panel caches:', error);
         }
 
-        panel._panel?.webview.postMessage({
+        this.postMessage({
             type: 'debugCacheCleared'
         });
         return this.success();
@@ -279,8 +280,8 @@ export class DebugCommands extends BaseMessageCommand {
 
     private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<any> {
         const document = context.fileManager.getDocument();
-        const panel = context.getWebviewPanel() as any;
-        const mainFile = panel?.fileRegistry?.getMainFile();
+        const fileRegistry = this.getFileRegistry();
+        const mainFile = fileRegistry?.getMainFile();
 
         const mainFilePath = context.fileManager.getFilePath() || document?.uri.fsPath || 'Unknown';
 
@@ -298,7 +299,7 @@ export class DebugCommands extends BaseMessageCommand {
         };
 
         const includeFiles: any[] = [];
-        const allIncludeFiles = panel?.fileRegistry?.getIncludeFiles() || [];
+        const allIncludeFiles = fileRegistry?.getIncludeFiles() || [];
 
         for (const file of allIncludeFiles) {
             includeFiles.push({
@@ -336,6 +337,11 @@ export class DebugCommands extends BaseMessageCommand {
             lastError: null
         };
 
+        // Check for unsaved changes via file registry
+        const hasUnsavedChanges = fileRegistry
+            ? fileRegistry.getFilesWithUnsavedChanges().length > 0
+            : false;
+
         return {
             mainFile: mainFileInfo.path,
             mainFileLastModified: mainFileInfo.lastModified,
@@ -343,7 +349,7 @@ export class DebugCommands extends BaseMessageCommand {
             includeFiles: includeFiles,
             conflictManager: conflictManager,
             systemHealth: systemHealth,
-            hasUnsavedChanges: panel ? panel._hasUnsavedChanges || false : false,
+            hasUnsavedChanges: hasUnsavedChanges,
             timestamp: new Date().toISOString(),
             watcherDetails: mainFileInfo
         };

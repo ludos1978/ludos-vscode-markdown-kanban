@@ -13,6 +13,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { getErrorMessage } from '../utils/stringUtils';
 
 /**
  * Task Commands Handler
@@ -81,7 +82,7 @@ export class TaskCommands extends BaseMessageCommand {
                     return this.failure(`Unknown task command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[TaskCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }

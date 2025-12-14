@@ -14,7 +14,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
-import { toForwardSlashes } from '../utils/stringUtils';
+import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -57,11 +57,8 @@ export class ClipboardCommands extends BaseMessageCommand {
      * Send a message to the webview panel
      * Centralizes null checks and panel access pattern
      */
-    private _sendToWebview(context: CommandContext, type: string, data: Record<string, any>): void {
-        const panel = context.getWebviewPanel();
-        if (panel && (panel as any)._panel) {
-            (panel as any)._panel.webview.postMessage({ type, ...data });
-        }
+    private _sendToWebview(_context: CommandContext, type: string, data: Record<string, any>): void {
+        this.postMessage({ type, ...data });
     }
 
     async execute(message: any, context: CommandContext): Promise<CommandResult> {
@@ -167,7 +164,7 @@ export class ClipboardCommands extends BaseMessageCommand {
                     return this.failure(`Unknown clipboard command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[ClipboardCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }

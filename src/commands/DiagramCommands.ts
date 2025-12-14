@@ -12,7 +12,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getMermaidExportService } from '../services/export/MermaidExportService';
-import { escapeRegExp } from '../utils/stringUtils';
+import { escapeRegExp, getErrorMessage } from '../utils/stringUtils';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -83,7 +83,7 @@ export class DiagramCommands extends BaseMessageCommand {
                     return this.failure(`Unknown diagram command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[DiagramCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -121,7 +121,7 @@ export class DiagramCommands extends BaseMessageCommand {
             panel.webview.postMessage({
                 type: 'plantUMLRenderError',
                 requestId,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
     }
@@ -180,7 +180,7 @@ export class DiagramCommands extends BaseMessageCommand {
             if (panel && panel.webview) {
                 panel.webview.postMessage({
                     type: 'plantUMLConvertError',
-                    error: error instanceof Error ? error.message : String(error)
+                    error: getErrorMessage(error)
                 });
             }
         }
@@ -332,7 +332,7 @@ ${plantUMLCode}
             if (panel && panel.webview) {
                 panel.webview.postMessage({
                     type: 'mermaidConvertError',
-                    error: error instanceof Error ? error.message : String(error)
+                    error: getErrorMessage(error)
                 });
             }
         }
@@ -509,7 +509,7 @@ ${mermaidCode}
             panel.webview.postMessage({
                 type: 'drawioRenderError',
                 requestId,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
     }
@@ -634,7 +634,7 @@ ${mermaidCode}
             panel.webview.postMessage({
                 type: 'excalidrawRenderError',
                 requestId,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
     }
@@ -693,7 +693,7 @@ ${mermaidCode}
             panel.webview.postMessage({
                 type: 'pdfPageRenderError',
                 requestId,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
     }
@@ -745,7 +745,7 @@ ${mermaidCode}
             panel.webview.postMessage({
                 type: 'pdfInfoError',
                 requestId,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
     }

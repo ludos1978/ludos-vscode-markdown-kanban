@@ -36,3 +36,14 @@ export function toForwardSlashes(filePath: string): string {
 export function normalizePathForLookup(filePath: string): string {
     return toForwardSlashes(filePath.toLowerCase());
 }
+
+/**
+ * Extracts a string message from an unknown error value.
+ * Safely handles Error objects, strings, and other types.
+ *
+ * @param error - The error value (typically from a catch block)
+ * @returns A string representation of the error
+ */
+export function getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}

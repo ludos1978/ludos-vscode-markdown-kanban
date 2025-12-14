@@ -13,7 +13,7 @@ import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { AssetHandler } from '../assets/AssetHandler';
-import { escapeRegExp, toForwardSlashes } from '../../utils/stringUtils';
+import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -1659,7 +1659,7 @@ export class ExportService {
 
                 return {
                     success: false,
-                    message: `Marp preview failed: ${error instanceof Error ? error.message : String(error)}`
+                    message: `Marp preview failed: ${getErrorMessage(error)}`
                 };
             }
         }
@@ -1688,7 +1688,7 @@ export class ExportService {
                 console.error(`[kanban.exportService.runMarpConversion] Conversion failed:`, error);
                 return {
                     success: false,
-                    message: `Marp conversion failed: ${error instanceof Error ? error.message : String(error)}`
+                    message: `Marp conversion failed: ${getErrorMessage(error)}`
                 };
             } finally {
                 // Cleanup preprocessed file
@@ -1746,7 +1746,7 @@ export class ExportService {
             console.error('[kanban.exportService.export] Export failed:', error);
             return {
                 success: false,
-                message: `Export failed: ${error instanceof Error ? error.message : String(error)}`
+                message: `Export failed: ${getErrorMessage(error)}`
             };
         }
     }

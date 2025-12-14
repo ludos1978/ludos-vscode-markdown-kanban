@@ -12,6 +12,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -73,7 +74,7 @@ export class FileCommands extends BaseMessageCommand {
                     return this.failure(`Unknown file command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[FileCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -169,7 +170,7 @@ export class FileCommands extends BaseMessageCommand {
             }
             return this.success();
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[FileCommands] Error opening file ${filePath}:`, error);
             return this.failure(errorMessage);
         }

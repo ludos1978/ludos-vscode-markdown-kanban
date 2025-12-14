@@ -23,6 +23,7 @@ import {
     ExportResult
 } from '../interfaces';
 import { MarpExportService, MarpExportOptions } from '../../services/export/MarpExportService';
+import { getErrorMessage } from '../../utils/stringUtils';
 import { KanbanBoard } from '../../markdownParser';
 
 /**
@@ -148,7 +149,7 @@ export class MarpExportPlugin implements ExportPlugin {
                 }
             };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             return {
                 success: false,
                 error: `Export failed: ${errorMessage}`,

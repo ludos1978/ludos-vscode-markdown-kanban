@@ -1,6 +1,7 @@
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { getErrorMessage } from '../../utils/stringUtils';
 
 /**
  * Backend service for rendering PlantUML diagrams using Java + PlantUML JAR
@@ -144,7 +145,7 @@ export class PlantUMLService {
 
             } catch (error) {
                 console.error('[PlantUML Service] Exception:', error);
-                reject(new Error(`PlantUML rendering failed: ${error instanceof Error ? error.message : String(error)}`));
+                reject(new Error(`PlantUML rendering failed: ${getErrorMessage(error)}`));
             }
         });
     }

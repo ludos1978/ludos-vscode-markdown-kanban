@@ -22,4 +22,4 @@ export { LinkOperations } from './linkOperations';
 export { safeFileUri } from './uriUtils';
 
 // String utilities
-export { escapeRegExp, normalizePathForLookup, toForwardSlashes } from './stringUtils';
+export { escapeRegExp, getErrorMessage, normalizePathForLookup, toForwardSlashes } from './stringUtils';

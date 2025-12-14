@@ -12,6 +12,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 
 /**
@@ -66,7 +67,7 @@ export class UICommands extends BaseMessageCommand {
                     return this.failure(`Unknown UI command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[UICommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }

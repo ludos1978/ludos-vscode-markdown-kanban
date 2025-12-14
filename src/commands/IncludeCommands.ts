@@ -18,6 +18,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
 import { safeFileUri } from '../utils/uriUtils';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -93,7 +94,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     return this.failure(`Unknown include command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[IncludeCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -101,7 +102,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
     // ============= INCLUDE MODE HANDLERS =============
 
-    private async handleConfirmDisableIncludeMode(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleConfirmDisableIncludeMode(message: any, _context: CommandContext): Promise<CommandResult> {
         const confirmation = await vscode.window.showWarningMessage(
             message.message,
             { modal: true },
@@ -110,20 +111,16 @@ export class IncludeCommands extends BaseMessageCommand {
         );
 
         if (confirmation === 'Disable Include Mode') {
-            const panel = context.getWebviewPanel() as any;
-            if (panel?._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'proceedDisableIncludeMode',
-                    columnId: message.columnId
-                });
-            }
+            this.postMessage({
+                type: 'proceedDisableIncludeMode',
+                columnId: message.columnId
+            });
         }
         return this.success();
     }
 
     private async handleRequestIncludeFile(filePath: string, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel?._panel) {
+        if (!this.getPanel()) {
             return this.failure('No webview panel available');
         }
 
@@ -137,7 +134,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
         try {
             if (!fs.existsSync(absolutePath)) {
-                panel._panel.webview.postMessage({
+                this.postMessage({
                     type: 'includeFileContent',
                     filePath: filePath,
                     content: null,
@@ -147,13 +144,13 @@ export class IncludeCommands extends BaseMessageCommand {
             }
 
             const content = fs.readFileSync(absolutePath, 'utf8');
-            panel._panel.webview.postMessage({
+            this.postMessage({
                 type: 'includeFileContent',
                 filePath: filePath,
                 content: content
             });
         } catch (fileError) {
-            panel._panel.webview.postMessage({
+            this.postMessage({
                 type: 'includeFileContent',
                 filePath: filePath,
                 content: null,
@@ -215,22 +212,18 @@ export class IncludeCommands extends BaseMessageCommand {
             const absolutePath = fileUris[0].fsPath;
             const relativePath = path.relative(currentDir, absolutePath);
 
-            const panel = context.getWebviewPanel() as any;
-            if (panel?._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'proceedEnableIncludeMode',
-                    columnId: message.columnId,
-                    fileName: relativePath
-                });
-            }
+            this.postMessage({
+                type: 'proceedEnableIncludeMode',
+                columnId: message.columnId,
+                fileName: relativePath
+            });
         }
         return this.success();
     }
 
     private async handleRequestEditIncludeFileName(message: any, context: CommandContext): Promise<CommandResult> {
         const currentFile = message.currentFile || '';
-        const panel = context.getWebviewPanel() as any;
-        const fileRegistry = context.getFileRegistry();
+        const fileRegistry = this.getFileRegistry();
         const file = fileRegistry?.getByRelativePath(currentFile);
 
         if (file && file.hasUnsavedChanges()) {
@@ -279,14 +272,12 @@ export class IncludeCommands extends BaseMessageCommand {
             const absolutePath = fileUris[0].fsPath;
             const relativePath = path.relative(currentDir, absolutePath);
 
-            if (panel?._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'proceedUpdateIncludeFile',
-                    columnId: message.columnId,
-                    newFileName: relativePath,
-                    currentFile: currentFile
-                });
-            }
+            this.postMessage({
+                type: 'proceedUpdateIncludeFile',
+                columnId: message.columnId,
+                newFileName: relativePath,
+                currentFile: currentFile
+            });
         }
         return this.success();
     }
@@ -296,8 +287,7 @@ export class IncludeCommands extends BaseMessageCommand {
         const taskId = message.taskId;
         const columnId = message.columnId;
 
-        const panel = context.getWebviewPanel() as any;
-        const fileRegistry = context.getFileRegistry();
+        const fileRegistry = this.getFileRegistry();
         const file = fileRegistry?.getByRelativePath(currentFile);
 
         if (file && file.hasUnsavedChanges()) {
@@ -346,15 +336,13 @@ export class IncludeCommands extends BaseMessageCommand {
             const absolutePath = fileUris[0].fsPath;
             const relativePath = path.relative(currentDir, absolutePath);
 
-            if (panel?._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'proceedUpdateTaskIncludeFile',
-                    taskId: taskId,
-                    columnId: columnId,
-                    newFileName: relativePath,
-                    currentFile: currentFile
-                });
-            }
+            this.postMessage({
+                type: 'proceedUpdateTaskIncludeFile',
+                taskId: taskId,
+                columnId: columnId,
+                newFileName: relativePath,
+                currentFile: currentFile
+            });
         }
         return this.success();
     }
@@ -380,15 +368,12 @@ export class IncludeCommands extends BaseMessageCommand {
             const absolutePath = fileUris[0].fsPath;
             const relativePath = path.relative(currentDir, absolutePath);
 
-            const panel = context.getWebviewPanel() as any;
-            if (panel?._panel) {
-                panel._panel.webview.postMessage({
-                    type: 'enableTaskIncludeMode',
-                    taskId: taskId,
-                    columnId: columnId,
-                    fileName: relativePath
-                });
-            }
+            this.postMessage({
+                type: 'enableTaskIncludeMode',
+                taskId: taskId,
+                columnId: columnId,
+                fileName: relativePath
+            });
         }
         return this.success();
     }
@@ -422,7 +407,7 @@ export class IncludeCommands extends BaseMessageCommand {
             await panel.loadMarkdownFile(document);
         }
 
-        panel._panel?.webview.postMessage({
+        this.postMessage({
             type: 'allIncludedFilesReloaded',
             reloadCount: reloadCount
         });
@@ -453,7 +438,7 @@ export class IncludeCommands extends BaseMessageCommand {
                 const { MarkdownKanbanParser } = require('../markdownParser');
                 const markdown = MarkdownKanbanParser.generateMarkdown(board);
 
-                const fileRegistry = panel._fileRegistry;
+                const fileRegistry = this.getFileRegistry();
                 const mainFile = fileRegistry?.getMainFile();
                 if (!mainFile) {
                     throw new Error('Main file not found in registry');
@@ -487,7 +472,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     }
                 }
 
-                panel._panel.webview.postMessage({
+                this.postMessage({
                     type: 'individualFileSaved',
                     filePath: filePath,
                     isMainFile: true,
@@ -495,7 +480,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     forceSave: forceSave
                 });
             } else {
-                const fileRegistry = panel._fileRegistry;
+                const fileRegistry = this.getFileRegistry();
                 if (!fileRegistry) {
                     throw new Error('File registry not available');
                 }
@@ -538,7 +523,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     }
                 }
 
-                panel._panel.webview.postMessage({
+                this.postMessage({
                     type: 'individualFileSaved',
                     filePath: filePath,
                     isMainFile: false,
@@ -547,16 +532,16 @@ export class IncludeCommands extends BaseMessageCommand {
                 });
 
                 // Trigger debug info refresh (handled by DebugCommands)
-                panel._panel.webview.postMessage({ type: 'refreshDebugInfo' });
+                this.postMessage({ type: 'refreshDebugInfo' });
             }
         } catch (error) {
-            panel._panel?.webview.postMessage({
+            this.postMessage({
                 type: 'individualFileSaved',
                 filePath: filePath,
                 isMainFile: isMainFile,
                 success: false,
                 forceSave: forceSave,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
         return this.success();
@@ -574,7 +559,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
         try {
             if (isMainFile) {
-                const fileRegistry = panel._fileRegistry;
+                const fileRegistry = this.getFileRegistry();
                 const mainFile = fileRegistry?.getMainFile();
                 if (!mainFile) {
                     throw new Error('Main file not found in registry');
@@ -592,14 +577,14 @@ export class IncludeCommands extends BaseMessageCommand {
                     await fileService.sendBoardUpdate(false, false);
                 }
 
-                panel._panel.webview.postMessage({
+                this.postMessage({
                     type: 'individualFileReloaded',
                     filePath: filePath,
                     isMainFile: true,
                     success: true
                 });
             } else {
-                const fileRegistry = panel._fileRegistry;
+                const fileRegistry = this.getFileRegistry();
                 if (!fileRegistry) {
                     throw new Error('File registry not available');
                 }
@@ -629,7 +614,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     }
                 }
 
-                panel._panel.webview.postMessage({
+                this.postMessage({
                     type: 'individualFileReloaded',
                     filePath: filePath,
                     isMainFile: false,
@@ -637,12 +622,12 @@ export class IncludeCommands extends BaseMessageCommand {
                 });
             }
         } catch (error) {
-            panel._panel?.webview.postMessage({
+            this.postMessage({
                 type: 'individualFileReloaded',
                 filePath: filePath,
                 isMainFile: isMainFile,
                 success: false,
-                error: error instanceof Error ? error.message : String(error)
+                error: getErrorMessage(error)
             });
         }
         return this.success();

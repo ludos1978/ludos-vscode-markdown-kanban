@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { getErrorMessage } from '../utils/stringUtils';
 
 /**
  * Unified file writing utility
@@ -63,7 +64,7 @@ export class FileWriter {
             };
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
 
             if (showNotification) {
                 vscode.window.showErrorMessage(

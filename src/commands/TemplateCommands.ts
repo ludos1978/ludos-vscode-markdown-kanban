@@ -14,6 +14,7 @@ import { TemplateService } from '../templates/TemplateService';
 import { VariableProcessor } from '../templates/VariableProcessor';
 import { FileCopyService } from '../templates/FileCopyService';
 import { IdGenerator } from '../utils/idGenerator';
+import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -54,7 +55,7 @@ export class TemplateCommands extends BaseMessageCommand {
                     return this.failure(`Unknown template command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[TemplateCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -87,7 +88,7 @@ export class TemplateCommands extends BaseMessageCommand {
 
             return this.success({ templateCount: templates.length });
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error('[TemplateCommands.handleGetTemplates] Error:', error);
             return this.failure(errorMessage);
         }

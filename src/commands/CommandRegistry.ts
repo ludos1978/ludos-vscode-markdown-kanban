@@ -11,6 +11,7 @@
 
 import { MessageCommand, CommandContext, CommandResult } from './interfaces/MessageCommand';
 import { ValidationResult } from '../shared/interfaces';
+import { getErrorMessage } from '../utils/stringUtils';
 
 // Re-export for backwards compatibility
 export { ValidationResult };
@@ -202,7 +203,7 @@ export class CommandRegistry {
         try {
             return await command.execute(message, this._context);
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[CommandRegistry] Command ${command.metadata.id} failed for message ${messageType}:`, error);
             return { success: false, error: errorMessage };
         }

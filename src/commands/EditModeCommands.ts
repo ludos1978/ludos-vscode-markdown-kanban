@@ -18,6 +18,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { getErrorMessage } from '../utils/stringUtils';
 
 /**
  * Edit Mode Commands Handler
@@ -212,7 +213,7 @@ export class EditModeCommands extends BaseMessageCommand {
                     return this.failure(`Unknown edit mode command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[EditModeCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }

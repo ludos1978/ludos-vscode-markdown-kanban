@@ -89,7 +89,10 @@
       "Bash(awk:*)",
       "Bash(for type in FormatStrategy ExportScope IncludeMode IncludeType ExportSpecificOptions BackupSpecificOptions ExportItem)",
       "Bash(do echo \"=== $type ===\" grep -r \"$type\" /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src --include=\"*.ts\" --include=\"*.js\")",
-      "Bash(npx madge:*)"
+      "Bash(npx madge:*)",
+      "Bash(for file in src/commands/ColumnCommands.ts src/commands/CommandRegistry.ts src/commands/EditModeCommands.ts src/commands/FileCommands.ts src/commands/TaskCommands.ts src/commands/TemplateCommands.ts src/commands/UICommands.ts)",
+      "Bash(do head -30 \"$file\")",
+      "Bash(echo \"$file needs import\" done)"
     ],
     "deny": [],
     "ask": []

@@ -170,4 +170,20 @@ export abstract class BaseMessageCommand implements MessageCommand {
         }
         return false;
     }
+
+    /**
+     * Get file registry from context
+     * Convenience method to avoid null checks
+     */
+    protected getFileRegistry(): MarkdownFileRegistry | undefined {
+        return this._context?.getFileRegistry();
+    }
+
+    /**
+     * Get current board from context
+     * Convenience method for common operation
+     */
+    protected getCurrentBoard(): KanbanBoard | undefined {
+        return this._context?.getCurrentBoard();
+    }
 }

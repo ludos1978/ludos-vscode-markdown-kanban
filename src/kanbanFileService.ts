@@ -8,6 +8,7 @@ import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
 import { ConflictContext, ConflictResolution } from './services/ConflictResolver';
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
+import { getErrorMessage } from './utils/stringUtils';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -331,7 +332,7 @@ export class KanbanFileService {
                 }
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Kanban parsing error: ${error instanceof Error ? error.message : String(error)}`);
+            vscode.window.showErrorMessage(`Kanban parsing error: ${getErrorMessage(error)}`);
             this.setBoard({
                 valid: false,
                 title: 'Error Loading Board',
@@ -430,7 +431,7 @@ export class KanbanFileService {
             await this.saveToMarkdown();
         } catch (error) {
             console.error('[InlineInclude] Error saving main kanban changes:', error);
-            vscode.window.showErrorMessage(`Error saving kanban changes: ${error instanceof Error ? error.message : String(error)}`);
+            vscode.window.showErrorMessage(`Error saving kanban changes: ${getErrorMessage(error)}`);
         }
     }
 

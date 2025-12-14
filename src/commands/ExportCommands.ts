@@ -18,6 +18,7 @@ import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { SaveEventDispatcher } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
+import { getErrorMessage } from '../utils/stringUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -112,7 +113,7 @@ export class ExportCommands extends BaseMessageCommand {
                     return this.failure(`Unknown export command: ${message.type}`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             console.error(`[ExportCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
         }
@@ -196,13 +197,10 @@ export class ExportCommands extends BaseMessageCommand {
             if (options.mode === 'copy') {
                 const result = await ExportService.export(document, options, board);
 
-                const panel = context.getWebviewPanel();
-                if (panel && (panel as any)._panel) {
-                    (panel as any)._panel.webview.postMessage({
-                        type: 'copyContentResult',
-                        result: result
-                    });
-                }
+                this.postMessage({
+                    type: 'copyContentResult',
+                    result: result
+                });
 
                 if (!result.success) {
                     vscode.window.showErrorMessage(result.message);
@@ -229,13 +227,10 @@ export class ExportCommands extends BaseMessageCommand {
                 progress.report({ increment: 80, message: 'Finalizing...' });
 
                 // Send result to webview
-                const panel = context.getWebviewPanel();
-                if (panel && (panel as any)._panel) {
-                    (panel as any)._panel.webview.postMessage({
-                        type: 'exportResult',
-                        result: result
-                    });
-                }
+                this.postMessage({
+                    type: 'exportResult',
+                    result: result
+                });
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 100, context);
@@ -251,7 +246,7 @@ export class ExportCommands extends BaseMessageCommand {
 
         } catch (error) {
             console.error('[ExportCommands.handleExport] Error:', error);
-            vscode.window.showErrorMessage(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+            vscode.window.showErrorMessage(`Export failed: ${getErrorMessage(error)}`);
         }
     }
 
@@ -314,7 +309,7 @@ export class ExportCommands extends BaseMessageCommand {
                 }
             } catch (error) {
                 console.error('[ExportCommands.autoExport] Auto-export failed:', error);
-                vscode.window.showErrorMessage(`Auto-export failed: ${error instanceof Error ? error.message : String(error)}`);
+                vscode.window.showErrorMessage(`Auto-export failed: ${getErrorMessage(error)}`);
             }
         });
 
@@ -424,13 +419,10 @@ export class ExportCommands extends BaseMessageCommand {
             }
 
             const defaultFolder = ExportService.generateDefaultExportFolder(document.uri.fsPath);
-            const panel = context.getWebviewPanel();
-            if (panel && (panel as any)._panel) {
-                (panel as any)._panel.webview.postMessage({
-                    type: 'exportDefaultFolder',
-                    folderPath: defaultFolder
-                });
-            }
+            this.postMessage({
+                type: 'exportDefaultFolder',
+                folderPath: defaultFolder
+            });
         } catch (error) {
             console.error('[ExportCommands.getExportDefaultFolder] Error:', error);
         }
@@ -450,13 +442,10 @@ export class ExportCommands extends BaseMessageCommand {
             });
 
             if (result && result[0]) {
-                const panel = context.getWebviewPanel();
-                if (panel && (panel as any)._panel) {
-                    (panel as any)._panel.webview.postMessage({
-                        type: 'exportFolderSelected',
-                        folderPath: result[0].fsPath
-                    });
-                }
+                this.postMessage({
+                    type: 'exportFolderSelected',
+                    folderPath: result[0].fsPath
+                });
             }
         } catch (error) {
             console.error('Error selecting export folder:', error);
@@ -488,51 +477,32 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Get available Marp themes
      */
-    private async handleGetMarpThemes(context: CommandContext): Promise<void> {
+    private async handleGetMarpThemes(_context: CommandContext): Promise<void> {
         try {
             const themes = await MarpExportService.getAvailableThemes();
 
-            const panel = context.getWebviewPanel();
-
-            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                const message = {
-                    type: 'marpThemesAvailable',
-                    themes: themes
-                };
-
-                (panel as any)._panel.webview.postMessage(message);
-            } else {
+            if (!this.postMessage({ type: 'marpThemesAvailable', themes: themes })) {
                 console.error('[ExportCommands.handleGetMarpThemes] No webview panel available');
             }
         } catch (error) {
             console.error('[ExportCommands.handleGetMarpThemes] Error:', error);
 
-            const panel = context.getWebviewPanel();
-            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                const message = {
-                    type: 'marpThemesAvailable',
-                    themes: ['default'], // Fallback
-                    error: error instanceof Error ? error.message : String(error)
-                };
-                (panel as any)._panel.webview.postMessage(message);
-            }
+            this.postMessage({
+                type: 'marpThemesAvailable',
+                themes: ['default'], // Fallback
+                error: getErrorMessage(error)
+            });
         }
     }
 
     /**
      * Poll for Marp themes (fallback mechanism)
      */
-    private async handlePollMarpThemes(context: CommandContext): Promise<void> {
+    private async handlePollMarpThemes(_context: CommandContext): Promise<void> {
         try {
             const themes = await MarpExportService.getAvailableThemes();
 
-            const panel = context.getWebviewPanel();
-            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                (panel as any)._panel.webview.postMessage({
-                    type: 'marpThemesAvailable',
-                    themes: themes
-                });
-            } else {
+            if (!this.postMessage({ type: 'marpThemesAvailable', themes: themes })) {
                 console.error('[ExportCommands.handlePollMarpThemes] Still no webview panel available');
             }
         } catch (error) {
@@ -548,7 +518,7 @@ export class ExportCommands extends BaseMessageCommand {
             await MarpExtensionService.openInMarpPreview(filePath);
         } catch (error) {
             console.error('[ExportCommands.handleOpenInMarpPreview] Error:', error);
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage = getErrorMessage(error);
             vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
         }
     }
@@ -556,24 +526,21 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Check Marp status and send to frontend
      */
-    private async handleCheckMarpStatus(context: CommandContext): Promise<void> {
+    private async handleCheckMarpStatus(_context: CommandContext): Promise<void> {
         try {
             const marpExtensionStatus = MarpExtensionService.getMarpStatus();
             const marpCliAvailable = await MarpExportService.isMarpCliAvailable();
             const engineFileExists = MarpExportService.engineFileExists();
             const enginePath = MarpExportService.getEnginePath();
 
-            const panel = context.getWebviewPanel();
-            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                (panel as any)._panel.webview.postMessage({
-                    type: 'marpStatus',
-                    extensionInstalled: marpExtensionStatus.installed,
-                    extensionVersion: marpExtensionStatus.version,
-                    cliAvailable: marpCliAvailable,
-                    engineFileExists: engineFileExists,
-                    enginePath: enginePath
-                });
-            } else {
+            if (!this.postMessage({
+                type: 'marpStatus',
+                extensionInstalled: marpExtensionStatus.installed,
+                extensionVersion: marpExtensionStatus.version,
+                cliAvailable: marpCliAvailable,
+                engineFileExists: engineFileExists,
+                enginePath: enginePath
+            })) {
                 console.error('[ExportCommands.handleCheckMarpStatus] No webview panel available');
             }
         } catch (error) {
@@ -584,19 +551,16 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Get available Marp CSS classes
      */
-    private async handleGetMarpAvailableClasses(context: CommandContext): Promise<void> {
+    private async handleGetMarpAvailableClasses(_context: CommandContext): Promise<void> {
         try {
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
             const availableClasses = marpConfig.availableClasses || [];
 
-            const panel = context.getWebviewPanel();
-            if (panel && (panel as any)._panel && (panel as any)._panel.webview) {
-                (panel as any)._panel.webview.postMessage({
-                    type: 'marpAvailableClasses',
-                    classes: availableClasses
-                });
-            }
+            this.postMessage({
+                type: 'marpAvailableClasses',
+                classes: availableClasses
+            });
         } catch (error) {
             console.error('[ExportCommands.handleGetMarpAvailableClasses] Error:', error);
         }

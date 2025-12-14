@@ -14,6 +14,7 @@ import { configService } from './services/ConfigurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';
+import { getErrorMessage } from './utils/stringUtils';
 import {
     MarkdownFileRegistry,
     FileFactory,
@@ -1606,7 +1607,7 @@ export class KanbanWebviewPanel {
             } catch (error) {
                 console.error('[PanelClose] Save failed:', error);
                 // Panel is already disposed by VS Code, but still run our cleanup
-                vscode.window.showErrorMessage(`Failed to save: ${error instanceof Error ? error.message : String(error)}`);
+                vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`);
             }
             // CRITICAL: Always call dispose() to clean up, even if save failed
             // We're in onDidDispose handler - panel is already disposed by VS Code
