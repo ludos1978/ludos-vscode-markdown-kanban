@@ -168,13 +168,6 @@ export class CommandRegistry {
         return Array.from(this._commands.values());
     }
 
-    /**
-     * Get commands sorted by priority (highest first)
-     */
-    getCommandsByPriority(): MessageCommand[] {
-        return this.getAllCommands().sort((a, b) => b.metadata.priority - a.metadata.priority);
-    }
-
     // ============= MESSAGE HANDLING =============
 
     /**
@@ -272,40 +265,5 @@ export class CommandRegistry {
         }
 
         return { valid: errors.length === 0, errors, warnings };
-    }
-
-    // ============= DEBUG =============
-
-    /**
-     * Get debug info about registered commands
-     */
-    getDebugInfo(): { commands: any[]; messageTypes: any[] } {
-        return {
-            commands: this.getAllCommands().map(c => ({
-                id: c.metadata.id,
-                name: c.metadata.name,
-                priority: c.metadata.priority,
-                messageTypes: c.metadata.messageTypes
-            })),
-            messageTypes: Array.from(this._messageTypeToCommand.entries()).map(([type, cmd]) => ({
-                messageType: type,
-                commandId: cmd.metadata.id
-            }))
-        };
-    }
-
-    /**
-     * Get list of all registered message types
-     */
-    getRegisteredMessageTypes(): string[] {
-        return Array.from(this._messageTypeToCommand.keys());
-    }
-
-    /**
-     * Get list of unhandled message types (for migration tracking)
-     * @param allMessageTypes - Complete list of message types from original messageHandler
-     */
-    getUnhandledMessageTypes(allMessageTypes: string[]): string[] {
-        return allMessageTypes.filter(type => !this._messageTypeToCommand.has(type));
     }
 }
