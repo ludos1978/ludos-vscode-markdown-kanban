@@ -60,9 +60,20 @@ export class IncludeFile extends MarkdownFile {
         fileType: IncludeFileType,
         isInline: boolean = false
     ) {
-        const absolutePath = IncludeFile._resolveAbsolutePath(relativePath, parentFile.getPath());
+        // Decode URL-encoded characters (e.g., %20 -> space) for both paths
+        let decodedRelativePath = relativePath;
+        try {
+            if (relativePath.includes('%')) {
+                decodedRelativePath = decodeURIComponent(relativePath);
+            }
+        } catch {
+            // If decoding fails, use the original path
+            decodedRelativePath = relativePath;
+        }
 
-        super(absolutePath, relativePath, conflictResolver, backupManager);
+        const absolutePath = IncludeFile._resolveAbsolutePath(decodedRelativePath, parentFile.getPath());
+
+        super(absolutePath, decodedRelativePath, conflictResolver, backupManager);
 
         this._fileType = fileType;
         this._parentFile = parentFile;
@@ -92,6 +103,7 @@ export class IncludeFile extends MarkdownFile {
 
     /**
      * Resolve relative path to absolute path
+     * Note: URL decoding is handled in constructor before calling this method
      */
     private static _resolveAbsolutePath(relativePath: string, parentPath: string): string {
         if (path.isAbsolute(relativePath)) {

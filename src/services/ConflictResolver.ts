@@ -459,12 +459,4 @@ export class ConflictResolver {
         const LEGITIMATE_SAVE_THRESHOLD_SECONDS = 30;
         return timeDiffSeconds > LEGITIMATE_SAVE_THRESHOLD_SECONDS;
     }
-
-    /**
-     * Clear all active dialogs (used for cleanup or reset)
-     */
-    public clearActiveDialogs(): void {
-        this.activeDialogs.clear();
-        this.pendingResolutions.clear();
-    }
 }

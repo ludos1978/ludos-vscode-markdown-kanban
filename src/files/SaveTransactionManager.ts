@@ -106,20 +106,4 @@ export class SaveTransactionManager {
         this.activeTransactions.delete(normalizedPath);
         return true;
     }
-
-    /**
-     * Get active transaction for debugging
-     */
-    getActiveTransaction(filePath: string): ActiveTransaction | undefined {
-        const normalizedPath = normalizePathForLookup(filePath);
-        return this.activeTransactions.get(normalizedPath);
-    }
-
-    /**
-     * Check if a transaction is active for a file
-     */
-    hasActiveTransaction(filePath: string): boolean {
-        const normalizedPath = normalizePathForLookup(filePath);
-        return this.activeTransactions.has(normalizedPath);
-    }
 }

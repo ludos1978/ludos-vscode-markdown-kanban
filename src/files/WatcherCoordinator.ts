@@ -117,29 +117,4 @@ export class WatcherCoordinator {
             }
         }
     }
-
-    /**
-     * Check if file has active operations
-     */
-    hasActiveOperations(filePath: string): boolean {
-        const normalizedPath = normalizePathForLookup(filePath);
-        return this.activeOperations.has(normalizedPath);
-    }
-
-    /**
-     * Get active operation info for debugging
-     */
-    getActiveOperation(filePath: string): { operation: string; startTime: Date } | undefined {
-        const normalizedPath = normalizePathForLookup(filePath);
-        const active = this.activeOperations.get(normalizedPath);
-        return active ? { operation: active.operation, startTime: active.startTime } : undefined;
-    }
-
-    /**
-     * Get queue length for a file
-     */
-    getQueueLength(filePath: string): number {
-        const normalizedPath = normalizePathForLookup(filePath);
-        return this.operationQueue.get(normalizedPath)?.length ?? 0;
-    }
 }

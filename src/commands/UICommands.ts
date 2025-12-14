@@ -198,6 +198,10 @@ export class UICommands extends BaseMessageCommand {
      * Handle setPreference command
      */
     private async handleSetPreference(message: any): Promise<CommandResult> {
+        if (!message.key) {
+            console.error('[UICommands] setPreference called with undefined key');
+            return this.failure('setPreference requires a key');
+        }
         const config = vscode.workspace.getConfiguration('markdown-kanban');
         await config.update(message.key, message.value, vscode.ConfigurationTarget.Global);
         return this.success();
@@ -207,7 +211,16 @@ export class UICommands extends BaseMessageCommand {
      * Handle setContext command
      */
     private async handleSetContext(message: any): Promise<CommandResult> {
-        await vscode.commands.executeCommand('setContext', message.key, message.value);
+        if (!message.key) {
+            console.error('[UICommands] setContext called with undefined key');
+            return this.failure('setContext requires a key');
+        }
+        try {
+            await vscode.commands.executeCommand('setContext', message.key, message.value);
+        } catch (error) {
+            console.error(`[UICommands] Error handling setContext:`, error);
+            return this.failure(`setContext failed: ${error}`);
+        }
         return this.success();
     }
 
