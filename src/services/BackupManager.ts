@@ -26,21 +26,6 @@ export class BackupManager {
     }
 
     /**
-     * Check if enough time has passed since unsaved changes for page hidden backup
-     */
-    public shouldCreatePageHiddenBackup(): boolean {
-        if (!this._lastUnsavedChangeTime) {
-            return false;
-        }
-
-        const now = new Date();
-        const timeSinceUnsaved = now.getTime() - this._lastUnsavedChangeTime.getTime();
-        const fiveMinutesMs = 5 * 60 * 1000;
-
-        return timeSinceUnsaved >= fiveMinutesMs;
-    }
-
-    /**
      * Create a backup of the given document
      */
     public async createBackup(document: vscode.TextDocument, options: BackupOptions = {}): Promise<boolean> {
@@ -345,82 +330,6 @@ export class BackupManager {
         if (this._backupTimer) {
             clearInterval(this._backupTimer);
             this._backupTimer = null;
-        }
-    }
-
-    /**
-     * Get list of available backups for a document
-     */
-    public getBackupList(document: vscode.TextDocument): Array<{name: string, path: string, date: Date}> {
-        try {
-            const originalPath = document.uri.fsPath;
-            const dir = path.dirname(originalPath);
-            const basename = path.basename(originalPath, '.md');
-
-            // Match backup files (with timestamp)
-            // This includes: .basename-backup-YYYYMMDDTHHmmss.md, .basename-conflict-YYYYMMDDTHHmmss.md
-            const backupPattern = new RegExp(`^\\.${escapeRegExp(basename)}-(backup|conflict)-(\\d{8}T\\d{6})\\.md$`);
-
-            const files = fs.readdirSync(dir);
-            const backups = files
-                .filter(file => backupPattern.test(file))
-                .map(file => {
-                    const match = file.match(backupPattern);
-                    if (!match) {return null;}
-
-                    const timestamp = match[2]; // YYYYMMDDTHHmmss
-
-                    // Parse date from timestamp
-                    const year = parseInt(timestamp.substring(0, 4));
-                    const month = parseInt(timestamp.substring(4, 6)) - 1;
-                    const day = parseInt(timestamp.substring(6, 8));
-                    const hours = parseInt(timestamp.substring(9, 11)); // Skip 'T'
-                    const minutes = parseInt(timestamp.substring(11, 13));
-                    const seconds = parseInt(timestamp.substring(13, 15));
-
-                    const date = new Date(year, month, day, hours, minutes, seconds);
-
-                    return {
-                        name: file,
-                        path: path.join(dir, file),
-                        date: date
-                    };
-                })
-                .filter(item => item !== null)
-                .sort((a, b) => b!.date.getTime() - a!.date.getTime());
-
-            return backups as Array<{name: string, path: string, date: Date}>;
-        } catch (error) {
-            console.error('[BackupManager] Failed to get backup list:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Restore from a backup file
-     */
-    public async restoreFromBackup(backupPath: string, targetDocument: vscode.TextDocument): Promise<boolean> {
-        try {
-            const backupContent = fs.readFileSync(backupPath, 'utf8');
-
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(
-                targetDocument.uri,
-                new vscode.Range(0, 0, targetDocument.lineCount, 0),
-                backupContent
-            );
-
-            const success = await vscode.workspace.applyEdit(edit);
-
-            if (success) {
-                await targetDocument.save();
-                vscode.window.showInformationMessage('Successfully restored from backup');
-            }
-
-            return success;
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to restore from backup: ${error}`);
-            return false;
         }
     }
 

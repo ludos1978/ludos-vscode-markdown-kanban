@@ -13,8 +13,7 @@ export {
     HandlerOptions,
     EventBusOptions,
     Middleware,
-    MiddlewareContext,
-    EventBusMetrics
+    MiddlewareContext
 } from './PanelEventBus';
 
 export {

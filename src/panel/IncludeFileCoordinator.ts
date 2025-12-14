@@ -36,9 +36,6 @@ export interface IncludeCoordinatorDependencies {
 export class IncludeFileCoordinator {
     private _deps: IncludeCoordinatorDependencies;
 
-    /** Track files that were just reloaded from external (to prevent double-save) */
-    private _recentlyReloadedFiles: Set<string> = new Set();
-
     constructor(deps: IncludeCoordinatorDependencies) {
         this._deps = deps;
     }
@@ -455,18 +452,7 @@ export class IncludeFileCoordinator {
 
         const includeColumns = board.columns.filter(col => col.includeMode);
 
-        const columnsToSave = includeColumns.filter(col => {
-            if (!col.includeFiles || col.includeFiles.length === 0) {
-                return true;
-            }
-            return !col.includeFiles.some(file => {
-                return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                    MarkdownFile.isSameFile(file, reloadedPath)
-                );
-            });
-        });
-
-        const savePromises = columnsToSave.map(col =>
+        const savePromises = includeColumns.map(col =>
             this._deps.fileRegistry.saveColumnIncludeChanges(col)
         );
 
@@ -488,15 +474,7 @@ export class IncludeFileCoordinator {
         for (const column of board.columns) {
             for (const task of column.tasks) {
                 if (task.includeMode) {
-                    const shouldSkip = task.includeFiles?.some(file => {
-                        return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-                            MarkdownFile.isSameFile(file, reloadedPath)
-                        );
-                    });
-
-                    if (!shouldSkip) {
-                        includeTasks.push(task);
-                    }
+                    includeTasks.push(task);
                 }
             }
         }
@@ -512,38 +490,6 @@ export class IncludeFileCoordinator {
         } catch (error) {
             console.error('[IncludeFileCoordinator] Error saving task include changes:', error);
         }
-    }
-
-    // ============= RECENTLY RELOADED TRACKING =============
-
-    /**
-     * Mark a file as recently reloaded (to prevent double-save)
-     */
-    markAsRecentlyReloaded(filePath: string): void {
-        this._recentlyReloadedFiles.add(filePath);
-    }
-
-    /**
-     * Clear recently reloaded status for a file
-     */
-    clearRecentlyReloaded(filePath: string): void {
-        this._recentlyReloadedFiles.delete(filePath);
-    }
-
-    /**
-     * Clear all recently reloaded files
-     */
-    clearAllRecentlyReloaded(): void {
-        this._recentlyReloadedFiles.clear();
-    }
-
-    /**
-     * Check if a file was recently reloaded
-     */
-    wasRecentlyReloaded(filePath: string): boolean {
-        return Array.from(this._recentlyReloadedFiles).some(reloadedPath =>
-            MarkdownFile.isSameFile(filePath, reloadedPath)
-        );
     }
 
     // ============= PRIVATE HELPERS =============

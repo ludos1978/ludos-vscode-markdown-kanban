@@ -107,37 +107,17 @@ export type Middleware = (
     next: () => Promise<void>
 ) => Promise<void>;
 
-/**
- * Metrics collected by the event bus
- */
-export interface EventBusMetrics {
-    eventsEmitted: number;
-    handlersInvoked: number;
-    errors: number;
-    slowEvents: number;
-    avgHandlerTimeMs: number;
-}
-
 // ============= MAIN CLASS =============
 
 export class PanelEventBus implements vscode.Disposable {
     private handlers = new Map<EventType, Set<RegisteredHandler<any>>>();
     private middlewares: Middleware[] = [];
     private eventHistory: PanelEvent[] = [];
-    private activeCorrelationId: string | null = null;
     private disposables: vscode.Disposable[] = [];
     private _isDisposed = false;
     private eventCounter = 0;
 
     private readonly options: Required<EventBusOptions>;
-
-    private _metrics: EventBusMetrics = {
-        eventsEmitted: 0,
-        handlersInvoked: 0,
-        errors: 0,
-        slowEvents: 0,
-        avgHandlerTimeMs: 0
-    };
 
     constructor(options: EventBusOptions = {}) {
         this.options = {
@@ -192,17 +172,6 @@ export class PanelEventBus implements vscode.Disposable {
         return disposable;
     }
 
-    /**
-     * Subscribe to an event type, auto-remove after first invocation
-     */
-    once<K extends EventType>(
-        type: K,
-        handler: Handler<K>,
-        options: Omit<HandlerOptions, 'once'> = {}
-    ): vscode.Disposable {
-        return this.on(type, handler, { ...options, once: true });
-    }
-
     // ============= EMISSION =============
 
     /**
@@ -220,13 +189,12 @@ export class PanelEventBus implements vscode.Disposable {
             payload,
             timestamp: Date.now(),
             id: this.generateEventId(type),
-            correlationId: options?.correlationId ?? this.activeCorrelationId ?? undefined,
+            correlationId: options?.correlationId,
             source: options?.source
         };
 
         // Record in history
         this.addToHistory(event);
-        this._metrics.eventsEmitted++;
 
         // Get handlers sorted by priority
         const registeredHandlers = this.getHandlersSorted(type);
@@ -255,37 +223,6 @@ export class PanelEventBus implements vscode.Disposable {
         await chain();
     }
 
-    /**
-     * Execute callback with correlation ID applied to all emitted events
-     */
-    async withCorrelation<T>(
-        correlationId: string,
-        callback: () => Promise<T>
-    ): Promise<T> {
-        const previous = this.activeCorrelationId;
-        this.activeCorrelationId = correlationId;
-        try {
-            return await callback();
-        } finally {
-            this.activeCorrelationId = previous;
-        }
-    }
-
-    /**
-     * Emit multiple events with shared correlation ID
-     */
-    async emitBatch(
-        events: Array<{ type: EventType; payload: any }>
-    ): Promise<void> {
-        const correlationId = this.generateEventId('batch');
-
-        await this.withCorrelation(correlationId, async () => {
-            for (const e of events) {
-                await this.emit(e.type, e.payload, { correlationId });
-            }
-        });
-    }
-
     private async executeHandlers<K extends EventType>(
         event: PanelEvent<K>,
         registeredHandlers: RegisteredHandler<K>[]
@@ -295,21 +232,13 @@ export class PanelEventBus implements vscode.Disposable {
         for (const registered of registeredHandlers) {
             const handler: Handler<K> = registered.handler;
 
-            // Execute with timeout
-            const startTime = Date.now();
-
             try {
                 await this.executeWithTimeout(
                     handler,
                     event,
                     registered.options.timeout
                 );
-
-                this._metrics.handlersInvoked++;
-                this.updateAvgHandlerTime(Date.now() - startTime);
-
             } catch (error) {
-                this._metrics.errors++;
                 await this.handleError(
                     error as Error,
                     event,
@@ -339,7 +268,6 @@ export class PanelEventBus implements vscode.Disposable {
     ): Promise<void> {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
-                this._metrics.slowEvents++;
                 reject(new Error(`Handler timeout after ${timeout}ms`));
             }, timeout);
 
@@ -422,67 +350,6 @@ export class PanelEventBus implements vscode.Disposable {
         while (this.eventHistory.length > this.options.historyLimit) {
             this.eventHistory.shift();
         }
-    }
-
-    private updateAvgHandlerTime(duration: number): void {
-        const count = this._metrics.handlersInvoked;
-        if (count === 0) {
-            this._metrics.avgHandlerTimeMs = duration;
-        } else {
-            const total = this._metrics.avgHandlerTimeMs * (count - 1);
-            this._metrics.avgHandlerTimeMs = (total + duration) / count;
-        }
-    }
-
-    // ============= INSPECTION =============
-
-    /**
-     * Get event history (if tracing enabled)
-     */
-    getHistory(): readonly PanelEvent[] {
-        return [...this.eventHistory];
-    }
-
-    /**
-     * Get events by correlation ID
-     */
-    getHistoryByCorrelation(correlationId: string): PanelEvent[] {
-        return this.eventHistory.filter(e => e.correlationId === correlationId);
-    }
-
-    /**
-     * Get current metrics
-     */
-    get metrics(): Readonly<EventBusMetrics> {
-        return { ...this._metrics };
-    }
-
-    /**
-     * Check if event type has listeners
-     */
-    hasListeners(type: EventType): boolean {
-        return (this.handlers.get(type)?.size ?? 0) > 0;
-    }
-
-    /**
-     * Get listener count for event type
-     */
-    listenerCount(type: EventType): number {
-        return this.handlers.get(type)?.size ?? 0;
-    }
-
-    /**
-     * Clear event history
-     */
-    clearHistory(): void {
-        this.eventHistory = [];
-    }
-
-    /**
-     * Check if disposed
-     */
-    get isDisposed(): boolean {
-        return this._isDisposed;
     }
 
     // ============= LIFECYCLE =============

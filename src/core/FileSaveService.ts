@@ -85,13 +85,4 @@ export class FileSaveService {
             throw error;
         }
     }
-
-    /**
-     * Get save statistics for debugging
-     */
-    public getStats(): { activeSaves: number } {
-        return {
-            activeSaves: this.activeSaves.size
-        };
-    }
 }

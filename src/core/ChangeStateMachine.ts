@@ -278,20 +278,6 @@ export class ChangeStateMachine {
         }
     }
 
-    /**
-     * Get current state (for debugging/testing)
-     */
-    public getCurrentState(): ChangeState {
-        return this._currentState;
-    }
-
-    /**
-     * Get current context (for debugging/testing)
-     */
-    public getCurrentContext(): ChangeContext | undefined {
-        return this._currentContext;
-    }
-
     // ============= STATE TRANSITION ENGINE =============
 
     /**
