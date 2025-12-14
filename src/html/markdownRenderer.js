@@ -1,3 +1,7 @@
+// Debug flag - set to true to enable verbose logging
+const DEBUG_MERMAID = false;
+const logMermaid = DEBUG_MERMAID ? console.log.bind(console, '[Mermaid]') : () => {};
+
 // Cached markdown-it instance for performance
 // Creating a new markdown-it instance with all plugins is expensive (~3-5ms per call)
 // With 400+ tasks, this adds up to 2+ seconds of rendering time
@@ -1354,7 +1358,7 @@ function loadMermaidLibrary() {
 
         // Start loading
         mermaidLoading = true;
-        console.log('[Mermaid] Lazy-loading library from CDN...');
+        logMermaid('Lazy-loading library from CDN...');
         const startTime = performance.now();
 
         const script = document.createElement('script');
@@ -1362,7 +1366,7 @@ function loadMermaidLibrary() {
         script.async = true;
 
         script.onload = () => {
-            console.log(`[Mermaid] Library loaded in ${(performance.now() - startTime).toFixed(0)}ms`);
+            logMermaid(`Library loaded in ${(performance.now() - startTime).toFixed(0)}ms`);
             initializeMermaid();
             mermaidLoading = false;
             resolve();
@@ -1403,7 +1407,7 @@ function initializeMermaid() {
         });
         mermaidReady = true;
         mermaidInitialized = true;
-        console.log('[Mermaid] Initialized successfully');
+        logMermaid('Initialized successfully');
     } catch (error) {
         console.error('[Mermaid] Initialization error:', error);
     }

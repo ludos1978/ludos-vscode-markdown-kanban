@@ -17,6 +17,10 @@ import { IdGenerator } from '../utils/idGenerator';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
+// Debug flag - set to true to enable verbose logging
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[TemplateCommands]') : () => {};
+
 /**
  * Template Commands Handler
  *
@@ -232,7 +236,7 @@ export class TemplateCommands extends BaseMessageCommand {
             context.markUnsavedChanges(true, currentBoard);
             await context.onBoardUpdate();
 
-            console.log(`[TemplateCommands.createEmptyColumn] Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}, stack=${needsStackTag}`);
+            log(`createEmptyColumn: Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}, stack=${needsStackTag}`);
 
             return this.success({ columnId: emptyColumn.id });
 
@@ -292,7 +296,7 @@ export class TemplateCommands extends BaseMessageCommand {
                 finalVariables,
                 template.variables
             );
-            console.log(`[TemplateCommands.applyTemplateWithVariables] Copied ${copiedFiles.length} files`);
+            log(`applyTemplateWithVariables: Copied ${copiedFiles.length} files`);
 
             // Process template content (columns and tasks)
             const processedColumns = this.processTemplateColumns(template, finalVariables);
@@ -351,7 +355,7 @@ export class TemplateCommands extends BaseMessageCommand {
                 board: currentBoard
             });
 
-            console.log(`[TemplateCommands.applyTemplateWithVariables] Applied template with ${columnsWithRow.length} columns`);
+            log(`applyTemplateWithVariables: Applied template with ${columnsWithRow.length} columns`);
 
             return this.success({ columnsAdded: columnsWithRow.length });
 

@@ -6,6 +6,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 
+// Debug flag - set to true to enable verbose logging
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[DiagramPreprocessor]') : () => {};
+
 interface DiagramBlock {
     type: 'plantuml' | 'mermaid' | 'drawio' | 'excalidraw';
     code: string;
@@ -357,7 +361,7 @@ export class DiagramPreprocessor {
 
                 // Check if output is up-to-date (skip re-rendering unchanged diagrams)
                 if (await this.isOutputUpToDate(absolutePath, outputPath)) {
-                    console.log(`[DiagramPreprocessor] ✓ Skipping ${diagram.id} (unchanged)`);
+                    log(`✓ Skipping ${diagram.id} (unchanged)`);
                     return {
                         id: diagram.id,
                         fileName,
@@ -366,7 +370,7 @@ export class DiagramPreprocessor {
                 }
 
                 // Render using draw.io service
-                console.log(`[DiagramPreprocessor] Rendering ${diagram.id}...`);
+                log(`Rendering ${diagram.id}...`);
                 const svg = await this.drawioService.renderSVG(absolutePath);
 
                 // Save SVG file
@@ -423,7 +427,7 @@ export class DiagramPreprocessor {
 
                 // Check if output is up-to-date (skip re-rendering unchanged diagrams)
                 if (await this.isOutputUpToDate(absolutePath, outputPath)) {
-                    console.log(`[DiagramPreprocessor] ✓ Skipping ${diagram.id} (unchanged)`);
+                    log(`✓ Skipping ${diagram.id} (unchanged)`);
                     return {
                         id: diagram.id,
                         fileName,
@@ -432,7 +436,7 @@ export class DiagramPreprocessor {
                 }
 
                 // Render using excalidraw service
-                console.log(`[DiagramPreprocessor] Rendering ${diagram.id}...`);
+                log(`Rendering ${diagram.id}...`);
                 const svg = await this.excalidrawService.renderSVG(absolutePath);
 
                 // Save SVG file

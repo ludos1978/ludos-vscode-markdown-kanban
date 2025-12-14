@@ -9,6 +9,10 @@
 })(this, (function() {
   "use strict";
 
+  // Set to true to enable debug logging
+  const DEBUG = false;
+  const log = DEBUG ? console.log.bind(console, '[include-browser]') : () => {};
+
   const INCLUDE_RE = /!!!include\(([^)]+)\)!!!/;
 
   // Cache for file contents to avoid repeated requests
@@ -236,7 +240,7 @@
           filePath: filePath
         });
       } catch (error) {
-        console.error('Error requesting include file:', error);
+        console.error('[include-browser] Error requesting include file:', error);
         pendingRequests.delete(filePath);
       }
     }
@@ -251,7 +255,7 @@
 
   // Function to update cache when file content is received
   function updateFileCache(filePath, content) {
-    console.log('[include-browser] updateFileCache called for:', filePath, 'content length:', content?.length);
+    log('updateFileCache called for:', filePath, 'content length:', content?.length);
 
     // Remove from pending requests
     pendingRequests.delete(filePath);
@@ -260,7 +264,7 @@
     const oldContent = fileCache.get(filePath);
     const wasNotCached = oldContent === undefined || oldContent === null;
     const contentChanged = oldContent !== content;
-    console.log('[include-browser] wasNotCached:', wasNotCached, 'contentChanged:', contentChanged);
+    log('wasNotCached:', wasNotCached, 'contentChanged:', contentChanged);
 
     // Update cache
     fileCache.set(filePath, content);
@@ -274,34 +278,34 @@
           content: content
         });
       } catch (error) {
-        console.error('Error registering inline include:', error);
+        console.error('[include-browser] Error registering inline include:', error);
       }
     }
 
     // If this is the first time we're receiving this file's content,
     // find and update only the task descriptions that have pending placeholders for this file
     if (wasNotCached) {
-      console.log('[include-browser] First time receiving content, calling updatePendingIncludePlaceholders');
+      log('First time receiving content, calling updatePendingIncludePlaceholders');
       updatePendingIncludePlaceholders(filePath);
     }
   }
 
   // Function to update only the task descriptions that have pending include placeholders
   function updatePendingIncludePlaceholders(filePath) {
-    console.log('[include-browser] updatePendingIncludePlaceholders called for:', filePath);
+    log('updatePendingIncludePlaceholders called for:', filePath);
 
     // Find all pending placeholders for this specific file
     const selector = `[data-include-pending="true"][data-include-file="${CSS.escape(filePath)}"]`;
-    console.log('[include-browser] Looking for placeholders with selector:', selector);
+    log('Looking for placeholders with selector:', selector);
     const placeholders = document.querySelectorAll(selector);
-    console.log('[include-browser] Found', placeholders.length, 'placeholders');
+    log('Found', placeholders.length, 'placeholders');
 
     if (placeholders.length === 0) {
       // Debug: check if there are ANY include placeholders
       const allPlaceholders = document.querySelectorAll('[data-include-pending="true"]');
-      console.log('[include-browser] Total pending placeholders in DOM:', allPlaceholders.length);
+      log('Total pending placeholders in DOM:', allPlaceholders.length);
       if (allPlaceholders.length > 0) {
-        console.log('[include-browser] Their file paths:', Array.from(allPlaceholders).map(p => p.getAttribute('data-include-file')));
+        log('Their file paths:', Array.from(allPlaceholders).map(p => p.getAttribute('data-include-file')));
       }
       return;
     }
@@ -312,33 +316,33 @@
     placeholders.forEach(placeholder => {
       // Find the closest task-description-display ancestor
       const taskDescription = placeholder.closest('.task-description-display');
-      console.log('[include-browser] Placeholder closest task-description-display:', taskDescription ? 'found' : 'NOT FOUND');
+      log('Placeholder closest task-description-display:', taskDescription ? 'found' : 'NOT FOUND');
       if (taskDescription) {
         taskDescriptionsToUpdate.add(taskDescription);
       }
     });
 
-    console.log('[include-browser] Task descriptions to update:', taskDescriptionsToUpdate.size);
+    log('Task descriptions to update:', taskDescriptionsToUpdate.size);
 
     // Re-render each affected task description
     taskDescriptionsToUpdate.forEach(taskDescriptionEl => {
       // Find the task element (class is 'task-item', not 'task')
       const taskEl = taskDescriptionEl.closest('.task-item');
       if (!taskEl) {
-        console.log('[include-browser] No .task-item parent found');
+        log('No .task-item parent found');
         return;
       }
 
       const taskId = taskEl.dataset.taskId;
       if (!taskId) {
-        console.log('[include-browser] No taskId on task element');
+        log('No taskId on task element');
         return;
       }
-      console.log('[include-browser] Found taskId:', taskId);
+      log('Found taskId:', taskId);
 
       // Get the task data from the current board data (stored in window.cachedBoard)
       if (typeof window.cachedBoard === 'undefined' || !window.cachedBoard) {
-        console.log('[include-browser] window.cachedBoard not available');
+        log('window.cachedBoard not available');
         return;
       }
 
@@ -353,20 +357,20 @@
       }
 
       if (!taskData || !taskData.description) {
-        console.log('[include-browser] Task data or description not found. taskData:', !!taskData, 'description:', !!taskData?.description);
+        log('Task data or description not found. taskData:', !!taskData, 'description:', !!taskData?.description);
         return;
       }
-      console.log('[include-browser] Found task description:', taskData.description.substring(0, 100));
+      log('Found task description:', taskData.description.substring(0, 100));
 
       // Re-render just the description using the existing renderMarkdown function
       if (typeof window.renderMarkdown === 'function') {
-        console.log('[include-browser] Calling window.renderMarkdown');
+        log('Calling window.renderMarkdown');
         const renderedHtml = window.renderMarkdown(taskData.description);
-        console.log('[include-browser] Rendered HTML length:', renderedHtml?.length);
+        log('Rendered HTML length:', renderedHtml?.length);
         taskDescriptionEl.innerHTML = renderedHtml;
-        console.log('[include-browser] Updated task description innerHTML');
+        log('Updated task description innerHTML');
       } else {
-        console.log('[include-browser] window.renderMarkdown is NOT a function:', typeof window.renderMarkdown);
+        log('window.renderMarkdown is NOT a function:', typeof window.renderMarkdown);
       }
     });
   }

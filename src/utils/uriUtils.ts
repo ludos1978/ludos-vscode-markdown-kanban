@@ -53,27 +53,3 @@ export function safeFileUri(filePath: string, context?: string): vscode.Uri {
         throw new Error(errorMsg);
     }
 }
-
-/**
- * Safely parse a URI string with detailed error logging
- * @param uriString - The URI string to parse
- * @param context - Optional context string to help identify where the error occurred
- * @returns vscode.Uri or throws with detailed error message
- */
-export function safeParseUri(uriString: string, context?: string): vscode.Uri {
-    const contextStr = context ? `[${context}]` : '';
-
-    if (!uriString) {
-        const error = `${contextStr} Cannot parse URI: uriString is empty or undefined`;
-        console.error(`[URI ERROR] ${error}`);
-        throw new Error(error);
-    }
-
-    try {
-        return vscode.Uri.parse(uriString);
-    } catch (error) {
-        const errorMsg = `${contextStr} Failed to parse URI "${uriString}": ${error}`;
-        console.error(`[URI ERROR] ${errorMsg}`);
-        throw new Error(errorMsg);
-    }
-}

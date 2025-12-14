@@ -24,8 +24,6 @@ export const FILE_TYPES = {
     INCLUDE_REGULAR: 'include-regular',
 } as const;
 
-export type FileType = typeof FILE_TYPES[keyof typeof FILE_TYPES];
-
 /**
  * Creates a display title by replacing !!!include()!!! directives with badge placeholders
  *

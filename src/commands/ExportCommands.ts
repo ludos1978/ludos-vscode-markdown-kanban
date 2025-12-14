@@ -22,6 +22,10 @@ import { FileChangeEvent } from '../files/MarkdownFile';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
+// Debug flag - set to true to enable verbose logging
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[ExportCommands]') : () => {};
+
 // Track auto-export subscriptions (file path -> disposable)
 const autoExportSubscriptions = new Map<string, vscode.Disposable>();
 
@@ -290,7 +294,7 @@ export class ExportCommands extends BaseMessageCommand {
             return;
         }
 
-        console.log('[ExportCommands] Setting up auto-export listener for:', mainFile.getPath());
+        log('Setting up auto-export listener for:', mainFile.getPath());
 
         // Subscribe to the kanban file's onDidChange event
         const subscription = mainFile.onDidChange(async (event: FileChangeEvent) => {
@@ -316,7 +320,7 @@ export class ExportCommands extends BaseMessageCommand {
 
         // Store the subscription for cleanup
         autoExportSubscriptions.set(docPath, subscription);
-        console.log('[ExportCommands] Auto-export listener registered');
+        log('Auto-export listener registered');
     }
 
     /**
@@ -336,7 +340,7 @@ export class ExportCommands extends BaseMessageCommand {
                 if (subscription) {
                     subscription.dispose();
                     autoExportSubscriptions.delete(docPath);
-                    console.log('[ExportCommands] Disposed auto-export subscription for:', docPath);
+                    log('Disposed auto-export subscription for:', docPath);
                 }
             }
 
