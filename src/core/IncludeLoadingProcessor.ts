@@ -11,13 +11,26 @@
 import * as path from 'path';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeTypes';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
+import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
+import { FileFactory } from '../files/FileFactory';
+import { MarkdownFile } from '../files/MarkdownFile';
+
+/**
+ * Interface for webview panel dependencies needed by this processor
+ */
+export interface IWebviewPanelForProcessor {
+    getBoard(): KanbanBoard | undefined;
+    fileFactory: FileFactory;
+    fileRegistry: MarkdownFileRegistry;
+}
 
 /**
  * Result of resolving the target column/task for an include switch
  */
 export interface TargetResolution {
-    targetColumn: any | null;
-    targetTask: any | null;
+    targetColumn: KanbanColumn | null;
+    targetTask: KanbanTask | null;
     isColumnSwitch: boolean;
     found: boolean;
 }
@@ -26,8 +39,8 @@ export interface TargetResolution {
  * Dependencies required by IncludeLoadingProcessor
  */
 export interface IncludeLoadingDependencies {
-    fileRegistry: any;
-    webviewPanel: any;
+    fileRegistry: MarkdownFileRegistry;
+    webviewPanel: IWebviewPanelForProcessor;
 }
 
 /**
@@ -35,8 +48,8 @@ export interface IncludeLoadingDependencies {
  * Extracted from ChangeStateMachine for better separation of concerns.
  */
 export class IncludeLoadingProcessor {
-    private _fileRegistry: any;
-    private _webviewPanel: any;
+    private _fileRegistry: MarkdownFileRegistry;
+    private _webviewPanel: IWebviewPanelForProcessor;
 
     constructor(deps: IncludeLoadingDependencies) {
         this._fileRegistry = deps.fileRegistry;
@@ -46,26 +59,26 @@ export class IncludeLoadingProcessor {
     /**
      * Resolve the target column/task based on the event type
      */
-    resolveTarget(event: IncludeSwitchEvent | UserEditEvent, board: any): TargetResolution {
-        let targetColumn: any = null;
-        let targetTask: any = null;
+    resolveTarget(event: IncludeSwitchEvent | UserEditEvent, board: KanbanBoard): TargetResolution {
+        let targetColumn: KanbanColumn | null = null;
+        let targetTask: KanbanTask | null = null;
         let isColumnSwitch = false;
 
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
-                targetColumn = board.columns.find((c: any) => c.id === event.targetId);
+                targetColumn = board.columns.find((c) => c.id === event.targetId) || null;
                 isColumnSwitch = true;
             } else if (event.target === 'task') {
-                targetColumn = board.columns.find((c: any) => c.id === event.columnIdForTask);
-                targetTask = targetColumn?.tasks.find((t: any) => t.id === event.targetId);
+                targetColumn = board.columns.find((c) => c.id === event.columnIdForTask) || null;
+                targetTask = targetColumn?.tasks.find((t) => t.id === event.targetId) || null;
             }
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
             if (event.editType === 'column_title') {
-                targetColumn = board.columns.find((c: any) => c.id === event.params.columnId);
+                targetColumn = board.columns.find((c) => c.id === event.params.columnId) || null;
                 isColumnSwitch = true;
             } else if (event.editType === 'task_title') {
-                targetColumn = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
-                targetTask = targetColumn?.tasks.find((t: any) => t.id === event.params.taskId);
+                targetColumn = board.columns.find((c) => c.tasks.some((t) => t.id === event.params.taskId)) || null;
+                targetTask = targetColumn?.tasks.find((t) => t.id === event.params.taskId) || null;
             }
         }
 
@@ -82,8 +95,8 @@ export class IncludeLoadingProcessor {
      */
     updateTargetTitle(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: any,
-        targetTask: any,
+        targetColumn: KanbanColumn | null,
+        targetTask: KanbanTask | null,
         isColumnSwitch: boolean
     ): void {
         if (event.type === 'include_switch' && event.newTitle !== undefined) {
@@ -101,8 +114,8 @@ export class IncludeLoadingProcessor {
      * Handle the case where all includes are being removed (newFiles is empty)
      */
     handleIncludeRemoval(
-        targetColumn: any,
-        targetTask: any,
+        targetColumn: KanbanColumn | null,
+        targetTask: KanbanTask | null,
         isColumnSwitch: boolean
     ): void {
         if (isColumnSwitch && targetColumn) {
@@ -124,8 +137,8 @@ export class IncludeLoadingProcessor {
      */
     handleAlreadyLoadedIncludes(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: any,
-        targetTask: any,
+        targetColumn: KanbanColumn | null,
+        targetTask: KanbanTask | null,
         isColumnSwitch: boolean,
         newFiles: string[]
     ): void {
@@ -141,7 +154,7 @@ export class IncludeLoadingProcessor {
      */
     async loadColumnIncludes(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: any,
+        targetColumn: KanbanColumn,
         loadingFiles: string[],
         context: ChangeContext
     ): Promise<void> {
@@ -169,7 +182,7 @@ export class IncludeLoadingProcessor {
         const preloadedContentMap = event.type === 'include_switch' ? event.preloadedContent : undefined;
 
         // Load all files and collect tasks
-        const tasks: any[] = [];
+        const tasks: KanbanTask[] = [];
 
         for (const relativePath of loadingFiles) {
             const preloadedContent = preloadedContentMap?.get(relativePath);
