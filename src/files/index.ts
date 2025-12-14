@@ -31,3 +31,10 @@ export { IncludeFile, IncludeFileType } from './IncludeFile';
 // Registry and factory
 export { MarkdownFileRegistry } from './MarkdownFileRegistry';
 export { FileFactory } from './FileFactory';
+
+// Save options and transactions
+export { SaveOptions } from './SaveOptions';
+export { SaveTransactionManager, TransactionState } from './SaveTransactionManager';
+
+// Watcher coordination
+export { WatcherCoordinator } from './WatcherCoordinator';
