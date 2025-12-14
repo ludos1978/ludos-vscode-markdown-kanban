@@ -12,7 +12,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
-import { ConfigurationService } from '../configurationService';
+import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';

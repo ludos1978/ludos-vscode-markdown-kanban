@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
-import { ConfigurationService } from '../../configurationService';
+import { ConfigurationService } from '../ConfigurationService';
 
 export type MarpOutputFormat = 'pdf' | 'pptx' | 'html' | 'markdown';
 

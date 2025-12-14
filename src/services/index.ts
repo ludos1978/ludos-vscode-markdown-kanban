@@ -23,6 +23,14 @@ export {
     ConflictFileType
 } from './ConflictResolver';
 
+// Configuration
+export {
+    ConfigurationService,
+    configService,
+    KanbanConfiguration,
+    ConfigurationDefaults
+} from './ConfigurationService';
+
 // Asset services
 export * from './assets';
 

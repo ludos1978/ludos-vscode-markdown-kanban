@@ -31,7 +31,6 @@ export interface KanbanConfiguration {
     htmlCommentRenderMode: string;
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
-    // Marp configuration
     marp: {
         enginePath: string;
         defaultTheme: string;
@@ -43,7 +42,6 @@ export interface KanbanConfiguration {
         globalClasses: string[];
         localClasses: string[];
     };
-    // Sidebar configuration
     sidebar: {
         autoScan: boolean;
     };
@@ -73,7 +71,6 @@ export interface ConfigurationDefaults {
     htmlCommentRenderMode: string;
     htmlContentRenderMode: string;
     arrowKeyFocusScroll: string;
-    // Marp configuration defaults
     marp: {
         enginePath: string;
         defaultTheme: string;
@@ -85,7 +82,6 @@ export interface ConfigurationDefaults {
         globalClasses: string[];
         localClasses: string[];
     };
-    // Sidebar configuration defaults
     sidebar: {
         autoScan: boolean;
     };
@@ -96,23 +92,20 @@ export class ConfigurationService {
     private cache: Map<string, any> = new Map();
     private readonly CONFIGURATION_SECTION = 'markdown-kanban';
 
-    // Default configuration values
-    // NOTE: These must match package.json contributes.configuration defaults!
-    // VS Code uses package.json as the source of truth, these are fallbacks.
     private readonly defaults: ConfigurationDefaults = {
         enableBackups: true,
         backupInterval: 15,
         backupLocation: 'same-folder',
         openLinksInNewTab: false,
-        pathGeneration: 'absolute' as 'relative' | 'absolute',  // matches package.json
-        whitespace: '4px',          // matches package.json
+        pathGeneration: 'absolute' as 'relative' | 'absolute',
+        whitespace: '4px',
         maxRowHeight: 0,
         taskMinHeight: 'auto',
         sectionHeight: 'auto',
         taskSectionHeight: 'auto',
-        fontSize: 'small',          // matches package.json
-        fontFamily: 'system',       // matches package.json
-        columnWidth: 'medium',      // matches package.json
+        fontSize: 'small',
+        fontFamily: 'system',
+        columnWidth: 'medium',
         columnBorder: '1px solid var(--vscode-panel-border)',
         taskBorder: '1px solid var(--vscode-panel-border)',
         layoutRows: 1,
@@ -123,7 +116,6 @@ export class ConfigurationService {
         htmlCommentRenderMode: 'hidden',
         htmlContentRenderMode: 'html',
         arrowKeyFocusScroll: 'center',
-        // Marp defaults
         marp: {
             enginePath: './marp-engine/engine.js',
             defaultTheme: 'default',
@@ -141,14 +133,12 @@ export class ConfigurationService {
             globalClasses: [],
             localClasses: []
         },
-        // Sidebar defaults
         sidebar: {
             autoScan: true
         }
     };
 
     private constructor() {
-        // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration(this.CONFIGURATION_SECTION)) {
                 this.clearCache();
@@ -163,9 +153,6 @@ export class ConfigurationService {
         return ConfigurationService.instance;
     }
 
-    /**
-     * Get configuration value with caching and default fallback
-     */
     public getConfig<K extends keyof KanbanConfiguration>(
         key: K,
         defaultValue?: KanbanConfiguration[K]
@@ -186,9 +173,6 @@ export class ConfigurationService {
         return value;
     }
 
-    /**
-     * Get nested configuration property using dot notation
-     */
     public getNestedConfig(path: string, defaultValue?: any): any {
         const cacheKey = `${this.CONFIGURATION_SECTION}.${path}`;
 
@@ -203,9 +187,6 @@ export class ConfigurationService {
         return value;
     }
 
-    /**
-     * Update configuration value
-     */
     public async updateConfig<K extends keyof KanbanConfiguration>(
         key: K,
         value: KanbanConfiguration[K],
@@ -214,19 +195,14 @@ export class ConfigurationService {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         await config.update(key as string, value, target);
 
-        // Clear cache for this key
         const cacheKey = `${this.CONFIGURATION_SECTION}.${key}`;
         this.cache.delete(cacheKey);
     }
 
-    /**
-     * Get all configuration as typed object
-     */
     public getAllConfig(): Partial<KanbanConfiguration> {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         const result: Partial<KanbanConfiguration> = {};
 
-        // Get all known configuration keys
         for (const key of Object.keys(this.defaults) as Array<keyof ConfigurationDefaults>) {
             result[key as keyof KanbanConfiguration] = config.get(
                 key,
@@ -237,18 +213,10 @@ export class ConfigurationService {
         return result;
     }
 
-    /**
-     * Clear configuration cache
-     */
     public clearCache(): void {
         this.cache.clear();
     }
 
-    /**
-     * Get configuration for specific features
-     */
-
-    // Tag configuration
     public getTagConfiguration() {
         return {
             tagColors: this.getConfig('tagColors', {}),
@@ -257,43 +225,35 @@ export class ConfigurationService {
         };
     }
 
-    // Tag category filtering for columns
     public getEnabledTagCategoriesColumn(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         const enabledArray = config.get<string[]>('enabledTagCategoriesColumn', []);
 
-        // Convert array to object format for backward compatibility
         const result: { [key: string]: boolean } = {};
         enabledArray.forEach(category => {
-            // Convert kebab-case to camelCase
             const camelCase = category.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
             result[camelCase] = true;
         });
         return result;
     }
 
-    // Tag category filtering for tasks
     public getEnabledTagCategoriesTask(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         const enabledArray = config.get<string[]>('enabledTagCategoriesTask', []);
 
-        // Convert array to object format for backward compatibility
         const result: { [key: string]: boolean } = {};
         enabledArray.forEach(category => {
-            // Convert kebab-case to camelCase
             const camelCase = category.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
             result[camelCase] = true;
         });
         return result;
     }
 
-    // Custom user-defined tag categories
     public getCustomTagCategories(): { [key: string]: any } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         return config.get('customTagCategories', {});
     }
 
-    // Layout configuration
     public getLayoutConfiguration() {
         return {
             whitespace: this.getConfig('whitespace'),
@@ -312,7 +272,6 @@ export class ConfigurationService {
         };
     }
 
-    // Backup configuration
     public getBackupConfiguration() {
         return {
             enableBackups: this.getConfig('enableBackups'),
@@ -321,7 +280,6 @@ export class ConfigurationService {
         };
     }
 
-    // Link configuration
     public getLinkConfiguration() {
         return {
             openLinksInNewTab: this.getConfig('openLinksInNewTab'),
@@ -329,21 +287,12 @@ export class ConfigurationService {
         };
     }
 
-    // Path generation configuration
     public getPathGenerationMode(): 'relative' | 'absolute' {
         return this.getConfig('pathGeneration');
     }
 
-    /**
-     * Get complete board view configuration for sending to webview
-     * This is the SINGLE SOURCE OF TRUTH for board view config
-     * Used by both _refreshAllViewConfiguration() and _sendBoardUpdate()
-     *
-     * @param layoutPresets - Layout presets from WebviewManager (merged with user config)
-     */
     public getBoardViewConfig(layoutPresets: Record<string, any>): Record<string, any> {
         return {
-            // Layout settings
             columnWidth: this.getConfig('columnWidth'),
             columnBorder: this.getConfig('columnBorder'),
             taskBorder: this.getConfig('taskBorder'),
@@ -352,42 +301,30 @@ export class ConfigurationService {
             layoutPreset: this.getConfig('layoutPreset'),
             layoutPresets: layoutPresets,
             maxRowHeight: this.getConfig('maxRowHeight'),
-
-            // Task/Content settings
             taskMinHeight: this.getConfig('taskMinHeight'),
             sectionHeight: this.getConfig('sectionHeight'),
             taskSectionHeight: this.getConfig('taskSectionHeight'),
             fontSize: this.getConfig('fontSize'),
             fontFamily: this.getConfig('fontFamily'),
             whitespace: this.getConfig('whitespace'),
-
-            // Rendering settings
             htmlCommentRenderMode: this.getConfig('htmlCommentRenderMode'),
             htmlContentRenderMode: this.getConfig('htmlContentRenderMode'),
-
-            // Tag settings
             tagColors: this.getConfig('tagColors'),
             enabledTagCategoriesColumn: this.getEnabledTagCategoriesColumn(),
             enabledTagCategoriesTask: this.getEnabledTagCategoriesTask(),
             customTagCategories: this.getCustomTagCategories(),
             tagVisibility: this.getConfig('tagVisibility'),
             exportTagVisibility: this.getConfig('exportTagVisibility'),
-
-            // Other settings
             arrowKeyFocusScroll: this.getConfig('arrowKeyFocusScroll'),
             openLinksInNewTab: this.getConfig('openLinksInNewTab'),
             pathGeneration: this.getConfig('pathGeneration')
         };
     }
 
-    /**
-     * Validate configuration value
-     */
     public validateConfig<K extends keyof KanbanConfiguration>(
         key: K,
         value: any
     ): boolean {
-        // Add validation logic based on configuration key
         switch (key) {
             case 'enableBackups':
                 return typeof value === 'boolean';
@@ -402,13 +339,10 @@ export class ConfigurationService {
             case 'tagVisibility':
                 return ['visible', 'hover', 'hidden'].includes(value);
             default:
-                return true; // Default to valid for unknown keys
+                return true;
         }
     }
 
-    /**
-     * Helper method to get nested property from object using dot notation
-     */
     private getNestedProperty(obj: any, path: string): any {
         return path.split('.').reduce((current, prop) => {
             return current && current[prop] !== undefined ? current[prop] : undefined;

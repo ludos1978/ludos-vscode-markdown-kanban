@@ -10,7 +10,7 @@ import { LinkHandler } from './services/LinkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './services/BackupManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './services/ConflictResolver';
-import { configService } from './configurationService';
+import { configService } from './services/ConfigurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
 import { LinkOperations } from './utils/linkOperations';

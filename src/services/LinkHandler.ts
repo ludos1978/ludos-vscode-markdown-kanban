@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { FileManager } from '../fileManager';
 import { FileSearchService } from '../fileSearchService';
-import { configService } from '../configurationService';
+import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 
 export class LinkHandler {

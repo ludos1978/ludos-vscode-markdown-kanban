@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { KanbanWebviewPanel } from './kanbanWebviewPanel';
-import { configService } from './configurationService';
+import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { PluginLoader } from './plugins';
 

@@ -15,7 +15,7 @@ import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } fr
 import { ExportService } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
-import { ConfigurationService } from '../configurationService';
+import { ConfigurationService } from '../services/ConfigurationService';
 import { SaveEventDispatcher } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';

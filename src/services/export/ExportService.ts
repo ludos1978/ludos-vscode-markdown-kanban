@@ -9,7 +9,7 @@ import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { getMermaidExportService } from './MermaidExportService';
-import { ConfigurationService } from '../../configurationService';
+import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { AssetHandler } from '../assets/AssetHandler';
