@@ -21,8 +21,8 @@ export class FileSaveService {
     private static instance: FileSaveService | undefined;
     private activeSaves = new Map<string, Promise<void>>();
 
-    public constructor() {
-        // No initialization needed
+    private constructor() {
+        // Singleton - use getInstance()
     }
 
     public static getInstance(): FileSaveService {
