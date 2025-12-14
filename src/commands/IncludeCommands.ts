@@ -17,8 +17,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
-import { safeFileUri } from '../utils/uriUtils';
-import { getErrorMessage } from '../utils/stringUtils';
+import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -200,12 +199,8 @@ export class IncludeCommands extends BaseMessageCommand {
         }
 
         const currentDir = path.dirname(currentFilePath);
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
+        const fileUris = await selectMarkdownFile({
             defaultUri: safeFileUri(currentDir, 'includeCommands-selectColumnInclude'),
-            filters: { 'Markdown files': ['md'] },
             title: 'Select include file for column'
         });
 
@@ -260,12 +255,8 @@ export class IncludeCommands extends BaseMessageCommand {
             }
         }
 
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
+        const fileUris = await selectMarkdownFile({
             defaultUri: defaultUri,
-            filters: { 'Markdown files': ['md'] },
             title: 'Select new include file for column'
         });
 
@@ -324,12 +315,8 @@ export class IncludeCommands extends BaseMessageCommand {
             }
         }
 
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
+        const fileUris = await selectMarkdownFile({
             defaultUri: defaultUri,
-            filters: { 'Markdown files': ['md'] },
             title: 'Select new include file for task'
         });
 
@@ -356,12 +343,8 @@ export class IncludeCommands extends BaseMessageCommand {
         }
 
         const currentDir = path.dirname(currentFilePath);
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
+        const fileUris = await selectMarkdownFile({
             defaultUri: safeFileUri(currentDir, 'includeCommands-selectTaskInclude'),
-            filters: { 'Markdown files': ['md'] },
             title: 'Select include file for task'
         });
 

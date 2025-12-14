@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { FileTypeUtils } from './utils/fileTypeUtils';
-import { toForwardSlashes } from './utils/stringUtils';
+import { FileTypeUtils, toForwardSlashes, selectMarkdownFile } from './utils';
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
 
@@ -102,15 +101,7 @@ export class FileManager {
     }
 
     public async selectFile(): Promise<vscode.TextDocument | null> {
-        const fileUris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            filters: {
-                'Markdown files': ['md']
-            }
-        });
-
+        const fileUris = await selectMarkdownFile();
         if (fileUris && fileUris.length > 0) {
             const targetUri = fileUris[0];
             try {

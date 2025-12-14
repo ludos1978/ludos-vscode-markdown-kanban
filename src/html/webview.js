@@ -25,14 +25,6 @@ let canUndo = false;
 let canRedo = false;
 window.currentImageMappings = {};
 
-// Card navigation variables
-let currentFocusedCard = null;
-let allCards = [];
-
-// Document-specific folding state storage
-let documentFoldingStates = new Map(); // Map<documentUri, {collapsedColumns: Set, collapsedTasks: Set, columnFoldStates: Map}>
-let currentDocumentUri = null;
-
 // Layout preferences
 let currentColumnWidth = '350px';
 let currentWhitespace = '8px';
@@ -1550,115 +1542,6 @@ function cleanupRowTags() {
     }
 }
 
-// Function to get current document folding state
-function getCurrentDocumentFoldingState() {
-    if (!currentDocumentUri) {return null;}
-    
-    if (!documentFoldingStates.has(currentDocumentUri)) {
-        // Initialize empty state for new document
-        documentFoldingStates.set(currentDocumentUri, {
-            collapsedColumns: new Set(),
-            collapsedTasks: new Set(),
-            columnFoldStates: new Map(),
-            globalColumnFoldState: 'fold-mixed',
-            isInitialized: false
-        });
-    }
-    
-    return documentFoldingStates.get(currentDocumentUri);
-}
-
-// Function to save current folding state to document storage
-/**
- * Saves current folding state for document persistence
- * Purpose: Preserve fold states across document switches
- * Used by: Before document changes, refreshes
- * Side effects: Updates documentFoldingStates map
- */
-function saveCurrentFoldingState() {
-    if (!currentDocumentUri || !window.collapsedColumns) {return;}
-    
-    const state = getCurrentDocumentFoldingState();
-    if (!state) {return;}
-    
-    // Copy current state
-    state.collapsedColumns = new Set(window.collapsedColumns);
-    state.collapsedTasks = new Set(window.collapsedTasks);
-    state.columnFoldStates = new Map(window.columnFoldStates);
-    state.globalColumnFoldState = window.globalColumnFoldState;
-    state.isInitialized = true;
-    
-}
-
-// Function to restore folding state from document storage
-function restoreFoldingState() {
-    if (!currentDocumentUri) {return false;}
-    
-    const state = getCurrentDocumentFoldingState();
-    if (!state) {return false;}
-    
-    // Initialize global folding variables if they don't exist
-    if (!window.collapsedColumns) {window.collapsedColumns = new Set();}
-    if (!window.collapsedTasks) {window.collapsedTasks = new Set();}
-    if (!window.columnFoldStates) {window.columnFoldStates = new Map();}
-    if (!window.globalColumnFoldState) {window.globalColumnFoldState = 'fold-mixed';}
-    
-    if (state.isInitialized) {
-        // Restore saved state
-        window.collapsedColumns = new Set(state.collapsedColumns);
-        window.collapsedTasks = new Set(state.collapsedTasks);
-        window.columnFoldStates = new Map(state.columnFoldStates);
-        window.globalColumnFoldState = state.globalColumnFoldState;
-        
-        return true;
-    }
-    
-    return false; // Don't apply default folding here
-}
-
-// Function to apply default folding (empty columns folded) - only for truly new documents
-function applyDefaultFoldingToNewDocument() {
-    if (!currentBoard || !currentBoard.columns) {return;}
-    
-    // Don't reset existing state, just add empty columns to collapsed set
-    currentBoard.columns.forEach(column => {
-        if (!column.tasks || column.tasks.length === 0) {
-            window.collapsedColumns.add(column.id);
-        }
-    });
-    
-    // Mark this document as initialized so we don't apply defaults again
-    const state = getCurrentDocumentFoldingState();
-    if (state) {
-        state.isInitialized = true;
-    }
-}
-
-// Function to update document URI and manage state
-function updateDocumentUri(newUri) {
-    if (currentDocumentUri !== newUri) {
-        // Save current state before switching
-        if (currentDocumentUri) {
-            saveCurrentFoldingState();
-        }
-
-        currentDocumentUri = newUri;
-
-        // Save state for VSCode webview panel serialization
-        // This ensures each panel remembers which file it's displaying when VSCode restarts
-        if (vscode && vscode.setState && currentDocumentUri) {
-            vscode.setState({ documentUri: currentDocumentUri });
-        }
-
-        // Try to restore state for the new document
-        const hadSavedState = restoreFoldingState();
-
-        // If no saved state exists and board is ready, apply defaults for new document
-        if (!hadSavedState && window.cachedBoard && window.cachedBoard.columns) {
-            applyDefaultFoldingToNewDocument();
-        }
-    }
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Request available Marp classes on load
@@ -1995,8 +1878,8 @@ function performFocusActions(focusTargets) {
 // Clear card focus on click
 document.addEventListener('click', (e) => {
     // Don't clear focus if clicking on a card
-    if (!e.target.closest('.task-item') && currentFocusedCard) {
-        focusCard(null);
+    if (!e.target.closest('.task-item') && window.getCurrentFocusedCard()) {
+        window.focusCard(null);
     }
 });
 
@@ -3285,368 +3168,6 @@ if (typeof MutationObserver !== 'undefined') {
     }
 }
 
-// Card navigation functions
-function updateCardList() {
-    // Use more flexible selector to handle class name variations
-    const allTaskItems = document.querySelectorAll('[class*="task-item"]');
-
-    allCards = Array.from(allTaskItems).filter(card => {
-        const column = card.closest('.kanban-full-height-column');
-        // Filter out cards in collapsed columns and collapsed tasks
-        return column && !window.isColumnCollapsed(column) && !card.classList.contains('collapsed');
-    });
-}
-
-function focusCard(card) {
-    if (currentFocusedCard) {
-        currentFocusedCard.classList.remove('card-focused');
-    }
-    
-    if (card) {
-        card.classList.add('card-focused');
-        
-        // Get scroll behavior from settings
-        const scrollBehavior = window.currentArrowKeyFocusScroll || 'center';
-
-        if (scrollBehavior === 'nearest') {
-            // Just bring into view with minimal scrolling
-            card.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'nearest'
-            });
-        } else {
-            // Center behavior (default)
-            // Check if card is larger than viewport
-            const cardRect = card.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const viewportWidth = window.innerWidth;
-
-            const cardTallerThanViewport = cardRect.height > viewportHeight;
-            const cardWiderThanViewport = cardRect.width > viewportWidth;
-
-            // If card is larger than viewport, scroll to show top-left corner
-            // Otherwise, center the card
-            if (cardTallerThanViewport || cardWiderThanViewport) {
-                card.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start',    // Show top of card
-                    inline: 'start'    // Show left of card
-                });
-            } else {
-                card.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center',   // Center vertically
-                    inline: 'center'   // Center horizontally
-                });
-            }
-        }
-        
-        currentFocusedCard = card;
-    } else {
-        currentFocusedCard = null;
-    }
-}
-
-// Helper function to focus on a section and also set card focus
-function focusSection(section) {
-    if (!section) {
-        return;
-    }
-
-    // Find the parent task card
-    const taskCard = section.closest('.task-item');
-    if (taskCard) {
-        // Update card focus state
-        if (currentFocusedCard && currentFocusedCard !== taskCard) {
-            currentFocusedCard.classList.remove('card-focused');
-        }
-        taskCard.classList.add('card-focused');
-        currentFocusedCard = taskCard;
-    }
-
-    // Focus the section
-    section.focus();
-    section.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-}
-
-// Helper function to get visible (non-collapsed) task cards from a column
-function getVisibleTaskCards(column) {
-    const allTaskItems = Array.from(column.querySelectorAll('[class*="task-item"]'));
-    return allTaskItems.filter(task => !task.classList.contains('collapsed'));
-}
-
-function getCurrentCardPosition() {
-    if (!currentFocusedCard) {return null;}
-
-    const column = currentFocusedCard.closest('.kanban-full-height-column');
-    if (!column) {return null;}
-
-    const columnCards = getVisibleTaskCards(column);
-    const cardIndex = columnCards.indexOf(currentFocusedCard);
-    const columnIndex = Array.from(document.querySelectorAll('.kanban-full-height-column')).indexOf(column);
-
-    return { columnIndex, cardIndex, columnCards };
-}
-
-function getCardClosestToTopLeft() {
-    const viewportRect = {
-        top: window.scrollY,
-        left: window.scrollX,
-        bottom: window.scrollY + window.innerHeight,
-        right: window.scrollX + window.innerWidth
-    };
-    
-    let closestCard = null;
-    let closestDistance = Infinity;
-    
-    for (const card of allCards) {
-        const cardRect = card.getBoundingClientRect();
-        const cardTop = cardRect.top + window.scrollY;
-        const cardLeft = cardRect.left + window.scrollX;
-        
-        // Check if card's top-left corner is within viewport
-        if (cardTop >= viewportRect.top && cardTop <= viewportRect.bottom &&
-            cardLeft >= viewportRect.left && cardLeft <= viewportRect.right) {
-            
-            // Calculate distance from viewport's top-left corner
-            const distance = Math.sqrt(
-                Math.pow(cardTop - viewportRect.top, 2) + 
-                Math.pow(cardLeft - viewportRect.left, 2)
-            );
-            
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestCard = card;
-            }
-        }
-    }
-    
-    // If no card is visible, find the one closest to being visible
-    if (!closestCard) {
-        for (const card of allCards) {
-            const cardRect = card.getBoundingClientRect();
-            const cardTop = cardRect.top + window.scrollY;
-            const cardLeft = cardRect.left + window.scrollX;
-            
-            // Calculate distance from viewport's top-left corner regardless of visibility
-            const distance = Math.sqrt(
-                Math.pow(cardTop - viewportRect.top, 2) + 
-                Math.pow(cardLeft - viewportRect.left, 2)
-            );
-            
-            if (distance < closestDistance) {
-                closestDistance = distance;
-                closestCard = card;
-            }
-        }
-    }
-    
-    return closestCard || allCards[0];
-}
-
-function navigateToCard(direction) {
-    updateCardList();
-    
-    if (allCards.length === 0) {
-        return;
-    }
-    
-    if (!currentFocusedCard) {
-        // No card focused, focus the one closest to top-left of viewport
-        const closestCard = getCardClosestToTopLeft();
-        focusCard(closestCard);
-        return;
-    }
-    
-    const position = getCurrentCardPosition();
-    if (!position) {return;}
-    
-    const { columnIndex, cardIndex, columnCards } = position;
-    const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-    
-    switch (direction) {
-        case 'up':
-            if (cardIndex > 0) {
-                focusCard(columnCards[cardIndex - 1]);
-            }
-            break;
-            
-        case 'down':
-            if (cardIndex < columnCards.length - 1) {
-                focusCard(columnCards[cardIndex + 1]);
-            }
-            break;
-            
-        case 'left':
-            // Find the first non-collapsed column to the left with visible tasks
-            for (let i = columnIndex - 1; i >= 0; i--) {
-                const prevColumn = columns[i];
-                if (!window.isColumnCollapsed(prevColumn)) {
-                    const prevColumnCards = getVisibleTaskCards(prevColumn);
-                    if (prevColumnCards.length > 0) {
-                        focusCard(prevColumnCards[0]);
-                        break;
-                    }
-                }
-            }
-            break;
-
-        case 'right':
-            // Find the first non-collapsed column to the right with visible tasks
-            for (let i = columnIndex + 1; i < columns.length; i++) {
-                const nextColumn = columns[i];
-                if (!window.isColumnCollapsed(nextColumn)) {
-                    const nextColumnCards = getVisibleTaskCards(nextColumn);
-                    if (nextColumnCards.length > 0) {
-                        focusCard(nextColumnCards[0]);
-                        break;
-                    }
-                }
-            }
-            break;
-    }
-}
-
-// Handle navigation from task level (card focused)
-function handleTaskNavigation(key) {
-    if (key === 'ArrowDown') {
-        // Go to first section of current task
-        const sections = currentFocusedCard.querySelectorAll('.task-section');
-        if (sections.length > 0) {
-            focusSection(sections[0]);
-        }
-    } else {
-        // For other directions, use card-level navigation
-        const direction = {
-            'ArrowUp': 'up',
-            'ArrowLeft': 'left',
-            'ArrowRight': 'right'
-        }[key];
-        if (direction) {
-            navigateToCard(direction);
-        }
-    }
-}
-
-// Handle navigation from section level
-function handleSectionNavigation(key, currentSection) {
-    const taskItem = currentSection.closest('.task-item');
-    const allSections = Array.from(taskItem.querySelectorAll('.task-section'));
-    const currentIndex = allSections.indexOf(currentSection);
-
-    if (key === 'ArrowDown') {
-        if (currentIndex < allSections.length - 1) {
-            // Go to next section in same task
-            focusSection(allSections[currentIndex + 1]);
-        } else {
-            // At last section, go to first section of next task
-            const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = getVisibleTaskCards(column);
-            const taskIndex = columnCards.indexOf(taskItem);
-
-            if (taskIndex < columnCards.length - 1) {
-                // Next task in same column
-                const nextTask = columnCards[taskIndex + 1];
-                const nextSections = nextTask.querySelectorAll('.task-section');
-                if (nextSections.length > 0) {
-                    focusSection(nextSections[0]);
-                }
-            } else {
-                // At last task of column, wrap to first section of first task in next column
-                const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-                const columnIndex = columns.indexOf(column);
-
-                // Find the first non-collapsed column to the right with visible tasks
-                for (let i = columnIndex + 1; i < columns.length; i++) {
-                    const nextColumn = columns[i];
-                    if (!window.isColumnCollapsed(nextColumn)) {
-                        const nextColumnCards = getVisibleTaskCards(nextColumn);
-
-                        if (nextColumnCards.length > 0) {
-                            const firstTask = nextColumnCards[0];
-                            const firstTaskSections = firstTask.querySelectorAll('.task-section');
-
-                            if (firstTaskSections.length > 0) {
-                                focusSection(firstTaskSections[0]);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    } else if (key === 'ArrowUp') {
-        if (currentIndex > 0) {
-            // Go to previous section in same task
-            focusSection(allSections[currentIndex - 1]);
-        } else {
-            // At first section, go to last section of previous task
-            const column = taskItem.closest('.kanban-full-height-column');
-            const columnCards = getVisibleTaskCards(column);
-            const taskIndex = columnCards.indexOf(taskItem);
-
-            if (taskIndex > 0) {
-                // Previous task in same column
-                const prevTask = columnCards[taskIndex - 1];
-                const prevSections = prevTask.querySelectorAll('.task-section');
-                if (prevSections.length > 0) {
-                    focusSection(prevSections[prevSections.length - 1]);
-                }
-            } else {
-                // At first task of column, wrap to last section of last task in previous column
-                const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-                const columnIndex = columns.indexOf(column);
-
-                // Find the first non-collapsed column to the left with visible tasks
-                for (let i = columnIndex - 1; i >= 0; i--) {
-                    const prevColumn = columns[i];
-                    if (!window.isColumnCollapsed(prevColumn)) {
-                        const prevColumnCards = getVisibleTaskCards(prevColumn);
-
-                        if (prevColumnCards.length > 0) {
-                            const lastTask = prevColumnCards[prevColumnCards.length - 1];
-                            const lastTaskSections = lastTask.querySelectorAll('.task-section');
-
-                            if (lastTaskSections.length > 0) {
-                                focusSection(lastTaskSections[lastTaskSections.length - 1]);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
-        // Navigate to first section of first task in adjacent column
-        const column = taskItem.closest('.kanban-full-height-column');
-        const columns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-        const columnIndex = columns.indexOf(column);
-
-        // Find the first non-collapsed column in the target direction
-        const start = key === 'ArrowLeft' ? columnIndex - 1 : columnIndex + 1;
-        const end = key === 'ArrowLeft' ? -1 : columns.length;
-        const step = key === 'ArrowLeft' ? -1 : 1;
-
-        for (let i = start; key === 'ArrowLeft' ? i > end : i < end; i += step) {
-            const targetColumn = columns[i];
-            if (!window.isColumnCollapsed(targetColumn)) {
-                const targetColumnCards = getVisibleTaskCards(targetColumn);
-
-                if (targetColumnCards.length > 0) {
-                    // Always go to first task's first section in the column
-                    const targetTask = targetColumnCards[0];
-                    const targetSections = targetTask.querySelectorAll('.task-section');
-
-                    if (targetSections.length > 0) {
-                        focusSection(targetSections[0]);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
 
 // Keyboard shortcuts for search and navigation
 document.addEventListener('keydown', (e) => {
@@ -3666,7 +3187,7 @@ document.addEventListener('keydown', (e) => {
 
     // Check if focused on a task section
     const isFocusedOnSection = activeElement && activeElement.classList.contains('task-section');
-    const isFocusedOnTask = currentFocusedCard !== null;
+    const isFocusedOnTask = window.getCurrentFocusedCard() !== null;
 
     // Hierarchical arrow key navigation
     if (!isEditing && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -3674,10 +3195,10 @@ document.addEventListener('keydown', (e) => {
 
         if (isFocusedOnSection) {
             // Navigation from section level
-            handleSectionNavigation(e.key, activeElement);
+            window.handleSectionNavigation(e.key, activeElement);
         } else if (isFocusedOnTask) {
             // Navigation from task level
-            handleTaskNavigation(e.key);
+            window.handleTaskNavigation(e.key);
         } else {
             // Navigation from board level (no focus)
             const direction = {
@@ -3686,11 +3207,11 @@ document.addEventListener('keydown', (e) => {
                 'ArrowLeft': 'left',
                 'ArrowRight': 'right'
             }[e.key];
-            navigateToCard(direction);
+            window.navigateToCard(direction);
         }
         return;
     }
-    
+
     // Escape to exit section focus and return to card focus
     if (e.key === 'Escape' && !isEditing && isFocusedOnSection) {
         const taskItem = activeElement.closest('.task-item');
@@ -3701,8 +3222,8 @@ document.addEventListener('keydown', (e) => {
     }
 
     // Escape to clear card focus
-    if (e.key === 'Escape' && !isEditing && currentFocusedCard) {
-        focusCard(null);
+    if (e.key === 'Escape' && !isEditing && window.getCurrentFocusedCard()) {
+        window.focusCard(null);
         return;
     }
     
@@ -3836,23 +3357,25 @@ document.addEventListener('keydown', (e) => {
             }
         }
         // Delete or Backspace to delete the focused task
-        else if ((e.key === 'Delete' || e.key === 'Backspace') && currentFocusedCard) {
+        else if ((e.key === 'Delete' || e.key === 'Backspace') && window.getCurrentFocusedCard()) {
             e.preventDefault();
-            const taskId = currentFocusedCard.dataset.taskId;
-            const columnId = window.getColumnIdFromElement(currentFocusedCard);
+            const focusedCard = window.getCurrentFocusedCard();
+            const taskId = focusedCard.dataset.taskId;
+            const columnId = window.getColumnIdFromElement(focusedCard);
             if (taskId && typeof deleteTask === 'function') {
                 deleteTask(taskId, columnId);
-                focusCard(null);
+                window.focusCard(null);
             }
         }
         // Enter to start editing the focused task
-        else if (e.key === 'Enter' && currentFocusedCard) {
+        else if (e.key === 'Enter' && window.getCurrentFocusedCard()) {
             e.preventDefault();
-            const taskId = currentFocusedCard.dataset.taskId;
-            const columnId = window.getColumnIdFromElement(currentFocusedCard);
+            const focusedCard = window.getCurrentFocusedCard();
+            const taskId = focusedCard.dataset.taskId;
+            const columnId = window.getColumnIdFromElement(focusedCard);
             // Start editing the title section
             if (window.taskEditor && taskId) {
-                window.taskEditor.startEdit(currentFocusedCard, 'task-title', taskId, columnId, false);
+                window.taskEditor.startEdit(focusedCard, 'task-title', taskId, columnId, false);
             }
         }
     }
@@ -4213,8 +3736,6 @@ function updateMaxRowHeight(value) {
 }
 
 // Export functions for use by other modules
-window.saveCurrentFoldingState = saveCurrentFoldingState;
-window.restoreFoldingState = restoreFoldingState;
 window.calculateTaskDescriptionHeight = calculateTaskDescriptionHeight;
 window.updateBorderStyles = updateBorderStyles;
 
@@ -4652,192 +4173,4 @@ function updateLayoutPresetsActiveState() {
     }
 }
 
-
-// ============================================================================
-// TEMPLATE VARIABLE DIALOG
-// ============================================================================
-
-/**
- * Show dialog to collect template variable values
- * @param {object} templateInfo - Contains templatePath, templateName, variables[], and position info
- */
-function showTemplateVariableDialog(templateInfo) {
-    // If no variables required, apply immediately
-    if (!templateInfo.variables || templateInfo.variables.length === 0) {
-        submitTemplateVariables(templateInfo, {});
-        return;
-    }
-
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'template-dialog-overlay';
-    overlay.id = 'template-variable-dialog-overlay';
-
-    // Create dialog
-    const dialog = document.createElement('div');
-    dialog.className = 'template-dialog';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'template-dialog-header';
-    header.innerHTML = `
-        <h3>Configure Template: ${escapeHtml(templateInfo.templateName || 'Template')}</h3>
-        <button class="template-dialog-close" onclick="closeTemplateVariableDialog()">&times;</button>
-    `;
-    dialog.appendChild(header);
-
-    // Form
-    const form = document.createElement('form');
-    form.className = 'template-dialog-form';
-    form.id = 'template-variable-form';
-
-    templateInfo.variables.forEach((variable, index) => {
-        const field = document.createElement('div');
-        field.className = 'template-dialog-field';
-
-        const label = document.createElement('label');
-        label.htmlFor = `template-var-${variable.name}`;
-        label.textContent = variable.label || variable.name;
-        if (variable.required !== false) {
-            label.innerHTML += ' <span class="required">*</span>';
-        }
-        field.appendChild(label);
-
-        const input = document.createElement('input');
-        input.type = variable.type === 'number' ? 'number' : 'text';
-        input.id = `template-var-${variable.name}`;
-        input.name = variable.name;
-        input.placeholder = variable.format ? `Format: ${variable.format}` : '';
-        if (variable.default !== undefined) {
-            input.value = variable.default;
-        }
-        if (variable.required !== false) {
-            input.required = true;
-        }
-        if (index === 0) {
-            input.autofocus = true;
-        }
-        field.appendChild(input);
-
-        form.appendChild(field);
-    });
-
-    dialog.appendChild(form);
-
-    // Footer with buttons
-    const footer = document.createElement('div');
-    footer.className = 'template-dialog-footer';
-    footer.innerHTML = `
-        <button type="button" class="template-dialog-btn template-dialog-cancel" onclick="closeTemplateVariableDialog()">Cancel</button>
-        <button type="button" class="template-dialog-btn template-dialog-submit" onclick="submitTemplateVariablesFromForm()">Apply Template</button>
-    `;
-    dialog.appendChild(footer);
-
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-
-    // Store template info for submission
-    window._pendingTemplateInfo = templateInfo;
-
-    // Focus first input
-    setTimeout(() => {
-        const firstInput = form.querySelector('input');
-        if (firstInput) {
-            firstInput.focus();
-        }
-    }, 50);
-
-    // Handle form submission on Enter
-    form.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            submitTemplateVariablesFromForm();
-        }
-    });
-
-    // Handle Escape to close
-    overlay.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeTemplateVariableDialog();
-        }
-    });
-}
-
-/**
- * Close the template variable dialog
- */
-function closeTemplateVariableDialog() {
-    const overlay = document.getElementById('template-variable-dialog-overlay');
-    if (overlay) {
-        overlay.remove();
-    }
-    window._pendingTemplateInfo = null;
-}
-
-/**
- * Submit template variables from the form
- */
-function submitTemplateVariablesFromForm() {
-    const form = document.getElementById('template-variable-form');
-    const templateInfo = window._pendingTemplateInfo;
-
-    if (!form || !templateInfo) {
-        return;
-    }
-
-    // Collect values
-    const values = {};
-    const formData = new FormData(form);
-    for (const [name, value] of formData.entries()) {
-        // Find variable definition to determine type
-        const varDef = templateInfo.variables.find(v => v.name === name);
-        if (varDef && varDef.type === 'number') {
-            values[name] = parseFloat(value) || 0;
-        } else {
-            values[name] = value;
-        }
-    }
-
-    // Validate required fields
-    const missingFields = [];
-    templateInfo.variables.forEach(variable => {
-        if (variable.required !== false) {
-            const value = values[variable.name];
-            if (value === undefined || value === '' || (typeof value === 'number' && isNaN(value))) {
-                missingFields.push(variable.label || variable.name);
-            }
-        }
-    });
-
-    if (missingFields.length > 0) {
-        alert(`Please fill in required fields: ${missingFields.join(', ')}`);
-        return;
-    }
-
-    submitTemplateVariables(templateInfo, values);
-    closeTemplateVariableDialog();
-}
-
-/**
- * Send template variables to backend for application
- */
-function submitTemplateVariables(templateInfo, values) {
-    if (typeof vscode !== 'undefined') {
-        vscode.postMessage({
-            type: 'submitTemplateVariables',
-            templatePath: templateInfo.templatePath,
-            templateName: templateInfo.templateName,
-            targetRow: templateInfo.targetRow,
-            insertAfterColumnId: templateInfo.insertAfterColumnId,
-            insertBeforeColumnId: templateInfo.insertBeforeColumnId,
-            position: templateInfo.position,
-            variables: values
-        });
-    }
-}
-
-// Make template dialog functions globally available
-window.showTemplateVariableDialog = showTemplateVariableDialog;
-window.closeTemplateVariableDialog = closeTemplateVariableDialog;
-window.submitTemplateVariablesFromForm = submitTemplateVariablesFromForm;
 

@@ -188,15 +188,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		const fileUris = await vscode.window.showOpenDialog({
-			canSelectFiles: true,
-			canSelectFolders: false,
-			canSelectMany: false,
-			filters: {
-				'Markdown files': ['md']
-			}
-		});
-
+		const fileUris = await selectMarkdownFile();
 		if (fileUris && fileUris.length > 0) {
 			const targetUri = fileUris[0];
 			try {
@@ -218,14 +210,7 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		const fileUris = await vscode.window.showOpenDialog({
-			canSelectFiles: true,
-			canSelectFolders: false,
-			canSelectMany: false,
-			filters: {
-				'Markdown files': ['md']
-			}
-		});
+		const fileUris = await selectMarkdownFile();
 
 		if (fileUris && fileUris.length > 0) {
 			const targetUri = fileUris[0];
@@ -260,14 +245,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	const addFileToSidebarCommand = vscode.commands.registerCommand('markdown-kanban.sidebar.addFile', async () => {
-		const fileUris = await vscode.window.showOpenDialog({
-			canSelectFiles: true,
-			canSelectFolders: false,
-			canSelectMany: true,
-			filters: {
-				'Markdown files': ['md']
-			}
-		});
+		const fileUris = await selectMarkdownFile({ canSelectMany: true });
 
 		if (fileUris && fileUris.length > 0) {
 			for (const uri of fileUris) {
