@@ -10,8 +10,8 @@
  * @module panel/IncludeFileCoordinator
  */
 
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
-import { MarkdownFileRegistry, FileFactory, MarkdownFile, MainKanbanFile, IncludeFile } from '../files';
+import { KanbanBoard, KanbanTask } from '../markdownParser';
+import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile } from '../files';
 import { WebviewBridge } from '../core/bridge';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelStateModel } from './PanelStateModel';
@@ -360,84 +360,6 @@ export class IncludeFileCoordinator {
         if (!result.success) {
             console.error('[IncludeFileCoordinator] Include switch failed:', result.error);
             throw result.error || new Error('Include switch failed');
-        }
-    }
-
-    /**
-     * Update include content unified - single entry point for all include content updates
-     */
-    async updateIncludeContentUnified(
-        column: KanbanColumn,
-        newIncludeFiles: string[],
-        source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
-    ): Promise<void> {
-        const normalizedNewFiles = newIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
-        const oldIncludeFiles = column.includeFiles || [];
-        const normalizedOldFiles = oldIncludeFiles.map(f => MarkdownFile.normalizeRelativePath(f));
-
-        const filesToRemove = normalizedOldFiles.filter((old: string) =>
-            !normalizedNewFiles.includes(old)
-        );
-
-        // Cleanup old files
-        for (const oldFilePath of filesToRemove) {
-            const oldFile = this._deps.fileRegistry.getByRelativePath(oldFilePath);
-            if (oldFile) {
-                oldFile.stopWatching();
-                this._deps.fileRegistry.unregister(oldFile.getPath());
-            }
-        }
-
-        // Unregister existing files (ensures fresh state)
-        for (const newFilePath of normalizedNewFiles) {
-            const existingFile = this._deps.fileRegistry.getByRelativePath(newFilePath);
-            if (existingFile) {
-                existingFile.stopWatching();
-                this._deps.fileRegistry.unregister(existingFile.getPath());
-            }
-        }
-
-        column.includeFiles = normalizedNewFiles;
-        const existingTasks = column.tasks;
-
-        // Create new file instances
-        const allTasks: KanbanTask[] = [];
-        for (const relativePath of normalizedNewFiles) {
-            const mainFile = this._deps.fileRegistry.getMainFile();
-            if (!mainFile) {
-                console.error('[IncludeFileCoordinator] No main file found!');
-                continue;
-            }
-
-            const columnInclude = this._deps.fileFactory.createIncludeDirect(
-                relativePath,
-                mainFile,
-                'include-column',
-                false
-            );
-            columnInclude.setColumnId(column.id);
-            columnInclude.setColumnTitle(column.title);
-            this._deps.fileRegistry.register(columnInclude);
-            columnInclude.startWatching();
-
-            await columnInclude.reload();
-            const mainFilePath = mainFile.getPath();
-            const tasks = columnInclude.parseToTasks(existingTasks, column.id, mainFilePath);
-            allTasks.push(...tasks);
-        }
-
-        column.tasks = allTasks;
-
-        if (this._deps.getPanel()) {
-            this._deps.webviewBridge.send({
-                type: 'updateColumnContent',
-                columnId: column.id,
-                tasks: allTasks,
-                columnTitle: column.title,
-                displayTitle: column.displayTitle,
-                includeMode: true,
-                includeFiles: normalizedNewFiles
-            } as any);
         }
     }
 

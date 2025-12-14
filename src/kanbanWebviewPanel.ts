@@ -1788,26 +1788,6 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Force reload the board from file (user-initiated)
-     */
-    public async forceReloadFromFile(): Promise<void> {
-        await this._fileService.forceReloadFromFile();
-        this._syncStateFromFileService();
-    }
-
-    /**
-     * UNIFIED ENTRY POINT for all include content updates
-     * This method MUST be used for all include content changes to ensure proper conflict detection
-     */
-    public async updateIncludeContentUnified(
-        column: KanbanColumn,
-        newIncludeFiles: string[],
-        source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
-    ): Promise<void> {
-        return this._includeCoordinator.updateIncludeContentUnified(column, newIncludeFiles, source);
-    }
-
-    /**
      * Ensure an include file is registered in the unified system for conflict resolution
      */
     public ensureIncludeFileRegistered(relativePath: string, type: 'regular' | 'column' | 'task'): void {

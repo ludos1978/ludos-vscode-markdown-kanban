@@ -311,16 +311,6 @@ export class KanbanFileService {
     }
 
     /**
-     * Force reload the board from file (user-initiated)
-     */
-    public async forceReloadFromFile(): Promise<void> {
-        const document = this.fileManager.getDocument();
-        if (document) {
-            await this.loadMarkdownFile(document, false, true); // forceReload = true
-        }
-    }
-
-    /**
      * Save board to markdown file using unified FileSaveService
      */
     public async saveToMarkdown(_updateVersionTracking: boolean = true, _triggerSave: boolean = true): Promise<void> {
