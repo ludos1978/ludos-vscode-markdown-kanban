@@ -926,7 +926,8 @@ export class ChangeStateMachine {
             taskTitle: task.title,
             originalTitle: task.originalTitle,
             includeMode: task.includeMode,
-            includeFiles: task.includeFiles
+            includeFiles: task.includeFiles,
+            isLoadingContent: false
         });
         context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
 
