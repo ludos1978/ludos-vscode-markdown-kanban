@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
@@ -617,7 +618,6 @@ export class ChangeStateMachine {
         const fileList = unsavedFiles.map(f => f.getRelativePath()).join('\n');
 
         // Show VSCode dialog with Save/Discard/Cancel options
-        const vscode = require('vscode');
         const choice = await vscode.window.showWarningMessage(
             `The following include files have unsaved changes:\n${fileList}\n\nDo you want to save them before unloading?`,
             { modal: true },
@@ -1072,7 +1072,6 @@ export class ChangeStateMachine {
         }
 
         // Show error dialog to user with warning about rollback
-        const vscode = require('vscode');
         const errorMessage = context.result.error?.message || 'Unknown error';
         const rollbackMsg = context.rollback ? ' The operation has been undone.' : '';
 

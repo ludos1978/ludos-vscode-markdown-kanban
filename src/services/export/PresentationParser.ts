@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { KanbanTask } from '../../markdownParser';
 import { IdGenerator } from '../../utils/idGenerator';
 
@@ -200,7 +201,6 @@ export class PresentationParser {
 
       // Add includeContext for dynamic image path resolution
       if (includeFilePath && mainFilePath) {
-        const path = require('path');
         task.includeContext = {
           includeFilePath: includeFilePath,
           includeDir: path.dirname(includeFilePath),

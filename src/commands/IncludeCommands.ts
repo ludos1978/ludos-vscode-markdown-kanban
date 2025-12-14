@@ -22,6 +22,7 @@ import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 
 /**
  * Include Commands Handler
@@ -565,7 +566,6 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error('Main file not found in registry');
                 }
 
-                const fsPromises = require('fs').promises;
                 const freshContent = await fsPromises.readFile(filePath, 'utf-8');
                 mainFile.setContent(freshContent, true);
                 mainFile.parseToBoard();
@@ -599,7 +599,6 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error(`File not found in registry: ${absolutePath}`);
                 }
 
-                const fsPromises = require('fs').promises;
                 const freshContent = await fsPromises.readFile(absolutePath, 'utf-8');
                 file.setContent(freshContent, true);
 

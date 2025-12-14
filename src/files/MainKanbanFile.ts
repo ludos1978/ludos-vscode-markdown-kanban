@@ -39,7 +39,6 @@ export class MainKanbanFile extends MarkdownFile {
     ) {
         // FOUNDATION-1: For main file, use basename as relative path
         // Main file doesn't have a "parent", so relative path = filename
-        const path = require('path');
         const relativePath = path.basename(filePath);
 
         super(filePath, relativePath, conflictResolver, backupManager);
