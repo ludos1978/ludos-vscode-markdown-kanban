@@ -217,14 +217,6 @@ export class ConfigurationService {
         this.cache.clear();
     }
 
-    public getTagConfiguration() {
-        return {
-            tagColors: this.getConfig('tagColors', {}),
-            tagVisibility: this.getConfig('tagVisibility'),
-            exportTagVisibility: this.getConfig('exportTagVisibility')
-        };
-    }
-
     public getEnabledTagCategoriesColumn(): { [key: string]: boolean } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         const enabledArray = config.get<string[]>('enabledTagCategoriesColumn', []);
@@ -252,39 +244,6 @@ export class ConfigurationService {
     public getCustomTagCategories(): { [key: string]: any } {
         const config = vscode.workspace.getConfiguration(this.CONFIGURATION_SECTION);
         return config.get('customTagCategories', {});
-    }
-
-    public getLayoutConfiguration() {
-        return {
-            whitespace: this.getConfig('whitespace'),
-            taskMinHeight: this.getConfig('taskMinHeight'),
-            sectionHeight: this.getConfig('sectionHeight'),
-            taskSectionHeight: this.getConfig('taskSectionHeight'),
-            fontSize: this.getConfig('fontSize'),
-            fontFamily: this.getConfig('fontFamily'),
-            columnWidth: this.getConfig('columnWidth'),
-            layoutRows: this.getConfig('layoutRows'),
-            rowHeight: this.getConfig('rowHeight'),
-            maxRowHeight: this.getConfig('maxRowHeight'),
-            layoutPreset: this.getConfig('layoutPreset'),
-            layoutPresets: this.getConfig('layoutPresets', {}),
-            arrowKeyFocusScroll: this.getConfig('arrowKeyFocusScroll')
-        };
-    }
-
-    public getBackupConfiguration() {
-        return {
-            enableBackups: this.getConfig('enableBackups'),
-            backupInterval: this.getConfig('backupInterval'),
-            backupLocation: this.getConfig('backupLocation')
-        };
-    }
-
-    public getLinkConfiguration() {
-        return {
-            openLinksInNewTab: this.getConfig('openLinksInNewTab'),
-            pathGeneration: this.getConfig('pathGeneration')
-        };
     }
 
     public getPathGenerationMode(): 'relative' | 'absolute' {
@@ -319,28 +278,6 @@ export class ConfigurationService {
             openLinksInNewTab: this.getConfig('openLinksInNewTab'),
             pathGeneration: this.getConfig('pathGeneration')
         };
-    }
-
-    public validateConfig<K extends keyof KanbanConfiguration>(
-        key: K,
-        value: any
-    ): boolean {
-        switch (key) {
-            case 'enableBackups':
-                return typeof value === 'boolean';
-            case 'backupInterval':
-                return typeof value === 'number' && value > 0;
-            case 'layoutRows':
-                return typeof value === 'number' && value >= 1;
-            case 'fontSize':
-                return ['small', 'medium', 'large', 'xlarge'].includes(value);
-            case 'whitespace':
-                return ['normal', 'nowrap', 'pre', 'pre-wrap'].includes(value);
-            case 'tagVisibility':
-                return ['visible', 'hover', 'hidden'].includes(value);
-            default:
-                return true;
-        }
     }
 
     private getNestedProperty(obj: any, path: string): any {
