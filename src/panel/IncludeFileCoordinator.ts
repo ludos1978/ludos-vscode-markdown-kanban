@@ -441,57 +441,6 @@ export class IncludeFileCoordinator {
         }
     }
 
-    // ============= SAVING INCLUDE CHANGES =============
-
-    /**
-     * Save all modified column includes when the board is saved
-     */
-    async saveAllColumnIncludeChanges(): Promise<void> {
-        const board = this._deps.getBoard();
-        if (!board) return;
-
-        const includeColumns = board.columns.filter(col => col.includeMode);
-
-        const savePromises = includeColumns.map(col =>
-            this._deps.fileRegistry.saveColumnIncludeChanges(col)
-        );
-
-        try {
-            await Promise.all(savePromises);
-        } catch (error) {
-            console.error('[IncludeFileCoordinator] Error saving column include changes:', error);
-        }
-    }
-
-    /**
-     * Save all modified task includes when the board is saved
-     */
-    async saveAllTaskIncludeChanges(): Promise<void> {
-        const board = this._deps.getBoard();
-        if (!board) return;
-
-        const includeTasks: KanbanTask[] = [];
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeMode) {
-                    includeTasks.push(task);
-                }
-            }
-        }
-
-        if (includeTasks.length === 0) return;
-
-        const savePromises = includeTasks.map(task =>
-            this._deps.fileRegistry.saveTaskIncludeChanges(task)
-        );
-
-        try {
-            await Promise.all(savePromises);
-        } catch (error) {
-            console.error('[IncludeFileCoordinator] Error saving task include changes:', error);
-        }
-    }
-
     // ============= PRIVATE HELPERS =============
 
     /**

@@ -52,7 +52,6 @@ export interface KanbanFileServiceCallbacks {
 export class KanbanFileService {
     // Service-specific state (not shared)
     private _lastKnownFileContent: string = '';
-    private _hasExternalUnsavedChanges: boolean = false;
 
     // State machine for tracking save operations
     private _saveState: SaveState = SaveState.IDLE;
@@ -102,7 +101,6 @@ export class KanbanFileService {
         hasUnsavedChanges: boolean;
         cachedBoardFromWebview: any;
         lastKnownFileContent: string;
-        hasExternalUnsavedChanges: boolean;
     } {
         // Query main file for unsaved changes (single source of truth)
         const mainFile = this.fileRegistry.getMainFile();
@@ -115,8 +113,7 @@ export class KanbanFileService {
             isUpdatingFromPanel,
             hasUnsavedChanges: hasUnsavedChanges,
             cachedBoardFromWebview: this._cachedBoardFromWebview,
-            lastKnownFileContent: this._lastKnownFileContent,
-            hasExternalUnsavedChanges: this._hasExternalUnsavedChanges
+            lastKnownFileContent: this._lastKnownFileContent
         };
     }
 
@@ -391,18 +388,6 @@ export class KanbanFileService {
 
 
     /**
-     * Save main kanban changes
-     */
-    public async saveMainKanbanChanges(): Promise<void> {
-        try {
-            await this.saveToMarkdown();
-        } catch (error) {
-            console.error('[InlineInclude] Error saving main kanban changes:', error);
-            vscode.window.showErrorMessage(`Error saving kanban changes: ${getErrorMessage(error)}`);
-        }
-    }
-
-    /**
      * Initialize a new kanban file with header
      */
     public async initializeFile(): Promise<void> {
@@ -522,7 +507,6 @@ export class KanbanFileService {
                 if (currentDocument && savedDocument === currentDocument) {
                     // Document was saved, update version tracking (in shared DocumentStateModel)
                     this._documentState.setLastDocumentVersion(savedDocument.version);
-                    this._hasExternalUnsavedChanges = false;
                     // NOTE: Watcher handles conflict detection and auto-reload via SaveOptions
                 }
 
@@ -558,7 +542,6 @@ export class KanbanFileService {
      */
     public updateKnownFileContent(content: string): void {
         this._lastKnownFileContent = content;
-        this._hasExternalUnsavedChanges = false;
     }
 
     /**

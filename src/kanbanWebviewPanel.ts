@@ -1796,37 +1796,6 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Save modifications from include columns back to their original presentation files
-     * This enables bidirectional editing
-     */
-    public async saveColumnIncludeChanges(column: KanbanColumn): Promise<boolean> {
-        return this._fileRegistry.saveColumnIncludeChanges(column);
-    }
-
-    public async checkTaskIncludeUnsavedChanges(task: KanbanTask): Promise<boolean> {
-        return this._fileRegistry.checkTaskIncludeUnsavedChanges(task);
-    }
-
-    /**
-     * Check if a column's include files have unsaved changes
-     */
-    public async checkColumnIncludeUnsavedChanges(column: KanbanColumn): Promise<boolean> {
-        return this._fileRegistry.checkColumnIncludeUnsavedChanges(column);
-    }
-
-    /**
-     * Check if a specific include file has unsaved changes
-     */
-    public hasUnsavedIncludeFileChanges(relativePath: string): boolean {
-        const file = this._fileRegistry.getByRelativePath(relativePath);
-        return file?.hasUnsavedChanges() || false;
-    }
-
-    public async saveTaskIncludeChanges(task: KanbanTask): Promise<boolean> {
-        return this._fileRegistry.saveTaskIncludeChanges(task);
-    }
-
-    /**
      * UNIFIED ENTRY POINT for all include content updates
      * This method MUST be used for all include content changes to ensure proper conflict detection
      */
@@ -1836,20 +1805,6 @@ export class KanbanWebviewPanel {
         source: 'external_file_change' | 'column_title_edit' | 'manual_refresh' | 'conflict_resolution'
     ): Promise<void> {
         return this._includeCoordinator.updateIncludeContentUnified(column, newIncludeFiles, source);
-    }
-
-    /**
-     * Save all modified column includes when the board is saved
-     */
-    public async saveAllColumnIncludeChanges(): Promise<void> {
-        return this._includeCoordinator.saveAllColumnIncludeChanges();
-    }
-
-    /**
-     * Save all modified task includes when the board is saved
-     */
-    public async saveAllTaskIncludeChanges(): Promise<void> {
-        return this._includeCoordinator.saveAllTaskIncludeChanges();
     }
 
     /**

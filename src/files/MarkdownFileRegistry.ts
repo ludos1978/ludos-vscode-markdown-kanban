@@ -591,68 +591,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     }
 
     /**
-     * Save column include file changes
-     */
-    public async saveColumnIncludeChanges(column: KanbanColumn): Promise<boolean> {
-        if (!column.includeFiles || column.includeFiles.length === 0) return true;
-
-        for (const relativePath of column.includeFiles) {
-            const file = this.getByRelativePath(relativePath) as IncludeFile;
-            if (file && file.getFileType() === 'include-column') {
-                const content = file.generateFromTasks(column.tasks);
-                file.setContent(content);
-                await this._fileSaveService.saveFile(file);
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Save task include file changes
-     */
-    public async saveTaskIncludeChanges(task: KanbanTask): Promise<boolean> {
-        if (!task.includeFiles || task.includeFiles.length === 0) return true;
-
-        for (const relativePath of task.includeFiles) {
-            const file = this.getByRelativePath(relativePath) as IncludeFile;
-            if (file && file.getFileType() === 'include-task') {
-                const fullContent = task.description || '';
-                if (fullContent.trim()) {
-                    file.setTaskDescription(fullContent);
-                    await this._fileSaveService.saveFile(file);
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Check if a column has unsaved include file changes
-     */
-    public checkColumnIncludeUnsavedChanges(column: KanbanColumn): boolean {
-        if (!column.includeFiles) return false;
-
-        for (const relativePath of column.includeFiles) {
-            const file = this.getByRelativePath(relativePath);
-            if (file?.hasUnsavedChanges()) return true;
-        }
-        return false;
-    }
-
-    /**
-     * Check if a task has unsaved include file changes
-     */
-    public checkTaskIncludeUnsavedChanges(task: KanbanTask): boolean {
-        if (!task.includeFiles) return false;
-
-        for (const relativePath of task.includeFiles) {
-            const file = this.getByRelativePath(relativePath);
-            if (file?.hasUnsavedChanges()) return true;
-        }
-        return false;
-    }
-
-    /**
      * Ensure an include file is registered (lazy registration)
      *
      * @param relativePath - Relative path to the include file
