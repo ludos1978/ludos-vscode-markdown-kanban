@@ -293,6 +293,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
         return this._exists;
     }
 
+    public setExists(value: boolean): void {
+        this._exists = value;
+    }
+
     public getLastModified(): Date | null {
         return this._lastModified;
     }

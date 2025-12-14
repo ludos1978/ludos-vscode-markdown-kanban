@@ -132,7 +132,7 @@ export class ChangeStateMachine {
 
             // CRITICAL: Clear flag on fatal error to prevent cache lock
             if (this._webviewPanel) {
-                (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+                this._webviewPanel.setIncludeSwitchInProgress(false);
             }
 
             return {
@@ -514,7 +514,7 @@ export class ChangeStateMachine {
     private async _handleLoadingNew(context: ChangeContext): Promise<ChangeState> {
         // CRITICAL FIX: Set flag to block cache invalidation during include switch
         if (context.impact.includesSwitched && this._webviewPanel) {
-            (this._webviewPanel as any).setIncludeSwitchInProgress?.(true);
+            this._webviewPanel.setIncludeSwitchInProgress(true);
         }
 
         // Only load new files if includes are being switched
@@ -633,11 +633,11 @@ export class ChangeStateMachine {
 
     private async _handleSyncingFrontend(context: ChangeContext): Promise<ChangeState> {
         // Only send updates if we have a webview panel
-        if (!this._webviewPanel || !(this._webviewPanel as any)._panel) {
+        if (!this._webviewPanel) {
             return ChangeState.COMPLETE;
         }
 
-        const panel = (this._webviewPanel as any)._panel;
+        const panel = this._webviewPanel.getPanel();
         const event = context.event;
 
         // CRITICAL FIX: Use the modified board from context instead of calling getBoard()
@@ -710,7 +710,7 @@ export class ChangeStateMachine {
         // CRITICAL FIX: Clear cache protection flag after include switch completes
         // This allows cache invalidation to work normally again
         if (context.impact.includesSwitched && this._webviewPanel) {
-            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+            this._webviewPanel.setIncludeSwitchInProgress(false);
         }
 
         context.result.success = true;
@@ -720,7 +720,7 @@ export class ChangeStateMachine {
     private async _handleCancelled(context: ChangeContext): Promise<ChangeState> {
         // Clear cache protection flag in case it was set
         if (this._webviewPanel) {
-            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+            this._webviewPanel.setIncludeSwitchInProgress(false);
         }
 
         context.result.success = false;
@@ -734,8 +734,8 @@ export class ChangeStateMachine {
         console.error(`[State:ERROR] Event type: ${context.event.type}`);
 
         // Perform rollback if we have saved state
-        if (context.rollback && this._webviewPanel && (this._webviewPanel as any)._panel) {
-            const panel = (this._webviewPanel as any)._panel;
+        if (context.rollback && this._webviewPanel) {
+            const panel = this._webviewPanel.getPanel();
             const board = this._webviewPanel.getBoard();
 
             if (board) {
@@ -757,7 +757,7 @@ export class ChangeStateMachine {
 
         // Clear cache protection flag in case it was set
         if (this._webviewPanel) {
-            (this._webviewPanel as any).setIncludeSwitchInProgress?.(false);
+            this._webviewPanel.setIncludeSwitchInProgress(false);
         }
 
         // Mark result as failed

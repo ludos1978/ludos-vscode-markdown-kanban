@@ -60,7 +60,7 @@ export class UnifiedChangeHandler {
      */
     private async handleFileDeleted(file: MarkdownFile): Promise<void> {
         // Mark file as deleted
-        file['_exists'] = false;
+        file.setExists(false);
         // Parent notification handled by file registry change notification system
     }
 
@@ -69,7 +69,7 @@ export class UnifiedChangeHandler {
      */
     private async handleFileCreated(file: MarkdownFile): Promise<void> {
         // Mark file as existing
-        file['_exists'] = true;
+        file.setExists(true);
 
         // Reload content
         await file.reload();
@@ -82,7 +82,7 @@ export class UnifiedChangeHandler {
     private async handleFileModified(file: MarkdownFile): Promise<void> {
         const hasUnsavedChanges = file.hasUnsavedChanges();
         const hasConflict = file.hasConflict(); // Use the file's conflict detection logic
-        const hasFileSystemChanges = file['_hasFileSystemChanges'];
+        const hasFileSystemChanges = file.hasExternalChanges();
 
         // For main file changes, also check if any include files have unsaved changes
         const hasAnyUnsavedChanges = file.getFileType() === 'main'

@@ -157,7 +157,7 @@ export class IncludeLoadingProcessor {
         }
 
         // Get dependencies
-        const fileFactory = (this._webviewPanel as any)._fileFactory;
+        const fileFactory = this._webviewPanel.fileFactory;
         const mainFile = this._fileRegistry.getMainFile();
 
         if (!fileFactory || !mainFile) {
@@ -211,7 +211,7 @@ export class IncludeLoadingProcessor {
         const relativePath = loadingFiles[0]; // Task includes are single file
 
         // Get dependencies
-        const fileFactory = (this._webviewPanel as any)._fileFactory;
+        const fileFactory = this._webviewPanel.fileFactory;
         const mainFile = this._fileRegistry.getMainFile();
 
         if (!fileFactory || !mainFile) {

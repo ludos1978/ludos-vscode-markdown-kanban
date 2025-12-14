@@ -1732,6 +1732,10 @@ export class KanbanWebviewPanel {
         return this._fileRegistry;
     }
 
+    public get fileFactory(): FileFactory {
+        return this._fileFactory;
+    }
+
     /**
      * Setup document change listener to track external modifications
      */
