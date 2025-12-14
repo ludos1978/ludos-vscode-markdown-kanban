@@ -8,6 +8,21 @@ export { PathResolver } from './PathResolver';
 export { FileWriter, FileWriteOptions, FileWriteResult, FileToWrite } from './FileWriter';
 export { KeybindingService } from './KeybindingService';
 
+// Link handling
+export { LinkHandler } from './LinkHandler';
+
+// Backup management
+export { BackupManager, BackupOptions } from './BackupManager';
+
+// Conflict resolution
+export {
+    ConflictResolver,
+    ConflictContext,
+    ConflictResolution,
+    ConflictType,
+    ConflictFileType
+} from './ConflictResolver';
+
 // Asset services
 export * from './assets';
 

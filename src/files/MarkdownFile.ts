@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
-import { BackupManager } from '../backupManager';
+import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
+import { BackupManager } from '../services/BackupManager';
 import { SaveOptions } from './SaveOptions';
 import { SaveTransactionManager } from './SaveTransactionManager';
 import { WatcherCoordinator } from './WatcherCoordinator';

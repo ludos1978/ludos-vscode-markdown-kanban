@@ -4,8 +4,8 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { KanbanBoard, MarkdownKanbanParser } from '../markdownParser';
-import { ConflictResolver, ConflictContext, ConflictResolution } from '../conflictResolver';
-import { BackupManager } from '../backupManager';
+import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
+import { BackupManager } from '../services/BackupManager';
 import { FileManager } from '../fileManager';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 

@@ -2,8 +2,8 @@ import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
 import { MarkdownFileRegistry } from './MarkdownFileRegistry';
 import { FileManager } from '../fileManager';
-import { ConflictResolver } from '../conflictResolver';
-import { BackupManager } from '../backupManager';
+import { ConflictResolver } from '../services/ConflictResolver';
+import { BackupManager } from '../services/BackupManager';
 import { PluginRegistry, ImportContext, IncludeContextLocation } from '../plugins';
 
 /**

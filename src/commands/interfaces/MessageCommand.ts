@@ -10,7 +10,7 @@
 import { FileManager } from '../../fileManager';
 import { BoardStore } from '../../core/stores';
 import { BoardOperations } from '../../board';
-import { LinkHandler } from '../../linkHandler';
+import { LinkHandler } from '../../services/LinkHandler';
 import { KanbanBoard } from '../../markdownParser';
 import { PlantUMLService } from '../../services/export/PlantUMLService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';

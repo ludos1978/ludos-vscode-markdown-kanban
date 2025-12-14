@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { configService } from './configurationService';
-import { escapeRegExp } from './utils/stringUtils';
+import { configService } from '../configurationService';
+import { escapeRegExp } from '../utils/stringUtils';
 
 export interface BackupOptions {
     label?: string;           // 'backup', 'conflict', etc.
@@ -80,7 +80,7 @@ export class BackupManager {
             }
 
             const backupPath = this.generateBackupPath(document, options.label || 'backup');
-            
+
             // Ensure backup directory exists
             const backupDir = path.dirname(backupPath);
             if (!fs.existsSync(backupDir)) {
@@ -96,10 +96,10 @@ export class BackupManager {
             this._lastBackupTime = new Date();
             this._lastContentHash = contentHash;
 
-            
+
             // Clean up old backups
             await this.cleanupOldBackups(document);
-            
+
             return true;
         } catch (error) {
             console.error('[BackupManager] Failed to create backup:', error);
@@ -321,18 +321,18 @@ export class BackupManager {
      */
     public startPeriodicBackup(document: vscode.TextDocument): void {
         this.stopPeriodicBackup();
-        
+
         const config = vscode.workspace.getConfiguration('markdown-kanban');
         const enableBackups = config.get<boolean>('enableBackups', true);
         const intervalMinutes = config.get<number>('backupInterval', 15);
-        
+
         if (!enableBackups) {
             return;
         }
-        
+
         // Convert minutes to milliseconds
         const intervalMs = intervalMinutes * 60 * 1000;
-        
+
         this._backupTimer = setInterval(async () => {
             await this.createBackup(document);
         }, intervalMs);
@@ -356,7 +356,7 @@ export class BackupManager {
             const originalPath = document.uri.fsPath;
             const dir = path.dirname(originalPath);
             const basename = path.basename(originalPath, '.md');
-            
+
             // Match backup files (with timestamp)
             // This includes: .basename-backup-YYYYMMDDTHHmmss.md, .basename-conflict-YYYYMMDDTHHmmss.md
             const backupPattern = new RegExp(`^\\.${escapeRegExp(basename)}-(backup|conflict)-(\\d{8}T\\d{6})\\.md$`);
@@ -379,7 +379,7 @@ export class BackupManager {
                     const seconds = parseInt(timestamp.substring(13, 15));
 
                     const date = new Date(year, month, day, hours, minutes, seconds);
-                    
+
                     return {
                         name: file,
                         path: path.join(dir, file),
@@ -388,7 +388,7 @@ export class BackupManager {
                 })
                 .filter(item => item !== null)
                 .sort((a, b) => b!.date.getTime() - a!.date.getTime());
-            
+
             return backups as Array<{name: string, path: string, date: Date}>;
         } catch (error) {
             console.error('[BackupManager] Failed to get backup list:', error);
@@ -402,21 +402,21 @@ export class BackupManager {
     public async restoreFromBackup(backupPath: string, targetDocument: vscode.TextDocument): Promise<boolean> {
         try {
             const backupContent = fs.readFileSync(backupPath, 'utf8');
-            
+
             const edit = new vscode.WorkspaceEdit();
             edit.replace(
                 targetDocument.uri,
                 new vscode.Range(0, 0, targetDocument.lineCount, 0),
                 backupContent
             );
-            
+
             const success = await vscode.workspace.applyEdit(edit);
-            
+
             if (success) {
                 await targetDocument.save();
                 vscode.window.showInformationMessage('Successfully restored from backup');
             }
-            
+
             return success;
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to restore from backup: ${error}`);

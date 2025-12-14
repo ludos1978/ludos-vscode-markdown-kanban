@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { FileManager } from './fileManager';
-import { FileSearchService } from './fileSearchService';
-import { configService } from './configurationService';
-import { safeFileUri } from './utils/uriUtils';
+import { FileManager } from '../fileManager';
+import { FileSearchService } from '../fileSearchService';
+import { configService } from '../configurationService';
+import { safeFileUri } from '../utils/uriUtils';
 
 export class LinkHandler {
     private _fileManager: FileManager;
@@ -53,27 +53,27 @@ export class LinkHandler {
                     await this.applyLinkReplacement(href, replacement, taskId, columnId, linkIndex);
                     return;
                 }
-                
+
                 // Original error handling (unchanged)
                 const workspaceFolders = vscode.workspace.workspaceFolders;
                 let contextInfo = '';
-                
+
                 if (workspaceFolders && workspaceFolders.length > 0) {
                     const folderNames = workspaceFolders.map(f => path.basename(f.uri.fsPath));
-                    
-                    const startsWithWorkspaceFolder = folderNames.some(name => 
+
+                    const startsWithWorkspaceFolder = folderNames.some(name =>
                         href.startsWith(name + '/') || href.startsWith(name + '\\')
                     );
-                    
+
                     if (startsWithWorkspaceFolder) {
                         contextInfo = `\n\nNote: This appears to be a workspace-relative path. Available workspace folders: ${folderNames.join(', ')}`;
                     } else {
                         contextInfo = `\n\nTip: For files in workspace folders, use paths like: ${folderNames[0]}/path/to/file.ext`;
                     }
                 }
-                
+
                 const pathsList = attemptedPaths.map((p, i) => `  ${i + 1}. ${p}`).join('\n');
-                
+
                 if (isAbsolute) {
                     vscode.window.showWarningMessage(
                         `File not found: ${resolvedPath}\n\nAttempted path:\n${pathsList}${contextInfo}`,
@@ -85,7 +85,7 @@ export class LinkHandler {
                         { modal: false }
                     );
                 }
-                
+
                 console.warn(`[LinkHandler] File not found: ${href} (tried ${attemptedPaths.length} paths)`);
                 return;
             }
@@ -93,7 +93,7 @@ export class LinkHandler {
             // Rest of the method remains unchanged...
             try {
                 const stats = fs.statSync(resolvedPath);
-                
+
                 if (stats.isDirectory()) {
                     vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolvedPath, 'linkHandler'));
                     return;
@@ -163,9 +163,9 @@ export class LinkHandler {
                 'dockerfile', 'Dockerfile', '.dockerfile',
                 '.diff', '.patch', '.vue', '.svelte'
             ];
-            
-            const isTextFile = textExtensions.includes(ext) || 
-                            basename === 'makefile' || 
+
+            const isTextFile = textExtensions.includes(ext) ||
+                            basename === 'makefile' ||
                             basename === 'dockerfile' ||
                             basename.startsWith('.') && !ext;
 
@@ -209,13 +209,13 @@ export class LinkHandler {
                             });
                         }
                     }
-                    
+
                     if (!isAbsolute) {
                         const workspaceFolders = vscode.workspace.workspaceFolders;
-                        const isWorkspaceRelative = workspaceFolders?.some(f => 
+                        const isWorkspaceRelative = workspaceFolders?.some(f =>
                             href.startsWith(path.basename(f.uri.fsPath) + '/')
                         );
-                        
+
                         const resolutionMethod = isWorkspaceRelative ? 'workspace-relative' : 'document-relative';
                         vscode.window.showInformationMessage(
                             `Opened in VS Code: ${path.basename(resolvedPath)} (${resolutionMethod} path: ${href})`
@@ -249,7 +249,7 @@ export class LinkHandler {
                     }
                 }
             }
-            
+
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to handle file link: ${href}`);
         }
@@ -290,12 +290,12 @@ export class LinkHandler {
     public async handleWikiLink(documentName: string) {
         const allAttemptedPaths: string[] = [];
         let triedFilenames: string[] = [];
-        
+
         // Check if the document name already has a file extension
         const hasExtension = /\.[a-zA-Z0-9]+$/.test(documentName);
-        
+
         let filesToTry: string[] = [];
-        
+
         if (hasExtension) {
             // If it already has an extension, try it as-is first
             filesToTry = [documentName];
@@ -305,20 +305,20 @@ export class LinkHandler {
             // If no extension, try markdown extensions and then no extension
             filesToTry = [documentName + '.md', documentName + '.markdown', documentName + '.txt', documentName];
         }
-        
+
         for (const filename of filesToTry) {
             triedFilenames.push(filename);
             const resolution = await this._fileManager.resolveFilePath(filename);
-            
+
             if (resolution) {
                 allAttemptedPaths.push(...resolution.attemptedPaths);
-                
+
                 if (resolution.exists) {
                     try {
                         // For text files, try to open in VS Code
                         const textExtensions = ['.md', '.markdown', '.txt', '.rtf', '.json', '.xml', '.html', '.css', '.js', '.ts', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.php', '.rb', '.go', '.rs', '.sh', '.bat', '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf'];
                         const ext = path.extname(filename).toLowerCase();
-                        
+
                         if (!ext || textExtensions.includes(ext)) {
                             // Normalize the path for comparison (resolve symlinks, normalize separators)
                             const normalizedPath = path.resolve(resolution.resolvedPath);
@@ -355,7 +355,7 @@ export class LinkHandler {
                                     preserveFocus: false
                                 });
                             }
-                            
+
                             vscode.window.showInformationMessage(
                                 `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)}`
                             );
@@ -382,7 +382,7 @@ export class LinkHandler {
                 }
             }
         }
-        
+
         // Offer replacement picker before warning
         try {
             const baseDir = this._fileManager.getDocument()
@@ -400,7 +400,7 @@ export class LinkHandler {
         // Enhanced error message with workspace context
         const workspaceFolders = vscode.workspace.workspaceFolders;
         let contextInfo = '';
-        
+
         if (workspaceFolders && workspaceFolders.length > 0) {
             const folderNames = workspaceFolders.map(f => path.basename(f.uri.fsPath));
             if (hasExtension) {
@@ -409,19 +409,19 @@ export class LinkHandler {
                 contextInfo = `\n\nTip: For files in specific workspace folders, try: [[${folderNames[0]}/${documentName}]] or [[${folderNames[0]}/${documentName}.ext]]`;
             }
         }
-        
+
         const pathsList = allAttemptedPaths.map((p, i) => `  ${i + 1}. ${p}`).join('\n');
         const extensionsList = triedFilenames.join(', ');
-        
-        const hasExtensionNote = hasExtension 
+
+        const hasExtensionNote = hasExtension
             ? `\n\nNote: "${documentName}" already has an extension, so it was tried as-is first.`
             : `\n\nNote: "${documentName}" has no extension, so markdown extensions (.md, .markdown, .txt) were tried first.`;
-        
+
         vscode.window.showWarningMessage(
             `Wiki link not found: [[${documentName}]]\n\nTried filenames: ${extensionsList}\n\nSearched in the following locations:\n${pathsList}${hasExtensionNote}${contextInfo}`,
             { modal: false }
         );
-        
+
         console.warn(`[LinkHandler] Wiki link not found: [[${documentName}]] (tried ${allAttemptedPaths.length} paths)`);
     }
 

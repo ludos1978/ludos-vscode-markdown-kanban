@@ -1,7 +1,7 @@
 import { FileManager } from './fileManager';
 import { BoardStore } from './core/stores';
 import { BoardOperations } from './board';
-import { LinkHandler } from './linkHandler';
+import { LinkHandler } from './services/LinkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';

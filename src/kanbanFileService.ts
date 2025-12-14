@@ -3,9 +3,9 @@ import * as path from 'path';
 import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
 import { MarkdownFileRegistry, FileFactory } from './files';
-import { BackupManager } from './backupManager';
+import { BackupManager } from './services/BackupManager';
 import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
-import { ConflictContext, ConflictResolution } from './conflictResolver';
+import { ConflictContext, ConflictResolution } from './services/ConflictResolver';
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
 

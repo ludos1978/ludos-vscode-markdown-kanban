@@ -9,8 +9,8 @@
 
 import { MarkdownFile } from '../../files/MarkdownFile';
 import { MainKanbanFile } from '../../files/MainKanbanFile';
-import { ConflictResolver } from '../../conflictResolver';
-import { BackupManager } from '../../backupManager';
+import { ConflictResolver } from '../../services/ConflictResolver';
+import { BackupManager } from '../../services/BackupManager';
 import { KanbanTask } from '../../markdownParser';
 
 /**
