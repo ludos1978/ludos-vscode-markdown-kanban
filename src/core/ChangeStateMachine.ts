@@ -859,7 +859,6 @@ export class ChangeStateMachine {
 
         // CRITICAL FIX: Use the modified board from context instead of calling getBoard()
         // After cache invalidation, getBoard() would regenerate from disk with stale data
-        // The modifiedBoard contains our in-memory changes with fresh include content
         const board = context.modifiedBoard || this._webviewPanel.getBoard();
 
         if (!board) {
@@ -868,125 +867,60 @@ export class ChangeStateMachine {
 
         // Determine what type of update to send based on event type and impact
         if (context.impact.includesSwitched) {
-            // Include switch - send targeted update
-
-            if (event.type === 'include_switch') {
-                if (event.target === 'column') {
-                    // Column include switch
-                    const column = board.columns.find((c: any) => c.id === event.targetId);
-                    if (column) {
-                        panel.webview.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            columnTitle: column.title,
-                            displayTitle: column.displayTitle,
-                            tasks: column.tasks,
-                            includeMode: column.includeMode,
-                            includeFiles: column.includeFiles,
-                            isLoadingContent: false
-                        });
-                        context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
-
-                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
-                        if (this._webviewPanel.clearColumnDirty) {
-                            this._webviewPanel.clearColumnDirty(column.id);
-                        }
-                    }
-                } else if (event.target === 'task') {
-                    // Task include switch
-                    const column = board.columns.find((c: any) => c.id === event.columnIdForTask);
-                    const task = column?.tasks.find((t: any) => t.id === event.targetId);
-                    if (task && column) {
-                        panel.webview.postMessage({
-                            type: 'updateTaskContent',
-                            columnId: column.id,
-                            taskId: task.id,
-                            description: task.description,
-                            displayTitle: task.displayTitle,
-                            taskTitle: task.title,
-                            originalTitle: task.originalTitle,
-                            includeMode: task.includeMode,
-                            includeFiles: task.includeFiles
-                        });
-                        context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
-
-                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
-                        if (this._webviewPanel.clearTaskDirty) {
-                            this._webviewPanel.clearTaskDirty(task.id);
-                        }
-                    }
-                }
-            } else if (event.type === 'user_edit' && event.params.includeSwitch) {
-                // User edit with include switch
-                if (event.editType === 'column_title') {
-                    const column = board.columns.find((c: any) => c.id === event.params.columnId);
-                    if (column) {
-                        panel.webview.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            columnTitle: column.title,
-                            displayTitle: column.displayTitle,
-                            tasks: column.tasks,
-                            includeMode: column.includeMode,
-                            includeFiles: column.includeFiles,
-                            isLoadingContent: false
-                        });
-                        context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
-
-                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
-                        if (this._webviewPanel.clearColumnDirty) {
-                            this._webviewPanel.clearColumnDirty(column.id);
-                        }
-                    }
-                } else if (event.editType === 'task_title') {
-                    const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
-                    const task = column?.tasks.find((t: any) => t.id === event.params.taskId);
-                    if (task && column) {
-                        panel.webview.postMessage({
-                            type: 'updateTaskContent',
-                            columnId: column.id,
-                            taskId: task.id,
-                            description: task.description,
-                            displayTitle: task.displayTitle,
-                            taskTitle: task.title,
-                            originalTitle: task.originalTitle,
-                            includeMode: task.includeMode,
-                            includeFiles: task.includeFiles
-                        });
-                        context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
-
-                        // Clear dirty flag - we just sent the fresh data, don't let syncDirtyItems re-send stale data
-                        if (this._webviewPanel.clearTaskDirty) {
-                            this._webviewPanel.clearTaskDirty(task.id);
-                        }
-                    }
-                }
-            }
-
+            this._sendIncludeSwitchUpdate(panel, board, event, context);
         } else if (context.impact.mainFileChanged && event.type === 'file_system_change') {
             // Main file changed externally - send full board refresh
-            // Use the webview panel's method to send board update
             if (this._webviewPanel.refreshWebviewContent) {
                 await this._webviewPanel.refreshWebviewContent();
                 context.result.frontendMessages.push({ type: 'fullBoardRefresh' });
             }
-
         } else if (context.impact.includeFilesChanged && event.type === 'file_system_change') {
-            // Include file changed externally
-            // The file instance will handle this autonomously via its change handler
+            // Include file changed - handled autonomously by file instance
             context.result.frontendMessages.push({ type: 'autonomousFileUpdate' });
-
-        } else if (event.type === 'user_edit' && !context.impact.includesSwitched) {
-            // Regular user edit without include switch
-            // Frontend already has the change, no update needed
-            context.result.frontendMessages.push({ type: 'noUpdateNeeded' });
-
-        } else if (event.type === 'save') {
-            // Save event - no frontend update needed
+        } else if (event.type === 'user_edit' || event.type === 'save') {
+            // No frontend update needed
             context.result.frontendMessages.push({ type: 'noUpdateNeeded' });
         }
 
         return ChangeState.COMPLETE;
+    }
+
+    /**
+     * Send appropriate update for include switch events
+     */
+    private _sendIncludeSwitchUpdate(
+        panel: any,
+        board: any,
+        event: ChangeEvent,
+        context: ChangeContext
+    ): void {
+        if (event.type === 'include_switch') {
+            if (event.target === 'column') {
+                const column = board.columns.find((c: any) => c.id === event.targetId);
+                if (column) {
+                    this._sendColumnUpdate(panel, column, context);
+                }
+            } else if (event.target === 'task') {
+                const column = board.columns.find((c: any) => c.id === event.columnIdForTask);
+                const task = column?.tasks.find((t: any) => t.id === event.targetId);
+                if (task && column) {
+                    this._sendTaskUpdate(panel, column, task, context);
+                }
+            }
+        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
+            if (event.editType === 'column_title') {
+                const column = board.columns.find((c: any) => c.id === event.params.columnId);
+                if (column) {
+                    this._sendColumnUpdate(panel, column, context);
+                }
+            } else if (event.editType === 'task_title') {
+                const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
+                const task = column?.tasks.find((t: any) => t.id === event.params.taskId);
+                if (task && column) {
+                    this._sendTaskUpdate(panel, column, task, context);
+                }
+            }
+        }
     }
 
     private async _handleComplete(context: ChangeContext): Promise<ChangeState> {
@@ -1022,56 +956,7 @@ export class ChangeStateMachine {
             const board = this._webviewPanel.getBoard();
 
             if (board) {
-                if (context.rollback.columnId) {
-                    // Rollback column state
-                    const column = board.columns.find((c: any) => c.id === context.rollback!.columnId);
-                    if (column) {
-                        // Restore backend board state
-                        column.title = context.rollback.oldState.title || column.title;
-                        column.displayTitle = context.rollback.oldState.displayTitle || column.displayTitle;
-                        column.tasks = context.rollback.oldState.tasks || [];
-                        column.includeFiles = context.rollback.oldState.includeFiles || [];
-                        column.includeMode = context.rollback.oldState.includeMode || false;
-
-                        // Send update to frontend to revert display
-                        panel.webview.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            columnTitle: column.title,
-                            displayTitle: column.displayTitle,
-                            tasks: column.tasks,
-                            includeFiles: column.includeFiles,
-                            includeMode: column.includeMode,
-                            isLoadingContent: false
-                        });
-                    }
-                } else if (context.rollback.taskId && context.rollback.taskColumnId) {
-                    // Rollback task state
-                    const column = board.columns.find((c: any) => c.id === context.rollback!.taskColumnId);
-                    const task = column?.tasks.find((t: any) => t.id === context.rollback!.taskId);
-
-                    if (task && column) {
-                        // Restore backend board state
-                        task.title = context.rollback.oldState.title || task.title;
-                        task.description = context.rollback.oldState.description || '';
-                        task.displayTitle = context.rollback.oldState.displayTitle || '';
-                        task.includeFiles = context.rollback.oldState.includeFiles || [];
-                        task.includeMode = context.rollback.oldState.includeMode || false;
-
-                        // Send update to frontend to revert display
-                        panel.webview.postMessage({
-                            type: 'updateTaskContent',
-                            columnId: column.id,
-                            taskId: task.id,
-                            taskTitle: task.title,
-                            originalTitle: task.originalTitle,
-                            description: task.description,
-                            displayTitle: task.displayTitle,
-                            includeFiles: task.includeFiles,
-                            includeMode: task.includeMode
-                        });
-                    }
-                }
+                this._performRollback(panel, board, context);
             }
         }
 
@@ -1148,6 +1033,97 @@ export class ChangeStateMachine {
         }
 
         return undefined;
+    }
+
+    /**
+     * Send column update message to frontend
+     */
+    private _sendColumnUpdate(
+        panel: any,
+        column: any,
+        context: ChangeContext
+    ): void {
+        panel.webview.postMessage({
+            type: 'updateColumnContent',
+            columnId: column.id,
+            columnTitle: column.title,
+            displayTitle: column.displayTitle,
+            tasks: column.tasks,
+            includeMode: column.includeMode,
+            includeFiles: column.includeFiles,
+            isLoadingContent: false
+        });
+        context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
+
+        // Clear dirty flag
+        if (this._webviewPanel?.clearColumnDirty) {
+            this._webviewPanel.clearColumnDirty(column.id);
+        }
+    }
+
+    /**
+     * Send task update message to frontend
+     */
+    private _sendTaskUpdate(
+        panel: any,
+        column: any,
+        task: any,
+        context: ChangeContext
+    ): void {
+        panel.webview.postMessage({
+            type: 'updateTaskContent',
+            columnId: column.id,
+            taskId: task.id,
+            description: task.description,
+            displayTitle: task.displayTitle,
+            taskTitle: task.title,
+            originalTitle: task.originalTitle,
+            includeMode: task.includeMode,
+            includeFiles: task.includeFiles
+        });
+        context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
+
+        // Clear dirty flag
+        if (this._webviewPanel?.clearTaskDirty) {
+            this._webviewPanel.clearTaskDirty(task.id);
+        }
+    }
+
+    /**
+     * Perform rollback on error - restore state and notify frontend
+     */
+    private _performRollback(panel: any, board: any, context: ChangeContext): void {
+        const rollback = context.rollback!;
+
+        if (rollback.columnId) {
+            const column = board.columns.find((c: any) => c.id === rollback.columnId);
+            if (column) {
+                // Restore backend board state
+                column.title = rollback.oldState.title || column.title;
+                column.displayTitle = rollback.oldState.displayTitle || column.displayTitle;
+                column.tasks = rollback.oldState.tasks || [];
+                column.includeFiles = rollback.oldState.includeFiles || [];
+                column.includeMode = rollback.oldState.includeMode || false;
+
+                // Send update to frontend
+                this._sendColumnUpdate(panel, column, context);
+            }
+        } else if (rollback.taskId && rollback.taskColumnId) {
+            const column = board.columns.find((c: any) => c.id === rollback.taskColumnId);
+            const task = column?.tasks.find((t: any) => t.id === rollback.taskId);
+
+            if (task && column) {
+                // Restore backend board state
+                task.title = rollback.oldState.title || task.title;
+                task.description = rollback.oldState.description || '';
+                task.displayTitle = rollback.oldState.displayTitle || '';
+                task.includeFiles = rollback.oldState.includeFiles || [];
+                task.includeMode = rollback.oldState.includeMode || false;
+
+                // Send update to frontend
+                this._sendTaskUpdate(panel, column, task, context);
+            }
+        }
     }
 
     // ============= CONTEXT MANAGEMENT =============

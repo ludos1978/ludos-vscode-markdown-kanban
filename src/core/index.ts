@@ -30,4 +30,3 @@ export { FileSaveService } from './FileSaveService';
 // Sub-modules
 export * from './stores';
 export * from './bridge';
-export * from './events';

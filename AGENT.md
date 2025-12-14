@@ -12,6 +12,7 @@
   - our focus is keeping the code simple and in a clean structure!
   - do not stop with the refactoring until you are completely finished. this must include completely removing any old or obsolete code! if you need to stop, as the last sentence, mention that you are not finished with the work!
   - only stop for questions that the user must answer.
+- for every larger action you take. think about the positive and negative aspects of implementing it and the positive and negative aspects of not implementing it. weight both sides against each other before taking action. only implement the change if its more then 60% positive! It does not matter how hard the task is, only the impact on the expected result!
 
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.

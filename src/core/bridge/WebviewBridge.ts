@@ -14,7 +14,6 @@
  */
 
 import * as vscode from 'vscode';
-import { PanelEventBus } from '../events';
 import {
     OutgoingMessage
 } from './MessageTypes';
@@ -34,7 +33,6 @@ export interface WebviewBridgeOptions {
 
 export class WebviewBridge implements vscode.Disposable {
     private _webview: vscode.Webview | null = null;
-    private _eventBus: PanelEventBus;
     private _isReady = false;
     private _isDisposed = false;
 
@@ -47,8 +45,7 @@ export class WebviewBridge implements vscode.Disposable {
     private readonly _batchFlushDelay: number;
     private readonly _debug: boolean;
 
-    constructor(eventBus: PanelEventBus, options: WebviewBridgeOptions = {}) {
-        this._eventBus = eventBus;
+    constructor(options: WebviewBridgeOptions = {}) {
         this._maxBatchSize = options.maxBatchSize ?? 10;
         this._batchFlushDelay = options.batchFlushDelay ?? 16;
         this._debug = options.debug ?? false;
@@ -62,10 +59,6 @@ export class WebviewBridge implements vscode.Disposable {
     setWebview(webview: vscode.Webview): void {
         this._webview = webview;
         this._isReady = true;
-
-        // Emit ready event
-        this._eventBus.emit('bridge:ready', { bridge: this }).catch(() => {});
-
         this._log('Webview connected');
     }
 

@@ -96,7 +96,8 @@
       "Bash(for method in syncIncludeFilesWithRegistry markIncludesAsLoading loadIncludeContentAsync handleIncludeSwitch updateIncludeContentUnified)",
       "Bash(do echo \"=== $method ===\")",
       "Bash(for name in extractPersonNames hasSticky extractDate getDatePropertyValue)",
-      "Bash(do echo \"=== $name ===\" grep -rn \"$name\" --include=\"*.ts\" src/)"
+      "Bash(do echo \"=== $name ===\" grep -rn \"$name\" --include=\"*.ts\" src/)",
+      "Bash(do echo \"=== $name ===\")"
     ],
     "deny": [],
     "ask": []

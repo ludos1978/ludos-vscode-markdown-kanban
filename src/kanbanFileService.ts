@@ -9,7 +9,7 @@ import { ConflictContext, ConflictResolution } from './services/ConflictResolver
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
 import { getErrorMessage } from './utils/stringUtils';
-import { DocumentStateModel } from './panel';
+import { PanelContext } from './panel';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -61,8 +61,8 @@ export class KanbanFileService {
     // NEW ARCHITECTURE COMPONENTS
     private _fileSaveService: FileSaveService;
 
-    // Shared document state (single source of truth with panel)
-    private _documentState: DocumentStateModel;
+    // Shared panel context (single source of truth with panel)
+    private _context: PanelContext;
 
     constructor(
         private fileManager: FileManager,
@@ -71,11 +71,11 @@ export class KanbanFileService {
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
         private callbacks: KanbanFileServiceCallbacks,
-        documentState: DocumentStateModel,  // Shared document state
+        context: PanelContext,  // Shared panel context
         private panelStates: Map<string, any>,
         private panels: Map<string, any>
     ) {
-        this._documentState = documentState;
+        this._context = context;
 
         // Initialize new architecture components
         this._fileSaveService = FileSaveService.getInstance();
@@ -94,7 +94,7 @@ export class KanbanFileService {
 
     /**
      * Get current state values for syncing back to panel
-     * NOTE: Document state (version, uri) is now shared via DocumentStateModel
+     * NOTE: Document state (version, uri) is now shared via PanelContext
      */
     public getState(): {
         isUpdatingFromPanel: boolean;
@@ -167,11 +167,11 @@ export class KanbanFileService {
             return;
         }
 
-        // Store document URI for serialization (in shared DocumentStateModel)
-        this._documentState.setLastDocumentUri(document.uri.toString());
+        // Store document URI for serialization (in shared PanelContext)
+        this._context.setLastDocumentUri(document.uri.toString());
 
         // Store panel state for serialization in VSCode context
-        const panelId = this._documentState.panelId;
+        const panelId = this._context.panelId;
         this.panelStates.set(panelId, {
             documentUri: document.uri.toString(),
             panelId: panelId
@@ -199,7 +199,7 @@ export class KanbanFileService {
             // 🚫 NEVER auto-reload: Preserve existing board state
 
             // But notify user if external changes detected (but NOT on editor focus)
-            const lastVersion = this._documentState.lastDocumentVersion;
+            const lastVersion = this._context.lastDocumentVersion;
             const hasExternalChanges = lastVersion !== -1 &&
                                      lastVersion < document.version &&
                                      this._saveState === SaveState.IDLE &&
@@ -209,7 +209,7 @@ export class KanbanFileService {
             // The UnifiedChangeHandler and individual file watchers detect and resolve conflicts
             if (!hasExternalChanges) {
                 // Only update version if no external changes were detected (to avoid blocking future detections)
-                this._documentState.setLastDocumentVersion(document.version);
+                this._context.setLastDocumentVersion(document.version);
             }
             return;
         }
@@ -221,7 +221,7 @@ export class KanbanFileService {
         // If document changed or this is the first document, update panel tracking
         if (documentChanged || isFirstDocumentLoad) {
             // Remove this panel from old document tracking
-            const oldDocUri = this._documentState.trackedDocumentUri || previousDocument?.uri.toString();
+            const oldDocUri = this._context.trackedDocumentUri || previousDocument?.uri.toString();
             const panelInstance = this.getPanelInstance();
             if (oldDocUri && this.panels.get(oldDocUri) === panelInstance) {
                 this.panels.delete(oldDocUri);
@@ -229,7 +229,7 @@ export class KanbanFileService {
 
             // Add to new document tracking
             const newDocUri = document.uri.toString();
-            this._documentState.setTrackedDocumentUri(newDocUri);  // Remember this URI for cleanup
+            this._context.setTrackedDocumentUri(newDocUri);  // Remember this URI for cleanup
             this.panels.set(newDocUri, panelInstance);
 
             // Update panel title
@@ -260,8 +260,8 @@ export class KanbanFileService {
             const basePath = path.dirname(document.uri.fsPath);
             const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
 
-            // Update version tracking (in shared DocumentStateModel)
-            this._documentState.setLastDocumentVersion(document.version);
+            // Update version tracking (in shared PanelContext)
+            this._context.setLastDocumentVersion(document.version);
 
             // Handle undo/redo history
             const isUndoRedoOperation = false; // This would need to be passed as parameter if needed
@@ -495,8 +495,8 @@ export class KanbanFileService {
                 const currentDocument = this.fileManager.getDocument();
 
                 if (currentDocument && savedDocument === currentDocument) {
-                    // Document was saved, update version tracking (in shared DocumentStateModel)
-                    this._documentState.setLastDocumentVersion(savedDocument.version);
+                    // Document was saved, update version tracking (in shared PanelContext)
+                    this._context.setLastDocumentVersion(savedDocument.version);
                     // NOTE: Watcher handles conflict detection and auto-reload via SaveOptions
                 }
 

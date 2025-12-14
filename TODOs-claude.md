@@ -1,154 +1,88 @@
-# Cleanup Tasks - Codebase Simplification
+# Code Cleanup Tasks
 
-## COMPLETED: Priority 1 & 2 - Extract Export + Marp UI from webview.js
-- [x] Created `src/html/exportMarpUI.js` combining export and Marp functions (they are tightly coupled)
-- [x] Moved 50+ functions including: showExportDialog, executeUnifiedExport, handleMarpStatus, toggleMarpClass, etc.
-- [x] Updated webview.html to include new script
-- [x] webview.js reduced from 7,740 lines to 5,388 lines (-2,352 lines)
-- [x] exportMarpUI.js: 1,918 lines
-- [x] Build compiles successfully
+## Completed
 
-## COMPLETED: Priority 3 - Extract Clipboard Handler from webview.js
-- [x] Created `src/html/clipboardHandler.js` with clipboard/drag functions
-- [x] Moved functions: handleClipboardMouseDown, handleClipboardDragStart, handleClipboardDragEnd, showClipboardPreview, hideClipboardPreview, handleEmptyCardDragStart, handleEmptyCardDragEnd, handleEmptyColumnDragStart, handleEmptyColumnDragEnd, handleTemplateMenuDragStart, handleTemplateMenuDragEnd
-- [x] Updated webview.html to include new script
-- [x] clipboardHandler.js: 612 lines
+### 1. Consolidate Panel State Models
+- [x] Merged `PanelStateModel` and `DocumentStateModel` into single `PanelContext`
+- [x] Updated all references in `KanbanWebviewPanel.ts`
+- [x] Updated references in `KanbanFileService.ts`
+- [x] Updated `IncludeFileCoordinator.ts`
+- [x] Deleted old `PanelStateModel.ts` and `DocumentStateModel.ts` files
+- **Impact:** Reduced 320 lines to ~200 lines, eliminated coordination bugs
 
-## COMPLETED: Priority 4a - Consolidate showOpenDialog helper (9 locations)
-- [x] Created `src/utils/fileDialogUtils.ts` with selectMarkdownFile() helper
-- [x] Exported from `src/utils/index.ts`
-- [x] Replaced duplicates in extension.ts (4 locations)
-- [x] Replaced duplicates in IncludeCommands.ts (4 locations)
-- [x] Replaced duplicate in fileManager.ts (1 location)
+### 2. Remove Custom PanelEventBus
+- [x] Analyzed usage - no subscribers to any events (all `.emit().catch(() => {})`)
+- [x] Removed `_eventBus` field from `KanbanWebviewPanel`
+- [x] Updated `BoardStore` constructor - removed eventBus parameter
+- [x] Updated `WebviewBridge` constructor - removed eventBus parameter
+- [x] Removed all `.emit()` calls
+- [x] Deleted `src/core/events/` directory entirely
+- [x] Updated `src/core/index.ts` exports
+- **Impact:** -400+ lines, simpler architecture
 
-## SKIPPED: Priority 4b - DEBUG pattern consolidation
-- Skipped because SmartLogger is browser-side only (window.createSmartLogger)
-- 3 of 4 target files (ExportCommands.ts, TemplateCommands.ts, DiagramPreprocessor.ts) are TypeScript backend files
-- Current DEBUG pattern is clean, efficient, and has zero runtime cost when disabled
+### 3. Simplify ChangeStateMachine
+- [x] Extracted `_sendColumnUpdate` helper method
+- [x] Extracted `_sendTaskUpdate` helper method
+- [x] Extracted `_sendIncludeSwitchUpdate` helper method
+- [x] Extracted `_performRollback` helper method
+- [x] Refactored `_handleSyncingFrontend` from ~140 lines to ~40 lines
+- [x] Refactored `_handleError` to use shared helpers
+- **Impact:** -24 lines, much improved readability, DRY principles
 
-## COMPLETED: Priority 5 - Extract Navigation Functions from webview.js
-- [x] Created `src/html/navigationHandler.js` with navigation functions
-- [x] Moved functions: updateCardList, focusCard, focusSection, getVisibleTaskCards, getCurrentCardPosition, getCardClosestToTopLeft, navigateToCard, handleTaskNavigation, handleSectionNavigation
-- [x] Moved state: currentFocusedCard, allCards
-- [x] Updated webview.html to include new script
-- [x] navigationHandler.js: 388 lines
+### 4. Analyze Singleton Usage
+- [x] Reviewed all `getInstance()` patterns
+- [x] Singletons are appropriate: ConfigurationService (global config), PluginRegistry (global registry), ChangeStateMachine (with initialize()), coordinators
+- **Decision:** Keep as-is - singletons are used correctly for truly global services
 
-## COMPLETED: Priority 6 - Extract Template Dialog from webview.js
-- [x] Created `src/html/templateDialog.js` with template functions
-- [x] Moved functions: showTemplateVariableDialog, closeTemplateVariableDialog, submitTemplateVariablesFromForm, submitTemplateVariables
-- [x] Updated webview.html to include new script
-- [x] templateDialog.js: 189 lines
+### 5. Analyze Include Processing
+- [x] Analyzed `IncludeLoadingProcessor` and `IncludeFileCoordinator`
+- [x] Found they serve different orchestrators (state machine vs panel)
+- [x] Coordinator initiates via `stateMachine.processChange()`
+- [x] Processor executes during LOADING_NEW state
+- **Decision:** Keep separate - reasonable separation of concerns
 
-## COMPLETED: Priority 7 - Extract Folding State Manager from webview.js
-- [x] Created `src/html/foldingStateManager.js` with folding functions
-- [x] Moved functions: getCurrentDocumentFoldingState, saveCurrentFoldingState, restoreFoldingState, applyDefaultFoldingToNewDocument, updateDocumentUri
-- [x] Moved state: documentFoldingStates, currentDocumentUri
-- [x] Updated webview.html to include new script
-- [x] foldingStateManager.js: 131 lines
+### 6. Analyze MarkdownFile Base Class
+- [x] Reviewed 865-line class structure
+- [x] Well-organized with clear sections
+- [x] Static utilities are minimal and tightly coupled
+- **Decision:** Keep as-is - complexity justified by responsibilities
 
-## Final Metrics (Round 1)
-- **webview.js**: 7,740 → 4,176 lines (**46% reduction** - 3,564 lines removed!)
-- **New focused modules**: 5 created
-  - exportMarpUI.js: 1,918 lines
-  - clipboardHandler.js: 612 lines
-  - navigationHandler.js: 388 lines
-  - templateDialog.js: 189 lines
-  - foldingStateManager.js: 131 lines
-- **Total extracted**: 3,238 lines
-- **Backend consolidation**: selectMarkdownFile() helper created, 9 duplicates removed
+## Skipped (User Decision)
 
----
+### ClipboardCommands Hash System
+- User requested to keep the hash-based system
 
-## COMPLETED: Round 2 - menuOperations.js Consolidation
+## Analyzed - Not Worth Changing
 
-### Priority 8 - Create Shared Menu Utilities (menuUtils.js)
-- [x] Created `src/html/utils/menuUtils.js` with shared utilities
-- [x] Updated webview.html to include new script
-- [x] menuUtils.js: 367 lines
+### Extract KanbanWebviewPanel Lifecycle
+- [x] Analyzed `createOrShow` (~67 lines) and `revive` (~80 lines)
+- [x] Static methods tightly coupled to private constructor
+- [x] Would require exposing internal methods or creating factory pattern
+- [x] Circular dependencies already exist in codebase (13 cycles found by madge)
+- **Decision:** Keep as-is - extraction would add complexity without significant benefit
 
-### Key utilities created:
-**Element Lookup:**
-- `findColumnInBoard(columnId)` - Find column in cachedBoard or currentBoard
-- `findTaskInBoard(taskId, columnId)` - Find task with fallback search
+## Summary
 
-**Tag Operations:**
-- `shouldExecute(key, throttleMs)` - Throttle duplicate calls
-- `buildTagPattern(tagName)` - Build regex for tag matching
-- `toggleTagInTitle(title, tagName, preserveRowTag)` - Toggle tag in title
-- `syncTitleToBoards(elementType, elementId, columnId, newTitle)` - Sync across board references
+**Lines Removed:** ~500+ lines
+**Files Deleted:** 4 files (PanelStateModel.ts, DocumentStateModel.ts, PanelEventBus.ts, EventDefinitions.ts, loggingMiddleware.ts, events/index.ts)
+**Files Modified:** KanbanWebviewPanel.ts, KanbanFileService.ts, IncludeFileCoordinator.ts, BoardStore.ts, WebviewBridge.ts, ChangeStateMachine.ts, panel/index.ts, core/index.ts
+**Files Created:** PanelContext.ts
 
-**Display Updates:**
-- `updateTemporalAttributes(element, text, elementType, context)` - Update temporal attributes
-- `updateTagDataAttributes(element, newTitle, elementType)` - Update tag data attributes
-- `updateTagChipButton(elementId, tagName, isActive)` - Update tag chip state
-- `applyTagFlash(element, isActive)` - Apply visual flash effect
+**Key Improvements:**
+1. Single source of truth for panel state (PanelContext)
+2. Removed dead event infrastructure
+3. Cleaner message handling in state machine
+4. Better helper method organization
 
-**Include Mode:**
-- `addIncludeSyntax(title, fileName)` - Add include syntax to title
-- `removeIncludeSyntax(title)` - Remove include syntax from title
-- `updateIncludeInTitle(title, newFileName)` - Update include file in title
-- `hasIncludeMode(element)` - Check if element has include mode
-- `getIncludeFile(element)` - Get current include file
-- `postEditMessage(elementType, elementId, columnId, newTitle)` - Post edit to VS Code
+## Additional Analysis (No Changes Needed)
 
-### Functions Refactored:
+### Final Codebase Check
+- [x] TypeScript compiles without errors
+- [x] No TODO/FIXME/HACK markers in code (except UI label "XXXL")
+- [x] ts-prune false positives - exports used in JS files
+- [x] Console.log statements appropriately gated by debug flags
+- [x] Command files well-organized (Command Pattern)
+- [x] Services properly structured
+- [x] 13 circular dependencies exist (legacy, separate concern)
 
-**Tag Toggle Functions (using menuUtils):**
-- `toggleColumnTag()` - ~150 → ~60 lines (60% reduction)
-- `toggleTaskTag()` - ~180 → ~55 lines (69% reduction)
-
-**Display Update Functions (using menuUtils):**
-- `updateColumnDisplayImmediate()` - ~100 → ~45 lines (55% reduction)
-- `updateTaskDisplayImmediate()` - ~110 → ~42 lines (62% reduction)
-
-**Include Mode Functions (using menuUtils):**
-- `toggleColumnIncludeMode()` - ~32 → ~18 lines (44% reduction)
-- `enableColumnIncludeMode()` - ~27 → ~11 lines (59% reduction)
-- `editColumnIncludeFile()` - ~35 → ~17 lines (51% reduction)
-- `updateColumnIncludeFile()` - ~34 → ~13 lines (62% reduction)
-- `disableColumnIncludeMode()` - ~38 → ~18 lines (53% reduction)
-- `enableTaskIncludeMode()` - ~34 → ~11 lines (68% reduction)
-- `editTaskIncludeFile()` - ~40 → ~17 lines (58% reduction)
-- `updateTaskIncludeFile()` - ~41 → ~13 lines (68% reduction)
-- `disableTaskIncludeMode()` - ~40 → ~14 lines (65% reduction)
-- `toggleTaskIncludeMode()` - ~30 → ~13 lines (57% reduction)
-
-### Round 2 Metrics
-- **menuOperations.js**: 4,682 → 4,144 lines (**538 lines removed**)
-- **New utility module**: menuUtils.js (367 lines)
-- **Net reduction**: 171 lines removed with much better code organization
-- **14 functions refactored** to use shared utilities
-- **Duplicate patterns eliminated**: element lookup, tag toggle, display update, include mode operations
-
----
-
-## Round 3 Analysis - No Major Issues Remaining
-
-### Current File Sizes
-| File | Lines |
-|------|-------|
-| boardRenderer.js | 5,327 |
-| webview.js | 4,176 |
-| menuOperations.js | 4,144 |
-| dragDrop.js | 4,005 |
-
-### Minor Patterns Identified (Not Worth Consolidating)
-Remaining patterns are small and fragmented:
-- Tag extraction pipeline: ~25-30 lines in boardRenderer.js
-- Header/footer bar classes: ~12-14 lines
-- Drop indicator factory: ~24 lines in dragDrop.js
-- JSON parse fallback: ~15-20 lines scattered
-
-**Total potential savings**: ~120-160 lines across 13,500+ lines (~1% improvement)
-**Verdict**: Diminishing returns - not worth additional refactoring complexity
-
-### Cleanup Summary
-| Round | Target | Lines Removed | Key Changes |
-|-------|--------|---------------|-------------|
-| 1 | webview.js | 3,564 | 5 new modules extracted |
-| 2 | menuOperations.js | 538 | menuUtils.js created, 14 functions refactored |
-| 3 | Analysis | 0 | No major patterns found |
-
-**Total lines reduced**: ~4,100 lines
-**New utility modules**: 6 (exportMarpUI.js, clipboardHandler.js, navigationHandler.js, templateDialog.js, foldingStateManager.js, menuUtils.js)
-**Code quality**: Significantly improved with shared utilities and better separation of concerns
+**Codebase Status:** Clean, well-structured, ~30k lines TypeScript

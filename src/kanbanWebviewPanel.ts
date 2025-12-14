@@ -22,10 +22,9 @@ import {
     MarkdownFile
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
-import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { PanelStateModel, DocumentStateModel, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
+import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
 
 export class KanbanWebviewPanel {
@@ -36,7 +35,7 @@ export class KanbanWebviewPanel {
 
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
-    private _context: vscode.ExtensionContext;
+    private _extensionContext: vscode.ExtensionContext;
     private _disposables: vscode.Disposable[] = [];
 
     // Main components
@@ -55,22 +54,19 @@ export class KanbanWebviewPanel {
     private _stateMachine: ChangeStateMachine;
 
     // Panel architecture components (Phase 1, 2 & 3)
-    private _state: PanelStateModel;
-    private _documentState: DocumentStateModel;  // Single source of truth for document state
+    private _context: PanelContext;  // Unified state: panel flags + document tracking
     private _concurrency: ConcurrencyManager;
     private _includeCoordinator: IncludeFileCoordinator;
     private _webviewManager: WebviewManager;
 
     // Public getter for backwards compatibility with external code
-    public get _isUpdatingFromPanel(): boolean { return this._state.updatingFromPanel; }
-    public set _isUpdatingFromPanel(value: boolean) { this._state.setUpdatingFromPanel(value); }
+    public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
+    public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
 
     // Timer for periodic unsaved changes check (lifecycle concern, not state)
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;
 
     private _conflictResolver: ConflictResolver;
-
-    private _eventBus: PanelEventBus;
 
     private _boardStore: BoardStore;
     private _webviewBridge: WebviewBridge;
@@ -85,7 +81,7 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (this._panel && board) {
             // Reset webviewReady since HTML reload will create new webview context
-            this._state.setWebviewReady(false);
+            this._context.setWebviewReady(false);
 
             this._panel.webview.html = this._getHtmlForWebview();
 
@@ -155,7 +151,7 @@ export class KanbanWebviewPanel {
         // Store the panel in the map and load document
         if (document) {
             const docUri = document.uri.toString();
-            kanbanPanel._documentState.setTrackedDocumentUri(docUri);  // Track the URI for cleanup
+            kanbanPanel._context.setTrackedDocumentUri(docUri);  // Track the URI for cleanup
             KanbanWebviewPanel.panels.set(docUri, kanbanPanel);
             // Load immediately - webview will request data when ready
             kanbanPanel.loadMarkdownFile(document);
@@ -258,7 +254,7 @@ export class KanbanWebviewPanel {
     }
 
     public getPanelId(): string {
-        return this._documentState.panelId;
+        return this._context.panelId;
     }
 
     public getPanel(): vscode.WebviewPanel {
@@ -274,33 +270,19 @@ export class KanbanWebviewPanel {
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         this._panel = panel;
         this._extensionUri = extensionUri;
-        this._context = context;
+        this._extensionContext = context;
 
         // Initialize panel architecture components (Phase 1)
         const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
-        this._state = new PanelStateModel(isDevelopment);
-        this._documentState = new DocumentStateModel(undefined, isDevelopment);  // Single source of truth
+        this._context = new PanelContext(undefined, isDevelopment);  // Unified state model
         this._concurrency = new ConcurrencyManager(isDevelopment);
 
-        this._eventBus = new PanelEventBus({
-            enableTracing: true, // Enable during development for debugging
-            defaultTimeout: 5000
-        });
-
-        // Add logging middleware in development mode
-        if (isDevelopment) {
-            this._eventBus.use(createLoggingMiddleware({
-                excludeTypes: ['debug:event_slow', 'debug:handler_error'],
-                logger: (msg) => getOutputChannel()?.appendLine(msg)
-            }));
-        }
-
-        this._boardStore = new BoardStore(this._eventBus, {
+        this._boardStore = new BoardStore({
             webview: this._panel.webview,
             maxUndoStackSize: 100
         });
 
-        this._webviewBridge = new WebviewBridge(this._eventBus, {
+        this._webviewBridge = new WebviewBridge({
             maxBatchSize: 10,
             batchFlushDelay: 50,
             debug: isDevelopment
@@ -333,7 +315,7 @@ export class KanbanWebviewPanel {
             fileFactory: this._fileFactory,
             webviewBridge: this._webviewBridge,
             stateMachine: this._stateMachine,
-            state: this._state,
+            state: this._context,
             getPanel: () => this._panel,
             getBoard: () => this.getBoard(),
             getMainFile: () => this._fileRegistry.getMainFile()
@@ -345,7 +327,7 @@ export class KanbanWebviewPanel {
             getPanel: () => this._panel,
             getDocument: () => this._fileManager.getDocument(),
             getBoard: () => this.getBoard(),
-            isInitialized: () => this._state.initialized,
+            isInitialized: () => this._context.initialized,
             getHtmlForWebview: () => this._getHtmlForWebview()
         });
 
@@ -362,7 +344,7 @@ export class KanbanWebviewPanel {
             setBoard: (board) => this._boardStore.setBoard(board, false),
             sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
             getPanel: () => this._panel,
-            getContext: () => this._context,
+            getContext: () => this._extensionContext,
             showConflictDialog: (context) => this.showConflictDialog(context),
             updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
             clearUndoRedo: () => this._boardStore.clearHistory(),
@@ -376,7 +358,7 @@ export class KanbanWebviewPanel {
             this._backupManager,
             this._boardOperations,
             fileServiceCallbacks,
-            this._documentState,  // Single source of truth for document state
+            this._context,  // Shared panel context
             KanbanWebviewPanel.panelStates,
             KanbanWebviewPanel.panels
         );
@@ -406,7 +388,7 @@ export class KanbanWebviewPanel {
                     this._boardStore.setBoard(board, true);
                 },
                 setUndoRedoOperation: (isOperation: boolean) => {
-                    this._state.setUndoRedoOperation(isOperation);
+                    this._context.setUndoRedoOperation(isOperation);
                 },
                 getWebviewPanel: () => this,
                 syncBoardToBackend: (board: KanbanBoard) => this.syncBoardToBackend(board)
@@ -416,7 +398,7 @@ export class KanbanWebviewPanel {
         // Connect message handler to file registry (for stopping edit mode during conflicts)
         this._fileRegistry.setMessageHandler(this._messageHandler);
 
-        // Note: No initializeState() call needed - DocumentStateModel is shared directly
+        // Note: No initializeState() call needed - PanelContext is shared directly
 
         this._initialize();
         this._setupEventListeners();
@@ -426,8 +408,6 @@ export class KanbanWebviewPanel {
 
         // Listen for document close events
         this._setupDocumentCloseListener();
-
-        this._eventBus.emit('panel:initialized', undefined).catch(() => {});
 
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
@@ -614,9 +594,9 @@ export class KanbanWebviewPanel {
     }
 
     private _initialize() {
-        if (!this._state.initialized) {
+        if (!this._context.initialized) {
             this._panel.webview.html = this._getHtmlForWebview();
-            this._state.setInitialized(true);
+            this._context.setInitialized(true);
         }
     }
 
@@ -631,7 +611,7 @@ export class KanbanWebviewPanel {
         if (state.cachedBoardFromWebview) {
             this._boardStore.setBoard(state.cachedBoardFromWebview, false);
         }
-        // Document state fields are now in shared DocumentStateModel - no sync needed
+        // Document state fields are now in shared PanelContext - no sync needed
     }
 
     private _setupEventListeners() {
@@ -662,7 +642,7 @@ export class KanbanWebviewPanel {
                         // 1. Board hasn't been initialized yet, OR
                         // 2. Board is null/undefined (needs initialization)
                         // Don't refresh just because the panel regained visibility after showing a message
-                        if (!this.getBoard() || !this._state.initialized) {
+                        if (!this.getBoard() || !this._context.initialized) {
                             this._ensureBoardAndSendUpdate();
                         }
                     }
@@ -700,10 +680,10 @@ export class KanbanWebviewPanel {
      */
     private _handleWebviewReady(): void {
         console.log('[kanban.handleWebviewReady] Webview is ready');
-        this._state.setWebviewReady(true);
+        this._context.setWebviewReady(true);
 
         // Send any pending board update (consume and clear atomically)
-        const pendingUpdate = this._documentState.consumePendingBoardUpdate();
+        const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
             console.log('[kanban.handleWebviewReady] Sending pending board update');
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
@@ -720,35 +700,24 @@ export class KanbanWebviewPanel {
         return this._concurrency.withLock('loadMarkdownFile', async () => {
             // CRITICAL: Set initial board load flag BEFORE loading main file
             // This prevents the main file's 'reloaded' event from triggering board regeneration
-            this._state.setInitialBoardLoad(true);
-
-            this._eventBus.emit('board:loading', { path: document.uri.fsPath }).catch(() => {});
+            this._context.setInitialBoardLoad(true);
 
             await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
             this._syncStateFromFileService();
 
             // Phase 1: Create or update MainKanbanFile instance
             await this._syncMainFileToRegistry(document);
-
-            const loadedBoard = this.getBoard();
-            if (loadedBoard) {
-                this._eventBus.emit('board:loaded', {
-                    board: loadedBoard,
-                    source: forceReload ? 'external_reload' : 'file',
-                    mainFilePath: document.uri.fsPath
-                }).catch(() => {});
-            }
         });
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, webviewReady=${this._state.webviewReady}`);
+        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, webviewReady=${this._context.webviewReady}`);
         if (!this._panel.webview) { return; }
 
         // Queue update if webview not ready yet
-        if (!this._state.webviewReady) {
+        if (!this._context.webviewReady) {
             console.log('[kanban.sendBoardUpdate] Webview not ready, queuing update');
-            this._documentState.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
+            this._context.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
             return;
         }
 
@@ -759,13 +728,6 @@ export class KanbanWebviewPanel {
             yamlHeader: null,
             kanbanFooter: null
         };
-
-        if (board.valid) {
-            this._eventBus.emit('board:updated', {
-                board,
-                changeType: isFullRefresh ? 'full_refresh' : 'incremental'
-            }).catch(() => {});
-        }
 
         // Update webview permissions to include asset directories
         // This ensures the webview can access images from include file directories
@@ -807,14 +769,6 @@ export class KanbanWebviewPanel {
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
         await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
         this._syncStateFromFileService();
-
-        const document = this._fileManager.getDocument();
-        if (document) {
-            this._eventBus.emit('file:saved', {
-                path: document.uri.fsPath,
-                silent: !triggerSave
-            }).catch(() => {});
-        }
     }
 
     private async initializeFile() {
@@ -823,7 +777,7 @@ export class KanbanWebviewPanel {
     }
 
     private _getHtmlForWebview() {
-        const filePath = vscode.Uri.file(path.join(this._context.extensionPath, 'src', 'html', 'webview.html'));
+        const filePath = vscode.Uri.file(path.join(this._extensionContext.extensionPath, 'src', 'html', 'webview.html'));
         let html = fs.readFileSync(filePath.fsPath, 'utf8');
 
         const cspSource = this._panel.webview.cspSource;
@@ -865,12 +819,12 @@ export class KanbanWebviewPanel {
         
         
         const webviewDir = this._panel.webview.asWebviewUri(
-            vscode.Uri.file(path.join(this._context.extensionPath, 'dist', 'src', 'html'))
+            vscode.Uri.file(path.join(this._extensionContext.extensionPath, 'dist', 'src', 'html'))
         );
-        
+
         // Add cache-busting timestamp for development
         const timestamp = Date.now();
-        const isDevelopment = !this._context.extensionMode || this._context.extensionMode === vscode.ExtensionMode.Development;
+        const isDevelopment = !this._extensionContext.extensionMode || this._extensionContext.extensionMode === vscode.ExtensionMode.Development;
         const cacheBuster = isDevelopment ? `?v=${timestamp}` : '';
         
         html = html.replace(/href="webview\.css"/, `href="${webviewDir}/webview.css${cacheBuster}"`);
@@ -967,11 +921,11 @@ export class KanbanWebviewPanel {
 
             this._includeCoordinator.loadIncludeContentAsync(board)
                 .then(() => {
-                    this._state.setInitialBoardLoad(false);
+                    this._context.setInitialBoardLoad(false);
                 })
                 .catch(error => {
                     console.error('[_syncMainFileToRegistry] Error loading include content:', error);
-                    this._state.setInitialBoardLoad(false);
+                    this._context.setInitialBoardLoad(false);
                 });
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
@@ -1000,7 +954,7 @@ export class KanbanWebviewPanel {
      * Set editing in progress flag to block board regenerations
      */
     public setEditingInProgress(isEditing: boolean): void {
-        this._state.setEditingInProgress(isEditing);
+        this._context.setEditingInProgress(isEditing);
     }
 
     /**
@@ -1041,7 +995,7 @@ export class KanbanWebviewPanel {
         // CRITICAL FIX: Don't sync during include switches - state machine sends correct updates
         // During include switch, board might be regenerated with empty descriptions (before async load completes)
         // This would send stale/empty data and cause content flapping
-        if (this._state.includeSwitchInProgress) {
+        if (this._context.includeSwitchInProgress) {
             return;
         }
 
@@ -1174,7 +1128,7 @@ export class KanbanWebviewPanel {
         if (fileType === 'main') {
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
-                if (this._state.initialBoardLoad) {
+                if (this._context.initialBoardLoad) {
                     return;
                 }
 
@@ -1191,7 +1145,7 @@ export class KanbanWebviewPanel {
             if (event.changeType === 'reloaded') {
                 // CRITICAL: Skip 'reloaded' events during initial board load
                 // These are just loading content for the first time, not actual changes
-                if (this._state.initialBoardLoad) {
+                if (this._context.initialBoardLoad) {
                     return;
                 }
 
@@ -1517,7 +1471,7 @@ export class KanbanWebviewPanel {
     public invalidateBoardCache(): void {
         // CRITICAL FIX: Block invalidation during include switches
         // This prevents column/task IDs from regenerating mid-switch
-        if (this._state.includeSwitchInProgress) {
+        if (this._context.includeSwitchInProgress) {
             return;
         }
 
@@ -1531,14 +1485,14 @@ export class KanbanWebviewPanel {
      * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
      */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
-        this._state.setIncludeSwitchInProgress(inProgress);
+        this._context.setIncludeSwitchInProgress(inProgress);
     }
 
     private async _handlePanelClose() {
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse during disposal
         // Panel is already disposed by VS Code when onDidDispose fires
         // Must remove before showing any dialogs (which await user input)
-        const trackedUri = this._documentState.trackedDocumentUri;
+        const trackedUri = this._context.trackedDocumentUri;
         if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
             KanbanWebviewPanel.panels.delete(trackedUri);
         }
@@ -1707,14 +1661,14 @@ export class KanbanWebviewPanel {
 
     public async dispose() {
         // Prevent double disposal
-        if (this._state.disposed) {
+        if (this._context.disposed) {
             return;
         }
-        this._state.setDisposed(true);
+        this._context.setDisposed(true);
 
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse of disposing panel
         // This must happen BEFORE any async operations or cleanup
-        const trackedUri = this._documentState.trackedDocumentUri;
+        const trackedUri = this._context.trackedDocumentUri;
         if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
             KanbanWebviewPanel.panels.delete(trackedUri);
         }
@@ -1733,7 +1687,7 @@ export class KanbanWebviewPanel {
             // discardChanges() internally checks if content changed before emitting events
             mainFileForDispose.discardChanges();
         }
-        this._state.setClosingPrevented(false);
+        this._context.setClosingPrevented(false);
 
         // Stop unsaved changes monitoring
         if (this._unsavedChangesCheckInterval) {
@@ -1744,7 +1698,7 @@ export class KanbanWebviewPanel {
         this._webviewBridge.dispose();
 
         // Clear panel state
-        KanbanWebviewPanel.panelStates.delete(this._documentState.panelId);
+        KanbanWebviewPanel.panelStates.delete(this._context.panelId);
 
         // Dispose concurrency manager (handles RACE-3 and RACE-4 cleanup)
         this._concurrency.dispose();
@@ -1760,8 +1714,6 @@ export class KanbanWebviewPanel {
         this._backupManager.dispose();
 
         this._fileRegistry.dispose();
-        this._eventBus.emit('panel:disposing', undefined).catch(() => {});
-        this._eventBus.dispose();
         this._boardStore.dispose();
 
         this._panel.dispose();

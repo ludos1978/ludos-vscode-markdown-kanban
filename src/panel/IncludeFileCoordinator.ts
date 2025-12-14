@@ -14,7 +14,7 @@ import { KanbanBoard, KanbanTask } from '../markdownParser';
 import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile } from '../files';
 import { WebviewBridge } from '../core/bridge';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
-import { PanelStateModel } from './PanelStateModel';
+import { PanelContext } from './PanelContext';
 
 /**
  * Dependencies required by IncludeFileCoordinator
@@ -24,7 +24,7 @@ export interface IncludeCoordinatorDependencies {
     fileFactory: FileFactory;
     webviewBridge: WebviewBridge;
     stateMachine: ChangeStateMachine;
-    state: PanelStateModel;
+    state: PanelContext;
     getPanel: () => any | undefined;
     getBoard: () => KanbanBoard | undefined;
     getMainFile: () => MainKanbanFile | undefined;

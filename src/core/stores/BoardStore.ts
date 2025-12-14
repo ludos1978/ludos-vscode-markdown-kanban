@@ -17,7 +17,6 @@
 
 import * as vscode from 'vscode';
 import { KanbanBoard } from '../../markdownParser';
-import { PanelEventBus } from '../events';
 
 // ============= TYPES =============
 
@@ -53,12 +52,10 @@ function deepCloneBoard(board: KanbanBoard): KanbanBoard {
 
 export class BoardStore implements vscode.Disposable {
     private _state: BoardState;
-    private _eventBus: PanelEventBus;
     private _webview?: vscode.Webview;
     private readonly _maxUndoStackSize: number;
 
-    constructor(eventBus: PanelEventBus, options: BoardStoreOptions = {}) {
-        this._eventBus = eventBus;
+    constructor(options: BoardStoreOptions = {}) {
         this._webview = options.webview;
         this._maxUndoStackSize = options.maxUndoStackSize ?? 100;
 
@@ -91,18 +88,9 @@ export class BoardStore implements vscode.Disposable {
     /**
      * Set the board (marks cache as valid)
      */
-    setBoard(board: KanbanBoard | null, emitEvent: boolean = true): void {
-        const previousBoard = this._state.board;
+    setBoard(board: KanbanBoard | null, _emitEvent: boolean = true): void {
         this._state.board = board;
         this._state.cacheValid = board !== null;
-
-        if (emitEvent && board) {
-            this._eventBus.emit('board:updated', {
-                board,
-                changeType: 'set',
-                previousBoard: previousBoard ?? undefined
-            }).catch(() => {});
-        }
     }
 
     /**
@@ -120,7 +108,6 @@ export class BoardStore implements vscode.Disposable {
      */
     markColumnDirty(columnId: string): void {
         this._state.dirtyColumns.add(columnId);
-        this._emitDirtyState();
     }
 
     /**
@@ -128,7 +115,6 @@ export class BoardStore implements vscode.Disposable {
      */
     markTaskDirty(taskId: string): void {
         this._state.dirtyTasks.add(taskId);
-        this._emitDirtyState();
     }
 
     /**
@@ -136,7 +122,6 @@ export class BoardStore implements vscode.Disposable {
      */
     clearColumnDirty(columnId: string): void {
         this._state.dirtyColumns.delete(columnId);
-        this._emitDirtyState();
     }
 
     /**
@@ -144,7 +129,6 @@ export class BoardStore implements vscode.Disposable {
      */
     clearTaskDirty(taskId: string): void {
         this._state.dirtyTasks.delete(taskId);
-        this._emitDirtyState();
     }
 
     /**
@@ -174,18 +158,6 @@ export class BoardStore implements vscode.Disposable {
     clearAllDirty(): void {
         this._state.dirtyColumns.clear();
         this._state.dirtyTasks.clear();
-        this._eventBus.emit('board:clean', undefined).catch(() => {});
-    }
-
-    private _emitDirtyState(): void {
-        if (this._state.dirtyColumns.size > 0 || this._state.dirtyTasks.size > 0) {
-            this._eventBus.emit('board:dirty', {
-                dirtyColumns: Array.from(this._state.dirtyColumns),
-                dirtyTasks: Array.from(this._state.dirtyTasks)
-            }).catch(() => {});
-        } else {
-            this._eventBus.emit('board:clean', undefined).catch(() => {});
-        }
     }
 
     // ============= UNDO/REDO =============
@@ -226,8 +198,6 @@ export class BoardStore implements vscode.Disposable {
 
         this._sendUndoRedoStatus();
 
-        this._eventBus.emit('undo:completed', { board: restoredBoard }).catch(() => {});
-
         return restoredBoard;
     }
 
@@ -251,8 +221,6 @@ export class BoardStore implements vscode.Disposable {
         this._state.cacheValid = true;
 
         this._sendUndoRedoStatus();
-
-        this._eventBus.emit('redo:completed', { board: restoredBoard }).catch(() => {});
 
         return restoredBoard;
     }
@@ -288,11 +256,6 @@ export class BoardStore implements vscode.Disposable {
                 canRedo: this.canRedo()
             });
         }
-
-        this._eventBus.emit('undoredo:state_changed', {
-            canUndo: this.canUndo(),
-            canRedo: this.canRedo()
-        }).catch(() => {});
     }
 
     // ============= LIFECYCLE =============
