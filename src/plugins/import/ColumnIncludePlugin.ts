@@ -23,7 +23,7 @@ import {
 } from '../interfaces';
 import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
-import { MainKanbanFile } from '../../files/MainKanbanFile';
+import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { PresentationParser } from '../../services/export/PresentationParser';
 import { KanbanTask } from '../../board/KanbanTypes';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
@@ -60,7 +60,7 @@ export class ColumnIncludePlugin extends AbstractImportPlugin {
      */
     createFile(
         relativePath: string,
-        parentFile: MainKanbanFile,
+        parentFile: IMainKanbanFile,
         dependencies: PluginDependencies
     ): IncludeFile {
         return new IncludeFile(

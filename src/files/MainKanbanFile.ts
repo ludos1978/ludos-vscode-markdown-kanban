@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
-import { MarkdownFileRegistry } from './MarkdownFileRegistry';
-import { KanbanBoard, MarkdownKanbanParser } from '../markdownParser';
+import { IMarkdownFileRegistry } from './FileInterfaces';
+import { KanbanBoard } from '../board/KanbanTypes';
+import { MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
 import { BackupManager } from '../services/BackupManager';
 import { FileManager } from '../fileManager';
@@ -27,7 +28,7 @@ export class MainKanbanFile extends MarkdownFile {
 
     // ============= DEPENDENCIES =============
     private _fileManager: FileManager;
-    private _fileRegistry: MarkdownFileRegistry;
+    private _fileRegistry: IMarkdownFileRegistry;
     private _parser: typeof MarkdownKanbanParser;
 
     constructor(
@@ -35,7 +36,7 @@ export class MainKanbanFile extends MarkdownFile {
         fileManager: FileManager,
         conflictResolver: ConflictResolver,
         backupManager: BackupManager,
-        fileRegistry: MarkdownFileRegistry
+        fileRegistry: IMarkdownFileRegistry
     ) {
         // FOUNDATION-1: For main file, use basename as relative path
         // Main file doesn't have a "parent", so relative path = filename

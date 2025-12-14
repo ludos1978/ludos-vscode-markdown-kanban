@@ -193,9 +193,12 @@ export class ExportCommands extends BaseMessageCommand {
             // Get board for ANY conversion exports (use in-memory board data)
             const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
+            // Get webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+            const webviewPanel = context.getWebviewPanel();
+
             // Handle COPY mode (no progress bar)
             if (options.mode === 'copy') {
-                const result = await ExportService.export(document, options, board);
+                const result = await ExportService.export(document, options, board, webviewPanel);
 
                 this.postMessage({
                     type: 'copyContentResult',
@@ -219,7 +222,7 @@ export class ExportCommands extends BaseMessageCommand {
                 }
                 progress.report({ increment: 20, message: 'Processing content...' });
 
-                const result = await ExportService.export(document!, options, board);
+                const result = await ExportService.export(document!, options, board, webviewPanel);
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 90, context, 'Finalizing...');
@@ -260,8 +263,11 @@ export class ExportCommands extends BaseMessageCommand {
         // Get board for conversion exports
         const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
+        // Get webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+        const webviewPanel = context.getWebviewPanel();
+
         // Do initial export FIRST (to start Marp if needed)
-        const initialResult = await ExportService.export(document, options, board);
+        const initialResult = await ExportService.export(document, options, board, webviewPanel);
 
         // NOW stop existing handlers/processes for other files
         // Use marpWatchPath (the file Marp is watching) for protection, fallback to exportedPath
@@ -301,7 +307,9 @@ export class ExportCommands extends BaseMessageCommand {
             try {
                 // Re-read the document to get fresh content
                 const freshDoc = await vscode.workspace.openTextDocument(document.uri);
-                const result = await ExportService.export(freshDoc, options, undefined);
+                // Get current webview panel (may have changed since initial setup)
+                const currentWebviewPanel = context.getWebviewPanel();
+                const result = await ExportService.export(freshDoc, options, undefined, currentWebviewPanel);
 
                 if (result.success && options.openAfterExport && result.exportedPath && !options.marpWatch) {
                     const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');

@@ -16,7 +16,7 @@
 import { ImportPluginMetadata, PluginDependencies } from '../interfaces';
 import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
-import { MainKanbanFile } from '../../files/MainKanbanFile';
+import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
 /**
@@ -50,7 +50,7 @@ export class RegularIncludePlugin extends AbstractImportPlugin {
      */
     createFile(
         relativePath: string,
-        parentFile: MainKanbanFile,
+        parentFile: IMainKanbanFile,
         dependencies: PluginDependencies
     ): IncludeFile {
         return new IncludeFile(

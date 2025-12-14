@@ -23,7 +23,7 @@ import {
     PluginContext
 } from '../interfaces';
 import { MarkdownFile } from '../../files/MarkdownFile';
-import { MainKanbanFile } from '../../files/MainKanbanFile';
+import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { FileTypeUtils } from '../../utils/fileTypeUtils';
 
 /**
@@ -106,7 +106,7 @@ export abstract class AbstractImportPlugin implements ImportPlugin {
      */
     abstract createFile(
         relativePath: string,
-        parentFile: MainKanbanFile,
+        parentFile: IMainKanbanFile,
         dependencies: PluginDependencies
     ): MarkdownFile;
 

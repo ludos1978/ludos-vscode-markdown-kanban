@@ -8,7 +8,7 @@
  */
 
 import { MarkdownFile } from '../../files/MarkdownFile';
-import { MainKanbanFile } from '../../files/MainKanbanFile';
+import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { ConflictResolver } from '../../services/ConflictResolver';
 import { BackupManager } from '../../services/BackupManager';
 import { KanbanTask } from '../../board/KanbanTypes';
@@ -62,7 +62,7 @@ export interface ImportContext {
     lineNumber?: number;
 
     /** Parent file reference (if available) */
-    parentFile?: MainKanbanFile;
+    parentFile?: IMainKanbanFile;
 
     /** Full line content (for additional context) */
     lineContent?: string;
@@ -193,13 +193,13 @@ export interface ImportPlugin {
      * Create a MarkdownFile instance for the given path
      *
      * @param relativePath - Relative path to the include file
-     * @param parentFile - Parent MainKanbanFile
+     * @param parentFile - Parent file implementing IMainKanbanFile
      * @param dependencies - Injected dependencies
      * @returns Created file instance
      */
     createFile(
         relativePath: string,
-        parentFile: MainKanbanFile,
+        parentFile: IMainKanbanFile,
         dependencies: PluginDependencies
     ): MarkdownFile;
 

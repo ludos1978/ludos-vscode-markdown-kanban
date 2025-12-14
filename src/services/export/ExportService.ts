@@ -1485,7 +1485,8 @@ export class ExportService {
     private static async outputContent(
         transformed: { content: string; notIncludedAssets: ExportAssetInfo[] },
         sourceDocument: vscode.TextDocument,
-        options: NewExportOptions
+        options: NewExportOptions,
+        webviewPanel?: any
     ): Promise<ExportResult> {
 
         // MODE: COPY (return content for clipboard)
@@ -1517,7 +1518,7 @@ export class ExportService {
 
         // Handle Marp conversion
         if (options.format === 'marp') {
-            return await this.runMarpConversion(markdownPath, sourcePath, options);
+            return await this.runMarpConversion(markdownPath, sourcePath, options, webviewPanel);
         }
 
         // Regular save succeeded
@@ -1533,11 +1534,13 @@ export class ExportService {
      * Helper for outputContentNew
      * @param markdownPath - Path to the exported markdown file (in _Export folder)
      * @param sourceFilePath - Path to the original source Kanban file (for webview lookup)
+     * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
      */
     private static async runMarpConversion(
         markdownPath: string,
         sourceFilePath: string,
-        options: NewExportOptions
+        options: NewExportOptions,
+        webviewPanel?: any
     ): Promise<ExportResult> {
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
@@ -1551,22 +1554,19 @@ export class ExportService {
         let preprocessCleanup: (() => Promise<void>) | undefined;
 
         try {
-            // Get the webview panel for the SOURCE document (needed for Mermaid rendering)
-            // NOTE: Use sourceFilePath, not markdownPath (which is the exported file)
-            const docUri = vscode.Uri.file(sourceFilePath).toString();
-
-            const { KanbanWebviewPanel } = await import('../../kanbanWebviewPanel');
-            const webviewPanel = KanbanWebviewPanel.getPanelForDocument(docUri);
-
+            // Use injected webview panel for Mermaid rendering (avoids circular dependency)
+            // webviewPanel is passed from ExportCommands which has access to it via CommandContext
 
             if (webviewPanel) {
                 // Set up Mermaid export service with webview
                 const mermaidService = getMermaidExportService();
-                mermaidService.setWebviewPanel(webviewPanel.getPanel());
+                const panel = typeof webviewPanel.getPanel === 'function' ? webviewPanel.getPanel() : webviewPanel;
+                mermaidService.setWebviewPanel(panel);
             }
 
             // Create diagram preprocessor
-            const preprocessor = new DiagramPreprocessor(webviewPanel ? webviewPanel.getPanel() : undefined);
+            const panel = webviewPanel ? (typeof webviewPanel.getPanel === 'function' ? webviewPanel.getPanel() : webviewPanel) : undefined;
+            const preprocessor = new DiagramPreprocessor(panel);
 
             // Preprocess diagrams
             const preprocessResult = await preprocessor.preprocess(
@@ -1708,11 +1708,13 @@ export class ExportService {
      * and all modes (copy, save, auto, preview).
      *
      * @param board - Optional in-memory board object for presentation exports (avoids file parsing)
+     * @param webviewPanel - Optional webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
      */
     public static async export(
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
-        board?: any
+        board?: any,
+        webviewPanel?: any
     ): Promise<ExportResult> {
         try {
             // Clear tracking map for new export
@@ -1737,7 +1739,8 @@ export class ExportService {
             const result = await this.outputContent(
                 transformed,
                 sourceDocument,
-                options
+                options,
+                webviewPanel
             );
 
             return result;

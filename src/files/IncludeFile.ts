@@ -4,9 +4,9 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { ConflictResolver, ConflictContext } from '../services/ConflictResolver';
 import { BackupManager } from '../services/BackupManager';
-import { MainKanbanFile } from './MainKanbanFile';
+import { IMainKanbanFile } from './FileInterfaces';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
-import { KanbanTask } from '../markdownParser';
+import { KanbanTask } from '../board/KanbanTypes';
 import { PresentationParser } from '../services/export/PresentationParser';
 
 /**
@@ -36,7 +36,7 @@ export class IncludeFile extends MarkdownFile {
     private _fileType: IncludeFileType;
 
     // ============= PARENT RELATIONSHIP =============
-    protected _parentFile: MainKanbanFile;          // Reference to parent kanban file
+    protected _parentFile: IMainKanbanFile;          // Reference to parent kanban file
     protected _absolutePath: string;                 // Cached absolute path
 
     // ============= INCLUDE-SPECIFIC STATE =============
@@ -54,7 +54,7 @@ export class IncludeFile extends MarkdownFile {
 
     constructor(
         relativePath: string,
-        parentFile: MainKanbanFile,
+        parentFile: IMainKanbanFile,
         conflictResolver: ConflictResolver,
         backupManager: BackupManager,
         fileType: IncludeFileType,
@@ -97,7 +97,7 @@ export class IncludeFile extends MarkdownFile {
     /**
      * Get the parent file
      */
-    public getParentFile(): MainKanbanFile {
+    public getParentFile(): IMainKanbanFile {
         return this._parentFile;
     }
 

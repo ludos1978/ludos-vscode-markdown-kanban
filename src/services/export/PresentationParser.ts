@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { KanbanTask } from '../../markdownParser';
+import { KanbanTask } from '../../board/KanbanTypes';
 import { IdGenerator } from '../../utils/idGenerator';
 
 export interface PresentationSlide {
