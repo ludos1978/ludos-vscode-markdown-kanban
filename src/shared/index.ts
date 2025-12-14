@@ -8,7 +8,6 @@ export {
     FILE_EXTENSIONS,
     DOTTED_EXTENSIONS,
     MIME_TYPE_MAP,
-    FileCategory,
     BaseFileTypeUtils
 } from './fileTypeDefinitions';
 

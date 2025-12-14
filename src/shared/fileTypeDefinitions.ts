@@ -168,11 +168,6 @@ export const MIME_TYPE_MAP: Record<string, string> = {
 };
 
 /**
- * File category type definition
- */
-export type FileCategory = 'image' | 'video' | 'audio' | 'text' | 'document' | 'code' | 'archive' | 'unknown';
-
-/**
  * Core utility functions that work in any environment
  */
 export class BaseFileTypeUtils {
@@ -283,25 +278,6 @@ export class BaseFileTypeUtils {
         }
         const extension = this.getFileExtension(fileName);
         return MIME_TYPE_MAP[extension] || 'application/octet-stream';
-    }
-
-    /**
-     * Get file category based on extension
-     */
-    static getFileCategory(fileName: string): FileCategory {
-        if (!fileName || typeof fileName !== 'string') {
-            return 'unknown';
-        }
-
-        const extension = this.getFileExtension(fileName);
-
-        for (const [category, extensions] of Object.entries(FILE_EXTENSIONS)) {
-            if (extensions.includes(extension)) {
-                return category as FileCategory;
-            }
-        }
-
-        return 'unknown';
     }
 
     /**
