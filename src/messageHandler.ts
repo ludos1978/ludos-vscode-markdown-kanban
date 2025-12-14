@@ -176,6 +176,34 @@ export class MessageHandler {
         });
     }
 
+    /**
+     * Handle response from frontend when editing is stopped (backend-initiated)
+     * Resolves the pending promise from requestStopEditing()
+     */
+    public async handleEditingStopped(message: any): Promise<void> {
+        const { requestId, capturedEdit } = message;
+
+        if (!requestId) {
+            console.warn('[handleEditingStopped] No requestId in message');
+            return;
+        }
+
+        const pending = this._pendingStopEditingRequests.get(requestId);
+        if (!pending) {
+            console.warn(`[handleEditingStopped] No pending request for id: ${requestId}`);
+            return;
+        }
+
+        // Clear the timeout
+        clearTimeout(pending.timeout);
+
+        // Resolve the promise with the captured edit value
+        pending.resolve(capturedEdit);
+
+        // Clean up
+        this._pendingStopEditingRequests.delete(requestId);
+    }
+
     public async handleMessage(message: any): Promise<void> {
         // Command Pattern: All message handling is done via CommandRegistry
         if (this._commandRegistry.canHandle(message.type)) {
