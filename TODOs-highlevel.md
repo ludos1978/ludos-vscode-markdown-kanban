@@ -1,3 +1,6 @@
+
+- [ ] it seems as if the board is rendered twice when loading the board.
+
 - [ ] do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems
 
 - [ ] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!

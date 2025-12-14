@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
-import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 
 /**

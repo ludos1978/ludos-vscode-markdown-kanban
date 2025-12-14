@@ -209,7 +209,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * @param stage - Description of where the check is happening
      * @returns true if cancelled, false if still current
      */
-    private _checkReloadCancelled(mySequence: number, stage: string): boolean {
+    private _checkReloadCancelled(mySequence: number, _stage: string): boolean {
         if (mySequence !== this._currentReloadSequence) {
             return true;
         }

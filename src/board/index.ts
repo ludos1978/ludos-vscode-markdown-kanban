@@ -97,7 +97,7 @@ export class BoardOperations {
         return this._crudOperations.addColumn(board, title);
     }
 
-    public moveColumn(board: KanbanBoard, fromIndex: number, toIndex: number, fromRow?: number, toRow?: number): boolean {
+    public moveColumn(board: KanbanBoard, fromIndex: number, toIndex: number, _fromRow?: number, _toRow?: number): boolean {
         return this._crudOperations.moveColumn(board, fromIndex, toIndex);
     }
 
