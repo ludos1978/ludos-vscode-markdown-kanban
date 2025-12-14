@@ -237,7 +237,7 @@ export class IncludeCommands extends BaseMessageCommand {
             );
 
             if (choice === 'Save and Switch') {
-                await file.save();
+                await context.fileSaveService.saveFile(file);
             } else if (choice === 'Discard and Switch') {
                 file.discardChanges();
             } else {
@@ -301,7 +301,7 @@ export class IncludeCommands extends BaseMessageCommand {
             );
 
             if (choice === 'Save and Switch') {
-                await file.save();
+                await context.fileSaveService.saveFile(file);
             } else if (choice === 'Discard and Switch') {
                 file.discardChanges();
             } else {
@@ -445,8 +445,7 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error('Main file not found in registry');
                 }
 
-                const fileSaveService = fileService._fileSaveService;
-                await fileSaveService.saveFile(mainFile, markdown);
+                await context.fileSaveService.saveFile(mainFile, markdown, { force: forceSave });
                 mainFile.updateFromBoard(board, true, true);
 
                 // Trigger marpWatch export if active
@@ -491,10 +490,11 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error(`File not found in registry: ${filePath}`);
                 }
 
-                await file.save({
+                await context.fileSaveService.saveFile(file, undefined, {
                     skipReloadDetection: true,
                     source: 'ui-edit',
-                    skipValidation: false
+                    skipValidation: false,
+                    force: forceSave
                 });
 
                 // Trigger marpWatch export if active

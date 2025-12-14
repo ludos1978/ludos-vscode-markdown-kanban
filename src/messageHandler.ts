@@ -6,6 +6,7 @@ import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path c
 import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { PresentationGenerator } from './services/export/PresentationGenerator';
+import { FileSaveService } from './core/FileSaveService';
 import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import { safeFileUri } from './utils/uriUtils';
@@ -29,6 +30,7 @@ export class MessageHandler {
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
     private _plantUMLService: PlantUMLService;
+    private _fileSaveService: FileSaveService;
     private _onBoardUpdate: () => Promise<void>;
     private _onSaveToMarkdown: () => Promise<void>;
     private _onInitializeFile: () => Promise<void>;
@@ -68,6 +70,7 @@ export class MessageHandler {
         this._boardOperations = boardOperations;
         this._linkHandler = linkHandler;
         this._plantUMLService = new PlantUMLService();
+        this._fileSaveService = FileSaveService.getInstance();
         this._onBoardUpdate = callbacks.onBoardUpdate;
         this._onSaveToMarkdown = callbacks.onSaveToMarkdown;
         this._onInitializeFile = callbacks.onInitializeFile;
@@ -93,6 +96,7 @@ export class MessageHandler {
             boardOperations: this._boardOperations,
             linkHandler: this._linkHandler,
             plantUMLService: this._plantUMLService,
+            fileSaveService: this._fileSaveService,
             getFileRegistry: () => this._getWebviewPanel()?._fileRegistry,
             onBoardUpdate: this._onBoardUpdate,
             onSaveToMarkdown: this._onSaveToMarkdown,
@@ -255,7 +259,7 @@ export class MessageHandler {
                             );
 
                             if (choice === 'Save and Continue') {
-                                await oldFile.save();
+                                await this._fileSaveService.saveFile(oldFile);
                             } else if (choice === 'Discard and Continue') {
                                 oldFile.discardChanges();
                             } else {
@@ -288,7 +292,7 @@ export class MessageHandler {
                                     );
 
                                     if (choice === 'Save and Continue') {
-                                        await oldFile.save();
+                                        await this._fileSaveService.saveFile(oldFile);
                                     } else if (choice === 'Discard and Continue') {
                                         oldFile.discardChanges();
                                     } else {

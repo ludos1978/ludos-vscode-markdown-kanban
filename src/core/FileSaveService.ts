@@ -35,8 +35,20 @@ export class FileSaveService {
     /**
      * Unified save method for all file types
      * Uses SaveOptions for consistent, parameter-based save handling
+     *
+     * IMPORTANT: This is THE ONLY entry point for all file saves.
+     * All saves MUST go through this method to ensure:
+     * - Hash-based unsaved detection is respected
+     * - Concurrent saves are prevented
+     * - SaveOptions are applied consistently
      */
     public async saveFile(file: MarkdownFile, content?: string, options?: SaveOptions): Promise<void> {
+        // HASH CHECK: Skip save if no unsaved changes (unless forced)
+        // This prevents unnecessary disk writes and ensures hash-based state is respected
+        if (!options?.force && !file.hasUnsavedChanges() && content === undefined) {
+            return; // No changes to save
+        }
+
         const filePath = file.getPath();
         const saveKey = `${file.getFileType()}:${filePath}`;
 

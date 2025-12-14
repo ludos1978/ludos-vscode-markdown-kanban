@@ -14,6 +14,7 @@ import { LinkHandler } from '../../services/LinkHandler';
 import { KanbanBoard } from '../../markdownParser';
 import { PlantUMLService } from '../../services/export/PlantUMLService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
+import { FileSaveService } from '../../core/FileSaveService';
 import * as vscode from 'vscode';
 
 /**
@@ -27,6 +28,7 @@ export interface CommandContext {
     boardOperations: BoardOperations;
     linkHandler: LinkHandler;
     plantUMLService: PlantUMLService;
+    fileSaveService: FileSaveService;
     getFileRegistry: () => MarkdownFileRegistry | undefined;
 
     // Callbacks for panel operations

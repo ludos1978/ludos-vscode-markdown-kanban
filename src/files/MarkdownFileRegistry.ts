@@ -3,6 +3,7 @@ import * as path from 'path';
 import { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
+import { FileSaveService } from '../core/FileSaveService';
 import type { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser'; // STATE-2: For generateBoard()
 
 /**
@@ -28,11 +29,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     // ============= PANEL REFERENCE (for stopping edit mode during conflicts) =============
     private _messageHandler?: any; // MessageHandler reference for requestStopEditing()
 
+    // ============= UNIFIED SAVE SERVICE =============
+    private _fileSaveService: FileSaveService;
+
     // ============= LIFECYCLE =============
     private _disposables: vscode.Disposable[] = [];
 
     constructor() {
         this._disposables.push(this._onDidChange);
+        this._fileSaveService = FileSaveService.getInstance();
     }
 
     // ============= MESSAGE HANDLER ACCESS =============
@@ -290,7 +295,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     public async saveAll(): Promise<void> {
         const filesToSave = this.getFilesWithUnsavedChanges();
 
-        await Promise.all(filesToSave.map(f => f.save()));
+        await Promise.all(filesToSave.map(f => this._fileSaveService.saveFile(f)));
     }
 
     /**
@@ -305,11 +310,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         const errors: string[] = [];
         let filesWritten = 0;
 
-        // Write all files in parallel
+        // Write all files in parallel with force: true to bypass hash check
         await Promise.all(
             allFiles.map(async (file) => {
                 try {
-                    await file.save();
+                    await this._fileSaveService.saveFile(file, undefined, { force: true });
                     filesWritten++;
                 } catch (error) {
                     const errorMsg = `Failed to write ${file.getRelativePath()}: ${error}`;
@@ -596,7 +601,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             if (file && file.getFileType() === 'include-column') {
                 const content = file.generateFromTasks(column.tasks);
                 file.setContent(content);
-                await file.save();
+                await this._fileSaveService.saveFile(file);
             }
         }
         return true;
@@ -614,7 +619,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 const fullContent = task.description || '';
                 if (fullContent.trim()) {
                     file.setTaskDescription(fullContent);
-                    await file.save();
+                    await this._fileSaveService.saveFile(file);
                 }
             }
         }

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
+import { FileSaveService } from './FileSaveService';
 
 /**
  * Unified Change State Machine
@@ -182,9 +183,12 @@ export class ChangeStateMachine {
     // Dependencies (injected)
     private _fileRegistry: any; // MarkdownFileRegistry
     private _webviewPanel: any; // KanbanWebviewPanel
+    private _fileSaveService: FileSaveService;
     private _includeProcessor: IncludeLoadingProcessor | null = null;
 
-    private constructor() {}
+    private constructor() {
+        this._fileSaveService = FileSaveService.getInstance();
+    }
 
     public static getInstance(): ChangeStateMachine {
         if (!ChangeStateMachine.instance) {
@@ -644,7 +648,7 @@ export class ChangeStateMachine {
 
         for (const file of unsavedFiles) {
             try {
-                await file.save();
+                await this._fileSaveService.saveFile(file);
                 context.result.updatedFiles.push(file.getRelativePath());
             } catch (error) {
                 console.error(`[State:SAVING_UNSAVED] Error saving ${file.getRelativePath()}:`, error);

@@ -21,4 +21,12 @@ export interface SaveOptions {
      * Skip validation before save (for performance)
      */
     skipValidation?: boolean;
+
+    /**
+     * Force save even if hasUnsavedChanges() returns false
+     * Use for emergency recovery (forceWriteAll) only
+     *
+     * Default: false
+     */
+    force?: boolean;
 }
