@@ -1870,36 +1870,6 @@ function setHtmlContentRenderMode(mode) {
     applyAndSaveSetting('htmlContentRenderMode', mode, applyHtmlContentRenderMode);
 }
 
-// Helper function to filter tags from text based on export tag visibility setting
-function filterTagsForExport(text, tagVisibility = 'allexcludinglayout') {
-    if (!text) {
-        return text;
-    }
-
-    const setting = tagVisibility;
-
-    switch (setting) {
-        case 'all':
-            // Export all tags - don't filter anything
-            return text;
-        case 'allexcludinglayout':
-            // Export all except #span, #row, and #stack tags
-            return text.replace(/#row\d+\b/gi, '').replace(/#span\d+\b/gi, '').replace(/#stack\b/gi, '').trim();
-        case 'customonly':
-            // Export only custom tags and @ tags (remove standard layout tags)
-            return text.replace(/#row\d+\b/gi, '').replace(/#span\d+\b/gi, '').replace(/#stack\b/gi, '').trim();
-        case 'mentionsonly':
-            // Export only @ tags - remove all # tags
-            return text.replace(/#\w+\b/gi, '').trim();
-        case 'none':
-            // Export no tags - remove all tags
-            return text.replace(/#\w+\b/gi, '').replace(/@\w+\b/gi, '').trim();
-        default:
-            // Default to allexcludinglayout behavior
-            return text.replace(/#row\d+\b/gi, '').replace(/#span\d+\b/gi, '').replace(/#stack\b/gi, '').trim();
-    }
-}
-
 // Arrow key focus scroll setting
 let currentArrowKeyFocusScroll = 'center'; // Default to center
 
