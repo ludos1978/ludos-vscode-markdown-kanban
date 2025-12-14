@@ -2446,21 +2446,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Notify backend that webview is ready to receive messages
-    // This implements request-response pattern to avoid race conditions
+    // This implements request-response pattern - backend queues board updates until this is received
     console.log('[kanban.webview] Sending webviewReady');
     vscode.postMessage({ type: 'webviewReady' });
-
-    // Safety fallback: if no board received after 2000ms, request one
-    // This handles edge cases where webviewReady message was lost
-    setTimeout(() => {
-        if (!window.cachedBoard || !window.cachedBoard.columns || window.cachedBoard.columns.length === 0) {
-            console.log('[kanban.webview] Safety fallback: requesting board update after timeout');
-            vscode.postMessage({ type: 'requestBoardUpdate' });
-        }
-        if (!currentFileInfo) {
-            vscode.postMessage({ type: 'requestFileInfo' });
-        }
-    }, 2000);
+    vscode.postMessage({ type: 'requestFileInfo' });
 
     // Setup drag and drop
     setupDragAndDrop();
