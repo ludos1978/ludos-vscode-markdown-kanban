@@ -565,7 +565,8 @@ export class ChangeStateMachine {
         // Load new include files
         if (isColumnSwitch && targetColumn) {
             await this._includeProcessor.loadColumnIncludes(event as any, targetColumn, loadingFiles, context);
-        } else if (targetTask) {
+        } else if (targetTask && targetColumn) {
+            // Task includes require both targetTask and targetColumn (task belongs to column)
             await this._includeProcessor.loadTaskInclude(event as any, targetColumn, targetTask, loadingFiles, context);
         }
 

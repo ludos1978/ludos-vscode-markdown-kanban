@@ -8,6 +8,7 @@ import { IMainKanbanFile } from './FileInterfaces';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 import { KanbanTask } from '../board/KanbanTypes';
 import { PresentationParser } from '../services/export/PresentationParser';
+import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 /**
  * Include file types supported by the plugin system
@@ -60,16 +61,8 @@ export class IncludeFile extends MarkdownFile {
         fileType: IncludeFileType,
         isInline: boolean = false
     ) {
-        // Decode URL-encoded characters (e.g., %20 -> space) for both paths
-        let decodedRelativePath = relativePath;
-        try {
-            if (relativePath.includes('%')) {
-                decodedRelativePath = decodeURIComponent(relativePath);
-            }
-        } catch {
-            // If decoding fails, use the original path
-            decodedRelativePath = relativePath;
-        }
+        // Decode URL-encoded characters (e.g., %20 -> space)
+        const decodedRelativePath = safeDecodeURIComponent(relativePath);
 
         const absolutePath = IncludeFile._resolveAbsolutePath(decodedRelativePath, parentFile.getPath());
 
@@ -316,10 +309,8 @@ export class IncludeFile extends MarkdownFile {
         // Trigger parent to reload/reparse
         // The parent will re-read this include file and update the board
         if (this._parentFile) {
-            // Check if parent needs to be reloaded
-            const hasParentChanges = await this._parentFile.checkForExternalChanges();
-            if (hasParentChanges) {
-            }
+            // Check if parent needs to be reloaded (side effect: marks parent as having external changes)
+            await this._parentFile.checkForExternalChanges();
         }
     }
 
@@ -422,9 +413,6 @@ export class IncludeFile extends MarkdownFile {
         // - Base class detects conflict (kanban UI changes + external changes)
         // - OR document is dirty (text editor changes) AND has external changes
         const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
-
-        if (hasConflict) {
-        }
 
         return hasConflict;
     }

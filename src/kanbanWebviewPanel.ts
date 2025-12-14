@@ -27,6 +27,16 @@ import { WebviewBridge } from './core/bridge';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
 
+// Configuration constants
+/** Delay before clearing revival tracking URIs (ms) */
+const REVIVAL_TRACKING_CLEAR_DELAY_MS = 5000;
+/** Maximum number of undo states to keep */
+const MAX_UNDO_STACK_SIZE = 100;
+/** Maximum messages to batch before flushing to webview */
+const MAX_BATCH_SIZE = 10;
+/** Delay before flushing batched messages to webview (ms) */
+const BATCH_FLUSH_DELAY_MS = 50;
+
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
     private static panelStates: Map<string, any> = new Map();
@@ -213,7 +223,7 @@ export class KanbanWebviewPanel {
                     // Clear the revival tracking after a short delay (panels should be revived quickly)
                     setTimeout(() => {
                         KanbanWebviewPanel._revivedUris.clear();
-                    }, 5000);
+                    }, REVIVAL_TRACKING_CLEAR_DELAY_MS);
                 }
             }
         } else {
@@ -279,12 +289,12 @@ export class KanbanWebviewPanel {
 
         this._boardStore = new BoardStore({
             webview: this._panel.webview,
-            maxUndoStackSize: 100
+            maxUndoStackSize: MAX_UNDO_STACK_SIZE
         });
 
         this._webviewBridge = new WebviewBridge({
-            maxBatchSize: 10,
-            batchFlushDelay: 50,
+            maxBatchSize: MAX_BATCH_SIZE,
+            batchFlushDelay: BATCH_FLUSH_DELAY_MS,
             debug: isDevelopment
         });
         this._webviewBridge.setWebview(this._panel.webview);

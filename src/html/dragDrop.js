@@ -1,3 +1,31 @@
+/**
+ * dragDrop.js - Drag and Drop System for Kanban Board
+ *
+ * ARCHITECTURE NOTES:
+ * This module handles all drag/drop operations for tasks, columns, templates, and external files.
+ *
+ * EVENT LISTENER PATTERN:
+ * - Global event listeners are added ONCE via setupGlobalDragAndDrop() using the
+ *   `dragDropInitialized` guard flag to prevent duplicate listeners
+ * - 28+ event listeners are added to document/boardContainer
+ * - Only 1 removeEventListener is used (scroll handler during drag)
+ *
+ * MEMORY CONSIDERATIONS:
+ * Since VS Code webviews are fully destroyed on panel close, event listeners
+ * on document/elements are cleaned up automatically. However, if the webview
+ * is revived (serialized/deserialized), the guard flag ensures listeners
+ * aren't duplicated.
+ *
+ * FUTURE MAINTENANCE:
+ * If memory issues arise or listeners need explicit cleanup:
+ * 1. Store listener references (e.g., `const dragStartHandler = (e) => {...}`)
+ * 2. Create a teardown function that calls removeEventListener for each
+ * 3. Expose teardown via window.cleanupDragDrop for panel disposal
+ *
+ * STATE MANAGEMENT:
+ * Uses window.dragState (DragStateManager) for centralized drag state.
+ * Local state variables track initialization and drop processing.
+ */
 
 // Add debugging flag
 let lastIndicatorUpdate = 0;

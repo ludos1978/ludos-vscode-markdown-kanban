@@ -27,7 +27,7 @@ export { ValidationResult };
  * Provides discovery, validation, and conflict resolution.
  */
 export class PluginRegistry {
-    private static _instance: PluginRegistry;
+    private static instance: PluginRegistry | undefined;
 
     private _importPlugins: Map<string, ImportPlugin> = new Map();
     private _exportPlugins: Map<string, ExportPlugin> = new Map();
@@ -41,11 +41,11 @@ export class PluginRegistry {
     /**
      * Get singleton instance
      */
-    static getInstance(): PluginRegistry {
-        if (!PluginRegistry._instance) {
-            PluginRegistry._instance = new PluginRegistry();
+    public static getInstance(): PluginRegistry {
+        if (!PluginRegistry.instance) {
+            PluginRegistry.instance = new PluginRegistry();
         }
-        return PluginRegistry._instance;
+        return PluginRegistry.instance;
     }
 
     // ============= INITIALIZATION =============

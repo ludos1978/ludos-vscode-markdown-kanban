@@ -590,10 +590,8 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 await this.save();
             } else if (resolution.shouldReload) {
                 await this.reload();
-            } else if (resolution.shouldIgnore) {
-            } else {
             }
-        } else {
+            // resolution.shouldIgnore: do nothing (user chose to ignore the conflict)
         }
 
         return resolution;
@@ -623,8 +621,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 forceCreate: true  // Always create backup for conflict resolution
             });
 
-            if (success) {
-            } else {
+            if (!success) {
                 console.warn(`[${this.getFileType()}] ⚠️  Backup creation returned false: ${this._relativePath}`);
             }
         } catch (error) {

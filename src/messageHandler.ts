@@ -20,6 +20,9 @@ function log(...args: any[]) {
     getOutputChannel()?.appendLine(message);
 }
 
+/** Timeout for waiting for frontend response to stop editing request */
+const STOP_EDITING_TIMEOUT_MS = 2000;
+
 export class MessageHandler {
     private _fileManager: FileManager;
     private _boardStore: BoardStore;
@@ -159,7 +162,7 @@ export class MessageHandler {
                 this._pendingStopEditingRequests.delete(requestId);
                 console.warn('[requestStopEditing] Timeout waiting for frontend response');
                 resolve(null); // Resolve with null if timeout
-            }, 2000);
+            }, STOP_EDITING_TIMEOUT_MS);
 
             // Store promise resolver
             this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });

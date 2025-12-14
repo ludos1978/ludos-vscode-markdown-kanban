@@ -47,3 +47,21 @@ export function normalizePathForLookup(filePath: string): string {
 export function getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
+
+/**
+ * Safely decodes a URI component, returning the original string if decoding fails.
+ * Optimizes by skipping decoding when no encoded characters are present.
+ *
+ * @param str - The string to decode
+ * @returns The decoded string, or original if decoding fails
+ */
+export function safeDecodeURIComponent(str: string): string {
+    if (!str.includes('%')) {
+        return str;
+    }
+    try {
+        return decodeURIComponent(str);
+    } catch {
+        return str;
+    }
+}

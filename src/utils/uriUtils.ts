@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { safeDecodeURIComponent } from './stringUtils';
 
 /**
  * Safely create a file URI with detailed error logging
@@ -22,15 +23,8 @@ export function safeFileUri(filePath: string, context?: string): vscode.Uri {
         throw new Error(error);
     }
 
-    // Check for URL-encoded paths that might cause issues
-    if (filePath.includes('%')) {
-        // Try to decode it
-        try {
-            filePath = decodeURIComponent(filePath);
-        } catch (decodeError) {
-            // Could not decode, use as-is
-        }
-    }
+    // Decode URL-encoded paths (e.g., %20 -> space)
+    filePath = safeDecodeURIComponent(filePath);
 
     // Check for scheme-like patterns in the path (common error source)
     const schemeMatch = filePath.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//);

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { FileTypeUtils, toForwardSlashes, selectMarkdownFile } from './utils';
+import { FileTypeUtils, toForwardSlashes, selectMarkdownFile, safeDecodeURIComponent } from './utils';
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
 
@@ -276,13 +276,7 @@ export class FileManager {
         const attemptedPaths: string[] = [];
 
         // Decode URL-encoded paths (e.g., %20 -> space)
-        let decodedHref = href;
-        try {
-            decodedHref = decodeURIComponent(href);
-        } catch (error) {
-            // If decoding fails, use the original href
-            decodedHref = href;
-        }
+        const decodedHref = safeDecodeURIComponent(href);
 
         const isAbsolute = path.isAbsolute(decodedHref) ||
                         decodedHref.match(/^[a-zA-Z]:/) ||

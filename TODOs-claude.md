@@ -124,64 +124,67 @@
 
 ### Phase 1 - Type Safety (Critical)
 
-#### 10. Add Public Accessors to KanbanWebviewPanel
-- [ ] Add `getFileFactory()` method to expose `_fileFactory`
-- [ ] Add `getVscodePanel()` method to expose `_panel`
-- [ ] Add `getIncludeSwitchInProgress()` and `setIncludeSwitchInProgress()` methods
-- [ ] Update ChangeStateMachine to use new public methods
-- [ ] Update IncludeLoadingProcessor to use new public methods
+#### 10. Add Public Accessors to KanbanWebviewPanel [COMPLETE]
+- [x] Add `fileFactory` getter to expose `_fileFactory`
+- [x] Add `getPanel()` method to expose `_panel`
+- [x] Add `getIncludeSwitchInProgress()` and `setIncludeSwitchInProgress()` methods
+- [x] Update ChangeStateMachine to use new public methods
+- [x] Update IncludeLoadingProcessor to use new public methods
 - **Impact:** Remove 17+ `as any` casts
 
-#### 11. Add Public Setters to MarkdownFile
-- [ ] Add `setExists(value: boolean)` method
-- [ ] Add `getHasFileSystemChanges()` method
-- [ ] Update UnifiedChangeHandler to use new methods instead of bracket notation
+#### 11. Add Public Setters to MarkdownFile [COMPLETE]
+- [x] Add `setExists(value: boolean)` method
+- [x] Add `getHasFileSystemChanges()` method (renamed to `hasExternalChanges()`)
+- [x] Update UnifiedChangeHandler to use new methods instead of bracket notation
 - **Impact:** Proper encapsulation, remove bracket notation hacks
 
-#### 12. Type IncludeLoadingDependencies Properly
-- [ ] Replace `any` types in `IncludeLoadingDependencies` interface
-- [ ] Type `TargetResolution` with proper `KanbanColumn` and `KanbanTask` types
-- [ ] Add proper types throughout IncludeLoadingProcessor methods
+#### 12. Type IncludeLoadingDependencies Properly [COMPLETE]
+- [x] Replace `any` types in `IncludeLoadingDependencies` interface
+- [x] Type `TargetResolution` with proper `KanbanColumn` and `KanbanTask` types
+- [x] Add proper types throughout IncludeLoadingProcessor methods
 - **Impact:** Restore type safety in core processor
 
 ### Phase 2 - Code Cleanup (Medium)
 
-#### 13. Remove Empty If Blocks
-- [ ] MainKanbanFile.ts:389-390 - Remove `if (hasConflict) { }`
-- [ ] MarkdownFile.ts:589-590 - Remove empty `else if` and `else` blocks
-- [ ] MarkdownFile.ts:622-623 - Remove empty `if/else` blocks
-- [ ] IncludeFile.ts:321-322 - Remove `if (hasParentChanges) { }`
-- [ ] IncludeFile.ts:426-427 - Remove `if (hasConflict) { }`
-- [ ] MarkdownFileRegistry.ts:464-465 - Remove `if (existingBoard) { }`
+#### 13. Remove Empty If Blocks [COMPLETE]
+- [x] MainKanbanFile.ts:389-390 - Remove `if (hasConflict) { }`
+- [x] MarkdownFile.ts:589-590 - Remove empty `else if` and `else` blocks
+- [x] MarkdownFile.ts:622-623 - Remove empty `if/else` blocks
+- [x] IncludeFile.ts:321-322 - Remove `if (hasParentChanges) { }` (not present - different code)
+- [x] IncludeFile.ts:426-427 - Remove `if (hasConflict) { }` (simplified hasConflict logic)
+- [x] MarkdownFileRegistry.ts:464-465 - Remove `if (existingBoard) { }`
 - **Impact:** Clean dead code
 
-#### 14. Standardize Singleton Pattern
-- [ ] Rename `_instance` to `instance` in PluginRegistry
-- [ ] Rename `_instance` to `instance` in SaveTransactionManager
-- [ ] Rename `_instance` to `instance` in WatcherCoordinator
-- [ ] Add `| undefined` to ConfigurationService instance type
-- [ ] Make all `getInstance()` methods consistently `public static`
+#### 14. Standardize Singleton Pattern [COMPLETE]
+- [x] Rename `_instance` to `instance` in PluginRegistry
+- [x] Rename `_instance` to `instance` in SaveTransactionManager
+- [x] Rename `_instance` to `instance` in WatcherCoordinator
+- [x] Add `| undefined` to ConfigurationService instance type
+- [x] Make all `getInstance()` methods consistently `public static`
 - **Impact:** Consistent patterns across codebase
 
-#### 15. Extract safeDecodeURIComponent Utility
-- [ ] Create `safeDecodeURIComponent(str: string): string` in utils/stringUtils.ts
-- [ ] Update fileManager.ts to use new utility
-- [ ] Update utils/uriUtils.ts to use new utility
-- [ ] Update fileSearchService.ts to use new utility
-- [ ] Update files/IncludeFile.ts to use new utility
-- [ ] Update services/PathResolver.ts to use new utility
+#### 15. Extract safeDecodeURIComponent Utility [COMPLETE]
+- [x] Create `safeDecodeURIComponent(str: string): string` in utils/stringUtils.ts
+- [x] Update fileManager.ts to use new utility
+- [x] Update utils/uriUtils.ts to use new utility
+- [x] Update fileSearchService.ts to use new utility
+- [x] Update files/IncludeFile.ts to use new utility
+- [x] Update services/PathResolver.ts to use new utility
 - **Impact:** DRY - remove 5 duplicate patterns
 
-#### 16. Extract Magic Numbers to Constants
-- [ ] Create constants for timeout values (2000ms, 5000ms, 200ms debounce)
-- [ ] Update messageHandler.ts, kanbanWebviewPanel.ts, fileSearchService.ts
+#### 16. Extract Magic Numbers to Constants [COMPLETE]
+- [x] Create constants for timeout values (2000ms, 5000ms, 200ms debounce)
+- [x] Update messageHandler.ts - STOP_EDITING_TIMEOUT_MS
+- [x] Update kanbanWebviewPanel.ts - REVIVAL_TRACKING_CLEAR_DELAY_MS, MAX_UNDO_STACK_SIZE, MAX_BATCH_SIZE, BATCH_FLUSH_DELAY_MS
+- [x] Update fileSearchService.ts - SEARCH_DEBOUNCE_DELAY_MS, MAX_SEARCH_RESULTS, MAX_RESULTS_PER_PATTERN, MAX_REGEX_RESULTS
 - **Impact:** Clearer code intent
 
 ### Phase 3 - Frontend (Lower Priority, Larger Effort)
 
-#### 17. Document Frontend Event Listener Issues
-- [ ] Add comment in dragDrop.js about listener cleanup needs
-- [ ] Create tracking issue for future frontend refactoring
+#### 17. Document Frontend Event Listener Issues [COMPLETE]
+- [x] Add comprehensive documentation comment in dragDrop.js about event listener architecture
+- [x] Document the `dragDropInitialized` guard pattern
+- [x] Add guidance for future maintenance/cleanup if needed
 - **Impact:** Technical debt documented
 
 ### Deferred (Requires Major Refactoring)

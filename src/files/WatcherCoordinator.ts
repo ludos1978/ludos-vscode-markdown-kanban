@@ -31,7 +31,7 @@ interface QueuedOperation {
  * Queues operations when a file is already being operated on.
  */
 export class WatcherCoordinator {
-    private static _instance: WatcherCoordinator;
+    private static instance: WatcherCoordinator | undefined;
     private readonly DEFAULT_TIMEOUT_MS = 5000;
 
     // Track active operations per file
@@ -42,11 +42,11 @@ export class WatcherCoordinator {
 
     private constructor() {}
 
-    static getInstance(): WatcherCoordinator {
-        if (!WatcherCoordinator._instance) {
-            WatcherCoordinator._instance = new WatcherCoordinator();
+    public static getInstance(): WatcherCoordinator {
+        if (!WatcherCoordinator.instance) {
+            WatcherCoordinator.instance = new WatcherCoordinator();
         }
-        return WatcherCoordinator._instance;
+        return WatcherCoordinator.instance;
     }
 
     /**

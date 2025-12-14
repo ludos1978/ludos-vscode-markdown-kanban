@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 /**
  * Path resolution utility for handling relative paths from webview
@@ -18,15 +19,7 @@ export class PathResolver {
         }
 
         // Decode URL-encoded paths (from webview)
-        let decoded = relativePath;
-        if (relativePath.includes('%')) {
-            try {
-                decoded = decodeURIComponent(relativePath);
-            } catch (error) {
-                // If decoding fails, use original (might not be URL-encoded)
-                decoded = relativePath;
-            }
-        }
+        const decoded = safeDecodeURIComponent(relativePath);
 
         // If already absolute, return as-is
         if (path.isAbsolute(decoded)) {

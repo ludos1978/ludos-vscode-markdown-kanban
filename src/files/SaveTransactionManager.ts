@@ -34,7 +34,7 @@ interface ActiveTransaction {
  * Ensures save operations are atomic with timeout-based rollback.
  */
 export class SaveTransactionManager {
-    private static _instance: SaveTransactionManager;
+    private static instance: SaveTransactionManager | undefined;
     private readonly TRANSACTION_TIMEOUT_MS = 30000;
 
     // Track active save transactions
@@ -42,11 +42,11 @@ export class SaveTransactionManager {
 
     private constructor() {}
 
-    static getInstance(): SaveTransactionManager {
-        if (!SaveTransactionManager._instance) {
-            SaveTransactionManager._instance = new SaveTransactionManager();
+    public static getInstance(): SaveTransactionManager {
+        if (!SaveTransactionManager.instance) {
+            SaveTransactionManager.instance = new SaveTransactionManager();
         }
-        return SaveTransactionManager._instance;
+        return SaveTransactionManager.instance;
     }
 
     /**

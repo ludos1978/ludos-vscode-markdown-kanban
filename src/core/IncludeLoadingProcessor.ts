@@ -15,6 +15,8 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { FileFactory } from '../files/FileFactory';
 import { MarkdownFile } from '../files/MarkdownFile';
+import { MainKanbanFile } from '../files/MainKanbanFile';
+import { IncludeFile } from '../files/IncludeFile';
 
 /**
  * Interface for webview panel dependencies needed by this processor
@@ -195,12 +197,14 @@ export class IncludeLoadingProcessor {
             if (file) {
                 await this._loadFileContent(file, preloadedContent);
 
-                if (file.parseToTasks) {
+                // Cast to IncludeFile - we know it's a column include from _ensureColumnIncludeRegistered
+                const includeFile = file as IncludeFile;
+                if (includeFile.getFileType() === 'include-column') {
                     const mainFilePath = mainFile.getPath();
-                    const fileTasks = file.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
+                    const fileTasks = includeFile.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
                     tasks.push(...fileTasks);
                 } else {
-                    console.error(`[IncludeLoadingProcessor] File has no parseToTasks method: ${relativePath}`);
+                    console.error(`[IncludeLoadingProcessor] File is not a column include: ${relativePath}`);
                 }
             } else {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
@@ -216,8 +220,8 @@ export class IncludeLoadingProcessor {
      */
     async loadTaskInclude(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: any,
-        targetTask: any,
+        targetColumn: KanbanColumn,
+        targetTask: KanbanTask,
         loadingFiles: string[],
         context: ChangeContext
     ): Promise<void> {
@@ -273,7 +277,7 @@ export class IncludeLoadingProcessor {
 
     private _restoreTaskIncludeFromLoadedFile(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetTask: any,
+        targetTask: KanbanTask,
         newFiles: string[]
     ): void {
         const relativePath = newFiles[0];
@@ -305,7 +309,7 @@ export class IncludeLoadingProcessor {
 
     private _restoreColumnIncludeFromLoadedFiles(
         event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: any,
+        targetColumn: KanbanColumn,
         newFiles: string[]
     ): void {
         targetColumn.includeFiles = newFiles;
@@ -321,12 +325,12 @@ export class IncludeLoadingProcessor {
         // Re-load tasks from already-loaded files
         const mainFile = this._fileRegistry.getMainFile();
         const mainFilePath = mainFile?.getPath();
-        const tasks: any[] = [];
+        const tasks: KanbanTask[] = [];
 
         for (const relativePath of newFiles) {
             const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file && file.parseToTasks) {
-                const fileTasks = file.parseToTasks([], targetColumn.id, mainFilePath);
+            if (file && (file as any).parseToTasks) {
+                const fileTasks = (file as any).parseToTasks([], targetColumn.id, mainFilePath);
                 tasks.push(...fileTasks);
             }
         }
@@ -352,9 +356,9 @@ export class IncludeLoadingProcessor {
 
     private async _ensureColumnIncludeRegistered(
         relativePath: string,
-        targetColumn: any,
-        fileFactory: any,
-        mainFile: any
+        targetColumn: KanbanColumn,
+        fileFactory: FileFactory,
+        mainFile: MainKanbanFile
     ): Promise<void> {
         const existingFile = this._fileRegistry.getByRelativePath(relativePath);
         const isCorrectType = existingFile?.getFileType() === 'include-column';
@@ -362,7 +366,7 @@ export class IncludeLoadingProcessor {
         if (!existingFile || !isCorrectType) {
             if (existingFile && !isCorrectType) {
                 existingFile.stopWatching();
-                this._fileRegistry.unregister(existingFile);
+                this._fileRegistry.unregister(existingFile.getPath());
             }
 
             const columnInclude = fileFactory.createIncludeDirect(relativePath, mainFile, 'include-column', false);
@@ -375,10 +379,10 @@ export class IncludeLoadingProcessor {
 
     private async _ensureTaskIncludeRegistered(
         relativePath: string,
-        targetColumn: any,
-        targetTask: any,
-        fileFactory: any,
-        mainFile: any
+        targetColumn: KanbanColumn,
+        targetTask: KanbanTask,
+        fileFactory: FileFactory,
+        mainFile: MainKanbanFile
     ): Promise<void> {
         const existingFile = this._fileRegistry.getByRelativePath(relativePath);
         const isCorrectType = existingFile?.getFileType() === 'include-task';
@@ -386,7 +390,7 @@ export class IncludeLoadingProcessor {
         if (!existingFile || !isCorrectType) {
             if (existingFile && !isCorrectType) {
                 existingFile.stopWatching();
-                this._fileRegistry.unregister(existingFile);
+                this._fileRegistry.unregister(existingFile.getPath());
             }
 
             const taskInclude = fileFactory.createInclude(relativePath, mainFile, 'include-task', false);
@@ -398,7 +402,7 @@ export class IncludeLoadingProcessor {
         }
     }
 
-    private async _loadFileContent(file: any, preloadedContent: string | undefined): Promise<void> {
+    private async _loadFileContent(file: MarkdownFile, preloadedContent: string | undefined): Promise<void> {
         if (preloadedContent !== undefined) {
             // Use preloaded content (marks as unsaved)
             file.setContent(preloadedContent, false);

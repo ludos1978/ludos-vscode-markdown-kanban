@@ -460,10 +460,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns KanbanBoard with all include content loaded, or undefined if main file not ready
      */
     public generateBoard(existingBoard?: KanbanBoard): KanbanBoard | undefined {
-
-        if (existingBoard) {
-        }
-
         // Step 1: Get main file
         const mainFile = this.getMainFile();
         if (!mainFile) {

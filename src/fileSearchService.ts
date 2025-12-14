@@ -1,6 +1,15 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { escapeRegExp } from './utils/stringUtils';
+import { escapeRegExp, safeDecodeURIComponent } from './utils/stringUtils';
+
+/** Debounce delay for search input (ms) */
+const SEARCH_DEBOUNCE_DELAY_MS = 200;
+/** Maximum results to return from search */
+const MAX_SEARCH_RESULTS = 200;
+/** Maximum results per glob pattern for workspace search */
+const MAX_RESULTS_PER_PATTERN = 200;
+/** Maximum results for regex searches (broader) */
+const MAX_REGEX_RESULTS = 1000;
 
 export class FileSearchService {
     private _extensionUri?: vscode.Uri;
@@ -14,20 +23,8 @@ export class FileSearchService {
      * Provides the same UX in dev and production: preview on hover, Enter to accept.
      */
     async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<vscode.Uri | undefined> {
-        // Try URL decoding if path contains % (only if it's valid decoding)
-        let decodedPath = originalPath;
-        if (originalPath.includes('%')) {
-            try {
-                const decoded = decodeURIComponent(originalPath);
-                // Only use decoded path if it's actually different (valid decoding occurred)
-                if (decoded !== originalPath) {
-                    decodedPath = decoded;
-                }
-            } catch {
-                // If decoding fails, use original path
-                decodedPath = originalPath;
-            }
-        }
+        // Decode URL-encoded paths (e.g., %20 -> space)
+        const decodedPath = safeDecodeURIComponent(originalPath);
 
         const nameRoot = path.parse(path.basename(decodedPath)).name;
 
@@ -232,7 +229,7 @@ export class FileSearchService {
 
                 const workspaceSearch = (async () => {
                     try {
-                        const maxPerPattern = useRegex ? 1000 : 200;
+                        const maxPerPattern = useRegex ? MAX_REGEX_RESULTS : MAX_RESULTS_PER_PATTERN;
                         const ops = patterns.map(p => vscode.workspace.findFiles(p, excludePattern, maxPerPattern));
                         const batches = await Promise.all(ops);
                         for (const batch of batches) {
@@ -248,7 +245,7 @@ export class FileSearchService {
                     try {
                         const visited = new Set<string>();
                         let foundCount = 0;
-                        const maxResults = 200;
+                        const maxResults = MAX_SEARCH_RESULTS;
                         const scan = async (dirFsPath: string) => {
                             if (seq !== searchSeq) {return;} // cancel
                             if (foundCount >= maxResults) {return;}
@@ -306,7 +303,7 @@ export class FileSearchService {
             // Debounced dynamic term handling and button toggles
             disposables.push(quickPick.onDidChangeValue((value) => {
                 if (debounceTimer) {clearTimeout(debounceTimer);}
-                debounceTimer = setTimeout(() => startSearch(value), 200);
+                debounceTimer = setTimeout(() => startSearch(value), SEARCH_DEBOUNCE_DELAY_MS);
             }));
 
             disposables.push(quickPick.onDidTriggerButton((button) => {

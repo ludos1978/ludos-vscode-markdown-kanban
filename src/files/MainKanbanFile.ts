@@ -386,9 +386,6 @@ export class MainKanbanFile extends MarkdownFile {
         // - OR document is dirty (text editor changes) AND has external changes
         const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
 
-        if (hasConflict) {
-        }
-
         return hasConflict;
     }
 

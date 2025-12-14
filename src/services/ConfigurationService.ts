@@ -88,7 +88,7 @@ export interface ConfigurationDefaults {
 }
 
 export class ConfigurationService {
-    private static instance: ConfigurationService;
+    private static instance: ConfigurationService | undefined;
     private cache: Map<string, any> = new Map();
     private readonly CONFIGURATION_SECTION = 'markdown-kanban';
 
