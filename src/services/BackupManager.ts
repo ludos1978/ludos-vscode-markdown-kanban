@@ -14,16 +14,8 @@ export class BackupManager {
     private _backupTimer: NodeJS.Timer | null = null;
     private _lastBackupTime: Date | null = null;
     private _lastContentHash: string | null = null;
-    private _lastUnsavedChangeTime: Date | null = null;
 
     constructor() {}
-
-    /**
-     * Mark when unsaved changes occurred (for page hidden logic)
-     */
-    public markUnsavedChanges(): void {
-        this._lastUnsavedChangeTime = new Date();
-    }
 
     /**
      * Create a backup of the given document

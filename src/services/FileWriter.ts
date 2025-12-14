@@ -80,48 +80,6 @@ export class FileWriter {
     }
 
     /**
-     * Write multiple files in a batch operation
-     * More efficient than calling writeFile multiple times
-     *
-     * @param files - Array of files to write
-     * @param options - Write options (applied to all files)
-     * @returns Array of write results
-     */
-    static async writeBatch(
-        files: FileToWrite[],
-        options: FileWriteOptions = {}
-    ): Promise<FileWriteResult[]> {
-        const results: FileWriteResult[] = [];
-
-        for (const file of files) {
-            const result = await this.writeFile(
-                file.filePath,
-                file.content,
-                { ...options, showNotification: false } // Suppress individual notifications
-            );
-            results.push(result);
-        }
-
-        // Show summary notification
-        if (options.showNotification !== false) {
-            const successCount = results.filter(r => r.success).length;
-            const totalCount = results.length;
-
-            if (successCount === totalCount) {
-                vscode.window.showInformationMessage(
-                    `Successfully wrote ${successCount} file(s)`
-                );
-            } else {
-                vscode.window.showWarningMessage(
-                    `Wrote ${successCount}/${totalCount} file(s). Some files failed.`
-                );
-            }
-        }
-
-        return results;
-    }
-
-    /**
      * Create a backup of a file
      *
      * @param filePath - Path to the file to backup
@@ -143,52 +101,6 @@ export class FileWriter {
         fs.copyFileSync(filePath, backupPath);
 
         return backupPath;
-    }
-
-    /**
-     * Check if a file exists
-     *
-     * @param filePath - Path to check
-     * @returns True if file exists
-     */
-    static fileExists(filePath: string): boolean {
-        try {
-            return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Check if a directory exists
-     *
-     * @param dirPath - Path to check
-     * @returns True if directory exists
-     */
-    static directoryExists(dirPath: string): boolean {
-        try {
-            return fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory();
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Create directory if it doesn't exist
-     *
-     * @param dirPath - Directory path
-     * @returns Success status
-     */
-    static ensureDirectory(dirPath: string): boolean {
-        try {
-            if (!this.directoryExists(dirPath)) {
-                fs.mkdirSync(dirPath, { recursive: true });
-            }
-            return true;
-        } catch (error) {
-            console.error(`Failed to create directory ${dirPath}:`, error);
-            return false;
-        }
     }
 }
 
@@ -226,13 +138,3 @@ export interface FileWriteResult {
     error?: string;
 }
 
-/**
- * Represents a file to be written in batch operations
- */
-export interface FileToWrite {
-    /** Absolute path where the file should be written */
-    filePath: string;
-
-    /** Content to write to the file */
-    content: string;
-}

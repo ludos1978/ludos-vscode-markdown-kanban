@@ -48,18 +48,6 @@ export class PluginRegistry {
         return PluginRegistry._instance;
     }
 
-    /**
-     * Reset the singleton (for testing)
-     */
-    static resetInstance(): void {
-        if (PluginRegistry._instance) {
-            PluginRegistry._instance._importPlugins.clear();
-            PluginRegistry._instance._exportPlugins.clear();
-            PluginRegistry._instance._initialized = false;
-        }
-        PluginRegistry._instance = undefined as any;
-    }
-
     // ============= INITIALIZATION =============
 
     /**
@@ -361,26 +349,5 @@ export class PluginRegistry {
         }
 
         return result;
-    }
-
-    /**
-     * Get debug info about registered plugins
-     */
-    getDebugInfo(): { import: any[]; export: any[] } {
-        return {
-            import: this.getAllImportPlugins().map(p => ({
-                id: p.metadata.id,
-                name: p.metadata.name,
-                priority: p.metadata.priority,
-                fileType: p.metadata.fileType,
-                contextLocation: p.metadata.contextLocation,
-                pattern: p.metadata.includePattern.source
-            })),
-            export: this.getAllExportPlugins().map(p => ({
-                id: p.metadata.id,
-                name: p.metadata.name,
-                formats: p.metadata.formats.map(f => f.id)
-            }))
-        };
     }
 }

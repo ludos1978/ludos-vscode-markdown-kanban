@@ -444,9 +444,6 @@ export class KanbanWebviewPanel {
                             mainFile2.setContent(markdown, false); // false = mark as unsaved
                         }
 
-                        // Track when unsaved changes occur for backup timing
-                        this._backupManager.markUnsavedChanges();
-
                         // Attempt to create backup if minimum interval has passed
                         const document = this._fileManager.getDocument();
                         if (document) {

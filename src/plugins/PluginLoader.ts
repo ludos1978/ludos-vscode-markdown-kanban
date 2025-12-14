@@ -93,27 +93,4 @@ export class PluginLoader {
 
         await registry.initialize(context);
     }
-
-    /**
-     * Check if plugins have been loaded
-     */
-    static isLoaded(): boolean {
-        return this._loaded;
-    }
-
-    /**
-     * Reset loader state (for testing)
-     */
-    static reset(): void {
-        this._loaded = false;
-        PluginRegistry.resetInstance();
-    }
-
-    /**
-     * Get debug information about loaded plugins
-     */
-    static getDebugInfo(): { import: any[]; export: any[] } {
-        const registry = PluginRegistry.getInstance();
-        return registry.getDebugInfo();
-    }
 }

@@ -5,7 +5,7 @@
  * Import { BoardOperations } from './board' for the unified class.
  */
 
-import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
+import { KanbanBoard, KanbanTask } from '../markdownParser';
 import { BoardCrudOperations } from './BoardCrudOperations';
 import { GatherQueryEngine } from './GatherQueryEngine';
 
@@ -127,10 +127,6 @@ export class BoardOperations {
 
     public moveColumnWithRowUpdate(board: KanbanBoard, columnId: string, newPosition: number, newRow: number): boolean {
         return this._crudOperations.moveColumnWithRowUpdate(board, columnId, newPosition, newRow);
-    }
-
-    public getColumnRow(column: KanbanColumn): number {
-        return this._crudOperations.getColumnRow(column);
     }
 
     public cleanupRowTags(board: KanbanBoard): boolean {
