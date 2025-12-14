@@ -407,11 +407,9 @@ export class IncludeLoadingProcessor {
             // Use preloaded content (marks as unsaved)
             file.setContent(preloadedContent, false);
         } else {
-            // Reload from disk if no unsaved changes
-            const hasUnsaved = file.hasUnsavedChanges();
-            if (!hasUnsaved) {
-                await file.reload();
-            }
+            // Always reload from disk during include switch
+            // User was already prompted about unsaved changes in PROMPTING_USER state
+            await file.reload();
         }
     }
 }

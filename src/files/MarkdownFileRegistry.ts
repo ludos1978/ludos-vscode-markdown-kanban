@@ -124,6 +124,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
         this._files.delete(path);
         this._filesByRelativePath.delete(normalizedRelativePath); // FOUNDATION-1: Use normalized key
+        this._registrationCache.delete(normalizedRelativePath); // Allow re-registration after unregister
 
         // Dispose the file
         file.dispose();

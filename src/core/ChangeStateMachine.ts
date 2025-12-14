@@ -467,6 +467,9 @@ export class ChangeStateMachine {
         // Clear frontend cache based on event type
         const event = context.event;
 
+        // Get panel for immediate frontend updates
+        const panel = this._webviewPanel?.getPanel();
+
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
                 // Column include switch - clear column tasks
@@ -475,6 +478,20 @@ export class ChangeStateMachine {
                     column.tasks = [];
                     column.includeFiles = [];
                     column.includeMode = false;
+
+                    // Immediately update frontend to show empty column
+                    if (panel) {
+                        panel.webview.postMessage({
+                            type: 'updateColumnContent',
+                            columnId: column.id,
+                            columnTitle: column.title,
+                            displayTitle: column.displayTitle,
+                            tasks: [],
+                            includeMode: false,
+                            includeFiles: [],
+                            isLoadingContent: true
+                        });
+                    }
                 }
             } else if (event.target === 'task') {
                 // Task include switch - clear task description
@@ -485,6 +502,22 @@ export class ChangeStateMachine {
                     task.displayTitle = '';
                     task.description = '';
                     task.includeMode = false;
+
+                    // Immediately update frontend to show empty task
+                    if (panel) {
+                        panel.webview.postMessage({
+                            type: 'updateTaskContent',
+                            columnId: column.id,
+                            taskId: task.id,
+                            description: '',
+                            displayTitle: '',
+                            taskTitle: task.title,
+                            originalTitle: task.originalTitle,
+                            includeMode: false,
+                            includeFiles: [],
+                            isLoadingContent: true
+                        });
+                    }
                 }
             }
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
@@ -495,15 +528,45 @@ export class ChangeStateMachine {
                     column.tasks = [];
                     column.includeFiles = [];
                     column.includeMode = false;
+
+                    // Immediately update frontend to show empty column
+                    if (panel) {
+                        panel.webview.postMessage({
+                            type: 'updateColumnContent',
+                            columnId: column.id,
+                            columnTitle: column.title,
+                            displayTitle: column.displayTitle,
+                            tasks: [],
+                            includeMode: false,
+                            includeFiles: [],
+                            isLoadingContent: true
+                        });
+                    }
                 }
             } else if (event.editType === 'task_title') {
                 const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
                 const task = column?.tasks.find((t: any) => t.id === event.params.taskId);
-                if (task) {
+                if (task && column) {
                     task.includeFiles = [];
                     task.displayTitle = '';
                     task.description = '';
                     task.includeMode = false;
+
+                    // Immediately update frontend to show empty task
+                    if (panel) {
+                        panel.webview.postMessage({
+                            type: 'updateTaskContent',
+                            columnId: column.id,
+                            taskId: task.id,
+                            description: '',
+                            displayTitle: '',
+                            taskTitle: task.title,
+                            originalTitle: task.originalTitle,
+                            includeMode: false,
+                            includeFiles: [],
+                            isLoadingContent: true
+                        });
+                    }
                 }
             }
         }
