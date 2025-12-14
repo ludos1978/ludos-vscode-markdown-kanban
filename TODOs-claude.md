@@ -74,6 +74,16 @@
 3. Cleaner message handling in state machine
 4. Better helper method organization
 
+### 7. Remove Dead Commented Code
+- [x] Removed 90 lines of commented-out duplicate validation code from `ChangeStateMachine.ts`
+- [x] Code was marked "TEMPORARY: Disable duplicate validation" but never re-enabled
+- **Impact:** -90 lines, cleaner state machine
+
+### 8. Update Documentation
+- [x] Updated `agent/FUNCTIONS.md` - replaced stale DocumentStateModel docs with PanelContext
+- [x] Removed stale EventBus reference from WebviewBridge properties
+- **Impact:** Documentation now matches actual code
+
 ## Additional Analysis (No Changes Needed)
 
 ### Final Codebase Check
@@ -86,3 +96,10 @@
 - [x] 13 circular dependencies exist (legacy, separate concern)
 
 **Codebase Status:** Clean, well-structured, ~30k lines TypeScript
+
+## Updated Summary
+
+**Total Lines Removed:** ~590+ lines
+**Files Deleted:** 6 files
+**Files Modified:** 10+ files
+**Documentation Updated:** agent/FUNCTIONS.md

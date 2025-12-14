@@ -6,13 +6,14 @@
 - if there are undone tasks in the TODOs-highlevel.md work on these. You can create individual tasks in the TODOs.md to manage workflow over multiple sessions, dont forget to mark the highlevel todos as done when planning has been done.
 - You may not add any functions, except if have not checked all the existing functions before for similar functionality or ones that might easily be extended to cover the feature. There must absoletely be no multiple functions that handle similar functions. Check the full code before you add any a new function.
 - Never do any lazy refactorings. Eighter we optimize the code or we leave it, but dont add any additional wrappers and leave the code it executes untouched!
-  - when migrating, copy the complete code and verify line by line that it's functionality is retained, fixed and migrated.
-  - only do a refactoring if it's really helpful in code organisation.
-  - how complex a refactoring is is irrelevant.
+  - When migrating, copy the complete code and verify line by line that it's functionality is retained, fixed and migrated.
+  - Only do a refactoring if it's really helpful in code organisation.
+  - how complex a refactoring is, is irrelevant.
   - our focus is keeping the code simple and in a clean structure!
   - do not stop with the refactoring until you are completely finished. this must include completely removing any old or obsolete code! if you need to stop, as the last sentence, mention that you are not finished with the work!
   - only stop for questions that the user must answer.
-- for every larger action you take. think about the positive and negative aspects of implementing it and the positive and negative aspects of not implementing it. weight both sides against each other before taking action. only implement the change if its more then 60% positive! It does not matter how hard the task is, only the impact on the expected result!
+- for every larger action you take. think about the positive and negative outcome of implementing it and the positive and negative outcome of not implementing it. Do not consider the work involved to do it, only the result of the work you would do. weight both sides against each other before taking action. only implement the change if its more then 60% positive! It does not matter how hard the task is, only weight in the impact on the expected result!
+- if a thought is a result of unfounded and illogical reasoning, then trash it. Only consider thoughts that are helping towards a good product.
 
 ## General rules about handling data:
 - use relative paths, relative to the main kanban file for all data storage, except for included files, they use relative paths to theyr own location.
@@ -81,3 +82,5 @@
 - Do not assume, rather ask if something is required to implement a feature or change
 - If we worked on a problem which was not successfully solved, analyze what might have gone wrong and dont repeat the error.
 - dont write reports of the tasks you finish, except if the user specifically requests it, othervise the chat is enough to track the progress.
+
+ALL RULES IN THE AGENT.MD DO NOT NEED TO BE VERIFIED BY ASKING THE USER AGAIN.

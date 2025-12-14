@@ -11,44 +11,53 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ## Recent Critical Fixes & New Functions (State Consolidation)
 
-### DocumentStateModel: Single Source of Truth for Document State (2025-12-14)
+### PanelContext: Unified Panel State Management (2025-12-14)
 
-**File:** [src/panel/DocumentStateModel.ts](src/panel/DocumentStateModel.ts)
+**File:** [src/panel/PanelContext.ts](src/panel/PanelContext.ts)
 
-**Purpose:** Eliminates state duplication between KanbanWebviewPanel and KanbanFileService. Previously, `_lastDocumentVersion`, `_lastDocumentUri`, `_trackedDocumentUri`, and `_panelId` were stored in both classes and synchronized via `initializeState()` / `getState()` methods. Now a single `DocumentStateModel` instance is shared by reference.
+**Purpose:** Consolidates PanelStateModel and DocumentStateModel into a single source of truth for all panel-related state. Eliminates state duplication and coordination bugs between KanbanWebviewPanel and KanbanFileService.
+
+**Panel Flag Properties:**
+- `initialized` - Panel has completed initialization
+- `updatingFromPanel` - Currently updating from webview
+- `undoRedoOperation` - Undo/redo in progress
+- `closingPrevented` - Panel close prevented for unsaved changes
+- `disposed` - Panel has been disposed
+- `editingInProgress` - User is editing content
+- `initialBoardLoad` - First board load in progress
+- `includeSwitchInProgress` - Include file switch in progress
+- `webviewReady` - Webview is ready to receive messages
+
+**Document State Properties:**
+- `lastDocumentVersion` - Tracked document version
+- `lastDocumentUri` - Last loaded document URI
+- `trackedDocumentUri` - URI for panel tracking/mapping
+- `pendingBoardUpdate` - Queued board update for webview
+- `panelId` - Unique panel identifier
 
 **Public Methods:**
-- `constructor(panelId?, debugMode?)` - Create new instance with optional panel ID
-- `get lastDocumentVersion()` - Get tracked document version
-- `get lastDocumentUri()` - Get last loaded document URI
-- `get trackedDocumentUri()` - Get URI for panel tracking
-- `get pendingBoardUpdate()` - Get queued board update
-- `get panelId()` - Get unique panel identifier
-- `setLastDocumentVersion(version)` - Update tracked version
-- `setLastDocumentUri(uri)` - Update last document URI
-- `setTrackedDocumentUri(uri)` - Update tracked URI for panel map
-- `setPendingBoardUpdate(update)` - Queue board update for webview
+- `constructor(panelId?, debugMode?)` - Create new instance
+- Flag setters: `setInitialized()`, `setUpdatingFromPanel()`, etc.
+- Document setters: `setLastDocumentVersion()`, `setLastDocumentUri()`, etc.
 - `consumePendingBoardUpdate()` - Get and clear pending update atomically
 - `toSnapshot()` - Create serializable snapshot for panel restoration
 - `fromSnapshot(snapshot)` - Restore state from snapshot
 - `static fromSnapshot(snapshot, debugMode?)` - Create new instance from snapshot
 
 **Interfaces:**
-- `PendingBoardUpdate` - Structure for queued board updates
-- `DocumentStateSnapshot` - Serializable state for persistence
+- `PendingBoardUpdate` - Structure for queued board updates (applyDefaultFolding, isFullRefresh)
+- `PanelContextSnapshot` - Serializable state for persistence
 
 **Integration:**
 - Created in `KanbanWebviewPanel` constructor
 - Passed to `KanbanFileService` constructor (shared reference)
 - Both classes access same instance directly (no sync needed)
-- Removed `initializeState()` method from KanbanFileService
-- Simplified `getState()` to return only service-specific state
 
 **Benefits:**
 - Single source of truth (eliminates sync bugs)
-- Clear ownership of document-tracking concerns
+- Combines panel flags + document tracking in one place
 - Supports serialization for panel restoration
-- Better testability (injectable dependency)
+- Debug mode logging for state changes
 
 ---
 
@@ -1339,8 +1348,8 @@ WebviewBridge provides a typed, promise-based interface for webview communicatio
 
 ### Properties:
 - _webview: vscode.Webview | null - Current webview instance
-- _eventBus: PanelEventBus - Event bus for bridge events
 - _isReady: boolean - Whether bridge is ready to send
+- _isDisposed: boolean - Whether bridge has been disposed
 - _pendingRequests: Map - Pending request/response operations
 - _batchedMessages: OutgoingMessage[] - Messages awaiting batch flush
 - _defaultTimeout: number - Default request timeout (5000ms)
