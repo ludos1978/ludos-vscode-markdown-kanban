@@ -16,7 +16,7 @@ export {
 } from './interfaces';
 
 // Registry
-export { CommandRegistry, ValidationResult, CommandStats } from './CommandRegistry';
+export { CommandRegistry, ValidationResult } from './CommandRegistry';
 
 // Command implementations
 export { TaskCommands } from './TaskCommands';

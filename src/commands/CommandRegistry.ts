@@ -16,19 +16,6 @@ import { ValidationResult } from '../shared/interfaces';
 export { ValidationResult };
 
 /**
- * Command execution statistics
- */
-export interface CommandStats {
-    messageType: string;
-    commandId: string;
-    executionCount: number;
-    totalDurationMs: number;
-    avgDurationMs: number;
-    lastExecuted: Date | null;
-    errorCount: number;
-}
-
-/**
  * Command Registry
  *
  * Per-instance registry for message commands.
@@ -42,7 +29,6 @@ export class CommandRegistry {
     private _messageTypeToCommand: Map<string, MessageCommand> = new Map();
     private _context?: CommandContext;
     private _initialized: boolean = false;
-    private _stats: Map<string, CommandStats> = new Map();
 
     constructor() {
         // Per-instance - each MessageHandler gets its own registry
@@ -54,7 +40,6 @@ export class CommandRegistry {
     reset(): void {
         this._commands.clear();
         this._messageTypeToCommand.clear();
-        this._stats.clear();
         this._initialized = false;
         this._context = undefined;
     }
@@ -129,19 +114,6 @@ export class CommandRegistry {
                 console.warn(`[CommandRegistry] Message type '${messageType}' already handled by '${existing.metadata.id}', replacing with '${command.metadata.id}'`);
             }
             this._messageTypeToCommand.set(messageType, command);
-
-            // Initialize stats for this message type
-            if (!this._stats.has(messageType)) {
-                this._stats.set(messageType, {
-                    messageType,
-                    commandId: command.metadata.id,
-                    executionCount: 0,
-                    totalDurationMs: 0,
-                    avgDurationMs: 0,
-                    lastExecuted: null,
-                    errorCount: 0
-                });
-            }
         }
 
         // Initialize if registry is already initialized
@@ -244,75 +216,12 @@ export class CommandRegistry {
             return null;
         }
 
-        // Track execution
-        const startTime = Date.now();
-        let result: CommandResult;
-
         try {
-            result = await command.execute(message, this._context);
+            return await command.execute(message, this._context);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error(`[CommandRegistry] Command ${command.metadata.id} failed for message ${messageType}:`, error);
-            result = { success: false, error: errorMessage };
-        }
-
-        // Update stats
-        const duration = Date.now() - startTime;
-        this._updateStats(messageType, command.metadata.id, duration, !result.success);
-
-        return result;
-    }
-
-    // ============= STATISTICS =============
-
-    /**
-     * Get execution statistics
-     */
-    getStats(): CommandStats[] {
-        return Array.from(this._stats.values());
-    }
-
-    /**
-     * Get stats for a specific message type
-     */
-    getStatsForMessageType(messageType: string): CommandStats | undefined {
-        return this._stats.get(messageType);
-    }
-
-    /**
-     * Reset statistics
-     */
-    resetStats(): void {
-        for (const stats of this._stats.values()) {
-            stats.executionCount = 0;
-            stats.totalDurationMs = 0;
-            stats.avgDurationMs = 0;
-            stats.lastExecuted = null;
-            stats.errorCount = 0;
-        }
-    }
-
-    private _updateStats(messageType: string, commandId: string, durationMs: number, isError: boolean): void {
-        let stats = this._stats.get(messageType);
-        if (!stats) {
-            stats = {
-                messageType,
-                commandId,
-                executionCount: 0,
-                totalDurationMs: 0,
-                avgDurationMs: 0,
-                lastExecuted: null,
-                errorCount: 0
-            };
-            this._stats.set(messageType, stats);
-        }
-
-        stats.executionCount++;
-        stats.totalDurationMs += durationMs;
-        stats.avgDurationMs = stats.totalDurationMs / stats.executionCount;
-        stats.lastExecuted = new Date();
-        if (isError) {
-            stats.errorCount++;
+            return { success: false, error: errorMessage };
         }
     }
 
