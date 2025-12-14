@@ -14,6 +14,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
+import { toForwardSlashes } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -633,7 +634,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             return absolutePath;
         }
         const relativePath = path.relative(kanbanDir, absolutePath);
-        return `./${relativePath.replace(/\\/g, '/')}`;
+        return `./${toForwardSlashes(relativePath)}`;
     }
 
     private _generateUniqueImageFilename(mediaFolderPath: string, originalFileName: string, fileBuffer: Buffer): string {

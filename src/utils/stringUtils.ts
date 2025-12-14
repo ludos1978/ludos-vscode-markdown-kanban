@@ -16,6 +16,17 @@ export function escapeRegExp(str: string): string {
 }
 
 /**
+ * Normalizes path separators to forward slashes.
+ * Use for cross-platform path consistency (e.g., in exports, URLs, relative paths).
+ *
+ * @param filePath - The file path to normalize
+ * @returns Path with forward slashes only
+ */
+export function toForwardSlashes(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
+}
+
+/**
  * Normalizes a file path for case-insensitive lookup.
  * Converts to lowercase and normalizes path separators.
  *
@@ -23,5 +34,5 @@ export function escapeRegExp(str: string): string {
  * @returns Normalized path for use as lookup key
  */
 export function normalizePathForLookup(filePath: string): string {
-    return filePath.toLowerCase().replace(/\\/g, '/');
+    return toForwardSlashes(filePath.toLowerCase());
 }

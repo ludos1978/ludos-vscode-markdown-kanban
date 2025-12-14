@@ -13,7 +13,7 @@ import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { AssetHandler } from '../assets/AssetHandler';
-import { escapeRegExp } from '../../utils/stringUtils';
+import { escapeRegExp, toForwardSlashes } from '../../utils/stringUtils';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -443,7 +443,7 @@ export class ExportService {
                         if (this.exportedFiles.has(md5Hash)) {
                             // Use existing exported file
                             const existingPath = this.exportedFiles.get(md5Hash)!;
-                            exportedRelativePath = path.relative(exportFolder, existingPath).replace(/\\/g, '/');
+                            exportedRelativePath = toForwardSlashes(path.relative(exportFolder, existingPath));
                         } else {
                             // Generate unique filename if needed
                             const fileName = path.basename(resolvedPath);
@@ -673,7 +673,7 @@ export class ExportService {
                         throw new Error(`Existing path is undefined for MD5: ${md5}`);
                     }
 
-                    const relativePath = path.relative(markdownLocation, existingPath).replace(/\\/g, '/');
+                    const relativePath = toForwardSlashes(path.relative(markdownLocation, existingPath));
                     modifiedContent = this.replaceAssetPath(modifiedContent, asset.originalPath, relativePath);
                     continue;
                 }
@@ -710,7 +710,7 @@ export class ExportService {
                 // mediaFolder is at exportFolder/fileBasename-Media
                 // Exported markdown is at exportFolder/fileBasename.md
                 // So relative path from markdown to media is just the folder name
-                const relativePath = path.join(`${fileBasename}-Media`, exportedFileName).replace(/\\/g, '/');
+                const relativePath = toForwardSlashes(path.join(`${fileBasename}-Media`, exportedFileName));
                 modifiedContent = this.replaceAssetPath(modifiedContent, asset.originalPath, relativePath);
 
             } catch (error) {
@@ -737,7 +737,7 @@ export class ExportService {
         const escapedOldPath = escapeRegExp(oldPath);
 
         // Normalize path separators for cross-platform compatibility
-        const normalizedNewPath = newPath.replace(/\\/g, '/');
+        const normalizedNewPath = toForwardSlashes(newPath);
 
         // Replace in markdown images: ![alt](oldPath) -> ![alt](newPath)
         content = content.replace(
@@ -902,7 +902,7 @@ export class ExportService {
 
         // Step 3: Calculate relative path from exported file to target
         const exportedFileDir = path.dirname(exportedFilePath);
-        const relativePath = path.relative(exportedFileDir, absoluteTargetPath).replace(/\\/g, '/');
+        const relativePath = toForwardSlashes(path.relative(exportedFileDir, absoluteTargetPath));
 
         // Rebuild the link with the new path
         if (link.match(/^<(?:img|video|audio)/i)) {
@@ -924,7 +924,7 @@ export class ExportService {
         _fileBasename: string
     ): string {
         const absoluteSourcePath = path.resolve(sourceDir, oldPath);
-        const relativePath = path.relative(exportFolder, absoluteSourcePath).replace(/\\/g, '/');
+        const relativePath = toForwardSlashes(path.relative(exportFolder, absoluteSourcePath));
 
         return tag.replace(/src=["'][^"']+["']/i, `src="${relativePath}"`);
     }

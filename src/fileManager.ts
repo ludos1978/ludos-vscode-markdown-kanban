@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { FileTypeUtils } from './utils/fileTypeUtils';
+import { toForwardSlashes } from './utils/stringUtils';
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
 
@@ -149,11 +150,11 @@ export class FileManager {
                     if (documentInSameWorkspace) {
                         // Both in same workspace - use traditional relative path
                         const relativePath = path.relative(documentDir, filePath);
-                        return relativePath.replace(/\\/g, '/');
+                        return toForwardSlashes(relativePath);
                     } else {
                         // File in workspace, document elsewhere - use workspace-relative path
                         const relativeToWorkspace = path.relative(folderPath, filePath);
-                        return (folderName + '/' + relativeToWorkspace).replace(/\\/g, '/');
+                        return toForwardSlashes(folderName + '/' + relativeToWorkspace);
                     }
                 }
             }
@@ -174,7 +175,7 @@ export class FileManager {
                              filePath.startsWith(fileFolderPath + '/'))) {
                             // File in different workspace - use workspace-relative path
                             const relativeToWorkspace = path.relative(fileFolderPath, filePath);
-                            return (fileFolderName + '/' + relativeToWorkspace).replace(/\\/g, '/');
+                            return toForwardSlashes(fileFolderName + '/' + relativeToWorkspace);
                         }
                     }
                     break;
@@ -184,7 +185,7 @@ export class FileManager {
         
         // Fall back to traditional relative path
         const relativePath = path.relative(documentDir, filePath);
-        return relativePath.replace(/\\/g, '/');
+        return toForwardSlashes(relativePath);
     }
 
     /**

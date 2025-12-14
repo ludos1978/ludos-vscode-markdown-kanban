@@ -6,6 +6,7 @@ import { BackupManager } from '../services/BackupManager';
 import { SaveOptions } from './SaveOptions';
 import { SaveTransactionManager } from './SaveTransactionManager';
 import { WatcherCoordinator } from './WatcherCoordinator';
+import { toForwardSlashes } from '../utils/stringUtils';
 
 /**
  * File change event emitted when file state changes
@@ -163,10 +164,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             return '';
         }
 
-        return relativePath
-            .trim()
-            .toLowerCase()
-            .replace(/\\/g, '/');
+        return toForwardSlashes(relativePath.trim().toLowerCase());
     }
 
     /**
