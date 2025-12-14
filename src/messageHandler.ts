@@ -10,7 +10,7 @@ import { getOutputChannel } from './extension';
 import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
 import { safeFileUri } from './utils/uriUtils';
 // Command Pattern: Registry and commands for message handling
-import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands } from './commands';
+import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -116,6 +116,7 @@ export class MessageHandler {
         this._commandRegistry.register(new IncludeCommands());
         this._commandRegistry.register(new EditModeCommands());
         this._commandRegistry.register(new TemplateCommands());
+        this._commandRegistry.register(new DebugCommands());
 
         // Initialize the registry with context
         this._commandRegistry.initialize(this._commandContext);

@@ -8,8 +8,9 @@
  * - requestEditTaskIncludeFileName, requestTaskIncludeFileName
  * - reloadAllIncludedFiles
  * - saveIndividualFile, reloadIndividualFile
- * - forceWriteAllContent, verifyContentSync
- * - getTrackedFilesDebugInfo, clearTrackedFilesCache
+ *
+ * Debug commands (forceWriteAllContent, verifyContentSync, etc.) have been
+ * moved to DebugCommands.ts for cleaner separation of concerns.
  *
  * @module commands/IncludeCommands
  */
@@ -41,11 +42,7 @@ export class IncludeCommands extends BaseMessageCommand {
             'requestTaskIncludeFileName',
             'reloadAllIncludedFiles',
             'saveIndividualFile',
-            'reloadIndividualFile',
-            'forceWriteAllContent',
-            'verifyContentSync',
-            'getTrackedFilesDebugInfo',
-            'clearTrackedFilesCache'
+            'reloadIndividualFile'
         ],
         priority: 100
     };
@@ -91,18 +88,6 @@ export class IncludeCommands extends BaseMessageCommand {
                         message.isMainFile,
                         context
                     );
-
-                case 'forceWriteAllContent':
-                    return await this.handleForceWriteAllContent(context);
-
-                case 'verifyContentSync':
-                    return await this.handleVerifyContentSync(message.frontendBoard, context);
-
-                case 'getTrackedFilesDebugInfo':
-                    return await this.handleGetTrackedFilesDebugInfo(context);
-
-                case 'clearTrackedFilesCache':
-                    return await this.handleClearTrackedFilesCache(context);
 
                 default:
                     return this.failure(`Unknown include command: ${message.type}`);
@@ -561,7 +546,8 @@ export class IncludeCommands extends BaseMessageCommand {
                     forceSave: forceSave
                 });
 
-                await this.handleGetTrackedFilesDebugInfo(context);
+                // Trigger debug info refresh (handled by DebugCommands)
+                panel._panel.webview.postMessage({ type: 'refreshDebugInfo' });
             }
         } catch (error) {
             panel._panel?.webview.postMessage({
@@ -660,294 +646,5 @@ export class IncludeCommands extends BaseMessageCommand {
             });
         }
         return this.success();
-    }
-
-    // ============= FORCE WRITE / VERIFICATION HANDLERS =============
-
-    private async handleForceWriteAllContent(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
-            return this.success();
-        }
-
-        console.warn('[IncludeCommands] FORCE WRITE ALL: Starting emergency file write operation');
-
-        let backupPath: string | undefined;
-        try {
-            const document = context.fileManager.getDocument();
-            if (document && panel._conflictService) {
-                backupPath = await panel._conflictService.createUnifiedBackup(
-                    document.uri.fsPath,
-                    'force-write',
-                    true
-                );
-            }
-        } catch (error) {
-            console.error('[IncludeCommands] Failed to create backup before force write:', error);
-        }
-
-        try {
-            const fileRegistry = panel._fileRegistry;
-            if (!fileRegistry?.forceWriteAll) {
-                throw new Error('File registry not available or forceWriteAll method not found');
-            }
-
-            const result = await fileRegistry.forceWriteAll();
-
-            panel._panel.webview.postMessage({
-                type: 'forceWriteAllResult',
-                success: result.errors.length === 0,
-                filesWritten: result.filesWritten,
-                errors: result.errors,
-                backupCreated: !!backupPath,
-                backupPath: backupPath,
-                timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-            panel._panel?.webview.postMessage({
-                type: 'forceWriteAllResult',
-                success: false,
-                filesWritten: 0,
-                errors: [error instanceof Error ? error.message : String(error)],
-                backupCreated: false,
-                timestamp: new Date().toISOString()
-            });
-        }
-        return this.success();
-    }
-
-    private async handleVerifyContentSync(frontendBoard: any, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
-            return this.success();
-        }
-
-        try {
-            if (!frontendBoard) {
-                throw new Error('Frontend board data not provided');
-            }
-
-            const fileRegistry = panel._fileRegistry;
-            if (!fileRegistry) {
-                throw new Error('File registry not available');
-            }
-
-            const { MarkdownKanbanParser } = require('../markdownParser');
-
-            const allFiles = fileRegistry.getAll();
-            const fileResults: any[] = [];
-            let matchingFiles = 0;
-            let mismatchedFiles = 0;
-
-            const backendBoard = panel.getBoard ? panel.getBoard() : undefined;
-
-            for (const file of allFiles) {
-                let backendContent: string;
-                let frontendContent: string;
-                let savedFileContent: string | null = null;
-
-                try {
-                    savedFileContent = fs.readFileSync(file.getPath(), 'utf8');
-                } catch (error) {
-                    console.error(`[IncludeCommands] Could not read saved file ${file.getPath()}:`, error);
-                }
-
-                if (file.getFileType() === 'main') {
-                    frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
-                    backendContent = backendBoard
-                        ? MarkdownKanbanParser.generateMarkdown(backendBoard)
-                        : file.getContent();
-                } else {
-                    backendContent = file.getContent();
-                    frontendContent = backendContent;
-                }
-
-                const backendHash = this.computeHash(backendContent);
-                const frontendHash = this.computeHash(frontendContent);
-                const savedHash = savedFileContent !== null ? this.computeHash(savedFileContent) : null;
-
-                const frontendBackendMatch = backendHash === frontendHash;
-                const backendSavedMatch = savedHash ? backendHash === savedHash : true;
-                const allMatch = frontendBackendMatch && backendSavedMatch;
-
-                if (allMatch) {
-                    matchingFiles++;
-                } else {
-                    mismatchedFiles++;
-                }
-
-                fileResults.push({
-                    path: file.getPath(),
-                    relativePath: file.getRelativePath(),
-                    isMainFile: file.getFileType() === 'main',
-                    matches: allMatch,
-                    frontendBackendMatch,
-                    backendSavedMatch,
-                    frontendSavedMatch: savedHash ? frontendHash === savedHash : true,
-                    frontendContentLength: frontendContent.length,
-                    backendContentLength: backendContent.length,
-                    savedContentLength: savedFileContent?.length ?? null,
-                    frontendBackendDiff: Math.abs(frontendContent.length - backendContent.length),
-                    backendSavedDiff: savedFileContent ? Math.abs(backendContent.length - savedFileContent.length) : null,
-                    frontendSavedDiff: savedFileContent ? Math.abs(frontendContent.length - savedFileContent.length) : null,
-                    frontendHash: frontendHash.substring(0, 8),
-                    backendHash: backendHash.substring(0, 8),
-                    savedHash: savedHash?.substring(0, 8) ?? null
-                });
-            }
-
-            panel._panel.webview.postMessage({
-                type: 'verifyContentSyncResult',
-                success: true,
-                timestamp: new Date().toISOString(),
-                totalFiles: allFiles.length,
-                matchingFiles: matchingFiles,
-                mismatchedFiles: mismatchedFiles,
-                missingFiles: 0,
-                fileResults: fileResults,
-                summary: `${matchingFiles} files match, ${mismatchedFiles} differ`
-            });
-        } catch (error) {
-            panel._panel?.webview.postMessage({
-                type: 'verifyContentSyncResult',
-                success: false,
-                timestamp: new Date().toISOString(),
-                totalFiles: 0,
-                matchingFiles: 0,
-                mismatchedFiles: 0,
-                missingFiles: 0,
-                fileResults: [],
-                summary: `Verification failed: ${error instanceof Error ? error.message : String(error)}`
-            });
-        }
-        return this.success();
-    }
-
-    // ============= DEBUG HANDLERS =============
-
-    private async handleGetTrackedFilesDebugInfo(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
-            return this.success();
-        }
-
-        const debugData = await this.collectTrackedFilesDebugInfo(context);
-        panel._panel?.webview.postMessage({
-            type: 'trackedFilesDebugInfo',
-            data: debugData
-        });
-        return this.success();
-    }
-
-    private async handleClearTrackedFilesCache(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
-            return this.success();
-        }
-
-        try {
-            const includeFileMap = panel._includeFiles;
-            if (includeFileMap) {
-                includeFileMap.clear();
-            }
-
-            panel._cachedBoardFromWebview = null;
-
-            const document = context.fileManager.getDocument();
-            if (document) {
-                await panel.loadMarkdownFile(document, false);
-            }
-        } catch (error) {
-            console.warn('[IncludeCommands] Error clearing panel caches:', error);
-        }
-
-        panel._panel?.webview.postMessage({
-            type: 'debugCacheCleared'
-        });
-        return this.success();
-    }
-
-    // ============= HELPER METHODS =============
-
-    private computeHash(content: string): string {
-        let hash = 0;
-        for (let i = 0; i < content.length; i++) {
-            const char = content.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return hash.toString(16);
-    }
-
-    private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<any> {
-        const document = context.fileManager.getDocument();
-        const panel = context.getWebviewPanel() as any;
-        const mainFile = panel?.fileRegistry?.getMainFile();
-
-        const mainFilePath = context.fileManager.getFilePath() || document?.uri.fsPath || 'Unknown';
-
-        const mainFileInfo = {
-            path: mainFilePath,
-            lastModified: mainFile?.getLastModified()?.toISOString() || 'Unknown',
-            exists: mainFile?.exists() ?? (document ? true : false),
-            watcherActive: true,
-            hasInternalChanges: mainFile?.hasUnsavedChanges() ?? false,
-            hasExternalChanges: mainFile?.hasExternalChanges() ?? false,
-            documentVersion: document?.version ?? 0,
-            lastDocumentVersion: document ? document.version - 1 : -1,
-            isUnsavedInEditor: document?.isDirty ?? false,
-            baseline: mainFile?.getBaseline() || ''
-        };
-
-        const includeFiles: any[] = [];
-        const allIncludeFiles = panel?.fileRegistry?.getIncludeFiles() || [];
-
-        for (const file of allIncludeFiles) {
-            includeFiles.push({
-                path: file.getRelativePath(),
-                type: file.getFileType(),
-                exists: file.exists(),
-                lastModified: file.getLastModified()?.toISOString() || 'Unknown',
-                size: 'Unknown',
-                hasInternalChanges: file.hasUnsavedChanges(),
-                hasExternalChanges: file.hasExternalChanges(),
-                isUnsavedInEditor: file.isDirtyInEditor(),
-                baseline: file.getBaseline(),
-                content: file.getContent(),
-                externalContent: '',
-                contentLength: file.getContent().length,
-                baselineLength: file.getBaseline().length,
-                externalContentLength: 0
-            });
-        }
-
-        const conflictManager = {
-            healthy: true,
-            trackedFiles: 1 + includeFiles.length,
-            activeWatchers: 1 + includeFiles.length,
-            pendingConflicts: 0,
-            watcherFailures: 0,
-            listenerEnabled: true,
-            documentSaveListenerActive: true
-        };
-
-        const systemHealth = {
-            overall: includeFiles.length > 0 ? 'good' : 'warn',
-            extensionState: 'active',
-            memoryUsage: 'normal',
-            lastError: null
-        };
-
-        return {
-            mainFile: mainFileInfo.path,
-            mainFileLastModified: mainFileInfo.lastModified,
-            fileWatcherActive: mainFileInfo.watcherActive,
-            includeFiles: includeFiles,
-            conflictManager: conflictManager,
-            systemHealth: systemHealth,
-            hasUnsavedChanges: panel ? panel._hasUnsavedChanges || false : false,
-            timestamp: new Date().toISOString(),
-            watcherDetails: mainFileInfo
-        };
     }
 }

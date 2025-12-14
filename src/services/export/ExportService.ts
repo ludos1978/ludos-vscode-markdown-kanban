@@ -111,14 +111,17 @@ export class ExportService {
     // This ensures consistency across all asset detection code
 
     // Include patterns for different include types
-    // UNIFIED SYNTAX: All includes use !!!include()!!! - position determines behavior
-    // Base pattern uses INCLUDE_SYNTAX.REGEX from centralized constants
-    // For task includes, match the entire task line including the checkbox prefix
-    // This prevents checkbox duplication when replacing with converted content
-    // USES UNIFIED SYNTAX: !!!include()!!! in task title (position-based)
+    // These patterns embed the core INCLUDE_SYNTAX pattern (!!!include(path)!!!) with additional
+    // context capture. The core pattern is defined in constants/IncludeConstants.ts.
+    //
+    // TASK_INCLUDE_PATTERN: Matches task lines with includes
+    //   Pattern: ^(\s*)-\s*\[\s*\]\s* + INCLUDE_SYNTAX (!!!include(path)!!!)
+    //   Captures: [1] leading whitespace, [2] file path
     private static readonly TASK_INCLUDE_PATTERN = /^(\s*)-\s*\[\s*\]\s*!!!include\(([^)]+)\)!!!/gm;
-    // For column includes (position-based: !!!include()!!! in column header), match the entire column header line
-    // Captures: prefix title, file path, and suffix (tags/other content)
+    //
+    // COLUMN_INCLUDE_PATTERN: Matches column headers with includes
+    //   Pattern: ^##\s+ + prefix + INCLUDE_SYNTAX (!!!include(path)!!!) + suffix
+    //   Captures: [1] prefix title, [2] file path, [3] suffix (tags/other content)
     private static readonly COLUMN_INCLUDE_PATTERN = /^##\s+(.*?)!!!include\(([^)]+)\)!!!(.*?)$/gm;
 
     // Track MD5 hashes to detect duplicates

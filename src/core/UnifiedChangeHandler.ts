@@ -12,6 +12,10 @@ import { MarkdownFile } from '../files/MarkdownFile';
  * NOTE: Legitimate saves (our own writes) are filtered out by _onFileSystemChange()
  * using the _skipNextReloadDetection flag (set via SaveOptions). This handler only
  * receives TRUE external changes.
+ *
+ * NOTE: Parent notification for include files is handled by the file registry change
+ * notification system (_handleFileRegistryChange -> _sendIncludeFileUpdateToFrontend).
+ * This handler only handles conflict detection and resolution.
  */
 export class UnifiedChangeHandler {
     private static instance: UnifiedChangeHandler | undefined;
@@ -55,13 +59,9 @@ export class UnifiedChangeHandler {
      * Handle file deletion
      */
     private async handleFileDeleted(file: MarkdownFile): Promise<void> {
-        // Mark file as deleted and notify parent
+        // Mark file as deleted
         file['_exists'] = false;
-
-        // For include files, notify parent of change
-        if (file.getFileType() !== 'main') {
-            await this.notifyParentOfChange(file);
-        }
+        // Parent notification handled by file registry change notification system
     }
 
     /**
@@ -73,11 +73,7 @@ export class UnifiedChangeHandler {
 
         // Reload content
         await file.reload();
-
-        // For include files, notify parent of change
-        if (file.getFileType() !== 'main') {
-            await this.notifyParentOfChange(file);
-        }
+        // Parent notification handled by file registry change notification system
     }
 
     /**
@@ -100,23 +96,18 @@ export class UnifiedChangeHandler {
         // CASE 1: Check for race condition - external save with unsaved Kanban changes
         // This happens when user saves externally (Ctrl+S) while having Kanban UI changes
         if (file.getFileType() === 'main' && hasAnyUnsavedChanges && hasFileSystemChanges) {
-
             await this.showConflictDialog(file);
             return;
         }
 
-        // CASE 3: No conflict detected by file's logic (safe auto-reload)
+        // CASE 2: No conflict detected by file's logic (safe auto-reload)
         if (!hasConflict) {
             await file.reload();
-
-            // For include files, notify parent of change
-            if (file.getFileType() !== 'main') {
-                await this.notifyParentOfChange(file);
-            }
+            // Parent notification handled by file registry change notification system
             return;
         }
 
-        // CASE 4: Conflict detected (show dialog)
+        // CASE 3: Conflict detected (show dialog)
         await this.showConflictDialog(file);
     }
 
@@ -131,16 +122,8 @@ export class UnifiedChangeHandler {
                 file.setEditMode(false);
             }
 
-            const resolution = await file.showConflictDialog();
-
-            if (resolution) {
-
-                // For include files, notify parent after conflict resolution
-                if (file.getFileType() !== 'main') {
-                    await this.notifyParentOfChange(file);
-                }
-            } else {
-            }
+            await file.showConflictDialog();
+            // Parent notification handled by file registry change notification system
         } catch (error) {
             console.error(`[UnifiedChangeHandler] Conflict dialog failed:`, error);
             // If dialog fails, keep current state to prevent data loss
@@ -162,22 +145,10 @@ export class UnifiedChangeHandler {
             const cachedBoard = mainFile.getCachedBoardFromWebview?.();
             const hasCachedBoardChanges = !!cachedBoard;
 
-
             return filesWithChanges.length > 0 || hasCachedBoardChanges;
         }
 
         // Fallback: just check the file itself
         return file.hasUnsavedChanges();
-    }
-
-    /**
-     * Notify parent of changes (for include files)
-     *
-     * NOTE: This is intentionally minimal because the file registry change notification
-     * already triggers proper updates through _handleFileRegistryChange -> _sendIncludeFileUpdateToFrontend
-     * Adding additional board updates here would cause duplicate updates and race conditions.
-     */
-    private async notifyParentOfChange(file: MarkdownFile): Promise<void> {
-        // The file registry change notification system handles the rest
     }
 }
