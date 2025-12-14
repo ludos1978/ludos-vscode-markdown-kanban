@@ -53,15 +53,6 @@ class ColorUtils {
 
 
     /**
-     * Validate hex color format
-     * @param {string} color - Color string to validate
-     * @returns {boolean} True if valid hex color
-     */
-    isValidHexColor(color) {
-        return /^#([0-9A-Fa-f]{3}){1,2}$/.test(color);
-    }
-
-    /**
      * Parse any color format to RGB
      * @param {string} color - Color in any format (hex, rgb, rgba)
      * @returns {Object|null} RGB object or null if invalid
@@ -88,57 +79,6 @@ class ColorUtils {
         }
 
         return null;
-    }
-
-    /**
-     * Lighten a color by percentage
-     * @param {string} color - Input color
-     * @param {number} percent - Percentage to lighten (0-100)
-     * @returns {string} Lightened hex color
-     */
-    lighten(color, percent) {
-        const rgb = this.parseToRgb(color);
-        if (!rgb) return color;
-
-        const factor = percent / 100;
-        const r = Math.round(rgb.r + (255 - rgb.r) * factor);
-        const g = Math.round(rgb.g + (255 - rgb.g) * factor);
-        const b = Math.round(rgb.b + (255 - rgb.b) * factor);
-
-        return this.rgbToHex(r, g, b);
-    }
-
-    /**
-     * Darken a color by percentage
-     * @param {string} color - Input color
-     * @param {number} percent - Percentage to darken (0-100)
-     * @returns {string} Darkened hex color
-     */
-    darken(color, percent) {
-        const rgb = this.parseToRgb(color);
-        if (!rgb) return color;
-
-        const factor = 1 - (percent / 100);
-        const r = Math.round(rgb.r * factor);
-        const g = Math.round(rgb.g * factor);
-        const b = Math.round(rgb.b * factor);
-
-        return this.rgbToHex(r, g, b);
-    }
-
-
-    /**
-     * Generate color with transparency
-     * @param {string} color - Base color
-     * @param {number} alpha - Alpha value (0-1)
-     * @returns {string} RGBA color string
-     */
-    withAlpha(color, alpha) {
-        const rgb = this.parseToRgb(color);
-        if (!rgb) return color;
-
-        alpha = Math.max(0, Math.min(1, alpha));
-        return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
     }
 
     /**
@@ -227,18 +167,6 @@ class ColorUtils {
         const darker = Math.min(lum1, lum2);
 
         return (lighter + 0.05) / (darker + 0.05);
-    }
-
-    /**
-     * Check if contrast between text and background is sufficient
-     * @param {string} textColor - Text color
-     * @param {string} backgroundColor - Background color
-     * @param {number} minRatio - Minimum contrast ratio (default 4.5 for normal text)
-     * @returns {boolean} True if contrast is sufficient
-     */
-    hasGoodContrast(textColor, backgroundColor, minRatio = 4.5) {
-        const ratio = this.getContrastRatio(textColor, backgroundColor);
-        return ratio >= minRatio;
     }
 
     /**

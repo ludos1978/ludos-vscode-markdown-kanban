@@ -276,13 +276,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     }
 
     /**
-     * Get files that need save
-     */
-    public getFilesThatNeedSave(): MarkdownFile[] {
-        return this.getAll().filter(f => f.needsSave());
-    }
-
-    /**
      * Get files in edit mode
      */
     public getFilesInEditMode(): MarkdownFile[] {
@@ -298,15 +291,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         const filesToSave = this.getFilesWithUnsavedChanges();
 
         await Promise.all(filesToSave.map(f => f.save()));
-    }
-
-    /**
-     * Reload all files with external changes (that don't have unsaved changes)
-     */
-    public async reloadAll(): Promise<void> {
-        const filesToReload = this.getFilesThatNeedReload();
-
-        await Promise.all(filesToReload.map(f => f.reload()));
     }
 
     /**
@@ -367,15 +351,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public stopWatchingAll(): void {
         this.getAll().forEach(f => f.stopWatching());
-    }
-
-    /**
-     * Create backups for all files with unsaved changes
-     */
-    public async backupAll(label: string = 'manual'): Promise<void> {
-        const filesToBackup = this.getFilesWithUnsavedChanges();
-
-        await Promise.all(filesToBackup.map(f => f.createBackup(label)));
     }
 
     // ============= CONVENIENCE METHODS (merged from FileRegistryAdapter) =============
