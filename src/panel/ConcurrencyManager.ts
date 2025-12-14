@@ -92,27 +92,6 @@ export class ConcurrencyManager {
         }
     }
 
-    /**
-     * Check if any operation is currently in progress
-     */
-    isOperationInProgress(): boolean {
-        return this._operationInProgress !== null;
-    }
-
-    /**
-     * Get the name of the current operation (for debugging)
-     */
-    getCurrentOperation(): string | null {
-        return this._operationInProgress;
-    }
-
-    /**
-     * Get count of pending operations
-     */
-    getPendingCount(): number {
-        return this._pendingOperations.length;
-    }
-
     // ============= EVENT TIMESTAMP TRACKING (RACE-3) =============
 
     /**
@@ -145,20 +124,6 @@ export class ConcurrencyManager {
         // Older or same timestamp - reject
         this._log(`Stale event for "${filePath}" - rejecting (${eventTimestamp} <= ${lastProcessed})`);
         return false;
-    }
-
-    /**
-     * Clear timestamp tracking for a file
-     */
-    clearTimestamp(filePath: string): void {
-        this._lastProcessedTimestamps.delete(filePath);
-    }
-
-    /**
-     * Clear all timestamp tracking
-     */
-    clearAllTimestamps(): void {
-        this._lastProcessedTimestamps.clear();
     }
 
     // ============= CLEANUP =============

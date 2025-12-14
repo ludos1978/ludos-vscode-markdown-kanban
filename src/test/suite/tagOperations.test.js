@@ -86,7 +86,8 @@ describe('Tag Operations', () => {
         global.window.tagColors = mockTagColors;
         global.window.pendingColumnChanges = new Map();
         global.window.pendingTaskChanges = new Map();
-        
+
+        require('../../html/utils/colorUtils.js');
         require('../../html/boardRenderer.js');
         require('../../html/menuOperations.js');
     });
@@ -248,8 +249,8 @@ describe('Tag Operations', () => {
         });
 
         test('should interpolate colors correctly', () => {
-            const color = interpolateColor('#ff0000', '#0000ff', 0.5);
-            
+            const color = colorUtils.interpolateColor('#ff0000', '#0000ff', 0.5);
+
             expect(color).toMatch(/^#[0-9a-f]{6}$/i);
         });
     });

@@ -134,66 +134,6 @@ export class PanelStateModel {
         this._setState('includeSwitchInProgress', value);
     }
 
-    // ============= CONVENIENCE METHODS =============
-
-    /**
-     * Check if any blocking operation is in progress
-     */
-    isBlocked(): boolean {
-        return this._state.disposed ||
-               this._state.updatingFromPanel ||
-               this._state.undoRedoOperation ||
-               this._state.includeSwitchInProgress;
-    }
-
-    /**
-     * Check if panel is ready for user interaction
-     */
-    isReady(): boolean {
-        return this._state.initialized &&
-               !this._state.disposed &&
-               !this._state.initialBoardLoad;
-    }
-
-    /**
-     * Check if external changes should be processed
-     */
-    shouldProcessExternalChanges(): boolean {
-        return !this._state.disposed &&
-               !this._state.updatingFromPanel &&
-               !this._state.includeSwitchInProgress;
-    }
-
-    /**
-     * Check if board regeneration is allowed
-     */
-    canRegenerateBoard(): boolean {
-        return !this._state.disposed &&
-               !this._state.editingInProgress &&
-               !this._state.includeSwitchInProgress;
-    }
-
-    /**
-     * Check if cache invalidation is allowed
-     */
-    canInvalidateCache(): boolean {
-        return !this._state.includeSwitchInProgress;
-    }
-
-    /**
-     * Get a snapshot of current state (for debugging/logging)
-     */
-    getSnapshot(): Readonly<PanelStateFlags> {
-        return { ...this._state };
-    }
-
-    /**
-     * Reset to default state (for testing)
-     */
-    reset(): void {
-        this._state = { ...DEFAULT_STATE };
-    }
-
     // ============= PRIVATE HELPERS =============
 
     private _setState<K extends keyof PanelStateFlags>(key: K, value: PanelStateFlags[K]): void {

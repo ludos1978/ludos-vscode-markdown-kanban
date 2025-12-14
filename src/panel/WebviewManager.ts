@@ -228,19 +228,4 @@ export class WebviewManager {
     getLayoutPresetsConfiguration(): Record<string, any> {
         return configService.getConfig('layoutPresets', {});
     }
-
-    /**
-     * Get a specific layout preset by name
-     */
-    getLayoutPreset(name: string): any | undefined {
-        const presets = this.getLayoutPresetsConfiguration();
-        return presets[name];
-    }
-
-    /**
-     * Get all preset names
-     */
-    getPresetNames(): string[] {
-        return Object.keys(this.getLayoutPresetsConfiguration());
-    }
 }

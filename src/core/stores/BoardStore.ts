@@ -56,7 +56,6 @@ export class BoardStore implements vscode.Disposable {
     private _eventBus: PanelEventBus;
     private _webview?: vscode.Webview;
     private readonly _maxUndoStackSize: number;
-    private _isDisposed = false;
 
     constructor(eventBus: PanelEventBus, options: BoardStoreOptions = {}) {
         this._eventBus = eventBus;
@@ -281,13 +280,6 @@ export class BoardStore implements vscode.Disposable {
         this._sendUndoRedoStatus();
     }
 
-    /**
-     * Set webview for undo/redo status updates
-     */
-    setWebview(webview: vscode.Webview): void {
-        this._webview = webview;
-    }
-
     private _sendUndoRedoStatus(): void {
         if (this._webview) {
             this._webview.postMessage({
@@ -303,50 +295,12 @@ export class BoardStore implements vscode.Disposable {
         }).catch(() => {});
     }
 
-    // ============= STATE ACCESS =============
-
-    /**
-     * Get full state (for debugging/testing)
-     */
-    get state(): Readonly<BoardState> {
-        return {
-            ...this._state,
-            dirtyColumns: new Set(this._state.dirtyColumns),
-            dirtyTasks: new Set(this._state.dirtyTasks),
-            undoStack: [...this._state.undoStack],
-            redoStack: [...this._state.redoStack]
-        };
-    }
-
-    /**
-     * Reset all state
-     */
-    reset(): void {
-        this._state = {
-            board: null,
-            cacheValid: false,
-            dirtyColumns: new Set(),
-            dirtyTasks: new Set(),
-            undoStack: [],
-            redoStack: []
-        };
-        this._sendUndoRedoStatus();
-    }
-
     // ============= LIFECYCLE =============
-
-    /**
-     * Check if disposed
-     */
-    get isDisposed(): boolean {
-        return this._isDisposed;
-    }
 
     /**
      * Dispose the store
      */
     dispose(): void {
-        this._isDisposed = true;
         this._state.undoStack = [];
         this._state.redoStack = [];
         this._state.dirtyColumns.clear();

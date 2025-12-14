@@ -234,13 +234,6 @@ window.getTaskIdFromElement = getTaskIdFromElement;
 // The colorUtils module provides: hexToRgb, rgbToHex, withAlpha, etc.
 
 
-/**
- * Legacy wrapper for backward compatibility - delegates to colorUtils
- * @deprecated Use colorUtils.interpolateColor() instead
- */
-function interpolateColor(color1, color2, factor) {
-    return colorUtils.interpolateColor(color1, color2, factor);
-}
 
 /**
  * Wraps rendered HTML content in task-section divs for keyboard navigation
@@ -380,8 +373,8 @@ function ensureTagStyleExists(tagName) {
         const columnColors = tagConfig.column[themeKey] || tagConfig.column.light || {};
         if (columnColors.background) {
             const bgDark = columnColors.backgroundDark || columnColors.background;
-            const columnBg = interpolateColor(editorBg, bgDark, 0.15);
-            const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
+            const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
+            const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
             newStyles += `.kanban-full-height-column[data-column-bg-tag="${tagName}"] .column-header {
     background-color: ${columnBg} !important;
@@ -412,8 +405,8 @@ function ensureTagStyleExists(tagName) {
         const cardColors = tagConfig.card[themeKey] || tagConfig.card.light || {};
         if (cardColors.background) {
             const bgDark = cardColors.backgroundDark || cardColors.background;
-            const cardBg = interpolateColor(editorBg, bgDark, 0.25);
-            const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
+            const cardBg = colorUtils.interpolateColor(editorBg, bgDark, 0.25);
+            const cardHoverBg = colorUtils.interpolateColor(editorBg, bgDark, 0.35);
 
             newStyles += `.task-item[data-task-bg-tag="${tagName}"] {
     background-color: ${cardBg} !important;
@@ -4175,7 +4168,7 @@ function generateTagStyles() {
                 const editorBg = getEditorBackground();
                 const bgDark = columnColors.backgroundDark || columnColors.background;
 
-                const columnBg = interpolateColor(editorBg, bgDark, 0.15);
+                const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                 // Calculate text color from the ACTUAL interpolated background
                 const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
@@ -4211,7 +4204,7 @@ function generateTagStyles() {
                     color: ${defaultColumnTextColor} !important;${defaultColumnTextShadow ? `\n                    text-shadow: ${defaultColumnTextShadow} !important;` : ''}
                 }\n`;
 
-                const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
+                const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                 // Calculate text color from the ACTUAL collapsed background
                 const defaultCollapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
@@ -4251,13 +4244,13 @@ function generateTagStyles() {
                 const editorBg = getEditorBackground();
                 const bgDark = cardColors.backgroundDark || cardColors.background;
                 
-                const cardBg = interpolateColor(editorBg, bgDark, 0.25);
+                const cardBg = colorUtils.interpolateColor(editorBg, bgDark, 0.25);
                 styles += `.task-item:not([data-task-tag]) {
                     background-color: ${cardBg} !important;
                     position: relative;
                 }\n`;
 
-                const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
+                const cardHoverBg = colorUtils.interpolateColor(editorBg, bgDark, 0.35);
                 styles += `.task-item:not([data-task-tag]):hover {
                     background-color: ${cardHoverBg} !important;
                 }\n`;
@@ -4325,7 +4318,7 @@ function generateTagStyles() {
 
                     // Column background styles - only for primary tag
                     // Interpolate 15% towards the darker color
-                    const columnBg = interpolateColor(editorBg, bgDark, 0.15);
+                    const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                     // Calculate text color from the ACTUAL interpolated background, not the original color
                     const columnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
@@ -4362,7 +4355,7 @@ function generateTagStyles() {
                     }\n`;
 
                     // Column collapsed state - interpolate 20% towards the darker color
-                    const columnCollapsedBg = interpolateColor(editorBg, bgDark, 0.2);
+                    const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                     // Calculate text color from the ACTUAL collapsed background
                     const collapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
@@ -4395,14 +4388,14 @@ function generateTagStyles() {
 
                     // Card background styles - only for primary tag
                     // Interpolate 25% towards the darker color
-                    const cardBg = interpolateColor(editorBg, bgDark, 0.25);
+                    const cardBg = colorUtils.interpolateColor(editorBg, bgDark, 0.25);
                     styles += `.task-item[data-task-bg-tag="${attrTagName}"] {
                         background-color: ${cardBg} !important;
                         position: relative;
                     }\n`;
 
                     // Card hover state - interpolate 35% towards the darker color
-                    const cardHoverBg = interpolateColor(editorBg, bgDark, 0.35);
+                    const cardHoverBg = colorUtils.interpolateColor(editorBg, bgDark, 0.35);
                     styles += `.task-item[data-task-bg-tag="${attrTagName}"]:hover {
                         background-color: ${cardHoverBg} !important;
                     }\n`;
