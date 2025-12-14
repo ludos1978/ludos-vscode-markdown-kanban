@@ -53,6 +53,3 @@ export {
 
 // Middleware
 export * from './middleware';
-
-// Testing utilities
-export * from './testing';

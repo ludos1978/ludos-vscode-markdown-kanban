@@ -202,31 +202,6 @@ export class VariableProcessor {
     }
 
     /**
-     * Extract variable names used in content
-     * Useful for detecting which variables a template needs
-     */
-    public static extractUsedVariables(content: string): string[] {
-        const variables = new Set<string>();
-
-        // Match {varname} and {varname:format}
-        const varMatches = content.matchAll(/\{(\w+)(?::[^}]+)?\}/g);
-        for (const match of varMatches) {
-            // Skip conditional keywords
-            if (!['#if', '#else', '/if'].includes(match[1])) {
-                variables.add(match[1]);
-            }
-        }
-
-        // Match conditional variable names
-        const condMatches = content.matchAll(/\{#if\s+(\w+)\}/g);
-        for (const match of condMatches) {
-            variables.add(match[1]);
-        }
-
-        return Array.from(variables);
-    }
-
-    /**
      * Validate that all required variables have values
      */
     public static validateVariables(

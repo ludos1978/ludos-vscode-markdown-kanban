@@ -34,16 +34,6 @@ export class CommandRegistry {
         // Per-instance - each MessageHandler gets its own registry
     }
 
-    /**
-     * Reset the instance (for testing)
-     */
-    reset(): void {
-        this._commands.clear();
-        this._messageTypeToCommand.clear();
-        this._initialized = false;
-        this._context = undefined;
-    }
-
     // ============= INITIALIZATION =============
 
     /**
