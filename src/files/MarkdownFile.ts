@@ -369,14 +369,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
         return this._hasFileSystemChanges && !this._isInEditMode && !this.hasUnsavedChanges();
     }
 
-    /**
-     * Check if file needs to be saved to disk
-     * (has unsaved changes, no external changes)
-     */
-    public needsSave(): boolean {
-        return this.hasUnsavedChanges() && !this._hasFileSystemChanges;
-    }
-
     // ============= FILE OPERATIONS =============
 
     /**
