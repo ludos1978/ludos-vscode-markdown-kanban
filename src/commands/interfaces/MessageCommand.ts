@@ -77,8 +77,6 @@ export interface CommandContext {
     handleIncludeSwitch: (params: IncludeSwitchParams) => Promise<void>;
     /** Request frontend to stop editing and capture current value */
     requestStopEditing: () => Promise<any>;
-    /** Handle unified column title edit (with include detection) */
-    handleEditColumnTitleUnified: (columnId: string, title: string) => Promise<void>;
 
     // Configuration
     /** Refresh configuration from VS Code settings */

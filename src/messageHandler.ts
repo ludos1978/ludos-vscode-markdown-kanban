@@ -5,16 +5,12 @@ import { LinkHandler } from './services/LinkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
-import { PresentationGenerator } from './services/export/PresentationGenerator';
 import { FileSaveService } from './core/FileSaveService';
 import { getOutputChannel } from './extension';
-import { INCLUDE_SYNTAX } from './constants/IncludeConstants';
-import { safeFileUri } from './utils/uriUtils';
 import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
-import * as path from 'path';
 
 // Helper function to log to both console and output channel
 function log(...args: any[]) {
@@ -121,7 +117,6 @@ export class MessageHandler {
             // Include file operations
             handleIncludeSwitch: (params) => this._getWebviewPanel()?.handleIncludeSwitch(params),
             requestStopEditing: () => this.requestStopEditing(),
-            handleEditColumnTitleUnified: (columnId: string, title: string) => this.handleEditColumnTitleUnified(columnId, title),
 
             // Configuration
             refreshConfiguration: () => this._getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve()
@@ -198,43 +193,7 @@ export class MessageHandler {
      * STATE-3: Unified board action method
      *
      * Performs a board modification action with explicit control over update behavior.
-     *
-     * @param action The action to perform (returns true on success)
-     * @param options Configuration options
-     * @param options.saveUndo Whether to save undo state (default: true)
-     * @param options.sendUpdate Whether to send board update to frontend (default: true)
-     *                           Set to false when frontend already has the change (e.g., live editing)
      */
-    private async performBoardAction(
-        action: () => boolean,
-        options: {
-            saveUndo?: boolean;
-            sendUpdate?: boolean;
-        } = {}
-    ) {
-        const { saveUndo = true, sendUpdate = true } = options;
-
-        const board = this._getCurrentBoard();
-        if (!board) {return;}
-
-        if (saveUndo) {
-            this._boardStore.saveStateForUndo(board);
-        }
-
-        const success = action();
-
-        if (success) {
-            const currentBoard = this._getCurrentBoard();
-            if (currentBoard) {
-                // Sync board state to backend (updates _content for unsaved detection)
-                this._syncBoardToBackend(currentBoard);
-            }
-            if (sendUpdate) {
-                // Backend-initiated change: also send update to frontend
-                await this._onBoardUpdate();
-            }
-        }
-    }
 
     async handleBoardUpdate(message: any): Promise<void> {
         try {
@@ -336,249 +295,5 @@ export class MessageHandler {
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);
         }
-    }
-
-    /**
-     * Unified handler for column title edits (handles both normal edits and strikethrough deletions)
-     * Detects include syntax and routes through state machine or regular edit
-     */
-    async handleEditColumnTitleUnified(columnId: string, newTitle: string): Promise<void> {
-        const currentBoard = this._getCurrentBoard();
-        log(`[editColumnTitle] Board has ${currentBoard?.columns?.length || 0} columns`);
-        log(`[editColumnTitle] Looking for column ID: ${columnId}`);
-        log(`[editColumnTitle] New title: ${newTitle}`);
-
-        if (!currentBoard) {
-            log(`[editColumnTitle] No board loaded`);
-            return;
-        }
-
-        const column = currentBoard.columns.find(col => col.id === columnId);
-        if (!column) {
-            log(`[editColumnTitle] Column ${columnId} not found`);
-            return;
-        }
-
-        // Check if the new title contains include syntax (location-based: column include)
-        const hasColumnIncludeMatches = newTitle.match(INCLUDE_SYNTAX.REGEX);
-
-        // BUGFIX: Also check if old title had includes that are being removed
-        const oldIncludeMatches = (column.title || '').match(INCLUDE_SYNTAX.REGEX);
-        const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
-
-        if (hasIncludeChanges) {
-            // Column include switch - route through state machine
-            log(`[editColumnTitle] Detected column include syntax, routing to state machine via handleIncludeSwitch`);
-
-            // Extract the include files from the new title
-            const newIncludeFiles: string[] = [];
-            if (hasColumnIncludeMatches) {
-                hasColumnIncludeMatches.forEach((match: string) => {
-                    const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                    newIncludeFiles.push(filePath);
-                });
-            }
-
-            // Get old include files for cleanup
-            const oldIncludeFiles = column.includeFiles || [];
-            log(`[editColumnTitle] Column ${columnId} current includeFiles:`, oldIncludeFiles);
-            log(`[editColumnTitle] New include files from title:`, newIncludeFiles);
-            log(`[editColumnTitle] Column title in board:`, column.title);
-
-            // DATA LOSS PREVENTION: Check if column has existing tasks that would be lost
-            // This happens when a regular column (no include) is being converted to an include column
-            const isAddingIncludeToRegularColumn = !oldIncludeMatches && hasColumnIncludeMatches && !column.includeMode;
-            const hasExistingTasks = column.tasks && column.tasks.length > 0;
-
-            log(`[editColumnTitle] DATA LOSS CHECK: oldIncludeMatches=${!!oldIncludeMatches}, hasColumnIncludeMatches=${!!hasColumnIncludeMatches}, column.includeMode=${column.includeMode}`);
-            log(`[editColumnTitle] DATA LOSS CHECK: isAddingIncludeToRegularColumn=${isAddingIncludeToRegularColumn}, hasExistingTasks=${hasExistingTasks}, tasks.length=${column.tasks?.length || 0}`);
-
-            // Prepare preloaded content map for include switch event (used if user chooses "append tasks")
-            let preloadedContent: Map<string, string> | undefined;
-
-            if (isAddingIncludeToRegularColumn && hasExistingTasks) {
-                log(`[editColumnTitle] Column has ${column.tasks.length} existing tasks that would be lost`);
-
-                // Ask user what to do with existing tasks
-                const choice = await vscode.window.showWarningMessage(
-                    `This column has ${column.tasks.length} existing task(s). Adding an include will replace them with the included file's content.`,
-                    { modal: true },
-                    'Append tasks to include file',
-                    'Discard tasks',
-                    'Cancel'
-                );
-
-                if (choice === 'Cancel' || choice === undefined) {
-                    log(`[editColumnTitle] User cancelled include switch to preserve tasks`);
-                    // Revert the title change in the frontend
-                    const panel = this._getWebviewPanel();
-                    if (panel && panel._panel && panel._panel.webview) {
-                        panel._panel.webview.postMessage({
-                            type: 'revertColumnTitle',
-                            columnId: columnId,
-                            title: column.title
-                        });
-                    }
-                    this._getWebviewPanel().setEditingInProgress(false);
-                    return;
-                }
-
-                if (choice === 'Append tasks to include file') {
-                    // Generate content for appending tasks to the include file
-                    const includeFilePath = newIncludeFiles[0];
-                    log(`[editColumnTitle] User chose 'Append tasks to include file', includeFilePath: ${includeFilePath}`);
-                    if (includeFilePath) {
-                        try {
-                            const { absolutePath, content } = await this.generateAppendTasksContent(column, includeFilePath, currentBoard);
-                            // Create a map with the preloaded content to pass through the event
-                            // IMPORTANT: Use absolute path as key - loadingFiles in state machine uses absolute paths
-                            preloadedContent = new Map<string, string>();
-                            preloadedContent.set(absolutePath, content);
-                            log(`[editColumnTitle] Generated content for ${column.tasks.length} tasks`);
-                            log(`[editColumnTitle] Map key (absolutePath): "${absolutePath}"`);
-                            log(`[editColumnTitle] Content length: ${content.length}`);
-                        } catch (error) {
-                            log(`[editColumnTitle] Error generating tasks content:`, error);
-                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${getErrorMessage(error)}`);
-                            // Revert the title change
-                            const panel = this._getWebviewPanel();
-                            if (panel && panel._panel && panel._panel.webview) {
-                                panel._panel.webview.postMessage({
-                                    type: 'revertColumnTitle',
-                                    columnId: columnId,
-                                    title: column.title
-                                });
-                            }
-                            this._getWebviewPanel().setEditingInProgress(false);
-                            return;
-                        }
-                    }
-                }
-                // If 'Discard tasks' was chosen, continue with the include switch (tasks will be cleared)
-            }
-
-            // Route through unified state machine via handleIncludeSwitch
-            const panel = this._getWebviewPanel();
-
-            // Clear dirty flag BEFORE stopping editing
-            // This prevents RACE-2 handler from sending stale updateColumnContent
-            if (panel.clearColumnDirty) {
-                panel.clearColumnDirty(columnId);
-                log(`[editColumnTitle] Cleared dirty flag for column ${columnId} before switch`);
-            }
-
-            // CRITICAL FIX: Stop editing BEFORE starting switch to prevent race condition
-            // This ensures user can't edit while content is loading
-            await this.requestStopEditing();
-
-            try {
-                // Call new state machine-based handler
-                // Pass preloaded content if we generated it (from "append tasks to include file")
-                log(`[editColumnTitle] Calling handleIncludeSwitch with preloadedContent: ${!!preloadedContent}, size: ${preloadedContent?.size || 0}`);
-                log(`[editColumnTitle] oldFiles: ${JSON.stringify(oldIncludeFiles)}, newFiles: ${JSON.stringify(newIncludeFiles)}`);
-                await panel.handleIncludeSwitch({
-                    columnId: columnId,
-                    oldFiles: oldIncludeFiles,
-                    newFiles: newIncludeFiles,
-                    newTitle: newTitle,
-                    preloadedContent: preloadedContent
-                });
-
-                log(`[editColumnTitle] Column include switch completed successfully`);
-
-                // State machine already updated all column properties (title, includeFiles, tasks)
-                // No need to update board here - would cause stale data issues
-
-                // Clear editing flag after completion
-                log(`[editColumnTitle] Edit completed - allowing board regenerations`);
-                this._getWebviewPanel().setEditingInProgress(false);
-            } catch (error) {
-                // RACE-1: On error, still clear editing flag
-                this._getWebviewPanel().setEditingInProgress(false);
-
-                const errorMsg = getErrorMessage(error);
-                if (errorMsg === 'USER_CANCELLED') {
-                    log(`[editColumnTitle] User cancelled switch, no changes made`);
-                } else {
-                    log(`[editColumnTitle] Error during column include switch:`, error);
-                    vscode.window.showErrorMessage(`Failed to switch column include: ${errorMsg}`);
-                }
-            }
-        } else {
-            // Regular title edit without include syntax
-            // STATE-3: Frontend already updated title, don't echo back
-            await this.performBoardAction(() =>
-                this._boardOperations.editColumnTitle(currentBoard, columnId, newTitle),
-                { sendUpdate: false }
-            );
-
-            // RACE-1: Clear editing flag after regular title edit
-            this._getWebviewPanel().setEditingInProgress(false);
-        }
-    }
-
-    /**
-     * Generate content for appending tasks from a column to an include file.
-     * Returns the content and relative path to be passed through the include switch event.
-     * The actual file write happens when the user saves the main kanban file.
-     *
-     * @returns Object with absolutePath and content to be passed to handleIncludeSwitch
-     *          absolutePath is used because loadingFiles in state machine uses absolute paths
-     */
-    private async generateAppendTasksContent(
-        column: any,
-        includeFilePath: string,
-        _board: any
-    ): Promise<{ absolutePath: string; content: string }> {
-        const panel = this._getWebviewPanel();
-        if (!panel) {
-            throw new Error('No panel available');
-        }
-
-        // Get the main file and file registry
-        const mainFile = panel._fileRegistry.getMainFile();
-        if (!mainFile) {
-            throw new Error('No main file found');
-        }
-
-        const mainFilePath = mainFile.getPath();
-        const mainFileDir = path.dirname(mainFilePath);
-        const absoluteIncludePath = path.isAbsolute(includeFilePath)
-            ? includeFilePath
-            : path.resolve(mainFileDir, includeFilePath);
-
-        // Generate presentation format content from the column's tasks
-        // This uses PresentationGenerator to create proper Marp slides (each task = one slide)
-        const tasksContent = PresentationGenerator.fromTasks(column.tasks, {
-            filterIncludes: true,  // Filter out task includes - they have their own files
-            includeMarpDirectives: false  // No YAML header - we'll add it ourselves or append to existing
-        });
-
-        // Check if the file exists on disk to read existing content
-        let existingContent = '';
-        try {
-            const fileContent = await vscode.workspace.fs.readFile(safeFileUri(absoluteIncludePath, 'messageHandler-readIncludeFile'));
-            existingContent = Buffer.from(fileContent).toString('utf8');
-        } catch {
-            // File doesn't exist yet - that's fine, we'll create it with YAML header
-        }
-
-        let finalContent: string;
-        if (existingContent) {
-            // Append tasks at the end with slide separator
-            // Ensure proper slide separation
-            const separator = existingContent.trimEnd().endsWith('---') ? '\n' : '\n---\n';
-            finalContent = existingContent.trimEnd() + separator + tasksContent;
-        } else {
-            // Create new content with YAML header for Marp compatibility
-            finalContent = `---
-marp: true
----
-${tasksContent}`;
-        }
-
-        log(`[generateAppendTasksContent] Generated content for ${column.tasks.length} tasks, absolutePath: ${absoluteIncludePath}`);
-
-        return { absolutePath: absoluteIncludePath, content: finalContent };
     }
 }

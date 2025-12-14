@@ -31,7 +31,7 @@
 - Risk: Low (interface extension is additive)
 - **COMPLETED**: Added 9 new methods to CommandContext:
   - `setEditingInProgress`, `markTaskDirty`, `clearTaskDirty`, `markColumnDirty`, `clearColumnDirty`
-  - `handleIncludeSwitch`, `requestStopEditing`, `handleEditColumnTitleUnified`, `refreshConfiguration`
+  - `handleIncludeSwitch`, `requestStopEditing`, `refreshConfiguration`
 - Reduced `(panel as any)` from 32+ to 1 (remaining: EditModeCommands accessing messageHandler for legacy methods)
 
 ### 5. [x] Consolidate duplicate include handling in TaskCommands
@@ -48,29 +48,30 @@
 - File: `src/messageHandler.ts`
 - Issue: After Command Pattern introduction, some methods are duplicated or unused
 - Methods evaluated:
-  - `performBoardAction` - KEPT (still used by `handleEditColumnTitleUnified`)
+  - `performBoardAction` - REMOVED (moved to ColumnCommands via BaseMessageCommand pattern)
   - `handleUpdateTaskFromStrikethroughDeletion` - REMOVED (now handled by TaskCommands)
 - Risk: Medium
-- **COMPLETED**: Removed `handleUpdateTaskFromStrikethroughDeletion` (~35 lines)
+- **COMPLETED**: Removed both obsolete methods (~70 lines)
 
-### 7. [ ] Move `handleEditColumnTitleUnified` to ColumnCommands (Architectural)
+### 7. [x] Move `handleEditColumnTitleUnified` to ColumnCommands (Architectural)
 - Files: `src/messageHandler.ts`, `src/commands/ColumnCommands.ts`
-- Issue: Commands call back into MessageHandler, breaking clean architecture
-- Action: Move the 200+ line method to ColumnCommands or create IncludeService
+- Issue: Commands called back into MessageHandler, breaking clean architecture
+- Action: Move the 200+ line method to ColumnCommands
 - Risk: Medium (complex logic, needs careful testing)
-- **DEFERRED**: This is a larger refactoring that requires:
-  - Moving ~200 lines of complex include handling logic
-  - Refactoring the `performBoardAction` pattern to use context
-  - Potentially creating a new IncludeService for shared logic
-  - Careful testing of column include switching
+- **COMPLETED**:
+  - Moved `handleEditColumnTitleUnified` (~110 lines) to ColumnCommands
+  - Moved `generateAppendTasksContent` helper (~50 lines) to ColumnCommands
+  - Added `extractIncludeFiles` helper method to ColumnCommands
+  - Removed `handleEditColumnTitleUnified` from CommandContext interface
+  - Removed 3 methods + ~250 lines from MessageHandler
+  - Removed 4 unused imports from MessageHandler (`PresentationGenerator`, `INCLUDE_SYNTAX`, `safeFileUri`, `path`)
 
 ---
 
 ## Progress Log
 
 - Started: 2024-12-14
-- Tasks 1-6: COMPLETED
-- Task 7: DEFERRED (architectural refactoring for future session)
+- Tasks 1-7: ALL COMPLETED
 
 ## Summary of Changes
 
@@ -78,12 +79,24 @@
 1. `src/commands/ClipboardCommands.ts` - Removed wrapper, consolidated path logic
 2. `src/commands/DiagramCommands.ts` - Created unified SVG conversion method
 3. `src/commands/TaskCommands.ts` - Created helper methods, use context methods
-4. `src/commands/ColumnCommands.ts` - Use context methods
+4. `src/commands/ColumnCommands.ts` - Added full column include handling logic, use context methods
 5. `src/commands/EditModeCommands.ts` - Use context methods
 6. `src/commands/UICommands.ts` - Use context methods
-7. `src/commands/interfaces/MessageCommand.ts` - Extended CommandContext interface
-8. `src/messageHandler.ts` - Added context methods, removed obsolete method
+7. `src/commands/interfaces/MessageCommand.ts` - Extended CommandContext interface (8 new methods)
+8. `src/messageHandler.ts` - Added context methods, removed 3 obsolete methods (~280 lines), cleaned up imports
 
 ### Lines Changed:
-- ~300 lines modified/reduced
-- Code is now more type-safe, maintainable, and follows DRY principles
+- MessageHandler reduced by ~280 lines (from ~580 to ~300 lines)
+- ColumnCommands increased by ~185 lines (proper location for column logic)
+- Net reduction: ~95 lines
+- Code is now more type-safe, maintainable, and follows clean architecture principles
+
+### Architectural Improvements:
+- Commands no longer call back into MessageHandler
+- Column include handling is properly encapsulated in ColumnCommands
+- `(panel as any)` patterns reduced from 32+ to 1
+- MessageHandler is now primarily responsible for:
+  - Context creation and command registry initialization
+  - Message routing to commands
+  - Board update handling
+  - Edit mode lifecycle

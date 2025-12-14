@@ -1,6 +1,4 @@
 
-- [ ] it seems as if the board is rendered twice when loading the board.
-
 - [ ] do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems
 
 - [ ] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!
@@ -414,7 +412,6 @@ remove the marp theme and style from the column headers and task headers.
 
 - [ ] The shortcuts dont work properly anymore. Also the complex feature for translation does not work properly. The complexity it adds is not feasable. We could try again with the paste version which just pastes the replaced content, but using new files is too much.
 
-
 - [ ] add a feature to add templates for marp styles. the user would be able to defined those, but a current list would be. Each can be toggled on or off. 
   - _class stylings which are set as <!-- class: style --> . style can be
     - fontXX : where XX is a number. the list of fonts tags are in the section.fontXX in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/marp-engine/themes/style-roboto-light.css
@@ -430,9 +427,7 @@ remove the marp theme and style from the column headers and task headers.
   - and the website: <https://deepwiki.com/marp-team/marp/3.4-theming-and-styling> 
   
 
-- [ ] Can we make the sticky setting for headers (which is currently modified by
- the "sticky stack mode") individual for each column header, with a global 
-sticky flag in the "file info bar". so each column gets a sticky flag (a pin icon). when the sticky flag is active, the header will stay on the screeen using the current layout settings.analyze the influence of the "sticky stack mode" on the kanban board. check if we can make each column have it's individual sticky setting . we still want the "sticky stack mode settings, but only "Full stack" and "Title only", the none feature is after this modification modified trough the "sticky flag" 
+- [x] Can we make the sticky setting for headers (which is currently modified by the "sticky stack mode") individual for each column header, with a global sticky flag in the "file info bar". so each column gets a sticky flag (a pin icon). when the sticky flag is active, the header will stay on the screeen using the current layout settings.analyze the influence of the "sticky stack mode" on the kanban board. check if we can make each column have it's individual sticky setting . we still want the "sticky stack mode settings, but only "Full stack" and "Title only", the none feature is after this modification modified trough the "sticky flag" 
   -> the sticky state can be saved into the kanban as #sticky, it should be 
 considered a layout tag that is filtered when displaying depending on the 
 setting, also when exporting it might get filtered! the default state should be 
@@ -442,10 +437,10 @@ states of each column and is saved to the files. place the icon right of the
 column folding. make sure it's applied after the rendering in the process where 
 all the tags are processed, as the user might add it by text. 
 
-- [ ] when adding multiple files using drag & drop it randomly places them over the board. why does that
+- [x] when adding multiple files using drag & drop it randomly places them over the board. why does that
   happen?
 
-- [ ] plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
+- [x] plan high-level cleanups. for this update the files in the agent folder first. then analyze the structure of the code. then analyze wether we could reasonably apply design patterns to optimize it and reduce changes of errors.
 - [x] COMPLETED: PlantUML integration (LOCAL WASM)
   - [x] Renders ```plantuml code blocks as SVG diagrams using LOCAL WASM (no server!)
   - [x] Uses @sakirtemel/plantuml.js with CheerpJ for browser-based Java execution
@@ -471,3 +466,6 @@ all the tags are processed, as the user might add it by text.
 - Add tags that parse numbers such as #1 #2 #13 and #04 #032 . They should be displayed as batches next to the column or task in a good contrast.
 
 - Re-Analyze the full process of file change detection and caching, conflict checking and user response as well as saving the data in the different ways. then i save the main file externally with an unsaved internal change its overwriting the external file. BUT THERE ARE OTHER PROBLEMS AS WELL. I WANT A COMPLETE AND FULL ANALYSIS, USING AN UML STRUCTURE. THEN VERIFY EACH STEP WETHER ITS NEEDED AND IN ORDER. THEN MAKE 3 SUGGESTIONS HOW TO SOLVE EACH OF THE PROBLEMS, IF CONFIDENCE IN SOLVING THE PROBLEM IS NOT 100% ANALYZE AGAIN AND REPEAT UNTIL YOU ARE SURE THE PROBLEM IS PROPERLY SOLVED. WORK AUTOMATICALLY UNTIL I INTERRUPT YOU!!!
+
+- [x] it seems as if the board is rendered twice when loading the board.
+

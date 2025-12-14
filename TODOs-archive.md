@@ -6,27 +6,24 @@ kanban-plugin: board
 
 - it still behaves problematically if the user switches to edit the task-description by using tab after editing the task-header which has a taskinclude. when a include change is detected (after the backend has processed it), then stop the edit that is currently active. store the changes from the edit to cache, if there are changes detected between cache and file ask the user what to do with the data (conflict handling if conflict, save handling if unsaved). 
 
-- [ ] Include files and cache handling:
+- [x] Include files and cache handling:
 
-If any change is saved to the kanban file, and included file in the kanban or the kanban-markdown file (the source) or any of the included files. Also when an column-title, task-title or task description is modified that contains an include (eigher trough text or using the menu).
-- make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
-- if it's an external change, and the user is currently editing the kanban. end the edit, keeping the change. use this state as baseline.
-- verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
-- unset the includefiles for the switched files and clear the cache in front and backend.
-- set the includefiles, load and update the cache in backend (and frontend?).
-- if any of the included files has changes: change the content in the frontend & backend for the included files.
-- if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
-- only update the contents that have been modified in the frontend.
+  If any change is saved to the kanban file, and included file in the kanban or the kanban-markdown file (the source) or any of the included files. Also when an column-title, task-title or task description is modified that contains an include (eigher trough text or using the menu).
+  - make sure there is only one entry point, but allow entering the execution path at any main points as listed below.
+  - if it's an external change, and the user is currently editing the kanban. end the edit, keeping the change. use this state as baseline.
+  - verify if any of the include files that are switched or unloaded have any unsaved content, if so ask the user if he wants to save the changes before unloading/switching. Dont yet apply the new files to the includefiles.
+  - unset the includefiles for the switched files and clear the cache in front and backend.
+  - set the includefiles, load and update the cache in backend (and frontend?).
+  - if any of the included files has changes: change the content in the frontend & backend for the included files.
+  - if the main file has changes: switch the content of the main displayed file with the included files contents. (could be combined with the above step)
+  - only update the contents that have been modified in the frontend.
 
-DO NOT SAVE TO THE FILE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES. BUT STORE TO THE BASELINE AUTOMATICALLY IF THE MAIN FILE OR ANY INCLUDED FILES ARE MODIFYED.
+  DO NOT SAVE TO THE FILE AT ANY POINT, EXCEPT WHEN THE USER SELECTS TO SAVE CHANGES INTO THE INCLUDED FILES. BUT STORE TO THE BASELINE AUTOMATICALLY IF THE MAIN FILE OR ANY INCLUDED FILES ARE MODIFYED.
 
-The Taskinclude, columninclude and regular include (include in task/column header or in task content):
-- shows the shortened !!!include(path/to/file.md)!!! as include(path/to/file.md) with all the tags and other content as a alt+clickable link.
+  The Taskinclude, columninclude and regular include (include in task/column header or in task content):
+  - shows the shortened !!!include(path/to/file.md)!!! as include(path/to/file.md) with all the tags and other content as a alt+clickable link.
 
-
-
-
-- [ ] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
+- [x] ok i had to undo the changes. the state of the code was really worse then before. can you try to fix the include system only, without affecting the column and taskincludes? make it use similar approaches as the task/column in the regular include. also make sure the column and taskincludes show an empty content as soon as the included file is changed, so the user might not make any mistake edit while it's being changed. but it must still ask for unsaved changes before doing so!
 
 - [x] Conflict tracking behaviour:
   - if the external file is modified and saved (a file modification is detected) and the kanban has saved or unsaved changes or is in edit mode. then the conflict manager must ask the user:
@@ -50,7 +47,7 @@ The Taskinclude, columninclude and regular include (include in task/column heade
 
   ULTRATHINK THINK PLAN
 
-- [ ] test the different situatuons when files are included into the kanban using task includes (!!!include in task title) or column includes (!!!include in column header). they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
+- [x] test the different situatuons when files are included into the kanban using task includes (!!!include in task title) or column includes (!!!include in column header). they should ask to save when: - closing the kanban, - chaging to another include file. they should ask to load the external changes if it's changed externally, but first it should verify if there are unsaved changes. test it carefully make test situations that we can run again. it must be completely stable and exteremely reliablly tested, verified and made sure that no data is overwritten or lost during working with the kanban. ULTRATHINK THINK PLAN. take all the time you need to test it. VERIFY CAREFULLY. continue automatically if possible as long as you can!!!
 
 - [x] currently if the markdown contains any html comment is displays them as is. can you make that an setting that can be changed in the main burger menu. new should also be that it can handle html contents that are embedded in the markdown. 
 

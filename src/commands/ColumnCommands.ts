@@ -14,6 +14,11 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
+import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { PresentationGenerator } from '../services/export/PresentationGenerator';
+import { safeFileUri } from '../utils/uriUtils';
+import * as vscode from 'vscode';
+import * as path from 'path';
 
 /**
  * Column Commands Handler
@@ -70,6 +75,190 @@ export class ColumnCommands extends BaseMessageCommand {
             const errorMessage = getErrorMessage(error);
             console.error(`[ColumnCommands] Error handling ${message.type}:`, error);
             return this.failure(errorMessage);
+        }
+    }
+
+    // ============= HELPER METHODS =============
+
+    /**
+     * Extract include file paths from a title string
+     * Returns array of file paths found in !!!include(path)!!! syntax
+     */
+    private extractIncludeFiles(title: string): string[] {
+        const includeFiles: string[] = [];
+        const matches = title.match(INCLUDE_SYNTAX.REGEX);
+        if (matches) {
+            matches.forEach((match: string) => {
+                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+                includeFiles.push(filePath);
+            });
+        }
+        return includeFiles;
+    }
+
+    /**
+     * Generate content for appending tasks from a column to an include file.
+     * Returns the content and absolute path to be passed through the include switch event.
+     */
+    private async generateAppendTasksContent(
+        column: any,
+        includeFilePath: string,
+        context: CommandContext
+    ): Promise<{ absolutePath: string; content: string }> {
+        const fileRegistry = context.getFileRegistry();
+        if (!fileRegistry) {
+            throw new Error('No file registry available');
+        }
+
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            throw new Error('No main file found');
+        }
+
+        const mainFilePath = mainFile.getPath();
+        const mainFileDir = path.dirname(mainFilePath);
+        const absoluteIncludePath = path.isAbsolute(includeFilePath)
+            ? includeFilePath
+            : path.resolve(mainFileDir, includeFilePath);
+
+        // Generate presentation format content from the column's tasks
+        const tasksContent = PresentationGenerator.fromTasks(column.tasks, {
+            filterIncludes: true,
+            includeMarpDirectives: false
+        });
+
+        // Check if the file exists on disk to read existing content
+        let existingContent = '';
+        try {
+            const fileContent = await vscode.workspace.fs.readFile(safeFileUri(absoluteIncludePath, 'ColumnCommands-readIncludeFile'));
+            existingContent = Buffer.from(fileContent).toString('utf8');
+        } catch {
+            // File doesn't exist yet - that's fine
+        }
+
+        let finalContent: string;
+        if (existingContent) {
+            const separator = existingContent.trimEnd().endsWith('---') ? '\n' : '\n---\n';
+            finalContent = existingContent.trimEnd() + separator + tasksContent;
+        } else {
+            finalContent = `---
+marp: true
+---
+${tasksContent}`;
+        }
+
+        return { absolutePath: absoluteIncludePath, content: finalContent };
+    }
+
+    /**
+     * Unified handler for column title edits with include detection
+     * Handles both normal edits and strikethrough deletions
+     */
+    private async handleEditColumnTitleUnified(
+        columnId: string,
+        newTitle: string,
+        context: CommandContext
+    ): Promise<void> {
+        const currentBoard = context.getCurrentBoard();
+        if (!currentBoard) {
+            return;
+        }
+
+        const column = currentBoard.columns.find(col => col.id === columnId);
+        if (!column) {
+            return;
+        }
+
+        // Check for include syntax changes
+        const hasColumnIncludeMatches = newTitle.match(INCLUDE_SYNTAX.REGEX);
+        const oldIncludeMatches = (column.title || '').match(INCLUDE_SYNTAX.REGEX);
+        const hasIncludeChanges = hasColumnIncludeMatches || oldIncludeMatches;
+
+        if (hasIncludeChanges) {
+            // Column include switch - route through state machine
+            const newIncludeFiles = this.extractIncludeFiles(newTitle);
+            const oldIncludeFiles = column.includeFiles || [];
+
+            // DATA LOSS PREVENTION: Check if column has existing tasks that would be lost
+            const isAddingIncludeToRegularColumn = !oldIncludeMatches && hasColumnIncludeMatches && !column.includeMode;
+            const hasExistingTasks = column.tasks && column.tasks.length > 0;
+
+            let preloadedContent: Map<string, string> | undefined;
+
+            if (isAddingIncludeToRegularColumn && hasExistingTasks) {
+                const choice = await vscode.window.showWarningMessage(
+                    `This column has ${column.tasks.length} existing task(s). Adding an include will replace them with the included file's content.`,
+                    { modal: true },
+                    'Append tasks to include file',
+                    'Discard tasks',
+                    'Cancel'
+                );
+
+                if (choice === 'Cancel' || choice === undefined) {
+                    // Revert the title change in the frontend
+                    this.postMessage({
+                        type: 'revertColumnTitle',
+                        columnId: columnId,
+                        title: column.title
+                    });
+                    context.setEditingInProgress(false);
+                    return;
+                }
+
+                if (choice === 'Append tasks to include file') {
+                    const includeFilePath = newIncludeFiles[0];
+                    if (includeFilePath) {
+                        try {
+                            const { absolutePath, content } = await this.generateAppendTasksContent(column, includeFilePath, context);
+                            preloadedContent = new Map<string, string>();
+                            preloadedContent.set(absolutePath, content);
+                        } catch (error) {
+                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${getErrorMessage(error)}`);
+                            this.postMessage({
+                                type: 'revertColumnTitle',
+                                columnId: columnId,
+                                title: column.title
+                            });
+                            context.setEditingInProgress(false);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Clear dirty flag BEFORE stopping editing
+            context.clearColumnDirty(columnId);
+
+            // Stop editing before switch
+            await context.requestStopEditing();
+
+            try {
+                await context.handleIncludeSwitch({
+                    columnId: columnId,
+                    oldFiles: oldIncludeFiles,
+                    newFiles: newIncludeFiles,
+                    newTitle: newTitle,
+                    preloadedContent: preloadedContent
+                });
+
+                context.setEditingInProgress(false);
+            } catch (error) {
+                context.setEditingInProgress(false);
+
+                const errorMsg = getErrorMessage(error);
+                if (errorMsg !== 'USER_CANCELLED') {
+                    vscode.window.showErrorMessage(`Failed to switch column include: ${errorMsg}`);
+                }
+            }
+        } else {
+            // Regular title edit without include syntax
+            await this.performBoardAction(
+                context,
+                () => context.boardOperations.editColumnTitle(currentBoard, columnId, newTitle),
+                { sendUpdate: false }
+            );
+
+            context.setEditingInProgress(false);
         }
     }
 
@@ -200,21 +389,17 @@ export class ColumnCommands extends BaseMessageCommand {
 
     /**
      * Handle editColumnTitle message - complex with include handling
-     * Routes to the unified handler for include detection
      */
     private async handleEditColumnTitle(message: any, context: CommandContext): Promise<CommandResult> {
-        // Route through unified column title handler which handles include detection
-        await context.handleEditColumnTitleUnified(message.columnId, message.title);
+        await this.handleEditColumnTitleUnified(message.columnId, message.title, context);
         return this.success();
     }
 
     /**
      * Handle updateColumnTitleFromStrikethroughDeletion message
-     * Routes through the same unified handler as editColumnTitle
      */
     private async handleUpdateColumnTitleFromStrikethroughDeletion(message: any, context: CommandContext): Promise<CommandResult> {
-        // Route through unified handler
-        await context.handleEditColumnTitleUnified(message.columnId, message.newTitle);
+        await this.handleEditColumnTitleUnified(message.columnId, message.newTitle, context);
         return this.success();
     }
 }
