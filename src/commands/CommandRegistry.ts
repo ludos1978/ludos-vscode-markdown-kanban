@@ -10,15 +10,10 @@
  */
 
 import { MessageCommand, CommandContext, CommandResult } from './interfaces/MessageCommand';
+import { ValidationResult } from '../shared/interfaces';
 
-/**
- * Validation result for command registration
- */
-export interface ValidationResult {
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
-}
+// Re-export for backwards compatibility
+export { ValidationResult };
 
 /**
  * Command execution statistics

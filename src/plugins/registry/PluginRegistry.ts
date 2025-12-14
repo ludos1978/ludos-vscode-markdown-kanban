@@ -15,15 +15,10 @@ import {
     ExportFormat,
     PluginContext
 } from '../interfaces';
+import { ValidationResult } from '../../shared/interfaces';
 
-/**
- * Validation result for plugin registration
- */
-export interface ValidationResult {
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
-}
+// Re-export for backwards compatibility
+export { ValidationResult };
 
 /**
  * Plugin Registry - Singleton
