@@ -818,16 +818,17 @@ export class ChangeStateMachine {
             }
         }
 
-        // CRITICAL FIX: Mark main file as modified for include switches
+        // CRITICAL FIX: Sync board to backend for include switches
         // When an include file is switched, the task/column title in the main file
         // changes (e.g., !!!include(old.md)!!! -> !!!include(new.md)!!!), so the
-        // main file needs to be marked as having unsaved changes
+        // main file content needs to be updated for unsaved detection
         if (context.impact.includesSwitched) {
             const mainFile = this._fileRegistry.getMainFile();
             if (mainFile && this._webviewPanel) {
-                // Mark as unsaved so user is prompted to save before closing
-                if (this._webviewPanel.markUnsavedChanges) {
-                    this._webviewPanel.markUnsavedChanges();
+                // Get current board and sync to backend (updates _content for unsaved detection)
+                const board = this._webviewPanel.getBoard?.();
+                if (board && this._webviewPanel.syncBoardToBackend) {
+                    this._webviewPanel.syncBoardToBackend(board);
                 }
             }
         }

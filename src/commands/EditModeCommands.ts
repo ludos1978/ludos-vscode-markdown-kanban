@@ -145,9 +145,12 @@ export class EditModeCommands extends BaseMessageCommand {
                     }
                     return this.success();
 
-                // Board state operations
+                // Board state operations - sync board from frontend to backend
                 case 'markUnsavedChanges':
-                    context.markUnsavedChanges(message.hasUnsavedChanges, message.cachedBoard);
+                    // Legacy message type from frontend - sync board if provided
+                    if (message.cachedBoard) {
+                        context.syncBoardToBackend(message.cachedBoard);
+                    }
                     return this.success();
 
                 case 'saveUndoState':
@@ -186,7 +189,7 @@ export class EditModeCommands extends BaseMessageCommand {
                     if (board) {
                         context.boardStore.saveStateForUndo(board);
                         context.boardOperations.performAutomaticSort(board);
-                        context.markUnsavedChanges(true);
+                        context.syncBoardToBackend(board);
                         await context.onBoardUpdate();
                     }
                     return this.success();

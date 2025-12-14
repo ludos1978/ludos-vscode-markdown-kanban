@@ -36,7 +36,7 @@ export class MessageHandler {
     private _setBoard: (board: KanbanBoard) => void;
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
-    private _markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+    private _syncBoardToBackend: (board: KanbanBoard) => void;
     private _autoExportSettings: any = null;
 
     // Command Pattern: Registry for message handlers
@@ -60,7 +60,7 @@ export class MessageHandler {
             setBoard: (board: KanbanBoard) => void;
             setUndoRedoOperation: (isOperation: boolean) => void;
             getWebviewPanel: () => any;
-            markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+            syncBoardToBackend: (board: KanbanBoard) => void;
         }
     ) {
         this._fileManager = fileManager;
@@ -75,7 +75,7 @@ export class MessageHandler {
         this._setBoard = callbacks.setBoard;
         this._setUndoRedoOperation = callbacks.setUndoRedoOperation;
         this._getWebviewPanel = callbacks.getWebviewPanel;
-        this._markUnsavedChanges = callbacks.markUnsavedChanges;
+        this._syncBoardToBackend = callbacks.syncBoardToBackend;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
         this._commandRegistry = new CommandRegistry();
@@ -101,7 +101,7 @@ export class MessageHandler {
             setBoard: this._setBoard,
             setUndoRedoOperation: this._setUndoRedoOperation,
             getWebviewPanel: this._getWebviewPanel,
-            markUnsavedChanges: this._markUnsavedChanges,
+            syncBoardToBackend: this._syncBoardToBackend,
             getAutoExportSettings: () => this._autoExportSettings,
             setAutoExportSettings: (settings: any) => { this._autoExportSettings = settings; }
         };
@@ -203,15 +203,14 @@ export class MessageHandler {
         const success = action();
 
         if (success) {
+            const currentBoard = this._getCurrentBoard();
+            if (currentBoard) {
+                // Sync board state to backend (updates _content for unsaved detection)
+                this._syncBoardToBackend(currentBoard);
+            }
             if (sendUpdate) {
-                // Backend-initiated change: mark unsaved and send update to frontend
-                this._markUnsavedChanges(true);
+                // Backend-initiated change: also send update to frontend
                 await this._onBoardUpdate();
-            } else {
-                // Frontend-initiated change: just mark backend as unsaved
-                // The frontend already has the correct state from immediate updates
-                // CRITICAL: Pass the current board so that trackIncludeFileUnsavedChanges is called
-                this._markUnsavedChanges(true, this._getCurrentBoard());
             }
         }
     }
@@ -310,8 +309,8 @@ export class MessageHandler {
                 panel.syncIncludeFilesWithBoard(board);
             }
 
-            // Mark as unsaved - user must explicitly save via Cmd+S or debug overlay
-            this._markUnsavedChanges(true, board);
+            // Sync board to backend (updates _content for unsaved detection)
+            this._syncBoardToBackend(board);
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);

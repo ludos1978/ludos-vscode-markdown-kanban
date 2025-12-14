@@ -84,7 +84,7 @@ export class UICommands extends BaseMessageCommand {
         const previousBoard = context.boardStore.undo();
         if (previousBoard) {
             context.setBoard(previousBoard);
-            context.markUnsavedChanges(true);
+            context.syncBoardToBackend(previousBoard);
             await context.onBoardUpdate();
         }
 
@@ -112,7 +112,7 @@ export class UICommands extends BaseMessageCommand {
         const nextBoard = context.boardStore.redo();
         if (nextBoard) {
             context.setBoard(nextBoard);
-            context.markUnsavedChanges(true);
+            context.syncBoardToBackend(nextBoard);
             await context.onBoardUpdate();
         }
 
@@ -158,10 +158,8 @@ export class UICommands extends BaseMessageCommand {
         context.setBoard(board);
 
         // Save to markdown file
+        // After save, _baseline is updated to match _content, so hasUnsavedChanges() returns false automatically
         await context.onSaveToMarkdown();
-
-        // Mark as saved (no unsaved changes)
-        context.markUnsavedChanges(false);
 
         return this.success();
     }

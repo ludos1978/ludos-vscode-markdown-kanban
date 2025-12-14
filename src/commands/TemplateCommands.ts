@@ -234,8 +234,8 @@ export class TemplateCommands extends BaseMessageCommand {
             // Insert empty column
             currentBoard.columns.splice(insertIndex, 0, emptyColumn);
 
-            // Mark unsaved and update frontend
-            context.markUnsavedChanges(true, currentBoard);
+            // Sync to backend and update frontend
+            context.syncBoardToBackend(currentBoard);
             await context.onBoardUpdate();
 
             log(`createEmptyColumn: Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}, stack=${needsStackTag}`);
@@ -348,8 +348,8 @@ export class TemplateCommands extends BaseMessageCommand {
             // Insert columns into board
             currentBoard.columns.splice(insertIndex, 0, ...columnsWithRow);
 
-            // Mark unsaved changes and update
-            context.markUnsavedChanges(true, currentBoard);
+            // Sync to backend and update frontend
+            context.syncBoardToBackend(currentBoard);
             await context.onBoardUpdate();
 
             // Send updated board to frontend

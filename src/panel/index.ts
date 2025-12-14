@@ -9,6 +9,7 @@
 
 // Foundation (Phase 1)
 export { PanelStateModel, PanelStateFlags } from './PanelStateModel';
+export { DocumentStateModel, DocumentStateSnapshot, PendingBoardUpdate } from './DocumentStateModel';
 export { ConcurrencyManager } from './ConcurrencyManager';
 
 // Core Operations (Phase 2)

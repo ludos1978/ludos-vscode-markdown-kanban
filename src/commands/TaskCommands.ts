@@ -112,13 +112,14 @@ export class TaskCommands extends BaseMessageCommand {
         const success = action();
 
         if (success) {
+            const board = context.getCurrentBoard();
+            if (board) {
+                // Sync board state to backend (updates _content for unsaved detection)
+                context.syncBoardToBackend(board);
+            }
             if (sendUpdate) {
-                // Backend-initiated change: mark unsaved and send update to frontend
-                context.markUnsavedChanges(true);
+                // Backend-initiated change: also send update to frontend
                 await context.onBoardUpdate();
-            } else {
-                // Frontend-initiated change: just mark backend as unsaved
-                context.markUnsavedChanges(true, context.getCurrentBoard());
             }
         }
 

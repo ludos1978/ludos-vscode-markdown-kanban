@@ -37,7 +37,8 @@ export interface CommandContext {
     setBoard: (board: KanbanBoard) => void;
     setUndoRedoOperation: (isOperation: boolean) => void;
     getWebviewPanel: () => vscode.WebviewPanel | undefined;
-    markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+    /** Sync board state from frontend to backend (updates _content, triggers hash comparison for unsaved detection) */
+    syncBoardToBackend: (board: KanbanBoard) => void;
 
     // Export settings
     getAutoExportSettings: () => any;

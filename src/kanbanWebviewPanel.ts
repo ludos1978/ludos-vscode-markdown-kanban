@@ -25,7 +25,7 @@ import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { PanelEventBus, createLoggingMiddleware } from './core/events';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { PanelStateModel, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
+import { PanelStateModel, DocumentStateModel, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
 
 export class KanbanWebviewPanel {
@@ -56,6 +56,7 @@ export class KanbanWebviewPanel {
 
     // Panel architecture components (Phase 1, 2 & 3)
     private _state: PanelStateModel;
+    private _documentState: DocumentStateModel;  // Single source of truth for document state
     private _concurrency: ConcurrencyManager;
     private _includeCoordinator: IncludeFileCoordinator;
     private _webviewManager: WebviewManager;
@@ -64,16 +65,8 @@ export class KanbanWebviewPanel {
     public get _isUpdatingFromPanel(): boolean { return this._state.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._state.setUpdatingFromPanel(value); }
 
-    // Non-flag state values
-    private _lastDocumentVersion: number = -1;  // Track document version
-    private _unsavedChangesCheckInterval?: NodeJS.Timeout;  // Periodic unsaved changes check
-    private _lastDocumentUri?: string;  // Track current document for serialization
-
-    // Queued board update - sent when webview becomes ready
-    private _pendingBoardUpdate: { applyDefaultFolding: boolean; isFullRefresh: boolean } | null = null;
-
-    private _panelId: string;  // Unique identifier for this panel
-    private _trackedDocumentUri: string | undefined;  // Track the document URI for panel map management
+    // Timer for periodic unsaved changes check (lifecycle concern, not state)
+    private _unsavedChangesCheckInterval?: NodeJS.Timeout;
 
     private _conflictResolver: ConflictResolver;
 
@@ -162,7 +155,7 @@ export class KanbanWebviewPanel {
         // Store the panel in the map and load document
         if (document) {
             const docUri = document.uri.toString();
-            kanbanPanel._trackedDocumentUri = docUri;  // Track the URI for cleanup
+            kanbanPanel._documentState.setTrackedDocumentUri(docUri);  // Track the URI for cleanup
             KanbanWebviewPanel.panels.set(docUri, kanbanPanel);
             // Load immediately - webview will request data when ready
             kanbanPanel.loadMarkdownFile(document);
@@ -265,7 +258,7 @@ export class KanbanWebviewPanel {
     }
 
     public getPanelId(): string {
-        return this._panelId;
+        return this._documentState.panelId;
     }
 
     public getPanel(): vscode.WebviewPanel {
@@ -281,12 +274,12 @@ export class KanbanWebviewPanel {
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         this._panel = panel;
         this._extensionUri = extensionUri;
-        this._panelId = `panel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`; // Generate unique ID
         this._context = context;
 
         // Initialize panel architecture components (Phase 1)
         const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
         this._state = new PanelStateModel(isDevelopment);
+        this._documentState = new DocumentStateModel(undefined, isDevelopment);  // Single source of truth
         this._concurrency = new ConcurrencyManager(isDevelopment);
 
         this._eventBus = new PanelEventBus({
@@ -383,6 +376,7 @@ export class KanbanWebviewPanel {
             this._backupManager,
             this._boardOperations,
             fileServiceCallbacks,
+            this._documentState,  // Single source of truth for document state
             KanbanWebviewPanel.panelStates,
             KanbanWebviewPanel.panels
         );
@@ -415,82 +409,14 @@ export class KanbanWebviewPanel {
                     this._state.setUndoRedoOperation(isOperation);
                 },
                 getWebviewPanel: () => this,
-                markUnsavedChanges: async (hasChanges: boolean, cachedBoard?: any) => {
-
-                    if (!this._fileRegistry.isReady()) {
-                        return;
-                    }
-
-                    // CRITICAL: Update cached board BEFORE any file operations
-                    // This ensures file watchers triggered by saves see the latest board state
-                    if (cachedBoard) {
-                        this._boardStore.setBoard(cachedBoard, false);
-
-                        // CRITICAL: Also update MainKanbanFile's cached board for conflict detection
-                        const mainFile = this._fileRegistry.getMainFile();
-                        if (mainFile) {
-                            mainFile.setCachedBoardFromWebview(cachedBoard);
-                        }
-                    }
-
-                    if (hasChanges && cachedBoard) {
-                        // User edited the board - mark as having unsaved changes
-
-                        // Track changes in include files (updates their cache)
-                        await this._fileRegistry.trackIncludeFileUnsavedChanges(cachedBoard);
-
-                        // Update main file content from board (for verification sync)
-                        const mainFile2 = this._fileRegistry.getMainFile();
-                        if (mainFile2) {
-                            // Generate markdown from cached board to keep backend in sync with frontend
-                            const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                            mainFile2.setContent(markdown, false); // false = mark as unsaved
-                        }
-
-                        // Attempt to create backup if minimum interval has passed
-                        const document = this._fileManager.getDocument();
-                        if (document) {
-                            this._backupManager.createBackup(document, { label: 'auto' })
-                                .catch(error => console.error('Cache update backup failed:', error));
-                        }
-                    } else {
-                        // ARCHITECTURE: Frontend can only mark changes (true), never clear them (false)
-                        // Only backend can clear unsaved changes after save completes
-                        if (!hasChanges && !cachedBoard) {
-                            console.warn('[markUnsavedChanges callback] IGNORING invalid markUnsavedChanges(false) from frontend - only backend can clear unsaved state');
-                            return;
-                        }
-
-                        // If we get here, it's a valid state change from frontend (marking something as changed)
-                        if (cachedBoard) {
-                            // Frontend sent board changes - update main file content and mark as unsaved
-                            const mainFile3 = this._fileRegistry.getMainFile();
-                            if (mainFile3) {
-                                // Generate markdown from cached board to keep backend in sync with frontend
-                                const markdown = MarkdownKanbanParser.generateMarkdown(cachedBoard);
-                                mainFile3.setContent(markdown, false); // false = mark as unsaved
-                            }
-                        } else if (hasChanges) {
-                            // Frontend marking as changed without board (edge case) - should not happen
-                            console.warn('[markUnsavedChanges callback] hasChanges=true but no cachedBoard provided');
-                        }
-                    }
-                }
+                syncBoardToBackend: (board: KanbanBoard) => this.syncBoardToBackend(board)
             }
         );
 
         // Connect message handler to file registry (for stopping edit mode during conflicts)
         this._fileRegistry.setMessageHandler(this._messageHandler);
 
-        // Initialize state in KanbanFileService
-        this._fileService.initializeState(
-            this._isUpdatingFromPanel,
-            this.getBoard(),
-            this._lastDocumentVersion,
-            this._lastDocumentUri,
-            this._trackedDocumentUri,
-            this._panelId
-        );
+        // Note: No initializeState() call needed - DocumentStateModel is shared directly
 
         this._initialize();
         this._setupEventListeners();
@@ -705,9 +631,7 @@ export class KanbanWebviewPanel {
         if (state.cachedBoardFromWebview) {
             this._boardStore.setBoard(state.cachedBoardFromWebview, false);
         }
-        this._lastDocumentVersion = state.lastDocumentVersion;
-        this._lastDocumentUri = state.lastDocumentUri;
-        this._trackedDocumentUri = state.trackedDocumentUri;
+        // Document state fields are now in shared DocumentStateModel - no sync needed
     }
 
     private _setupEventListeners() {
@@ -778,12 +702,11 @@ export class KanbanWebviewPanel {
         console.log('[kanban.handleWebviewReady] Webview is ready');
         this._state.setWebviewReady(true);
 
-        // Send any pending board update
-        if (this._pendingBoardUpdate) {
+        // Send any pending board update (consume and clear atomically)
+        const pendingUpdate = this._documentState.consumePendingBoardUpdate();
+        if (pendingUpdate) {
             console.log('[kanban.handleWebviewReady] Sending pending board update');
-            const { applyDefaultFolding, isFullRefresh } = this._pendingBoardUpdate;
-            this._pendingBoardUpdate = null;
-            this.sendBoardUpdate(applyDefaultFolding, isFullRefresh);
+            this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
         }
     }
 
@@ -825,7 +748,7 @@ export class KanbanWebviewPanel {
         // Queue update if webview not ready yet
         if (!this._state.webviewReady) {
             console.log('[kanban.sendBoardUpdate] Webview not ready, queuing update');
-            this._pendingBoardUpdate = { applyDefaultFolding, isFullRefresh };
+            this._documentState.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
             return;
         }
 
@@ -1544,6 +1467,46 @@ export class KanbanWebviewPanel {
     }
 
     /**
+     * Sync board state from frontend to backend
+     *
+     * Updates _content in MainKanbanFile which triggers hash comparison
+     * for unsaved change detection. Also creates backup.
+     *
+     * @param board - The board state to sync to backend
+     */
+    public async syncBoardToBackend(board: KanbanBoard): Promise<void> {
+        if (!this._fileRegistry.isReady()) {
+            return;
+        }
+
+        // 1. Update board store (without emitting event - we're syncing, not changing)
+        this._boardStore.setBoard(board, false);
+
+        // 2. Update MainKanbanFile's cached board for conflict detection
+        const mainFile = this._fileRegistry.getMainFile();
+        if (mainFile) {
+            mainFile.setCachedBoardFromWebview(board);
+        }
+
+        // 3. Track changes in include files (updates their cache)
+        await this._fileRegistry.trackIncludeFileUnsavedChanges(board);
+
+        // 4. Generate markdown and update main file content
+        // This causes hasUnsavedChanges() to return true (content !== baseline)
+        if (mainFile) {
+            const markdown = MarkdownKanbanParser.generateMarkdown(board);
+            mainFile.setContent(markdown, false); // false = don't update baseline
+        }
+
+        // 5. Create backup if minimum interval has passed
+        const document = this._fileManager.getDocument();
+        if (document) {
+            this._backupManager.createBackup(document, { label: 'auto' })
+                .catch(error => console.error('Backend sync backup failed:', error));
+        }
+    }
+
+    /**
      * STATE-2: Invalidate board cache
      *
      * Call this whenever registry files change to force fresh board generation on next access.
@@ -1575,8 +1538,9 @@ export class KanbanWebviewPanel {
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse during disposal
         // Panel is already disposed by VS Code when onDidDispose fires
         // Must remove before showing any dialogs (which await user input)
-        if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
-            KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
+        const trackedUri = this._documentState.trackedDocumentUri;
+        if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
+            KanbanWebviewPanel.panels.delete(trackedUri);
         }
         // Also check all entries as a fallback
         for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
@@ -1750,8 +1714,9 @@ export class KanbanWebviewPanel {
 
         // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse of disposing panel
         // This must happen BEFORE any async operations or cleanup
-        if (this._trackedDocumentUri && KanbanWebviewPanel.panels.get(this._trackedDocumentUri) === this) {
-            KanbanWebviewPanel.panels.delete(this._trackedDocumentUri);
+        const trackedUri = this._documentState.trackedDocumentUri;
+        if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
+            KanbanWebviewPanel.panels.delete(trackedUri);
         }
 
         // Also check all entries as a fallback in case tracking failed
@@ -1779,7 +1744,7 @@ export class KanbanWebviewPanel {
         this._webviewBridge.dispose();
 
         // Clear panel state
-        KanbanWebviewPanel.panelStates.delete(this._panelId);
+        KanbanWebviewPanel.panelStates.delete(this._documentState.panelId);
 
         // Dispose concurrency manager (handles RACE-3 and RACE-4 cleanup)
         this._concurrency.dispose();

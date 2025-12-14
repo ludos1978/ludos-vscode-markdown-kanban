@@ -2,10 +2,91 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-11-13
+**Last Updated:** 2025-12-14
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
+
+---
+
+## Recent Critical Fixes & New Functions (State Consolidation)
+
+### DocumentStateModel: Single Source of Truth for Document State (2025-12-14)
+
+**File:** [src/panel/DocumentStateModel.ts](src/panel/DocumentStateModel.ts)
+
+**Purpose:** Eliminates state duplication between KanbanWebviewPanel and KanbanFileService. Previously, `_lastDocumentVersion`, `_lastDocumentUri`, `_trackedDocumentUri`, and `_panelId` were stored in both classes and synchronized via `initializeState()` / `getState()` methods. Now a single `DocumentStateModel` instance is shared by reference.
+
+**Public Methods:**
+- `constructor(panelId?, debugMode?)` - Create new instance with optional panel ID
+- `get lastDocumentVersion()` - Get tracked document version
+- `get lastDocumentUri()` - Get last loaded document URI
+- `get trackedDocumentUri()` - Get URI for panel tracking
+- `get pendingBoardUpdate()` - Get queued board update
+- `get panelId()` - Get unique panel identifier
+- `setLastDocumentVersion(version)` - Update tracked version
+- `setLastDocumentUri(uri)` - Update last document URI
+- `setTrackedDocumentUri(uri)` - Update tracked URI for panel map
+- `setPendingBoardUpdate(update)` - Queue board update for webview
+- `consumePendingBoardUpdate()` - Get and clear pending update atomically
+- `toSnapshot()` - Create serializable snapshot for panel restoration
+- `fromSnapshot(snapshot)` - Restore state from snapshot
+- `static fromSnapshot(snapshot, debugMode?)` - Create new instance from snapshot
+
+**Interfaces:**
+- `PendingBoardUpdate` - Structure for queued board updates
+- `DocumentStateSnapshot` - Serializable state for persistence
+
+**Integration:**
+- Created in `KanbanWebviewPanel` constructor
+- Passed to `KanbanFileService` constructor (shared reference)
+- Both classes access same instance directly (no sync needed)
+- Removed `initializeState()` method from KanbanFileService
+- Simplified `getState()` to return only service-specific state
+
+**Benefits:**
+- Single source of truth (eliminates sync bugs)
+- Clear ownership of document-tracking concerns
+- Supports serialization for panel restoration
+- Better testability (injectable dependency)
+
+---
+
+### syncBoardToBackend: Renamed from markUnsavedChanges (2025-12-14)
+
+**Files:**
+- [src/commands/interfaces/MessageCommand.ts](src/commands/interfaces/MessageCommand.ts)
+- [src/messageHandler.ts](src/messageHandler.ts)
+- [src/kanbanWebviewPanel.ts](src/kanbanWebviewPanel.ts)
+- All command files in [src/commands/](src/commands/)
+
+**Purpose:** Renamed `markUnsavedChanges(hasChanges, board?)` to `syncBoardToBackend(board)` to reflect actual functionality.
+
+**Old Signature (misleading):**
+```typescript
+markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+```
+
+**New Signature (clear):**
+```typescript
+syncBoardToBackend: (board: KanbanBoard) => void;
+```
+
+**What It Actually Does:**
+1. Updates `boardStore` with the board
+2. Updates `MainKanbanFile.cachedBoardFromWebview` for conflict detection
+3. Tracks include file changes
+4. Generates markdown and updates `MainKanbanFile._content`
+5. Creates backup
+
+**Why Renamed:**
+- Unsaved changes are detected via hash comparison (`_content !== _baseline`)
+- The old function didn't "mark" anything - it synced board state to backend
+- The `hasChanges` parameter was meaningless (ignored when false, required board when true)
+- Calling without a board did nothing (just logged warning)
+
+**Added Public Method:**
+- `KanbanWebviewPanel.syncBoardToBackend(board)` - Public method for use by ChangeStateMachine
 
 ---
 
