@@ -7,6 +7,8 @@
  * @module files/SaveTransactionManager
  */
 
+import { normalizePathForLookup } from '../utils/stringUtils';
+
 /**
  * State captured at the start of a save transaction
  */
@@ -25,13 +27,6 @@ interface ActiveTransaction {
     startTime: Date;
     originalState: TransactionState;
     timeout: NodeJS.Timeout;
-}
-
-/**
- * Normalizes a file path for consistent lookup
- */
-function normalizePathForLookup(filePath: string): string {
-    return filePath.toLowerCase().replace(/\\/g, '/');
 }
 
 /**

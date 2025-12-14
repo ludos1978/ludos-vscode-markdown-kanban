@@ -14,3 +14,14 @@
 export function escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+/**
+ * Normalizes a file path for case-insensitive lookup.
+ * Converts to lowercase and normalizes path separators.
+ *
+ * @param filePath - The file path to normalize
+ * @returns Normalized path for use as lookup key
+ */
+export function normalizePathForLookup(filePath: string): string {
+    return filePath.toLowerCase().replace(/\\/g, '/');
+}

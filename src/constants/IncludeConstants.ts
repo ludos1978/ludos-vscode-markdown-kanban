@@ -17,13 +17,6 @@ export const INCLUDE_SYNTAX = {
     REGEX_SINGLE: /!!!include\(([^)]+)\)!!!/,
 } as const;
 
-export const FILE_TYPES = {
-    MAIN: 'main',
-    INCLUDE_COLUMN: 'include-column',
-    INCLUDE_TASK: 'include-task',
-    INCLUDE_REGULAR: 'include-regular',
-} as const;
-
 /**
  * Creates a display title by replacing !!!include()!!! directives with badge placeholders
  *

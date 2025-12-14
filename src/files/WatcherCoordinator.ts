@@ -7,6 +7,8 @@
  * @module files/WatcherCoordinator
  */
 
+import { normalizePathForLookup } from '../utils/stringUtils';
+
 /**
  * Active operation data
  */
@@ -22,13 +24,6 @@ interface ActiveOperation {
 interface QueuedOperation {
     operation: string;
     callback: () => Promise<void>;
-}
-
-/**
- * Normalizes a file path for consistent lookup
- */
-function normalizePathForLookup(filePath: string): string {
-    return filePath.toLowerCase().replace(/\\/g, '/');
 }
 
 /**
