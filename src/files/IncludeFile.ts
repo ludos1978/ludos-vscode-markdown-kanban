@@ -4,7 +4,7 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { ConflictResolver, ConflictContext } from '../services/ConflictResolver';
 import { BackupManager } from '../services/BackupManager';
-import { IMainKanbanFile } from './FileInterfaces';
+import { IMainKanbanFile, IMarkdownFileRegistry, CapturedEdit } from './FileInterfaces';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 import { KanbanTask } from '../board/KanbanTypes';
 import { PresentationParser } from '../services/export/PresentationParser';
@@ -85,7 +85,7 @@ export class IncludeFile extends MarkdownFile {
         return this._fileType;
     }
 
-    public getFileRegistry(): { requestStopEditing(): Promise<any> } | undefined {
+    public getFileRegistry(): IMarkdownFileRegistry | undefined {
         return this._parentFile.getFileRegistry();
     }
 
@@ -354,7 +354,7 @@ export class IncludeFile extends MarkdownFile {
      * Apply a captured edit to the baseline for include files
      * CRITICAL: Include files need to apply edits directly to content baseline
      */
-    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+    public async applyEditToBaseline(capturedEdit: CapturedEdit): Promise<void> {
 
         // For include files (column/task), the edit is a description edit
         // Apply the new value directly to the baseline content

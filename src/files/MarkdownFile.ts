@@ -7,6 +7,7 @@ import { SaveOptions } from './SaveOptions';
 import { SaveTransactionManager } from './SaveTransactionManager';
 import { WatcherCoordinator } from './WatcherCoordinator';
 import { toForwardSlashes } from '../utils/stringUtils';
+import { CapturedEdit, IMarkdownFileRegistry } from './FileInterfaces';
 
 /**
  * File change event emitted when file state changes
@@ -140,7 +141,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * Get the file registry (if accessible from this file type)
      * MainKanbanFile returns its _fileRegistry, IncludeFile delegates to parent
      */
-    public abstract getFileRegistry(): { requestStopEditing(): Promise<any> } | undefined;
+    public abstract getFileRegistry(): IMarkdownFileRegistry | undefined;
 
     // ============= PATH NORMALIZATION (FOUNDATION-1) =============
 
@@ -842,9 +843,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
     /**
      * Apply a captured edit to the baseline (in-memory, not saved to disk)
      * This updates the "local state" to include the user's edit
+     * Subclasses override this to handle their specific edit types
      */
-    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
-        // Subclasses override this to handle their specific edit types
+    public async applyEditToBaseline(capturedEdit: CapturedEdit): Promise<void> {
         // Default: do nothing (main file handles via board, includes override)
     }
 

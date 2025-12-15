@@ -47,13 +47,42 @@ let currentLayoutRows = 1;
 // ============================================================================
 
 /**
- * Handle click on "Convert to SVG" button
+ * Diagram conversion configuration
+ * Maps diagram types to their specific handlers and message types
  */
-async function handlePlantUMLConvert(button) {
+const diagramConvertConfig = {
+    plantuml: {
+        cache: () => plantumlRenderCache,
+        render: renderPlantUML,
+        messageType: 'convertPlantUMLToSVG',
+        codeKey: 'plantUMLCode',
+        logPrefix: '[PlantUML]'
+    },
+    mermaid: {
+        cache: () => mermaidRenderCache,
+        render: renderMermaid,
+        messageType: 'convertMermaidToSVG',
+        codeKey: 'mermaidCode',
+        logPrefix: '[Mermaid]'
+    }
+};
+
+/**
+ * Unified handler for diagram "Convert to SVG" button clicks
+ * @param {HTMLElement} button - The clicked button element
+ * @param {'plantuml' | 'mermaid'} diagramType - The type of diagram
+ */
+async function handleDiagramConvert(button, diagramType) {
+    const config = diagramConvertConfig[diagramType];
+    if (!config) {
+        console.error(`[Diagram] Unknown diagram type: ${diagramType}`);
+        return;
+    }
+
     const code = button.getAttribute('data-code');
 
     if (!code) {
-        console.error('[PlantUML] No code found for conversion');
+        console.error(`${config.logPrefix} No code found for conversion`);
         return;
     }
 
@@ -64,11 +93,12 @@ async function handlePlantUMLConvert(button) {
     try {
         // Get SVG from cache or render it
         let svg;
-        if (plantumlRenderCache && plantumlRenderCache.has(code)) {
-            svg = plantumlRenderCache.get(code);
+        const cache = config.cache();
+        if (cache && cache.has(code)) {
+            svg = cache.get(code);
         } else {
             // This shouldn't happen (already rendered), but handle it
-            svg = await renderPlantUML(code);
+            svg = await config.render(code);
         }
 
         // Get current board file path
@@ -79,17 +109,18 @@ async function handlePlantUMLConvert(button) {
         }
 
         // Send message to backend to save SVG and update markdown
-        vscode.postMessage({
-            type: 'convertPlantUMLToSVG',
+        const message = {
+            type: config.messageType,
             filePath: currentFilePath,
-            plantUMLCode: code,
             svgContent: svg
-        });
+        };
+        message[config.codeKey] = code;
+        vscode.postMessage(message);
 
         // Button will be updated when file reloads
         button.textContent = '✓ Converting...';
     } catch (error) {
-        console.error('[PlantUML] Conversion error:', error);
+        console.error(`${config.logPrefix} Conversion error:`, error);
         button.disabled = false;
         button.textContent = '❌ Convert Failed';
 
@@ -97,77 +128,28 @@ async function handlePlantUMLConvert(button) {
             button.textContent = '💾 Convert to SVG';
         }, 3000);
     }
+}
+
+// Legacy wrapper functions for backwards compatibility
+function handlePlantUMLConvert(button) {
+    return handleDiagramConvert(button, 'plantuml');
+}
+
+function handleMermaidConvert(button) {
+    return handleDiagramConvert(button, 'mermaid');
 }
 
 // Event delegation for convert buttons (wrapped in guard to prevent duplicates on webview revival)
 if (!webviewEventListenersInitialized) {
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('plantuml-convert-btn')) {
-            handlePlantUMLConvert(e.target);
+            handleDiagramConvert(e.target, 'plantuml');
         }
 
         if (e.target.classList.contains('mermaid-convert-btn')) {
-            handleMermaidConvert(e.target);
+            handleDiagramConvert(e.target, 'mermaid');
         }
     });
-}
-
-// ============================================================================
-// Mermaid Diagram Conversion
-// ============================================================================
-
-/**
- * Handle "Convert to SVG" button click for Mermaid diagrams
- * @param {HTMLElement} button - The clicked button element
- */
-async function handleMermaidConvert(button) {
-    const code = button.getAttribute('data-code');
-
-    if (!code) {
-        console.error('[Mermaid] No code found in button data-code attribute');
-        return;
-    }
-
-    // Disable button during processing
-    button.disabled = true;
-    button.textContent = '⏳ Converting...';
-
-    try {
-        // Get SVG from cache or render it
-        let svg;
-        if (mermaidRenderCache && mermaidRenderCache.has(code)) {
-            svg = mermaidRenderCache.get(code);
-        } else {
-            // This shouldn't happen (already rendered), but handle it
-            svg = await renderMermaid(code);
-        }
-
-        // Get current board file path
-        const currentFilePath = window.currentKanbanFilePath;
-
-        if (!currentFilePath) {
-            throw new Error('No kanban file currently open');
-        }
-
-        // Send message to backend to save SVG and update markdown
-        vscode.postMessage({
-            type: 'convertMermaidToSVG',
-            filePath: currentFilePath,
-            mermaidCode: code,
-            svgContent: svg
-        });
-
-        // Button will be updated when file reloads
-        button.textContent = '✓ Converting...';
-    } catch (error) {
-        console.error('[Mermaid] Conversion error:', error);
-        button.disabled = false;
-        button.textContent = '❌ Convert Failed';
-
-        setTimeout(() => {
-            button.textContent = '💾 Convert to SVG';
-        }, 3000);
-    }
 }
 
 // ============================================================================
@@ -3809,19 +3791,7 @@ function applyFontSize(size) {
 }
 
 function setFontSize(size) {
-    applyFontSize(size);
-
-    vscode.postMessage({
-        type: 'setPreference',
-        key: 'fontSize',
-        value: size
-    });
-
-    updateAllMenuIndicators();
-
-    document.querySelectorAll('.file-bar-menu').forEach(m => {
-        m.classList.remove('active');
-    });
+    applyAndSaveSetting('fontSize', size, applyFontSize);
 }
 
 // Font family functionality
@@ -3859,19 +3829,7 @@ function applyFontFamily(family) {
 }
 
 function setFontFamily(family) {
-    applyFontFamily(family);
-
-    vscode.postMessage({
-        type: 'setPreference',
-        key: 'fontFamily',
-        value: family
-    });
-
-    updateAllMenuIndicators();
-
-    document.querySelectorAll('.file-bar-menu').forEach(m => {
-        m.classList.remove('active');
-    });
+    applyAndSaveSetting('fontFamily', family, applyFontFamily);
 }
 
 // Legacy function for backward compatibility

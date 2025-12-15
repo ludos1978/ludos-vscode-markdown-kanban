@@ -11,6 +11,17 @@
  */
 
 /**
+ * Represents a captured edit from the UI (task title, description, column title)
+ * Used when the user is editing and we need to preserve their changes
+ */
+export interface CapturedEdit {
+    type: 'task-title' | 'task-description' | 'column-title';
+    value: string;
+    taskId?: string;
+    columnId?: string;
+}
+
+/**
  * Interface for MarkdownFileRegistry
  * Used by MainKanbanFile to avoid direct import of MarkdownFileRegistry
  */
@@ -31,6 +42,7 @@ export interface IMainKanbanFile {
     getPath(): string;
     getFileType(): 'main';
     getFileRegistry(): IMarkdownFileRegistry | undefined;
+    getCachedBoardFromWebview?(): any;
 }
 
 /**

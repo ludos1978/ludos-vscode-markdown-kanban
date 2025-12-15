@@ -21,7 +21,9 @@ import {
     ChangeState,
     ChangeEvent,
     ChangeContext,
-    ChangeResult
+    ChangeResult,
+    IncludeSwitchEvent,
+    UserEditEvent
 } from './ChangeTypes';
 
 /**
@@ -318,7 +320,7 @@ export class ChangeStateMachine {
         let editedFile: MarkdownFile | undefined;
 
         for (const file of context.impact.affectedFiles) {
-            if ((file as any)._isInEditMode) {
+            if (file.isInEditMode()) {
                 isEditing = true;
                 editedFile = file;
                 break;
@@ -354,9 +356,7 @@ export class ChangeStateMachine {
                     // Apply to baseline of the edited file
                     if (context.editCapture!.editedFile) {
                         const file = context.editCapture!.editedFile;
-                        if ((file as any).applyEditToBaseline) {
-                            await (file as any).applyEditToBaseline(capturedEdit);
-                        }
+                        await file.applyEditToBaseline(capturedEdit);
                     }
                 }
             } catch (error) {
@@ -594,11 +594,13 @@ export class ChangeStateMachine {
             return ChangeState.UPDATING_BACKEND;
         }
 
-        const event = context.event;
+        // This handler is only called for include_switch and user_edit events
+        // Assert the narrower type for the include processor methods
+        const event = context.event as IncludeSwitchEvent | UserEditEvent;
         const loadingFiles = context.switches.loadingFiles;
 
         // Resolve target column/task
-        const target = this._includeProcessor.resolveTarget(event as any, board);
+        const target = this._includeProcessor.resolveTarget(event, board);
         if (!target.found) {
             console.error(`[State:LOADING_NEW] Could not find target column/task`);
             return ChangeState.UPDATING_BACKEND;
@@ -607,7 +609,7 @@ export class ChangeStateMachine {
         const { targetColumn, targetTask, isColumnSwitch } = target;
 
         // Update title if provided in event
-        this._includeProcessor.updateTargetTitle(event as any, targetColumn, targetTask, isColumnSwitch);
+        this._includeProcessor.updateTargetTitle(event, targetColumn, targetTask, isColumnSwitch);
 
         // Handle empty loadingFiles (removal or already-loaded)
         if (loadingFiles.length === 0) {
@@ -619,7 +621,7 @@ export class ChangeStateMachine {
             } else {
                 // ALREADY LOADED: restore from loaded files
                 this._includeProcessor.handleAlreadyLoadedIncludes(
-                    event as any, targetColumn, targetTask, isColumnSwitch, newFiles
+                    event, targetColumn, targetTask, isColumnSwitch, newFiles
                 );
             }
 
@@ -628,10 +630,10 @@ export class ChangeStateMachine {
 
         // Load new include files
         if (isColumnSwitch && targetColumn) {
-            await this._includeProcessor.loadColumnIncludes(event as any, targetColumn, loadingFiles, context);
+            await this._includeProcessor.loadColumnIncludes(event, targetColumn, loadingFiles, context);
         } else if (targetTask && targetColumn) {
             // Task includes require both targetTask and targetColumn (task belongs to column)
-            await this._includeProcessor.loadTaskInclude(event as any, targetColumn, targetTask, loadingFiles, context);
+            await this._includeProcessor.loadTaskInclude(event, targetColumn, targetTask, loadingFiles, context);
         }
 
         return ChangeState.UPDATING_BACKEND;

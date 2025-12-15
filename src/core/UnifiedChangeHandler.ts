@@ -1,4 +1,5 @@
 import { MarkdownFile } from '../files/MarkdownFile';
+import { MainKanbanFile } from '../files/MainKanbanFile';
 
 /**
  * Unified External Change Handler - Single logic for all file types
@@ -135,17 +136,24 @@ export class UnifiedChangeHandler {
      * Used for main file conflict detection to include include file changes
      */
     private hasAnyUnsavedChangesInRegistry(file: MarkdownFile): boolean {
-        // Access the file registry through the main file
-        const mainFile = file as any;
-        if (mainFile._fileRegistry) {
-            const filesWithChanges = mainFile._fileRegistry.getFilesWithUnsavedChanges();
+        // Access the file registry through the public method
+        const fileRegistry = file.getFileRegistry();
+        if (fileRegistry) {
+            // Check for files with unsaved changes via include files
+            const includeFiles = fileRegistry.getIncludeFiles();
+            const hasIncludeChanges = includeFiles.some(f => f.hasUnsavedChanges());
 
             // CRITICAL: Also check if there's a cached board from webview (UI edits)
             // This is essential for conflict detection when user edits in UI but hasn't saved
-            const cachedBoard = mainFile.getCachedBoardFromWebview?.();
-            const hasCachedBoardChanges = !!cachedBoard;
+            // Note: getCachedBoardFromWebview is only on MainKanbanFile
+            if (file.getFileType() === 'main') {
+                const mainFile = file as MainKanbanFile;
+                const cachedBoard = mainFile.getCachedBoardFromWebview?.();
+                const hasCachedBoardChanges = !!cachedBoard;
+                return hasIncludeChanges || hasCachedBoardChanges;
+            }
 
-            return filesWithChanges.length > 0 || hasCachedBoardChanges;
+            return hasIncludeChanges;
         }
 
         // Fallback: just check the file itself

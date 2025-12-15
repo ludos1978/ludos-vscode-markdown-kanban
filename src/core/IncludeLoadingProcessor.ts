@@ -330,8 +330,9 @@ export class IncludeLoadingProcessor {
 
         for (const relativePath of newFiles) {
             const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file && (file as any).parseToTasks) {
-                const fileTasks = (file as any).parseToTasks([], targetColumn.id, mainFilePath);
+            if (file && file.getFileType() === 'include-column') {
+                const columnIncludeFile = file as IncludeFile;
+                const fileTasks = columnIncludeFile.parseToTasks([], targetColumn.id, mainFilePath);
                 tasks.push(...fileTasks);
             }
         }

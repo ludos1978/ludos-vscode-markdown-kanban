@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
-import { IMarkdownFileRegistry } from './FileInterfaces';
+import { IMarkdownFileRegistry, CapturedEdit } from './FileInterfaces';
 import { KanbanBoard } from '../board/KanbanTypes';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { MarkdownKanbanParser } from '../markdownParser';
@@ -130,7 +130,7 @@ export class MainKanbanFile extends MarkdownFile {
      * Apply a captured edit to the baseline (in-memory, not saved to disk)
      * This updates the "local state" to include the user's edit for conflict resolution
      */
-    protected async applyEditToBaseline(capturedEdit: any): Promise<void> {
+    public async applyEditToBaseline(capturedEdit: CapturedEdit): Promise<void> {
 
         // Get the current board (from webview cache or parse from content)
         let board = this._cachedBoardFromWebview;
@@ -139,17 +139,17 @@ export class MainKanbanFile extends MarkdownFile {
         }
 
         // Apply the edit to the board based on type
-        if (capturedEdit.type === 'task-title') {
+        if (capturedEdit.type === 'task-title' && capturedEdit.taskId) {
             const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
             if (task) {
                 task.title = capturedEdit.value;
             }
-        } else if (capturedEdit.type === 'task-description') {
+        } else if (capturedEdit.type === 'task-description' && capturedEdit.taskId) {
             const task = this._findTaskInBoard(board, capturedEdit.taskId, capturedEdit.columnId);
             if (task) {
                 task.description = capturedEdit.value;
             }
-        } else if (capturedEdit.type === 'column-title') {
+        } else if (capturedEdit.type === 'column-title' && capturedEdit.columnId) {
             const column = BoardCrudOperations.findColumnById(board, capturedEdit.columnId);
             if (column) {
                 column.title = capturedEdit.value;
