@@ -10,6 +10,8 @@
  * @module files/FileInterfaces
  */
 
+import { KanbanBoard } from '../board/KanbanTypes';
+
 /**
  * Represents a captured edit from the UI (task title, description, column title)
  * Used when the user is editing and we need to preserve their changes
@@ -22,12 +24,20 @@ export interface CapturedEdit {
 }
 
 /**
+ * Interface for MessageHandler
+ * Used by MarkdownFileRegistry to avoid direct import of MessageHandler
+ */
+export interface IMessageHandler {
+    requestStopEditing(): Promise<CapturedEdit | undefined>;
+}
+
+/**
  * Interface for MarkdownFileRegistry
  * Used by MainKanbanFile to avoid direct import of MarkdownFileRegistry
  */
 export interface IMarkdownFileRegistry {
     getIncludeFiles(): IIncludeFile[];
-    requestStopEditing(): Promise<any>;
+    requestStopEditing(): Promise<CapturedEdit | undefined>;
 }
 
 /**
@@ -42,8 +52,14 @@ export interface IMainKanbanFile {
     getPath(): string;
     getFileType(): 'main';
     getFileRegistry(): IMarkdownFileRegistry | undefined;
-    getCachedBoardFromWebview?(): any;
+    getCachedBoardFromWebview?(): KanbanBoard | undefined;
 }
+
+/**
+ * Include file type union
+ * Matches the type in IncludeFile.ts
+ */
+export type IncludeFileType = 'include-regular' | 'include-column' | 'include-task';
 
 /**
  * Interface for IncludeFile
@@ -53,7 +69,20 @@ export interface IMainKanbanFile {
  */
 export interface IIncludeFile {
     getParentFile(): IMainKanbanFile;
-    getFileType(): 'include-column' | 'include-task' | 'include-regular';
+    getFileType(): IncludeFileType;
     getPath(): string;
     hasUnsavedChanges(): boolean;
+}
+
+/**
+ * Interface for FileFactory
+ * Used by MarkdownFileRegistry to avoid direct import of FileFactory
+ */
+export interface IFileFactory {
+    createIncludeDirect(
+        relativePath: string,
+        parentFile: IMainKanbanFile,
+        fileType: IncludeFileType,
+        isInline: boolean
+    ): IIncludeFile;
 }

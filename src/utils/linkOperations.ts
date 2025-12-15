@@ -1,6 +1,22 @@
 import { escapeRegExp } from './stringUtils';
 
 /**
+ * Types of link patterns that can be matched
+ */
+type LinkMatchType = 'strikeImage' | 'strikeLink' | 'strikeWiki' | 'strikeAuto' | 'image' | 'link' | 'wiki' | 'auto';
+
+/**
+ * Information about a matched link in the text
+ */
+interface LinkMatchInfo {
+    match: RegExpExecArray;
+    start: number;
+    end: number;
+    type: LinkMatchType;
+    fullMatch: string;
+}
+
+/**
  * LinkOperations - Pure utility functions for link replacement operations
  *
  * This class provides static methods for replacing links in markdown text,
@@ -61,7 +77,7 @@ export class LinkOperations {
         const escapedPath = escapeRegExp(originalPath);
 
         // Define all patterns we need to check
-        const patterns = [
+        const patterns: { regex: RegExp; type: LinkMatchType }[] = [
             // Already strikethrough patterns
             { regex: new RegExp(`~~(!\\[[^\\]]*\\]\\(${escapedPath}\\))~~`, 'g'), type: 'strikeImage' },
             { regex: new RegExp(`~~(\\[[^\\]]+\\]\\(${escapedPath}\\))~~`, 'g'), type: 'strikeLink' },
@@ -75,7 +91,7 @@ export class LinkOperations {
         ];
 
         // Find all matches with their positions
-        const allMatches = [];
+        const allMatches: LinkMatchInfo[] = [];
         for (const pattern of patterns) {
             let match;
             const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
@@ -111,7 +127,7 @@ export class LinkOperations {
         allMatches.sort((a, b) => a.start - b.start);
 
         // Remove nested matches - if we have both ~~![image]~~ and ![image], remove the inner one
-        const filteredMatches = [];
+        const filteredMatches: LinkMatchInfo[] = [];
         for (const match of allMatches) {
             // Check if this match is contained within any other match
             const isNested = allMatches.some(other =>
@@ -153,7 +169,7 @@ export class LinkOperations {
      * @param encodedNewPath - The new path to replace with
      * @returns The text with the link replaced at the specific position
      */
-    public static replaceMatchAtPosition(text: string, matchInfo: any, originalPath: string, encodedNewPath: string): string {
+    public static replaceMatchAtPosition(text: string, matchInfo: LinkMatchInfo, originalPath: string, encodedNewPath: string): string {
         const { match, type, start, end } = matchInfo;
         const escapedPath = escapeRegExp(originalPath);
 

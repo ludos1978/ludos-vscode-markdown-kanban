@@ -4,6 +4,33 @@ import { DrawIOService } from './DrawIOService';
 import { JSDOM } from 'jsdom';
 
 /**
+ * Excalidraw element structure (subset of properties used)
+ */
+interface ExcalidrawElement {
+    type: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    strokeColor?: string;
+    backgroundColor?: string;
+    strokeWidth?: number;
+    points?: number[][];
+    text?: string;
+    fontSize?: number;
+}
+
+/**
+ * Excalidraw file data structure
+ */
+interface ExcalidrawData {
+    type?: 'excalidraw';
+    elements: ExcalidrawElement[];
+    appState?: Record<string, unknown>;
+    files?: Record<string, unknown>;
+}
+
+/**
  * Service for converting excalidraw diagrams to SVG
  * Uses @excalidraw/utils with jsdom for server-side conversion
  *
@@ -31,7 +58,7 @@ export class ExcalidrawService {
             }
 
             // For .excalidraw and .excalidraw.json files, we need to convert
-            let excalidrawData: any;
+            let excalidrawData: ExcalidrawData;
 
             try {
                 excalidrawData = JSON.parse(content);
@@ -59,7 +86,7 @@ export class ExcalidrawService {
      * Extract excalidraw JSON data from SVG file
      * Excalidraw embeds JSON in HTML comments within SVG
      */
-    private extractJsonFromSvg(svgContent: string): any {
+    private extractJsonFromSvg(svgContent: string): ExcalidrawData {
         // Look for excalidraw JSON in HTML comments
         // Pattern: <!-- payload-start -->{"type":"excalidraw",...}<!-- payload-end -->
         const payloadMatch = svgContent.match(/<!-- payload-start -->(.*?)<!-- payload-end -->/s);
@@ -78,7 +105,7 @@ export class ExcalidrawService {
     /**
      * Validate excalidraw data structure
      */
-    private validateExcalidrawData(data: any): boolean {
+    private validateExcalidrawData(data: ExcalidrawData): boolean {
         if (!data || typeof data !== 'object') {
             return false;
         }
@@ -100,7 +127,7 @@ export class ExcalidrawService {
      * Convert excalidraw data to SVG using @excalidraw/utils with jsdom
      * This provides full-fidelity rendering including hand-drawn styles, fonts, etc.
      */
-    private async convertToSVG(excalidrawData: any): Promise<string> {
+    private async convertToSVG(excalidrawData: ExcalidrawData): Promise<string> {
         try {
             const svg = await this.convertWithJsdom(excalidrawData);
             return svg;
@@ -115,7 +142,7 @@ export class ExcalidrawService {
      * This simulates a browser environment to run Excalidraw's export code
      * Based on the approach from excalidraw-to-svg library
      */
-    private async convertWithJsdom(excalidrawData: any): Promise<string> {
+    private async convertWithJsdom(excalidrawData: ExcalidrawData): Promise<string> {
         // Paths to required library files (using UMD build from @excalidraw/utils@0.1.2)
         const canvasPolyfillPath = path.join(__dirname, '../../../node_modules/canvas-5-polyfill/canvas.js');
         const excalidrawUtilsPath = path.join(__dirname, '../../../node_modules/@excalidraw/utils/dist/excalidraw-utils.min.js');
@@ -221,7 +248,7 @@ export class ExcalidrawService {
      * Create a simplified SVG rendering from Excalidraw JSON
      * Renders basic shapes when the excalidraw library is not available
      */
-    private createFallbackSVG(excalidrawData: any): string {
+    private createFallbackSVG(excalidrawData: ExcalidrawData): string {
         const elements = excalidrawData.elements || [];
 
         if (elements.length === 0) {
@@ -284,7 +311,7 @@ export class ExcalidrawService {
                 case 'line':
                 case 'arrow':
                     if (el.points && el.points.length >= 2) {
-                        const points = el.points.map((p: any) => `${x + p[0]},${y + p[1]}`).join(' ');
+                        const points = el.points.map((p: number[]) => `${x + p[0]},${y + p[1]}`).join(' ');
                         svgElements += `<polyline points="${points}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" />\n`;
                         if (el.type === 'arrow' && el.points.length >= 2) {
                             // Add simple arrowhead

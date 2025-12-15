@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { FileManager } from '../fileManager';
+import { FileManager, IncludeContextForResolution } from '../fileManager';
 import { FileSearchService } from '../fileSearchService';
 import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
@@ -24,7 +24,7 @@ export class LinkHandler {
     /**
      * Enhanced file link handler with workspace-relative path support
      */
-    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: any) {
+    public async handleFileLink(href: string, taskId?: string, columnId?: string, linkIndex?: number, includeContext?: IncludeContextForResolution) {
         try {
             if (href.startsWith('file://')) {
                 href = vscode.Uri.parse(href).fsPath;

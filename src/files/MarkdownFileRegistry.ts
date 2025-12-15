@@ -5,6 +5,7 @@ import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
 import { FileSaveService } from '../core/FileSaveService';
 import type { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser'; // STATE-2: For generateBoard()
+import type { IMessageHandler, IFileFactory, CapturedEdit } from './FileInterfaces';
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -27,7 +28,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     public readonly onDidChange = this._onDidChange.event;
 
     // ============= PANEL REFERENCE (for stopping edit mode during conflicts) =============
-    private _messageHandler?: any; // MessageHandler reference for requestStopEditing()
+    private _messageHandler?: IMessageHandler; // MessageHandler reference for requestStopEditing()
 
     // ============= UNIFIED SAVE SERVICE =============
     private _fileSaveService: FileSaveService;
@@ -45,7 +46,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     /**
      * Set the message handler reference (used for stopping edit mode during conflicts)
      */
-    public setMessageHandler(messageHandler: any): void {
+    public setMessageHandler(messageHandler: IMessageHandler): void {
         this._messageHandler = messageHandler;
     }
 
@@ -53,11 +54,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Request frontend to stop editing and return the captured edit value
      * Used during conflict resolution to preserve user's edit in baseline
      */
-    public async requestStopEditing(): Promise<any> {
-        if (this._messageHandler && typeof this._messageHandler.requestStopEditing === 'function') {
+    public async requestStopEditing(): Promise<CapturedEdit | undefined> {
+        if (this._messageHandler) {
             return await this._messageHandler.requestStopEditing();
         }
-        return null;
+        return undefined;
     }
 
     // ============= REGISTRATION =============
@@ -667,7 +668,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     public ensureIncludeFileRegistered(
         relativePath: string,
         type: 'regular' | 'column' | 'task',
-        fileFactory: any
+        fileFactory: IFileFactory
     ): void {
         // Convert absolute path to relative if needed
         if (path.isAbsolute(relativePath)) {
@@ -707,7 +708,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     private async _performLazyRegistration(
         relativePath: string,
         type: 'regular' | 'column' | 'task',
-        fileFactory: any
+        fileFactory: IFileFactory
     ): Promise<void> {
         try {
             // Double-check if file is still needed
@@ -726,8 +727,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 : type === 'task' ? 'include-task'
                 : 'include-regular';
 
-            // Create and register
-            const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, true);
+            // Create and register (cast to IncludeFile for full type support)
+            const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, true) as IncludeFile;
             this.register(includeFile);
             includeFile.startWatching();
         } catch (error) {

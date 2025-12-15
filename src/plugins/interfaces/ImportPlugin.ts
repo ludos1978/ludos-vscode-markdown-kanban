@@ -7,6 +7,7 @@
  * @module plugins/interfaces/ImportPlugin
  */
 
+import * as vscode from 'vscode';
 import { MarkdownFile } from '../../files/MarkdownFile';
 import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { ConflictResolver } from '../../services/ConflictResolver';
@@ -147,7 +148,7 @@ export interface GenerateOptions {
  */
 export interface PluginContext {
     /** Extension context (for storage, etc.) */
-    extensionContext?: any;
+    extensionContext?: vscode.ExtensionContext;
 
     /** Logger for plugin output */
     logger?: {
@@ -221,7 +222,7 @@ export interface ImportPlugin {
      * @param options - Generation options
      * @returns Generated content string
      */
-    generateContent?(data: any, options: GenerateOptions): string;
+    generateContent?(data: unknown, options: GenerateOptions): string;
 
     /**
      * Called when the plugin is activated (optional)

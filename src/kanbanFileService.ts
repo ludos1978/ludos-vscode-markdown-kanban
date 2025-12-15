@@ -56,7 +56,7 @@ export class KanbanFileService {
     // State machine for tracking save operations
     private _saveState: SaveState = SaveState.IDLE;
 
-    private _cachedBoardFromWebview: any = null;
+    private _cachedBoardFromWebview: KanbanBoard | null = null;
 
     // NEW ARCHITECTURE COMPONENTS
     private _fileSaveService: FileSaveService;
@@ -99,7 +99,7 @@ export class KanbanFileService {
     public getState(): {
         isUpdatingFromPanel: boolean;
         hasUnsavedChanges: boolean;
-        cachedBoardFromWebview: any;
+        cachedBoardFromWebview: KanbanBoard | null;
         lastKnownFileContent: string;
     } {
         // Query main file for unsaved changes (single source of truth)

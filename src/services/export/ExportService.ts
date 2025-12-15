@@ -14,6 +14,7 @@ import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
+import { KanbanBoard, KanbanTask } from '../../board/KanbanTypes';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -1203,7 +1204,7 @@ export class ExportService {
      * Extract Marp classes from HTML comment directives in markdown
      * Format: <!-- _class: font24 center -->
      */
-    private static extractMarpClassesFromMarkdown(markdown: string, board: any): { global: string[], local: string[], perSlide: Map<number, string[]> } {
+    private static extractMarpClassesFromMarkdown(markdown: string, board: KanbanBoard | undefined): { global: string[], local: string[], perSlide: Map<number, string[]> } {
         const result = {
             global: [] as string[],
             local: [] as string[],
@@ -1263,7 +1264,7 @@ export class ExportService {
         return result;
     }
 
-    private static filterBoard(board: any, options: NewExportOptions): any {
+    private static filterBoard(board: KanbanBoard, options: NewExportOptions): KanbanBoard {
         // Check for columnIndexes (new export dialog system)
         if (options.columnIndexes && options.columnIndexes.length > 0) {
             const selectedColumns = options.columnIndexes
@@ -1271,6 +1272,7 @@ export class ExportService {
                 .map(index => board.columns[index]);
 
             return {
+                ...board,
                 columns: selectedColumns
             };
         }
@@ -1284,6 +1286,7 @@ export class ExportService {
             const columnIndex = options.selection.columnIndex;
             if (columnIndex >= 0 && columnIndex < board.columns.length) {
                 return {
+                    ...board,
                     columns: [board.columns[columnIndex]]
                 };
             }
@@ -1295,10 +1298,11 @@ export class ExportService {
 
             if (columnIndex >= 0 && columnIndex < board.columns.length) {
                 const column = board.columns[columnIndex];
-                const task = column.tasks?.find((t: any) => t.id === taskId);
+                const task = column.tasks?.find((t: KanbanTask) => t.id === taskId);
 
                 if (task) {
                     return {
+                        ...board,
                         columns: [{
                             id: column.id,
                             title: '',
@@ -1364,7 +1368,7 @@ export class ExportService {
         content: string,
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
-        board?: any
+        board?: KanbanBoard
     ): Promise<{ content: string; notIncludedAssets: ExportAssetInfo[] }> {
 
         const sourcePath = sourceDocument.uri.fsPath;
@@ -1492,7 +1496,7 @@ export class ExportService {
         transformed: { content: string; notIncludedAssets: ExportAssetInfo[] },
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
-        webviewPanel?: any
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
 
         // MODE: COPY (return content for clipboard)
@@ -1546,7 +1550,7 @@ export class ExportService {
         markdownPath: string,
         sourceFilePath: string,
         options: NewExportOptions,
-        webviewPanel?: any
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
         const marpFormat: MarpOutputFormat = (options.marpFormat as MarpOutputFormat) || 'html';
 
@@ -1566,12 +1570,12 @@ export class ExportService {
             if (webviewPanel) {
                 // Set up Mermaid export service with webview
                 const mermaidService = getMermaidExportService();
-                const panel = typeof webviewPanel.getPanel === 'function' ? webviewPanel.getPanel() : webviewPanel;
+                const panel = 'getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel;
                 mermaidService.setWebviewPanel(panel);
             }
 
             // Create diagram preprocessor
-            const panel = webviewPanel ? (typeof webviewPanel.getPanel === 'function' ? webviewPanel.getPanel() : webviewPanel) : undefined;
+            const panel = webviewPanel ? ('getPanel' in webviewPanel ? webviewPanel.getPanel() : webviewPanel) : undefined;
             const preprocessor = new DiagramPreprocessor(panel);
 
             // Preprocess diagrams
@@ -1719,8 +1723,8 @@ export class ExportService {
     public static async export(
         sourceDocument: vscode.TextDocument,
         options: NewExportOptions,
-        board?: any,
-        webviewPanel?: any
+        board?: KanbanBoard,
+        webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {
         try {
             // Clear tracking map for new export

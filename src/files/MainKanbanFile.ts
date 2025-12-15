@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { IMarkdownFileRegistry, CapturedEdit } from './FileInterfaces';
-import { KanbanBoard } from '../board/KanbanTypes';
+import { KanbanBoard, KanbanTask } from '../board/KanbanTypes';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
@@ -170,7 +170,7 @@ export class MainKanbanFile extends MarkdownFile {
     /**
      * Find a task in the board by ID
      */
-    private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): any {
+    private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): KanbanTask | null {
         // If columnId provided, search only that column first
         if (columnId) {
             const result = BoardCrudOperations.findTaskInColumn(board, columnId, taskId);

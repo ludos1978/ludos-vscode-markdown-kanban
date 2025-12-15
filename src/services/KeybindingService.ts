@@ -13,6 +13,16 @@ import * as path from 'path';
 import * as os from 'os';
 
 /**
+ * VS Code keybinding entry structure from keybindings.json
+ */
+interface VSCodeKeybinding {
+    key: string;
+    command: string;
+    when?: string;
+    args?: unknown;
+}
+
+/**
  * KeybindingService - Singleton service for keybinding management
  */
 export class KeybindingService {
@@ -124,11 +134,11 @@ export class KeybindingService {
         return validShortcuts;
     }
 
-    private async loadVSCodeKeybindings(): Promise<any[]> {
+    private async loadVSCodeKeybindings(): Promise<VSCodeKeybinding[]> {
         try {
             // Load user keybindings
             const userKeybindingsPath = this.getUserKeybindingsPath();
-            let keybindings: any[] = [];
+            let keybindings: VSCodeKeybinding[] = [];
 
             if (userKeybindingsPath && fs.existsSync(userKeybindingsPath)) {
                 const content = fs.readFileSync(userKeybindingsPath, 'utf8');

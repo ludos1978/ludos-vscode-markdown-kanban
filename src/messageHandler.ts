@@ -6,6 +6,7 @@ import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path c
 import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
+import { NewExportOptions } from './services/export/ExportService';
 import { getOutputChannel } from './services/OutputChannelService';
 import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
@@ -40,7 +41,7 @@ export class MessageHandler {
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
     private _syncBoardToBackend: (board: KanbanBoard) => void;
-    private _autoExportSettings: any = null;
+    private _autoExportSettings: NewExportOptions | null = null;
 
     // Command Pattern: Registry for message handlers
     private _commandRegistry: CommandRegistry;
@@ -108,7 +109,7 @@ export class MessageHandler {
             getWebviewPanel: this._getWebviewPanel,
             syncBoardToBackend: this._syncBoardToBackend,
             getAutoExportSettings: () => this._autoExportSettings,
-            setAutoExportSettings: (settings: any) => { this._autoExportSettings = settings; },
+            setAutoExportSettings: (settings: NewExportOptions | null) => { this._autoExportSettings = settings; },
 
             // Editing state management
             setEditingInProgress: (value: boolean) => this._getWebviewPanel()?.setEditingInProgress(value),

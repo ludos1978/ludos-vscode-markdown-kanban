@@ -17,7 +17,7 @@ interface PendingOperation<T> {
     name: string;
     operation: () => Promise<T>;
     resolve: (value: T) => void;
-    reject: (error: any) => void;
+    reject: (error: unknown) => void;
 }
 
 /**
