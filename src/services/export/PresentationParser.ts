@@ -34,7 +34,9 @@ export class PresentationParser {
    * Note: Any '---' at the beginning or end of the file are ignored (treated as empty slides)
    */
   static parsePresentation(content: string): PresentationSlide[] {
-    if (!content || !content.trim()) {
+    // CRITICAL: Only skip if content is null/undefined/empty string
+    // Do NOT use trim() - whitespace/newlines ARE valid content
+    if (!content) {
       return [];
     }
 
@@ -63,9 +65,8 @@ export class PresentationParser {
     const slides: PresentationSlide[] = [];
 
     rawSlides.forEach((slideContent, index) => {
-      if (!slideContent.trim()) {
-        return; // Skip empty slides
-      }
+      // CRITICAL: Process ALL slides - never skip based on content
+      // Empty/whitespace content IS valid content
 
       const lines = slideContent.split('\n');
 
@@ -108,9 +109,10 @@ export class PresentationParser {
       }
 
       // Count CONSECUTIVE leading empty lines from the start
+      // CRITICAL: Only check for exact empty string, NOT trim
       let emptyLineCount = 0;
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() === '') {
+        if (lines[i] === '') {
           emptyLineCount++;
         } else {
           break; // Stop at first non-empty line
@@ -118,9 +120,10 @@ export class PresentationParser {
       }
 
       // Get the first 2 lines with content (to determine structure)
+      // CRITICAL: Only check for exact empty string, NOT trim
       const contentLines: number[] = [];
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim() !== '') {
+        if (lines[i] !== '') {
           contentLines.push(i);
           if (contentLines.length >= 2) {
             break;
@@ -169,9 +172,10 @@ export class PresentationParser {
           descriptionStartLine = Math.min(contentLines[0], 3);
         }
       } else {
-        // No content at all
+        // No non-whitespace content, but whitespace IS content
+        // CRITICAL: Preserve whitespace-only slides as description
         titleLine = -1;
-        descriptionStartLine = -1;
+        descriptionStartLine = lines.length > 0 ? 0 : -1;
       }
 
       // Extract title - NO TRIMMING
@@ -222,14 +226,13 @@ export class PresentationParser {
     return slides.map(slide => {
       const task: KanbanTask = {
         id: IdGenerator.generateTaskId(),
-        title: slide.title || '',
+        // CRITICAL: Use ?? not || - empty string IS a valid title
+        title: slide.title ?? '',
       };
 
-      // Add content as description if it exists
-      // NO TRIMMING - preserve exact content including whitespace
-      if (slide.content !== undefined && slide.content !== '') {
-        task.description = slide.content;
-      }
+      // CRITICAL: Always set description - never check for empty
+      // Empty/whitespace content IS valid content
+      task.description = slide.content;
 
       // Add includeContext for dynamic image path resolution
       if (includeFilePath && mainFilePath) {

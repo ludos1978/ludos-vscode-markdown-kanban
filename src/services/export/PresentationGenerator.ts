@@ -43,7 +43,6 @@ interface Slide {
     content: string;
     level: 'column' | 'task';
     yaml?: string;  // YAML frontmatter (only attached to first slide)
-    hasTitle: boolean;  // Whether this slide has a title (affects blank line count)
 }
 
 /**
@@ -133,48 +132,39 @@ export class PresentationGenerator {
 
         for (const column of board.columns) {
             // Column title slide
-            let columnTitle = column.displayTitle || column.title;
+            // CRITICAL: Use ?? not || - empty string IS a valid title
+            let columnTitle = column.displayTitle ?? column.title;
 
             if (options.stripIncludes) {
                 columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
             }
 
-            if (columnTitle) {
-                slides.push({
-                    content: columnTitle,
-                    level: 'column',
-                    hasTitle: true // Column title IS the slide title
-                });
-            }
+            // CRITICAL: Always add column slide
+            slides.push({
+                content: columnTitle ?? '',
+                level: 'column'
+            });
 
             // Task slides
             for (const task of column.tasks) {
-                let taskTitle = task.displayTitle || task.title;
-
-                // Track if we have a title (before any replacements)
-                const hasTitle = !!(taskTitle && taskTitle.trim());
-
-                // replace an empty title with
-                if (!hasTitle) {
-                    taskTitle = '\n';
-                }
+                // CRITICAL: Use ?? not || - empty string IS a valid title
+                const taskTitle = task.displayTitle ?? task.title ?? '';
+                const taskDescription = task.description ?? '';
 
                 if (options.stripIncludes) {
-                    taskTitle = taskTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+                    // Only strip includes syntax, don't affect content otherwise
                 }
 
+                // Build slide content: title + description
                 let slideContent = taskTitle;
-                if (task.description && task.description.trim()) {
-                    slideContent += '\n\n' + task.description;
+                if (taskDescription) {
+                    slideContent += '\n\n' + taskDescription;
                 }
 
-                if (slideContent) {
-                    slides.push({
-                        content: slideContent,
-                        level: 'task',
-                        hasTitle
-                    });
-                }
+                slides.push({
+                    content: slideContent,
+                    level: 'task'
+                });
             }
         }
 
@@ -208,15 +198,12 @@ export class PresentationGenerator {
             // Column header: ## Title (non-indented only)
             if (line.startsWith('## ') && !line.startsWith(' ')) {
                 const columnTitle = line.substring(3);
-                if (columnTitle) {
-                    slides.push({
-                        content: columnTitle,
-                        level: 'column',
-                        yaml: yaml, // Attach YAML to first slide
-                        hasTitle: true // Column title IS the slide title
-                    });
-                    yaml = ''; // Only attach once
-                }
+                slides.push({
+                    content: columnTitle,
+                    level: 'column',
+                    yaml: yaml // Attach YAML to first slide
+                });
+                yaml = ''; // Only attach once
                 i++;
                 continue;
             }
@@ -251,17 +238,16 @@ export class PresentationGenerator {
 
                 // Build slide content
                 let slideContent = taskTitle;
+                // CRITICAL: Always add description if there are lines, even if they're empty
+                // Do NOT check if joined description is truthy - preserve whitespace/newlines
                 if (descriptionLines.length > 0) {
                     const description = descriptionLines.join('\n');
-                    if (description) {
-                        slideContent += '\n\n' + description;
-                    }
+                    slideContent += '\n\n' + description;
                 }
 
                 slides.push({
                     content: slideContent,
-                    level: 'task',
-                    hasTitle: !!(taskTitle && taskTitle.trim()) // Has title if taskTitle is non-empty
+                    level: 'task'
                 });
                 continue;
             }
@@ -285,26 +271,19 @@ export class PresentationGenerator {
             filteredTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
         }
 
-        return filteredTasks
-            .map(task => {
-                let content = '';
-                const hasTitle = !!(task.title && task.title.trim());
+        return filteredTasks.map(task => {
+            // CRITICAL: Title and description are always strings (empty string if not set)
+            const title = task.title ?? '';
+            const description = task.description ?? '';
 
-                if (hasTitle) {
-                    content = task.title;
-                }
+            // Build content: title + description
+            let content = title;
+            if (description) {
+                content += '\n\n' + description;
+            }
 
-                if (task.description) {
-                    if (content) {
-                        content += '\n\n' + task.description;
-                    } else {
-                        content = task.description;
-                    }
-                }
-
-                return content ? { content, level: 'task', hasTitle } : null;
-            })
-            .filter((slide): slide is Slide => slide !== null);
+            return { content, level: 'task' as const };
+        });
     }
 
     /**

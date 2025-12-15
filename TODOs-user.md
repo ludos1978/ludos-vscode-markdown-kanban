@@ -1,3 +1,5 @@
+- [ ] when pressing the save button in the fiel states overview it doesnt allways write the file. this is a force save, which writes the file no matter what any automatic system says!
+
 - [ ] when switching from one columninclude to another, it doesnt load the content if it's not already in the cache. alwayss immediately remove the old content after asking to save changed content. then emtpy the columns tasks, then fill up as soon as the data is available. verify the current order, make 3 suggestions how to fix the problem with quality rating. do not add new functions, fix the existing flow
 
 
