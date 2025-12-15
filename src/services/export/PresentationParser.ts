@@ -34,6 +34,9 @@ export class PresentationParser {
    * Note: Any '---' at the beginning or end of the file are ignored (treated as empty slides)
    */
   static parsePresentation(content: string): PresentationSlide[] {
+    // DEBUG: Log input content
+    console.log(`[PresentationParser.parsePresentation] INPUT content length=${content?.length}, content JSON=${JSON.stringify(content)}`);
+
     // CRITICAL: Only skip if content is null/undefined/empty string
     // Do NOT use trim() - whitespace/newlines ARE valid content
     if (!content) {
@@ -69,6 +72,9 @@ export class PresentationParser {
     // This prevents an extra leading empty line in each slide
     const rawSlides = contentWithPlaceholders.split(/^---[ \t]*\n/gm);
     const slides: PresentationSlide[] = [];
+
+    // DEBUG: Log rawSlides after split
+    console.log(`[PresentationParser.parsePresentation] rawSlides count=${rawSlides.length}, rawSlides=${JSON.stringify(rawSlides)}`);
 
     rawSlides.forEach((slideContent, index) => {
       // CRITICAL: Process ALL slides - never skip based on content
@@ -117,6 +123,9 @@ export class PresentationParser {
       if (lines.length > 0 && lines[lines.length - 1] === '') {
         lines.pop();
       }
+
+      // DEBUG: Show lines array after pops
+      console.log(`[PresentationParser] Slide ${index} after pops: lines=${JSON.stringify(lines)}`);
 
       // Count CONSECUTIVE leading empty lines from the start
       // CRITICAL: Only check for exact empty string, NOT trim

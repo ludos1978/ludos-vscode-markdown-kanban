@@ -2644,6 +2644,13 @@ window.addEventListener('message', event => {
                     // Support both formats: individual properties OR column object
                     const colData = message.column || message;
 
+                    // DEBUG: Log received tasks with descriptions
+                    if (colData.tasks) {
+                        colData.tasks.forEach((t, i) => {
+                            console.log(`[webview.updateColumnContent] Received task ${i}: title=${JSON.stringify(t.title)}, description JSON=${JSON.stringify(t.description)}`);
+                        });
+                    }
+
                     // Update tasks and column metadata
                     if (colData.tasks !== undefined) column.tasks = colData.tasks;
 

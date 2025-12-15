@@ -2390,6 +2390,9 @@ function createTaskElement(task, columnId, taskIndex) {
         }
     }
 
+    // DEBUG: Log task.description value before rendering
+    console.log(`[boardRenderer.createTaskElement] task.id=${task.id}, task.title=${JSON.stringify(task.title)}, task.description JSON=${JSON.stringify(task.description)}`);
+
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description, task.includeContext) : '';
 
     // Clear the rendering context AFTER description is rendered

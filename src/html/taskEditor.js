@@ -563,6 +563,18 @@ class TaskEditor {
             }
         }
 
+        // CRITICAL: For task description editing, set value via JavaScript
+        // HTML strips the first newline after opening <textarea> tag, so we MUST set it here
+        // to preserve leading newlines in the description
+        if (type === 'task-description' && taskId) {
+            const column = window.cachedBoard?.columns.find(col => col.id === columnId);
+            const task = column?.tasks.find(t => t.id === taskId);
+            if (task) {
+                // Set raw description value - preserves leading newlines
+                editElement.value = task.description || '';
+            }
+        }
+
         // Show edit element, hide display
         if (displayElement) {displayElement.style.display = 'none';}
         editElement.style.display = 'block';
