@@ -202,19 +202,23 @@ export class MainKanbanFile extends MarkdownFile {
 
     /**
      * Read content from VS Code document or disk
+     * CRITICAL: Normalizes CRLF to LF to ensure consistent line endings
      */
     public async readFromDisk(): Promise<string | null> {
 
         // Try to get from open document first
         const document = this._fileManager.getDocument();
         if (document && document.uri.fsPath === this._path) {
-            return document.getText();
+            const text = document.getText();
+            // CRITICAL: Normalize CRLF to LF (Windows line endings to Unix)
+            return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         }
 
         // Read from file system
         try {
             const content = await fs.promises.readFile(this._path, 'utf-8');
-            return content;
+            // CRITICAL: Normalize CRLF to LF (Windows line endings to Unix)
+            return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         } catch (error) {
             console.error(`[MainKanbanFile] Failed to read file:`, error);
             return null;

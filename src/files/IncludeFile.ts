@@ -182,12 +182,15 @@ export class IncludeFile extends MarkdownFile {
 
     /**
      * Read content from disk
+     * CRITICAL: Normalizes CRLF to LF to ensure consistent line endings
      */
     public async readFromDisk(): Promise<string | null> {
 
         try {
             const content = await fs.promises.readFile(this._absolutePath, 'utf-8');
-            return content;
+            // CRITICAL: Normalize CRLF to LF (Windows line endings to Unix)
+            // This ensures consistent line endings for all parsing operations
+            return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         } catch (error) {
             if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
                 console.warn(`[${this.getFileType()}] File not found: ${this._absolutePath}`);

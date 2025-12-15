@@ -40,12 +40,18 @@ export class PresentationParser {
       return [];
     }
 
+    // CRITICAL: Normalize CRLF to LF (Windows line endings to Unix)
+    // This MUST happen FIRST before any other processing!
+    // Without this, \r would remain at end of lines after split('\n')
+    // and break all empty line checks (since '\r' !== '')
+    let workingContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
     // Strip YAML frontmatter if present (e.g., ---\nmarp: true\n---\n)
     // This is critical for parsing include files that have Marp YAML headers
-    let workingContent = content;
-    const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n/);
+    // NOTE: Must use workingContent (normalized) not original content!
+    const yamlMatch = workingContent.match(/^---\n[\s\S]*?\n---\n/);
     if (yamlMatch) {
-      workingContent = content.substring(yamlMatch[0].length);
+      workingContent = workingContent.substring(yamlMatch[0].length);
     }
 
     // CRITICAL: Temporarily replace HTML comments with placeholders
@@ -197,6 +203,9 @@ export class PresentationParser {
           descriptionLines.push(lines[i]);
         }
         description = descriptionLines.join('\n');
+
+        // DEBUG: Trace description extraction
+        console.log(`[PresentationParser.parsePresentation] Slide ${index}: titleLine=${titleLine}, descStart=${descriptionStartLine}, descEnd=${descriptionEndLine}, descLines=${JSON.stringify(descriptionLines)}, desc=${JSON.stringify(description)}`);
       } else {
         description = '';
       }
@@ -226,7 +235,7 @@ export class PresentationParser {
    * Convert presentation slides to kanban tasks
    */
   static slidesToTasks(slides: PresentationSlide[], includeFilePath?: string, mainFilePath?: string): KanbanTask[] {
-    return slides.map(slide => {
+    return slides.map((slide, index) => {
       const task: KanbanTask = {
         id: IdGenerator.generateTaskId(),
         // CRITICAL: Use ?? not || - empty string IS a valid title
@@ -236,6 +245,9 @@ export class PresentationParser {
       // CRITICAL: Always set description - never check for empty
       // Empty/whitespace content IS valid content
       task.description = slide.content;
+
+      // DEBUG: Trace exact description content
+      console.log(`[PresentationParser.slidesToTasks] Slide ${index}: title="${slide.title}", content length=${slide.content?.length}, content JSON=${JSON.stringify(slide.content)}`);
 
       // Add includeContext for dynamic image path resolution
       if (includeFilePath && mainFilePath) {
