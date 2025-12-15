@@ -99,6 +99,10 @@ export class PresentationParser {
       // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatSlides!
       // ═══════════════════════════════════════════════════════════════════════════
 
+      // ═══════════════════════════════════════════════════════════════════════════
+      // NEVER CHANGE THESE POPS! UP TO 2 POPS IF LAST LINES ARE EMPTY!
+      // NO OTHER WAY IS PERMITTED! NEVER EVER!
+      // ═══════════════════════════════════════════════════════════════════════════
       // Pop 1: Remove trailing empty from split (after last \n)
       if (lines.length > 0 && lines[lines.length - 1] === '') {
         lines.pop();
@@ -156,14 +160,13 @@ export class PresentationParser {
             // Normal case: first content is title
             titleLine = contentLines[0];
 
-            if (contentLines.length === 2) {
-              // Have a second content line - description starts after title
-              // Take the line after the title, or at max one empty line after that
-              const gap = contentLines[1] - contentLines[0];
-              descriptionStartLine = Math.min(contentLines[0] + Math.max(gap, 1), contentLines[0] + 3);
+            // CRITICAL: Skip AT MAX ONE empty line between title and content
+            // BUT ONLY if that line is actually empty!
+            const lineAfterTitle = titleLine + 1;
+            if (lineAfterTitle < lines.length && lines[lineAfterTitle] === '') {
+              descriptionStartLine = titleLine + 2; // Skip the one empty line
             } else {
-              // Only one content line (the title) - no description
-              descriptionStartLine = lines.length; // Beyond end = no description
+              descriptionStartLine = titleLine + 1; // No empty line, start right after title
             }
           }
         } else {

@@ -433,12 +433,10 @@ export class MarkdownKanbanParser {
   private static finalizeCurrentTask(task: KanbanTask | null, column: KanbanColumn | null, existingBoard?: KanbanBoard, columnIndex?: number): void {
     if (!task || !column) {return;}
 
-    // Clean up description - only remove if completely empty, preserve whitespace otherwise
-    if (task.description !== undefined) {
-      if (task.description.trim() === '') {
-        delete task.description;
-      }
-      // DO NOT trim whitespace - preserve user's formatting including trailing newlines
+    // CRITICAL: NEVER delete or trim description - whitespace IS valid content
+    // Description is always a string (empty string if not set)
+    if (task.description === undefined) {
+      task.description = '';
     }
 
     // CRITICAL: Match by POSITION to preserve ID (Backend is source of truth)
@@ -501,8 +499,9 @@ export class MarkdownKanbanParser {
           // For taskinclude tasks, don't save the description (it comes from the file)
           if (!task.includeMode) {
             // Add description with proper indentation
-            const descriptionToUse = task.description;
-            if (descriptionToUse && descriptionToUse.trim() !== '') {
+            // CRITICAL: Always write description - whitespace IS valid content
+            const descriptionToUse = task.description ?? '';
+            if (descriptionToUse) {
               const descriptionLines = descriptionToUse.split('\n');
               // Filter out the last element if it's empty (happens when description ends with \n)
               // This prevents adding extra blank lines
