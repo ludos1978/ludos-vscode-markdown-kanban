@@ -60,7 +60,6 @@ export interface IncludeFileInfo {
  * Internal file service access - commands access private methods
  * Uses 'any' return/param types to allow flexible access to private methods
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type FileServiceAccess = Record<string, (...args: any[]) => any>;
 
 /**

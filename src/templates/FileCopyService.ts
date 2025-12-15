@@ -83,7 +83,7 @@ export class FileCopyService {
     private static async getTemplateFiles(folder: string): Promise<string[]> {
         const files: string[] = [];
 
-        async function scanDir(dir: string) {
+        async function scanDir(dir: string): Promise<void> {
             const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
             for (const entry of entries) {
