@@ -57,6 +57,16 @@ export class PresentationParser {
       workingContent = workingContent.substring(yamlMatch[0].length);
     }
 
+    // CRITICAL: Strip ONE trailing newline (file convention, not content)
+    // Files conventionally end with \n, but that's not part of the content.
+    // Content with intentional trailing newlines will have EXTRA newlines:
+    // - Content "A" + file newline = "A\n" (strip to "A")
+    // - Content "A\n" + file newline = "A\n\n" (strip to "A\n")
+    // This ensures round-trip: write adds \n, read strips \n = identical content
+    if (workingContent.endsWith('\n')) {
+      workingContent = workingContent.slice(0, -1);
+    }
+
     // CRITICAL: Temporarily replace HTML comments with placeholders
     // This prevents '---' inside comments from being treated as slide separators
     // while preserving the comments in the output
@@ -100,23 +110,23 @@ export class PresentationParser {
       //
       // READING: Split on \n\n---\n\n (consumes blank before + --- + blank after)
       //   - Slides start directly with content (no leading blank from ---)
-      //   - Only pop ONE trailing empty (artifact of split on \n)
+      //   - File's trailing \n is stripped BEFORE split (see above)
+      //   - NO popping - trailing newlines in content ARE preserved
       //
       // WRITING (in PresentationGenerator.formatSlides):
       //   - Join with '\n\n---\n\n' (blank + separator + blank)
+      //   - Add ONE trailing \n to file (convention)
       //
       // This ensures perfect round-trip: read → parse → generate → write = identical
       //
       // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatSlides!
       // ═══════════════════════════════════════════════════════════════════════════
 
-      // Pop trailing empty from split (artifact: empty string after last \n)
-      if (lines.length > 0 && lines[lines.length - 1] === '') {
-        lines.pop();
-      }
+      // NO pop - trailing newlines in content are meaningful and preserved
+      // The file's trailing \n was stripped before split, so what remains is content
 
-      // DEBUG: Show lines array after pops
-      console.log(`[PresentationParser] Slide ${index} after pops: lines=${JSON.stringify(lines)}`);
+      // DEBUG: Show lines array
+      console.log(`[PresentationParser] Slide ${index} lines=${JSON.stringify(lines)}`);
 
       // Count CONSECUTIVE leading empty lines from the start
       // CRITICAL: Only check for exact empty string, NOT trim

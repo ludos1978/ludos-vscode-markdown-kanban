@@ -148,18 +148,16 @@ export class PresentationGenerator {
             // Task slides
             for (const task of column.tasks) {
                 // CRITICAL: Use ?? not || - empty string IS a valid title
-                const taskTitle = task.displayTitle ?? task.title ?? '';
-                const taskDescription = task.description ?? '';
+                const taskTitle = task.title;
+                const taskDescription = task.description;
 
                 if (options.stripIncludes) {
                     // Only strip includes syntax, don't affect content otherwise
                 }
 
-                // Build slide content: title + description
-                let slideContent = taskTitle;
-                if (taskDescription) {
-                    slideContent += '\n\n' + taskDescription;
-                }
+                // Build slide content: title + \n\n + description
+                // ALWAYS include \n\n even if description is empty (preserves format)
+                const slideContent = taskTitle + '\n\n' + taskDescription;
 
                 slides.push({
                     content: slideContent,
@@ -236,14 +234,10 @@ export class PresentationGenerator {
                     i++;
                 }
 
-                // Build slide content
-                let slideContent = taskTitle;
-                // CRITICAL: Always add description if there are lines, even if they're empty
-                // Do NOT check if joined description is truthy - preserve whitespace/newlines
-                if (descriptionLines.length > 0) {
-                    const description = descriptionLines.join('\n');
-                    slideContent += '\n\n' + description;
-                }
+                // Build slide content: title + \n\n + description
+                // ALWAYS include \n\n even if description is empty (preserves format)
+                const description = descriptionLines.join('\n');
+                const slideContent = taskTitle + '\n\n' + description;
 
                 slides.push({
                     content: slideContent,
@@ -276,11 +270,9 @@ export class PresentationGenerator {
             const title = task.title ?? '';
             const description = task.description ?? '';
 
-            // Build content: title + description
-            let content = title;
-            if (description) {
-                content += '\n\n' + description;
-            }
+            // Build content: title + \n\n + description
+            // ALWAYS include \n\n even if description is empty (preserves format)
+            const content = title + '\n\n' + description;
 
             return { content, level: 'task' as const };
         });
@@ -325,38 +317,26 @@ export class PresentationGenerator {
         // CRITICAL: Column Include Format
         // ═══════════════════════════════════════════════════════════════════════════
         //
-        // The column include file format is:
+        // Format: content\n\n---\n\ncontent
         //
-        //   ## Title
-        //
-        //   content
-        //   content
-        //
-        //   ---
-        //
-        //   ## Title2
-        //   ...
-        //
-        // WRITING:
-        //   - Add '\n' after each slide content
-        //   - Join with '\n---\n\n' (combined: slide\n + \n---\n\n = slide\n\n---\n\n)
-        //
-        // READING (in PresentationParser.parsePresentation):
-        //   - Split on \n\n---\n\n (consumes blank before + --- + blank after)
+        // READING: Split on \n\n---\n\n (consumes blank before + --- + blank after)
+        // WRITING: Join with \n\n---\n\n (content is NOT modified)
         //
         // This ensures perfect round-trip: read → parse → generate → write = identical
         //
         // DO NOT CHANGE THIS WITHOUT UPDATING PresentationParser.parsePresentation!
         // ═══════════════════════════════════════════════════════════════════════════
 
-        const formattedSlides = filteredSlides.map((slide, i) => {
-            const slideContent = slideContents[i];
-            // Add newline after content (combined with join creates \n\n---\n\n)
-            return slideContent + '\n';
+        // DEBUG: Log slide contents
+        slideContents.forEach((sc, i) => {
+            console.log(`[PresentationGenerator] Slide ${i} content JSON=${JSON.stringify(sc)}`);
         });
 
-        // Join with \n---\n\n (slide ends with \n, so total is \n\n---\n\n between slides)
-        const content = formattedSlides.join('\n---\n\n');
+        // Join with \n\n---\n\n - content is NOT modified, separator handles blank lines
+        const content = slideContents.join('\n\n---\n\n');
+
+        // DEBUG: Log final content
+        console.log(`[PresentationGenerator] Final content JSON=${JSON.stringify(content)}`);
 
         // Combine YAML and content
         // Only add final newline if content doesn't already end with one
