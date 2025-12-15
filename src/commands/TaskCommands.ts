@@ -11,7 +11,7 @@
  * @module commands/TaskCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
@@ -46,7 +46,7 @@ export class TaskCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'editTask':

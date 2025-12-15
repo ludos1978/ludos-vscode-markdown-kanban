@@ -11,7 +11,7 @@
  * @module commands/UICommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 
@@ -40,7 +40,7 @@ export class UICommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'undo':

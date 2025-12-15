@@ -11,7 +11,7 @@
  * @module commands/ExportCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { ExportService } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
@@ -58,7 +58,7 @@ export class ExportCommands extends BaseMessageCommand {
     // Track active operations for progress reporting
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'export':

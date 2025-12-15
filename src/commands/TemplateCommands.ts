@@ -9,7 +9,7 @@
  * @module commands/TemplateCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { TemplateService } from '../templates/TemplateService';
 import { VariableProcessor } from '../templates/VariableProcessor';
 import { FileCopyService } from '../templates/FileCopyService';
@@ -42,7 +42,7 @@ export class TemplateCommands extends BaseMessageCommand {
 
     private _templateService: TemplateService = new TemplateService();
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'getTemplates':

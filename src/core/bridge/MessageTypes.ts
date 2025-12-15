@@ -429,6 +429,110 @@ export interface DeleteTaskMessage extends BaseMessage {
 }
 
 /**
+ * Add task at specific position
+ */
+export interface AddTaskAtPositionMessage extends BaseMessage {
+    type: 'addTaskAtPosition';
+    columnId: string;
+    title: string;
+    insertionIndex: number;
+    description?: string;
+}
+
+/**
+ * Duplicate task request
+ */
+export interface DuplicateTaskMessage extends BaseMessage {
+    type: 'duplicateTask';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Insert task before another task
+ */
+export interface InsertTaskBeforeMessage extends BaseMessage {
+    type: 'insertTaskBefore';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Insert task after another task
+ */
+export interface InsertTaskAfterMessage extends BaseMessage {
+    type: 'insertTaskAfter';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Move task to a different column
+ */
+export interface MoveTaskToColumnMessage extends BaseMessage {
+    type: 'moveTaskToColumn';
+    taskId: string;
+    sourceColumnId: string;
+    targetColumnId: string;
+}
+
+/**
+ * Move task to top of column
+ */
+export interface MoveTaskToTopMessage extends BaseMessage {
+    type: 'moveTaskToTop';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Move task up in column
+ */
+export interface MoveTaskUpMessage extends BaseMessage {
+    type: 'moveTaskUp';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Move task down in column
+ */
+export interface MoveTaskDownMessage extends BaseMessage {
+    type: 'moveTaskDown';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Move task to bottom of column
+ */
+export interface MoveTaskToBottomMessage extends BaseMessage {
+    type: 'moveTaskToBottom';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Edit task title
+ */
+export interface EditTaskTitleMessage extends BaseMessage {
+    type: 'editTaskTitle';
+    taskId: string;
+    columnId: string;
+    title: string;
+}
+
+/**
+ * Update task from strikethrough deletion
+ */
+export interface UpdateTaskFromStrikethroughDeletionMessage extends BaseMessage {
+    type: 'updateTaskFromStrikethroughDeletion';
+    taskId: string;
+    columnId: string;
+    newTitle: string;
+}
+
+/**
  * Add column request
  */
 export interface AddColumnMessage extends BaseMessage {
@@ -461,6 +565,593 @@ export interface EditColumnTitleMessage extends BaseMessage {
     type: 'editColumnTitle';
     columnId: string;
     title: string;
+}
+
+/**
+ * Move column with row update
+ */
+export interface MoveColumnWithRowUpdateMessage extends BaseMessage {
+    type: 'moveColumnWithRowUpdate';
+    columnId: string;
+    newPosition: number;
+    newRow: number;
+}
+
+/**
+ * Reorder columns request
+ */
+export interface ReorderColumnsMessage extends BaseMessage {
+    type: 'reorderColumns';
+    newOrder: string[];
+    movedColumnId: string;
+    targetRow: number;
+}
+
+/**
+ * Insert column before another column
+ */
+export interface InsertColumnBeforeMessage extends BaseMessage {
+    type: 'insertColumnBefore';
+    columnId: string;
+    title: string;
+}
+
+/**
+ * Insert column after another column
+ */
+export interface InsertColumnAfterMessage extends BaseMessage {
+    type: 'insertColumnAfter';
+    columnId: string;
+    title: string;
+}
+
+/**
+ * Sort column request
+ */
+export interface SortColumnMessage extends BaseMessage {
+    type: 'sortColumn';
+    columnId: string;
+    sortType: 'unsorted' | 'title' | 'numericTag';
+}
+
+/**
+ * Update column title from strikethrough deletion
+ */
+export interface UpdateColumnTitleFromStrikethroughDeletionMessage extends BaseMessage {
+    type: 'updateColumnTitleFromStrikethroughDeletion';
+    columnId: string;
+    newTitle: string;
+}
+
+/**
+ * Get templates request
+ */
+export interface GetTemplatesMessage extends BaseMessage {
+    type: 'getTemplates';
+}
+
+/**
+ * Apply template request
+ */
+export interface ApplyTemplateMessage extends BaseMessage {
+    type: 'applyTemplate';
+    templatePath: string;
+    templateName: string;
+}
+
+/**
+ * Submit template variables request
+ */
+export interface SubmitTemplateVariablesMessage extends BaseMessage {
+    type: 'submitTemplateVariables';
+    templatePath: string;
+    templateName: string;
+    variables: Record<string, string>;
+}
+
+/**
+ * Render PlantUML request
+ */
+export interface RenderPlantUMLMessage extends BaseMessage {
+    type: 'renderPlantUML';
+    code: string;
+    taskId?: string;
+    columnId?: string;
+}
+
+/**
+ * Convert PlantUML to SVG request
+ */
+export interface ConvertPlantUMLToSVGMessage extends BaseMessage {
+    type: 'convertPlantUMLToSVG';
+    plantUMLCode: string;
+    filePath: string;
+}
+
+/**
+ * Convert Mermaid to SVG request
+ */
+export interface ConvertMermaidToSVGMessage extends BaseMessage {
+    type: 'convertMermaidToSVG';
+    mermaidCode: string;
+    filePath: string;
+}
+
+/**
+ * Mermaid export success response
+ */
+export interface MermaidExportSuccessMessage extends BaseMessage {
+    type: 'mermaidExportSuccess';
+    requestId: string;
+    svg: string;
+}
+
+/**
+ * Mermaid export error response
+ */
+export interface MermaidExportErrorMessage extends BaseMessage {
+    type: 'mermaidExportError';
+    requestId: string;
+    error: string;
+}
+
+/**
+ * Request Draw.io render
+ */
+export interface RequestDrawIORenderMessage extends BaseMessage {
+    type: 'requestDrawIORender';
+    filePath: string;
+    pageIndex?: number;
+}
+
+/**
+ * Request Excalidraw render
+ */
+export interface RequestExcalidrawRenderMessage extends BaseMessage {
+    type: 'requestExcalidrawRender';
+    filePath: string;
+}
+
+/**
+ * Request PDF page render
+ */
+export interface RequestPDFPageRenderMessage extends BaseMessage {
+    type: 'requestPDFPageRender';
+    filePath: string;
+    pageNumber: number;
+}
+
+/**
+ * Request PDF info
+ */
+export interface RequestPDFInfoMessage extends BaseMessage {
+    type: 'requestPDFInfo';
+    filePath: string;
+}
+
+// ============= UI MESSAGES =============
+
+/**
+ * Save board state request
+ */
+export interface SaveBoardStateMessage extends BaseMessage {
+    type: 'saveBoardState';
+    board: KanbanBoard;
+}
+
+/**
+ * Show message request
+ */
+export interface ShowMessageRequestMessage extends BaseMessage {
+    type: 'showMessage';
+    message: string;
+    severity?: 'info' | 'warning' | 'error';
+}
+
+/**
+ * Show error request
+ */
+export interface ShowErrorMessage extends BaseMessage {
+    type: 'showError';
+    message: string;
+}
+
+/**
+ * Show info request
+ */
+export interface ShowInfoMessage extends BaseMessage {
+    type: 'showInfo';
+    message: string;
+}
+
+/**
+ * Set preference request
+ */
+export interface SetPreferenceMessage extends BaseMessage {
+    type: 'setPreference';
+    key: string;
+    value: unknown;
+}
+
+/**
+ * Set context request
+ */
+export interface SetContextMessage extends BaseMessage {
+    type: 'setContext';
+    key: string;
+    value: unknown;
+}
+
+/**
+ * Request configuration refresh
+ */
+export interface RequestConfigurationRefreshMessage extends BaseMessage {
+    type: 'requestConfigurationRefresh';
+}
+
+// ============= CLIPBOARD MESSAGES =============
+
+/**
+ * Drop position coordinates
+ */
+export interface DropPosition {
+    x: number;
+    y: number;
+}
+
+/**
+ * Save clipboard image
+ */
+export interface SaveClipboardImageMessage extends BaseMessage {
+    type: 'saveClipboardImage';
+    imageData: string;
+    imagePath: string;
+    mediaFolderPath: string;
+    dropPosition: DropPosition;
+    imageFileName?: string;
+    mediaFolderName?: string;
+}
+
+/**
+ * Save clipboard image with path
+ */
+export interface SaveClipboardImageWithPathMessage extends BaseMessage {
+    type: 'saveClipboardImageWithPath';
+    imageData: string;
+    imageType: string;
+    dropPosition: DropPosition;
+    md5Hash?: string;
+}
+
+/**
+ * Paste image into field
+ */
+export interface PasteImageIntoFieldMessage extends BaseMessage {
+    type: 'pasteImageIntoField';
+    imageData: string;
+    imageType: string;
+    md5Hash?: string;
+    cursorPosition?: number;
+}
+
+/**
+ * Save dropped image from contents
+ */
+export interface SaveDroppedImageFromContentsMessage extends BaseMessage {
+    type: 'saveDroppedImageFromContents';
+    imageData: string;
+    originalFileName: string;
+    dropPosition: DropPosition;
+}
+
+/**
+ * Copy image to media
+ */
+export interface CopyImageToMediaMessage extends BaseMessage {
+    type: 'copyImageToMedia';
+    sourcePath: string;
+    originalFileName: string;
+    dropPosition: DropPosition;
+}
+
+/**
+ * Handle file URI drop
+ */
+export interface HandleFileUriDropMessage extends BaseMessage {
+    type: 'handleFileUriDrop';
+    sourcePath: string;
+    originalFileName: string;
+    dropPosition: DropPosition;
+}
+
+/**
+ * Save dropped file from contents
+ */
+export interface SaveDroppedFileFromContentsMessage extends BaseMessage {
+    type: 'saveDroppedFileFromContents';
+    fileData: string;
+    originalFileName: string;
+    dropPosition: DropPosition;
+}
+
+/**
+ * Request file drop dialogue
+ */
+export interface RequestFileDropDialogueMessage extends BaseMessage {
+    type: 'requestFileDropDialogue';
+}
+
+/**
+ * Execute file drop copy
+ */
+export interface ExecuteFileDropCopyMessage extends BaseMessage {
+    type: 'executeFileDropCopy';
+}
+
+/**
+ * Execute file drop link
+ */
+export interface ExecuteFileDropLinkMessage extends BaseMessage {
+    type: 'executeFileDropLink';
+}
+
+/**
+ * Link existing file
+ */
+export interface LinkExistingFileMessage extends BaseMessage {
+    type: 'linkExistingFile';
+}
+
+/**
+ * Open media folder
+ */
+export interface OpenMediaFolderMessage extends BaseMessage {
+    type: 'openMediaFolder';
+}
+
+// ============= EXPORT MESSAGES =============
+
+/**
+ * Stop auto export
+ */
+export interface StopAutoExportMessage extends BaseMessage {
+    type: 'stopAutoExport';
+}
+
+/**
+ * Get export default folder
+ */
+export interface GetExportDefaultFolderMessage extends BaseMessage {
+    type: 'getExportDefaultFolder';
+}
+
+/**
+ * Select export folder
+ */
+export interface SelectExportFolderMessage extends BaseMessage {
+    type: 'selectExportFolder';
+    defaultPath?: string;
+}
+
+/**
+ * Get Marp themes
+ */
+export interface GetMarpThemesMessage extends BaseMessage {
+    type: 'getMarpThemes';
+}
+
+/**
+ * Poll Marp themes
+ */
+export interface PollMarpThemesMessage extends BaseMessage {
+    type: 'pollMarpThemes';
+}
+
+/**
+ * Open in Marp preview
+ */
+export interface OpenInMarpPreviewMessage extends BaseMessage {
+    type: 'openInMarpPreview';
+    filePath: string;
+}
+
+/**
+ * Check Marp status
+ */
+export interface CheckMarpStatusMessage extends BaseMessage {
+    type: 'checkMarpStatus';
+}
+
+/**
+ * Get Marp available classes
+ */
+export interface GetMarpAvailableClassesMessage extends BaseMessage {
+    type: 'getMarpAvailableClasses';
+}
+
+/**
+ * Ask open export folder
+ */
+export interface AskOpenExportFolderMessage extends BaseMessage {
+    type: 'askOpenExportFolder';
+    path: string;
+}
+
+// ============= INCLUDE MESSAGES =============
+
+/**
+ * Confirm disable include mode
+ */
+export interface ConfirmDisableIncludeModeMessage extends BaseMessage {
+    type: 'confirmDisableIncludeMode';
+}
+
+/**
+ * Register inline include
+ */
+export interface RegisterInlineIncludeMessage extends BaseMessage {
+    type: 'registerInlineInclude';
+    filePath: string;
+    content: string;
+}
+
+/**
+ * Request include file name
+ */
+export interface RequestIncludeFileNameMessage extends BaseMessage {
+    type: 'requestIncludeFileName';
+}
+
+/**
+ * Request edit include file name
+ */
+export interface RequestEditIncludeFileNameMessage extends BaseMessage {
+    type: 'requestEditIncludeFileName';
+}
+
+/**
+ * Request edit task include file name
+ */
+export interface RequestEditTaskIncludeFileNameMessage extends BaseMessage {
+    type: 'requestEditTaskIncludeFileName';
+}
+
+/**
+ * Request task include file name
+ */
+export interface RequestTaskIncludeFileNameMessage extends BaseMessage {
+    type: 'requestTaskIncludeFileName';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Reload all included files
+ */
+export interface ReloadAllIncludedFilesMessage extends BaseMessage {
+    type: 'reloadAllIncludedFiles';
+}
+
+/**
+ * Save individual file
+ */
+export interface SaveIndividualFileMessage extends BaseMessage {
+    type: 'saveIndividualFile';
+    filePath: string;
+    isMainFile: boolean;
+    forceSave: boolean;
+}
+
+/**
+ * Reload individual file
+ */
+export interface ReloadIndividualFileMessage extends BaseMessage {
+    type: 'reloadIndividualFile';
+    filePath: string;
+    isMainFile: boolean;
+}
+
+// ============= EDIT MODE MESSAGES =============
+
+/**
+ * Editing started notification
+ */
+export interface EditingStartedMessage extends BaseMessage {
+    type: 'editingStarted';
+    taskId?: string;
+    columnId?: string;
+}
+
+/**
+ * Editing stopped normal
+ */
+export interface EditingStoppedNormalMessage extends BaseMessage {
+    type: 'editingStoppedNormal';
+    taskId: string;
+    columnId: string;
+}
+
+/**
+ * Mark unsaved changes
+ */
+export interface MarkUnsavedChangesMessage extends BaseMessage {
+    type: 'markUnsavedChanges';
+    cachedBoard?: KanbanBoard;
+}
+
+/**
+ * Page hidden with unsaved changes
+ */
+export interface PageHiddenWithUnsavedChangesMessage extends BaseMessage {
+    type: 'pageHiddenWithUnsavedChanges';
+}
+
+/**
+ * Update Marp global setting
+ */
+export interface UpdateMarpGlobalSettingMessage extends BaseMessage {
+    type: 'updateMarpGlobalSetting';
+    key: string;
+    value: unknown;
+}
+
+/**
+ * Trigger VS Code snippet
+ */
+export interface TriggerVSCodeSnippetMessage extends BaseMessage {
+    type: 'triggerVSCodeSnippet';
+}
+
+/**
+ * Handle editor shortcut
+ */
+export interface HandleEditorShortcutMessage extends BaseMessage {
+    type: 'handleEditorShortcut';
+}
+
+/**
+ * Perform sort
+ */
+export interface PerformSortMessage extends BaseMessage {
+    type: 'performSort';
+}
+
+/**
+ * Runtime tracking report
+ */
+export interface RuntimeTrackingReportMessage extends BaseMessage {
+    type: 'runtimeTrackingReport';
+}
+
+// ============= DEBUG MESSAGES =============
+
+/**
+ * Force write all content
+ */
+export interface ForceWriteAllContentMessage extends BaseMessage {
+    type: 'forceWriteAllContent';
+}
+
+/**
+ * Verify content sync
+ */
+export interface VerifyContentSyncMessage extends BaseMessage {
+    type: 'verifyContentSync';
+    frontendBoard: unknown;
+}
+
+/**
+ * Get tracked files debug info
+ */
+export interface GetTrackedFilesDebugInfoMessage extends BaseMessage {
+    type: 'getTrackedFilesDebugInfo';
+}
+
+/**
+ * Clear tracked files cache
+ */
+export interface ClearTrackedFilesCacheMessage extends BaseMessage {
+    type: 'clearTrackedFilesCache';
 }
 
 /**
@@ -543,7 +1234,8 @@ export interface SaveBoardStateMessage extends BaseMessage {
  */
 export interface SaveUndoStateMessage extends BaseMessage {
     type: 'saveUndoState';
-    board: KanbanBoard;
+    board?: KanbanBoard;
+    currentBoard?: KanbanBoard;
 }
 
 /**
@@ -571,6 +1263,8 @@ export interface RenderCompletedMessage extends BaseMessage {
     type: 'renderCompleted';
     columnIds?: string[];
     taskIds?: string[];
+    itemType?: 'task' | 'column';
+    itemId?: string;
 }
 
 /**
@@ -581,6 +1275,8 @@ export interface RenderSkippedMessage extends BaseMessage {
     reason: string;
     columnId?: string;
     taskId?: string;
+    itemType?: 'task' | 'column';
+    itemId?: string;
 }
 
 /**
@@ -715,10 +1411,39 @@ export type IncomingMessage =
     | MoveTaskMessage
     | AddTaskMessage
     | DeleteTaskMessage
+    | AddTaskAtPositionMessage
+    | DuplicateTaskMessage
+    | InsertTaskBeforeMessage
+    | InsertTaskAfterMessage
+    | MoveTaskToColumnMessage
+    | MoveTaskToTopMessage
+    | MoveTaskUpMessage
+    | MoveTaskDownMessage
+    | MoveTaskToBottomMessage
+    | EditTaskTitleMessage
+    | UpdateTaskFromStrikethroughDeletionMessage
     | AddColumnMessage
     | MoveColumnMessage
     | DeleteColumnMessage
     | EditColumnTitleMessage
+    | MoveColumnWithRowUpdateMessage
+    | ReorderColumnsMessage
+    | InsertColumnBeforeMessage
+    | InsertColumnAfterMessage
+    | SortColumnMessage
+    | UpdateColumnTitleFromStrikethroughDeletionMessage
+    | GetTemplatesMessage
+    | ApplyTemplateMessage
+    | SubmitTemplateVariablesMessage
+    | RenderPlantUMLMessage
+    | ConvertPlantUMLToSVGMessage
+    | ConvertMermaidToSVGMessage
+    | MermaidExportSuccessMessage
+    | MermaidExportErrorMessage
+    | RequestDrawIORenderMessage
+    | RequestExcalidrawRenderMessage
+    | RequestPDFPageRenderMessage
+    | RequestPDFInfoMessage
     | EditModeStartMessage
     | EditModeEndMessage
     | EditingStoppedMessage
@@ -745,7 +1470,62 @@ export type IncomingMessage =
     | SyncDirtyItemsMessage
     | UpdateShortcutsMessage
     | UpdateColumnContentExtendedMessage
-    | UpdateTaskContentExtendedMessage;
+    | UpdateTaskContentExtendedMessage
+    // UI messages
+    | ShowMessageRequestMessage
+    | ShowErrorMessage
+    | ShowInfoMessage
+    | SetPreferenceMessage
+    | SetContextMessage
+    | RequestConfigurationRefreshMessage
+    // Clipboard messages
+    | SaveClipboardImageMessage
+    | SaveClipboardImageWithPathMessage
+    | PasteImageIntoFieldMessage
+    | SaveDroppedImageFromContentsMessage
+    | CopyImageToMediaMessage
+    | HandleFileUriDropMessage
+    | SaveDroppedFileFromContentsMessage
+    | RequestFileDropDialogueMessage
+    | ExecuteFileDropCopyMessage
+    | ExecuteFileDropLinkMessage
+    | LinkExistingFileMessage
+    | OpenMediaFolderMessage
+    // Export messages
+    | StopAutoExportMessage
+    | GetExportDefaultFolderMessage
+    | SelectExportFolderMessage
+    | GetMarpThemesMessage
+    | PollMarpThemesMessage
+    | OpenInMarpPreviewMessage
+    | CheckMarpStatusMessage
+    | GetMarpAvailableClassesMessage
+    | AskOpenExportFolderMessage
+    // Include messages
+    | ConfirmDisableIncludeModeMessage
+    | RegisterInlineIncludeMessage
+    | RequestIncludeFileNameMessage
+    | RequestEditIncludeFileNameMessage
+    | RequestEditTaskIncludeFileNameMessage
+    | RequestTaskIncludeFileNameMessage
+    | ReloadAllIncludedFilesMessage
+    | SaveIndividualFileMessage
+    | ReloadIndividualFileMessage
+    // EditMode messages
+    | EditingStartedMessage
+    | EditingStoppedNormalMessage
+    | MarkUnsavedChangesMessage
+    | PageHiddenWithUnsavedChangesMessage
+    | UpdateMarpGlobalSettingMessage
+    | TriggerVSCodeSnippetMessage
+    | HandleEditorShortcutMessage
+    | PerformSortMessage
+    | RuntimeTrackingReportMessage
+    // Debug messages
+    | ForceWriteAllContentMessage
+    | VerifyContentSyncMessage
+    | GetTrackedFilesDebugInfoMessage
+    | ClearTrackedFilesCacheMessage;
 
 /**
  * Message type string literals for type-safe checking

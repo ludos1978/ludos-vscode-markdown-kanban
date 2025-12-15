@@ -10,3 +10,6 @@ export {
     CommandMetadata,
     CommandResult
 } from './MessageCommand';
+
+// Re-export IncomingMessage for command implementations
+export { IncomingMessage } from '../../core/bridge/MessageTypes';

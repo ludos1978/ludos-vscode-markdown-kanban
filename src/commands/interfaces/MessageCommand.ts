@@ -15,6 +15,7 @@ import { KanbanBoard } from '../../markdownParser';
 import { PlantUMLService } from '../../services/export/PlantUMLService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { FileSaveService } from '../../core/FileSaveService';
+import { IncomingMessage } from '../../core/bridge/MessageTypes';
 import * as vscode from 'vscode';
 
 /**
@@ -140,7 +141,7 @@ export interface MessageCommand {
      * @param context - Command execution context
      * @returns Result of command execution
      */
-    execute(message: any, context: CommandContext): Promise<CommandResult>;
+    execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult>;
 
     /**
      * Optional initialization when command is registered
@@ -167,7 +168,7 @@ export abstract class BaseMessageCommand implements MessageCommand {
         return this.metadata.messageTypes.includes(messageType);
     }
 
-    abstract execute(message: any, context: CommandContext): Promise<CommandResult>;
+    abstract execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult>;
 
     async initialize(context: CommandContext): Promise<void> {
         this._context = context;

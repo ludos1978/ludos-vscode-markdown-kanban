@@ -17,7 +17,7 @@
  * @module commands/EditModeCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { hasMessageHandler } from '../types/PanelCommandAccess';
 
@@ -56,7 +56,7 @@ export class EditModeCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             const panel = context.getWebviewPanel();
             if (!panel || !hasMessageHandler(panel)) {
@@ -128,18 +128,18 @@ export class EditModeCommands extends BaseMessageCommand {
                 // Render lifecycle
                 case 'renderSkipped':
                     // Frontend reports it skipped a render - mark as dirty
-                    if (message.itemType === 'column') {
+                    if (message.itemType === 'column' && message.itemId) {
                         context.markColumnDirty(message.itemId);
-                    } else if (message.itemType === 'task') {
+                    } else if (message.itemType === 'task' && message.itemId) {
                         context.markTaskDirty(message.itemId);
                     }
                     return this.success();
 
                 case 'renderCompleted':
                     // Frontend successfully rendered - clear dirty flag
-                    if (message.itemType === 'column') {
+                    if (message.itemType === 'column' && message.itemId) {
                         context.clearColumnDirty(message.itemId);
-                    } else if (message.itemType === 'task') {
+                    } else if (message.itemType === 'task' && message.itemId) {
                         context.clearTaskDirty(message.itemId);
                     }
                     return this.success();

@@ -12,7 +12,7 @@
  * @module commands/ColumnCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
@@ -46,7 +46,7 @@ export class ColumnCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'addColumn':

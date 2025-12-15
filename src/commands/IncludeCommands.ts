@@ -15,7 +15,7 @@
  * @module commands/IncludeCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
@@ -49,14 +49,14 @@ export class IncludeCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'confirmDisableIncludeMode':
                     return await this.handleConfirmDisableIncludeMode(message, context);
 
                 case 'requestIncludeFile':
-                    return await this.handleRequestIncludeFile(message.filePath, context);
+                    return await this.handleRequestIncludeFile(message.filePath ?? '', context);
 
                 case 'registerInlineInclude':
                     return await this.handleRegisterInlineInclude(message.filePath, message.content, context);

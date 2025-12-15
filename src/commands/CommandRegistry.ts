@@ -10,6 +10,7 @@
  */
 
 import { MessageCommand, CommandContext, CommandResult } from './interfaces/MessageCommand';
+import { IncomingMessage } from '../core/bridge/MessageTypes';
 import { ValidationResult } from '../shared/interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 
@@ -182,7 +183,7 @@ export class CommandRegistry {
      * @param message - Message from webview
      * @returns Command result or null if no handler found
      */
-    async execute(message: any): Promise<CommandResult | null> {
+    async execute(message: IncomingMessage): Promise<CommandResult | null> {
         if (!this._initialized || !this._context) {
             console.error('[CommandRegistry] Not initialized, cannot execute command');
             return { success: false, error: 'CommandRegistry not initialized' };

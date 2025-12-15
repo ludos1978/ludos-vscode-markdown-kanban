@@ -96,6 +96,32 @@ Additional `as any` casts fixed:
 **Remaining 2 actual casts (unavoidable):**
 - PanelContext.ts:207,209 - Dynamic property access `(this as any)[\`_${name}\`]` (TypeScript limitation for computed property names)
 
+### Track I: Command Message Type Safety ✅ COMPLETED (125→107 `: any`)
+Typed all command `execute()` signatures from `message: any` to `message: IncomingMessage`:
+- [x] TaskCommands.ts - Uses IncomingMessage with typed task message types
+- [x] ColumnCommands.ts - Uses IncomingMessage with typed column message types
+- [x] TemplateCommands.ts - Uses IncomingMessage with typed template message types
+- [x] DiagramCommands.ts - Uses IncomingMessage with typed diagram message types
+- [x] UICommands.ts - Uses IncomingMessage with typed UI message types
+- [x] ClipboardCommands.ts - Uses IncomingMessage with typed clipboard message types
+- [x] ExportCommands.ts - Uses IncomingMessage with typed export message types
+- [x] IncludeCommands.ts - Uses IncomingMessage with typed include message types
+- [x] EditModeCommands.ts - Uses IncomingMessage with typed edit mode message types
+- [x] DebugCommands.ts - Uses IncomingMessage with typed debug message types
+- [x] CommandRegistry.ts - Uses IncomingMessage for dispatch
+
+**New message types added to MessageTypes.ts:**
+- Task messages: AddTaskAtPositionMessage, DuplicateTaskMessage, InsertTaskBeforeMessage, etc.
+- Column messages: MoveColumnWithRowUpdateMessage, ReorderColumnsMessage, etc.
+- Template messages: GetTemplatesMessage, ApplyTemplateMessage, SubmitTemplateVariablesMessage
+- Diagram messages: RenderPlantUMLMessage, ConvertPlantUMLToSVGMessage, ConvertMermaidToSVGMessage, etc.
+- UI messages: ShowMessageRequestMessage, ShowErrorMessage, SetPreferenceMessage, etc.
+- Clipboard messages: SaveClipboardImageMessage, PasteImageIntoFieldMessage, DropPosition type, etc.
+- Export messages: StopAutoExportMessage, GetMarpThemesMessage, OpenInMarpPreviewMessage, etc.
+- Include messages: ConfirmDisableIncludeModeMessage, RegisterInlineIncludeMessage, etc.
+- EditMode messages: EditingStartedMessage, EditingStoppedNormalMessage, MarkUnsavedChangesMessage, etc.
+- Debug messages: ForceWriteAllContentMessage, VerifyContentSyncMessage, etc.
+
 ---
 
 ## Phase 1 - Critical Quick Wins (High Impact, Lower Effort)
@@ -854,7 +880,7 @@ if (array.at(0)) { ... }       // Has first element
 | High Priority | 9 |
 | Medium Priority | 16 |
 | Low Priority | 11 |
-| Estimated `as any` to fix | 56→13 (9 actual) |
+| Estimated `as any` to fix | 56→2 (DONE) |
 | **Additional `any` types** | **311→125** |
 | Estimated duplicate lookups to remove | 62 |
 | Singletons to refactor | 11 |
@@ -1052,7 +1078,7 @@ Total:             27,905 lines
 | High Priority | 11 |
 | Medium Priority | 18 |
 | Low Priority | 12 |
-| Estimated `as any` to fix | 56→13 (9 actual) |
+| Estimated `as any` to fix | 56→2 (DONE) |
 | **Additional `any` types** | **311→125** |
 | Estimated duplicate lookups to remove | 62 |
 | Singletons to refactor | 11 |
@@ -1413,7 +1439,7 @@ const tagPattern = new RegExp(`#${tag}`);  // Created once
 | High Priority | 13 |
 | Medium Priority | 21 |
 | Low Priority | 18 |
-| Estimated `as any` to fix | 56→13 (9 actual) |
+| Estimated `as any` to fix | 56→2 (DONE) |
 | **Additional `any` types** | **311→125** |
 | Estimated duplicate lookups to remove | 62 |
 | Singletons to refactor | 11 |

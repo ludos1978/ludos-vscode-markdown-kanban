@@ -11,7 +11,7 @@
  * @module commands/ClipboardCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
@@ -51,7 +51,7 @@ export class ClipboardCommands extends BaseMessageCommand {
 
     private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'saveClipboardImage':
@@ -60,8 +60,8 @@ export class ClipboardCommands extends BaseMessageCommand {
                         message.imagePath,
                         message.mediaFolderPath,
                         message.dropPosition,
-                        message.imageFileName,
-                        message.mediaFolderName,
+                        message.imageFileName ?? '',
+                        message.mediaFolderName ?? '',
                         context
                     );
                     return this.success();
@@ -80,8 +80,8 @@ export class ClipboardCommands extends BaseMessageCommand {
                     await this.handlePasteImageIntoField(
                         message.imageData,
                         message.imageType,
-                        message.md5Hash,
-                        message.cursorPosition,
+                        message.md5Hash ?? '',
+                        message.cursorPosition ?? 0,
                         context
                     );
                     return this.success();
