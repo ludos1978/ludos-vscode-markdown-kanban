@@ -15,6 +15,33 @@ import { PathResolver } from '../services/PathResolver';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import {
+    OpenFileLinkMessage,
+    OpenWikiLinkMessage,
+    OpenExternalLinkMessage,
+    OpenFileMessage,
+    OpenIncludeFileMessage,
+    HandleFileDropMessage,
+    HandleUriDropMessage,
+    ResolveAndCopyPathMessage
+} from '../core/bridge/MessageTypes';
+
+/**
+ * Union type for all file command messages
+ */
+type FileCommandMessage =
+    | OpenFileLinkMessage
+    | OpenWikiLinkMessage
+    | OpenExternalLinkMessage
+    | OpenFileMessage
+    | OpenIncludeFileMessage
+    | HandleFileDropMessage
+    | HandleUriDropMessage
+    | ResolveAndCopyPathMessage
+    | { type: 'toggleFileLock' }
+    | { type: 'selectFile' }
+    | { type: 'requestFileInfo' }
+    | { type: 'initializeFile' };
 
 /**
  * File Commands Handler
@@ -43,7 +70,7 @@ export class FileCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: any, context: CommandContext): Promise<CommandResult> {
+    async execute(message: FileCommandMessage, context: CommandContext): Promise<CommandResult> {
         try {
             switch (message.type) {
                 case 'openFileLink':
@@ -71,7 +98,7 @@ export class FileCommands extends BaseMessageCommand {
                 case 'resolveAndCopyPath':
                     return await this.handleResolveAndCopyPath(message, context);
                 default:
-                    return this.failure(`Unknown file command: ${message.type}`);
+                    return this.failure(`Unknown file command: ${(message as { type: string }).type}`);
             }
         } catch (error) {
             const errorMessage = getErrorMessage(error);
@@ -85,7 +112,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle openFileLink command
      */
-    private async handleOpenFileLink(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleOpenFileLink(message: OpenFileLinkMessage, context: CommandContext): Promise<CommandResult> {
         await context.linkHandler.handleFileLink(
             message.href,
             message.taskId,
@@ -99,7 +126,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle openWikiLink command
      */
-    private async handleOpenWikiLink(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleOpenWikiLink(message: OpenWikiLinkMessage, context: CommandContext): Promise<CommandResult> {
         await context.linkHandler.handleWikiLink(message.documentName);
         return this.success();
     }
@@ -107,7 +134,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle openExternalLink command
      */
-    private async handleOpenExternalLink(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleOpenExternalLink(message: OpenExternalLinkMessage, context: CommandContext): Promise<CommandResult> {
         await context.linkHandler.handleExternalLink(message.href);
         return this.success();
     }
@@ -115,7 +142,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle openFile command - opens a file in VS Code editor
      */
-    private async handleOpenFile(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleOpenFile(message: OpenFileMessage, context: CommandContext): Promise<CommandResult> {
         const filePath = message.filePath;
         if (!filePath) {
             return this.failure('No file path provided');
@@ -179,7 +206,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle openIncludeFile command
      */
-    private async handleOpenIncludeFile(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleOpenIncludeFile(message: OpenIncludeFileMessage, context: CommandContext): Promise<CommandResult> {
         await context.linkHandler.handleFileLink(message.filePath);
         return this.success();
     }
@@ -189,7 +216,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle handleFileDrop command
      */
-    private async handleFileDrop(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleFileDrop(message: HandleFileDropMessage, context: CommandContext): Promise<CommandResult> {
         await context.fileManager.handleFileDrop(message);
         return this.success();
     }
@@ -197,7 +224,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle handleUriDrop command
      */
-    private async handleUriDrop(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleUriDrop(message: HandleUriDropMessage, context: CommandContext): Promise<CommandResult> {
         await context.fileManager.handleUriDrop(message);
         return this.success();
     }
@@ -241,7 +268,7 @@ export class FileCommands extends BaseMessageCommand {
     /**
      * Handle resolveAndCopyPath command
      */
-    private async handleResolveAndCopyPath(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleResolveAndCopyPath(message: ResolveAndCopyPathMessage, context: CommandContext): Promise<CommandResult> {
         const resolution = await context.fileManager.resolveFilePath(message.path);
         if (resolution && resolution.exists) {
             await vscode.env.clipboard.writeText(resolution.resolvedPath);

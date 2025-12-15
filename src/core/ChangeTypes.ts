@@ -7,7 +7,53 @@
  * @module core/ChangeTypes
  */
 
+import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
+import { KanbanBoard, KanbanTask } from '../markdownParser';
+import { CapturedEdit } from '../files/FileInterfaces';
+
+// Re-export for consumers
+export { CapturedEdit };
+
+// ============= DEPENDENCY INTERFACES =============
+
+/**
+ * Interface for file registry methods used by ChangeStateMachine
+ * Avoids circular dependency with MarkdownFileRegistry
+ */
+export interface IFileRegistryForStateMachine {
+    getByRelativePath(path: string): MarkdownFile | undefined;
+    getMainFile(): MarkdownFile | undefined;
+    requestStopEditing?(): Promise<CapturedEdit | undefined>;
+}
+
+/**
+ * Interface for webview panel methods used by ChangeStateMachine
+ * Avoids circular dependency with KanbanWebviewPanel
+ */
+export interface IWebviewPanelForStateMachine {
+    setIncludeSwitchInProgress(inProgress: boolean): void;
+    isEditingInProgress?(): boolean;
+    getBoard(): KanbanBoard | undefined;
+    getPanel(): vscode.WebviewPanel | undefined;
+    syncIncludeFilesWithBoard?(board: KanbanBoard): void;
+    syncBoardToBackend?(board: KanbanBoard): void;
+    invalidateBoardCache?(): void;
+    refreshWebviewContent?(): Promise<void>;
+    clearColumnDirty?(columnId: string): void;
+    clearTaskDirty?(taskId: string): void;
+}
+
+// ============= STATUS MESSAGES =============
+
+/**
+ * Internal status message for state machine tracking
+ * These are not OutgoingMessage types - they're internal status indicators
+ */
+export interface StateMachineStatusMessage {
+    type: string;
+    [key: string]: unknown;
+}
 
 // ============= STATE DEFINITIONS =============
 
@@ -98,7 +144,7 @@ export interface ChangeContext {
     editCapture?: {
         wasEditing: boolean;
         editedFile?: MarkdownFile;
-        capturedValue?: any;
+        capturedValue?: CapturedEdit;
     };
 
     // Unsaved files management
@@ -120,11 +166,11 @@ export interface ChangeContext {
         success: boolean;
         error?: Error;
         updatedFiles: string[];
-        frontendMessages: any[];
+        frontendMessages: StateMachineStatusMessage[];
     };
 
     // Modified board reference (to avoid re-fetching stale data)
-    modifiedBoard?: any;
+    modifiedBoard?: KanbanBoard;
 
     // Rollback data for error recovery
     rollback?: {
@@ -133,7 +179,7 @@ export interface ChangeContext {
         taskColumnId?: string;
         oldState: {
             title?: string;
-            tasks?: any[];
+            tasks?: KanbanTask[];
             includeFiles?: string[];
             includeMode?: boolean;
             description?: string;

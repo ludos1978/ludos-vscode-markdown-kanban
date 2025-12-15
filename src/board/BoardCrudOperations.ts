@@ -7,6 +7,14 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 import { IdGenerator } from '../utils/idGenerator';
 
 /**
+ * Input data for creating a new task
+ */
+export interface NewTaskInput {
+    title?: string;
+    description?: string;
+}
+
+/**
  * Core CRUD operations for Kanban board tasks and columns
  */
 export class BoardCrudOperations {
@@ -69,7 +77,7 @@ export class BoardCrudOperations {
         return true;
     }
 
-    public addTask(board: KanbanBoard, columnId: string, taskData: any): boolean {
+    public addTask(board: KanbanBoard, columnId: string, taskData: NewTaskInput): boolean {
         const column = this.findColumn(board, columnId);
         if (!column) { return false; }
 
@@ -83,7 +91,7 @@ export class BoardCrudOperations {
         return true;
     }
 
-    public addTaskAtPosition(board: KanbanBoard, columnId: string, taskData: any, insertionIndex: number): boolean {
+    public addTaskAtPosition(board: KanbanBoard, columnId: string, taskData: NewTaskInput, insertionIndex: number): boolean {
         const column = this.findColumn(board, columnId);
         if (!column) { return false; }
 

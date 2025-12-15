@@ -11,6 +11,8 @@ import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
+import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage } from './core/bridge/MessageTypes';
+import { CapturedEdit } from './files/FileInterfaces';
 
 // Helper function to log to both console and output channel
 function log(...args: any[]) {
@@ -45,7 +47,7 @@ export class MessageHandler {
     private _commandContext: CommandContext | null = null;
 
     // Request-response pattern for stopEditing
-    private _pendingStopEditingRequests = new Map<string, { resolve: (value: void) => void, reject: (reason: any) => void, timeout: NodeJS.Timeout }>();
+    private _pendingStopEditingRequests = new Map<string, { resolve: (value: CapturedEdit | undefined) => void, reject: (reason: Error) => void, timeout: NodeJS.Timeout }>();
     private _stopEditingRequestCounter = 0;
 
     constructor(
@@ -180,7 +182,7 @@ export class MessageHandler {
      * Handle response from frontend when editing is stopped (backend-initiated)
      * Resolves the pending promise from requestStopEditing()
      */
-    public async handleEditingStopped(message: any): Promise<void> {
+    public async handleEditingStopped(message: EditingStoppedMessage): Promise<void> {
         const { requestId, capturedEdit } = message;
 
         if (!requestId) {
@@ -204,7 +206,7 @@ export class MessageHandler {
         this._pendingStopEditingRequests.delete(requestId);
     }
 
-    public async handleMessage(message: any): Promise<void> {
+    public async handleMessage(message: IncomingMessage): Promise<void> {
         // Command Pattern: All message handling is done via CommandRegistry
         if (this._commandRegistry.canHandle(message.type)) {
             const result = await this._commandRegistry.execute(message);
@@ -226,7 +228,7 @@ export class MessageHandler {
      * Performs a board modification action with explicit control over update behavior.
      */
 
-    async handleBoardUpdate(message: any): Promise<void> {
+    async handleBoardUpdate(message: BoardUpdateFromFrontendMessage): Promise<void> {
         try {
             const board = message.board;
             if (!board) {
@@ -277,7 +279,7 @@ export class MessageHandler {
 
                     // Check task includes within this column
                     for (const newTask of newCol.tasks) {
-                        const oldTask = oldCol.tasks.find((t: any) => t.id === newTask.id);
+                        const oldTask = oldCol.tasks.find(t => t.id === newTask.id);
                         if (oldTask) {
                             const oldTaskIncludes = oldTask.includeFiles || [];
                             const newTaskIncludes = newTask.includeFiles || [];

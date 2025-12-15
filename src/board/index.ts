@@ -6,13 +6,13 @@
  */
 
 import { KanbanBoard, KanbanTask } from './KanbanTypes';
-import { BoardCrudOperations } from './BoardCrudOperations';
+import { BoardCrudOperations, NewTaskInput } from './BoardCrudOperations';
 import { GatherQueryEngine } from './GatherQueryEngine';
 
 // Export core types
 export { KanbanBoard, KanbanColumn, KanbanTask } from './KanbanTypes';
 
-export { BoardCrudOperations } from './BoardCrudOperations';
+export { BoardCrudOperations, NewTaskInput } from './BoardCrudOperations';
 export { GatherQueryEngine } from './GatherQueryEngine';
 export {
     extractDate,
@@ -46,11 +46,11 @@ export class BoardOperations {
         return this._crudOperations.moveTask(board, taskId, fromColumnId, toColumnId, newIndex);
     }
 
-    public addTask(board: KanbanBoard, columnId: string, taskData: any): boolean {
+    public addTask(board: KanbanBoard, columnId: string, taskData: NewTaskInput): boolean {
         return this._crudOperations.addTask(board, columnId, taskData);
     }
 
-    public addTaskAtPosition(board: KanbanBoard, columnId: string, taskData: any, insertionIndex: number): boolean {
+    public addTaskAtPosition(board: KanbanBoard, columnId: string, taskData: NewTaskInput, insertionIndex: number): boolean {
         return this._crudOperations.addTaskAtPosition(board, columnId, taskData, insertionIndex);
     }
 

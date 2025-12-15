@@ -18,6 +18,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
+import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -161,8 +162,12 @@ export class IncludeCommands extends BaseMessageCommand {
     }
 
     private async handleRegisterInlineInclude(filePath: string, content: string, context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel?.ensureIncludeFileRegistered) {
+        const panel = context.getWebviewPanel();
+        if (!panel || !hasIncludeFileMethods(panel)) {
+            return this.success();
+        }
+        const panelAccess = panel as PanelCommandAccess;
+        if (!panelAccess.ensureIncludeFileRegistered) {
             return this.success();
         }
 
@@ -171,9 +176,9 @@ export class IncludeCommands extends BaseMessageCommand {
             relativePath = './' + relativePath;
         }
 
-        panel.ensureIncludeFileRegistered(relativePath, 'regular');
+        panelAccess.ensureIncludeFileRegistered(relativePath, 'regular');
 
-        const includeFile = panel._includeFiles?.get(relativePath);
+        const includeFile = panelAccess._includeFiles?.get(relativePath);
         if (includeFile && content) {
             includeFile.content = content;
             includeFile.baseline = content;
@@ -365,19 +370,22 @@ export class IncludeCommands extends BaseMessageCommand {
     // ============= FILE RELOAD/SAVE HANDLERS =============
 
     private async handleReloadAllIncludedFiles(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
-        if (!panel) {
+        const panel = context.getWebviewPanel();
+        if (!panel || !hasIncludeFileMethods(panel)) {
             return this.success();
         }
+        const panelAccess = panel as PanelCommandAccess;
 
         let reloadCount = 0;
-        const includeFileMap = panel._includeFiles;
+        const includeFileMap = panelAccess._includeFiles;
         if (includeFileMap) {
             for (const [relativePath] of includeFileMap) {
                 try {
-                    const freshContent = await panel._readFileContent(relativePath);
-                    if (freshContent !== null) {
-                        panel.updateIncludeFileContent(relativePath, freshContent, true);
+                    const freshContent = panelAccess._readFileContent
+                        ? await panelAccess._readFileContent(relativePath)
+                        : null;
+                    if (freshContent !== null && freshContent !== undefined && panelAccess.updateIncludeFileContent) {
+                        panelAccess.updateIncludeFileContent(relativePath, freshContent, true);
                         reloadCount++;
                     }
                 } catch (error) {
@@ -387,8 +395,8 @@ export class IncludeCommands extends BaseMessageCommand {
         }
 
         const document = context.fileManager.getDocument();
-        if (document) {
-            await panel.loadMarkdownFile(document);
+        if (document && panelAccess.loadMarkdownFile) {
+            await panelAccess.loadMarkdownFile(document);
         }
 
         this.postMessage({
@@ -405,14 +413,15 @@ export class IncludeCommands extends BaseMessageCommand {
         forceSave: boolean = false,
         context: CommandContext
     ): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
+        const panel = context.getWebviewPanel();
         if (!panel) {
             return this.failure('No panel available');
         }
+        const panelAccess = panel as PanelCommandAccess;
 
         try {
             if (isMainFile) {
-                const fileService = panel._fileService;
+                const fileService = panelAccess._fileService;
                 const board = fileService?.board();
 
                 if (!board || !board.valid) {
@@ -496,7 +505,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
                     if (document) {
                         const { ExportService } = require('../exportService');
-                        const fileService = panel._fileService;
+                        const fileService = panelAccess._fileService;
                         const board = fileService?.board();
 
                         try {
@@ -536,10 +545,11 @@ export class IncludeCommands extends BaseMessageCommand {
         isMainFile: boolean,
         context: CommandContext
     ): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
+        const panel = context.getWebviewPanel();
         if (!panel) {
             return this.success();
         }
+        const panelAccess = panel as PanelCommandAccess;
 
         try {
             if (isMainFile) {
@@ -553,9 +563,9 @@ export class IncludeCommands extends BaseMessageCommand {
                 mainFile.setContent(freshContent, true);
                 mainFile.parseToBoard();
 
-                const fileService = panel._fileService;
+                const fileService = panelAccess._fileService;
                 const freshBoard = mainFile.getBoard();
-                if (freshBoard && freshBoard.valid) {
+                if (freshBoard && freshBoard.valid && fileService) {
                     fileService.setBoard(freshBoard);
                     await fileService.sendBoardUpdate(false, false);
                 }
@@ -585,12 +595,12 @@ export class IncludeCommands extends BaseMessageCommand {
                 const freshContent = await fsPromises.readFile(absolutePath, 'utf-8');
                 file.setContent(freshContent, true);
 
-                const fileService = panel._fileService;
+                const fileService = panelAccess._fileService;
                 const mainFileObj = fileRegistry.getMainFile();
                 if (mainFileObj) {
                     mainFileObj.parseToBoard();
                     const freshBoard = mainFileObj.getBoard();
-                    if (freshBoard && freshBoard.valid) {
+                    if (freshBoard && freshBoard.valid && fileService) {
                         fileService.setBoard(freshBoard);
                         await fileService.sendBoardUpdate(false, false);
                     }

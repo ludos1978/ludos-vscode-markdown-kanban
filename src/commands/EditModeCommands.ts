@@ -19,6 +19,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
+import { hasMessageHandler } from '../types/PanelCommandAccess';
 
 /**
  * Edit Mode Commands Handler
@@ -58,20 +59,23 @@ export class EditModeCommands extends BaseMessageCommand {
     async execute(message: any, context: CommandContext): Promise<CommandResult> {
         try {
             const panel = context.getWebviewPanel();
-            const messageHandler = (panel as any)?._messageHandler;
-
-            if (!messageHandler) {
+            if (!panel || !hasMessageHandler(panel)) {
                 return this.failure('No message handler available');
             }
+            const messageHandler = panel._messageHandler;
 
             switch (message.type) {
                 // Edit mode lifecycle
                 case 'editModeStart':
-                    await messageHandler.handleEditModeStart(message);
+                    if (messageHandler.handleEditModeStart) {
+                        await messageHandler.handleEditModeStart(message);
+                    }
                     return this.success();
 
                 case 'editModeEnd':
-                    await messageHandler.handleEditModeEnd(message);
+                    if (messageHandler.handleEditModeEnd) {
+                        await messageHandler.handleEditModeEnd(message);
+                    }
                     return this.success();
 
                 case 'editingStarted':
@@ -167,21 +171,29 @@ export class EditModeCommands extends BaseMessageCommand {
                     return this.success();
 
                 case 'pageHiddenWithUnsavedChanges':
-                    await messageHandler.handlePageHiddenWithUnsavedChanges();
+                    if (messageHandler.handlePageHiddenWithUnsavedChanges) {
+                        await messageHandler.handlePageHiddenWithUnsavedChanges();
+                    }
                     return this.success();
 
                 // Marp settings
                 case 'updateMarpGlobalSetting':
-                    await messageHandler.handleUpdateMarpGlobalSetting(message.key, message.value);
+                    if (messageHandler.handleUpdateMarpGlobalSetting) {
+                        await messageHandler.handleUpdateMarpGlobalSetting(message.key, message.value);
+                    }
                     return this.success();
 
                 // Editor shortcuts and snippets
                 case 'triggerVSCodeSnippet':
-                    await messageHandler.handleVSCodeSnippet(message);
+                    if (messageHandler.handleVSCodeSnippet) {
+                        await messageHandler.handleVSCodeSnippet(message);
+                    }
                     return this.success();
 
                 case 'handleEditorShortcut':
-                    await messageHandler.handleEditorShortcut(message);
+                    if (messageHandler.handleEditorShortcut) {
+                        await messageHandler.handleEditorShortcut(message);
+                    }
                     return this.success();
 
                 // Sorting
@@ -203,15 +215,21 @@ export class EditModeCommands extends BaseMessageCommand {
 
                 // Template operations
                 case 'getTemplates':
-                    await messageHandler.handleGetTemplates();
+                    if (messageHandler.handleGetTemplates) {
+                        await messageHandler.handleGetTemplates();
+                    }
                     return this.success();
 
                 case 'applyTemplate':
-                    await messageHandler.handleApplyTemplate(message);
+                    if (messageHandler.handleApplyTemplate) {
+                        await messageHandler.handleApplyTemplate(message);
+                    }
                     return this.success();
 
                 case 'submitTemplateVariables':
-                    await messageHandler.handleSubmitTemplateVariables(message);
+                    if (messageHandler.handleSubmitTemplateVariables) {
+                        await messageHandler.handleSubmitTemplateVariables(message);
+                    }
                     return this.success();
 
                 default:

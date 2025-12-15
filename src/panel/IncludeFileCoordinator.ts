@@ -13,6 +13,12 @@
 import { KanbanBoard, KanbanTask } from '../markdownParser';
 import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile } from '../files';
 import { WebviewBridge } from '../core/bridge';
+import {
+    UpdateColumnContentExtendedMessage,
+    UpdateTaskContentExtendedMessage,
+    UpdateIncludeContentMessage,
+    IncludesUpdatedMessage
+} from '../core/bridge/MessageTypes';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelContext } from './PanelContext';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
@@ -155,7 +161,7 @@ export class IncludeFileCoordinator {
                             }
 
                             if (this._deps.getPanel()) {
-                                this._deps.webviewBridge.sendBatched({
+                                const columnMsg: UpdateColumnContentExtendedMessage = {
                                     type: 'updateColumnContent',
                                     columnId: column.id,
                                     tasks: tasks,
@@ -164,14 +170,15 @@ export class IncludeFileCoordinator {
                                     includeMode: true,
                                     includeFiles: column.includeFiles,
                                     isLoadingContent: false
-                                } as any);
+                                };
+                                this._deps.webviewBridge.sendBatched(columnMsg);
                             }
                         } catch (error) {
                             console.error(`[IncludeFileCoordinator] Failed to load column include ${relativePath}:`, error);
                             column.isLoadingContent = false;
 
                             if (this._deps.getPanel()) {
-                                this._deps.webviewBridge.send({
+                                const errorMsg: UpdateColumnContentExtendedMessage = {
                                     type: 'updateColumnContent',
                                     columnId: column.id,
                                     tasks: [],
@@ -181,7 +188,8 @@ export class IncludeFileCoordinator {
                                     includeFiles: column.includeFiles,
                                     isLoadingContent: false,
                                     loadError: true
-                                } as any);
+                                };
+                                this._deps.webviewBridge.send(errorMsg);
                             }
                         }
                     }
@@ -212,7 +220,7 @@ export class IncludeFileCoordinator {
                                 }
 
                                 if (this._deps.getPanel()) {
-                                    this._deps.webviewBridge.send({
+                                    const taskMsg: UpdateTaskContentExtendedMessage = {
                                         type: 'updateTaskContent',
                                         columnId: column.id,
                                         taskId: task.id,
@@ -223,14 +231,15 @@ export class IncludeFileCoordinator {
                                         includeMode: true,
                                         includeFiles: task.includeFiles,
                                         isLoadingContent: false
-                                    } as any);
+                                    };
+                                    this._deps.webviewBridge.send(taskMsg);
                                 }
                             } catch (error) {
                                 console.error(`[IncludeFileCoordinator] Failed to load task include ${relativePath}:`, error);
                                 task.isLoadingContent = false;
 
                                 if (this._deps.getPanel()) {
-                                    this._deps.webviewBridge.send({
+                                    const errorMsg: UpdateTaskContentExtendedMessage = {
                                         type: 'updateTaskContent',
                                         columnId: column.id,
                                         taskId: task.id,
@@ -242,7 +251,8 @@ export class IncludeFileCoordinator {
                                         includeFiles: task.includeFiles,
                                         isLoadingContent: false,
                                         loadError: true
-                                    } as any);
+                                    };
+                                    this._deps.webviewBridge.send(errorMsg);
                                 }
                             }
                         }
@@ -266,11 +276,12 @@ export class IncludeFileCoordinator {
                     const content = file.getContent();
 
                     if (this._deps.getPanel()) {
-                        this._deps.webviewBridge.sendBatched({
+                        const includeMsg: UpdateIncludeContentMessage = {
                             type: 'updateIncludeContent',
                             filePath: relativePath,
                             content: content
-                        } as any);
+                        };
+                        this._deps.webviewBridge.sendBatched(includeMsg);
                     }
                 } catch (error) {
                     console.error(`[IncludeFileCoordinator] Failed to load regular include ${relativePath}:`, error);
@@ -279,9 +290,10 @@ export class IncludeFileCoordinator {
         }
 
         if (regularIncludes.length > 0 && this._deps.getPanel()) {
-            this._deps.webviewBridge.sendBatched({
+            const updatedMsg: IncludesUpdatedMessage = {
                 type: 'includesUpdated'
-            } as any);
+            };
+            this._deps.webviewBridge.sendBatched(updatedMsg);
         }
     }
 

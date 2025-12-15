@@ -23,8 +23,11 @@ import {
     ChangeContext,
     ChangeResult,
     IncludeSwitchEvent,
-    UserEditEvent
+    UserEditEvent,
+    IFileRegistryForStateMachine,
+    IWebviewPanelForStateMachine
 } from './ChangeTypes';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 
 /**
  * Unified Change State Machine
@@ -57,8 +60,8 @@ export class ChangeStateMachine {
     private _eventQueue: ChangeEvent[] = [];
 
     // Dependencies (injected)
-    private _fileRegistry: any; // MarkdownFileRegistry
-    private _webviewPanel: any; // KanbanWebviewPanel
+    private _fileRegistry: IFileRegistryForStateMachine | null = null;
+    private _webviewPanel: IWebviewPanelForStateMachine | null = null;
     private _fileSaveService: FileSaveService;
     private _includeProcessor: IncludeLoadingProcessor | null = null;
 
@@ -75,13 +78,17 @@ export class ChangeStateMachine {
 
     /**
      * Initialize with dependencies
+     * Note: The actual parameters must be MarkdownFileRegistry and KanbanWebviewPanel instances
+     * which implement the interfaces used here. We cast to concrete types for IncludeLoadingProcessor
+     * which requires additional methods.
      */
-    public initialize(fileRegistry: any, webviewPanel: any): void {
+    public initialize(fileRegistry: IFileRegistryForStateMachine, webviewPanel: IWebviewPanelForStateMachine): void {
         this._fileRegistry = fileRegistry;
         this._webviewPanel = webviewPanel;
+        // Cast to concrete types for IncludeLoadingProcessor which needs full implementations
         this._includeProcessor = new IncludeLoadingProcessor({
-            fileRegistry,
-            webviewPanel
+            fileRegistry: fileRegistry as unknown as import('../files/MarkdownFileRegistry').MarkdownFileRegistry,
+            webviewPanel: webviewPanel as unknown as import('./IncludeLoadingProcessor').IWebviewPanelForProcessor
         });
     }
 
@@ -265,9 +272,11 @@ export class ChangeStateMachine {
             context.impact.includesSwitched = true;
 
             // Calculate files being unloaded
-            const oldFiles = event.oldFiles.map(path =>
-                this._fileRegistry.getByRelativePath(path)
-            ).filter(f => f !== undefined);
+            const oldFiles = this._fileRegistry
+                ? event.oldFiles.map(path =>
+                    this._fileRegistry!.getByRelativePath(path)
+                  ).filter((f): f is MarkdownFile => f !== undefined)
+                : [];
 
             context.impact.affectedFiles = oldFiles;
 
@@ -286,7 +295,7 @@ export class ChangeStateMachine {
             context.impact.includeFilesChanged = false;
             context.impact.includesSwitched = !!event.params.includeSwitch;
 
-            const mainFile = this._fileRegistry.getMainFile();
+            const mainFile = this._fileRegistry?.getMainFile();
             context.impact.affectedFiles = mainFile ? [mainFile] : [];
 
             if (event.params.includeSwitch) {
@@ -385,7 +394,7 @@ export class ChangeStateMachine {
         const unsavedFiles: MarkdownFile[] = [];
 
         for (const relativePath of unloadingFiles) {
-            const file = this._fileRegistry.getByRelativePath(relativePath);
+            const file = this._fileRegistry?.getByRelativePath(relativePath);
             if (file && file.hasUnsavedChanges()) {
                 unsavedFiles.push(file);
             }
@@ -458,7 +467,7 @@ export class ChangeStateMachine {
 
         // Clear backend cache for unloading files
         for (const relativePath of unloadingFiles) {
-            const file = this._fileRegistry.getByRelativePath(relativePath);
+            const file = this._fileRegistry?.getByRelativePath(relativePath);
             if (file) {
                 // Discard any uncommitted changes (revert to baseline/disk)
                 file.discardChanges();
@@ -655,17 +664,17 @@ export class ChangeStateMachine {
         // CRITICAL FIX: Update MainKanbanFile content when includes are modified
         // This ensures that removing a column include updates the file's markdown content
         if (context.impact.includesSwitched || context.impact.mainFileChanged) {
-            const mainFile = this._fileRegistry.getMainFile();
+            const mainFile = this._fileRegistry?.getMainFile();
             const board = context.modifiedBoard || this._webviewPanel?.getBoard();
 
-            if (mainFile && board) {
-                mainFile.updateFromBoard(board);
+            if (mainFile && board && 'updateFromBoard' in mainFile) {
+                (mainFile as import('../files/MainKanbanFile').MainKanbanFile).updateFromBoard(board);
             }
         }
 
         // Mark main file as having unsaved changes if user made edits
         if (context.impact.mainFileChanged && context.event.type === 'user_edit') {
-            const mainFile = this._fileRegistry.getMainFile();
+            const mainFile = this._fileRegistry?.getMainFile();
             if (mainFile) {
                 // The file's internal state already reflects the change
                 // No need to explicitly mark it - setContent() already did that
@@ -677,7 +686,7 @@ export class ChangeStateMachine {
         // changes (e.g., !!!include(old.md)!!! -> !!!include(new.md)!!!), so the
         // main file content needs to be updated for unsaved detection
         if (context.impact.includesSwitched) {
-            const mainFile = this._fileRegistry.getMainFile();
+            const mainFile = this._fileRegistry?.getMainFile();
             if (mainFile && this._webviewPanel) {
                 // Get current board and sync to backend (updates _content for unsaved detection)
                 const board = this._webviewPanel.getBoard?.();
@@ -716,7 +725,7 @@ export class ChangeStateMachine {
         }
 
         // Determine what type of update to send based on event type and impact
-        if (context.impact.includesSwitched) {
+        if (context.impact.includesSwitched && panel) {
             this._sendIncludeSwitchUpdate(panel, board, event, context);
         } else if (context.impact.mainFileChanged && event.type === 'file_system_change') {
             // Main file changed externally - send full board refresh
@@ -739,8 +748,8 @@ export class ChangeStateMachine {
      * Send appropriate update for include switch events
      */
     private _sendIncludeSwitchUpdate(
-        panel: any,
-        board: any,
+        panel: vscode.WebviewPanel,
+        board: KanbanBoard,
         event: ChangeEvent,
         context: ChangeContext
     ): void {
@@ -805,7 +814,7 @@ export class ChangeStateMachine {
             const panel = this._webviewPanel.getPanel();
             const board = this._webviewPanel.getBoard();
 
-            if (board) {
+            if (panel && board) {
                 this._performRollback(panel, board, context);
             }
         }
@@ -844,7 +853,7 @@ export class ChangeStateMachine {
      * @returns Location info if found, undefined otherwise
      */
     private _findFileIncludeLocation(
-        board: any,
+        board: KanbanBoard,
         relativePath: string,
         excludeColumnId?: string,
         excludeTaskId?: string
@@ -889,8 +898,8 @@ export class ChangeStateMachine {
      * Send column update message to frontend
      */
     private _sendColumnUpdate(
-        panel: any,
-        column: any,
+        panel: vscode.WebviewPanel,
+        column: KanbanColumn,
         context: ChangeContext
     ): void {
         panel.webview.postMessage({
@@ -915,9 +924,9 @@ export class ChangeStateMachine {
      * Send task update message to frontend
      */
     private _sendTaskUpdate(
-        panel: any,
-        column: any,
-        task: any,
+        panel: vscode.WebviewPanel,
+        column: KanbanColumn,
+        task: KanbanTask,
         context: ChangeContext
     ): void {
         panel.webview.postMessage({
@@ -943,7 +952,7 @@ export class ChangeStateMachine {
     /**
      * Perform rollback on error - restore state and notify frontend
      */
-    private _performRollback(panel: any, board: any, context: ChangeContext): void {
+    private _performRollback(panel: vscode.WebviewPanel, board: KanbanBoard, context: ChangeContext): void {
         const rollback = context.rollback!;
 
         if (rollback.columnId) {

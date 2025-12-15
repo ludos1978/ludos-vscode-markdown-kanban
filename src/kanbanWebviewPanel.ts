@@ -19,11 +19,24 @@ import {
     MarkdownFileRegistry,
     FileFactory,
     FileChangeEvent,
-    MarkdownFile
+    MarkdownFile,
+    IncludeFile
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
+import {
+    BoardUpdateMessage,
+    UpdateIncludeContentMessage,
+    SyncDirtyItemsMessage,
+    SyncDirtyColumnInfo,
+    SyncDirtyTaskInfo,
+    UpdateShortcutsMessage,
+    UpdateColumnContentExtendedMessage,
+    UpdateTaskContentExtendedMessage,
+    ConfigurationUpdateMessage,
+    TriggerSnippetMessage
+} from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
 
@@ -37,9 +50,17 @@ const MAX_BATCH_SIZE = 10;
 /** Delay before flushing batched messages to webview (ms) */
 const BATCH_FLUSH_DELAY_MS = 50;
 
+/**
+ * Persisted panel state for revival
+ */
+interface PersistedPanelState {
+    documentUri: string;
+    lastAccessed: number;
+}
+
 export class KanbanWebviewPanel {
     private static panels: Map<string, KanbanWebviewPanel> = new Map();
-    private static panelStates: Map<string, any> = new Map();
+    private static panelStates: Map<string, PersistedPanelState> = new Map();
 
     public static readonly viewType = 'markdownKanbanPanel';
 
@@ -204,7 +225,7 @@ export class KanbanWebviewPanel {
                 const availableStates: Array<{ uri: string; time: number }> = [];
 
                 for (const key of panelKeys) {
-                    const panelState = context.globalState.get(key) as any;
+                    const panelState = context.globalState.get<PersistedPanelState>(key);
                     if (panelState?.documentUri && !KanbanWebviewPanel._revivedUris.has(panelState.documentUri)) {
                         availableStates.push({
                             uri: panelState.documentUri,
@@ -761,11 +782,12 @@ export class KanbanWebviewPanel {
         const includeFiles = this._fileRegistry.getIncludeFiles();
         if (includeFiles.length > 0) {
             for (const file of includeFiles) {
-                this._webviewBridge.sendBatched({
+                const message: UpdateIncludeContentMessage = {
                     type: 'updateIncludeContent',
                     filePath: file.getRelativePath(),
                     content: file.getContent()
-                } as any);
+                };
+                this._webviewBridge.sendBatched(message);
             }
         }
 
@@ -1021,7 +1043,7 @@ export class KanbanWebviewPanel {
         const dirtyTaskIds = this._boardStore.getDirtyTasks();
 
         // Collect dirty columns
-        const dirtyColumns: any[] = [];
+        const dirtyColumns: SyncDirtyColumnInfo[] = [];
         for (const columnId of dirtyColumnIds) {
             const column = BoardCrudOperations.findColumnById(board, columnId);
             if (column) {
@@ -1036,7 +1058,7 @@ export class KanbanWebviewPanel {
         }
 
         // Collect dirty tasks
-        const dirtyTasks: any[] = [];
+        const dirtyTasks: SyncDirtyTaskInfo[] = [];
         for (const taskId of dirtyTaskIds) {
             const result = BoardCrudOperations.findTaskById(board, taskId);
             if (result) {
@@ -1050,11 +1072,12 @@ export class KanbanWebviewPanel {
         }
 
         // Send single batched message
-        this._webviewBridge.send({
+        const syncMessage: SyncDirtyItemsMessage = {
             type: 'syncDirtyItems',
             columns: dirtyColumns,
             tasks: dirtyTasks
-        } as any);
+        };
+        this._webviewBridge.send(syncMessage);
 
         this._boardStore.clearAllDirty();
     }
@@ -1193,13 +1216,13 @@ export class KanbanWebviewPanel {
 
             if (column) {
                 // Parse tasks from updated file
-                const columnFile = file as any; // ColumnIncludeFile
+                const columnFile = file as IncludeFile;
                 const mainFilePath = this._fileManager.getDocument()?.uri.fsPath;
                 const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
                 column.tasks = tasks;
 
                 // Send update to frontend
-                this._webviewBridge.send({
+                const columnMessage: UpdateColumnContentExtendedMessage = {
                     type: 'updateColumnContent',
                     columnId: column.id,
                     tasks: tasks,
@@ -1207,7 +1230,8 @@ export class KanbanWebviewPanel {
                     displayTitle: column.displayTitle,
                     includeMode: true,
                     includeFiles: column.includeFiles
-                } as any);
+                };
+                this._webviewBridge.send(columnMessage);
             }
         } else if (fileType === 'include-task') {
             // Find task that uses this include file
@@ -1236,7 +1260,7 @@ export class KanbanWebviewPanel {
                 foundTask.description = fullContent;
 
                 // Send update to frontend
-                this._webviewBridge.send({
+                const taskMessage: UpdateTaskContentExtendedMessage = {
                     type: 'updateTaskContent',
                     columnId: foundColumn.id,
                     taskId: foundTask.id,
@@ -1246,7 +1270,8 @@ export class KanbanWebviewPanel {
                     originalTitle: foundTask.originalTitle,
                     includeMode: true,
                     includeFiles: foundTask.includeFiles
-                } as any);
+                };
+                this._webviewBridge.send(taskMessage);
             }
         } else if (fileType === 'include-regular') {
             // Regular include - find and update only affected tasks
@@ -1254,11 +1279,12 @@ export class KanbanWebviewPanel {
 
             // CRITICAL: Send updated include content to frontend cache
             const content = file.getContent();
-            this._webviewBridge.sendBatched({
+            const includeContentMessage: UpdateIncludeContentMessage = {
                 type: 'updateIncludeContent',
                 filePath: relativePath,
                 content: content
-            } as any);
+            };
+            this._webviewBridge.sendBatched(includeContentMessage);
 
             // Find all tasks that use this regular include
             const affectedTasks: Array<{task: KanbanTask, column: KanbanColumn}> = [];
@@ -1283,7 +1309,7 @@ export class KanbanWebviewPanel {
             // WebviewBridge batching ensures cache update arrives BEFORE task updates
             for (const {task, column} of affectedTasks) {
                 // Send task update with current description (frontend will re-render the markdown with updated cache)
-                this._webviewBridge.sendBatched({
+                const regularTaskMessage: UpdateTaskContentExtendedMessage = {
                     type: 'updateTaskContent',
                     columnId: column.id,
                     taskId: task.id,
@@ -1293,8 +1319,8 @@ export class KanbanWebviewPanel {
                     originalTitle: task.originalTitle,
                     includeMode: false, // Regular includes are NOT includeMode
                     regularIncludeFiles: task.regularIncludeFiles // Send the list so frontend knows what changed
-                } as any);
-
+                };
+                this._webviewBridge.sendBatched(regularTaskMessage);
             }
 
             // NOTE: No need for 'includesUpdated' message - updateTaskContent already triggers
@@ -1311,10 +1337,11 @@ export class KanbanWebviewPanel {
 
         try {
             const shortcuts = await KeybindingService.getInstance().getAllShortcuts();
-            this._webviewBridge.send({
+            const shortcutsMessage: UpdateShortcutsMessage = {
                 type: 'updateShortcuts',
                 shortcuts: shortcuts
-            } as any);
+            };
+            this._webviewBridge.send(shortcutsMessage);
         } catch (error) {
             console.error('[KanbanWebviewPanel] Failed to send shortcuts to webview:', error);
         }
@@ -1364,10 +1391,11 @@ export class KanbanWebviewPanel {
             const config = configService.getBoardViewConfig(layoutPresets);
 
             // Send configuration to webview
-            this._webviewBridge.send({
+            const configMessage: ConfigurationUpdateMessage = {
                 type: 'configurationUpdate',
                 config: config
-            } as any);
+            };
+            this._webviewBridge.send(configMessage);
 
         } catch (error) {
             console.error('[KanbanWebviewPanel] ❌ Failed to refresh view configuration:', error);
@@ -1385,17 +1413,18 @@ export class KanbanWebviewPanel {
         const layoutPresets = this._webviewManager.getLayoutPresetsConfiguration();
         const viewConfig = configService.getBoardViewConfig(layoutPresets);
 
+        // BoardUpdateMessage type matches getBoardViewConfig() output
         const message = {
-            type: 'boardUpdate',
+            type: 'boardUpdate' as const,
             board: board,
-            ...viewConfig,
+            ...(viewConfig as Partial<BoardUpdateMessage>),
             // Optional fields for full board loads
             ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
             ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
             ...(options.version && { version: options.version })
-        };
+        } as BoardUpdateMessage;
 
-        this._webviewBridge.send(message as any);
+        this._webviewBridge.send(message);
     }
 
     /**
@@ -1641,21 +1670,17 @@ export class KanbanWebviewPanel {
                 for (const fileWithChanges of includeStatus.changedFiles) {
                     const includeFile = this._fileRegistry.getIncludeFile(fileWithChanges);
                     if (includeFile && includeFile.hasUnsavedChanges()) {
-                        const fileManager = (includeFile as any)._fileManager;
-                        if (fileManager) {
-                            const document = fileManager.getDocument();
-                            if (document) {
-                                const filePath = document.uri.fsPath;
-                                const content = includeFile.getContent();
+                        const filePath = includeFile.getPath();
+                        if (filePath) {
+                            const content = includeFile.getContent();
 
-                                // Create backup filename: "include.md" -> "include-unsavedchanges.md"
-                                const ext = path.extname(filePath);
-                                const baseName = path.basename(filePath, ext);
-                                const dirName = path.dirname(filePath);
-                                const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
+                            // Create backup filename: "include.md" -> "include-unsavedchanges.md"
+                            const ext = path.extname(filePath);
+                            const baseName = path.basename(filePath, ext);
+                            const dirName = path.dirname(filePath);
+                            const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
 
-                                fs.writeFileSync(backupPath, content, 'utf8');
-                            }
+                            fs.writeFileSync(backupPath, content, 'utf8');
                         }
                     }
                 }
@@ -1770,9 +1795,10 @@ export class KanbanWebviewPanel {
      */
     public triggerSnippetInsertion(): void {
         if (this._panel) {
-            this._webviewBridge.send({
+            const snippetMessage: TriggerSnippetMessage = {
                 type: 'triggerSnippet'
-            } as any);
+            };
+            this._webviewBridge.send(snippetMessage);
         }
     }
 }

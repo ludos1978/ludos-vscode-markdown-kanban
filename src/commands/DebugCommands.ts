@@ -15,6 +15,7 @@
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
+import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
 import * as fs from 'fs';
 
 /**
@@ -64,7 +65,7 @@ export class DebugCommands extends BaseMessageCommand {
     // ============= FORCE WRITE / VERIFICATION HANDLERS =============
 
     private async handleForceWriteAllContent(context: CommandContext): Promise<CommandResult> {
-        const panel = context.getWebviewPanel() as any;
+        const panel = context.getWebviewPanel();
         if (!panel) {
             return this.success();
         }
@@ -74,8 +75,7 @@ export class DebugCommands extends BaseMessageCommand {
         let backupPath: string | undefined;
         try {
             const document = context.fileManager.getDocument();
-            // Note: _conflictService is panel-internal, needs 'as any' access
-            if (document && panel._conflictService) {
+            if (document && hasConflictService(panel)) {
                 backupPath = await panel._conflictService.createUnifiedBackup(
                     document.uri.fsPath,
                     'force-write',
@@ -238,23 +238,23 @@ export class DebugCommands extends BaseMessageCommand {
     }
 
     private async handleClearTrackedFilesCache(context: CommandContext): Promise<CommandResult> {
-        // Note: This method needs panel-internal access for cache clearing
-        const panel = context.getWebviewPanel() as any;
+        const panel = context.getWebviewPanel();
         if (!panel) {
             return this.success();
         }
+        const panelAccess = panel as PanelCommandAccess;
 
         try {
-            const includeFileMap = panel._includeFiles;
+            const includeFileMap = panelAccess._includeFiles;
             if (includeFileMap) {
                 includeFileMap.clear();
             }
 
-            panel._cachedBoardFromWebview = null;
+            panelAccess._cachedBoardFromWebview = null;
 
             const document = context.fileManager.getDocument();
-            if (document) {
-                await panel.loadMarkdownFile(document, false);
+            if (document && panelAccess.loadMarkdownFile) {
+                await panelAccess.loadMarkdownFile(document, false);
             }
         } catch (error) {
             console.warn('[DebugCommands] Error clearing panel caches:', error);

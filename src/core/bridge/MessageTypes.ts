@@ -11,6 +11,7 @@
  */
 
 import { KanbanBoard, KanbanTask, KanbanColumn } from '../../markdownParser';
+import { CapturedEdit } from '../../files/FileInterfaces';
 
 // ============= BASE TYPES =============
 
@@ -39,14 +40,14 @@ export interface ResponseMessage extends BaseMessage {
 
 /**
  * Board update message - sends full board state to webview
+ * Includes all view configuration from getBoardViewConfig()
  */
 export interface BoardUpdateMessage extends BaseMessage {
     type: 'boardUpdate';
     board: KanbanBoard;
-    imageMappings: Record<string, string>;
+    // Core view settings
     columnBorder: string;
     taskBorder: string;
-    htmlRenderMode: string;
     tagVisibility: string;
     taskMinHeight: string;
     sectionHeight: string;
@@ -58,6 +59,24 @@ export interface BoardUpdateMessage extends BaseMessage {
     rowHeight: string;
     layoutPreset: string;
     arrowKeyFocusScroll: string;
+    // Additional config from getBoardViewConfig()
+    layoutPresets?: Record<string, unknown>;
+    maxRowHeight?: number;
+    whitespace?: string;
+    htmlCommentRenderMode?: string;
+    htmlContentRenderMode?: string;
+    tagColors?: Record<string, string>;
+    enabledTagCategoriesColumn?: Record<string, boolean>;
+    enabledTagCategoriesTask?: Record<string, boolean>;
+    customTagCategories?: Record<string, unknown>;
+    exportTagVisibility?: boolean;
+    openLinksInNewTab?: boolean;
+    pathGeneration?: 'relative' | 'absolute';
+    imageMappings?: Record<string, string>;
+    // Optional fields for full board loads
+    isFullRefresh?: boolean;
+    applyDefaultFolding?: boolean;
+    version?: string;
     focusTargets?: FocusTarget[];
 }
 
@@ -228,6 +247,109 @@ export interface FileVerificationResult {
     backendContentLength: number;
 }
 
+/**
+ * Update include file content in frontend cache
+ */
+export interface UpdateIncludeContentMessage extends BaseMessage {
+    type: 'updateIncludeContent';
+    filePath: string;
+    content: string;
+}
+
+/**
+ * Dirty column info for sync
+ */
+export interface SyncDirtyColumnInfo {
+    columnId: string;
+    title: string;
+    displayTitle?: string;
+    includeMode?: boolean;
+    includeFiles?: string[];
+}
+
+/**
+ * Dirty task info for sync
+ */
+export interface SyncDirtyTaskInfo {
+    columnId: string;
+    taskId: string;
+    displayTitle?: string;
+    description?: string;
+}
+
+/**
+ * Sync dirty items to frontend
+ */
+export interface SyncDirtyItemsMessage extends BaseMessage {
+    type: 'syncDirtyItems';
+    columns: SyncDirtyColumnInfo[];
+    tasks: SyncDirtyTaskInfo[];
+}
+
+/**
+ * Update keyboard shortcuts
+ */
+export interface UpdateShortcutsMessage extends BaseMessage {
+    type: 'updateShortcuts';
+    shortcuts: Record<string, string>;
+}
+
+/**
+ * Extended column content update for include files
+ */
+export interface UpdateColumnContentExtendedMessage extends BaseMessage {
+    type: 'updateColumnContent';
+    columnId: string;
+    tasks: KanbanTask[];
+    columnTitle: string;
+    displayTitle?: string;
+    includeMode: boolean;
+    includeFiles?: string[];
+    isLoadingContent?: boolean;
+    loadError?: boolean;
+}
+
+/**
+ * Extended task content update for include files
+ */
+export interface UpdateTaskContentExtendedMessage extends BaseMessage {
+    type: 'updateTaskContent';
+    columnId: string;
+    taskId: string;
+    title?: string;
+    description?: string;
+    displayTitle?: string;
+    taskTitle?: string;
+    originalTitle?: string;
+    includeMode: boolean;
+    includeFiles?: string[];
+    regularIncludeFiles?: string[];
+    isLoadingContent?: boolean;
+    loadError?: boolean;
+}
+
+/**
+ * Configuration update message - sends view configuration to webview
+ */
+export interface ConfigurationUpdateMessage extends BaseMessage {
+    type: 'configurationUpdate';
+    config: Record<string, unknown>;
+}
+
+/**
+ * Trigger snippet insertion in webview
+ */
+export interface TriggerSnippetMessage extends BaseMessage {
+    type: 'triggerSnippet';
+}
+
+/**
+ * Notify frontend that includes have been updated
+ */
+export interface IncludesUpdatedMessage extends BaseMessage {
+    type: 'includesUpdated';
+}
+
 // ============= INCOMING MESSAGES (Frontend → Backend) =============
 
 /**
@@ -364,11 +486,7 @@ export interface EditModeEndMessage extends BaseMessage {
  */
 export interface EditingStoppedMessage extends ResponseMessage {
     type: 'editingStopped';
-    capturedEdit?: {
-        type: 'task' | 'column';
-        id: string;
-        value: string;
-    };
+    capturedEdit?: CapturedEdit;
 }
 
 /**
@@ -383,7 +501,15 @@ export interface ColumnsUnfoldedMessage extends ResponseMessage {
  */
 export interface OpenFileLinkMessage extends BaseMessage {
     type: 'openFileLink';
-    path: string;
+    href: string;
+    linkIndex?: number;
+    taskId?: string;
+    columnId?: string;
+    includeContext?: {
+        columnId?: string;
+        taskId?: string;
+        filePath?: string;
+    };
 }
 
 /**
@@ -391,7 +517,10 @@ export interface OpenFileLinkMessage extends BaseMessage {
  */
 export interface OpenWikiLinkMessage extends BaseMessage {
     type: 'openWikiLink';
-    link: string;
+    documentName: string;
+    linkIndex?: number;
+    taskId?: string;
+    columnId?: string;
 }
 
 /**
@@ -399,7 +528,7 @@ export interface OpenWikiLinkMessage extends BaseMessage {
  */
 export interface OpenExternalLinkMessage extends BaseMessage {
     type: 'openExternalLink';
-    url: string;
+    href: string;
 }
 
 /**
@@ -454,6 +583,95 @@ export interface RenderSkippedMessage extends BaseMessage {
     taskId?: string;
 }
 
+/**
+ * Open file in editor request
+ */
+export interface OpenFileMessage extends BaseMessage {
+    type: 'openFile';
+    filePath: string;
+}
+
+/**
+ * Open include file request
+ */
+export interface OpenIncludeFileMessage extends BaseMessage {
+    type: 'openIncludeFile';
+    filePath: string;
+}
+
+/**
+ * Drop position info for file drops
+ */
+export interface DropPosition {
+    columnId?: string;
+    taskId?: string;
+    position?: 'title' | 'description';
+}
+
+/**
+ * Handle file drop request
+ */
+export interface HandleFileDropMessage extends BaseMessage {
+    type: 'handleFileDrop';
+    fileName: string;
+    dropPosition?: DropPosition;
+    activeEditor?: {
+        taskId?: string;
+        columnId?: string;
+        position?: string;
+    };
+}
+
+/**
+ * Handle URI drop request
+ */
+export interface HandleUriDropMessage extends BaseMessage {
+    type: 'handleUriDrop';
+    uris: string[];
+    dropPosition?: DropPosition;
+    activeEditor?: {
+        taskId?: string;
+        columnId?: string;
+        position?: string;
+    };
+}
+
+/**
+ * Toggle file lock request
+ */
+export interface ToggleFileLockMessage extends BaseMessage {
+    type: 'toggleFileLock';
+}
+
+/**
+ * Select file request
+ */
+export interface SelectFileMessage extends BaseMessage {
+    type: 'selectFile';
+}
+
+/**
+ * Request file info
+ */
+export interface RequestFileInfoMessage extends BaseMessage {
+    type: 'requestFileInfo';
+}
+
+/**
+ * Initialize file request
+ */
+export interface InitializeFileMessage extends BaseMessage {
+    type: 'initializeFile';
+}
+
+/**
+ * Resolve and copy path request
+ */
+export interface ResolveAndCopyPathMessage extends BaseMessage {
+    type: 'resolveAndCopyPath';
+    path: string;
+}
+
 // ============= TYPE UNIONS =============
 
 /**
@@ -475,7 +693,15 @@ export type OutgoingMessage =
     | MarpStatusMessage
     | ShowMessageMessage
     | TrackedFilesDebugInfoMessage
-    | ContentVerificationResultMessage;
+    | ContentVerificationResultMessage
+    | UpdateIncludeContentMessage
+    | SyncDirtyItemsMessage
+    | UpdateShortcutsMessage
+    | UpdateColumnContentExtendedMessage
+    | UpdateTaskContentExtendedMessage
+    | ConfigurationUpdateMessage
+    | TriggerSnippetMessage
+    | IncludesUpdatedMessage;
 
 /**
  * All incoming message types (Frontend → Backend)
@@ -500,12 +726,26 @@ export type IncomingMessage =
     | OpenFileLinkMessage
     | OpenWikiLinkMessage
     | OpenExternalLinkMessage
+    | OpenFileMessage
+    | OpenIncludeFileMessage
+    | HandleFileDropMessage
+    | HandleUriDropMessage
+    | ToggleFileLockMessage
+    | SelectFileMessage
+    | RequestFileInfoMessage
+    | InitializeFileMessage
+    | ResolveAndCopyPathMessage
     | SaveBoardStateMessage
     | SaveUndoStateMessage
     | RequestIncludeFileMessage
     | ExportMessage
     | RenderCompletedMessage
-    | RenderSkippedMessage;
+    | RenderSkippedMessage
+    | UpdateIncludeContentMessage
+    | SyncDirtyItemsMessage
+    | UpdateShortcutsMessage
+    | UpdateColumnContentExtendedMessage
+    | UpdateTaskContentExtendedMessage;
 
 /**
  * Message type string literals for type-safe checking

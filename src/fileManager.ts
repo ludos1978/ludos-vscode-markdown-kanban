@@ -3,6 +3,7 @@ import * as path from 'path';
 import { FileTypeUtils, toForwardSlashes, selectMarkdownFile, safeDecodeURIComponent } from './utils';
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
+import { HandleFileDropMessage, HandleUriDropMessage, DropPosition } from './core/bridge/MessageTypes';
 
 export interface FileInfo {
     fileName: string;
@@ -11,12 +12,21 @@ export interface FileInfo {
     isLocked: boolean;
 }
 
+/**
+ * Active editor context for file drops
+ */
+export interface ActiveEditorContext {
+    taskId?: string;
+    columnId?: string;
+    position?: string;
+}
+
 export interface FileDropInfo {
     fileName: string;
     relativePath: string;
     isImage: boolean;
-    activeEditor?: any;
-    dropPosition?: { x: number; y: number };
+    activeEditor?: ActiveEditorContext;
+    dropPosition?: DropPosition;
 }
 
 export interface ImagePathMapping {
@@ -28,6 +38,16 @@ export interface FileResolutionResult {
     exists: boolean;
     isAbsolute: boolean;
     attemptedPaths: string[]; // Track all attempted paths for debugging
+}
+
+/**
+ * Include context for file path resolution
+ */
+export interface IncludeContextForResolution {
+    includeDir?: string;
+    columnId?: string;
+    taskId?: string;
+    filePath?: string;
 }
 
 export class FileManager {
@@ -197,7 +217,7 @@ export class FileManager {
         return FileTypeUtils.isImageFile(fileName);
     }
 
-    public async handleFileDrop(message: any) {
+    public async handleFileDrop(message: HandleFileDropMessage) {
         try {
             const { fileName, dropPosition, activeEditor } = message;
             const isImage = this.isImageFile(fileName);
@@ -226,7 +246,7 @@ export class FileManager {
     /**
      * Enhanced drag & drop handling with workspace-relative paths
      */
-    public async handleUriDrop(message: any) {
+    public async handleUriDrop(message: HandleUriDropMessage) {
         try {
             const { uris, dropPosition, activeEditor } = message;
             
@@ -272,7 +292,7 @@ export class FileManager {
     /**
      * Enhanced file path resolution that handles workspace-relative paths
      */
-    public async resolveFilePath(href: string, includeContext?: any): Promise<FileResolutionResult | null> {
+    public async resolveFilePath(href: string, includeContext?: IncludeContextForResolution): Promise<FileResolutionResult | null> {
         const attemptedPaths: string[] = [];
 
         // Decode URL-encoded paths (e.g., %20 -> space)

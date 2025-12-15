@@ -121,22 +121,6 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	// Optional: Add debug command to troubleshoot webview permissions
-	const debugPermissionsCommand = vscode.commands.registerCommand('markdown-kanban.debugPermissions', () => {
-		const activeEditor = vscode.window.activeTextEditor;
-		if (activeEditor && activeEditor.document.languageId === 'markdown') {
-			const panel = KanbanWebviewPanel.getPanelForDocument(activeEditor.document.uri.toString());
-			if (panel) {
-				(panel as any).debugWebviewPermissions();
-				vscode.window.showInformationMessage('Check the console for debug output');
-			} else {
-				vscode.window.showWarningMessage('No kanban panel is open for this document');
-			}
-		} else {
-			vscode.window.showWarningMessage('No active markdown document');
-		}
-	});
-
 	const disableFileListenerCommand = vscode.commands.registerCommand('markdown-kanban.disableFileListener', async () => {
 		fileListenerEnabled = !fileListenerEnabled;
 		const status = fileListenerEnabled ? 'enabled' : 'disabled';
@@ -293,7 +277,6 @@ export function activate(context: vscode.ExtensionContext) {
 		openKanbanFromPanelCommand,
 		switchFileCommand,
 		insertSnippetCommand,
-		debugPermissionsCommand,
 		scanWorkspaceCommand,
 		addFileToSidebarCommand,
 		removeFileFromSidebarCommand,
