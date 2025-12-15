@@ -12,6 +12,12 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    RequestFileDropDialogueMessage,
+    ExecuteFileDropCopyMessage,
+    ExecuteFileDropLinkMessage,
+    LinkExistingFileMessage
+} from '../core/bridge/MessageTypes';
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
@@ -293,9 +299,9 @@ export class ClipboardCommands extends BaseMessageCommand {
         }
     }
 
-    private async handleRequestFileDropDialogue(message: any, context: CommandContext): Promise<void> {
+    private async handleRequestFileDropDialogue(message: RequestFileDropDialogueMessage, context: CommandContext): Promise<void> {
         const { dropId, fileName, isImage, hasSourcePath, sourcePath, partialHashData, dropPosition } = message;
-        let { fileSize } = message;
+        let fileSize = message.fileSize;
 
         try {
             const { directory, baseFileName } = this._getCurrentFilePaths(context);
@@ -341,7 +347,7 @@ export class ClipboardCommands extends BaseMessageCommand {
         }
     }
 
-    private async handleExecuteFileDropCopy(message: any, context: CommandContext): Promise<void> {
+    private async handleExecuteFileDropCopy(message: ExecuteFileDropCopyMessage, context: CommandContext): Promise<void> {
         const { sourcePath, fileName, isImage, dropPosition } = message;
 
         try {
@@ -353,7 +359,7 @@ export class ClipboardCommands extends BaseMessageCommand {
         }
     }
 
-    private async handleExecuteFileDropLink(message: any, context: CommandContext): Promise<void> {
+    private async handleExecuteFileDropLink(message: ExecuteFileDropLinkMessage, context: CommandContext): Promise<void> {
         const { sourcePath, fileName, isImage, dropPosition } = message;
 
         try {
@@ -365,7 +371,7 @@ export class ClipboardCommands extends BaseMessageCommand {
         }
     }
 
-    private async handleLinkExistingFile(message: any, context: CommandContext): Promise<void> {
+    private async handleLinkExistingFile(message: LinkExistingFileMessage, context: CommandContext): Promise<void> {
         const { existingFile, fileName, isImage, dropPosition } = message;
 
         try {

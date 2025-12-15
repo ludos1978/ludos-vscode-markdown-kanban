@@ -404,9 +404,9 @@ export interface EditTaskMessage extends BaseMessage {
 export interface MoveTaskMessage extends BaseMessage {
     type: 'moveTask';
     taskId: string;
-    sourceColumnId: string;
-    targetColumnId: string;
-    targetIndex: number;
+    fromColumnId: string;
+    toColumnId: string;
+    newIndex: number;
 }
 
 /**
@@ -415,8 +415,11 @@ export interface MoveTaskMessage extends BaseMessage {
 export interface AddTaskMessage extends BaseMessage {
     type: 'addTask';
     columnId: string;
-    title: string;
-    description?: string;
+    taskData: {
+        title?: string;
+        description?: string;
+        [key: string]: unknown;
+    };
 }
 
 /**
@@ -434,9 +437,12 @@ export interface DeleteTaskMessage extends BaseMessage {
 export interface AddTaskAtPositionMessage extends BaseMessage {
     type: 'addTaskAtPosition';
     columnId: string;
-    title: string;
+    taskData: {
+        title?: string;
+        description?: string;
+        [key: string]: unknown;
+    };
     insertionIndex: number;
-    description?: string;
 }
 
 /**
@@ -472,8 +478,8 @@ export interface InsertTaskAfterMessage extends BaseMessage {
 export interface MoveTaskToColumnMessage extends BaseMessage {
     type: 'moveTaskToColumn';
     taskId: string;
-    sourceColumnId: string;
-    targetColumnId: string;
+    fromColumnId: string;
+    toColumnId: string;
 }
 
 /**
@@ -529,7 +535,8 @@ export interface UpdateTaskFromStrikethroughDeletionMessage extends BaseMessage 
     type: 'updateTaskFromStrikethroughDeletion';
     taskId: string;
     columnId: string;
-    newTitle: string;
+    newContent: string;
+    contentType: 'title' | 'description';
 }
 
 /**
@@ -546,8 +553,10 @@ export interface AddColumnMessage extends BaseMessage {
  */
 export interface MoveColumnMessage extends BaseMessage {
     type: 'moveColumn';
-    columnId: string;
-    targetIndex: number;
+    fromIndex: number;
+    toIndex: number;
+    fromRow: number;
+    toRow: number;
 }
 
 /**
@@ -636,7 +645,12 @@ export interface GetTemplatesMessage extends BaseMessage {
 export interface ApplyTemplateMessage extends BaseMessage {
     type: 'applyTemplate';
     templatePath: string;
-    templateName: string;
+    templateName?: string;
+    isEmptyColumn?: boolean;
+    targetRow?: number;
+    insertAfterColumnId?: string;
+    insertBeforeColumnId?: string;
+    position?: 'first' | 'last';
 }
 
 /**
@@ -645,14 +659,18 @@ export interface ApplyTemplateMessage extends BaseMessage {
 export interface SubmitTemplateVariablesMessage extends BaseMessage {
     type: 'submitTemplateVariables';
     templatePath: string;
-    templateName: string;
+    templateName?: string;
     variables: Record<string, string>;
+    targetRow?: number;
+    insertAfterColumnId?: string;
+    insertBeforeColumnId?: string;
+    position?: 'first' | 'last';
 }
 
 /**
  * Render PlantUML request
  */
-export interface RenderPlantUMLMessage extends BaseMessage {
+export interface RenderPlantUMLMessage extends RequestMessage {
     type: 'renderPlantUML';
     code: string;
     taskId?: string;
@@ -666,6 +684,7 @@ export interface ConvertPlantUMLToSVGMessage extends BaseMessage {
     type: 'convertPlantUMLToSVG';
     plantUMLCode: string;
     filePath: string;
+    svgContent: string;
 }
 
 /**
@@ -675,6 +694,7 @@ export interface ConvertMermaidToSVGMessage extends BaseMessage {
     type: 'convertMermaidToSVG';
     mermaidCode: string;
     filePath: string;
+    svgContent: string;
 }
 
 /**
@@ -698,7 +718,7 @@ export interface MermaidExportErrorMessage extends BaseMessage {
 /**
  * Request Draw.io render
  */
-export interface RequestDrawIORenderMessage extends BaseMessage {
+export interface RequestDrawIORenderMessage extends RequestMessage {
     type: 'requestDrawIORender';
     filePath: string;
     pageIndex?: number;
@@ -707,7 +727,7 @@ export interface RequestDrawIORenderMessage extends BaseMessage {
 /**
  * Request Excalidraw render
  */
-export interface RequestExcalidrawRenderMessage extends BaseMessage {
+export interface RequestExcalidrawRenderMessage extends RequestMessage {
     type: 'requestExcalidrawRender';
     filePath: string;
 }
@@ -715,7 +735,7 @@ export interface RequestExcalidrawRenderMessage extends BaseMessage {
 /**
  * Request PDF page render
  */
-export interface RequestPDFPageRenderMessage extends BaseMessage {
+export interface RequestPDFPageRenderMessage extends RequestMessage {
     type: 'requestPDFPageRender';
     filePath: string;
     pageNumber: number;
@@ -724,7 +744,7 @@ export interface RequestPDFPageRenderMessage extends BaseMessage {
 /**
  * Request PDF info
  */
-export interface RequestPDFInfoMessage extends BaseMessage {
+export interface RequestPDFInfoMessage extends RequestMessage {
     type: 'requestPDFInfo';
     filePath: string;
 }
@@ -744,8 +764,8 @@ export interface SaveBoardStateMessage extends BaseMessage {
  */
 export interface ShowMessageRequestMessage extends BaseMessage {
     type: 'showMessage';
-    message: string;
-    severity?: 'info' | 'warning' | 'error';
+    text: string;
+    messageType?: 'info' | 'warning' | 'error';
 }
 
 /**
@@ -753,7 +773,7 @@ export interface ShowMessageRequestMessage extends BaseMessage {
  */
 export interface ShowErrorMessage extends BaseMessage {
     type: 'showError';
-    message: string;
+    text: string;
 }
 
 /**
@@ -761,7 +781,7 @@ export interface ShowErrorMessage extends BaseMessage {
  */
 export interface ShowInfoMessage extends BaseMessage {
     type: 'showInfo';
-    message: string;
+    text: string;
 }
 
 /**
@@ -879,6 +899,14 @@ export interface SaveDroppedFileFromContentsMessage extends BaseMessage {
  */
 export interface RequestFileDropDialogueMessage extends BaseMessage {
     type: 'requestFileDropDialogue';
+    dropId: string;
+    fileName: string;
+    fileSize?: number;
+    isImage: boolean;
+    hasSourcePath: boolean;
+    sourcePath?: string;
+    partialHashData?: string;
+    dropPosition: DropPosition;
 }
 
 /**
@@ -886,6 +914,10 @@ export interface RequestFileDropDialogueMessage extends BaseMessage {
  */
 export interface ExecuteFileDropCopyMessage extends BaseMessage {
     type: 'executeFileDropCopy';
+    sourcePath: string;
+    fileName: string;
+    isImage: boolean;
+    dropPosition: DropPosition;
 }
 
 /**
@@ -893,6 +925,10 @@ export interface ExecuteFileDropCopyMessage extends BaseMessage {
  */
 export interface ExecuteFileDropLinkMessage extends BaseMessage {
     type: 'executeFileDropLink';
+    sourcePath: string;
+    fileName: string;
+    isImage: boolean;
+    dropPosition: DropPosition;
 }
 
 /**
@@ -900,6 +936,10 @@ export interface ExecuteFileDropLinkMessage extends BaseMessage {
  */
 export interface LinkExistingFileMessage extends BaseMessage {
     type: 'linkExistingFile';
+    existingFile: string;
+    fileName: string;
+    isImage: boolean;
+    dropPosition: DropPosition;
 }
 
 /**
@@ -984,6 +1024,8 @@ export interface AskOpenExportFolderMessage extends BaseMessage {
  */
 export interface ConfirmDisableIncludeModeMessage extends BaseMessage {
     type: 'confirmDisableIncludeMode';
+    message: string;
+    columnId: string;
 }
 
 /**
@@ -1000,6 +1042,7 @@ export interface RegisterInlineIncludeMessage extends BaseMessage {
  */
 export interface RequestIncludeFileNameMessage extends BaseMessage {
     type: 'requestIncludeFileName';
+    columnId?: string;
 }
 
 /**
@@ -1007,6 +1050,8 @@ export interface RequestIncludeFileNameMessage extends BaseMessage {
  */
 export interface RequestEditIncludeFileNameMessage extends BaseMessage {
     type: 'requestEditIncludeFileName';
+    currentFile?: string;
+    columnId?: string;
 }
 
 /**
@@ -1014,6 +1059,9 @@ export interface RequestEditIncludeFileNameMessage extends BaseMessage {
  */
 export interface RequestEditTaskIncludeFileNameMessage extends BaseMessage {
     type: 'requestEditTaskIncludeFileName';
+    currentFile?: string;
+    taskId?: string;
+    columnId?: string;
 }
 
 /**
@@ -1253,7 +1301,7 @@ export interface RequestIncludeFileMessage extends BaseMessage {
 export interface ExportMessage extends BaseMessage {
     type: 'export';
     format: string;
-    options: Record<string, any>;
+    options: Record<string, unknown>;
 }
 
 /**
@@ -1296,9 +1344,9 @@ export interface OpenIncludeFileMessage extends BaseMessage {
 }
 
 /**
- * Drop position info for file drops
+ * Editor drop position info for file drops into editor fields
  */
-export interface DropPosition {
+export interface EditorDropPosition {
     columnId?: string;
     taskId?: string;
     position?: 'title' | 'description';
@@ -1310,7 +1358,7 @@ export interface DropPosition {
 export interface HandleFileDropMessage extends BaseMessage {
     type: 'handleFileDrop';
     fileName: string;
-    dropPosition?: DropPosition;
+    dropPosition?: EditorDropPosition;
     activeEditor?: {
         taskId?: string;
         columnId?: string;
@@ -1324,7 +1372,7 @@ export interface HandleFileDropMessage extends BaseMessage {
 export interface HandleUriDropMessage extends BaseMessage {
     type: 'handleUriDrop';
     uris: string[];
-    dropPosition?: DropPosition;
+    dropPosition?: EditorDropPosition;
     activeEditor?: {
         taskId?: string;
         columnId?: string;

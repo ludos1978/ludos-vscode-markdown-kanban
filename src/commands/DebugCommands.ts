@@ -19,6 +19,87 @@ import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAcc
 import * as fs from 'fs';
 
 /**
+ * File verification result for content sync check
+ */
+interface FileVerificationResult {
+    path: string;
+    relativePath: string;
+    isMainFile: boolean;
+    matches: boolean;
+    frontendBackendMatch: boolean;
+    backendSavedMatch: boolean;
+    frontendSavedMatch: boolean;
+    frontendContentLength: number;
+    backendContentLength: number;
+    savedContentLength: number | null;
+    frontendBackendDiff: number;
+    backendSavedDiff: number | null;
+    frontendSavedDiff: number | null;
+    frontendHash: string;
+    backendHash: string;
+    savedHash: string | null;
+}
+
+/**
+ * Include file debug info
+ */
+interface IncludeFileDebugInfo {
+    path: string;
+    type: string;
+    exists: boolean;
+    lastModified: string;
+    size: string;
+    hasInternalChanges: boolean;
+    hasExternalChanges: boolean;
+    isUnsavedInEditor: boolean;
+    baseline: string;
+    content: string;
+    externalContent: string;
+    contentLength: number;
+    baselineLength: number;
+    externalContentLength: number;
+}
+
+/**
+ * Tracked files debug info structure
+ */
+interface TrackedFilesDebugInfo {
+    mainFile: string;
+    mainFileLastModified: string;
+    fileWatcherActive: boolean;
+    includeFiles: IncludeFileDebugInfo[];
+    conflictManager: {
+        healthy: boolean;
+        trackedFiles: number;
+        activeWatchers: number;
+        pendingConflicts: number;
+        watcherFailures: number;
+        listenerEnabled: boolean;
+        documentSaveListenerActive: boolean;
+    };
+    systemHealth: {
+        overall: string;
+        extensionState: string;
+        memoryUsage: string;
+        lastError: string | null;
+    };
+    hasUnsavedChanges: boolean;
+    timestamp: string;
+    watcherDetails: {
+        path: string;
+        lastModified: string;
+        exists: boolean;
+        watcherActive: boolean;
+        hasInternalChanges: boolean;
+        hasExternalChanges: boolean;
+        documentVersion: number;
+        lastDocumentVersion: number;
+        isUnsavedInEditor: boolean;
+        baseline: string;
+    };
+}
+
+/**
  * Debug Commands Handler
  *
  * Processes debug-related messages from the webview.
@@ -116,7 +197,7 @@ export class DebugCommands extends BaseMessageCommand {
         return this.success();
     }
 
-    private async handleVerifyContentSync(frontendBoard: any, context: CommandContext): Promise<CommandResult> {
+    private async handleVerifyContentSync(frontendBoard: unknown, context: CommandContext): Promise<CommandResult> {
         if (!this.getPanel()) {
             return this.success();
         }
@@ -134,7 +215,7 @@ export class DebugCommands extends BaseMessageCommand {
             const { MarkdownKanbanParser } = require('../markdownParser');
 
             const allFiles = fileRegistry.getAll();
-            const fileResults: any[] = [];
+            const fileResults: FileVerificationResult[] = [];
             let matchingFiles = 0;
             let mismatchedFiles = 0;
 
@@ -278,7 +359,7 @@ export class DebugCommands extends BaseMessageCommand {
         return hash.toString(16);
     }
 
-    private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<any> {
+    private async collectTrackedFilesDebugInfo(context: CommandContext): Promise<TrackedFilesDebugInfo> {
         const document = context.fileManager.getDocument();
         const fileRegistry = this.getFileRegistry();
         const mainFile = fileRegistry?.getMainFile();
@@ -298,7 +379,7 @@ export class DebugCommands extends BaseMessageCommand {
             baseline: mainFile?.getBaseline() || ''
         };
 
-        const includeFiles: any[] = [];
+        const includeFiles: IncludeFileDebugInfo[] = [];
         const allIncludeFiles = fileRegistry?.getIncludeFiles() || [];
 
         for (const file of allIncludeFiles) {

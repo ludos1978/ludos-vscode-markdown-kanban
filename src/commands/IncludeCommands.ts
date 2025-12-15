@@ -16,6 +16,12 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    ConfirmDisableIncludeModeMessage,
+    RequestIncludeFileNameMessage,
+    RequestEditIncludeFileNameMessage,
+    RequestEditTaskIncludeFileNameMessage
+} from '../core/bridge/MessageTypes';
 import { PathResolver } from '../services/PathResolver';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
@@ -103,7 +109,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
     // ============= INCLUDE MODE HANDLERS =============
 
-    private async handleConfirmDisableIncludeMode(message: any, _context: CommandContext): Promise<CommandResult> {
+    private async handleConfirmDisableIncludeMode(message: ConfirmDisableIncludeModeMessage, _context: CommandContext): Promise<CommandResult> {
         const confirmation = await vscode.window.showWarningMessage(
             message.message,
             { modal: true },
@@ -196,7 +202,7 @@ export class IncludeCommands extends BaseMessageCommand {
 
     // ============= FILE PICKER HANDLERS =============
 
-    private async handleRequestIncludeFileName(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleRequestIncludeFileName(message: RequestIncludeFileNameMessage, context: CommandContext): Promise<CommandResult> {
         const currentFilePath = context.fileManager.getFilePath();
         if (!currentFilePath) {
             vscode.window.showErrorMessage('No active kanban file');
@@ -222,7 +228,7 @@ export class IncludeCommands extends BaseMessageCommand {
         return this.success();
     }
 
-    private async handleRequestEditIncludeFileName(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleRequestEditIncludeFileName(message: RequestEditIncludeFileNameMessage, context: CommandContext): Promise<CommandResult> {
         const currentFile = message.currentFile || '';
         const fileRegistry = this.getFileRegistry();
         const file = fileRegistry?.getByRelativePath(currentFile);
@@ -279,7 +285,7 @@ export class IncludeCommands extends BaseMessageCommand {
         return this.success();
     }
 
-    private async handleRequestEditTaskIncludeFileName(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleRequestEditTaskIncludeFileName(message: RequestEditTaskIncludeFileNameMessage, context: CommandContext): Promise<CommandResult> {
         const currentFile = message.currentFile || '';
         const taskId = message.taskId;
         const columnId = message.columnId;

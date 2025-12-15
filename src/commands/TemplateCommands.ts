@@ -10,9 +10,15 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    ApplyTemplateMessage,
+    SubmitTemplateVariablesMessage
+} from '../core/bridge/MessageTypes';
 import { TemplateService } from '../templates/TemplateService';
+import { TemplateDefinition, TemplateColumn, TemplateTask } from '../templates/TemplateParser';
 import { VariableProcessor } from '../templates/VariableProcessor';
 import { FileCopyService } from '../templates/FileCopyService';
+import { KanbanColumn } from '../board/KanbanTypes';
 import { IdGenerator } from '../utils/idGenerator';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
@@ -98,7 +104,7 @@ export class TemplateCommands extends BaseMessageCommand {
      * Handle initial template application request (before variables)
      * This loads the template and sends variable definitions to frontend
      */
-    private async handleApplyTemplate(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleApplyTemplate(message: ApplyTemplateMessage, context: CommandContext): Promise<CommandResult> {
         const panel = context.getWebviewPanel();
         if (!panel) {
             return this.failure('No panel available');
@@ -147,7 +153,7 @@ export class TemplateCommands extends BaseMessageCommand {
     /**
      * Handle template variable submission
      */
-    private async handleSubmitTemplateVariables(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleSubmitTemplateVariables(message: SubmitTemplateVariablesMessage, context: CommandContext): Promise<CommandResult> {
         return await this.applyTemplateWithVariables(message, message.variables || {}, context);
     }
 
@@ -155,7 +161,7 @@ export class TemplateCommands extends BaseMessageCommand {
      * Create an empty column at the specified position
      * Stack tags MUST be set here because renderer groups columns based on #stack tag
      */
-    private async createEmptyColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async createEmptyColumn(message: ApplyTemplateMessage, context: CommandContext): Promise<CommandResult> {
         try {
             const insertAfterColumnId = message.insertAfterColumnId;
             const insertBeforeColumnId = message.insertBeforeColumnId;
@@ -171,13 +177,13 @@ export class TemplateCommands extends BaseMessageCommand {
             context.boardStore.saveStateForUndo(currentBoard);
 
             // Helper to get row from column title
-            const getColumnRow = (col: any): number => {
+            const getColumnRow = (col: KanbanColumn): number => {
                 const rowMatch = col.title?.match(/#row(\d+)/i);
                 return rowMatch ? parseInt(rowMatch[1], 10) : 1;
             };
 
             // Helper to check if column has #stack tag
-            const hasStackTag = (col: any): boolean => {
+            const hasStackTag = (col: KanbanColumn): boolean => {
                 return /#stack\b/i.test(col.title || '');
             };
 
@@ -187,7 +193,7 @@ export class TemplateCommands extends BaseMessageCommand {
             let needsStackTag = false;
 
             if (insertAfterColumnId) {
-                const afterIdx = currentBoard.columns.findIndex((c: any) => c.id === insertAfterColumnId);
+                const afterIdx = currentBoard.columns.findIndex((c) => c.id === insertAfterColumnId);
                 if (afterIdx >= 0) {
                     insertIndex = afterIdx + 1;
                     targetRow = getColumnRow(currentBoard.columns[afterIdx]);
@@ -199,7 +205,7 @@ export class TemplateCommands extends BaseMessageCommand {
                     }
                 }
             } else if (insertBeforeColumnId) {
-                const beforeIdx = currentBoard.columns.findIndex((c: any) => c.id === insertBeforeColumnId);
+                const beforeIdx = currentBoard.columns.findIndex((c) => c.id === insertBeforeColumnId);
                 if (beforeIdx >= 0) {
                     insertIndex = beforeIdx;
                     targetRow = getColumnRow(currentBoard.columns[beforeIdx]);
@@ -210,7 +216,7 @@ export class TemplateCommands extends BaseMessageCommand {
                     }
                 }
             } else if (message.position === 'first') {
-                const firstInRow = currentBoard.columns.findIndex((c: any) => getColumnRow(c) === targetRow);
+                const firstInRow = currentBoard.columns.findIndex((c) => getColumnRow(c) === targetRow);
                 insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
             }
 
@@ -254,7 +260,7 @@ export class TemplateCommands extends BaseMessageCommand {
      * Apply a template with the given variable values
      */
     private async applyTemplateWithVariables(
-        message: any,
+        message: ApplyTemplateMessage | SubmitTemplateVariablesMessage,
         variables: Record<string, string | number>,
         context: CommandContext
     ): Promise<CommandResult> {
@@ -374,10 +380,10 @@ export class TemplateCommands extends BaseMessageCommand {
      * Process template columns with variable substitution
      */
     private processTemplateColumns(
-        template: any,
+        template: TemplateDefinition,
         variables: Record<string, string | number>
-    ): any[] {
-        return template.columns.map((col: any) => {
+    ): KanbanColumn[] {
+        return template.columns.map((col: TemplateColumn) => {
             // Process title
             const processedTitle = VariableProcessor.substitute(
                 col.title,
@@ -386,14 +392,21 @@ export class TemplateCommands extends BaseMessageCommand {
             );
 
             // Process tasks
-            const processedTasks = (col.tasks || []).map((task: any) => {
+            const processedTasks = (col.tasks || []).map((task: TemplateTask) => {
                 const processedTaskTitle = VariableProcessor.substitute(
                     task.title,
                     variables,
                     template.variables
                 );
 
-                const processedTask: any = {
+                const processedTask: {
+                    id: string;
+                    title: string;
+                    completed: boolean;
+                    description?: string;
+                    includeFiles?: string[];
+                    includeMode?: boolean;
+                } = {
                     id: IdGenerator.generateTaskId(),
                     title: processedTaskTitle,
                     completed: task.completed || false

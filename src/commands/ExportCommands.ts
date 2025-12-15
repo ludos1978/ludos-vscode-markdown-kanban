@@ -12,7 +12,7 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
-import { ExportService } from '../services/export/ExportService';
+import { ExportService, NewExportOptions } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../services/ConfigurationService';
@@ -65,7 +65,7 @@ export class ExportCommands extends BaseMessageCommand {
                     const exportId = `export_${Date.now()}`;
                     await this.startOperation(exportId, 'export', 'Exporting...', context);
                     try {
-                        await this.handleExport(message.options, context, exportId);
+                        await this.handleExport(message.options as unknown as NewExportOptions, context, exportId);
                         await this.endOperation(exportId, context);
                     } catch (error) {
                         await this.endOperation(exportId, context);
@@ -167,7 +167,7 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Unified export handler - handles ALL export operations
      */
-    private async handleExport(options: any, context: CommandContext, operationId?: string): Promise<void> {
+    private async handleExport(options: NewExportOptions, context: CommandContext, operationId?: string): Promise<void> {
         try {
             // Get document (with fallback to file path if document is closed)
             let document = context.fileManager.getDocument();
@@ -256,7 +256,7 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Handle auto-export mode (register save handler)
      */
-    private async handleAutoExportMode(document: vscode.TextDocument, options: any, context: CommandContext): Promise<void> {
+    private async handleAutoExportMode(document: vscode.TextDocument, options: NewExportOptions, context: CommandContext): Promise<void> {
         // Store settings
         context.setAutoExportSettings(options);
 

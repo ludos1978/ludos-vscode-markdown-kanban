@@ -12,6 +12,14 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    SaveBoardStateMessage,
+    ShowMessageRequestMessage,
+    ShowErrorMessage,
+    ShowInfoMessage,
+    SetPreferenceMessage,
+    SetContextMessage
+} from '../core/bridge/MessageTypes';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
 
@@ -144,7 +152,7 @@ export class UICommands extends BaseMessageCommand {
      * Handle saveBoardState command
      * This is called when user presses Cmd+S to save all changes
      */
-    private async handleSaveBoardState(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleSaveBoardState(message: SaveBoardStateMessage, context: CommandContext): Promise<CommandResult> {
         const board = message.board;
         if (!board) {
             console.warn('[UICommands.saveBoardState] No board data received');
@@ -167,7 +175,7 @@ export class UICommands extends BaseMessageCommand {
     /**
      * Handle showMessage command
      */
-    private async handleShowMessage(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleShowMessage(message: ShowMessageRequestMessage, _context: CommandContext): Promise<CommandResult> {
         if (message.messageType === 'error') {
             vscode.window.showErrorMessage(message.text);
         } else if (message.messageType === 'warning') {
@@ -181,7 +189,7 @@ export class UICommands extends BaseMessageCommand {
     /**
      * Handle showError command
      */
-    private async handleShowError(message: any): Promise<CommandResult> {
+    private async handleShowError(message: ShowErrorMessage): Promise<CommandResult> {
         vscode.window.showErrorMessage(message.text);
         return this.success();
     }
@@ -189,7 +197,7 @@ export class UICommands extends BaseMessageCommand {
     /**
      * Handle showInfo command
      */
-    private async handleShowInfo(message: any): Promise<CommandResult> {
+    private async handleShowInfo(message: ShowInfoMessage): Promise<CommandResult> {
         vscode.window.showInformationMessage(message.text);
         return this.success();
     }
@@ -197,7 +205,7 @@ export class UICommands extends BaseMessageCommand {
     /**
      * Handle setPreference command
      */
-    private async handleSetPreference(message: any): Promise<CommandResult> {
+    private async handleSetPreference(message: SetPreferenceMessage): Promise<CommandResult> {
         if (!message.key) {
             console.error('[UICommands] setPreference called with undefined key');
             return this.failure('setPreference requires a key');
@@ -210,7 +218,7 @@ export class UICommands extends BaseMessageCommand {
     /**
      * Handle setContext command
      */
-    private async handleSetContext(message: any): Promise<CommandResult> {
+    private async handleSetContext(message: SetContextMessage): Promise<CommandResult> {
         if (!message.key) {
             console.error('[UICommands] setContext called with undefined key');
             return this.failure('setContext requires a key');

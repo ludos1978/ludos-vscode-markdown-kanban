@@ -12,6 +12,23 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    EditTaskMessage,
+    AddTaskMessage,
+    AddTaskAtPositionMessage,
+    DeleteTaskMessage,
+    DuplicateTaskMessage,
+    InsertTaskBeforeMessage,
+    InsertTaskAfterMessage,
+    MoveTaskMessage,
+    MoveTaskToColumnMessage,
+    MoveTaskToTopMessage,
+    MoveTaskUpMessage,
+    MoveTaskDownMessage,
+    MoveTaskToBottomMessage,
+    EditTaskTitleMessage,
+    UpdateTaskFromStrikethroughDeletionMessage
+} from '../core/bridge/MessageTypes';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
@@ -152,7 +169,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle editTask message - complex with include handling
      */
-    private async handleEditTask(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleEditTask(message: EditTaskMessage, context: CommandContext): Promise<CommandResult> {
         // Check if this is a title change with include syntax (add/remove/change)
         if (message.taskData?.title !== undefined) {
             const newTitle = message.taskData.title;
@@ -223,7 +240,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle addTask message
      */
-    private async handleAddTask(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleAddTask(message: AddTaskMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.addTask(
@@ -238,7 +255,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle addTaskAtPosition message
      */
-    private async handleAddTaskAtPosition(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleAddTaskAtPosition(message: AddTaskAtPositionMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.addTaskAtPosition(
@@ -254,7 +271,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle deleteTask message
      */
-    private async handleDeleteTask(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleDeleteTask(message: DeleteTaskMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.deleteTask(
@@ -270,7 +287,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle duplicateTask message
      */
-    private async handleDuplicateTask(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleDuplicateTask(message: DuplicateTaskMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.duplicateTask(
@@ -285,7 +302,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle insertTaskBefore message
      */
-    private async handleInsertTaskBefore(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleInsertTaskBefore(message: InsertTaskBeforeMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.insertTaskBefore(
@@ -300,7 +317,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle insertTaskAfter message
      */
-    private async handleInsertTaskAfter(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleInsertTaskAfter(message: InsertTaskAfterMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.insertTaskAfter(
@@ -315,7 +332,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTask message
      */
-    private async handleMoveTask(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTask(message: MoveTaskMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTask(
@@ -332,7 +349,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTaskToColumn message
      */
-    private async handleMoveTaskToColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTaskToColumn(message: MoveTaskToColumnMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTaskToColumn(
@@ -348,7 +365,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTaskToTop message
      */
-    private async handleMoveTaskToTop(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTaskToTop(message: MoveTaskToTopMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTaskToTop(
@@ -363,7 +380,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTaskUp message
      */
-    private async handleMoveTaskUp(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTaskUp(message: MoveTaskUpMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTaskUp(
@@ -378,7 +395,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTaskDown message
      */
-    private async handleMoveTaskDown(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTaskDown(message: MoveTaskDownMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTaskDown(
@@ -393,7 +410,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle moveTaskToBottom message
      */
-    private async handleMoveTaskToBottom(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveTaskToBottom(message: MoveTaskToBottomMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveTaskToBottom(
@@ -408,7 +425,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle editTaskTitle message - complex with include handling
      */
-    private async handleEditTaskTitle(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleEditTaskTitle(message: EditTaskTitleMessage, context: CommandContext): Promise<CommandResult> {
         const currentBoard = context.getCurrentBoard();
         const targetColumn = currentBoard ? BoardCrudOperations.findColumnById(currentBoard, message.columnId) : undefined;
         const task = targetColumn?.tasks.find(t => t.id === message.taskId);
@@ -456,7 +473,7 @@ export class TaskCommands extends BaseMessageCommand {
     /**
      * Handle updateTaskFromStrikethroughDeletion message
      */
-    private async handleUpdateTaskFromStrikethroughDeletion(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleUpdateTaskFromStrikethroughDeletion(message: UpdateTaskFromStrikethroughDeletionMessage, context: CommandContext): Promise<CommandResult> {
         const { taskId, columnId, newContent, contentType } = message;
 
         const board = context.getCurrentBoard();
@@ -466,7 +483,7 @@ export class TaskCommands extends BaseMessageCommand {
         }
 
         // Content is already in markdown format from frontend
-        const updateData: any = {};
+        const updateData: { title?: string; description?: string } = {};
         if (contentType === 'title') {
             updateData.title = newContent;
         } else if (contentType === 'description') {

@@ -11,6 +11,15 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    RenderPlantUMLMessage,
+    ConvertPlantUMLToSVGMessage,
+    ConvertMermaidToSVGMessage,
+    RequestDrawIORenderMessage,
+    RequestExcalidrawRenderMessage,
+    RequestPDFPageRenderMessage,
+    RequestPDFInfoMessage
+} from '../core/bridge/MessageTypes';
 import { getMermaidExportService } from '../services/export/MermaidExportService';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
@@ -95,7 +104,7 @@ export class DiagramCommands extends BaseMessageCommand {
     /**
      * Handle PlantUML rendering request from webview
      */
-    private async handleRenderPlantUML(message: any, context: CommandContext): Promise<void> {
+    private async handleRenderPlantUML(message: RenderPlantUMLMessage, context: CommandContext): Promise<void> {
         const { requestId, code } = message;
         const panel = context.getWebviewPanel();
 
@@ -130,7 +139,7 @@ export class DiagramCommands extends BaseMessageCommand {
     /**
      * Handle PlantUML to SVG conversion
      */
-    private async handleConvertPlantUMLToSVG(message: any, context: CommandContext): Promise<void> {
+    private async handleConvertPlantUMLToSVG(message: ConvertPlantUMLToSVGMessage, context: CommandContext): Promise<void> {
         await this.convertDiagramToSVG(
             message.filePath,
             message.plantUMLCode,
@@ -146,7 +155,7 @@ export class DiagramCommands extends BaseMessageCommand {
     /**
      * Handle Mermaid to SVG conversion
      */
-    private async handleConvertMermaidToSVG(message: any, context: CommandContext): Promise<void> {
+    private async handleConvertMermaidToSVG(message: ConvertMermaidToSVGMessage, context: CommandContext): Promise<void> {
         await this.convertDiagramToSVG(
             message.filePath,
             message.mermaidCode,
@@ -233,7 +242,7 @@ export class DiagramCommands extends BaseMessageCommand {
      * Uses backend DrawIOService with CLI for conversion
      * Implements file-based caching to avoid re-rendering unchanged diagrams
      */
-    private async handleRenderDrawIO(message: any, context: CommandContext): Promise<void> {
+    private async handleRenderDrawIO(message: RequestDrawIORenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath } = message;
         const panel = context.getWebviewPanel();
 
@@ -380,7 +389,7 @@ export class DiagramCommands extends BaseMessageCommand {
      * Handle excalidraw diagram rendering request from webview
      * Uses backend ExcalidrawService with library for conversion
      */
-    private async handleRenderExcalidraw(message: any, context: CommandContext): Promise<void> {
+    private async handleRenderExcalidraw(message: RequestExcalidrawRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath } = message;
         const panel = context.getWebviewPanel();
 
@@ -445,7 +454,7 @@ export class DiagramCommands extends BaseMessageCommand {
      * Renders a specific page from a PDF file to PNG
      * Uses backend PDFService with pdftoppm CLI for conversion
      */
-    private async handleRenderPDFPage(message: any, context: CommandContext): Promise<void> {
+    private async handleRenderPDFPage(message: RequestPDFPageRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath, pageNumber } = message;
         const panel = context.getWebviewPanel();
 
@@ -500,7 +509,7 @@ export class DiagramCommands extends BaseMessageCommand {
     /**
      * Handle PDF info request (get page count)
      */
-    private async handleGetPDFInfo(message: any, context: CommandContext): Promise<void> {
+    private async handleGetPDFInfo(message: RequestPDFInfoMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath } = message;
         const panel = context.getWebviewPanel();
 

@@ -13,9 +13,22 @@
  */
 
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import {
+    AddColumnMessage,
+    DeleteColumnMessage,
+    MoveColumnMessage,
+    MoveColumnWithRowUpdateMessage,
+    ReorderColumnsMessage,
+    InsertColumnBeforeMessage,
+    InsertColumnAfterMessage,
+    SortColumnMessage,
+    EditColumnTitleMessage,
+    UpdateColumnTitleFromStrikethroughDeletionMessage
+} from '../core/bridge/MessageTypes';
 import { getErrorMessage } from '../utils/stringUtils';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { KanbanColumn } from '../board/KanbanTypes';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
@@ -102,7 +115,7 @@ export class ColumnCommands extends BaseMessageCommand {
      * Returns the content and absolute path to be passed through the include switch event.
      */
     private async generateAppendTasksContent(
-        column: any,
+        column: KanbanColumn,
         includeFilePath: string,
         context: CommandContext
     ): Promise<{ absolutePath: string; content: string }> {
@@ -268,7 +281,7 @@ ${tasksContent}`;
     /**
      * Handle addColumn message
      */
-    private async handleAddColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleAddColumn(message: AddColumnMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.addColumn(
@@ -282,7 +295,7 @@ ${tasksContent}`;
     /**
      * Handle deleteColumn message
      */
-    private async handleDeleteColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleDeleteColumn(message: DeleteColumnMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.deleteColumn(
@@ -296,7 +309,7 @@ ${tasksContent}`;
     /**
      * Handle moveColumn message
      */
-    private async handleMoveColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveColumn(message: MoveColumnMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveColumn(
@@ -313,7 +326,7 @@ ${tasksContent}`;
     /**
      * Handle moveColumnWithRowUpdate message
      */
-    private async handleMoveColumnWithRowUpdate(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleMoveColumnWithRowUpdate(message: MoveColumnWithRowUpdateMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.moveColumnWithRowUpdate(
@@ -330,7 +343,7 @@ ${tasksContent}`;
     /**
      * Handle reorderColumns message
      */
-    private async handleReorderColumns(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleReorderColumns(message: ReorderColumnsMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.reorderColumns(
@@ -346,7 +359,7 @@ ${tasksContent}`;
     /**
      * Handle insertColumnBefore message
      */
-    private async handleInsertColumnBefore(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleInsertColumnBefore(message: InsertColumnBeforeMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.insertColumnBefore(
@@ -361,7 +374,7 @@ ${tasksContent}`;
     /**
      * Handle insertColumnAfter message
      */
-    private async handleInsertColumnAfter(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleInsertColumnAfter(message: InsertColumnAfterMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.insertColumnAfter(
@@ -376,7 +389,7 @@ ${tasksContent}`;
     /**
      * Handle sortColumn message
      */
-    private async handleSortColumn(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleSortColumn(message: SortColumnMessage, context: CommandContext): Promise<CommandResult> {
         await this.performBoardAction(
             context,
             () => context.boardOperations.sortColumn(
@@ -391,7 +404,7 @@ ${tasksContent}`;
     /**
      * Handle editColumnTitle message - complex with include handling
      */
-    private async handleEditColumnTitle(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleEditColumnTitle(message: EditColumnTitleMessage, context: CommandContext): Promise<CommandResult> {
         await this.handleEditColumnTitleUnified(message.columnId, message.title, context);
         return this.success();
     }
@@ -399,7 +412,7 @@ ${tasksContent}`;
     /**
      * Handle updateColumnTitleFromStrikethroughDeletion message
      */
-    private async handleUpdateColumnTitleFromStrikethroughDeletion(message: any, context: CommandContext): Promise<CommandResult> {
+    private async handleUpdateColumnTitleFromStrikethroughDeletion(message: UpdateColumnTitleFromStrikethroughDeletionMessage, context: CommandContext): Promise<CommandResult> {
         await this.handleEditColumnTitleUnified(message.columnId, message.newTitle, context);
         return this.success();
     }

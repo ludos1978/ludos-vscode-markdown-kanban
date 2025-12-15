@@ -3,7 +3,7 @@ import * as path from 'path';
 import { FileTypeUtils, toForwardSlashes, selectMarkdownFile, safeDecodeURIComponent } from './utils';
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
-import { HandleFileDropMessage, HandleUriDropMessage, DropPosition } from './core/bridge/MessageTypes';
+import { HandleFileDropMessage, HandleUriDropMessage, EditorDropPosition } from './core/bridge/MessageTypes';
 
 export interface FileInfo {
     fileName: string;
@@ -26,7 +26,7 @@ export interface FileDropInfo {
     relativePath: string;
     isImage: boolean;
     activeEditor?: ActiveEditorContext;
-    dropPosition?: DropPosition;
+    dropPosition?: EditorDropPosition;
 }
 
 export interface ImagePathMapping {
