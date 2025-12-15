@@ -218,9 +218,9 @@ function createExternalDropIndicator() {
 }
 
 function showExternalDropIndicator(column, clientY) {
-    // Remove highlight from previous column when switching to a different column
+    // Clear previous highlights when switching to a different column
     if (currentExternalDropColumn && currentExternalDropColumn !== column) {
-        currentExternalDropColumn.classList.remove('external-drag-over');
+        clearHighlights();
     }
     const indicator = createExternalDropIndicator();
     const tasksContainer = column.querySelector('.tasks-container');
@@ -264,27 +264,20 @@ function showExternalDropIndicator(column, clientY) {
     indicator.style.top = insertionY + 'px';
     indicator.classList.add('active');
 
-    // Add highlight to column
-    column.classList.add('external-drag-over');
+    // Add highlight to column using tracking system
+    addHighlight(column, 'external-drag-over');
     currentExternalDropColumn = column;
 }
 
 function hideExternalDropIndicator() {
-
     if (externalDropIndicator) {
         externalDropIndicator.classList.remove('active');
         externalDropIndicator.style.display = 'none';
     }
-    
-    if (currentExternalDropColumn) {
-        currentExternalDropColumn.classList.remove('external-drag-over');
-        currentExternalDropColumn = null;
-    }
-    
-    // Remove highlight from all columns
-    document.querySelectorAll('.kanban-full-height-column').forEach(col => {
-        col.classList.remove('external-drag-over');
-    });
+
+    // Clear all tracked highlights (includes external-drag-over)
+    clearHighlights();
+    currentExternalDropColumn = null;
 }
 
 function cleanupExternalDropIndicators() {
@@ -670,10 +663,7 @@ function setupGlobalDragAndDrop() {
         hideDropFeedback();
         hideExternalDropIndicator();
         hideInternalDropIndicator();
-        document.querySelectorAll('.kanban-full-height-column').forEach(col => {
-            col.classList.remove('external-drag-over');
-        });
-        cleanupDropZoneHighlights();
+        // Note: clearHighlights() already called by hideExternalDropIndicator()
 
         const dt = e.dataTransfer;
         if (!dt) {
