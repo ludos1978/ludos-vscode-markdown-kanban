@@ -23,6 +23,8 @@ import {
     RequestEditTaskIncludeFileNameMessage
 } from '../core/bridge/MessageTypes';
 import { PathResolver } from '../services/PathResolver';
+import { MarkdownKanbanParser } from '../markdownParser';
+import { ExportService } from '../services/export/ExportService';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
 import * as vscode from 'vscode';
@@ -434,7 +436,6 @@ export class IncludeCommands extends BaseMessageCommand {
                     throw new Error('Invalid board state');
                 }
 
-                const { MarkdownKanbanParser } = require('../markdownParser');
                 const markdown = MarkdownKanbanParser.generateMarkdown(board);
 
                 const fileRegistry = this.getFileRegistry();
@@ -461,7 +462,6 @@ export class IncludeCommands extends BaseMessageCommand {
                     }
 
                     if (document) {
-                        const { ExportService } = require('../exportService');
                         try {
                             await ExportService.export(document, autoExportSettings, board);
                         } catch (error) {
@@ -510,7 +510,6 @@ export class IncludeCommands extends BaseMessageCommand {
                     }
 
                     if (document) {
-                        const { ExportService } = require('../exportService');
                         const fileService = panelAccess._fileService;
                         const board = fileService?.board();
 

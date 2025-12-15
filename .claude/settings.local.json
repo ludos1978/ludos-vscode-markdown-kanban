@@ -99,7 +99,9 @@
       "Bash(do echo \"=== $name ===\" grep -rn \"$name\" --include=\"*.ts\" src/)",
       "Bash(do echo \"=== $name ===\")",
       "Bash(for file in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/*.js)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(npm run lint)",
+      "Bash(uniq:*)"
     ],
     "deny": [],
     "ask": []

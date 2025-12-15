@@ -104,7 +104,7 @@ export class MarpExportPlugin implements ExportPlugin {
      *
      * Delegates to MarpExportService.export()
      */
-    async export(board: KanbanBoard, options: ExportOptions): Promise<ExportResult> {
+    async export(_board: KanbanBoard, options: ExportOptions): Promise<ExportResult> {
         const startTime = Date.now();
 
         try {

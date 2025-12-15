@@ -67,7 +67,7 @@ export class MarpExtensionService {
 
         if (!extensionInstalled) {
             // Extension not installed - show install prompt
-            const choice = await this.promptInstallMarpExtension();
+            await this.promptInstallMarpExtension();
 
             vscode.window.showInformationMessage(
                 'Marp presentation file opened. After installing the Marp extension, click the preview button in the editor toolbar to start the presentation.',

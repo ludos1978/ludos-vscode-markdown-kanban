@@ -1,15 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { escapeRegExp, safeDecodeURIComponent } from './utils/stringUtils';
-
-/** Debounce delay for search input (ms) */
-const SEARCH_DEBOUNCE_DELAY_MS = 200;
-/** Maximum results to return from search */
-const MAX_SEARCH_RESULTS = 200;
-/** Maximum results per glob pattern for workspace search */
-const MAX_RESULTS_PER_PATTERN = 200;
-/** Maximum results for regex searches (broader) */
-const MAX_REGEX_RESULTS = 1000;
+import {
+    SEARCH_DEBOUNCE_DELAY_MS,
+    MAX_SEARCH_RESULTS,
+    MAX_RESULTS_PER_PATTERN,
+    MAX_REGEX_RESULTS
+} from './constants/TimeoutConstants';
 
 export class FileSearchService {
     private _extensionUri?: vscode.Uri;

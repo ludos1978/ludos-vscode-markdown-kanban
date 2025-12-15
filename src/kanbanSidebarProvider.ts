@@ -117,7 +117,7 @@ class KanbanDragAndDropController implements vscode.TreeDragAndDropController<Ka
 	async handleDrag(
 		source: readonly KanbanBoardItem[],
 		dataTransfer: vscode.DataTransfer,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): Promise<void> {
 		if (source.length === 0) {
 			return;

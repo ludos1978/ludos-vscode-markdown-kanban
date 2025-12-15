@@ -6,9 +6,20 @@
 export {
     MessageCommand,
     BaseMessageCommand,
+    // Main context (composed of sub-interfaces)
     CommandContext,
+    // Focused sub-interfaces for type narrowing
+    BoardContext,
+    FileContext,
+    UIContext,
+    EditContext,
+    IncludeContext,
+    ExportContext,
+    ServiceContext,
+    // Supporting types
     CommandMetadata,
-    CommandResult
+    CommandResult,
+    IncludeSwitchParams
 } from './MessageCommand';
 
 // Re-export IncomingMessage for command implementations

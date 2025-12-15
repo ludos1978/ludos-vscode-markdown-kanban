@@ -16,6 +16,9 @@ import { PlantUMLService } from '../../services/export/PlantUMLService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { FileSaveService } from '../../core/FileSaveService';
 import { IncomingMessage } from '../../core/bridge/MessageTypes';
+import { WebviewBridge } from '../../core/bridge/WebviewBridge';
+import { NewExportOptions } from '../../services/export/ExportService';
+import { CapturedEdit } from '../../files/FileInterfaces';
 import * as vscode from 'vscode';
 
 /**
@@ -30,59 +33,96 @@ export interface IncludeSwitchParams {
     preloadedContent?: Map<string, string>;
 }
 
+// =============================================================================
+// SUB-INTERFACES FOR FOCUSED CONTEXTS
+// Commands can use these narrower types in helper methods for better type safety
+// =============================================================================
+
 /**
- * Context provided to command handlers
- * Contains all dependencies needed to process messages
+ * Board-related context for commands that manipulate board state
  */
-export interface CommandContext {
-    // Core dependencies
-    fileManager: FileManager;
+export interface BoardContext {
     boardStore: BoardStore;
     boardOperations: BoardOperations;
-    linkHandler: LinkHandler;
-    plantUMLService: PlantUMLService;
-    fileSaveService: FileSaveService;
-    getFileRegistry: () => MarkdownFileRegistry | undefined;
-
-    // Callbacks for panel operations
-    onBoardUpdate: () => Promise<void>;
-    onSaveToMarkdown: () => Promise<void>;
-    onInitializeFile: () => Promise<void>;
     getCurrentBoard: () => KanbanBoard | undefined;
     setBoard: (board: KanbanBoard) => void;
     setUndoRedoOperation: (isOperation: boolean) => void;
-    getWebviewPanel: () => vscode.WebviewPanel | undefined;
-    /** Sync board state from frontend to backend (updates _content, triggers hash comparison for unsaved detection) */
     syncBoardToBackend: (board: KanbanBoard) => void;
+    onBoardUpdate: () => Promise<void>;
+}
 
-    // Export settings
-    getAutoExportSettings: () => any;
-    setAutoExportSettings: (settings: any) => void;
+/**
+ * File-related context for commands that handle file operations
+ */
+export interface FileContext {
+    fileManager: FileManager;
+    fileSaveService: FileSaveService;
+    getFileRegistry: () => MarkdownFileRegistry | undefined;
+    onSaveToMarkdown: () => Promise<void>;
+    onInitializeFile: () => Promise<void>;
+}
 
-    // Editing state management
-    /** Set whether editing is in progress (blocks board regenerations) */
-    setEditingInProgress: (value: boolean) => void;
-
-    // Dirty tracking for unsaved changes
-    /** Mark a task as having unsaved changes */
-    markTaskDirty: (taskId: string) => void;
-    /** Clear dirty flag for a task */
-    clearTaskDirty: (taskId: string) => void;
-    /** Mark a column as having unsaved changes */
-    markColumnDirty: (columnId: string) => void;
-    /** Clear dirty flag for a column */
-    clearColumnDirty: (columnId: string) => void;
-
-    // Include file operations
-    /** Handle switching include files for a task or column */
-    handleIncludeSwitch: (params: IncludeSwitchParams) => Promise<void>;
-    /** Request frontend to stop editing and capture current value */
-    requestStopEditing: () => Promise<any>;
-
-    // Configuration
-    /** Refresh configuration from VS Code settings */
+/**
+ * UI/Webview context for commands that interact with the frontend
+ */
+export interface UIContext {
+    getWebviewPanel: () => vscode.WebviewPanel | undefined;
+    getWebviewBridge: () => WebviewBridge | undefined;
     refreshConfiguration: () => Promise<void>;
 }
+
+/**
+ * Edit state context for commands that track editing state
+ */
+export interface EditContext {
+    setEditingInProgress: (value: boolean) => void;
+    markTaskDirty: (taskId: string) => void;
+    clearTaskDirty: (taskId: string) => void;
+    markColumnDirty: (columnId: string) => void;
+    clearColumnDirty: (columnId: string) => void;
+    requestStopEditing: () => Promise<CapturedEdit | undefined>;
+}
+
+/**
+ * Include file context for commands that handle include operations
+ */
+export interface IncludeContext {
+    handleIncludeSwitch: (params: IncludeSwitchParams) => Promise<void>;
+}
+
+/**
+ * Export context for commands that handle export operations
+ */
+export interface ExportContext {
+    getAutoExportSettings: () => NewExportOptions | null;
+    setAutoExportSettings: (settings: NewExportOptions | null) => void;
+}
+
+/**
+ * Service context for specialized services used by commands
+ */
+export interface ServiceContext {
+    linkHandler: LinkHandler;
+    plantUMLService: PlantUMLService;
+}
+
+// =============================================================================
+// MAIN COMMAND CONTEXT (composes all sub-interfaces)
+// =============================================================================
+
+/**
+ * Context provided to command handlers
+ * Contains all dependencies needed to process messages.
+ * Composed of focused sub-interfaces for better organization.
+ */
+export interface CommandContext extends
+    BoardContext,
+    FileContext,
+    UIContext,
+    EditContext,
+    IncludeContext,
+    ExportContext,
+    ServiceContext {}
 
 /**
  * Metadata for a message command
@@ -115,7 +155,7 @@ export interface CommandResult {
     error?: string;
 
     /** Optional data to return */
-    data?: any;
+    data?: unknown;
 }
 
 /**
@@ -181,7 +221,7 @@ export abstract class BaseMessageCommand implements MessageCommand {
     /**
      * Helper to create a success result
      */
-    protected success(data?: any): CommandResult {
+    protected success(data?: unknown): CommandResult {
         return { success: true, data };
     }
 
@@ -200,9 +240,15 @@ export abstract class BaseMessageCommand implements MessageCommand {
     }
 
     /**
-     * Send message to webview
+     * Send message to webview via WebviewBridge
+     * Uses bridge for consistent error handling and type safety
      */
     protected postMessage(message: any): boolean {
+        const bridge = this._context?.getWebviewBridge();
+        if (bridge) {
+            return bridge.send(message);
+        }
+        // Fallback to direct postMessage if bridge not available (should not happen)
         const panel = this.getPanel();
         if (panel?.webview) {
             panel.webview.postMessage(message);

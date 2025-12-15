@@ -86,7 +86,7 @@ export class TemplateCommands extends BaseMessageCommand {
             const templates = await this._templateService.getTemplateList(workspaceFolder);
             const showBar = this._templateService.shouldShowBar();
 
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'updateTemplates',
                 templates,
                 showBar
@@ -127,7 +127,7 @@ export class TemplateCommands extends BaseMessageCommand {
 
             // If template has variables, send them to frontend for dialog
             if (template.variables && template.variables.length > 0) {
-                panel.webview.postMessage({
+                this.postMessage({
                     type: 'templateVariables',
                     templatePath: templatePath,
                     templateName: template.name,
@@ -359,7 +359,7 @@ export class TemplateCommands extends BaseMessageCommand {
             await context.onBoardUpdate();
 
             // Send updated board to frontend
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'templateApplied',
                 board: currentBoard
             });

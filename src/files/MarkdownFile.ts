@@ -529,7 +529,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     public async save(options: SaveOptions = {}): Promise<void> {
         const skipReloadDetection = options.skipReloadDetection ?? true; // Default: skip (our own save)
-        const source = options.source ?? 'unknown';
+        // options.source available for debugging if needed
 
 
         // PERFORMANCE: Use watcher coordinator to prevent conflicts
@@ -701,17 +701,17 @@ export abstract class MarkdownFile implements vscode.Disposable {
             this._fileWatcher = existingWatcher.watcher;
 
             // CRITICAL: Each instance needs its own event subscriptions even when sharing a watcher
-            const changeSubscription = this._fileWatcher.onDidChange(async (uri) => {
+            const changeSubscription = this._fileWatcher.onDidChange(async (_uri) => {
                 await this._onFileSystemChange('modified');
             });
             this._watcherSubscriptions.push(changeSubscription);
 
-            const deleteSubscription = this._fileWatcher.onDidDelete(async (uri) => {
+            const deleteSubscription = this._fileWatcher.onDidDelete(async (_uri) => {
                 await this._onFileSystemChange('deleted');
             });
             this._watcherSubscriptions.push(deleteSubscription);
 
-            const createSubscription = this._fileWatcher.onDidCreate(async (uri) => {
+            const createSubscription = this._fileWatcher.onDidCreate(async (_uri) => {
                 await this._onFileSystemChange('created');
             });
             this._watcherSubscriptions.push(createSubscription);
@@ -729,19 +729,19 @@ export abstract class MarkdownFile implements vscode.Disposable {
         this._fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
         // Watch for modifications - CRITICAL: Store disposables to prevent memory leak
-        const changeSubscription = this._fileWatcher.onDidChange(async (uri) => {
+        const changeSubscription = this._fileWatcher.onDidChange(async (_uri) => {
             await this._onFileSystemChange('modified');
         });
         this._watcherSubscriptions.push(changeSubscription);
 
         // Watch for deletion
-        const deleteSubscription = this._fileWatcher.onDidDelete(async (uri) => {
+        const deleteSubscription = this._fileWatcher.onDidDelete(async (_uri) => {
             await this._onFileSystemChange('deleted');
         });
         this._watcherSubscriptions.push(deleteSubscription);
 
         // Watch for creation
-        const createSubscription = this._fileWatcher.onDidCreate(async (uri) => {
+        const createSubscription = this._fileWatcher.onDidCreate(async (_uri) => {
             await this._onFileSystemChange('created');
         });
         this._watcherSubscriptions.push(createSubscription);
@@ -845,7 +845,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * This updates the "local state" to include the user's edit
      * Subclasses override this to handle their specific edit types
      */
-    public async applyEditToBaseline(capturedEdit: CapturedEdit): Promise<void> {
+    public async applyEditToBaseline(_capturedEdit: CapturedEdit): Promise<void> {
         // Default: do nothing (main file handles via board, includes override)
     }
 

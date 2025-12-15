@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import * as vscode from 'vscode';
+import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
 
 /**
  * Service for rendering individual PDF pages to images
@@ -60,7 +61,7 @@ export class PDFService {
                     resolve(false);
                 });
 
-                process.on('exit', (code) => {
+                process.on('exit', (_code) => {
                     // pdftoppm returns 0 for -v, or 99 for --version, or 1 for -v (depends on version)
                     // Any response means it exists
                     resolve(true);
@@ -92,7 +93,7 @@ export class PDFService {
         }
 
         return new Promise((resolve, reject) => {
-            const timeout = 30000; // 30 seconds
+            const timeout = EXTERNAL_SERVICE_TIMEOUT_MS;
 
             // Create temp output file path
             const tempDir = path.join(__dirname, '../../../tmp');

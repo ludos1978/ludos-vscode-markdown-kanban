@@ -247,7 +247,7 @@ export class ChangeStateMachine {
 
     // ============= STATE HANDLERS =============
 
-    private async _handleReceivingChange(context: ChangeContext): Promise<ChangeState> {
+    private async _handleReceivingChange(_context: ChangeContext): Promise<ChangeState> {
         // Event already captured in context during creation
         return ChangeState.ANALYZING_IMPACT;
     }
@@ -844,55 +844,7 @@ export class ChangeStateMachine {
 
     // ============= HELPER METHODS =============
 
-    /**
-     * Find where a file is currently included in the board
-     * @param board The kanban board
-     * @param relativePath Path of the file to search for
-     * @param excludeColumnId Exclude this column from search (current target)
-     * @param excludeTaskId Exclude this task from search (current target)
-     * @returns Location info if found, undefined otherwise
-     */
-    private _findFileIncludeLocation(
-        board: KanbanBoard,
-        relativePath: string,
-        excludeColumnId?: string,
-        excludeTaskId?: string
-    ): { type: 'column' | 'task'; columnTitle: string; taskTitle?: string } | undefined {
-        // Check all columns for this include file
-        for (const column of board.columns) {
-            // Skip the target column if specified
-            if (excludeColumnId && column.id === excludeColumnId) {
-                continue;
-            }
-
-            // Check if column includes this file
-            if (column.includeFiles && column.includeFiles.includes(relativePath)) {
-                return {
-                    type: 'column',
-                    columnTitle: column.title
-                };
-            }
-
-            // Check all tasks in this column
-            for (const task of column.tasks) {
-                // Skip the target task if specified
-                if (excludeTaskId && task.id === excludeTaskId) {
-                    continue;
-                }
-
-                // Check if task includes this file
-                if (task.includeFiles && task.includeFiles.includes(relativePath)) {
-                    return {
-                        type: 'task',
-                        columnTitle: column.title,
-                        taskTitle: task.title
-                    };
-                }
-            }
-        }
-
-        return undefined;
-    }
+    // Note: File include location search reserved for future conflict detection
 
     /**
      * Send column update message to frontend

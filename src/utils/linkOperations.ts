@@ -142,9 +142,6 @@ export class LinkOperations {
             }
         }
 
-        filteredMatches.forEach((match, i) => {
-        });
-
         // Check if targetIndex is valid (using filtered matches)
         if (targetIndex >= 0 && targetIndex < filteredMatches.length) {
             const targetMatch = filteredMatches[targetIndex];

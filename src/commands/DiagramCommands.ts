@@ -118,7 +118,7 @@ export class DiagramCommands extends BaseMessageCommand {
             const svg = await context.plantUMLService.renderSVG(code);
 
             // Send success response to webview
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'plantUMLRenderSuccess',
                 requestId,
                 svg
@@ -128,7 +128,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error('[PlantUML Backend] Render error:', error);
 
             // Send error response to webview
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'plantUMLRenderError',
                 requestId,
                 error: getErrorMessage(error)
@@ -217,7 +217,7 @@ export class DiagramCommands extends BaseMessageCommand {
             // Notify success
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
-                panel.webview.postMessage({
+                this.postMessage({
                     type: `${diagramType}ConvertSuccess`,
                     svgPath: relativePath
                 });
@@ -227,7 +227,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error(`[${capitalizedType}] Conversion failed:`, error);
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
-                panel.webview.postMessage({
+                this.postMessage({
                     type: `${diagramType}ConvertError`,
                     error: getErrorMessage(error)
                 });
@@ -303,7 +303,7 @@ export class DiagramCommands extends BaseMessageCommand {
             }
 
             // Send success response to webview with mtime for cache invalidation
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'drawioRenderSuccess',
                 requestId,
                 svgDataUrl: pngDataUrl,  // Keep property name for compatibility
@@ -314,7 +314,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error('[DrawIO Backend] Render error:', error);
 
             // Send error response to webview
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'drawioRenderError',
                 requestId,
                 error: getErrorMessage(error)
@@ -428,7 +428,7 @@ export class DiagramCommands extends BaseMessageCommand {
             }
 
             // Send success response to webview with mtime for cache invalidation
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'excalidrawRenderSuccess',
                 requestId,
                 svgDataUrl: dataUrl,  // Keep property name for compatibility
@@ -439,7 +439,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error('[Excalidraw Backend] Render error:', error);
 
             // Send error response to webview
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'excalidrawRenderError',
                 requestId,
                 error: getErrorMessage(error)
@@ -487,7 +487,7 @@ export class DiagramCommands extends BaseMessageCommand {
             const pngDataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
 
             // Send success response to webview with mtime for cache invalidation
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'pdfPageRenderSuccess',
                 requestId,
                 pngDataUrl,
@@ -498,7 +498,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error('[PDF Backend] Render error:', error);
 
             // Send error response to webview
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'pdfPageRenderError',
                 requestId,
                 error: getErrorMessage(error)
@@ -539,7 +539,7 @@ export class DiagramCommands extends BaseMessageCommand {
             const pageCount = await service.getPageCount(absolutePath);
 
             // Send success response
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'pdfInfoSuccess',
                 requestId,
                 pageCount,
@@ -550,7 +550,7 @@ export class DiagramCommands extends BaseMessageCommand {
             console.error('[PDF Info] Error:', error);
 
             // Send error response
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'pdfInfoError',
                 requestId,
                 error: getErrorMessage(error)

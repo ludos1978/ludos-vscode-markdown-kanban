@@ -216,7 +216,7 @@ export class PresentationParser {
    * Convert presentation slides to kanban tasks
    */
   static slidesToTasks(slides: PresentationSlide[], includeFilePath?: string, mainFilePath?: string): KanbanTask[] {
-    return slides.map((slide, index) => {
+    return slides.map((slide, _index) => {
       const task: KanbanTask = {
         id: IdGenerator.generateTaskId(),
         // CRITICAL: Use ?? not || - empty string IS a valid title

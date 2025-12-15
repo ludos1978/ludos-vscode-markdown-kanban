@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EXTERNAL_SERVICE_TIMEOUT_MS } from '../../constants/TimeoutConstants';
 
 /**
  * Service for converting draw.io diagrams to SVG using draw.io CLI
@@ -81,7 +82,7 @@ export class DrawIOService {
         }
 
         return new Promise((resolve, reject) => {
-            const timeout = 30000; // 30 seconds
+            const timeout = EXTERNAL_SERVICE_TIMEOUT_MS;
 
             // Create temp output file path
             const tempDir = path.join(__dirname, '../../../tmp');

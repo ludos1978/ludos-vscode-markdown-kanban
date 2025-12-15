@@ -202,7 +202,16 @@ export class IncludeLoadingProcessor {
                 const includeFile = file as IncludeFile;
                 if (includeFile.getFileType() === 'include-column') {
                     const mainFilePath = mainFile.getPath();
+                    const contentLength = includeFile.getContent()?.length || 0;
                     const fileTasks = includeFile.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
+
+                    // Debug: Log if content was loaded but no tasks were parsed
+                    if (contentLength > 0 && fileTasks.length === 0) {
+                        console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
+                    } else if (contentLength === 0) {
+                        console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
+                    }
+
                     tasks.push(...fileTasks);
                 } else {
                     console.error(`[IncludeLoadingProcessor] File is not a column include: ${relativePath}`);

@@ -175,7 +175,7 @@ export class ClipboardCommands extends BaseMessageCommand {
         dropPosition: { x: number; y: number },
         imageFileName: string,
         mediaFolderName: string,
-        context: CommandContext
+        _context: CommandContext
     ): Promise<void> {
         try {
             if (!fs.existsSync(mediaFolderPath)) {
@@ -729,7 +729,7 @@ export class ClipboardCommands extends BaseMessageCommand {
         }
     }
 
-    private _sendFileDropError(error: string, dropPosition: { x: number; y: number }, isImage: boolean, isFileObject: boolean, context: CommandContext): void {
+    private _sendFileDropError(error: string, dropPosition: { x: number; y: number }, isImage: boolean, isFileObject: boolean, _context: CommandContext): void {
         if (isImage) {
             this.postMessage({ type: 'droppedImageSaved',
                 success: false,

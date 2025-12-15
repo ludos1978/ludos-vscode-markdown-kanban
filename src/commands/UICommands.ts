@@ -101,7 +101,7 @@ export class UICommands extends BaseMessageCommand {
         // Send undo/redo state to frontend
         const panel = context.getWebviewPanel();
         if (panel?.webview) {
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'undoRedoState',
                 canUndo: context.boardStore.canUndo(),
                 canRedo: context.boardStore.canRedo()
@@ -129,7 +129,7 @@ export class UICommands extends BaseMessageCommand {
         // Send undo/redo state to frontend
         const panel = context.getWebviewPanel();
         if (panel?.webview) {
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'undoRedoState',
                 canUndo: context.boardStore.canUndo(),
                 canRedo: context.boardStore.canRedo()

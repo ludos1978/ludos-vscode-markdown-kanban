@@ -32,7 +32,6 @@ export class PluginRegistry {
     private _importPlugins: Map<string, ImportPlugin> = new Map();
     private _exportPlugins: Map<string, ExportPlugin> = new Map();
     private _initialized: boolean = false;
-    private _context: PluginContext = {};
 
     private constructor() {
         // Singleton - use getInstance()
@@ -54,7 +53,6 @@ export class PluginRegistry {
      * Initialize the registry with context
      */
     async initialize(context: PluginContext): Promise<void> {
-        this._context = context;
         this._initialized = true;
 
         // Activate all registered plugins
@@ -68,7 +66,7 @@ export class PluginRegistry {
             }
         }
 
-        for (const plugin of this._exportPlugins.values()) {
+        for (const _plugin of this._exportPlugins.values()) {
             // Export plugins don't have activate in current interface, but may in future
         }
     }

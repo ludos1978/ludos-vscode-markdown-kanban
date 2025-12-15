@@ -10,8 +10,8 @@
  * @module panel/IncludeFileCoordinator
  */
 
-import { KanbanBoard, KanbanTask } from '../markdownParser';
-import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile } from '../files';
+import { KanbanBoard, KanbanTask, KanbanColumn } from '../markdownParser';
+import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile, MarkdownFile } from '../files';
 import { WebviewBridge } from '../core/bridge';
 import {
     UpdateColumnContentExtendedMessage,
@@ -329,6 +329,151 @@ export class IncludeFileCoordinator {
         if (!result.success) {
             console.error('[IncludeFileCoordinator] Include switch failed:', result.error);
             throw result.error || new Error('Include switch failed');
+        }
+    }
+
+    // ============= FRONTEND UPDATE BROADCASTING =============
+
+    /**
+     * Send updated include file content to frontend
+     * Called after file has been reloaded (from external change or manual reload)
+     */
+    sendIncludeFileUpdateToFrontend(file: MarkdownFile): void {
+        const board = this._deps.getBoard();
+        if (!board || !this._deps.getPanel()) {
+            console.warn(`[IncludeFileCoordinator] No board or panel available for update`);
+            return;
+        }
+
+        const relativePath = file.getRelativePath();
+        const fileType = file.getFileType();
+
+        if (fileType === 'include-column') {
+            this._sendColumnIncludeUpdate(file, board, relativePath);
+        } else if (fileType === 'include-task') {
+            this._sendTaskIncludeUpdate(file, board, relativePath);
+        } else if (fileType === 'include-regular') {
+            this._sendRegularIncludeUpdate(file, board, relativePath);
+        }
+    }
+
+    /**
+     * Send column include file update to frontend
+     */
+    private _sendColumnIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
+        // Find column that uses this include file
+        const column = board.columns.find(c =>
+            c.includeFiles && c.includeFiles.some(p => MarkdownFile.isSameFile(p, relativePath))
+        );
+
+        if (column) {
+            // Parse tasks from updated file
+            const columnFile = file as IncludeFile;
+            const mainFilePath = this._deps.getMainFile()?.getPath();
+            const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
+            column.tasks = tasks;
+
+            // Send update to frontend
+            const columnMessage: UpdateColumnContentExtendedMessage = {
+                type: 'updateColumnContent',
+                columnId: column.id,
+                tasks: tasks,
+                columnTitle: column.title,
+                displayTitle: column.displayTitle,
+                includeMode: true,
+                includeFiles: column.includeFiles
+            };
+            this._deps.webviewBridge.send(columnMessage);
+        }
+    }
+
+    /**
+     * Send task include file update to frontend
+     */
+    private _sendTaskIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
+        // Find task that uses this include file
+        let foundTask: KanbanTask | undefined;
+        let foundColumn: KanbanColumn | undefined;
+
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
+                    foundTask = task;
+                    foundColumn = column;
+                    break;
+                }
+            }
+            if (foundTask) break;
+        }
+
+        if (foundTask && foundColumn) {
+            // Get updated content from file
+            const fullContent = file.getContent();
+            const displayTitle = `# include in ${relativePath}`;
+
+            // Update task
+            foundTask.displayTitle = displayTitle;
+            foundTask.description = fullContent;
+
+            // Send update to frontend
+            const taskMessage: UpdateTaskContentExtendedMessage = {
+                type: 'updateTaskContent',
+                columnId: foundColumn.id,
+                taskId: foundTask.id,
+                description: fullContent,
+                displayTitle: displayTitle,
+                taskTitle: foundTask.title,
+                originalTitle: foundTask.originalTitle,
+                includeMode: true,
+                includeFiles: foundTask.includeFiles
+            };
+            this._deps.webviewBridge.send(taskMessage);
+        }
+    }
+
+    /**
+     * Send regular include file update to frontend
+     */
+    private _sendRegularIncludeUpdate(file: MarkdownFile, board: KanbanBoard, relativePath: string): void {
+        // Send updated include content to frontend cache
+        const content = file.getContent();
+        const includeContentMessage: UpdateIncludeContentMessage = {
+            type: 'updateIncludeContent',
+            filePath: relativePath,
+            content: content
+        };
+        this._deps.webviewBridge.sendBatched(includeContentMessage);
+
+        // Find all tasks that use this regular include
+        const affectedTasks: Array<{task: KanbanTask, column: KanbanColumn}> = [];
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.regularIncludeFiles?.length) {
+                    const hasThisInclude = task.regularIncludeFiles.some((p: string) =>
+                        MarkdownFile.isSameFile(p, relativePath)
+                    );
+
+                    if (hasThisInclude) {
+                        affectedTasks.push({ task, column });
+                    }
+                }
+            }
+        }
+
+        // Send targeted updates for each affected task
+        for (const {task, column} of affectedTasks) {
+            const regularTaskMessage: UpdateTaskContentExtendedMessage = {
+                type: 'updateTaskContent',
+                columnId: column.id,
+                taskId: task.id,
+                description: task.description,
+                displayTitle: task.displayTitle,
+                taskTitle: task.title,
+                originalTitle: task.originalTitle,
+                includeMode: false,
+                regularIncludeFiles: task.regularIncludeFiles
+            };
+            this._deps.webviewBridge.sendBatched(regularTaskMessage);
         }
     }
 

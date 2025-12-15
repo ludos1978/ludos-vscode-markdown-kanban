@@ -8,6 +8,7 @@ import { IMainKanbanFile, IMarkdownFileRegistry, CapturedEdit } from './FileInte
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
 import { KanbanTask } from '../board/KanbanTypes';
 import { PresentationParser } from '../services/export/PresentationParser';
+import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeDecodeURIComponent } from '../utils/stringUtils';
 
 /**
@@ -274,7 +275,6 @@ export class IncludeFile extends MarkdownFile {
         }
 
         // Use unified presentation generator (no YAML for copying)
-        const { PresentationGenerator } = require('../services/export/PresentationGenerator');
         return PresentationGenerator.fromTasks(tasks, {
             filterIncludes: true
             // Note: includeMarpDirectives defaults to false (no YAML when copying)

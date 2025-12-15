@@ -259,7 +259,7 @@ export class GatherQueryEngine {
         }
 
         // Default: treat as person name
-        return (taskText, taskDate, personNames) => {
+        return (_taskText, _taskDate, personNames) => {
             return personNames.map(p => p.toLowerCase()).includes(expr.toLowerCase());
         };
     }
@@ -302,7 +302,7 @@ export class GatherQueryEngine {
         const isDateProperty = dateProperties.includes(property.toLowerCase());
 
         if (isDateProperty) {
-            return (taskText: string, taskDate: string | null) => {
+            return (_taskText: string, taskDate: string | null) => {
                 if (!taskDate) { return false; }
 
                 const propValue = getDatePropertyValue(property.toLowerCase(), taskDate);
@@ -358,7 +358,7 @@ export class GatherQueryEngine {
             };
         } else {
             // Treat property as a person name check
-            return (taskText: string, taskDate: string | null, personNames: string[]) => {
+            return (_taskText: string, _taskDate: string | null, personNames: string[]) => {
                 const hasPersonName = personNames.map(p => p.toLowerCase()).includes(property.toLowerCase());
 
                 switch (operator) {

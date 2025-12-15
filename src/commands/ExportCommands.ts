@@ -126,7 +126,7 @@ export class ExportCommands extends BaseMessageCommand {
 
         const panel = context.getWebviewPanel();
         if (panel && panel.webview) {
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'operationStarted',
                 operationId,
                 operationType: type,
@@ -138,7 +138,7 @@ export class ExportCommands extends BaseMessageCommand {
     private async updateOperationProgress(operationId: string, progress: number, context: CommandContext, message?: string) {
         const panel = context.getWebviewPanel();
         if (panel && panel.webview) {
-            panel.webview.postMessage({
+            this.postMessage({
                 type: 'operationProgress',
                 operationId,
                 progress,
@@ -154,7 +154,7 @@ export class ExportCommands extends BaseMessageCommand {
 
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
-                panel.webview.postMessage({
+                this.postMessage({
                     type: 'operationCompleted',
                     operationId
                 });
@@ -355,7 +355,7 @@ export class ExportCommands extends BaseMessageCommand {
             // Notify frontend to hide the auto-export button
             const panel = context.getWebviewPanel();
             if (panel && panel.webview) {
-                panel.webview.postMessage({
+                this.postMessage({
                     type: 'autoExportStopped'
                 });
             } else {
@@ -370,7 +370,7 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Stop auto-export for other kanban files (not generated files from current export)
      */
-    private async handleStopAutoExportForOtherKanbanFiles(currentKanbanFilePath: string, context: CommandContext, protectExportedPath?: string): Promise<void> {
+    private async handleStopAutoExportForOtherKanbanFiles(_currentKanbanFilePath: string, context: CommandContext, protectExportedPath?: string): Promise<void> {
         try {
             // Unregister from SaveEventDispatcher
             const doc = context.fileManager.getDocument();
@@ -439,7 +439,7 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Select export folder via dialog
      */
-    private async handleSelectExportFolder(context: CommandContext, defaultPath?: string): Promise<void> {
+    private async handleSelectExportFolder(_context: CommandContext, defaultPath?: string): Promise<void> {
         try {
             const result = await vscode.window.showOpenDialog({
                 canSelectFiles: false,

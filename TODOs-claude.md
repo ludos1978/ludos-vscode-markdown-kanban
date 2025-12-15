@@ -753,6 +753,59 @@ await saveFile();  // Did it work? 🤷
 - 2 logging functions (messageHandler.ts, PanelContext.ts)
 - 2 standard TypeScript patterns (constructor types, function maps)
 
+**Session 2024-12-15: Unused Variables/Imports Cleanup (55 items):**
+- [x] Removed unused imports: `getOutputChannel`, `getErrorMessage`, `KanbanColumn`, `KanbanTask`, `IncludeMatch`
+- [x] Removed unused functions: `log()` in messageHandler.ts, `_getIncludeMatches()` in markdownParser.ts
+- [x] Removed unused methods: `_extractJsonFromSvg()` in ExcalidrawService.ts, `_findFileIncludeLocation()` in ChangeStateMachine.ts
+- [x] Prefixed 40+ unused parameters with `_` (TypeScript convention for intentionally unused)
+- [x] TypeScript `--noUnusedLocals --noUnusedParameters` now passes cleanly
+
+**Session 2024-12-15: Circular Dependency Fixes (Task 3.3):**
+- [x] Converted 9 `require()` calls to proper `import` statements
+- [x] Fixed: IncludeFile.ts → PresentationGenerator
+- [x] Fixed: ColumnIncludePlugin.ts → PresentationGenerator
+- [x] Fixed: ExportService.ts → PresentationGenerator (2 locations)
+- [x] Fixed: DebugCommands.ts → MarkdownKanbanParser
+- [x] Fixed: IncludeCommands.ts → MarkdownKanbanParser + ExportService (3 locations)
+- [x] Remaining: Only `require('../package.json')` for JSON loading (intentional)
+- [x] Also improved type safety: MessageCommand.ts (4 more `: any` → proper types)
+
+**Session 2024-12-15: File Splitting & Constants (Task 8.1, 7.3):**
+- [x] Task 8.1: Split kanbanWebviewPanel.ts (1803→1664 lines, -139)
+  - Extracted `_sendIncludeFileUpdateToFrontend` → IncludeFileCoordinator
+  - Added `sendIncludeFileUpdateToFrontend()` method to IncludeFileCoordinator
+  - Cleaned up unused imports (KanbanColumn, KanbanTask, MarkdownFile, IncludeFile, etc.)
+- [x] Task 8.2: ExportService analyzed - determined low value split (tightly coupled, ~40% positive)
+- [x] Task 7.3: Created `src/constants/TimeoutConstants.ts` with centralized constants:
+  - STOP_EDITING_TIMEOUT_MS, SEARCH_DEBOUNCE_DELAY_MS, BATCH_FLUSH_DELAY_MS
+  - REVIVAL_TRACKING_CLEAR_DELAY_MS, MAX_UNDO_STACK_SIZE, MAX_BATCH_SIZE
+  - MAX_SEARCH_RESULTS, MAX_RESULTS_PER_PATTERN, MAX_REGEX_RESULTS
+  - EXTERNAL_SERVICE_TIMEOUT_MS
+- [x] Updated files to use TimeoutConstants:
+  - messageHandler.ts, kanbanWebviewPanel.ts, fileSearchService.ts
+  - DrawIOService.ts, PDFService.ts
+- [x] Updated `src/constants/index.ts` to export all constants
+
+**Session 2024-12-15: WebView Messaging & CommandContext (Task 4.1, 3.4):**
+- [x] Task 4.1: Added `getWebviewBridge()` to CommandContext interface
+- [x] Task 4.1: Updated `BaseMessageCommand.postMessage()` to use WebviewBridge
+- [x] Task 4.1: Converted 21 direct `panel.webview.postMessage` calls in command files:
+  - DiagramCommands.ts (12 calls)
+  - ExportCommands.ts (4 calls)
+  - TemplateCommands.ts (3 calls)
+  - UICommands.ts (2 calls)
+- [x] Task 4.1: Remaining 11 non-command calls analyzed - <60% positive to convert (deferred)
+- [x] Task 3.4: Split CommandContext into focused sub-interfaces:
+  - BoardContext: board state operations
+  - FileContext: file operations
+  - UIContext: webview/UI operations
+  - EditContext: edit state tracking
+  - IncludeContext: include file operations
+  - ExportContext: export settings
+  - ServiceContext: specialized services
+- [x] Task 3.4: CommandContext now extends all sub-interfaces (backwards compatible)
+- [x] Task 3.4: Exported new interfaces from commands/interfaces/index.ts
+
 **Top offenders:**
 | File | `any` count |
 |------|-------------|

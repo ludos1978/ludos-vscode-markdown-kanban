@@ -7,24 +7,12 @@ import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
-import { getOutputChannel } from './services/OutputChannelService';
-import { getErrorMessage } from './utils/stringUtils';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
 import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage } from './core/bridge/MessageTypes';
 import { CapturedEdit } from './files/FileInterfaces';
-
-// Helper function to log to both console and output channel
-function log(...args: any[]) {
-    const message = args.map(arg =>
-        typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-    ).join(' ');
-    getOutputChannel()?.appendLine(message);
-}
-
-/** Timeout for waiting for frontend response to stop editing request */
-const STOP_EDITING_TIMEOUT_MS = 2000;
+import { STOP_EDITING_TIMEOUT_MS } from './constants/TimeoutConstants';
 
 export class MessageHandler {
     private _fileManager: FileManager;
@@ -40,6 +28,7 @@ export class MessageHandler {
     private _setBoard: (board: KanbanBoard) => void;
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
+    private _getWebviewBridge: (() => any) | undefined;
     private _syncBoardToBackend: (board: KanbanBoard) => void;
     private _autoExportSettings: NewExportOptions | null = null;
 
@@ -64,6 +53,7 @@ export class MessageHandler {
             setBoard: (board: KanbanBoard) => void;
             setUndoRedoOperation: (isOperation: boolean) => void;
             getWebviewPanel: () => any;
+            getWebviewBridge?: () => any;
             syncBoardToBackend: (board: KanbanBoard) => void;
         }
     ) {
@@ -80,6 +70,7 @@ export class MessageHandler {
         this._setBoard = callbacks.setBoard;
         this._setUndoRedoOperation = callbacks.setUndoRedoOperation;
         this._getWebviewPanel = callbacks.getWebviewPanel;
+        this._getWebviewBridge = callbacks.getWebviewBridge;
         this._syncBoardToBackend = callbacks.syncBoardToBackend;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
@@ -107,6 +98,7 @@ export class MessageHandler {
             setBoard: this._setBoard,
             setUndoRedoOperation: this._setUndoRedoOperation,
             getWebviewPanel: this._getWebviewPanel,
+            getWebviewBridge: () => this._getWebviewBridge?.() ?? this._getWebviewPanel()?._webviewBridge,
             syncBoardToBackend: this._syncBoardToBackend,
             getAutoExportSettings: () => this._autoExportSettings,
             setAutoExportSettings: (settings: NewExportOptions | null) => { this._autoExportSettings = settings; },
@@ -170,12 +162,17 @@ export class MessageHandler {
             // Store promise resolver
             this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });
 
-            // Send request to frontend to capture edit value
-            panel.webview.postMessage({
-                type: 'stopEditing',
-                requestId,
-                captureValue: true  // Tell frontend to capture the edit value
-            });
+            // Send request to frontend to capture edit value via bridge
+            const bridge = this._getWebviewBridge?.();
+            if (bridge) {
+                bridge.send({
+                    type: 'stopEditing',
+                    requestId,
+                    captureValue: true  // Tell frontend to capture the edit value
+                });
+            } else {
+                console.warn('[MessageHandler] WebviewBridge not available for stopEditing request');
+            }
         });
     }
 

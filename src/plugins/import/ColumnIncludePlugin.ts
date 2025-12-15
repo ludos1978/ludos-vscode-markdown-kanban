@@ -25,6 +25,7 @@ import { AbstractImportPlugin } from './AbstractImportPlugin';
 import { IncludeFile } from '../../files/IncludeFile';
 import { IMainKanbanFile } from '../../files/FileInterfaces';
 import { PresentationParser } from '../../services/export/PresentationParser';
+import { PresentationGenerator } from '../../services/export/PresentationGenerator';
 import { KanbanTask } from '../../board/KanbanTypes';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
@@ -125,9 +126,6 @@ export class ColumnIncludePlugin extends AbstractImportPlugin {
      * Delegates to PresentationGenerator.
      */
     generateContent(data: KanbanTask[], options: GenerateOptions): string {
-        // Dynamic import to avoid circular dependency
-        const { PresentationGenerator } = require('../../services/export/PresentationGenerator');
-
         return PresentationGenerator.fromTasks(data, {
             filterIncludes: options.filterIncludes ?? true,
             includeMarpDirectives: options.includeMarpDirectives ?? false

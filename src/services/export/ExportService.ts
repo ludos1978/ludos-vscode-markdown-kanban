@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 import { PresentationParser } from './PresentationParser';
+import { PresentationGenerator } from './PresentationGenerator';
 import { PathResolver } from '../PathResolver';
 import { MarpExportService, MarpOutputFormat } from './MarpExportService';
 import { DiagramPreprocessor } from './DiagramPreprocessor';
@@ -229,7 +230,7 @@ export class ExportService {
         protectedContent = protectedContent.replace(/<(?!\!--|\/?https?:\/\/)(.*?)>/g, '');
 
         // Restore code blocks
-        protectedContent = protectedContent.replace(new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g'), (match, index) => {
+        protectedContent = protectedContent.replace(new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g'), (_match, index) => {
             return codeBlocks[parseInt(index)];
         });
 
@@ -826,7 +827,7 @@ export class ExportService {
         });
 
         // Restore code blocks
-        modifiedContent = modifiedContent.replace(new RegExp(`${codeBlockPlaceholder}(\\d+)${codeBlockPlaceholder}`, 'g'), (match, index) => {
+        modifiedContent = modifiedContent.replace(new RegExp(`${codeBlockPlaceholder}(\\d+)${codeBlockPlaceholder}`, 'g'), (_match, index) => {
             return codeBlocks[parseInt(index)];
         });
 
@@ -1040,8 +1041,6 @@ export class ExportService {
 
         // Convert to presentation format if requested
         if (convertToPresentation) {
-            const { PresentationGenerator } = require('./PresentationGenerator');
-            const { PresentationParser } = require('./PresentationParser');
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
@@ -1410,7 +1409,6 @@ export class ExportService {
             const filteredBoard = this.filterBoard(board, options);
 
             // Use unified presentation generator
-            const { PresentationGenerator } = require('./PresentationGenerator');
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
@@ -1548,7 +1546,7 @@ export class ExportService {
      */
     private static async runMarpConversion(
         markdownPath: string,
-        sourceFilePath: string,
+        _sourceFilePath: string,  // Reserved for future path normalization
         options: NewExportOptions,
         webviewPanel?: vscode.WebviewPanel | { getPanel(): vscode.WebviewPanel }
     ): Promise<ExportResult> {

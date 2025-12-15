@@ -178,7 +178,7 @@ export class MermaidExportService {
     cleanup(): void {
 
         // Reject all pending requests
-        for (const [requestId, request] of this.pendingRequests.entries()) {
+        for (const [_requestId, request] of this.pendingRequests.entries()) {
             clearTimeout(request.timeout);
             request.reject(new Error('Service cleanup'));
         }

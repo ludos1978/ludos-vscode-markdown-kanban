@@ -32,6 +32,7 @@ import {
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { PresentationGenerator } from '../services/export/PresentationGenerator';
 
 /**
  * Task Commands Handler
@@ -164,6 +165,31 @@ export class TaskCommands extends BaseMessageCommand {
         return true;
     }
 
+    /**
+     * Sync column include file content when tasks within it are modified
+     * Regenerates the include file content from the column's current tasks
+     */
+    private syncColumnIncludeContent(columnId: string, context: CommandContext): void {
+        const board = context.getCurrentBoard();
+        const column = board ? BoardCrudOperations.findColumnById(board, columnId) : undefined;
+
+        if (!column?.includeMode || !column.includeFiles) {
+            return;
+        }
+
+        const fileRegistry = context.getFileRegistry();
+        for (const relativePath of column.includeFiles) {
+            const file = fileRegistry?.getByRelativePath(relativePath);
+            if (file) {
+                const newContent = PresentationGenerator.fromTasks(column.tasks, {
+                    filterIncludes: true,
+                    includeMarpDirectives: false
+                });
+                file.setContent(newContent, false);
+            }
+        }
+    }
+
     // ============= TASK HANDLERS =============
 
     /**
@@ -232,6 +258,11 @@ export class TaskCommands extends BaseMessageCommand {
                     }
                 }
             }
+
+            // COLUMN INCLUDE: Update column include file content when tasks within it are edited
+            if (columnHasInclude) {
+                this.syncColumnIncludeContent(message.columnId, context);
+            }
         }
 
         return this.success();
@@ -249,6 +280,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.taskData
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -265,6 +297,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.insertionIndex
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -281,6 +314,7 @@ export class TaskCommands extends BaseMessageCommand {
             ),
             { sendUpdate: false }
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -296,6 +330,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -311,6 +346,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -326,6 +362,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -343,6 +380,11 @@ export class TaskCommands extends BaseMessageCommand {
                 message.newIndex
             )
         );
+        // Sync both source and destination columns (in case either is a column include)
+        this.syncColumnIncludeContent(message.fromColumnId, context);
+        if (message.toColumnId !== message.fromColumnId) {
+            this.syncColumnIncludeContent(message.toColumnId, context);
+        }
         return this.success();
     }
 
@@ -359,6 +401,11 @@ export class TaskCommands extends BaseMessageCommand {
                 message.toColumnId
             )
         );
+        // Sync both source and destination columns (in case either is a column include)
+        this.syncColumnIncludeContent(message.fromColumnId, context);
+        if (message.toColumnId !== message.fromColumnId) {
+            this.syncColumnIncludeContent(message.toColumnId, context);
+        }
         return this.success();
     }
 
@@ -374,6 +421,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -389,6 +437,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -404,6 +453,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -419,6 +469,7 @@ export class TaskCommands extends BaseMessageCommand {
                 message.columnId
             )
         );
+        this.syncColumnIncludeContent(message.columnId, context);
         return this.success();
     }
 
@@ -465,6 +516,11 @@ export class TaskCommands extends BaseMessageCommand {
             { sendUpdate: false }
         );
 
+        // Sync column include content if this task is in a column include
+        if (columnHasTaskInclude) {
+            this.syncColumnIncludeContent(message.columnId, context);
+        }
+
         context.setEditingInProgress(false);
 
         return this.success();
@@ -498,6 +554,9 @@ export class TaskCommands extends BaseMessageCommand {
             () => context.boardOperations.editTask(board, taskId, columnId, updateData),
             { sendUpdate: false }
         );
+
+        // Sync column include content if applicable
+        this.syncColumnIncludeContent(columnId, context);
 
         return this.success();
     }

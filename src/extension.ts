@@ -4,7 +4,7 @@ import { configService } from './services/ConfigurationService';
 import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
-import { initializeOutputChannel, getOutputChannel } from './services/OutputChannelService';
+import { initializeOutputChannel } from './services/OutputChannelService';
 
 // Re-export for backwards compatibility
 export { getOutputChannel } from './services/OutputChannelService';

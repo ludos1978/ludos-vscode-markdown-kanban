@@ -16,6 +16,8 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
+import { MarkdownKanbanParser } from '../markdownParser';
+import { KanbanBoard } from '../board/KanbanTypes';
 import * as fs from 'fs';
 
 /**
@@ -197,7 +199,7 @@ export class DebugCommands extends BaseMessageCommand {
         return this.success();
     }
 
-    private async handleVerifyContentSync(frontendBoard: unknown, context: CommandContext): Promise<CommandResult> {
+    private async handleVerifyContentSync(frontendBoard: unknown, _context: CommandContext): Promise<CommandResult> {
         if (!this.getPanel()) {
             return this.success();
         }
@@ -211,8 +213,6 @@ export class DebugCommands extends BaseMessageCommand {
             if (!fileRegistry) {
                 throw new Error('File registry not available');
             }
-
-            const { MarkdownKanbanParser } = require('../markdownParser');
 
             const allFiles = fileRegistry.getAll();
             const fileResults: FileVerificationResult[] = [];
@@ -233,7 +233,7 @@ export class DebugCommands extends BaseMessageCommand {
                 }
 
                 if (file.getFileType() === 'main') {
-                    frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard);
+                    frontendContent = MarkdownKanbanParser.generateMarkdown(frontendBoard as KanbanBoard);
                     backendContent = backendBoard
                         ? MarkdownKanbanParser.generateMarkdown(backendBoard)
                         : file.getContent();

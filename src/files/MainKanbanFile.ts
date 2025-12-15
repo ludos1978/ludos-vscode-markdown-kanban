@@ -113,7 +113,7 @@ export class MainKanbanFile extends MarkdownFile {
      * @param updateBaseline Whether to update the baseline (default: false)
      *                       Set to true when called after save to mark content as saved
      */
-    public updateFromBoard(board: KanbanBoard, preserveYaml: boolean = true, updateBaseline: boolean = false): void {
+    public updateFromBoard(board: KanbanBoard, _preserveYaml: boolean = true, updateBaseline: boolean = false): void {
 
         this._board = board;
 

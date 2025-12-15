@@ -488,7 +488,7 @@ export class MarpExportService {
         const pdfOutputPath = options.outputPath.replace(/\.html?$/i, '-handout.pdf');
         const args = [postProcessorPath, options.outputPath, pdfOutputPath, '--pdf'];
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, _reject) => {
             const postProcess = spawn('node', args, {
                 env: env,
                 stdio: ['ignore', 'pipe', 'pipe']

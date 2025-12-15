@@ -166,7 +166,7 @@ export class VariableProcessor {
             // Match innermost {#if ...}...{/if} (no nested {#if inside)
             result = result.replace(
                 /\{#if\s+(\w+)\}((?:(?!\{#if).)*?)\{\/if\}/gs,
-                (match, varName, body) => {
+                (_match, varName, body) => {
                     changed = true;
                     const value = values[varName];
                     const isTruthy = this.isTruthy(value);

@@ -283,7 +283,7 @@ export class BaseFileTypeUtils {
     /**
      * Abstract method to get file extension - must be implemented by environment-specific classes
      */
-    static getFileExtension(fileName: string): string {
+    static getFileExtension(_fileName: string): string {
         throw new Error('getFileExtension must be implemented by environment-specific subclass');
     }
 }

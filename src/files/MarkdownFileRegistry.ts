@@ -4,7 +4,7 @@ import { MarkdownFile, FileChangeEvent } from './MarkdownFile';
 import { MainKanbanFile } from './MainKanbanFile';
 import { IncludeFile, IncludeFileType } from './IncludeFile';
 import { FileSaveService } from '../core/FileSaveService';
-import type { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser'; // STATE-2: For generateBoard()
+import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
 import type { IMessageHandler, IFileFactory, CapturedEdit } from './FileInterfaces';
 
 /**
@@ -78,7 +78,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      */
     public register(file: MarkdownFile): void {
         const path = file.getPath();
-        const relativePath = file.getRelativePath();
         const normalizedRelativePath = file.getNormalizedRelativePath();
 
         // PERFORMANCE: Check registration cache first
@@ -441,7 +440,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * Log current statistics
      */
     public logStatistics(): void {
-        const stats = this.getStatistics();
+        // Stats available via getStatistics() for debugging
+        this.getStatistics();
     }
 
     // ============= BOARD GENERATION (STATE-2) =============

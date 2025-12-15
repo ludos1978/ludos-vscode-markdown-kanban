@@ -67,7 +67,7 @@ export class KanbanFileService {
     constructor(
         private fileManager: FileManager,
         private fileRegistry: MarkdownFileRegistry,
-        private fileFactory: FileFactory,
+        _fileFactory: FileFactory,  // Reserved for future use
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
         private callbacks: KanbanFileServiceCallbacks,
@@ -87,7 +87,7 @@ export class KanbanFileService {
     private get sendBoardUpdate() { return this.callbacks.sendBoardUpdate; }
     private get panel() { return this.callbacks.getPanel; }
     private get context() { return this.callbacks.getContext; }
-    private get showConflictDialog() { return this.callbacks.showConflictDialog; }
+    // showConflictDialog available via this.callbacks.showConflictDialog if needed
     private get updateWebviewPermissions() { return this.callbacks.updateWebviewPermissions; }
     private get undoRedoManagerClear() { return this.callbacks.clearUndoRedo; }
     private get getPanelInstance() { return this.callbacks.getPanelInstance; }

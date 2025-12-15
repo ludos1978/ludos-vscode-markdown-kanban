@@ -330,7 +330,7 @@ export class TemplateParser {
      * Get list of files/folders to copy from template folder
      * Excludes template.md itself
      */
-    private static extractFilesToCopy(templateFolder: string): string[] {
+    private static extractFilesToCopy(_templateFolder: string): string[] {
         // This will be populated during actual template application
         // For now, return empty - the FileCopyService will scan the folder
         return [];

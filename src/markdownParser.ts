@@ -4,7 +4,7 @@ import { PathResolver } from './services/PathResolver';
 import { sortColumnsByRow } from './utils/columnUtils';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
 import { createDisplayTitleWithPlaceholders } from './constants/IncludeConstants';
-import { PluginRegistry, IncludeMatch, IncludeContextLocation } from './plugins';
+import { PluginRegistry, IncludeContextLocation } from './plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -26,7 +26,7 @@ export class MarkdownKanbanParser {
    * CRITICAL: NEVER match by title - position determines identity
    * Titles can be duplicated, changed, or empty
    */
-  private static findExistingColumn(existingBoard: KanbanBoard | undefined, title: string, columnIndex?: number, newTasks?: KanbanTask[]): KanbanColumn | undefined {
+  private static findExistingColumn(existingBoard: KanbanBoard | undefined, _title: string, columnIndex?: number, _newTasks?: KanbanTask[]): KanbanColumn | undefined {
     if (!existingBoard) return undefined;
 
     // ONLY match by position - title/content matching is FORBIDDEN
@@ -57,20 +57,7 @@ export class MarkdownKanbanParser {
     return matches.map(m => m.filePath);
   }
 
-  /**
-   * Get include matches with full details using plugin system
-   *
-   * Returns IncludeMatch objects with position information for advanced processing.
-   * Plugins MUST be loaded via PluginLoader.loadBuiltinPlugins() at extension activation.
-   *
-   * @param content - Content to search for includes
-   * @param contextLocation - Where the content comes from
-   * @returns Array of IncludeMatch objects
-   */
-  private static getIncludeMatches(content: string, contextLocation: IncludeContextLocation): IncludeMatch[] {
-    const registry = PluginRegistry.getInstance();
-    return registry.detectIncludes(content, { location: contextLocation });
-  }
+  // Include match detection handled directly via PluginRegistry.detectIncludes()
 
   static parseMarkdown(content: string, basePath?: string, existingBoard?: KanbanBoard, mainFilePath?: string): { board: KanbanBoard, includedFiles: string[], columnIncludeFiles: string[], taskIncludeFiles: string[] } {
       // First parse with original content to preserve raw descriptions

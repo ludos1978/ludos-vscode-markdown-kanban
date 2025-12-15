@@ -82,25 +82,8 @@ export class ExcalidrawService {
         }
     }
 
-    /**
-     * Extract excalidraw JSON data from SVG file
-     * Excalidraw embeds JSON in HTML comments within SVG
-     */
-    private extractJsonFromSvg(svgContent: string): ExcalidrawData {
-        // Look for excalidraw JSON in HTML comments
-        // Pattern: <!-- payload-start -->{"type":"excalidraw",...}<!-- payload-end -->
-        const payloadMatch = svgContent.match(/<!-- payload-start -->(.*?)<!-- payload-end -->/s);
-
-        if (payloadMatch && payloadMatch[1]) {
-            try {
-                return JSON.parse(payloadMatch[1]);
-            } catch (error) {
-                throw new Error('Failed to parse embedded JSON from SVG');
-            }
-        }
-
-        throw new Error('No excalidraw JSON data found in SVG file');
-    }
+    // Note: For .excalidraw.svg files, the SVG is returned directly (no JSON extraction needed)
+    // JSON extraction from embedded SVG comments reserved for future use if needed
 
     /**
      * Validate excalidraw data structure

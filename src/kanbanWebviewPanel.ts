@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-import { getOutputChannel } from './services/OutputChannelService';
-import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
+import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
 import { BoardOperations, BoardCrudOperations } from './board';
 import { LinkHandler } from './services/LinkHandler';
@@ -18,9 +17,7 @@ import { getErrorMessage } from './utils/stringUtils';
 import {
     MarkdownFileRegistry,
     FileFactory,
-    FileChangeEvent,
-    MarkdownFile,
-    IncludeFile
+    FileChangeEvent
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
@@ -32,23 +29,17 @@ import {
     SyncDirtyColumnInfo,
     SyncDirtyTaskInfo,
     UpdateShortcutsMessage,
-    UpdateColumnContentExtendedMessage,
-    UpdateTaskContentExtendedMessage,
     ConfigurationUpdateMessage,
     TriggerSnippetMessage
 } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import { KeybindingService } from './services/KeybindingService';
-
-// Configuration constants
-/** Delay before clearing revival tracking URIs (ms) */
-const REVIVAL_TRACKING_CLEAR_DELAY_MS = 5000;
-/** Maximum number of undo states to keep */
-const MAX_UNDO_STACK_SIZE = 100;
-/** Maximum messages to batch before flushing to webview */
-const MAX_BATCH_SIZE = 10;
-/** Delay before flushing batched messages to webview (ms) */
-const BATCH_FLUSH_DELAY_MS = 50;
+import {
+    REVIVAL_TRACKING_CLEAR_DELAY_MS,
+    MAX_UNDO_STACK_SIZE,
+    MAX_BATCH_SIZE,
+    BATCH_FLUSH_DELAY_MS
+} from './constants/TimeoutConstants';
 
 /**
  * Persisted panel state for revival
@@ -422,6 +413,7 @@ export class KanbanWebviewPanel {
                     this._context.setUndoRedoOperation(isOperation);
                 },
                 getWebviewPanel: () => this,
+                getWebviewBridge: () => this._webviewBridge,
                 syncBoardToBackend: (board: KanbanBoard) => this.syncBoardToBackend(board)
             }
         );
@@ -443,7 +435,7 @@ export class KanbanWebviewPanel {
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
-    private async handleLinkReplacement(originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) {
+    private async handleLinkReplacement(originalPath: string, newPath: string, _isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) {
         const board = this.getBoard();
         if (!board || !board.valid) { return; }
 
@@ -603,7 +595,7 @@ export class KanbanWebviewPanel {
      */
     private _setupWorkspaceChangeListener() {
         // Listen for workspace folder changes
-        const workspaceChangeListener = vscode.workspace.onDidChangeWorkspaceFolders(event => {
+        const workspaceChangeListener = vscode.workspace.onDidChangeWorkspaceFolders(_event => {
                 this._webviewManager.updatePermissions();
         });
         
@@ -1187,144 +1179,9 @@ export class KanbanWebviewPanel {
                 }
 
                 // File has been reloaded (either from external change or manual reload)
-                // Send updated content to frontend
-                await this._sendIncludeFileUpdateToFrontend(file);
+                // Send updated content to frontend via coordinator
+                this._includeCoordinator.sendIncludeFileUpdateToFrontend(file);
             }
-        }
-    }
-
-    /**
-     * Send updated include file content to frontend
-     * Called after file has been reloaded (from external change or manual reload)
-     */
-    private async _sendIncludeFileUpdateToFrontend(file: MarkdownFile): Promise<void> {
-        const board = this.getBoard();
-        if (!board || !this._panel) {
-            console.warn(`[_sendIncludeFileUpdateToFrontend] No board or panel available`);
-            return;
-        }
-
-        const relativePath = file.getRelativePath();
-        const fileType = file.getFileType();
-
-        if (fileType === 'include-column') {
-            // Find column that uses this include file
-            // FOUNDATION-1: Use normalized path comparison instead of === comparison
-            const column = board.columns.find(c =>
-                c.includeFiles && c.includeFiles.some(p => MarkdownFile.isSameFile(p, relativePath))
-            );
-
-            if (column) {
-                // Parse tasks from updated file
-                const columnFile = file as IncludeFile;
-                const mainFilePath = this._fileManager.getDocument()?.uri.fsPath;
-                const tasks = columnFile.parseToTasks(column.tasks, column.id, mainFilePath);
-                column.tasks = tasks;
-
-                // Send update to frontend
-                const columnMessage: UpdateColumnContentExtendedMessage = {
-                    type: 'updateColumnContent',
-                    columnId: column.id,
-                    tasks: tasks,
-                    columnTitle: column.title,
-                    displayTitle: column.displayTitle,
-                    includeMode: true,
-                    includeFiles: column.includeFiles
-                };
-                this._webviewBridge.send(columnMessage);
-            }
-        } else if (fileType === 'include-task') {
-            // Find task that uses this include file
-            let foundTask: KanbanTask | undefined;
-            let foundColumn: KanbanColumn | undefined;
-
-            for (const column of board.columns) {
-                for (const task of column.tasks) {
-                    // FOUNDATION-1: Use normalized comparison
-                    if (task.includeFiles && task.includeFiles.some((p: string) => MarkdownFile.isSameFile(p, relativePath))) {
-                        foundTask = task;
-                        foundColumn = column;
-                        break;
-                    }
-                }
-                if (foundTask) break;
-            }
-
-            if (foundTask && foundColumn) {
-                // Get updated content from file (already using no-parsing approach)
-                const fullContent = file.getContent();
-                const displayTitle = `# include in ${relativePath}`;
-
-                // Update task
-                foundTask.displayTitle = displayTitle;
-                foundTask.description = fullContent;
-
-                // Send update to frontend
-                const taskMessage: UpdateTaskContentExtendedMessage = {
-                    type: 'updateTaskContent',
-                    columnId: foundColumn.id,
-                    taskId: foundTask.id,
-                    description: fullContent,
-                    displayTitle: displayTitle,
-                    taskTitle: foundTask.title,
-                    originalTitle: foundTask.originalTitle,
-                    includeMode: true,
-                    includeFiles: foundTask.includeFiles
-                };
-                this._webviewBridge.send(taskMessage);
-            }
-        } else if (fileType === 'include-regular') {
-            // Regular include - find and update only affected tasks
-            // Regular includes (!!!include()!!!) are resolved on frontend during markdown rendering
-
-            // CRITICAL: Send updated include content to frontend cache
-            const content = file.getContent();
-            const includeContentMessage: UpdateIncludeContentMessage = {
-                type: 'updateIncludeContent',
-                filePath: relativePath,
-                content: content
-            };
-            this._webviewBridge.sendBatched(includeContentMessage);
-
-            // Find all tasks that use this regular include
-            const affectedTasks: Array<{task: KanbanTask, column: KanbanColumn}> = [];
-            for (const column of board.columns) {
-                for (const task of column.tasks) {
-                    // Check if this task has the regular include in its description
-                    if (task.regularIncludeFiles?.length) {
-
-                        const hasThisInclude = task.regularIncludeFiles.some((p: string) => {
-                            const matches = MarkdownFile.isSameFile(p, relativePath);
-                            return matches;
-                        });
-
-                        if (hasThisInclude) {
-                            affectedTasks.push({ task, column });
-                        }
-                    }
-                }
-            }
-
-            // Send targeted updates for each affected task
-            // WebviewBridge batching ensures cache update arrives BEFORE task updates
-            for (const {task, column} of affectedTasks) {
-                // Send task update with current description (frontend will re-render the markdown with updated cache)
-                const regularTaskMessage: UpdateTaskContentExtendedMessage = {
-                    type: 'updateTaskContent',
-                    columnId: column.id,
-                    taskId: task.id,
-                    description: task.description, // Same description, but frontend will re-render includes
-                    displayTitle: task.displayTitle,
-                    taskTitle: task.title,
-                    originalTitle: task.originalTitle,
-                    includeMode: false, // Regular includes are NOT includeMode
-                    regularIncludeFiles: task.regularIncludeFiles // Send the list so frontend knows what changed
-                };
-                this._webviewBridge.sendBatched(regularTaskMessage);
-            }
-
-            // NOTE: No need for 'includesUpdated' message - updateTaskContent already triggers
-            // renderSingleColumn() for each affected column, which re-renders markdown with updated cache
         }
     }
 
