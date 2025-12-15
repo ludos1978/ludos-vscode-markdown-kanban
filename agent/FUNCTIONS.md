@@ -121,7 +121,7 @@ syncBoardToBackend: (board: KanbanBoard) => void;
   - `perSlideClasses?: Map<number, string[]>` - Per-slide class overrides
 
 **Modified Functions:**
-- `PresentationGenerator.formatSlides()` - Now injects local class directives before slide content
+- `PresentationGenerator.formatOutput()` - Now injects local class directives before slide content
 - `PresentationGenerator.buildYamlFrontmatter()` - Now adds global class directive to YAML
 - `ExportService` (lines 1057-1067, 1627-1638) - Reads config and passes classes to PresentationGenerator
 

@@ -1,4 +1,4 @@
-import { KanbanBoard, KanbanTask } from '../../markdownParser';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 
@@ -37,268 +37,155 @@ export interface MarpOptions {
 }
 
 /**
- * Internal slide representation
- */
-interface Slide {
-    content: string;
-    level: 'column' | 'task';
-    yaml?: string;  // YAML frontmatter (only attached to first slide)
-}
-
-/**
- * Unified presentation generator
+ * Presentation Generator
  *
- * Replaces duplicate functions across the codebase:
- * - ExportService.boardToPresentation()
- * - ExportService.convertToPresentationFormat()
- * - PresentationParser.tasksToPresentation()
- * - MarpConverter.kanbanToMarp()
- * - MarpConverter.convertMarkdownToMarp()
- * - MarpConverter.columnToSlides()
+ * Converts Kanban data structures to presentation (Marp) format.
+ * Works directly with KanbanTask, KanbanColumn, and KanbanBoard.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CRITICAL: Presentation Format
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Format: slide\n\n---\n\nslide\n\n---\n\nslide\n
+ *
+ * Each slide is: title\n\ndescription
+ * (title and description can be empty, but \n\n separator is always present)
+ *
+ * WRITING: Join slides with \n\n---\n\n, add trailing \n
+ * READING: Strip trailing \n, split on \n\n---\n\n
+ *
+ * DO NOT CHANGE THIS WITHOUT UPDATING PresentationParser!
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 export class PresentationGenerator {
     /**
-     * Generate presentation from board object
-     *
-     * @param board - Kanban board
-     * @param options - Generation options
-     * @returns Marp presentation format string
-     *
-     * @example
-     * // Without Marp directives (for copying)
-     * const output = PresentationGenerator.fromBoard(board);
-     *
-     * @example
-     * // With Marp directives (for export)
-     * const output = PresentationGenerator.fromBoard(board, {
-     *     includeMarpDirectives: true,
-     *     marp: { theme: 'gaia' }
-     * });
-     */
-    static fromBoard(board: KanbanBoard, options: PresentationOptions = {}): string {
-        const slides = this.extractSlidesFromBoard(board, options);
-        return this.formatSlides(slides, options);
-    }
-
-    /**
-     * Generate presentation from kanban markdown
-     *
-     * @param markdown - Kanban markdown string
-     * @param options - Generation options
-     * @returns Marp presentation format string
-     *
-     * @example
-     * // Without Marp directives (for copying)
-     * const output = PresentationGenerator.fromMarkdown(markdown);
-     *
-     * @example
-     * // With Marp directives merged with existing YAML (for export)
-     * const output = PresentationGenerator.fromMarkdown(markdown, {
-     *     includeMarpDirectives: true,
-     *     tagVisibility: 'hide'
-     * });
-     */
-    static fromMarkdown(markdown: string, options: PresentationOptions = {}): string {
-        const slides = this.extractSlidesFromMarkdown(markdown, options);
-        return this.formatSlides(slides, options);
-    }
-
-    /**
-     * Generate presentation from task array
+     * Generate presentation from tasks
      *
      * @param tasks - Array of kanban tasks
      * @param options - Generation options
-     * @returns Marp presentation format string (without YAML - for copying)
-     *
-     * @example
-     * // Without Marp directives (for copying tasks)
-     * const output = PresentationGenerator.fromTasks(tasks, {
-     *     filterIncludes: true
-     * });
+     * @returns Presentation markdown string
      */
     static fromTasks(tasks: KanbanTask[], options: PresentationOptions = {}): string {
-        const slides = this.extractSlidesFromTasks(tasks, options);
-        return this.formatSlides(slides, options);
-    }
-
-    /**
-     * Extract slides from board object
-     */
-    private static extractSlidesFromBoard(
-        board: KanbanBoard,
-        options: PresentationOptions
-    ): Slide[] {
-        const slides: Slide[] = [];
-
-        for (const column of board.columns) {
-            // Column title slide
-            // CRITICAL: Use ?? not || - empty string IS a valid title
-            let columnTitle = column.displayTitle ?? column.title;
-
-            if (options.stripIncludes) {
-                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-            }
-
-            // CRITICAL: Always add column slide
-            slides.push({
-                content: columnTitle ?? '',
-                level: 'column'
-            });
-
-            // Task slides
-            for (const task of column.tasks) {
-                // CRITICAL: Use ?? not || - empty string IS a valid title
-                const taskTitle = task.title;
-                const taskDescription = task.description;
-
-                if (options.stripIncludes) {
-                    // Only strip includes syntax, don't affect content otherwise
-                }
-
-                // Build slide content: title + \n\n + description
-                // ALWAYS include \n\n even if description is empty (preserves format)
-                const slideContent = taskTitle + '\n\n' + taskDescription;
-
-                slides.push({
-                    content: slideContent,
-                    level: 'task'
-                });
-            }
-        }
-
-        return slides;
-    }
-
-    /**
-     * Extract slides from kanban markdown
-     */
-    private static extractSlidesFromMarkdown(
-        markdown: string,
-        options: PresentationOptions
-    ): Slide[] {
-        // Extract YAML if present
-        const yamlMatch = markdown.match(/^---\n([\s\S]*?)\n---\n\n?/);
-        let yaml = '';
-        let workingContent = markdown;
-
-        if (yamlMatch) {
-            yaml = yamlMatch[0];
-            workingContent = markdown.substring(yamlMatch[0].length);
-        }
-
-        const slides: Slide[] = [];
-        const lines = workingContent.split('\n');
-        let i = 0;
-
-        while (i < lines.length) {
-            const line = lines[i];
-
-            // Column header: ## Title (non-indented only)
-            if (line.startsWith('## ') && !line.startsWith(' ')) {
-                const columnTitle = line.substring(3);
-                slides.push({
-                    content: columnTitle,
-                    level: 'column',
-                    yaml: yaml // Attach YAML to first slide
-                });
-                yaml = ''; // Only attach once
-                i++;
-                continue;
-            }
-
-            // Task: - [ ] or - [x] (non-indented only)
-            // Note: trailing space is optional (empty tasks may not have it)
-            if (line.match(/^- \[[x ]\]( |$)/) && !line.startsWith(' ')) {
-                const taskTitle = line.replace(/^- \[[x ]\] ?/, '');
-
-                // Collect description (indented lines)
-                const descriptionLines: string[] = [];
-                i++;
-
-                while (i < lines.length) {
-                    const nextLine = lines[i];
-
-                    // Stop at next non-indented column or task
-                    // Note: trailing space is optional (empty tasks may not have it)
-                    if (!nextLine.startsWith(' ') &&
-                        (nextLine.startsWith('## ') || nextLine.match(/^- \[[x ]\]( |$)/))) {
-                        break;
-                    }
-
-                    // Collect ALL content (indented or not) until next column/task
-                    let descLine = nextLine;
-                    if (nextLine.startsWith('  ')) {
-                        descLine = nextLine.substring(2);
-                    }
-                    descriptionLines.push(descLine);
-                    i++;
-                }
-
-                // Build slide content: title + \n\n + description
-                // ALWAYS include \n\n even if description is empty (preserves format)
-                const description = descriptionLines.join('\n');
-                const slideContent = taskTitle + '\n\n' + description;
-
-                slides.push({
-                    content: slideContent,
-                    level: 'task'
-                });
-                continue;
-            }
-
-            i++;
-        }
-
-        return slides;
-    }
-
-    /**
-     * Extract slides from task array
-     */
-    private static extractSlidesFromTasks(
-        tasks: KanbanTask[],
-        options: PresentationOptions
-    ): Slide[] {
-        // Filter out include tasks if requested
+        // Filter include tasks if requested
         let filteredTasks = tasks;
         if (options.filterIncludes) {
             filteredTasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
         }
 
-        return filteredTasks.map(task => {
-            // CRITICAL: Title and description are always strings (empty string if not set)
-            const title = task.title ?? '';
-            const description = task.description ?? '';
+        // Convert tasks to slide content strings
+        const slideContents = filteredTasks.map(task => this.taskToSlideContent(task, options));
 
-            // Build content: title + \n\n + description
-            // ALWAYS include \n\n even if description is empty (preserves format)
-            const content = title + '\n\n' + description;
-
-            return { content, level: 'task' as const };
-        });
+        return this.formatOutput(slideContents, options);
     }
 
     /**
-     * Format slides into output string (shared by all input types)
+     * Generate presentation from a single column
+     *
+     * @param column - Kanban column
+     * @param options - Generation options
+     * @returns Presentation markdown string (column title slide + task slides)
      */
-    private static formatSlides(slides: Slide[], options: PresentationOptions): string {
-        // Apply tag filtering if specified
-        const filteredSlides = this.applyTagFiltering(slides, options.tagVisibility);
+    static fromColumn(column: KanbanColumn, options: PresentationOptions = {}): string {
+        const slideContents: string[] = [];
 
-        // Build YAML frontmatter if requested
-        let yaml = '';
-        if (options.includeMarpDirectives) {
-            yaml = this.buildYamlFrontmatter(filteredSlides, options);
+        // Column title slide (title only, no description)
+        let columnTitle = column.displayTitle ?? column.title;
+        if (options.stripIncludes) {
+            columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+        }
+        slideContents.push(columnTitle + '\n\n');
+
+        // Task slides
+        let tasks = column.tasks;
+        if (options.filterIncludes) {
+            tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+        }
+        for (const task of tasks) {
+            slideContents.push(this.taskToSlideContent(task, options));
         }
 
-        // Build slide content with proper formatting
-        const slideContents = filteredSlides.map((slide, index) => {
-            let content = slide.content;
+        return this.formatOutput(slideContents, options);
+    }
+
+    /**
+     * Generate presentation from multiple columns
+     *
+     * @param columns - Array of kanban columns
+     * @param options - Generation options
+     * @returns Presentation markdown string
+     */
+    static fromColumns(columns: KanbanColumn[], options: PresentationOptions = {}): string {
+        const slideContents: string[] = [];
+
+        for (const column of columns) {
+            // Column title slide
+            let columnTitle = column.displayTitle ?? column.title;
+            if (options.stripIncludes) {
+                columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+            }
+            slideContents.push(columnTitle + '\n\n');
+
+            // Task slides
+            let tasks = column.tasks;
+            if (options.filterIncludes) {
+                tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
+            }
+            for (const task of tasks) {
+                slideContents.push(this.taskToSlideContent(task, options));
+            }
+        }
+
+        return this.formatOutput(slideContents, options);
+    }
+
+    /**
+     * Generate presentation from entire board
+     *
+     * @param board - Kanban board
+     * @param options - Generation options
+     * @returns Presentation markdown string
+     */
+    static fromBoard(board: KanbanBoard, options: PresentationOptions = {}): string {
+        return this.fromColumns(board.columns, options);
+    }
+
+    /**
+     * Convert a single task to slide content string
+     */
+    private static taskToSlideContent(task: KanbanTask, options: PresentationOptions): string {
+        // Use displayTitle if available, fall back to title
+        let title = task.displayTitle ?? task.title ?? '';
+        const description = task.description ?? '';
+
+        if (options.stripIncludes) {
+            title = title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+        }
+
+        // Slide format: title\n\ndescription
+        // ALWAYS include \n\n even if description is empty (preserves format)
+        return title + '\n\n' + description;
+    }
+
+    /**
+     * Format slide contents into final output string
+     */
+    private static formatOutput(slideContents: string[], options: PresentationOptions): string {
+        // Apply tag filtering if specified
+        let filteredContents = slideContents;
+        if (options.tagVisibility && options.tagVisibility !== 'all') {
+            filteredContents = slideContents.map(content =>
+                TagUtils.processMarkdownContent(content, options.tagVisibility!)
+            );
+        }
+
+        // Apply Marp class directives if specified
+        const finalContents = filteredContents.map((content, index) => {
+            let result = content;
 
             // Add local class directive for this specific slide if configured
             if (options.marp?.localClasses && options.marp.localClasses.length > 0) {
                 const classDirective = `<!-- _class: ${options.marp.localClasses.join(' ')} -->\n\n`;
-                content = classDirective + content;
+                result = classDirective + result;
             }
 
             // Add per-slide class overrides if specified
@@ -306,80 +193,43 @@ export class PresentationGenerator {
                 const slideClasses = options.marp.perSlideClasses.get(index);
                 if (slideClasses && slideClasses.length > 0) {
                     const classDirective = `<!-- _class: ${slideClasses.join(' ')} -->\n\n`;
-                    content = classDirective + content;
+                    result = classDirective + result;
                 }
             }
 
-            return content;
+            return result;
         });
 
-        // ═══════════════════════════════════════════════════════════════════════════
-        // CRITICAL: Column Include Format
-        // ═══════════════════════════════════════════════════════════════════════════
-        //
-        // Format: content\n\n---\n\ncontent
-        //
-        // READING: Split on \n\n---\n\n (consumes blank before + --- + blank after)
-        // WRITING: Join with \n\n---\n\n (content is NOT modified)
-        //
-        // This ensures perfect round-trip: read → parse → generate → write = identical
-        //
-        // DO NOT CHANGE THIS WITHOUT UPDATING PresentationParser.parsePresentation!
-        // ═══════════════════════════════════════════════════════════════════════════
-
         // DEBUG: Log slide contents
-        slideContents.forEach((sc, i) => {
+        finalContents.forEach((sc, i) => {
             console.log(`[PresentationGenerator] Slide ${i} content JSON=${JSON.stringify(sc)}`);
         });
 
-        // Join with \n\n---\n\n - content is NOT modified, separator handles blank lines
-        const content = slideContents.join('\n\n---\n\n');
+        // Join with \n\n---\n\n - content is NOT modified
+        const content = finalContents.join('\n\n---\n\n');
 
         // DEBUG: Log final content
         console.log(`[PresentationGenerator] Final content JSON=${JSON.stringify(content)}`);
 
-        // Combine YAML and content
-        // Only add final newline if content doesn't already end with one
-        const finalNewline = content.endsWith('\n') ? '' : '\n';
+        // Build YAML frontmatter if requested
+        let yaml = '';
+        if (options.includeMarpDirectives) {
+            yaml = this.buildYamlFrontmatter(options);
+        }
 
+        // NO newline manipulation - content is output exactly as-is
         if (yaml) {
-            return yaml + content + finalNewline;
+            return yaml + content;
         }
 
-        return content + finalNewline;
+        return content;
     }
 
     /**
-     * Apply tag filtering to slides
+     * Build YAML frontmatter for Marp
      */
-    private static applyTagFiltering(
-        slides: Slide[],
-        tagVisibility?: TagVisibility
-    ): Slide[] {
-        if (!tagVisibility || tagVisibility === 'all') {
-            return slides;
-        }
-
-        return slides.map(slide => ({
-            ...slide,
-            content: TagUtils.processMarkdownContent(slide.content, tagVisibility)
-        }));
-    }
-
-    /**
-     * Build YAML frontmatter by merging existing YAML, Marp directives, and custom YAML
-     */
-    private static buildYamlFrontmatter(
-        slides: Slide[],
-        options: PresentationOptions
-    ): string {
-        // Start with existing YAML from source if present
+    private static buildYamlFrontmatter(options: PresentationOptions): string {
         const allYaml: Record<string, any> = {};
-
-        if (slides.length > 0 && slides[0].yaml) {
-            const existingYaml = this.parseYaml(slides[0].yaml);
-            Object.assign(allYaml, existingYaml);
-        }
 
         // Add Marp directives
         allYaml.marp = true;
@@ -408,30 +258,10 @@ export class PresentationGenerator {
             } else if (typeof value === 'boolean' || typeof value === 'number') {
                 result += `${key}: ${value}\n`;
             } else {
-                // For complex values, use JSON stringification
                 result += `${key}: ${JSON.stringify(value)}\n`;
             }
         }
         result += '---\n\n';
-
-        return result;
-    }
-
-    /**
-     * Parse YAML frontmatter (simple parser)
-     */
-    private static parseYaml(yaml: string): Record<string, any> {
-        const result: Record<string, any> = {};
-        const content = yaml.replace(/^---\n/, '').replace(/\n---\n.*$/, '');
-        const lines = content.split('\n');
-
-        for (const line of lines) {
-            const match = line.match(/^(\w+):\s*(.+)$/);
-            if (match) {
-                const [, key, value] = match;
-                result[key] = value.replace(/["']/g, '');
-            }
-        }
 
         return result;
     }

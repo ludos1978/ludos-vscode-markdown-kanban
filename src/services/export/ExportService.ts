@@ -1038,10 +1038,14 @@ export class ExportService {
         // Convert to presentation format if requested
         if (convertToPresentation) {
             const { PresentationGenerator } = require('./PresentationGenerator');
+            const { PresentationParser } = require('./PresentationParser');
             const config = ConfigurationService.getInstance();
             const marpConfig = config.getConfig('marp');
 
-            filteredContent = PresentationGenerator.fromMarkdown(filteredContent, {
+            // Parse markdown to tasks, then generate presentation
+            // This uses proper parsing instead of duplicating logic
+            const tasks = PresentationParser.parseMarkdownToTasks(filteredContent);
+            filteredContent = PresentationGenerator.fromTasks(tasks, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
                 marp: {
                     theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',

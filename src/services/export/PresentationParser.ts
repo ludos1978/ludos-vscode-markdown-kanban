@@ -57,15 +57,7 @@ export class PresentationParser {
       workingContent = workingContent.substring(yamlMatch[0].length);
     }
 
-    // CRITICAL: Strip ONE trailing newline (file convention, not content)
-    // Files conventionally end with \n, but that's not part of the content.
-    // Content with intentional trailing newlines will have EXTRA newlines:
-    // - Content "A" + file newline = "A\n" (strip to "A")
-    // - Content "A\n" + file newline = "A\n\n" (strip to "A\n")
-    // This ensures round-trip: write adds \n, read strips \n = identical content
-    if (workingContent.endsWith('\n')) {
-      workingContent = workingContent.slice(0, -1);
-    }
+    // NO newline manipulation - content is read exactly as-is
 
     // CRITICAL: Temporarily replace HTML comments with placeholders
     // This prevents '---' inside comments from being treated as slide separators
@@ -109,21 +101,11 @@ export class PresentationParser {
       //   ...
       //
       // READING: Split on \n\n---\n\n (consumes blank before + --- + blank after)
-      //   - Slides start directly with content (no leading blank from ---)
-      //   - File's trailing \n is stripped BEFORE split (see above)
-      //   - NO popping - trailing newlines in content ARE preserved
+      // WRITING: Join with \n\n---\n\n
+      // NO newline manipulation - content is preserved exactly as-is
       //
-      // WRITING (in PresentationGenerator.formatSlides):
-      //   - Join with '\n\n---\n\n' (blank + separator + blank)
-      //   - Add ONE trailing \n to file (convention)
-      //
-      // This ensures perfect round-trip: read → parse → generate → write = identical
-      //
-      // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatSlides!
+      // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatOutput!
       // ═══════════════════════════════════════════════════════════════════════════
-
-      // NO pop - trailing newlines in content are meaningful and preserved
-      // The file's trailing \n was stripped before split, so what remains is content
 
       // DEBUG: Show lines array
       console.log(`[PresentationParser] Slide ${index} lines=${JSON.stringify(lines)}`);
