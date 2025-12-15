@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import { getOutputChannel } from './services/OutputChannelService';
 import { MarkdownKanbanParser, KanbanBoard, KanbanColumn, KanbanTask } from './markdownParser';
 import { FileManager } from './fileManager';
-import { BoardOperations } from './board';
+import { BoardOperations, BoardCrudOperations } from './board';
 import { LinkHandler } from './services/LinkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './services/BackupManager';
@@ -438,7 +438,7 @@ export class KanbanWebviewPanel {
         // If we have specific context, target only that link instance
         if (taskId && columnId) {
             // Find the specific column and task
-            const targetColumn = board.columns.find(col => col.id === columnId);
+            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
             if (!targetColumn) {
                 console.warn(`Column ${columnId} not found for link replacement`);
                 return;
@@ -468,7 +468,7 @@ export class KanbanWebviewPanel {
         }
         // If no specific context but we have a columnId, target only that column
         else if (columnId && !taskId) {
-            const targetColumn = board.columns.find(col => col.id === columnId);
+            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
             if (!targetColumn) {
                 console.warn(`Column ${columnId} not found for link replacement`);
                 return;
@@ -526,7 +526,7 @@ export class KanbanWebviewPanel {
             // OPTIMIZATION: Send targeted update instead of full board redraw
             if (taskId && columnId) {
                 // Find the updated task and send targeted update
-                const targetColumn = board.columns.find(col => col.id === columnId);
+                const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
                 const targetTask = targetColumn?.tasks.find(task => task.id === taskId);
                 if (targetTask) {
                     this._webviewBridge.sendBatched({
@@ -540,7 +540,7 @@ export class KanbanWebviewPanel {
                 }
             } else if (columnId && !taskId) {
                 // Find the updated column and send targeted update
-                const targetColumn = board.columns.find(col => col.id === columnId);
+                const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
                 if (targetColumn) {
                     this._webviewBridge.sendBatched({
                         type: 'updateColumnContent',
@@ -571,7 +571,6 @@ export class KanbanWebviewPanel {
                 // Clear document reference but keep file path for display
                 this._fileManager.clearDocument();
                 this._fileManager.sendFileInfo();
-            } else {
             }
         });
 
@@ -1028,7 +1027,7 @@ export class KanbanWebviewPanel {
         // Collect dirty columns
         const dirtyColumns: any[] = [];
         for (const columnId of dirtyColumnIds) {
-            const column = board.columns.find(c => c.id === columnId);
+            const column = BoardCrudOperations.findColumnById(board, columnId);
             if (column) {
                 dirtyColumns.push({
                     columnId: column.id,
@@ -1043,17 +1042,14 @@ export class KanbanWebviewPanel {
         // Collect dirty tasks
         const dirtyTasks: any[] = [];
         for (const taskId of dirtyTaskIds) {
-            for (const column of board.columns) {
-                const task = column.tasks.find(t => t.id === taskId);
-                if (task) {
-                    dirtyTasks.push({
-                        columnId: column.id,
-                        taskId: task.id,
-                        displayTitle: task.displayTitle,
-                        description: task.description
-                    });
-                    break;
-                }
+            const result = BoardCrudOperations.findTaskById(board, taskId);
+            if (result) {
+                dirtyTasks.push({
+                    columnId: result.column.id,
+                    taskId: result.task.id,
+                    displayTitle: result.task.displayTitle,
+                    description: result.task.description
+                });
             }
         }
 

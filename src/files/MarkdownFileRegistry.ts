@@ -522,6 +522,76 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     // (Migrated from IncludeFileManager - these are the active methods)
 
     /**
+     * Ensure an include file is registered with the correct type.
+     * Handles type mismatch by replacing the existing registration.
+     *
+     * This is the consolidated registration method used by both:
+     * - IncludeLoadingProcessor (for include switch operations)
+     * - IncludeFileCoordinator (for board sync operations)
+     *
+     * @param relativePath - Relative path to the include file
+     * @param fileType - Include type
+     * @param fileFactory - FileFactory instance for creating files
+     * @param mainFile - Parent main kanban file
+     * @param context - Column/task context for setting IDs and titles
+     * @returns The registered include file, or undefined if registration failed
+     */
+    public ensureIncludeRegistered(
+        relativePath: string,
+        fileType: IncludeFileType,
+        fileFactory: { createIncludeDirect: (path: string, mainFile: MainKanbanFile, type: IncludeFileType, isInline: boolean) => IncludeFile },
+        mainFile: MainKanbanFile,
+        context: {
+            columnId?: string;
+            columnTitle?: string;
+            taskId?: string;
+            taskTitle?: string;
+        }
+    ): IncludeFile | undefined {
+        const existingFile = this.getByRelativePath(relativePath);
+        const isCorrectType = existingFile?.getFileType() === fileType;
+
+        // If file exists with wrong type, replace it
+        if (existingFile && !isCorrectType) {
+            console.warn(`[MarkdownFileRegistry] File ${relativePath} registered as ${existingFile.getFileType()} but should be ${fileType}! Replacing...`);
+            existingFile.stopWatching();
+            this.unregister(existingFile.getPath());
+        }
+
+        // If file already registered with correct type, return it
+        if (existingFile && isCorrectType) {
+            return existingFile as IncludeFile;
+        }
+
+        // Create and register new include file
+        const isInline = fileType === 'include-regular';
+        const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, isInline);
+
+        // Set context based on file type
+        if (fileType === 'include-column' && context.columnId) {
+            includeFile.setColumnId(context.columnId);
+            if (context.columnTitle) {
+                includeFile.setColumnTitle(context.columnTitle);
+            }
+        } else if (fileType === 'include-task') {
+            if (context.taskId) {
+                includeFile.setTaskId(context.taskId);
+            }
+            if (context.taskTitle) {
+                includeFile.setTaskTitle(context.taskTitle);
+            }
+            if (context.columnId) {
+                includeFile.setColumnId(context.columnId);
+            }
+        }
+
+        this.register(includeFile);
+        includeFile.startWatching();
+
+        return includeFile;
+    }
+
+    /**
      * Track unsaved changes in include files by syncing board state to file instances.
      * Updates IncludeFile content from board data WITHOUT saving to disk.
      *

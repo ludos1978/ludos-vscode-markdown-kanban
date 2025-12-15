@@ -15,6 +15,7 @@ import { MarkdownFileRegistry, FileFactory, MainKanbanFile, IncludeFile } from '
 import { WebviewBridge } from '../core/bridge';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelContext } from './PanelContext';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 
 /**
  * Dependencies required by IncludeFileCoordinator
@@ -52,34 +53,17 @@ export class IncludeFileCoordinator {
             return;
         }
 
-        let createdCount = 0;
-
         // Sync column includes
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
-                    const existingFile = this._deps.fileRegistry.getByRelativePath(relativePath);
-
-                    // Check if file exists with WRONG type
-                    if (existingFile && existingFile.getFileType() !== 'include-column') {
-                        console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-column! Replacing...`);
-                        this._deps.fileRegistry.unregister(existingFile.getPath());
-                    }
-
-                    if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {
-                        const columnInclude = this._deps.fileFactory.createIncludeDirect(
-                            relativePath,
-                            mainFile,
-                            'include-column',
-                            false
-                        );
-
-                        columnInclude.setColumnId(column.id);
-                        columnInclude.setColumnTitle(column.title);
-                        this._deps.fileRegistry.register(columnInclude);
-                        columnInclude.startWatching();
-                        createdCount++;
-                    }
+                    this._deps.fileRegistry.ensureIncludeRegistered(
+                        relativePath,
+                        'include-column',
+                        this._deps.fileFactory,
+                        mainFile,
+                        { columnId: column.id, columnTitle: column.title }
+                    );
                 }
             }
         }
@@ -89,28 +73,13 @@ export class IncludeFileCoordinator {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
-                        const existingFile = this._deps.fileRegistry.getByRelativePath(relativePath);
-
-                        if (existingFile && existingFile.getFileType() !== 'include-task') {
-                            console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-task! Replacing...`);
-                            this._deps.fileRegistry.unregister(existingFile.getPath());
-                        }
-
-                        if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {
-                            const taskInclude = this._deps.fileFactory.createIncludeDirect(
-                                relativePath,
-                                mainFile,
-                                'include-task',
-                                false
-                            );
-
-                            taskInclude.setTaskId(task.id);
-                            taskInclude.setTaskTitle(task.title);
-                            taskInclude.setColumnId(column.id);
-                            this._deps.fileRegistry.register(taskInclude);
-                            taskInclude.startWatching();
-                            createdCount++;
-                        }
+                        this._deps.fileRegistry.ensureIncludeRegistered(
+                            relativePath,
+                            'include-task',
+                            this._deps.fileFactory,
+                            mainFile,
+                            { columnId: column.id, taskId: task.id, taskTitle: task.title }
+                        );
                     }
                 }
             }
@@ -119,25 +88,13 @@ export class IncludeFileCoordinator {
         // Sync regular includes (!!!include(path)!!! in task descriptions)
         const regularIncludes = mainFile.getIncludedFiles();
         for (const relativePath of regularIncludes) {
-            const existingFile = this._deps.fileRegistry.getByRelativePath(relativePath);
-
-            if (existingFile && existingFile.getFileType() !== 'include-regular') {
-                console.warn(`[IncludeFileCoordinator] File ${relativePath} registered as ${existingFile.getFileType()} but should be include-regular! Replacing...`);
-                this._deps.fileRegistry.unregister(existingFile.getPath());
-            }
-
-            if (!this._deps.fileRegistry.hasByRelativePath(relativePath)) {
-                const regularInclude = this._deps.fileFactory.createIncludeDirect(
-                    relativePath,
-                    mainFile,
-                    'include-regular',
-                    true // Regular includes are inline
-                );
-
-                this._deps.fileRegistry.register(regularInclude);
-                regularInclude.startWatching();
-                createdCount++;
-            }
+            this._deps.fileRegistry.ensureIncludeRegistered(
+                relativePath,
+                'include-regular',
+                this._deps.fileFactory,
+                mainFile,
+                {}
+            );
         }
 
         // Update content of existing include files with board changes
@@ -342,9 +299,9 @@ export class IncludeFileCoordinator {
         preloadedContent?: Map<string, string>;
     }): Promise<void> {
         const board = this._deps.getBoard();
-        const column = params.columnId
-            ? board?.columns.find((c: any) => c.id === params.columnId)
-            : board?.columns.find((c: any) => c.tasks.some((t: any) => t.id === params.taskId));
+        const column = board ? (params.columnId
+            ? BoardCrudOperations.findColumnById(board, params.columnId)
+            : BoardCrudOperations.findColumnContainingTask(board, params.taskId!)) : undefined;
 
         const result = await this._deps.stateMachine.processChange({
             type: 'include_switch',

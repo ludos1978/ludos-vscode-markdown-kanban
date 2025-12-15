@@ -47,45 +47,10 @@ export interface KanbanConfiguration {
     };
 }
 
-export interface ConfigurationDefaults {
-    enableBackups: boolean;
-    backupInterval: number;
-    backupLocation: string;
-    openLinksInNewTab: boolean;
-    pathGeneration: 'relative' | 'absolute';
-    whitespace: string;
-    maxRowHeight: number;
-    taskMinHeight: string;
-    sectionHeight: string;
-    taskSectionHeight: string;
-    fontSize: string;
-    fontFamily: string;
-    columnWidth: string;
-    columnBorder: string;
-    taskBorder: string;
-    layoutRows: number;
-    rowHeight: string;
-    layoutPreset: string;
-    tagVisibility: string;
-    exportTagVisibility: boolean;
-    htmlCommentRenderMode: string;
-    htmlContentRenderMode: string;
-    arrowKeyFocusScroll: string;
-    marp: {
-        enginePath: string;
-        defaultTheme: string;
-        allowLocalFiles: boolean;
-        browser: 'auto' | 'chrome' | 'edge' | 'firefox';
-        themeFolders: string[];
-        keepTempFiles: boolean;
-        availableClasses: string[];
-        globalClasses: string[];
-        localClasses: string[];
-    };
-    sidebar: {
-        autoScan: boolean;
-    };
-}
+/**
+ * Type for configuration defaults - KanbanConfiguration without runtime-only properties
+ */
+export type ConfigurationDefaults = Omit<KanbanConfiguration, 'tagColors' | 'layoutPresets'>;
 
 export class ConfigurationService {
     private static instance: ConfigurationService | undefined;

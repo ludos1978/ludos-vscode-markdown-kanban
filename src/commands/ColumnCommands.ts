@@ -15,6 +15,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
@@ -164,7 +165,7 @@ ${tasksContent}`;
             return;
         }
 
-        const column = currentBoard.columns.find(col => col.id === columnId);
+        const column = BoardCrudOperations.findColumnById(currentBoard, columnId);
         if (!column) {
             return;
         }

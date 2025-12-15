@@ -85,6 +85,10 @@ export class IncludeFile extends MarkdownFile {
         return this._fileType;
     }
 
+    public getFileRegistry(): { requestStopEditing(): Promise<any> } | undefined {
+        return this._parentFile.getFileRegistry();
+    }
+
     // ============= PATH RESOLUTION =============
 
     /**
@@ -364,61 +368,8 @@ export class IncludeFile extends MarkdownFile {
 
     // ============= SIMPLIFIED CONFLICT DETECTION =============
 
-    /**
-     * Check if there are ANY unsaved changes (simplified 3-variant approach)
-     * Returns true if ANY of these conditions are met:
-     * - Internal state flag is true (kanban UI edits)
-     * - User is in edit mode
-     * - VSCode document is dirty (text editor edits)
-     * - Document is open but we can't access it (safe default)
-     */
-    public hasAnyUnsavedChanges(): boolean {
-        // Check 1: Internal state flag (from kanban UI) - computed from content comparison
-        if (this.hasUnsavedChanges()) return true;
-
-        // Check 2: Edit mode (user is actively editing)
-        if (this._isInEditMode) return true;
-
-        // Check 3: VSCode document dirty status (text editor edits)
-        // Need to search through all open documents since IncludeFile doesn't have FileManager
-        const openDocuments = vscode.workspace.textDocuments;
-        const documentIsDirty = openDocuments.some(doc =>
-            doc.uri.fsPath === this._path && doc.isDirty
-        );
-        if (documentIsDirty) {
-            return true;
-        }
-
-        // Check 4: If document is open but not dirty, we already checked above
-        // No need for additional safety check here
-
-        return false;
-    }
-
-    // ============= CONFLICT DETECTION =============
-
-    /**
-     * Override hasConflict to also check VSCode document dirty status
-     * This ensures conflicts are detected when include file is edited in text editor
-     */
-    public hasConflict(): boolean {
-        // Check base class flags (kanban UI changes)
-        const baseHasConflict = super.hasConflict();
-
-        // Also check if VSCode document is dirty (text editor changes)
-        // Need to search through all open documents since IncludeFile doesn't have FileManager
-        const openDocuments = vscode.workspace.textDocuments;
-        const documentIsDirty = openDocuments.some(doc =>
-            doc.uri.fsPath === this._path && doc.isDirty
-        );
-
-        // Conflict if:
-        // - Base class detects conflict (kanban UI changes + external changes)
-        // - OR document is dirty (text editor changes) AND has external changes
-        const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
-
-        return hasConflict;
-    }
+    // hasAnyUnsavedChanges() and hasConflict() are now implemented in base class MarkdownFile
+    // The base class handles VS Code document dirty checks via isDocumentDirtyInVSCode()
 
     // ============= CONFLICT CONTEXT =============
 

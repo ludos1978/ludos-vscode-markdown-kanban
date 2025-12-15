@@ -446,6 +446,62 @@ export class BoardCrudOperations {
         return null;
     }
 
+    // ============= STATIC LOOKUP HELPERS =============
+    // These can be used anywhere without instantiating BoardCrudOperations
+
+    /**
+     * Find a column by ID in a board
+     * @param board The board to search
+     * @param columnId The column ID to find
+     * @returns The column or undefined if not found
+     */
+    public static findColumnById(board: KanbanBoard, columnId: string): KanbanColumn | undefined {
+        return board.columns.find(col => col.id === columnId);
+    }
+
+    /**
+     * Find a task by ID, searching all columns
+     * @param board The board to search
+     * @param taskId The task ID to find
+     * @returns Object with task, column, and index, or undefined if not found
+     */
+    public static findTaskById(board: KanbanBoard, taskId: string): { task: KanbanTask; column: KanbanColumn; index: number } | undefined {
+        for (const column of board.columns) {
+            const index = column.tasks.findIndex(t => t.id === taskId);
+            if (index !== -1) {
+                return { task: column.tasks[index], column, index };
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Find a task by ID within a specific column
+     * @param board The board to search
+     * @param columnId The column to search in
+     * @param taskId The task ID to find
+     * @returns Object with task, column, and index, or undefined if not found
+     */
+    public static findTaskInColumn(board: KanbanBoard, columnId: string, taskId: string): { task: KanbanTask; column: KanbanColumn; index: number } | undefined {
+        const column = BoardCrudOperations.findColumnById(board, columnId);
+        if (!column) return undefined;
+
+        const index = column.tasks.findIndex(t => t.id === taskId);
+        if (index === -1) return undefined;
+
+        return { task: column.tasks[index], column, index };
+    }
+
+    /**
+     * Find the column that contains a task with the given ID
+     * @param board The board to search
+     * @param taskId The task ID to find
+     * @returns The column containing the task, or undefined if not found
+     */
+    public static findColumnContainingTask(board: KanbanBoard, taskId: string): KanbanColumn | undefined {
+        return board.columns.find(c => c.tasks.some(t => t.id === taskId));
+    }
+
     // ============= HELPER METHODS =============
 
     public getColumnRow(column: KanbanColumn): number {

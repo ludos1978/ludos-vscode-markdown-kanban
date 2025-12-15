@@ -136,6 +136,12 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     protected abstract getConflictContext(): ConflictContext;
 
+    /**
+     * Get the file registry (if accessible from this file type)
+     * MainKanbanFile returns its _fileRegistry, IncludeFile delegates to parent
+     */
+    public abstract getFileRegistry(): { requestStopEditing(): Promise<any> } | undefined;
+
     // ============= PATH NORMALIZATION (FOUNDATION-1) =============
 
     /**
@@ -357,10 +363,48 @@ export abstract class MarkdownFile implements vscode.Disposable {
     }
 
     /**
+     * Check if VS Code has this file open and it's dirty (unsaved in text editor)
+     * This is the common pattern used by both MainKanbanFile and IncludeFile
+     */
+    protected isDocumentDirtyInVSCode(): boolean {
+        const openDocuments = vscode.workspace.textDocuments;
+        return openDocuments.some(doc =>
+            doc.uri.fsPath === this._path && doc.isDirty
+        );
+    }
+
+    /**
+     * Check if file has any unsaved changes from any source:
+     * - Internal state (kanban UI edits)
+     * - Edit mode (user actively editing)
+     * - VS Code document dirty (text editor edits)
+     */
+    public hasAnyUnsavedChanges(): boolean {
+        // Check 1: Internal state flag (from kanban UI) - computed from content comparison
+        if (this.hasUnsavedChanges()) return true;
+
+        // Check 2: Edit mode (user is actively editing)
+        if (this._isInEditMode) return true;
+
+        // Check 3: VSCode document dirty status (text editor edits)
+        if (this.isDocumentDirtyInVSCode()) return true;
+
+        return false;
+    }
+
+    /**
      * Check if file has a conflict (both local and external changes)
+     * Includes VS Code document dirty status in conflict detection
      */
     public hasConflict(): boolean {
-        return (this.hasUnsavedChanges() || this._isInEditMode) && this._hasFileSystemChanges;
+        // Base check: kanban UI changes + external changes
+        const hasKanbanConflict = (this.hasUnsavedChanges() || this._isInEditMode) && this._hasFileSystemChanges;
+
+        // Also check VS Code document dirty status
+        const documentIsDirty = this.isDocumentDirtyInVSCode();
+        const hasEditorConflict = documentIsDirty && this._hasFileSystemChanges;
+
+        return hasKanbanConflict || hasEditorConflict;
     }
 
     /**
@@ -730,7 +774,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 // Last reference - dispose the watcher
                 existingWatcher.watcher.dispose();
                 MarkdownFile._activeWatchers.delete(watchPath);
-            } else {
             }
         } else {
             console.warn(`[${this.getFileType()}] No watcher found in registry for: ${this._relativePath}`);
@@ -782,9 +825,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
      */
     protected async requestStopEditing(): Promise<void> {
         // Access the file registry to request stop editing and capture value
-        const mainFile = this.getFileType() === 'main' ? this as any : (this as any)._parentFile;
-        if (mainFile && mainFile._fileRegistry) {
-            const capturedEdit = await mainFile._fileRegistry.requestStopEditing();
+        const fileRegistry = this.getFileRegistry();
+        if (fileRegistry) {
+            const capturedEdit = await fileRegistry.requestStopEditing();
 
             // If we got an edit value, apply it to the baseline (not save to disk)
             if (capturedEdit && capturedEdit.value !== undefined) {

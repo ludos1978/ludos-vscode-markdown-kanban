@@ -16,6 +16,7 @@
  */
 export interface IMarkdownFileRegistry {
     getIncludeFiles(): IIncludeFile[];
+    requestStopEditing(): Promise<any>;
 }
 
 /**
@@ -29,6 +30,7 @@ export interface IMainKanbanFile {
     hasUnsavedChanges(): boolean;
     getPath(): string;
     getFileType(): 'main';
+    getFileRegistry(): IMarkdownFileRegistry | undefined;
 }
 
 /**

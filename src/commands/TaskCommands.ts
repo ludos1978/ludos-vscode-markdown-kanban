@@ -14,6 +14,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 
 /**
  * Task Commands Handler
@@ -156,8 +157,8 @@ export class TaskCommands extends BaseMessageCommand {
         if (message.taskData?.title !== undefined) {
             const newTitle = message.taskData.title;
             const board = context.getCurrentBoard();
-            const column = board?.columns.find((c: any) => c.id === message.columnId);
-            const task = column?.tasks.find((t: any) => t.id === message.taskId);
+            const column = board ? BoardCrudOperations.findColumnById(board, message.columnId) : undefined;
+            const task = column?.tasks.find(t => t.id === message.taskId);
 
             if (task) {
                 // CRITICAL: Skip include detection for column-generated tasks
@@ -197,8 +198,8 @@ export class TaskCommands extends BaseMessageCommand {
         // If this is a task include and description was updated, update the file instance
         if (message.taskData.description !== undefined) {
             const board = context.getCurrentBoard();
-            const column = board?.columns.find((c: any) => c.id === message.columnId);
-            const task = column?.tasks.find((t: any) => t.id === message.taskId);
+            const column = board ? BoardCrudOperations.findColumnById(board, message.columnId) : undefined;
+            const task = column?.tasks.find(t => t.id === message.taskId);
 
             const columnHasInclude = column?.includeMode === true;
 
@@ -409,7 +410,7 @@ export class TaskCommands extends BaseMessageCommand {
      */
     private async handleEditTaskTitle(message: any, context: CommandContext): Promise<CommandResult> {
         const currentBoard = context.getCurrentBoard();
-        const targetColumn = currentBoard?.columns.find(col => col.id === message.columnId);
+        const targetColumn = currentBoard ? BoardCrudOperations.findColumnById(currentBoard, message.columnId) : undefined;
         const task = targetColumn?.tasks.find(t => t.id === message.taskId);
 
         // Skip include detection for column-generated tasks

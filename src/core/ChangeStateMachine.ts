@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 import { FileSaveService } from './FileSaveService';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 
 // Re-export types from ChangeTypes for backwards compatibility
 export {
@@ -473,7 +474,7 @@ export class ChangeStateMachine {
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
                 // Column include switch - clear column tasks
-                const column = board.columns.find((c: any) => c.id === event.targetId);
+                const column = BoardCrudOperations.findColumnById(board, event.targetId);
                 if (column) {
                     column.tasks = [];
                     column.includeFiles = [];
@@ -495,9 +496,9 @@ export class ChangeStateMachine {
                 }
             } else if (event.target === 'task') {
                 // Task include switch - clear task description
-                const column = board.columns.find((c: any) => c.id === event.columnIdForTask);
-                const task = column?.tasks.find((t: any) => t.id === event.targetId);
-                if (task) {
+                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
+                const task = column?.tasks.find(t => t.id === event.targetId);
+                if (task && column) {
                     task.includeFiles = [];
                     task.displayTitle = '';
                     task.description = '';
@@ -523,7 +524,7 @@ export class ChangeStateMachine {
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
             // User edit with include switch - determine target from edit type
             if (event.editType === 'column_title') {
-                const column = board.columns.find((c: any) => c.id === event.params.columnId);
+                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
                 if (column) {
                     column.tasks = [];
                     column.includeFiles = [];
@@ -544,8 +545,8 @@ export class ChangeStateMachine {
                     }
                 }
             } else if (event.editType === 'task_title') {
-                const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
-                const task = column?.tasks.find((t: any) => t.id === event.params.taskId);
+                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
+                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
                 if (task && column) {
                     task.includeFiles = [];
                     task.displayTitle = '';
@@ -743,26 +744,26 @@ export class ChangeStateMachine {
     ): void {
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
-                const column = board.columns.find((c: any) => c.id === event.targetId);
+                const column = BoardCrudOperations.findColumnById(board, event.targetId);
                 if (column) {
                     this._sendColumnUpdate(panel, column, context);
                 }
             } else if (event.target === 'task') {
-                const column = board.columns.find((c: any) => c.id === event.columnIdForTask);
-                const task = column?.tasks.find((t: any) => t.id === event.targetId);
+                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
+                const task = column?.tasks.find(t => t.id === event.targetId);
                 if (task && column) {
                     this._sendTaskUpdate(panel, column, task, context);
                 }
             }
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
             if (event.editType === 'column_title') {
-                const column = board.columns.find((c: any) => c.id === event.params.columnId);
+                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
                 if (column) {
                     this._sendColumnUpdate(panel, column, context);
                 }
             } else if (event.editType === 'task_title') {
-                const column = board.columns.find((c: any) => c.tasks.some((t: any) => t.id === event.params.taskId));
-                const task = column?.tasks.find((t: any) => t.id === event.params.taskId);
+                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
+                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
                 if (task && column) {
                     this._sendTaskUpdate(panel, column, task, context);
                 }
@@ -944,7 +945,7 @@ export class ChangeStateMachine {
         const rollback = context.rollback!;
 
         if (rollback.columnId) {
-            const column = board.columns.find((c: any) => c.id === rollback.columnId);
+            const column = BoardCrudOperations.findColumnById(board, rollback.columnId);
             if (column) {
                 // Restore backend board state
                 column.title = rollback.oldState.title || column.title;
@@ -957,8 +958,8 @@ export class ChangeStateMachine {
                 this._sendColumnUpdate(panel, column, context);
             }
         } else if (rollback.taskId && rollback.taskColumnId) {
-            const column = board.columns.find((c: any) => c.id === rollback.taskColumnId);
-            const task = column?.tasks.find((t: any) => t.id === rollback.taskId);
+            const column = BoardCrudOperations.findColumnById(board, rollback.taskColumnId);
+            const task = column?.tasks.find(t => t.id === rollback.taskId);
 
             if (task && column) {
                 // Restore backend board state

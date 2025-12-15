@@ -12,6 +12,7 @@ import * as path from 'path';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeTypes';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { FileFactory } from '../files/FileFactory';
 import { MarkdownFile } from '../files/MarkdownFile';
@@ -68,19 +69,19 @@ export class IncludeLoadingProcessor {
 
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
-                targetColumn = board.columns.find((c) => c.id === event.targetId) || null;
+                targetColumn = BoardCrudOperations.findColumnById(board, event.targetId) || null;
                 isColumnSwitch = true;
             } else if (event.target === 'task') {
-                targetColumn = board.columns.find((c) => c.id === event.columnIdForTask) || null;
-                targetTask = targetColumn?.tasks.find((t) => t.id === event.targetId) || null;
+                targetColumn = (event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : null) ?? null;
+                targetTask = targetColumn?.tasks.find(t => t.id === event.targetId) || null;
             }
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
             if (event.editType === 'column_title') {
-                targetColumn = board.columns.find((c) => c.id === event.params.columnId) || null;
+                targetColumn = (event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : null) ?? null;
                 isColumnSwitch = true;
             } else if (event.editType === 'task_title') {
-                targetColumn = board.columns.find((c) => c.tasks.some((t) => t.id === event.params.taskId)) || null;
-                targetTask = targetColumn?.tasks.find((t) => t.id === event.params.taskId) || null;
+                targetColumn = (event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : null) ?? null;
+                targetTask = event.params.taskId ? (targetColumn?.tasks.find(t => t.id === event.params.taskId) || null) : null;
             }
         }
 
@@ -360,21 +361,13 @@ export class IncludeLoadingProcessor {
         fileFactory: FileFactory,
         mainFile: MainKanbanFile
     ): Promise<void> {
-        const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-        const isCorrectType = existingFile?.getFileType() === 'include-column';
-
-        if (!existingFile || !isCorrectType) {
-            if (existingFile && !isCorrectType) {
-                existingFile.stopWatching();
-                this._fileRegistry.unregister(existingFile.getPath());
-            }
-
-            const columnInclude = fileFactory.createIncludeDirect(relativePath, mainFile, 'include-column', false);
-            columnInclude.setColumnId(targetColumn.id);
-            columnInclude.setColumnTitle(targetColumn.title);
-            this._fileRegistry.register(columnInclude);
-            columnInclude.startWatching();
-        }
+        this._fileRegistry.ensureIncludeRegistered(
+            relativePath,
+            'include-column',
+            fileFactory,
+            mainFile,
+            { columnId: targetColumn.id, columnTitle: targetColumn.title }
+        );
     }
 
     private async _ensureTaskIncludeRegistered(
@@ -384,22 +377,13 @@ export class IncludeLoadingProcessor {
         fileFactory: FileFactory,
         mainFile: MainKanbanFile
     ): Promise<void> {
-        const existingFile = this._fileRegistry.getByRelativePath(relativePath);
-        const isCorrectType = existingFile?.getFileType() === 'include-task';
-
-        if (!existingFile || !isCorrectType) {
-            if (existingFile && !isCorrectType) {
-                existingFile.stopWatching();
-                this._fileRegistry.unregister(existingFile.getPath());
-            }
-
-            const taskInclude = fileFactory.createInclude(relativePath, mainFile, 'include-task', false);
-            taskInclude.setTaskId(targetTask.id);
-            taskInclude.setTaskTitle(targetTask.title);
-            taskInclude.setColumnId(targetColumn.id);
-            this._fileRegistry.register(taskInclude);
-            taskInclude.startWatching();
-        }
+        this._fileRegistry.ensureIncludeRegistered(
+            relativePath,
+            'include-task',
+            fileFactory,
+            mainFile,
+            { columnId: targetColumn.id, taskId: targetTask.id, taskTitle: targetTask.title }
+        );
     }
 
     private async _loadFileContent(file: MarkdownFile, preloadedContent: string | undefined): Promise<void> {

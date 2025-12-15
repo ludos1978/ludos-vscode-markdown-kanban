@@ -4,6 +4,7 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { IMarkdownFileRegistry } from './FileInterfaces';
 import { KanbanBoard } from '../board/KanbanTypes';
+import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
 import { BackupManager } from '../services/BackupManager';
@@ -52,6 +53,10 @@ export class MainKanbanFile extends MarkdownFile {
 
     public getFileType(): 'main' {
         return 'main';
+    }
+
+    public getFileRegistry(): IMarkdownFileRegistry | undefined {
+        return this._fileRegistry;
     }
 
     // ============= BOARD OPERATIONS =============
@@ -145,7 +150,7 @@ export class MainKanbanFile extends MarkdownFile {
                 task.description = capturedEdit.value;
             }
         } else if (capturedEdit.type === 'column-title') {
-            const column = board.columns.find(c => c.id === capturedEdit.columnId);
+            const column = BoardCrudOperations.findColumnById(board, capturedEdit.columnId);
             if (column) {
                 column.title = capturedEdit.value;
             }
@@ -168,20 +173,13 @@ export class MainKanbanFile extends MarkdownFile {
     private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): any {
         // If columnId provided, search only that column first
         if (columnId) {
-            const column = board.columns.find(c => c.id === columnId);
-            if (column) {
-                const task = column.tasks.find(t => t.id === taskId);
-                if (task) return task;
-            }
+            const result = BoardCrudOperations.findTaskInColumn(board, columnId, taskId);
+            if (result) return result.task;
         }
 
         // Search all columns
-        for (const column of board.columns) {
-            const task = column.tasks.find(t => t.id === taskId);
-            if (task) return task;
-        }
-
-        return null;
+        const result = BoardCrudOperations.findTaskById(board, taskId);
+        return result?.task ?? null;
     }
 
     /**
@@ -339,59 +337,8 @@ export class MainKanbanFile extends MarkdownFile {
 
     // ============= SIMPLIFIED CONFLICT DETECTION =============
 
-    /**
-     * Check if there are ANY unsaved changes (simplified 3-variant approach)
-     * Returns true if ANY of these conditions are met:
-     * - Internal state flag is true (kanban UI edits)
-     * - User is in edit mode
-     * - VSCode document is dirty (text editor edits)
-     * - Document is open but we can't access it (safe default)
-     */
-    public hasAnyUnsavedChanges(): boolean {
-        // Check 1: Internal state flag (from kanban UI) - computed from content comparison
-        if (this.hasUnsavedChanges()) return true;
-
-        // Check 2: Edit mode (user is actively editing)
-        if (this._isInEditMode) return true;
-
-        // Check 3: VSCode document dirty status (text editor edits)
-        const document = this._fileManager.getDocument();
-        if (document && document.uri.fsPath === this._path && document.isDirty) {
-            return true;
-        }
-
-        // Check 4: If document is open but we can't find it, be safe
-        const allDocs = vscode.workspace.textDocuments;
-        const docOpen = allDocs.some(d => d.uri.fsPath === this._path);
-        if (docOpen && !document) {
-            // Document is open but we can't access it - assume it might have changes
-            return true;
-        }
-
-        return false;
-    }
-
-    // ============= OVERRIDES =============
-
-    /**
-     * Override hasConflict to also check VSCode document dirty status
-     * This ensures conflicts are detected when editing in text editor (not just kanban UI)
-     */
-    public hasConflict(): boolean {
-        // Check base class flags (kanban UI changes)
-        const baseHasConflict = super.hasConflict();
-
-        // Also check if VSCode document is dirty (text editor changes)
-        const document = this._fileManager.getDocument();
-        const documentIsDirty = !!(document && document.uri.fsPath === this._path && document.isDirty);
-
-        // Conflict if:
-        // - Base class detects conflict (kanban UI changes + external changes)
-        // - OR document is dirty (text editor changes) AND has external changes
-        const hasConflict = baseHasConflict || (documentIsDirty && this._hasFileSystemChanges);
-
-        return hasConflict;
-    }
+    // hasAnyUnsavedChanges() and hasConflict() are now implemented in base class MarkdownFile
+    // The base class handles VS Code document dirty checks via isDocumentDirtyInVSCode()
 
     /**
      * Override reload to also parse board
