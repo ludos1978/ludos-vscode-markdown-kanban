@@ -322,7 +322,7 @@ export class PresentationGenerator {
         });
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // CRITICAL: Column Include Format - DO NOT MODIFY THIS LOGIC
+        // CRITICAL: Column Include Format
         // ═══════════════════════════════════════════════════════════════════════════
         //
         // The column include file format is:
@@ -337,12 +337,12 @@ export class PresentationGenerator {
         //   ## Title2
         //   ...
         //
-        // When WRITING:
-        //   - Add '\n' after each slide content (creates blank line before ---)
-        //   - Join with '\n---\n\n' (newline + separator + blank line after)
+        // WRITING:
+        //   - Add '\n' after each slide content
+        //   - Join with '\n---\n\n' (combined: slide\n + \n---\n\n = slide\n\n---\n\n)
         //
-        // When READING (in PresentationParser.parsePresentation):
-        //   - We pop exactly TWO trailing empty lines per slide
+        // READING (in PresentationParser.parsePresentation):
+        //   - Split on \n\n---\n\n (consumes blank before + --- + blank after)
         //
         // This ensures perfect round-trip: read → parse → generate → write = identical
         //
@@ -351,19 +351,22 @@ export class PresentationGenerator {
 
         const formattedSlides = filteredSlides.map((slide, i) => {
             const slideContent = slideContents[i];
-            // Add blank line after content (before ---) - paired with pop in parser
+            // Add newline after content (combined with join creates \n\n---\n\n)
             return slideContent + '\n';
         });
 
-        // Join: newline before ---, then ---, then blank line after
+        // Join with \n---\n\n (slide ends with \n, so total is \n\n---\n\n between slides)
         const content = formattedSlides.join('\n---\n\n');
 
         // Combine YAML and content
+        // Only add final newline if content doesn't already end with one
+        const finalNewline = content.endsWith('\n') ? '' : '\n';
+
         if (yaml) {
-            return yaml + content + '\n';
+            return yaml + content + finalNewline;
         }
 
-        return content + '\n';
+        return content + finalNewline;
     }
 
     /**

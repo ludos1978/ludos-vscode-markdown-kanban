@@ -67,10 +67,10 @@ export class PresentationParser {
       return `__COMMENT_PLACEHOLDER_${index}__`;
     });
 
-    // Split by slide separators ONLY (not column markers like ---:, :--:, :---)
-    // CRITICAL: Only plain --- is a separator, others are Marp column layout markers
-    // This prevents an extra leading empty line in each slide
-    const rawSlides = contentWithPlaceholders.split(/^---[ \t]*\n/gm);
+    // Split by slide separators: \n\n---\n\n (blank line + --- + blank line)
+    // This consumes the blank lines around ---, so slides don't have extra leading/trailing empties
+    // CRITICAL: Only plain --- is a separator, others are Marp column layout markers (---:, :--:, :---)
+    const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/g);
     const slides: PresentationSlide[] = [];
 
     // DEBUG: Log rawSlides after split
@@ -83,7 +83,7 @@ export class PresentationParser {
       const lines = slideContent.split('\n');
 
       // ═══════════════════════════════════════════════════════════════════════════
-      // CRITICAL: Column Include Format - DO NOT MODIFY THIS LOGIC
+      // CRITICAL: Column Include Format
       // ═══════════════════════════════════════════════════════════════════════════
       //
       // The column include file format is:
@@ -98,28 +98,19 @@ export class PresentationParser {
       //   ## Title2
       //   ...
       //
-      // When READING, we pop exactly TWO trailing empty lines:
-      //   1. The empty string after the last \n (artifact of split)
-      //   2. The blank line before --- (formatting, not content)
+      // READING: Split on \n\n---\n\n (consumes blank before + --- + blank after)
+      //   - Slides start directly with content (no leading blank from ---)
+      //   - Only pop ONE trailing empty (artifact of split on \n)
       //
-      // When WRITING (in PresentationGenerator.formatSlides):
-      //   - We add '\n' after each slide content (restores the blank before ---)
-      //   - We join with '\n---\n\n' (separator + blank after)
+      // WRITING (in PresentationGenerator.formatSlides):
+      //   - Join with '\n\n---\n\n' (blank + separator + blank)
       //
       // This ensures perfect round-trip: read → parse → generate → write = identical
       //
       // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatSlides!
       // ═══════════════════════════════════════════════════════════════════════════
 
-      // ═══════════════════════════════════════════════════════════════════════════
-      // NEVER CHANGE THESE POPS! UP TO 2 POPS IF LAST LINES ARE EMPTY!
-      // NO OTHER WAY IS PERMITTED! NEVER EVER!
-      // ═══════════════════════════════════════════════════════════════════════════
-      // Pop 1: Remove trailing empty from split (after last \n)
-      if (lines.length > 0 && lines[lines.length - 1] === '') {
-        lines.pop();
-      }
-      // Pop 2: Remove the blank line before --- (we add it back when writing)
+      // Pop trailing empty from split (artifact: empty string after last \n)
       if (lines.length > 0 && lines[lines.length - 1] === '') {
         lines.pop();
       }
@@ -155,9 +146,10 @@ export class PresentationParser {
       const descriptionEndLine: number = lines.length; // Always read to end
 
       if (contentLines.length >= 1) {
-        // Check empty line count: 0-1 empty lines = has title, 2+ = no title
-        if (emptyLineCount < 2) {
-          // 0 or 1 empty lines => first content is title
+        // Check empty line count: 0 empty lines = has title, 1+ = no title
+        // (Since split consumes \n\n---\n\n, slides start directly with content)
+        if (emptyLineCount < 1) {
+          // 0 empty lines => first content is title
           const firstContentLine = lines[contentLines[0]];
 
           // ERROR CORRECTION: Check if first line contains patterns that indicate
@@ -185,7 +177,7 @@ export class PresentationParser {
             }
           }
         } else {
-          // 2+ empty lines => no title, all is description
+          // 1+ empty lines => no title, all is description
           titleLine = -1; // undefined
           descriptionStartLine = Math.min(contentLines[0], 3);
         }
