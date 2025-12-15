@@ -44,35 +44,35 @@ export class FileSearchService {
         let useRegex = false;
 
         const makeCaseBtn = (): vscode.QuickInputButton => {
-            const icon = this._extensionUri
+            const icon: vscode.Uri | vscode.ThemeIcon = this._extensionUri
                 ? (caseSensitive
                     ? vscode.Uri.joinPath(this._extensionUri, 'imgs', 'case-on.svg')
                     : vscode.Uri.joinPath(this._extensionUri, 'imgs', 'case-off.svg'))
                 : new vscode.ThemeIcon('case-sensitive');
             return {
-                iconPath: icon as any,
+                iconPath: icon,
                 tooltip: `Match Case: ${caseSensitive ? 'On' : 'Off'} (click to toggle)`
             };
         };
         const makeWordBtn = (): vscode.QuickInputButton => {
-            const icon = this._extensionUri
+            const icon: vscode.Uri | vscode.ThemeIcon = this._extensionUri
                 ? (wholeWord
                     ? vscode.Uri.joinPath(this._extensionUri, 'imgs', 'word-on.svg')
                     : vscode.Uri.joinPath(this._extensionUri, 'imgs', 'word-off.svg'))
                 : new vscode.ThemeIcon('whole-word');
             return {
-                iconPath: icon as any,
+                iconPath: icon,
                 tooltip: `Whole Word: ${wholeWord ? 'On' : 'Off'} (click to toggle)`
             };
         };
         const makeRegexBtn = (): vscode.QuickInputButton => {
-            const icon = this._extensionUri
+            const icon: vscode.Uri | vscode.ThemeIcon = this._extensionUri
                 ? (useRegex
                     ? vscode.Uri.joinPath(this._extensionUri, 'imgs', 'regex-on.svg')
                     : vscode.Uri.joinPath(this._extensionUri, 'imgs', 'regex-off.svg'))
                 : new vscode.ThemeIcon('regex');
             return {
-                iconPath: icon as any,
+                iconPath: icon,
                 tooltip: `Regular Expression: ${useRegex ? 'On' : 'Off'} (click to toggle)`
             };
         };
@@ -108,7 +108,8 @@ export class FileSearchService {
                 const tabsToClose: vscode.Tab[] = [];
                 for (const group of vscode.window.tabGroups.all) {
                     for (const tab of group.tabs) {
-                        const tabInput = tab.input as any;
+                        // TabInputText has uri property
+                        const tabInput = tab.input as vscode.TabInputText | undefined;
                         const tabUri = tabInput?.uri?.toString();
                         if (tabUri === targetUri && tab.isPreview) {
                             tabsToClose.push(tab);

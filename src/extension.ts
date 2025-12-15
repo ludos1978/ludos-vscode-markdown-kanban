@@ -52,7 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
 	};
 
 	// Expose these functions to the KanbanWebviewPanel
-	(globalThis as any).kanbanFileListener = {
+	globalThis.kanbanFileListener = {
 		getStatus: getFileListenerStatus,
 		setStatus: setFileListenerStatus
 	};

@@ -519,14 +519,14 @@ export type IncomingMessageType = IncomingMessage['type'];
  * Check if message is a request (has requestId)
  */
 export function isRequestMessage(message: BaseMessage): message is RequestMessage {
-    return 'requestId' in message && typeof (message as any).requestId === 'string';
+    return 'requestId' in message && typeof (message as RequestMessage).requestId === 'string';
 }
 
 /**
  * Check if message is a response
  */
 export function isResponseMessage(message: BaseMessage): message is ResponseMessage {
-    return 'requestId' in message && typeof (message as any).requestId === 'string';
+    return 'requestId' in message && typeof (message as ResponseMessage).requestId === 'string';
 }
 
 /**

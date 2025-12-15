@@ -152,10 +152,10 @@ export class TemplateParser {
                         result.variables!.push(this.normalizeVariable(currentVariable));
                     }
                     // Start new variable
-                    currentVariable = {};
-                    const key = itemMatch[1];
+                    currentVariable = {} as Partial<TemplateVariable>;
+                    const key = itemMatch[1] as keyof TemplateVariable;
                     const value = this.unquote(itemMatch[2].trim());
-                    (currentVariable as any)[key] = value;
+                    (currentVariable as Record<string, unknown>)[key] = value;
                     indent = line.search(/\S/);
                     continue;
                 }
@@ -175,7 +175,7 @@ export class TemplateParser {
                             value = parseInt(value as string, 10);
                         }
 
-                        (currentVariable as any)[key] = value;
+                        (currentVariable as Record<string, unknown>)[key] = value;
                     }
                 }
             }

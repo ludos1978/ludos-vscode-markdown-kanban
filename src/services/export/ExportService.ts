@@ -64,6 +64,8 @@ export interface NewExportOptions {
 
     // MARP SPECIFIC
     marpTheme?: string;
+    marpGlobalClasses?: string[];   // Global CSS classes for all slides
+    marpLocalClasses?: string[];    // Local CSS classes for specific slides
     marpBrowser?: string;
     marpEnginePath?: string;
     marpWatch?: boolean;            // Run Marp in watch mode
@@ -1048,9 +1050,9 @@ export class ExportService {
             filteredContent = PresentationGenerator.fromTasks(tasks, {
                 includeMarpDirectives: true,  // Export always includes Marp directives
                 marp: {
-                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
-                    globalClasses: (options as any).marpGlobalClasses || marpConfig.globalClasses || [],
-                    localClasses: (options as any).marpLocalClasses || marpConfig.localClasses || []
+                    theme: options.marpTheme || marpConfig.defaultTheme || 'default',
+                    globalClasses: options.marpGlobalClasses || marpConfig.globalClasses || [],
+                    localClasses: options.marpLocalClasses || marpConfig.localClasses || []
                 }
             });
         }
@@ -1418,7 +1420,7 @@ export class ExportService {
                 includeMarpDirectives: true,  // Export always includes Marp directives
                 stripIncludes: true,  // Strip include syntax (content already inlined in board)
                 marp: {
-                    theme: (options as any).marpTheme || marpConfig.defaultTheme || 'default',
+                    theme: options.marpTheme || marpConfig.defaultTheme || 'default',
                     globalClasses: marpClasses.global.length > 0 ? marpClasses.global : (marpConfig.globalClasses || []),
                     localClasses: marpClasses.local.length > 0 ? marpClasses.local : (marpConfig.localClasses || []),
                     perSlideClasses: marpClasses.perSlide

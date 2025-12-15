@@ -169,10 +169,11 @@ export class ConfigurationService {
         const result: Partial<KanbanConfiguration> = {};
 
         for (const key of Object.keys(this.defaults) as Array<keyof ConfigurationDefaults>) {
-            result[key as keyof KanbanConfiguration] = config.get(
+            // Use type assertion for dynamic property assignment
+            (result as Record<string, unknown>)[key] = config.get(
                 key,
                 this.defaults[key]
-            ) as any;
+            );
         }
 
         return result;

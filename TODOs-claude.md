@@ -56,8 +56,23 @@
 - [x] H2: Chained .replace() - Idiomatic patterns (CRLF normalization, tag stripping)
 - [x] H3: Dynamic RegExp - Need runtime values (paths, tags) - can't be pre-cached
 - [x] H4: Null checking - Already consistent with strict equality (`===`/`!==`)
+- [x] H5: Frontend console logging - Already clean (no unguarded `console.log` calls)
+- [x] H6: Error handling patterns - Reasonable (catch-and-log for stability)
 
 **Summary:** Codebase polish is already good. No significant cleanup needed for these patterns.
+
+### Track C: Type Safety ✅ CONTINUED (45→37)
+Additional `as any` casts fixed:
+- [x] MessageTypes.ts: 2 fixed (proper type assertions in type guards)
+- [x] fileSearchService.ts: 4 fixed (icon types, TabInputText)
+- [x] extension.ts: 1 fixed (global type declaration for kanbanFileListener)
+- [x] TemplateParser.ts: 2 fixed (Record<string, unknown> for dynamic props)
+- [x] ConfigurationService.ts: 1 fixed (Record<string, unknown>)
+- [x] ExportService.ts: 4 fixed (added marpGlobalClasses, marpLocalClasses to interface)
+
+**Remaining 37 casts need larger changes:**
+- Panel internal access (needs typed panel interface)
+- Message types (needs message schema updates)
 
 ---
 
