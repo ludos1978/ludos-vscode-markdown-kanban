@@ -334,10 +334,10 @@ window.handleEmptyColumnDragEnd = function(e) {
         boardElement.classList.remove('template-dragging');
     }
 
-    // Clear all drag-over classes
-    document.querySelectorAll('.template-drag-over, .drag-over').forEach(el => {
-        el.classList.remove('template-drag-over', 'drag-over');
-    });
+    // Clear all tracked highlights efficiently
+    if (typeof window.clearHighlights === 'function') {
+        window.clearHighlights();
+    }
 
     // If we have a valid drop target, create empty column using SAME logic as regular column drops
     if (typeof window.templateDragState !== 'undefined' &&
@@ -521,10 +521,10 @@ window.handleTemplateMenuDragEnd = function(e) {
         boardElement.classList.remove('template-dragging');
     }
 
-    // Clear all drag-over classes
-    document.querySelectorAll('.template-drag-over, .drag-over').forEach(el => {
-        el.classList.remove('template-drag-over', 'drag-over');
-    });
+    // Clear all tracked highlights efficiently
+    if (typeof window.clearHighlights === 'function') {
+        window.clearHighlights();
+    }
 
     // If we have a valid drop target, apply the template
     if (typeof window.templateDragState !== 'undefined' &&

@@ -39,6 +39,34 @@ let isProcessingDrop = false; // Prevent multiple simultaneous drops
 let currentExternalDropColumn = null;
 let externalDropIndicator = null;
 
+// PERFORMANCE: Track highlighted elements to avoid querySelectorAll on cleanup
+const highlightedElements = new Set();
+
+/**
+ * Add a highlight class to an element and track it for efficient cleanup
+ * @param {HTMLElement} element - Element to highlight
+ * @param {string} className - Class to add ('drag-over' or 'task-drop-target')
+ */
+function addHighlight(element, className) {
+    if (!element) return;
+    element.classList.add(className);
+    highlightedElements.add({ element, className });
+}
+
+/**
+ * Clear all tracked highlights efficiently (no querySelectorAll)
+ */
+function clearHighlights() {
+    for (const { element, className } of highlightedElements) {
+        element.classList.remove(className);
+    }
+    highlightedElements.clear();
+}
+
+// Make highlight functions globally available for clipboardHandler.js
+window.addHighlight = addHighlight;
+window.clearHighlights = clearHighlights;
+
 // File drop dialogue: store pending File objects until user confirms action
 const pendingFileDrops = new Map();
 const FILE_SIZE_LIMIT_MB = 10;
@@ -503,12 +531,10 @@ function cleanupInternalDropIndicator() {
  * Cleans up all drop zone highlight classes
  * Purpose: Remove drag-over highlights from margins, drop zones, and columns
  * Used by: handleExternalDrop, cleanupDragVisuals, dragleave handlers, document dragover
+ * PERFORMANCE: Uses tracked highlights instead of querySelectorAll
  */
 function cleanupDropZoneHighlights() {
-    document.querySelectorAll('.column-margin.drag-over').forEach(el => el.classList.remove('drag-over'));
-    document.querySelectorAll('.stack-bottom-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
-    document.querySelectorAll('.column-drop-zone.drag-over').forEach(el => el.classList.remove('drag-over'));
-    document.querySelectorAll('.column-title.task-drop-target').forEach(el => el.classList.remove('task-drop-target'));
+    clearHighlights();
 }
 
 /**
@@ -1447,23 +1473,6 @@ function setupGlobalDragAndDrop() {
     }
 
     function resetDragState() {
-        // PERFORMANCE: Remove scroll handler if it exists
-        if (dragState.scrollHandler) {
-            document.removeEventListener('scroll', dragState.scrollHandler, { capture: true });
-            dragState.scrollHandler = null;
-        }
-
-        // CRITICAL: Clear all position caches to prevent memory leaks and stale references
-        dragState.cachedColumnPositions = null;
-        dragState.cachedStacks = null;
-        dragState.cachedRows = null;
-        dragState.cachedAddButtonRect = null;
-        dragState.draggedColumnCache = null;
-        if (dragState.allColumnPositions) {
-            dragState.allColumnPositions.clear();
-            dragState.allColumnPositions = null;
-        }
-
         // Reset all drag state properties
         dragState.draggedClipboardCard = null;
         dragState.draggedEmptyCard = null;
@@ -2576,27 +2585,6 @@ function setupTaskDragHandle(handle) {
             dragState.affectedColumns = new Set(); // PERFORMANCE: Track affected columns for targeted cleanup
             dragState.affectedColumns.add(dragState.originalTaskParent); // Add origin column
 
-            // PERFORMANCE: Cache task positions for ALL columns at dragstart
-            // This eliminates ALL querySelectorAll and getBoundingClientRect calls during drag
-            dragState.allColumnPositions = new Map();
-            document.querySelectorAll('.column-tasks-container').forEach(container => {
-                const containerKey = container.id || container.dataset.columnId || container;
-                const tasks = Array.from(container.querySelectorAll('.task-item'))
-                    .filter(task => task !== taskItem)
-                    .map(task => ({
-                        element: task,
-                        rect: task.getBoundingClientRect()
-                    }));
-                const addButton = container.querySelector('.add-task-btn');
-                const addButtonRect = addButton ? addButton.getBoundingClientRect() : null;
-
-                dragState.allColumnPositions.set(containerKey, {
-                    tasks: tasks,
-                    addButton: addButton,
-                    addButtonRect: addButtonRect
-                });
-            });
-
             // Set multiple data formats
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', `kanban-task:${taskId}`); // Add prefix
@@ -3087,269 +3075,8 @@ function setupColumnDragAndDrop() {
             dragState.lastDropTarget = null;  // Track last drop position
             dragState.styleUpdatePending = false;  // Track if style update is needed
 
-            // PERFORMANCE: Cache column AND margin/title positions for fast lookup during drag
-            const allColumns = document.querySelectorAll('.kanban-full-height-column');
-
-            // Cache dragged column separately (needed for drop-below-last-column indicator)
-            const draggedColumnTitle = columnElement.querySelector('.column-title');
-            const draggedIsSticky = draggedColumnTitle && window.getComputedStyle(draggedColumnTitle).position === 'sticky';
-            const draggedContent = columnElement.querySelector('.column-content');
-            const draggedContentRect = draggedContent ? draggedContent.getBoundingClientRect() : null;
-            const draggedTitleRect = draggedColumnTitle ? draggedColumnTitle.getBoundingClientRect() : null;
-            const draggedContentVisible = draggedContentRect && draggedContentRect.bottom > 0 && draggedContentRect.top < window.innerHeight;
-
-            dragState.draggedColumnCache = {
-                element: columnElement,
-                rect: columnElement.getBoundingClientRect(),
-                columnId: columnId,
-                isSticky: draggedIsSticky,
-                isFolded: draggedIsSticky && !draggedContentVisible,
-                isContentVisible: draggedContentVisible,
-                contentRect: draggedContentRect,
-                columnTitleRect: draggedTitleRect
-            };
-
-            // HIERARCHICAL CACHE: Rows → Stacks → Columns
-            const board = document.getElementById('kanban-board');
-
-            // STEP 1: Cache ROW positions
-            const rows = board.querySelectorAll('.kanban-row');
-            if (rows.length > 0) {
-                dragState.cachedRows = Array.from(rows).map(row => {
-                    const rect = row.getBoundingClientRect();
-                    return {
-                        element: row,
-                        rowNumber: parseInt(row.dataset.rowNumber, 10) || 1,
-                        top: rect.top,
-                        bottom: rect.bottom
-                    };
-                });
-            } else {
-                // Single row layout - use board as the row
-                const boardRect = board.getBoundingClientRect();
-                dragState.cachedRows = [{
-                    element: board,
-                    rowNumber: 1,
-                    top: boardRect.top,
-                    bottom: boardRect.bottom
-                }];
-            }
-
-            // STEP 2: Cache ALL STACKS (including drop-zone-stacks) with hierarchical column data
-            dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack')).map(stack => {
-                const stackRect = stack.getBoundingClientRect();
-                const isDropZoneStack = stack.classList.contains('column-drop-zone-stack');
-                const rowElement = stack.closest('.kanban-row') || board;
-
-                // For regular stacks, cache columns with header/footer positions
-                let columnsData = [];
-                if (!isDropZoneStack) {
-                    const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
-                    columnsData = columnsInStack.map(col => {
-                        const columnTitle = col.querySelector('.column-title');
-                        const columnFooter = col.querySelector('.column-footer');
-                        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
-                        const bottomMargin = col.querySelector('.column-margin-bottom');
-
-                        // Get header top (column-title top)
-                        const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
-
-                        // Get footer bottom (column-footer bottom, or column bottom if no footer)
-                        let footerBottom;
-                        if (columnFooter) {
-                            footerBottom = columnFooter.getBoundingClientRect().bottom;
-                        } else {
-                            // Use column bottom as fallback
-                            footerBottom = col.getBoundingClientRect().bottom;
-                        }
-
-                        return {
-                            element: col,
-                            columnId: col.getAttribute('data-column-id'),
-                            headerTop: headerTop,
-                            footerBottom: footerBottom,
-                            topMarginElement: topMargin,
-                            bottomMarginElement: bottomMargin
-                        };
-                    });
-                }
-
-                // Find stack-bottom-drop-zone if exists
-                const stackBottomDropZone = stack.querySelector('.stack-bottom-drop-zone');
-
-                return {
-                    element: stack,
-                    rowElement: rowElement,
-                    isDropZoneStack: isDropZoneStack,
-                    left: stackRect.left,
-                    right: stackRect.right,
-                    top: stackRect.top,
-                    bottom: stackRect.bottom,
-                    columns: columnsData,
-                    lastColumn: columnsData.length > 0 ? columnsData[columnsData.length - 1].element : null,
-                    stackBottomDropZone: stackBottomDropZone
-                };
-            });
-
-            // Keep cachedColumnPositions for backward compatibility with showInternalColumnDropIndicator
-            dragState.cachedColumnPositions = Array.from(allColumns)
-                .filter(col => col !== columnElement)
-                .map(col => {
-                    const colId = col.getAttribute('data-column-id');
-                    const columnTitle = col.querySelector('.column-title');
-                    const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
-                    const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
-                    const bottomMargin = col.querySelector('.column-margin-bottom');
-                    const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
-                    const columnContent = col.querySelector('.column-content');
-                    const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
-                    const viewportHeight = window.innerHeight;
-                    const isContentVisible = contentRect && contentRect.bottom > 0 && contentRect.top < viewportHeight;
-                    const isFolded = isSticky && !isContentVisible;
-
-                    return {
-                        element: col,
-                        rect: col.getBoundingClientRect(),
-                        columnId: colId,
-                        isSticky: isSticky,
-                        isFolded: isFolded,
-                        isContentVisible: isContentVisible,
-                        contentRect: contentRect,
-                        topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
-                        bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
-                        columnTitleRect: columnTitleRect
-                    };
-                });
-
             // Track throttling for column dragover
             dragState.columnDragoverThrottleId = null;
-
-            // PERFORMANCE: Add scroll handler to update cache during drag
-            // This keeps cached positions accurate if user scrolls while dragging
-            const scrollHandler = () => {
-                if (!dragState.isDragging || !dragState.draggedColumn) return;
-
-                const board = document.getElementById('kanban-board');
-
-                // Re-cache dragged column position
-                const draggedCol = dragState.draggedColumn;
-                const draggedTitle = draggedCol.querySelector('.column-title');
-                const draggedSticky = draggedTitle && window.getComputedStyle(draggedTitle).position === 'sticky';
-                const draggedCont = draggedCol.querySelector('.column-content');
-                const draggedContRect = draggedCont ? draggedCont.getBoundingClientRect() : null;
-                const draggedTitleRect = draggedTitle ? draggedTitle.getBoundingClientRect() : null;
-                const draggedContVisible = draggedContRect && draggedContRect.bottom > 0 && draggedContRect.top < window.innerHeight;
-
-                dragState.draggedColumnCache = {
-                    element: draggedCol,
-                    rect: draggedCol.getBoundingClientRect(),
-                    columnId: draggedCol.getAttribute('data-column-id'),
-                    isSticky: draggedSticky,
-                    isFolded: draggedSticky && !draggedContVisible,
-                    isContentVisible: draggedContVisible,
-                    contentRect: draggedContRect,
-                    columnTitleRect: draggedTitleRect
-                };
-
-                // Re-cache ROW positions
-                const rows = board.querySelectorAll('.kanban-row');
-                if (rows.length > 0) {
-                    dragState.cachedRows = Array.from(rows).map(row => {
-                        const rect = row.getBoundingClientRect();
-                        return {
-                            element: row,
-                            rowNumber: parseInt(row.dataset.rowNumber, 10) || 1,
-                            top: rect.top,
-                            bottom: rect.bottom
-                        };
-                    });
-                } else {
-                    const boardRect = board.getBoundingClientRect();
-                    dragState.cachedRows = [{
-                        element: board,
-                        rowNumber: 1,
-                        top: boardRect.top,
-                        bottom: boardRect.bottom
-                    }];
-                }
-
-                // Re-cache STACKS with hierarchical column data
-                dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack')).map(stack => {
-                    const stackRect = stack.getBoundingClientRect();
-                    const isDropZoneStack = stack.classList.contains('column-drop-zone-stack');
-                    const rowElement = stack.closest('.kanban-row') || board;
-
-                    let columnsData = [];
-                    if (!isDropZoneStack) {
-                        const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
-                        columnsData = columnsInStack.map(col => {
-                            const columnTitle = col.querySelector('.column-title');
-                            const columnFooter = col.querySelector('.column-footer');
-                            const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
-                            const bottomMargin = col.querySelector('.column-margin-bottom');
-                            const headerTop = columnTitle ? columnTitle.getBoundingClientRect().top : col.getBoundingClientRect().top;
-                            let footerBottom = columnFooter ? columnFooter.getBoundingClientRect().bottom : col.getBoundingClientRect().bottom;
-
-                            return {
-                                element: col,
-                                columnId: col.getAttribute('data-column-id'),
-                                headerTop: headerTop,
-                                footerBottom: footerBottom,
-                                topMarginElement: topMargin,
-                                bottomMarginElement: bottomMargin
-                            };
-                        });
-                    }
-
-                    const stackBottomDropZone = stack.querySelector('.stack-bottom-drop-zone');
-
-                    return {
-                        element: stack,
-                        rowElement: rowElement,
-                        isDropZoneStack: isDropZoneStack,
-                        left: stackRect.left,
-                        right: stackRect.right,
-                        top: stackRect.top,
-                        bottom: stackRect.bottom,
-                        columns: columnsData,
-                        lastColumn: columnsData.length > 0 ? columnsData[columnsData.length - 1].element : null,
-                        stackBottomDropZone: stackBottomDropZone
-                    };
-                });
-
-                // Re-cache all other column positions (for backward compatibility)
-                const allColumns = document.querySelectorAll('.kanban-full-height-column');
-                dragState.cachedColumnPositions = Array.from(allColumns)
-                    .filter(col => col !== dragState.draggedColumn)
-                    .map(col => {
-                        const colId = col.getAttribute('data-column-id');
-                        const columnTitle = col.querySelector('.column-title');
-                        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
-                        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
-                        const bottomMargin = col.querySelector('.column-margin-bottom');
-                        const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
-                        const columnContent = col.querySelector('.column-content');
-                        const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
-                        const viewportHeight = window.innerHeight;
-                        const isContentVisible = contentRect && contentRect.bottom > 0 && contentRect.top < viewportHeight;
-                        const isFolded = isSticky && !isContentVisible;
-
-                        return {
-                            element: col,
-                            rect: col.getBoundingClientRect(),
-                            columnId: colId,
-                            isSticky: isSticky,
-                            isFolded: isFolded,
-                            isContentVisible: isContentVisible,
-                            contentRect: contentRect,
-                            topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
-                            bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
-                            columnTitleRect: columnTitleRect
-                        };
-                    });
-            };
-            dragState.scrollHandler = scrollHandler;
-            document.addEventListener('scroll', scrollHandler, { passive: true, capture: true });
 
             // Set drag data
             e.dataTransfer.effectAllowed = 'move';
@@ -3518,7 +3245,7 @@ function setupColumnDragAndDrop() {
             if (foundStack && isDropZoneStack && !stillTaskDrag && !stillClipboardDrag && !stillEmptyCardDrag) {
                 const dropZone = foundStack.querySelector('.column-drop-zone');
                 if (dropZone) {
-                    dropZone.classList.add('drag-over');
+                    addHighlight(dropZone, 'drag-over');
                     dragState.pendingDropZone = dropZone;
 
                     // For template drags, set target position
@@ -3612,7 +3339,7 @@ function setupColumnDragAndDrop() {
                 if (dropAtEnd) {
                     const columnTitle = targetColumn.querySelector('.column-title');
                     if (columnTitle) {
-                        columnTitle.classList.add('task-drop-target');
+                        addHighlight(columnTitle, 'task-drop-target');
                     }
                     if (tasksContainer) {
                         dragState.dropTargetContainer = tasksContainer;
@@ -3683,7 +3410,7 @@ function setupColumnDragAndDrop() {
 
             // Highlight the appropriate margin element
             if (highlightMargin) {
-                highlightMargin.classList.add('drag-over');
+                addHighlight(highlightMargin, 'drag-over');
             }
 
             // Update drop target state
@@ -3791,10 +3518,8 @@ function handleTemplateDragEnd(e) {
         boardElement.classList.remove('template-dragging');
     }
 
-    // Clear all template-drag-over classes
-    document.querySelectorAll('.template-drag-over').forEach(el => {
-        el.classList.remove('template-drag-over');
-    });
+    // Clear all tracked highlights (including template-drag-over)
+    clearHighlights();
 
     // If we have a valid drop target, apply the template
     if (templateDragState.isDragging && templateDragState.targetRow !== null) {
@@ -3822,8 +3547,8 @@ function handleTemplateDragOver(e, dropZone) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
 
-    // Highlight the drop zone
-    dropZone.classList.add('template-drag-over');
+    // Highlight the drop zone using tracking system
+    addHighlight(dropZone, 'template-drag-over');
 
     // Determine target row and position
     const row = dropZone.closest('.kanban-row');
@@ -3867,7 +3592,8 @@ function handleTemplateDragLeave(e, dropZone) {
         return;
     }
 
-    dropZone.classList.remove('template-drag-over');
+    // Clear highlights when leaving (will be re-added if entering another zone)
+    clearHighlights();
 }
 
 /**
@@ -3893,75 +3619,6 @@ function applyTemplateAtPosition() {
     }
 }
 
-/**
- * Cache column positions for template drags
- * Called when template drag starts to enable same drop behavior as column drags
- * MUST match the caching logic in setupColumnDragAndDrop exactly!
- */
-function cacheColumnPositionsForTemplateDrag() {
-    const allColumns = document.querySelectorAll('.kanban-full-height-column');
-    const board = document.getElementById('kanban-board');
-    const viewportHeight = window.innerHeight;
-
-    // Cache stack structure (same as column drag)
-    dragState.cachedStacks = Array.from(board.querySelectorAll('.kanban-column-stack:not(.column-drop-zone-stack)')).map(stack => {
-        const columnsInStack = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
-        return {
-            element: stack,
-            columns: columnsInStack,
-            lastColumn: columnsInStack[columnsInStack.length - 1]
-        };
-    });
-
-    // Cache column positions (same logic as column drag in setupColumnDragAndDrop)
-    dragState.cachedColumnPositions = Array.from(allColumns).map(col => {
-        const colId = col.getAttribute('data-column-id');
-        const columnTitle = col.querySelector('.column-title');
-
-        // Check if column is using sticky positioning (collapsed/stacked)
-        const isSticky = columnTitle && window.getComputedStyle(columnTitle).position === 'sticky';
-
-        // Cache margins (used when NOT sticky) - use actual DOM elements
-        const topMargin = col.querySelector('.column-margin:not(.column-margin-bottom)');
-        const bottomMargin = col.querySelector('.column-margin-bottom');
-
-        // Cache column title rect (used when sticky)
-        const columnTitleRect = columnTitle ? columnTitle.getBoundingClientRect() : null;
-
-        // CRITICAL: Check if column-content is visible in viewport (determines folded state)
-        const columnContent = col.querySelector('.column-content');
-        const contentRect = columnContent ? columnContent.getBoundingClientRect() : null;
-
-        // Column is "folded" only if content is NOT visible in viewport
-        // If any part of content is visible, it's NOT folded
-        const isContentVisible = contentRect &&
-            contentRect.bottom > 0 &&
-            contentRect.top < viewportHeight;
-        const isFolded = isSticky && !isContentVisible;
-
-        return {
-            element: col,
-            rect: col.getBoundingClientRect(),
-            columnId: colId,
-            isSticky: isSticky,
-            isFolded: isFolded,
-            isContentVisible: isContentVisible,
-            contentRect: contentRect,
-            topMarginRect: topMargin ? topMargin.getBoundingClientRect() : null,
-            bottomMarginRect: bottomMargin ? bottomMargin.getBoundingClientRect() : null,
-            columnTitleRect: columnTitleRect
-        };
-    });
-}
-
-/**
- * Clear cached positions after template drag ends
- */
-function clearTemplateDragCache() {
-    dragState.cachedColumnPositions = null;
-    dragState.cachedStacks = null;
-    dragState.cachedRows = null;
-}
 
 /**
  * Normalize stack tags for all columns based on DOM positions
@@ -4021,6 +3678,4 @@ window.setupTemplateDragHandlers = setupTemplateDragHandlers;
 window.handleTemplateDragOver = handleTemplateDragOver;
 window.handleTemplateDragLeave = handleTemplateDragLeave;
 window.templateDragState = templateDragState;
-window.cacheColumnPositionsForTemplateDrag = cacheColumnPositionsForTemplateDrag;
-window.clearTemplateDragCache = clearTemplateDragCache;
 window.normalizeAllStackTags = normalizeAllStackTags;

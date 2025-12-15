@@ -5,6 +5,7 @@ import { KanbanSidebarProvider } from './kanbanSidebarProvider';
 import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
+import { SaveEventDispatcher } from './SaveEventDispatcher';
 
 // Re-export for backwards compatibility
 export { getOutputChannel } from './services/OutputChannelService';
@@ -375,4 +376,7 @@ export async function deactivate(): Promise<void> {
 
 	// Clean up context
 	await vscode.commands.executeCommand('setContext', 'markdownKanbanActive', false);
+
+	// Dispose singleton services to prevent resource leaks
+	SaveEventDispatcher.getInstance().dispose();
 }

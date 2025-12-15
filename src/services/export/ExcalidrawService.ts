@@ -1,7 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { DrawIOService } from './DrawIOService';
-import { JSDOM } from 'jsdom';
+
+// Dynamic import of jsdom - only available in development, not bundled in production
+let JSDOM: typeof import('jsdom').JSDOM | undefined;
+try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    JSDOM = require('jsdom').JSDOM;
+} catch {
+    // jsdom not available in production - will use fallback SVG generation
+}
 
 /**
  * Excalidraw element structure (subset of properties used)
@@ -126,6 +134,11 @@ export class ExcalidrawService {
      * Based on the approach from excalidraw-to-svg library
      */
     private async convertWithJsdom(excalidrawData: ExcalidrawData): Promise<string> {
+        // Check if jsdom is available (only in development)
+        if (!JSDOM) {
+            throw new Error('jsdom not available - using fallback');
+        }
+
         // Paths to required library files (using UMD build from @excalidraw/utils@0.1.2)
         const canvasPolyfillPath = path.join(__dirname, '../../../node_modules/canvas-5-polyfill/canvas.js');
         const excalidrawUtilsPath = path.join(__dirname, '../../../node_modules/@excalidraw/utils/dist/excalidraw-utils.min.js');
