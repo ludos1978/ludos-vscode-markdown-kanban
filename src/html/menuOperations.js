@@ -3164,9 +3164,8 @@ function manualRefresh() {
             });
         });
         window.pendingColumnChanges.clear();
-    } else {
     }
-    
+
     // Send all pending task changes
     if (window.pendingTaskChanges && window.pendingTaskChanges.size > 0) {
         window.pendingTaskChanges.forEach((change) => {
@@ -3178,9 +3177,8 @@ function manualRefresh() {
             });
         });
         window.pendingTaskChanges.clear();
-    } else {
     }
-    
+
     // Clear any pending timeouts
     if (window.columnTagUpdateTimeout) {
         clearTimeout(window.columnTagUpdateTimeout);

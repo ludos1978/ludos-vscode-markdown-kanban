@@ -470,11 +470,6 @@ export class MarkdownKanbanParser {
       markdown += board.yamlHeader + '\n\n';
     }
 
-    // Add board title if it exists
-    // if (board.title) {
-    //   markdown += `# ${board.title}\n\n`;
-    // }
-
     // Sort columns by row before saving to ensure correct order in file
     // This maintains row 1 columns before row 2 columns in the saved markdown
     const sortedColumns = sortColumnsByRow(board.columns);

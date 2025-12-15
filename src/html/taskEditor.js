@@ -1207,13 +1207,9 @@ class TaskEditor {
                         } else {
                             console.error('[TaskEditor] markUnsavedChanges function not available!');
                         }
-
-                        // Note: No need to send updateTaskInBackend message here
-                        // The markUnsavedChanges() call above already sends the complete
-                        // updated board data via the cachedBoard parameter
-                    } else {
+                        // Note: markUnsavedChanges() sends the complete updated board data
                     }
-                    
+
                     if (this.currentEditor.displayElement) {
                         if (value.trim()) {
                             // For task includes, determine the correct display value

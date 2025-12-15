@@ -175,7 +175,6 @@ function refreshDebugOverlay() {
     // Only request new data if we don't have recent data
     if (window.vscode) {
         window.vscode.postMessage({ type: 'getTrackedFilesDebugInfo' });
-    } else {
     }
 
     // Don't rebuild DOM here - let updateTrackedFilesData handle it
@@ -283,7 +282,6 @@ function updateFileStatesContent() {
             const newSummaryHTML = createFileStatesSummary(allFiles);
             if (summaryElement.innerHTML !== newSummaryHTML) {
                 summaryElement.innerHTML = newSummaryHTML;
-            } else {
             }
         }
 
@@ -294,7 +292,6 @@ function updateFileStatesContent() {
             const htmlChanged = listElement.innerHTML !== newListHTML;
             if (htmlChanged) {
                 listElement.innerHTML = newListHTML;
-            } else {
             }
         }
     });
@@ -1484,7 +1481,6 @@ function initializeDebugOverlay() {
                 // Update the file states content to show sync status
                 if (debugOverlayVisible && debugOverlayElement) {
                     updateFileStatesContent();
-                } else {
                 }
                 break;
         }

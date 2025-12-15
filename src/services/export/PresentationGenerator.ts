@@ -200,16 +200,8 @@ export class PresentationGenerator {
             return result;
         });
 
-        // DEBUG: Log slide contents
-        finalContents.forEach((sc, i) => {
-            console.log(`[PresentationGenerator] Slide ${i} content JSON=${JSON.stringify(sc)}`);
-        });
-
         // Join with \n\n---\n\n - content is NOT modified
         const content = finalContents.join('\n\n---\n\n');
-
-        // DEBUG: Log final content
-        console.log(`[PresentationGenerator] Final content JSON=${JSON.stringify(content)}`);
 
         // Build YAML frontmatter if requested
         let yaml = '';

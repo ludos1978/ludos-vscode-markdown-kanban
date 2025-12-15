@@ -33,9 +33,7 @@ function createSmartLogger(prefix) {
          * @param {*} data - Optional data to log
          */
         always(message, data) {
-            if (data !== undefined) {
-            } else {
-            }
+            // Stub: logging disabled
         },
 
         /**

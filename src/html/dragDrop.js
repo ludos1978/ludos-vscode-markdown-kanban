@@ -32,13 +32,6 @@ let lastIndicatorUpdate = 0;
 const INDICATOR_UPDATE_THROTTLE = 100; // milliseconds
 const DEBUG_DROP = false;
 
-// Create smart logger for drag and drop
-// const dragLogger = window.createSmartLogger ? window.createSmartLogger('DragDrop') : {
-//     log: () => {},
-//     always: console.log.bind(console, '[DragDrop]'),
-//     clear: () => {},
-//     once: () => {}
-// };
 
 // Track if drag/drop is already set up to prevent multiple listeners
 let dragDropInitialized = false;
@@ -2806,7 +2799,6 @@ function setupDragAndDrop() {
     if (!dragDropInitialized) {
         setupGlobalDragAndDrop();
         dragDropInitialized = true;
-    } else {
     }
     
     // Always refresh column, task, and row drag/drop since DOM changes

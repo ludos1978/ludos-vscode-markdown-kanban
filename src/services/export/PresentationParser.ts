@@ -34,9 +34,6 @@ export class PresentationParser {
    * Note: Any '---' at the beginning or end of the file are ignored (treated as empty slides)
    */
   static parsePresentation(content: string): PresentationSlide[] {
-    // DEBUG: Log input content
-    console.log(`[PresentationParser.parsePresentation] INPUT content length=${content?.length}, content JSON=${JSON.stringify(content)}`);
-
     // CRITICAL: Only skip if content is null/undefined/empty string
     // Do NOT use trim() - whitespace/newlines ARE valid content
     if (!content) {
@@ -75,9 +72,6 @@ export class PresentationParser {
     const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/g);
     const slides: PresentationSlide[] = [];
 
-    // DEBUG: Log rawSlides after split
-    console.log(`[PresentationParser.parsePresentation] rawSlides count=${rawSlides.length}, rawSlides=${JSON.stringify(rawSlides)}`);
-
     rawSlides.forEach((slideContent, index) => {
       // CRITICAL: Process ALL slides - never skip based on content
       // Empty/whitespace content IS valid content
@@ -106,9 +100,6 @@ export class PresentationParser {
       //
       // DO NOT CHANGE THIS WITHOUT UPDATING PresentationGenerator.formatOutput!
       // ═══════════════════════════════════════════════════════════════════════════
-
-      // DEBUG: Show lines array
-      console.log(`[PresentationParser] Slide ${index} lines=${JSON.stringify(lines)}`);
 
       // Count CONSECUTIVE leading empty lines from the start
       // CRITICAL: Only check for exact empty string, NOT trim
@@ -196,9 +187,6 @@ export class PresentationParser {
           descriptionLines.push(lines[i]);
         }
         description = descriptionLines.join('\n');
-
-        // DEBUG: Trace description extraction
-        console.log(`[PresentationParser.parsePresentation] Slide ${index}: titleLine=${titleLine}, descStart=${descriptionStartLine}, descEnd=${descriptionEndLine}, descLines=${JSON.stringify(descriptionLines)}, desc=${JSON.stringify(description)}`);
       } else {
         description = '';
       }
@@ -238,9 +226,6 @@ export class PresentationParser {
       // CRITICAL: Always set description - never check for empty
       // Empty/whitespace content IS valid content
       task.description = slide.content;
-
-      // DEBUG: Trace exact description content
-      console.log(`[PresentationParser.slidesToTasks] Slide ${index}: title="${slide.title}", content length=${slide.content?.length}, content JSON=${JSON.stringify(slide.content)}`);
 
       // Add includeContext for dynamic image path resolution
       if (includeFilePath && mainFilePath) {

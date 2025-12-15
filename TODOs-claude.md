@@ -5,73 +5,90 @@
 
 ---
 
-## Phase 1 - Critical Quick Wins (High Impact, Lower Effort)
+## Completed Tracks
 
-### Task 1.1: Use BoardCrudOperations Everywhere
-**Priority:** Critical | **Effort:** Low | **Impact:** High
+### Track A: Quick Wins ✅ COMPLETED
+- [x] A1: BoardCrudOperations already used everywhere (verified)
+- [x] A2: Removed empty else blocks
+- [x] A3: Removed duplicate ConfigurationDefaults interface (38 lines → 1 type alias)
+- [x] A4: Fixed base class encapsulation - added `getFileRegistry()` to interfaces
+- [x] A5: Consolidated include file registration via `ensureIncludeRegistered()`
+- [x] A6: Consolidated conflict detection - moved `hasAnyUnsavedChanges()` and `hasConflict()` to base class
 
-**Problem:** `BoardCrudOperations` class exists with `findColumn()` and `findTask()` methods but is NOT used. Instead, 60+ inline lookups scattered across codebase:
-- 40+ occurrences of `board.columns.find(c => c.id === ...)`
-- 22+ occurrences of `.tasks.find(t => t.id === ...)`
+### Track B: Memory Leak Fixes ✅ COMPLETED
+- [x] B1: Added initialization guards to webview.js and taskEditor.js
+- [x] B2: Verified setTimeout patterns are correct (debouncing with clearTimeout)
+- [x] B3: Verified requestAnimationFrame patterns (all one-shot frames)
+- [x] B4: Verified disposable cleanup is properly implemented
+- [x] B5: Verified VS Code event subscriptions are properly disposed
+- [x] B6: Added FIFO eviction with size limits (100 entries) to diagram caches
 
-**Files with inline lookups (to refactor):**
-- [ ] `src/core/ChangeStateMachine.ts` - 10 column finds, 5 task finds
-- [ ] `src/core/IncludeLoadingProcessor.ts` - 4 column finds, 2 task finds
-- [ ] `src/kanbanWebviewPanel.ts` - 6 column finds, 3 task finds
-- [ ] `src/files/MainKanbanFile.ts` - 2 column finds, 2 task finds
-- [ ] `src/commands/TaskCommands.ts` - 3 column finds, 3 task finds
-- [ ] `src/panel/IncludeFileCoordinator.ts` - 2 column finds
-- [ ] `src/commands/ColumnCommands.ts` - 1 column find
-- [ ] `src/commands/TemplateCommands.ts` - 6 column finds
+### Track C: Type Safety ✅ PARTIAL
+- [x] C1: Fixed 11 `as any` casts (56→45)
+  - Created `CapturedEdit` interface
+  - Made `applyEditToBaseline` public with proper typing
+  - Used `file.isInEditMode()` instead of private field access
+  - Proper type narrowing for event types in ChangeStateMachine
+  - Fixed `UnifiedChangeHandler` to use `getFileRegistry()`
+- [ ] C2-C5: Remaining casts need message type schema updates (deferred)
 
-**Action:**
-1. Import `BoardCrudOperations` or add static methods
-2. Replace all `board.columns.find(c => c.id === columnId)` with `BoardCrudOperations.findColumn(board, columnId)`
-3. Replace all `.tasks.find(t => t.id === taskId)` with `BoardCrudOperations.findTask(board, columnId, taskId)`
+### Track G: Frontend Cleanup ✅ COMPLETED
+- [x] G1: Merged handlePlantUMLConvert/handleMermaidConvert into unified handler
+- [x] G2: All set* functions now use applyAndSaveSetting pattern
+- [x] G3: Analyzed DOM queries - no severe issues found
+- [x] G4-G5: Analyzed window.* globals (297 refs) - requires bundler/tests (deferred)
+
+### Track E: Architecture Fixes ✅ PARTIAL
+- [x] E1: Reduced console logging (21→8 calls, all guarded behind DEBUG flags)
+  - Removed 13 unconditional debug console.log statements
+  - Remaining 8 are conditional behind DEBUG flags (proper pattern)
+- [x] E2: Markdown generation already consolidated (single source `MarkdownKanbanParser.generateMarkdown()`)
+- [x] E3: Removed 16 empty else blocks across 7 files
+  - debugOverlay.js (4), dragDrop.js (1), menuOperations.js (2), smartLogger.js (1)
+  - webview.js (5), taskEditor.js (1), boardRenderer.js (2)
+- [x] E4: Cleaned up commented-out dead code
+  - Removed board title generation (markdownParser.ts)
+  - Removed disabled flushPendingTagChanges block (webview.js)
+  - Removed empty unload event handler (webview.js)
+
+### Track H: Polish ✅ ANALYZED (Already Good)
+- [x] H1: Magic numbers - Already extracted as named constants (TIMEOUT_MS, MAX_SIZE, etc.)
+- [x] H2: Chained .replace() - Idiomatic patterns (CRLF normalization, tag stripping)
+- [x] H3: Dynamic RegExp - Need runtime values (paths, tags) - can't be pre-cached
+- [x] H4: Null checking - Already consistent with strict equality (`===`/`!==`)
+
+**Summary:** Codebase polish is already good. No significant cleanup needed for these patterns.
 
 ---
 
-### Task 1.2: Fix `as any` Type Casts (56 occurrences)
+## Phase 1 - Critical Quick Wins (High Impact, Lower Effort)
+
+### Task 1.1: Use BoardCrudOperations Everywhere ✅ VERIFIED
+**Status:** Already using BoardCrudOperations throughout codebase
+
+~~**Problem:** `BoardCrudOperations` class exists with `findColumn()` and `findTask()` methods but is NOT used.~~
+
+**Verified:** Code already uses `BoardCrudOperations.findColumnById()`, `findTaskById()`, etc.
+
+---
+
+### Task 1.2: Fix `as any` Type Casts ✅ PARTIAL (56→45)
 **Priority:** Critical | **Effort:** Medium | **Impact:** High (Type Safety)
 
-**Problem:** 56 `as any` casts break TypeScript's type safety.
+**Progress:** Fixed 11 casts, 45 remaining
 
-**Files to fix:**
-- [ ] `src/core/ChangeStateMachine.ts` (8 casts)
-  - Lines 320, 356, 357, 600, 609, 621, 630, 633
-  - Issue: Accessing `_isInEditMode`, `applyEditToBaseline` via any
-  - Fix: Add proper interface methods to `MarkdownFile`
+**Completed fixes:**
+- [x] `src/core/ChangeStateMachine.ts` - Fixed `_isInEditMode` → `isInEditMode()`, `applyEditToBaseline`, event type narrowing
+- [x] `src/core/UnifiedChangeHandler.ts` - Fixed via `getFileRegistry()` method
+- [x] `src/core/IncludeLoadingProcessor.ts` - Fixed `parseToTasks` with proper type check
+- [x] Created `CapturedEdit` interface in `FileInterfaces.ts`
+- [x] Made `applyEditToBaseline` public in base class
 
-- [ ] `src/kanbanWebviewPanel.ts` (13 casts)
-  - Lines 207, 773, 1065, 1204, 1218, 1257, 1269, 1304, 1325, 1378, 1406, 1652, 1783
-  - Issue: Message types, file access
-  - Fix: Use proper message type interfaces
-
-- [ ] `src/panel/IncludeFileCoordinator.ts` (6 casts)
-  - Lines 210, 227, 269, 288, 316, 327
-  - Issue: All webview messages cast to any
-  - Fix: Import and use `UpdateColumnContentMessage`, etc.
-
-- [ ] `src/core/UnifiedChangeHandler.ts` (1 cast)
-  - Line 139: `const mainFile = file as any;`
-  - Fix: Add `getFileRegistry()` method to `MainKanbanFile` interface
-
-- [ ] `src/commands/IncludeCommands.ts` (4 casts)
-  - Lines 164, 368, 408, 539
-  - Fix: Proper panel typing
-
-- [ ] `src/files/MarkdownFile.ts` (1 cast)
-  - Line 785: `_parentFile` access
-  - Fix: Add abstract method for file registry access
-
-- [ ] `src/services/export/ExportService.ts` (4 casts)
-  - Lines 1051, 1052, 1053, 1421
-  - Fix: Extend options interface
-
-**Action:**
-1. Add missing methods to interfaces (`isInEditMode()`, `getFileRegistry()`)
-2. Create proper message type interfaces for all webview messages
-3. Use generic typed methods: `webviewBridge.send<MessageType>(...)`
+**Remaining (need message type schema updates):**
+- [ ] `src/kanbanWebviewPanel.ts` (13 casts) - Message types don't match actual payload
+- [ ] `src/panel/IncludeFileCoordinator.ts` (6 casts) - Same issue
+- [ ] `src/commands/IncludeCommands.ts` (4 casts) - Panel typing
+- [ ] `src/services/export/ExportService.ts` (4 casts) - Options interface
 
 ---
 

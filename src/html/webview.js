@@ -1535,7 +1535,6 @@ function cleanupRowTags() {
 document.addEventListener('DOMContentLoaded', () => {
     // MEMORY SAFETY: Skip initialization if already done (prevents duplicate listeners on webview revival)
     if (webviewEventListenersInitialized) {
-        console.log('[webview] Skipping duplicate initialization on webview revival');
         // Still send ready message and setup drag/drop (idempotent operations)
         vscode.postMessage({ type: 'webviewReady' });
         vscode.postMessage({ type: 'requestFileInfo' });
@@ -1617,7 +1616,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             if (document.hidden || !document.hasFocus()) {
                 autoSavePendingChanges();
-            } else {
             }
         }, 100);
     });
@@ -1706,16 +1704,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const inMovedDropdown = e.target.closest('.donut-menu-dropdown.moved-to-body, .file-bar-menu-dropdown.moved-to-body');
 
         if (!inDonutMenu && !inFileBarMenu && !inMovedDropdown) {
-            // Don't automatically flush changes when clicking outside menus
-            // Changes will only be saved when user explicitly saves (Cmd+S)
-            // if (typeof flushPendingTagChanges === 'function') {
-            //     const pendingColumnCount = window.pendingColumnChanges?.size || 0;
-            //     const pendingTaskCount = window.pendingTaskChanges?.size || 0;
-            //     if (pendingColumnCount > 0 || pendingTaskCount > 0) {
-            //         flushPendingTagChanges();
-            //     }
-            // }
-            
             // Close all menus and clean up moved dropdowns
             document.querySelectorAll('.donut-menu').forEach(menu => {
                 menu.classList.remove('active');
@@ -1755,7 +1743,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Notify backend that webview is ready to receive messages
     // This implements request-response pattern - backend queues board updates until this is received
-    console.log('[kanban.webview] Sending webviewReady');
     vscode.postMessage({ type: 'webviewReady' });
     vscode.postMessage({ type: 'requestFileInfo' });
 
@@ -1789,10 +1776,8 @@ window.onBoardRenderingComplete = function() {
             // Element exists - process focus targets and clear them
             handleFocusAfterUndoRedo(window.pendingFocusTargets);
             window.pendingFocusTargets = null;
-        } else {
-            // Element not found yet - keep targets for next render completion
         }
-    } else {
+        // If element not found, keep targets for next render completion
     }
 };
 
@@ -1913,7 +1898,6 @@ if (!webviewEventListenersInitialized) {
             }
             break;
         case 'boardUpdate':
-            console.log(`[kanban.webview.boardUpdate] Received - isFullRefresh=${message.isFullRefresh}, applyDefaultFolding=${message.applyDefaultFolding}`);
             const previousBoard = window.cachedBoard;
 
             // Clear card focus when board is updated
@@ -2226,7 +2210,6 @@ if (!webviewEventListenersInitialized) {
             if (!isEditing && !shouldSkipRender) {
                 // Only render if not editing and not explicitly skipping
                 if (typeof window.renderBoard === 'function') {
-                    console.log(`[kanban.webview.boardUpdate] Calling renderBoard()`);
                     window.renderBoard();
                 }
                 
@@ -2645,13 +2628,6 @@ if (!webviewEventListenersInitialized) {
                     // Support both formats: individual properties OR column object
                     const colData = message.column || message;
 
-                    // DEBUG: Log received tasks with descriptions
-                    if (colData.tasks) {
-                        colData.tasks.forEach((t, i) => {
-                            console.log(`[webview.updateColumnContent] Received task ${i}: title=${JSON.stringify(t.title)}, description JSON=${JSON.stringify(t.description)}`);
-                        });
-                    }
-
                     // Update tasks and column metadata
                     if (colData.tasks !== undefined) column.tasks = colData.tasks;
 
@@ -3015,10 +2991,7 @@ if (!webviewEventListenersInitialized) {
             break;
 
         case 'allIncludedFilesReloaded':
-            // Handle reload confirmation
-            if (message.reloadCount > 0) {
-                } else {
-            }
+            // Handle reload confirmation (no UI notification needed)
             break;
 
         case 'individualFileSaved':
@@ -3400,14 +3373,11 @@ document.addEventListener('keydown', (e) => {
  */
 function undo() {
     if (canUndo) {
-        
         try {
-            const message = { type: 'undo' };
-            const result = vscode.postMessage(message);
+            vscode.postMessage({ type: 'undo' });
         } catch (error) {
             // Silently handle error
         }
-    } else {
     }
 }
 
@@ -3427,23 +3397,17 @@ function redo() {
 // Add beforeunload detection for unsaved changes
 window.addEventListener('beforeunload', function(e) {
     if (typeof hasUnsavedChanges === 'function') {
-        const hasChanges = hasUnsavedChanges();
-        
-        if (hasChanges) {
+        if (hasUnsavedChanges()) {
             e.preventDefault();
             e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
             return 'You have unsaved changes. Are you sure you want to leave?';
-        } else {
         }
     } else {
         console.error('❌ hasUnsavedChanges function not available');
     }
 });
 
-window.addEventListener('unload', function(e) {
-    if (typeof hasUnsavedChanges === 'function' && hasUnsavedChanges()) {
-    }
-});
+// Note: unload event removed - was empty/no-op
 
 // Add visibility change detection (tab switching, window minimizing, etc)
 // Global flag to prevent auto-save when close prompt is active

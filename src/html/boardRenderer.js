@@ -1317,15 +1317,15 @@ function generateGroupTagItems(tags, id, type, columnId = null, isConfigured = t
                     handleColumnTagClick(id, tagName, event);
                 } else if (typeof window.handleColumnTagClick === 'function') {
                     window.handleColumnTagClick(id, tagName, event);
-                } else {
                 }
+                // No handler available - fail silently
             } else {
                 if (typeof handleTaskTagClick === 'function') {
                     handleTaskTagClick(id, columnId, tagName, event);
                 } else if (typeof window.handleTaskTagClick === 'function') {
                     window.handleTaskTagClick(id, columnId, tagName, event);
-                } else {
                 }
+                // No handler available - fail silently
             }
             return false;
         };
@@ -1596,7 +1596,6 @@ window.updateTemplates = function(templates, showBar = true) {
  * Performance: Debounced to prevent rapid re-renders
  */
 function renderBoard(options = null) {
-    console.log(`[kanban.renderBoard] Called - options=${JSON.stringify(options)}, stack=${new Error().stack?.split('\n').slice(1, 4).join(' <- ')}`);
     // Apply tag styles first
     applyTagStyles();
 
@@ -2389,9 +2388,6 @@ function createTaskElement(task, columnId, taskIndex) {
             window.currentRenderingTimeSlot = extracted;
         }
     }
-
-    // DEBUG: Log task.description value before rendering
-    console.log(`[boardRenderer.createTaskElement] task.id=${task.id}, task.title=${JSON.stringify(task.title)}, task.description JSON=${JSON.stringify(task.description)}`);
 
     let renderedDescription = (task.description && typeof task.description === 'string' && task.description.trim()) ? renderMarkdown(task.description, task.includeContext) : '';
 

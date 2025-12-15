@@ -305,7 +305,6 @@ export class KanbanFileService {
             });
         }
 
-        console.log(`[kanban.fileService.loadMarkdownFile] About to call sendBoardUpdate, forceReload=${forceReload}`);
         await this.sendBoardUpdate(false, forceReload);
         this.fileManager.sendFileInfo();
     }

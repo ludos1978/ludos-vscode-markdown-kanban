@@ -688,13 +688,11 @@ export class KanbanWebviewPanel {
      * Handle webviewReady message - webview is ready to receive board updates
      */
     private _handleWebviewReady(): void {
-        console.log('[kanban.handleWebviewReady] Webview is ready');
         this._context.setWebviewReady(true);
 
         // Send any pending board update (consume and clear atomically)
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
-            console.log('[kanban.handleWebviewReady] Sending pending board update');
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
         }
     }
@@ -720,12 +718,10 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        console.log(`[kanban.sendBoardUpdate] Called - applyDefaultFolding=${applyDefaultFolding}, isFullRefresh=${isFullRefresh}, webviewReady=${this._context.webviewReady}`);
         if (!this._panel.webview) { return; }
 
         // Queue update if webview not ready yet
         if (!this._context.webviewReady) {
-            console.log('[kanban.sendBoardUpdate] Webview not ready, queuing update');
             this._context.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
             return;
         }
