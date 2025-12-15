@@ -1,6 +1,11 @@
 // Use the global vscode instance set up in HTML
 // (vscode is already declared globally in webview.html)
 
+// MEMORY SAFETY: Guard flag to prevent duplicate event listeners on webview revival
+// When VS Code restores a webview from serialized state, all scripts run again.
+// This flag ensures listeners are only added once.
+let webviewEventListenersInitialized = false;
+
 // Global variables
 let currentFileInfo = null;
 
@@ -94,16 +99,18 @@ async function handlePlantUMLConvert(button) {
     }
 }
 
-// Event delegation for convert buttons
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('plantuml-convert-btn')) {
-        handlePlantUMLConvert(e.target);
-    }
+// Event delegation for convert buttons (wrapped in guard to prevent duplicates on webview revival)
+if (!webviewEventListenersInitialized) {
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('plantuml-convert-btn')) {
+            handlePlantUMLConvert(e.target);
+        }
 
-    if (e.target.classList.contains('mermaid-convert-btn')) {
-        handleMermaidConvert(e.target);
-    }
-});
+        if (e.target.classList.contains('mermaid-convert-btn')) {
+            handleMermaidConvert(e.target);
+        }
+    });
+}
 
 // ============================================================================
 // Mermaid Diagram Conversion
@@ -1544,6 +1551,17 @@ function cleanupRowTags() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // MEMORY SAFETY: Skip initialization if already done (prevents duplicate listeners on webview revival)
+    if (webviewEventListenersInitialized) {
+        console.log('[webview] Skipping duplicate initialization on webview revival');
+        // Still send ready message and setup drag/drop (idempotent operations)
+        vscode.postMessage({ type: 'webviewReady' });
+        vscode.postMessage({ type: 'requestFileInfo' });
+        setupDragAndDrop();
+        return;
+    }
+    webviewEventListenersInitialized = true;
+
     // Request available Marp classes on load
     vscode.postMessage({
         type: 'getMarpAvailableClasses'
@@ -1875,27 +1893,28 @@ function performFocusActions(focusTargets) {
     });
 }
 
-// Clear card focus on click
-document.addEventListener('click', (e) => {
-    // Don't clear focus if clicking on a card
-    if (!e.target.closest('.task-item') && window.getCurrentFocusedCard()) {
-        window.focusCard(null);
-    }
-});
-
-// Handle collapse toggle clicks with event delegation
-document.addEventListener('click', (e) => {
-    const collapseToggle = e.target.closest('.collapse-toggle');
-    if (collapseToggle) {
-        const columnId = collapseToggle.getAttribute('data-column-id');
-        if (columnId && typeof window.toggleColumnCollapse === 'function') {
-            window.toggleColumnCollapse(columnId, e);
+// Clear card focus on click (wrapped in guard)
+if (!webviewEventListenersInitialized) {
+    document.addEventListener('click', (e) => {
+        // Don't clear focus if clicking on a card
+        if (!e.target.closest('.task-item') && window.getCurrentFocusedCard()) {
+            window.focusCard(null);
         }
-    }
-});
+    });
 
-// Listen for messages from the extension
-window.addEventListener('message', event => {
+    // Handle collapse toggle clicks with event delegation
+    document.addEventListener('click', (e) => {
+        const collapseToggle = e.target.closest('.collapse-toggle');
+        if (collapseToggle) {
+            const columnId = collapseToggle.getAttribute('data-column-id');
+            if (columnId && typeof window.toggleColumnCollapse === 'function') {
+                window.toggleColumnCollapse(columnId, e);
+            }
+        }
+    });
+
+    // Listen for messages from the extension
+    window.addEventListener('message', event => {
     const message = event.data;
 
     switch (message.type) {
@@ -3110,6 +3129,7 @@ window.addEventListener('message', event => {
             break;
     }
 });
+} // End of webviewEventListenersInitialized guard
 
 /**
  * Insert VS Code snippet content into the active editor
@@ -3176,7 +3196,8 @@ if (typeof MutationObserver !== 'undefined') {
 }
 
 
-// Keyboard shortcuts for search and navigation
+// Keyboard shortcuts for search and navigation (wrapped in guard)
+if (!webviewEventListenersInitialized) {
 document.addEventListener('keydown', (e) => {
     
     const activeElement = document.activeElement;
@@ -3467,11 +3488,12 @@ document.addEventListener('visibilitychange', function() {
         closePromptActive = false;
     }
 });
+} // End of second webviewEventListenersInitialized guard
 
 function updateUndoRedoButtons() {
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
-    
+
     if (undoBtn) {
         undoBtn.disabled = !canUndo;
         undoBtn.style.opacity = canUndo ? '1' : '0.5';
@@ -3927,7 +3949,8 @@ function initializeVideoLazyLoading() {
     }
 }
 
-// Initialize font size on page load
+// Initialize font size on page load (wrapped in guard)
+if (!webviewEventListenersInitialized) {
 document.addEventListener('DOMContentLoaded', function() {
     // Set default font size (CSS classes are pre-defined in webview.css)
     setFontSize('1_0x');
@@ -3986,6 +4009,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize layout presets menu
     initializeLayoutPresetsMenu();
 });
+} // End of third webviewEventListenersInitialized guard
 
 /**
  * Initialize the layout presets menu by populating it with preset options

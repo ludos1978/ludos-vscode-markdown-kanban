@@ -785,6 +785,29 @@ function htmlCommentPlugin(md, options = {}) {
 // PlantUML Rendering System
 // ============================================================================
 
+// MEMORY SAFETY: Cache size limits to prevent unbounded growth
+const DIAGRAM_CACHE_MAX_SIZE = 100;
+
+/**
+ * Set a value in a cache with size limit (FIFO eviction)
+ * @param {Map} cache - The cache Map
+ * @param {string} key - Cache key
+ * @param {any} value - Value to cache
+ * @param {number} maxSize - Maximum cache size
+ */
+function setCacheWithLimit(cache, key, value, maxSize = DIAGRAM_CACHE_MAX_SIZE) {
+    // If key already exists, delete it first so it becomes "newest"
+    if (cache.has(key)) {
+        cache.delete(key);
+    }
+    // Evict oldest entries if at capacity
+    while (cache.size >= maxSize) {
+        const oldestKey = cache.keys().next().value;
+        cache.delete(oldestKey);
+    }
+    cache.set(key, value);
+}
+
 // PlantUML is now rendered in the extension backend (Node.js)
 // No initialization needed in webview
 window.plantumlReady = true; // Always ready - backend handles rendering
@@ -794,6 +817,7 @@ const pendingPlantUMLQueue = [];
 let plantumlQueueProcessing = false;
 
 // Cache for rendered PlantUML diagrams (code → svg)
+// MEMORY SAFETY: Limited to DIAGRAM_CACHE_MAX_SIZE entries
 const plantumlRenderCache = new Map();
 window.plantumlRenderCache = plantumlRenderCache; // Make globally accessible
 
@@ -852,6 +876,7 @@ async function renderPlantUML(code) {
 window.renderPlantUML = renderPlantUML;
 
 // Diagram rendering (draw.io, excalidraw)
+// MEMORY SAFETY: Limited to DIAGRAM_CACHE_MAX_SIZE entries
 const diagramRenderCache = new Map();  // Cache key: `${type}:${path}:${mtime}` → svgDataUrl
 const diagramRenderRequests = new Map();
 let diagramRequestId = 0;
@@ -1139,12 +1164,11 @@ async function processDiagramQueue() {
             const cacheKey = item.diagramType === 'pdf'
                 ? `pdf:${item.filePath}:${item.pageNumber}:${fileMtime}`
                 : `${item.diagramType}:${item.filePath}:${fileMtime}`;
-            diagramRenderCache.set(cacheKey, imageDataUrl);
 
-            // Invalidate old cache entries for this file
+            // Invalidate old cache entries for this file first
             invalidateDiagramCache(item.filePath, item.diagramType);
-            // Re-add current version
-            diagramRenderCache.set(cacheKey, imageDataUrl);
+            // Add current version (with size limit)
+            setCacheWithLimit(diagramRenderCache, cacheKey, imageDataUrl);
 
             // Replace placeholder with rendered image
             // Include data-original-src for alt-click to open in editor
@@ -1175,8 +1199,8 @@ window.addEventListener('message', event => {
 
         if (request) {
 
-            // Cache the result
-            plantumlRenderCache.set(request.code, svg);
+            // Cache the result (with size limit)
+            setCacheWithLimit(plantumlRenderCache, request.code, svg);
 
             // Resolve promise
             request.resolve(svg);
@@ -1420,6 +1444,7 @@ const pendingMermaidQueue = [];
 let mermaidQueueProcessing = false;
 
 // Cache for rendered Mermaid diagrams (code → svg)
+// MEMORY SAFETY: Limited to DIAGRAM_CACHE_MAX_SIZE entries
 const mermaidRenderCache = new Map();
 window.mermaidRenderCache = mermaidRenderCache; // Make globally accessible
 
@@ -1461,8 +1486,8 @@ async function renderMermaid(code) {
         // Use mermaid.render() to generate SVG
         const { svg } = await mermaid.render(diagramId, code);
 
-        // Cache the result
-        mermaidRenderCache.set(code, svg);
+        // Cache the result (with size limit)
+        setCacheWithLimit(mermaidRenderCache, code, svg);
 
         return svg;
     } catch (error) {

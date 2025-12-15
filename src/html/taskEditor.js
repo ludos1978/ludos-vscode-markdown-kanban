@@ -1638,10 +1638,12 @@ class TaskEditor {
     }
 }
 
-// Initialize the editor system
-const taskEditor = new TaskEditor();
-window.taskEditor = taskEditor;
-window.taskEditorManager = taskEditor; // Alias for compatibility
+// Initialize the editor system (with guard to prevent duplicate initialization on webview revival)
+if (!window.taskEditor) {
+    const taskEditor = new TaskEditor();
+    window.taskEditor = taskEditor;
+    window.taskEditorManager = taskEditor; // Alias for compatibility
+}
 
 /**
  * Triggers title editing for a task
