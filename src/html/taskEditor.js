@@ -511,7 +511,7 @@ class TaskEditor {
             if (typeof vscode !== 'undefined') {
                 vscode.postMessage({
                     type: 'setContext',
-                    contextVariable: 'kanbanTaskEditing',
+                    key: 'kanbanTaskEditing',
                     value: true
                 });
             }
@@ -658,6 +658,10 @@ class TaskEditor {
                 const stack = containerElement.closest('.kanban-column-stack');
                 if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
                     // Only recalc if we're in an actual stack (more than 1 column)
+                    // Get columnId to only recalculate THIS stack, not all stacks
+                    const column = containerElement.closest('.kanban-full-height-column');
+                    const columnId = column ? column.dataset.columnId : null;
+
                     const now = Date.now();
                     const timeSinceLastRecalc = now - lastRecalcTime;
 
@@ -671,7 +675,7 @@ class TaskEditor {
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
                                 void stack.offsetHeight;
-                                window.applyStackedColumnStyles();
+                                window.applyStackedColumnStyles(columnId);
                             });
                         });
                     } else {
@@ -685,7 +689,7 @@ class TaskEditor {
                             requestAnimationFrame(() => {
                                 requestAnimationFrame(() => {
                                     void stack.offsetHeight;
-                                    window.applyStackedColumnStyles();
+                                    window.applyStackedColumnStyles(columnId);
                                 });
                             });
                             recalcTimeout = null;
@@ -1384,7 +1388,7 @@ class TaskEditor {
             if (typeof vscode !== 'undefined') {
                 vscode.postMessage({
                     type: 'setContext',
-                    contextVariable: 'kanbanTaskEditing',
+                    key: 'kanbanTaskEditing',
                     value: false
                 });
             }

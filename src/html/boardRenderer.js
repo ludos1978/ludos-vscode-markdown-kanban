@@ -3133,13 +3133,11 @@ function setupColumnResizeObserver() {
     });
 
     // Observe all existing tasks-container elements
+    // NOTE: We only observe containers, NOT individual task-items
+    // Observing 600+ task-items causes feedback loops and 100% CPU
+    // Container resize is sufficient - it changes when any child content changes
     document.querySelectorAll('.tasks-container').forEach(tasksContainer => {
         columnResizeObserver.observe(tasksContainer);
-    });
-
-    // Also observe all task-item elements (resizes when content like diagrams change)
-    document.querySelectorAll('.task-item').forEach(taskItem => {
-        columnResizeObserver.observe(taskItem);
     });
 
     // MUTATION OBSERVER: Detects DOM changes (innerHTML) that ResizeObserver doesn't catch
@@ -3211,15 +3209,9 @@ function setupColumnResizeObserver() {
 function observeColumnForResize(columnElement) {
     const tasksContainer = columnElement.querySelector('.tasks-container');
 
-    // Add to ResizeObserver
-    if (columnResizeObserver) {
-        if (tasksContainer) {
-            columnResizeObserver.observe(tasksContainer);
-        }
-        // Also observe all task-item elements in this column
-        columnElement.querySelectorAll('.task-item').forEach(taskItem => {
-            columnResizeObserver.observe(taskItem);
-        });
+    // Add to ResizeObserver (only container, not individual tasks)
+    if (columnResizeObserver && tasksContainer) {
+        columnResizeObserver.observe(tasksContainer);
     }
 
     // Add to MutationObserver
