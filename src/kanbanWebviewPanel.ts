@@ -12,6 +12,7 @@ import { ConflictResolver, ConflictContext, ConflictResolution } from './service
 import { configService } from './services/ConfigurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
+import { MediaTracker, ChangedMediaFile } from './services/MediaTracker';
 import { LinkOperations } from './utils/linkOperations';
 import { getErrorMessage } from './utils/stringUtils';
 import {
@@ -89,6 +90,9 @@ export class KanbanWebviewPanel {
     private _unsavedChangesCheckInterval?: NodeJS.Timeout;
 
     private _conflictResolver: ConflictResolver;
+
+    // Media file change tracking (diagrams, images, audio, video)
+    private _mediaTracker: MediaTracker | null = null;
 
     private _boardStore: BoardStore;
     private _webviewBridge: WebviewBridge;
@@ -660,6 +664,9 @@ export class KanbanWebviewPanel {
                     // This catches changes to Excalidraw, DrawIO, and other included files
                     this._checkIncludeFilesForExternalChanges();
 
+                    // Check media files (embedded images, diagrams) for external changes
+                    this._checkMediaFilesForChanges();
+
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
                     // but avoids re-rendering when the view just temporarily lost focus (e.g., showing messages)
@@ -933,6 +940,16 @@ export class KanbanWebviewPanel {
             console.error(`[KanbanWebviewPanel] Failed to load MainKanbanFile content:`, error);
         }
 
+        // Initialize MediaTracker for this kanban file
+        // Tracks modification times of embedded media (images, diagrams, audio, video)
+        this._mediaTracker = new MediaTracker(filePath);
+
+        // Update tracked media files from current content
+        const content = mainFile.getContent();
+        if (content) {
+            this._mediaTracker.updateTrackedFiles(content);
+        }
+
         // Load include files if board is available
         const board = this.getBoard();
         if (board && board.valid) {
@@ -949,6 +966,9 @@ export class KanbanWebviewPanel {
             this._includeCoordinator.loadIncludeContentAsync(board)
                 .then(() => {
                     this._context.setInitialBoardLoad(false);
+
+                    // After include files are loaded, also track their media references
+                    this._updateMediaTrackingFromIncludes();
                 })
                 .catch(error => {
                     console.error('[_syncMainFileToRegistry] Error loading include content:', error);
@@ -1288,9 +1308,73 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Check all include files for external changes (async, non-blocking)
-     * Called when view gains focus to detect changes to Excalidraw, DrawIO, etc.
-     * If changes are found, reloads the affected files and sends a board update
+     * Update media tracking to include media from include files
+     * Called after include files are loaded asynchronously
+     */
+    private _updateMediaTrackingFromIncludes(): void {
+        if (!this._mediaTracker) {
+            return;
+        }
+
+        // Get all include files and add their media references to tracking
+        const includeFiles = this._fileRegistry.getIncludeFiles();
+        for (const includeFile of includeFiles) {
+            const content = includeFile.getContent();
+            if (content) {
+                this._mediaTracker.addTrackedFiles(content);
+            }
+        }
+    }
+
+    /**
+     * Check media files (embedded images, diagrams) for external changes
+     * Called when view gains focus to detect changes to Excalidraw, DrawIO, images, etc.
+     * Only re-renders files that have actually changed (mtime comparison)
+     */
+    private _checkMediaFilesForChanges(): void {
+        if (!this._mediaTracker) {
+            console.log('[MediaTracker] No media tracker initialized');
+            return;
+        }
+
+        try {
+            // Debug: Log what files are being tracked
+            const trackedFiles = this._mediaTracker.getTrackedFiles();
+            console.log(`[MediaTracker] Checking ${trackedFiles.length} tracked file(s):`,
+                trackedFiles.map(f => `${f.path} (${f.type})`));
+
+            // Check which media files have changed since last check
+            const changedFiles = this._mediaTracker.checkForChanges();
+
+            if (changedFiles.length > 0) {
+                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} changed media file(s):`,
+                    changedFiles.map(f => f.path));
+
+                // Send changed file paths to frontend for selective re-rendering
+                // Only these specific files will have their diagram cache cleared
+                if (this._panel) {
+                    this._panel.webview.postMessage({
+                        type: 'mediaFilesChanged',
+                        files: changedFiles.map(f => ({
+                            path: f.path,
+                            absolutePath: f.absolutePath,
+                            type: f.type
+                        }))
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[KanbanWebviewPanel] Error checking media files for changes:', error);
+        }
+    }
+
+    /**
+     * Check all include files (markdown) for external changes (async, non-blocking)
+     * Called when view gains focus to detect changes to include file CONTENT.
+     * If changes are found, reloads the affected files and sends a board update.
+     *
+     * NOTE: Media files (DrawIO, Excalidraw, images) are handled by MediaTracker,
+     * NOT by this method. This only handles include file markdown content changes.
      */
     private async _checkIncludeFilesForExternalChanges(): Promise<void> {
         if (!this._fileRegistry.isReady()) {
@@ -1298,7 +1382,7 @@ export class KanbanWebviewPanel {
         }
 
         try {
-            // Check all files for external changes (mtime comparison)
+            // Check all include files for external changes (mtime comparison)
             const changesMap = await this._fileRegistry.checkAllForExternalChanges();
 
             // Count files that changed
@@ -1310,9 +1394,9 @@ export class KanbanWebviewPanel {
             });
 
             if (changedFiles.length > 0) {
-                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} externally modified file(s) on focus:`, changedFiles);
+                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} externally modified include file(s) on focus:`, changedFiles);
 
-                // Reload content for changed files
+                // Reload content for changed include files
                 for (const file of this._fileRegistry.getAll()) {
                     if (changesMap.get(file.getPath())) {
                         // Reload the file content from disk
@@ -1320,20 +1404,12 @@ export class KanbanWebviewPanel {
                     }
                 }
 
-                // Invalidate board cache and send update
+                // Invalidate board cache and send update for include file content changes
                 this._boardStore.invalidateCache();
-
-                // Clear diagram render cache in frontend (for Excalidraw/DrawIO)
-                // Using generic postMessage since this is a custom message type
-                if (this._panel) {
-                    this._panel.webview.postMessage({
-                        type: 'clearDiagramCache',
-                        paths: changedFiles
-                    });
-                }
-
-                // Send board update to refresh the view
                 this.sendBoardUpdate(false, true);
+
+                // After reloading include files, update media tracking for any new media references
+                this._updateMediaTrackingFromIncludes();
             }
         } catch (error) {
             console.error('[KanbanWebviewPanel] Error checking include files for external changes:', error);
@@ -1553,7 +1629,7 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Save unsaved changes to backup files with "-unsavedchanges" suffix
+     * Save unsaved changes to backup files with ".{name}-unsavedchanges" naming (hidden)
      * Called when VSCode closes with unsaved changes
      * This creates a safety backup before prompting the user
      */
@@ -1567,11 +1643,11 @@ export class KanbanWebviewPanel {
                     const filePath = uri.fsPath;
                     const content = mainFile.getContent();
 
-                    // Create backup filename: "file.md" -> "file-unsavedchanges.md"
+                    // Create backup filename: "file.md" -> ".file-unsavedchanges.md" (hidden)
                     const ext = path.extname(filePath);
                     const baseName = path.basename(filePath, ext);
                     const dirName = path.dirname(filePath);
-                    const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
+                    const backupPath = path.join(dirName, `.${baseName}-unsavedchanges${ext}`);
 
                     fs.writeFileSync(backupPath, content, 'utf8');
                 }
@@ -1587,11 +1663,11 @@ export class KanbanWebviewPanel {
                         if (filePath) {
                             const content = includeFile.getContent();
 
-                            // Create backup filename: "include.md" -> "include-unsavedchanges.md"
+                            // Create backup filename: "include.md" -> ".include-unsavedchanges.md" (hidden)
                             const ext = path.extname(filePath);
                             const baseName = path.basename(filePath, ext);
                             const dirName = path.dirname(filePath);
-                            const backupPath = path.join(dirName, `${baseName}-unsavedchanges${ext}`);
+                            const backupPath = path.join(dirName, `.${baseName}-unsavedchanges${ext}`);
 
                             fs.writeFileSync(backupPath, content, 'utf8');
                         }
@@ -1657,6 +1733,12 @@ export class KanbanWebviewPanel {
 
         // Stop backup timer
         this._backupManager.dispose();
+
+        // Dispose media tracker (saves final cache state)
+        if (this._mediaTracker) {
+            this._mediaTracker.dispose();
+            this._mediaTracker = null;
+        }
 
         this._fileRegistry.dispose();
         this._boardStore.dispose();

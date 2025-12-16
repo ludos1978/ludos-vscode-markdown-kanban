@@ -883,6 +883,10 @@ let diagramRequestId = 0;
 const pendingDiagramQueue = [];
 let diagramQueueProcessing = false;
 
+// Track rendered media files with their mtimes for change detection
+// Key: filePath, Value: { mtime, diagramType, element }
+const renderedMediaTracker = new Map();
+
 /**
  * Invalidate cached diagram renders for a specific file path
  * Removes all cache entries for the file (regardless of mtime)
@@ -1276,7 +1280,7 @@ window.addEventListener('message', event => {
 });
 
 // Clear diagram cache when webview gains focus
-// This ensures diagrams are re-rendered if files changed while webview was in background
+// The actual re-rendering of changed files will be triggered by backend after mtime check
 window.addEventListener('focus', () => {
     clearDiagramCache();
 });

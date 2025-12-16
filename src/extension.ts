@@ -337,7 +337,7 @@ export async function deactivate(): Promise<void> {
 		const hasUnsaved = await panel.checkUnsavedChanges();
 
 		if (hasUnsaved) {
-			// First, save a backup file with "-unsavedchanges" suffix
+			// First, save a backup file with ".{name}-unsavedchanges" prefix (hidden)
 			// This ensures we don't lose data regardless of user's choice
 			await panel.saveUnsavedChangesBackup();
 

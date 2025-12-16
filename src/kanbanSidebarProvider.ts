@@ -39,8 +39,8 @@ class FileTypeDetector {
 			return FileCategory.Conflicts;
 		}
 
-		// Check for unsaved changes: {basename}-unsavedchanges.md
-		if (/-unsavedchanges\.md$/.test(fileName)) {
+		// Check for unsaved changes: .{basename}-unsavedchanges.md (hidden files with dot prefix)
+		if (/^\..+-unsavedchanges\.md$/.test(fileName)) {
 			return FileCategory.UnsavedChanges;
 		}
 
@@ -604,7 +604,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			{
 				label: `$(${FileTypeDetector.getCategoryIcon(FileCategory.UnsavedChanges)}) Unsaved Changes`,
 				description: `${this.categoryCounts.get(FileCategory.UnsavedChanges) || 0} file(s)`,
-				detail: 'Show unsaved changes files ({name}-unsavedchanges.md)',
+				detail: 'Show unsaved changes files (.{name}-unsavedchanges.md)',
 				picked: this.activeFilter === FileCategory.UnsavedChanges
 			}
 		];

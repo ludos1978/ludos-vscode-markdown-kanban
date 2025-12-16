@@ -2459,6 +2459,62 @@ if (!webviewEventListenersInitialized) {
             }
             break;
 
+        case 'mediaFilesChanged':
+            // Handle media files that have changed externally (detected via mtime comparison)
+            // Only re-renders the specific files that changed, not everything
+            if (message.files && message.files.length > 0) {
+                console.log(`[Frontend] Media files changed:`, message.files.map(f => f.path));
+
+                // Process each changed file
+                message.files.forEach(file => {
+                    if (file.type === 'diagram') {
+                        // Clear diagram cache for this specific file
+                        if (typeof window.invalidateDiagramCache === 'function') {
+                            window.invalidateDiagramCache(file.path, 'drawio');
+                            window.invalidateDiagramCache(file.path, 'excalidraw');
+                        }
+                    }
+
+                    // For images/diagrams, find and re-render all img elements with matching src
+                    const encodedPath = encodeURI(file.path).replace(/[()]/g, match =>
+                        match === '(' ? '%28' : '%29'
+                    );
+
+                    // Find all images referencing this file
+                    const images = document.querySelectorAll(`img[src*="${CSS.escape(file.path)}"], img[src*="${CSS.escape(encodedPath)}"]`);
+                    images.forEach(img => {
+                        // Force reload by appending cache-busting timestamp
+                        const originalSrc = img.getAttribute('src');
+                        if (originalSrc) {
+                            // Remove any existing cache buster
+                            const cleanSrc = originalSrc.replace(/[?&]_cb=\d+/, '');
+                            // Add new cache buster
+                            const separator = cleanSrc.includes('?') ? '&' : '?';
+                            img.setAttribute('src', `${cleanSrc}${separator}_cb=${Date.now()}`);
+                        }
+                    });
+
+                    // For diagram containers, trigger re-render
+                    if (file.type === 'diagram') {
+                        const diagramContainers = document.querySelectorAll(`[data-diagram-path*="${CSS.escape(file.path)}"]`);
+                        diagramContainers.forEach(container => {
+                            // Trigger re-render by clearing content and re-processing
+                            if (typeof window.renderDiagramInContainer === 'function') {
+                                const diagramType = container.getAttribute('data-diagram-type');
+                                const diagramPath = container.getAttribute('data-diagram-path');
+                                if (diagramType && diagramPath) {
+                                    container.innerHTML = '<div class="diagram-loading">Reloading...</div>';
+                                    window.renderDiagramInContainer(container, diagramType, diagramPath);
+                                }
+                            }
+                        });
+                    }
+                });
+
+                console.log(`[Frontend] Processed ${message.files.length} changed media file(s)`);
+            }
+            break;
+
         case 'fileUriDropped':
             // Handle dropped file save/link response from backend
             if (message.success) {
