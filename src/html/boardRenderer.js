@@ -223,9 +223,24 @@ function getTaskIdFromElement(element) {
     return taskElement?.dataset.taskId || null;
 }
 
+/**
+ * Finds a task by ID across all columns in the cached board
+ * @param {string} taskId - The task ID to find
+ * @returns {object|null} The task object, or null if not found
+ */
+function findTaskById(taskId) {
+    if (!window.cachedBoard?.columns) return null;
+    for (const column of window.cachedBoard.columns) {
+        const task = column.tasks.find(t => t.id === taskId);
+        if (task) return task;
+    }
+    return null;
+}
+
 // Make them globally accessible
 window.getColumnIdFromElement = getColumnIdFromElement;
 window.getTaskIdFromElement = getTaskIdFromElement;
+window.findTaskById = findTaskById;
 
 // extractFirstTag function now in utils/tagUtils.js
 

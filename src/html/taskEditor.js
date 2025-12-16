@@ -588,8 +588,11 @@ class TaskEditor {
             const stack = containerElement.closest('.kanban-column-stack');
             if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
                 // Only recalc if we're in an actual stack (more than 1 column)
+                // Get columnId to only recalculate THIS stack, not all stacks
+                const column = containerElement.closest('.kanban-full-height-column');
+                const stackColumnId = column ? column.dataset.columnId : null;
                 requestAnimationFrame(() => {
-                    window.applyStackedColumnStyles();
+                    window.applyStackedColumnStyles(stackColumnId);
                 });
             }
         }
@@ -1361,10 +1364,12 @@ class TaskEditor {
             if (col) {
                 const stack = col.closest('.kanban-column-stack');
                 if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
+                    // Get columnId to only recalculate THIS stack, not all stacks
+                    const closeColumnId = col.dataset.columnId || null;
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
                             void stack.offsetHeight;
-                            window.applyStackedColumnStyles();
+                            window.applyStackedColumnStyles(closeColumnId);
                         });
                     });
                 }
