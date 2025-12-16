@@ -198,11 +198,7 @@ class ColorUtils {
 // Create singleton instance
 const colorUtils = new ColorUtils();
 
-// ES Module export (primary)
-export { colorUtils, ColorUtils };
-export default colorUtils;
-
-// Global window exposure (backwards compatibility during migration)
+// Global window exposure
 if (typeof window !== 'undefined') {
     window.colorUtils = colorUtils;
 }

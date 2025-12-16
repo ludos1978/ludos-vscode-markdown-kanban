@@ -187,7 +187,7 @@ class MenuManager {
 // Create singleton instance
 const menuManager = new MenuManager();
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = menuManager;
+// Global window exposure
+if (typeof window !== 'undefined') {
+    window.menuManager = menuManager;
 }

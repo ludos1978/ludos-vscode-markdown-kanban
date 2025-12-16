@@ -61,5 +61,7 @@ function createSmartLogger(prefix) {
     };
 }
 
-// Export for use in other modules
-window.createSmartLogger = createSmartLogger;
+// Global window exposure
+if (typeof window !== 'undefined') {
+    window.createSmartLogger = createSmartLogger;
+}

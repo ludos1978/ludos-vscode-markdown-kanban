@@ -949,6 +949,18 @@ export interface OpenMediaFolderMessage extends BaseMessage {
     type: 'openMediaFolder';
 }
 
+/**
+ * Create diagram file (Excalidraw or Draw.io)
+ */
+export interface CreateDiagramFileMessage extends BaseMessage {
+    type: 'createDiagramFile';
+    diagramType: 'excalidraw' | 'drawio';
+    columnId: string;
+    insertionIndex: number;
+    dropPosition: DropPosition;
+    sourceFilePath: string | null;  // null means use main file
+}
+
 // ============= EXPORT MESSAGES =============
 
 /**
@@ -1539,6 +1551,7 @@ export type IncomingMessage =
     | ExecuteFileDropLinkMessage
     | LinkExistingFileMessage
     | OpenMediaFolderMessage
+    | CreateDiagramFileMessage
     // Export messages
     | StopAutoExportMessage
     | GetExportDefaultFolderMessage

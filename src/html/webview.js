@@ -8,6 +8,9 @@ let webviewEventListenersInitialized = false;
 
 // Global variables
 let currentFileInfo = null;
+let currentBoard = null;
+window.currentBoard = currentBoard; // Expose to window for debug overlay verification
+// Note: lastClipboardCheck, clipboardCardData, CLIPBOARD_CHECK_THROTTLE are declared in clipboardHandler.js
 
 // Note: window.tagColors is set by backend in boardUpdate message
 // Do NOT initialize to {} here - it prevents actual config from loading!
@@ -1938,6 +1941,7 @@ if (!webviewEventListenersInitialized) {
                 }
             }
             currentBoard = window.cachedBoard;
+            window.currentBoard = currentBoard; // Expose to window for debug overlay verification
 
             // Clean up any duplicate row tags
             cleanupRowTags();
@@ -2405,6 +2409,53 @@ if (!webviewEventListenersInitialized) {
                     message.dropPosition,
                     `Failed to save image: ${message.error || 'Unknown error'}`
                 );
+            }
+            break;
+
+        case 'diagramFileCreated':
+            // Handle diagram file creation response from backend (Excalidraw/DrawIO)
+            if (message.success) {
+                // Create a new task with the diagram filename as title and markdown link as description
+                const diagramFileName = message.fileName.replace(/\.[^/.]+$/, ''); // Remove extension
+                const safeDiagramPath = escapeFilePath(message.relativePath);
+                const diagramLink = `![](${safeDiagramPath})`;
+
+                // Use explicit column and position from the message
+                createNewTaskWithContent(
+                    diagramFileName,
+                    message.dropPosition,
+                    diagramLink,
+                    message.columnId,
+                    message.insertionIndex
+                );
+            } else {
+                // Show error if diagram creation failed
+                vscode.postMessage({
+                    type: 'showMessage',
+                    text: `Failed to create diagram: ${message.error || 'Unknown error'}`
+                });
+            }
+            break;
+
+        case 'clearDiagramCache':
+            // Clear diagram render cache for specific files (or all if no paths specified)
+            // Called when include files are modified externally (Excalidraw, DrawIO, etc.)
+            if (typeof window.clearDiagramCache === 'function') {
+                if (message.paths && message.paths.length > 0) {
+                    // Clear cache for specific files
+                    message.paths.forEach(filePath => {
+                        if (typeof window.invalidateDiagramCache === 'function') {
+                            // Clear for all diagram types (drawio, excalidraw)
+                            window.invalidateDiagramCache(filePath, 'drawio');
+                            window.invalidateDiagramCache(filePath, 'excalidraw');
+                        }
+                    });
+                    console.log(`[Frontend] Cleared diagram cache for ${message.paths.length} file(s)`);
+                } else {
+                    // Clear entire cache
+                    window.clearDiagramCache();
+                    console.log('[Frontend] Cleared all diagram cache');
+                }
             }
             break;
 

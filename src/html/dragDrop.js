@@ -724,7 +724,21 @@ function setupGlobalDragAndDrop() {
             dragState.isDragging = false;
             return;
         }
-        
+
+        // Priority 1.5: Check for diagram card (Excalidraw/DrawIO)
+        if (dragState.draggedDiagramCard) {
+            const diagramData = JSON.stringify({
+                type: 'diagram-card',
+                diagramType: dragState.draggedDiagramCard.type
+            });
+            if (typeof handleDiagramCardDrop === 'function') {
+                handleDiagramCardDrop(e, diagramData);
+            }
+            dragState.draggedDiagramCard = null;
+            dragState.isDragging = false;
+            return;
+        }
+
         // Priority 2: Check for files
         if (dt.files && dt.files.length > 0) {
             handleVSCodeFileDrop(e, dt.files);
@@ -741,6 +755,11 @@ function setupGlobalDragAndDrop() {
             } else if (textData2.startsWith('EMPTY_CARD:')) {
                 const emptyCardData = textData2.substring('EMPTY_CARD:'.length);
                 handleEmptyCardDrop(e, emptyCardData);
+            } else if (textData2.startsWith('DIAGRAM_CARD:')) {
+                const diagramData = textData2.substring('DIAGRAM_CARD:'.length);
+                if (typeof handleDiagramCardDrop === 'function') {
+                    handleDiagramCardDrop(e, diagramData);
+                }
             } else if (textData2.startsWith('MULTIPLE_FILES:')) {
                 const filesContent = textData2.substring('MULTIPLE_FILES:'.length);
                 handleMultipleFilesDrop(e, filesContent);
@@ -3668,3 +3687,4 @@ window.handleTemplateDragOver = handleTemplateDragOver;
 window.handleTemplateDragLeave = handleTemplateDragLeave;
 window.templateDragState = templateDragState;
 window.normalizeAllStackTags = normalizeAllStackTags;
+window.setupDragAndDrop = setupDragAndDrop;

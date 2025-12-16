@@ -115,8 +115,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// Create or show kanban panel in center area
 			KanbanWebviewPanel.createOrShow(context.extensionUri, context, document);
-
-			vscode.window.showInformationMessage(`Kanban loaded from: ${document.fileName}`);
 		} catch (error) {
 			vscode.window.showErrorMessage(`Failed to open kanban: ${error}`);
 		}

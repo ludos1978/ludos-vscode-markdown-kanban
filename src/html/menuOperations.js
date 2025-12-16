@@ -1,8 +1,5 @@
 // Unified Menu System - Simple and DRY
 
-// ES Module imports
-import { colorUtils } from './utils/colorUtils.js';
-
 // Declare window properties for TypeScript
 if (typeof window !== 'undefined') {
     window._lastFlushedChanges = null;
@@ -1792,6 +1789,7 @@ async function copyColumnAsMarkdown(columnId) {
     if (columnIndex === -1) {return;}
 
     // Use NEW unified export system with presentation format
+    // mergeIncludes: true is required to use board-based path which respects scope/selection
     vscode.postMessage({
         type: 'export',
         options: {
@@ -1800,6 +1798,7 @@ async function copyColumnAsMarkdown(columnId) {
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
             packAssets: false,
+            mergeIncludes: true,
             selection: {
                 columnIndex: columnIndex
             }
@@ -1815,6 +1814,7 @@ async function copyTaskAsMarkdown(taskId, columnId) {
     if (columnIndex === -1) {return;}
 
     // Use NEW unified export system with presentation format
+    // mergeIncludes: true is required to use board-based path which respects scope/selection
     vscode.postMessage({
         type: 'export',
         options: {
@@ -1823,6 +1823,7 @@ async function copyTaskAsMarkdown(taskId, columnId) {
             format: 'presentation',
             tagVisibility: 'allexcludinglayout',
             packAssets: false,
+            mergeIncludes: true,
             selection: {
                 columnIndex: columnIndex,
                 taskId: taskId

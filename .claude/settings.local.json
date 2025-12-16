@@ -102,7 +102,17 @@
       "Bash(npm test:*)",
       "Bash(npm run lint)",
       "Bash(uniq:*)",
-      "Bash(npm run test:unit:*)"
+      "Bash(npm run test:unit:*)",
+      "Bash(node --check:*)",
+      "Bash(for f in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/*.js)",
+      "Bash(do node --check:*)",
+      "Bash(for f in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/utils/*.js)",
+      "Bash(for f in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/markdown-it-*.js)",
+      "Bash(do echo \"Checking: $f\")",
+      "Bash(for f in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/utils/*.js /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/*.js)",
+      "Bash(while read f)",
+      "Bash(if [ ! -f \"/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/$f\" ])",
+      "Bash(npm run compile:check:*)"
     ],
     "deny": [],
     "ask": []

@@ -656,6 +656,10 @@ export class KanbanWebviewPanel {
                     // This ensures settings (shortcuts, tag colors, layout, etc.) are always up-to-date
                     await this._refreshAllViewConfiguration();
 
+                    // Check include files for external changes (async, non-blocking)
+                    // This catches changes to Excalidraw, DrawIO, and other included files
+                    this._checkIncludeFilesForExternalChanges();
+
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     // This fixes empty view issues after debug restart or workspace restore
                     // but avoids re-rendering when the view just temporarily lost focus (e.g., showing messages)
@@ -864,7 +868,6 @@ export class KanbanWebviewPanel {
             'utils/exportTreeUI.js',
             'utils/smartLogger.js',
             'utils/menuUtils.js',
-            'runtime-tracker.js',
             'markdownRenderer.js',
             'taskEditor.js',
             'boardRenderer.js',
@@ -1282,6 +1285,59 @@ export class KanbanWebviewPanel {
         } as BoardUpdateMessage;
 
         this._webviewBridge.send(message);
+    }
+
+    /**
+     * Check all include files for external changes (async, non-blocking)
+     * Called when view gains focus to detect changes to Excalidraw, DrawIO, etc.
+     * If changes are found, reloads the affected files and sends a board update
+     */
+    private async _checkIncludeFilesForExternalChanges(): Promise<void> {
+        if (!this._fileRegistry.isReady()) {
+            return;
+        }
+
+        try {
+            // Check all files for external changes (mtime comparison)
+            const changesMap = await this._fileRegistry.checkAllForExternalChanges();
+
+            // Count files that changed
+            const changedFiles: string[] = [];
+            changesMap.forEach((hasChanged, path) => {
+                if (hasChanged) {
+                    changedFiles.push(path);
+                }
+            });
+
+            if (changedFiles.length > 0) {
+                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} externally modified file(s) on focus:`, changedFiles);
+
+                // Reload content for changed files
+                for (const file of this._fileRegistry.getAll()) {
+                    if (changesMap.get(file.getPath())) {
+                        // Reload the file content from disk
+                        await file.readFromDisk();
+                    }
+                }
+
+                // Invalidate board cache and send update
+                this._boardStore.invalidateCache();
+
+                // Clear diagram render cache in frontend (for Excalidraw/DrawIO)
+                // Using generic postMessage since this is a custom message type
+                if (this._panel) {
+                    this._panel.webview.postMessage({
+                        type: 'clearDiagramCache',
+                        paths: changedFiles
+                    });
+                }
+
+                // Send board update to refresh the view
+                this.sendBoardUpdate(false, true);
+            }
+        } catch (error) {
+            console.error('[KanbanWebviewPanel] Error checking include files for external changes:', error);
+        }
     }
 
     /**

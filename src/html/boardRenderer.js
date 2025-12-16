@@ -1,6 +1,3 @@
-// ES Module imports
-import { colorUtils } from './utils/colorUtils.js';
-
 let scrollPositions = new Map();
 
 // Make folding state variables global for persistence
@@ -4103,31 +4100,28 @@ function handleDescriptionClick(event, element, taskId, columnId) {
 // Helper function to get tag configuration from grouped or flat structure
 function getTagConfig(tagName) {
     if (!window.tagColors) {return null;}
-    
+
     // Skip default configuration
     if (tagName === 'default') {return null;}
-    
-    // Check grouped structure
-    const groups = [
-        'status', 'type', 'priority', 'category', 'colors', 'importance',
-        'workflow', 'organization', 'positivity',
-        'content-type-teaching', 'content-type-product',
-        'complexity', 'review-status', 'time-estimate',
-        'testing-status', 'platform-teaching', 'platform-product',
-        'version', 'impact',
-        'schedule', 'overview', 'example', 'deliveries'
-    ];
-    for (const group of groups) {
-        if (window.tagColors[group] && window.tagColors[group][tagName]) {
-            return window.tagColors[group][tagName];
+
+    // Check all keys in tagColors dynamically (supports any group name)
+    for (const key of Object.keys(window.tagColors)) {
+        const value = window.tagColors[key];
+        // Check if this is a group (object containing tag configs)
+        if (value && typeof value === 'object' && !value.light && !value.dark &&
+            !value.headerBar && !value.footerBar && !value.border && !value.cornerBadge) {
+            // This looks like a group - check if it contains the tag
+            if (value[tagName]) {
+                return value[tagName];
+            }
         }
     }
-    
-    // Check flat structure
+
+    // Check flat structure (direct tag config at root level)
     if (window.tagColors[tagName]) {
         return window.tagColors[tagName];
     }
-    
+
     return null;
 }
 
@@ -4614,43 +4608,26 @@ function generateTagStyles() {
         }
     };
     
-    // Check if we have grouped structure
-    const isGrouped = window.tagColors.status || window.tagColors.type ||
-                     window.tagColors.priority || window.tagColors.category ||
-                     window.tagColors.colors || window.tagColors['dark-colors'] ||
-                     window.tagColors['light-colors'] || window.tagColors['accessible-colors'] ||
-                     window.tagColors.workflow ||
-                     window.tagColors.organization || window.tagColors.importance ||
-                     window.tagColors.positivity ||
-                     window.tagColors['content-type-teaching'] || window.tagColors['content-type-product'] ||
-                     window.tagColors.complexity || window.tagColors['review-status'] ||
-                     window.tagColors['time-estimate'] || window.tagColors['testing-status'] ||
-                     window.tagColors['platform-teaching'] || window.tagColors['platform-product'] ||
-                     window.tagColors.version || window.tagColors.impact ||
-                     window.tagColors.schedule || window.tagColors.overview ||
-                     window.tagColors.example || window.tagColors.deliveries;
+    // Process all tag configs dynamically - no hardcoded group names
+    // Iterate over all keys in tagColors and detect structure automatically
+    Object.keys(window.tagColors).forEach(key => {
+        const value = window.tagColors[key];
+        if (!value || typeof value !== 'object') return;
 
-    if (isGrouped) {
-        // Process each group
-        const groups = [
-            'status', 'type', 'priority', 'category',
-            'colors', 'dark-colors', 'light-colors', 'accessible-colors',
-            'importance', 'workflow', 'organization', 'positivity',
-            'content-type-teaching', 'content-type-product',
-            'complexity', 'review-status', 'time-estimate',
-            'testing-status', 'platform-teaching', 'platform-product',
-            'version', 'impact',
-            'schedule', 'overview', 'example', 'deliveries'
-        ];
-        groups.forEach(groupName => {
-            if (window.tagColors[groupName]) {
-                processTags(window.tagColors[groupName]);
-            }
-        });
-    } else {
-        // Process flat structure
-        processTags(window.tagColors);
-    }
+        // Check if this is a direct tag config (has theme colors or style properties)
+        const isDirectTagConfig = value.light || value.dark ||
+            value.headerBar || value.footerBar || value.border || value.cornerBadge;
+
+        if (isDirectTagConfig) {
+            // This is a direct tag config at root level - process as single tag
+            const singleTagObj = {};
+            singleTagObj[key] = value;
+            processTags(singleTagObj);
+        } else {
+            // This is a group containing multiple tags - process the group
+            processTags(value);
+        }
+    });
     
     return styles;
 }

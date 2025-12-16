@@ -903,6 +903,10 @@ function clearDiagramCache() {
     diagramRenderCache.clear();
 }
 
+// Expose diagram cache functions for external calls (e.g., from webview.js)
+window.clearDiagramCache = clearDiagramCache;
+window.invalidateDiagramCache = invalidateDiagramCache;
+
 /**
  * Render diagram file (draw.io or excalidraw) to SVG using backend
  * @param {string} filePath - Path to diagram file

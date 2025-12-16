@@ -138,7 +138,7 @@ class ActivityIndicatorManager {
 // Create singleton instance
 const activityManager = new ActivityIndicatorManager();
 
-// Make globally available
+// Global window exposure
 if (typeof window !== 'undefined') {
     window.ActivityIndicatorManager = ActivityIndicatorManager;
     window.activityManager = activityManager;

@@ -481,6 +481,7 @@ export class IncludeFileCoordinator {
 
     /**
      * Update content of existing include files with board changes
+     * Note: A file can be used in multiple contexts - use board context, not file type
      */
     private _updateIncludeFilesContent(board: KanbanBoard): void {
         // Update column include files
@@ -488,7 +489,7 @@ export class IncludeFileCoordinator {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                    if (file && file.getFileType() === 'include-column') {
+                    if (file) {
                         const columnIncludeFile = file as IncludeFile;
                         columnIncludeFile.updateTasks(column.tasks);
                     }
@@ -502,7 +503,7 @@ export class IncludeFileCoordinator {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
                         const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                        if (file && file.getFileType() === 'include-task') {
+                        if (file) {
                             const taskContent = task.description || '';
                             file.setContent(taskContent, false);
                         }

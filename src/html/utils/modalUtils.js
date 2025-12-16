@@ -301,7 +301,3 @@ if (typeof window !== 'undefined') {
     window.showLoading = modalUtils.showLoading.bind(modalUtils);
 }
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = modalUtils;
-}

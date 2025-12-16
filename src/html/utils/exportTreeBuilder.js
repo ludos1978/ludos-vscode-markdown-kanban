@@ -297,9 +297,7 @@ class ExportTreeBuilder {
     }
 }
 
-// Export for use in other modules
+// Global window exposure
 if (typeof window !== 'undefined') {
     window.ExportTreeBuilder = ExportTreeBuilder;
-} else {
-    console.error('[kanban.exportTreeBuilder] window is undefined');
 }

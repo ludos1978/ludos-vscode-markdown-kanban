@@ -483,13 +483,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
 
         // Step 3: Load content for column includes
+        // Note: A file can be used in multiple contexts (column include in one place,
+        // task include in another). Don't check file type - just use the file content.
         const mainFilePath = mainFile.getPath();
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
 
                 for (const relativePath of column.includeFiles) {
                     const file = this.getByRelativePath(relativePath) as IncludeFile;
-                    if (file && file.getFileType() === 'include-column') {
+                    if (file) {
                         // Parse tasks from include file, preserving existing task IDs
                         const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
                         column.tasks = tasks;
@@ -505,7 +507,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
 
                     for (const relativePath of task.includeFiles) {
                         const file = this.getByRelativePath(relativePath) as IncludeFile;
-                        if (file && file.getFileType() === 'include-task') {
+                        if (file) {
                             // Load description from task include file
                             task.description = file.getContent();
                         } else {
@@ -550,17 +552,11 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
     ): IncludeFile | undefined {
         const existingFile = this.getByRelativePath(relativePath);
-        const isCorrectType = existingFile?.getFileType() === fileType;
 
-        // If file exists with wrong type, replace it
-        if (existingFile && !isCorrectType) {
-            console.warn(`[MarkdownFileRegistry] File ${relativePath} registered as ${existingFile.getFileType()} but should be ${fileType}! Replacing...`);
-            existingFile.stopWatching();
-            this.unregister(existingFile.getPath());
-        }
-
-        // If file already registered with correct type, return it
-        if (existingFile && isCorrectType) {
+        // If file already registered, return it regardless of type.
+        // A file can be used in multiple contexts (column include in one place,
+        // task include in another). The registered type is just the first usage.
+        if (existingFile) {
             return existingFile as IncludeFile;
         }
 
@@ -600,12 +596,15 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns false (main file also needs saving)
      */
     public async trackIncludeFileUnsavedChanges(board: KanbanBoard): Promise<boolean> {
-        // Update IncludeFile instances (type=include-column) with current task content
+        // Note: A file can be used in multiple contexts (column include in one place,
+        // task include in another). Use board context to determine behavior, not file type.
+
+        // Update IncludeFile instances used as column includes with current task content
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
                 for (const relativePath of column.includeFiles) {
                     const file = this.getByRelativePath(relativePath) as IncludeFile;
-                    if (file && file.getFileType() === 'include-column') {
+                    if (file) {
                         const content = file.generateFromTasks(column.tasks);
                         const currentContent = file.getContent();
                         const baseline = file.getBaseline();
@@ -627,13 +626,13 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             }
         }
 
-        // Update IncludeFile instances (type=include-task) with current task content
+        // Update IncludeFile instances used as task includes with current task content
         for (const column of board.columns) {
             for (const task of column.tasks) {
                 if (task.includeFiles && task.includeFiles.length > 0) {
                     for (const relativePath of task.includeFiles) {
                         const file = this.getByRelativePath(relativePath) as IncludeFile;
-                        if (file && file.getFileType() === 'include-task') {
+                        if (file) {
                             const fullContent = task.description || '';
                             const currentContent = file.getContent();
                             const baseline = file.getBaseline();

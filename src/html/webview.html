@@ -326,6 +326,14 @@
                             <span class="drag-menu-item-icon">📋</span>
                             <span class="drag-menu-item-text" id="clipboard-menu-text">Clipboard</span>
                         </div>
+                        <div id="excalidraw-card-source" class="drag-menu-item" draggable="true" ondragstart="handleDiagramCardDragStart(event, 'excalidraw')" ondragend="handleDiagramCardDragEnd(event)">
+                            <span class="drag-menu-item-icon">✏️</span>
+                            <span class="drag-menu-item-text">Excalidraw</span>
+                        </div>
+                        <div id="drawio-card-source" class="drag-menu-item" draggable="true" ondragstart="handleDiagramCardDragStart(event, 'drawio')" ondragend="handleDiagramCardDragEnd(event)">
+                            <span class="drag-menu-item-icon">📐</span>
+                            <span class="drag-menu-item-text">Draw.io</span>
+                        </div>
                     </div>
                 </div>
 
@@ -799,15 +807,45 @@
     </div>
 
     <!-- JavaScript modules -->
-    <!-- Initialize vscode API first (before bundle loads) -->
+    <!-- Initialize vscode API first -->
     <script>
         // Initialize VS Code API globally before any modules load
         const vscode = acquireVsCodeApi();
         window.vscode = vscode;
     </script>
 
-    <!-- Bundled application code (all modules in dependency order) -->
-    <script src="bundle.js"></script>
+    <!-- Utility modules (order matters - later modules may depend on earlier ones) -->
+    <script src="utils/colorUtils.js"></script>
+    <script src="utils/fileTypeUtils.js"></script>
+    <script src="utils/tagUtils.js"></script>
+    <script src="utils/configManager.js"></script>
+    <script src="utils/styleManager.js"></script>
+    <script src="utils/menuManager.js"></script>
+    <script src="utils/dragStateManager.js"></script>
+    <script src="utils/validationUtils.js"></script>
+    <script src="utils/modalUtils.js"></script>
+    <script src="utils/activityIndicator.js"></script>
+    <script src="utils/exportTreeBuilder.js"></script>
+    <script src="utils/exportTreeUI.js"></script>
+    <script src="utils/smartLogger.js"></script>
+    <script src="utils/menuUtils.js"></script>
+
+    <!-- Core modules -->
+    <script src="markdownRenderer.js"></script>
+    <script src="taskEditor.js"></script>
+    <script src="boardRenderer.js"></script>
+    <script src="dragDrop.js"></script>
+    <script src="menuOperations.js"></script>
+    <script src="search.js"></script>
+    <script src="debugOverlay.js"></script>
+    <script src="clipboardHandler.js"></script>
+    <script src="navigationHandler.js"></script>
+    <script src="foldingStateManager.js"></script>
+    <script src="templateDialog.js"></script>
+    <script src="exportMarpUI.js"></script>
+
+    <!-- Main webview entry point (must be last) -->
+    <script src="webview.js"></script>
     <div id="path-context-menu" class="context-menu" style="display: none;">
         <div class="context-menu-item" onclick="copyFullPath()">Copy Full OS Path</div>
         <div class="context-menu-item" onclick="copyStoredPath()">Copy Stored Path</div>

@@ -198,24 +198,22 @@ export class IncludeLoadingProcessor {
             if (file) {
                 await this._loadFileContent(file, preloadedContent);
 
-                // Cast to IncludeFile - we know it's a column include from _ensureColumnIncludeRegistered
+                // Cast to IncludeFile and parse as tasks
+                // Note: A file can be used in multiple contexts (column include in one place,
+                // task include in another). Don't check file type - just parse the content.
                 const includeFile = file as IncludeFile;
-                if (includeFile.getFileType() === 'include-column') {
-                    const mainFilePath = mainFile.getPath();
-                    const contentLength = includeFile.getContent()?.length || 0;
-                    const fileTasks = includeFile.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
+                const mainFilePath = mainFile.getPath();
+                const contentLength = includeFile.getContent()?.length || 0;
+                const fileTasks = includeFile.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
 
-                    // Debug: Log if content was loaded but no tasks were parsed
-                    if (contentLength > 0 && fileTasks.length === 0) {
-                        console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
-                    } else if (contentLength === 0) {
-                        console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
-                    }
-
-                    tasks.push(...fileTasks);
-                } else {
-                    console.error(`[IncludeLoadingProcessor] File is not a column include: ${relativePath}`);
+                // Debug: Log if content was loaded but no tasks were parsed
+                if (contentLength > 0 && fileTasks.length === 0) {
+                    console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
+                } else if (contentLength === 0) {
+                    console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
                 }
+
+                tasks.push(...fileTasks);
             } else {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
             }
@@ -333,13 +331,14 @@ export class IncludeLoadingProcessor {
         }
 
         // Re-load tasks from already-loaded files
+        // Note: A file can be used in multiple contexts - use it regardless of registered type
         const mainFile = this._fileRegistry.getMainFile();
         const mainFilePath = mainFile?.getPath();
         const tasks: KanbanTask[] = [];
 
         for (const relativePath of newFiles) {
             const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file && file.getFileType() === 'include-column') {
+            if (file) {
                 const columnIncludeFile = file as IncludeFile;
                 const fileTasks = columnIncludeFile.parseToTasks([], targetColumn.id, mainFilePath);
                 tasks.push(...fileTasks);

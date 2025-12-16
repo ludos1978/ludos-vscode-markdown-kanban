@@ -58,23 +58,11 @@ console.log('Marp watch script placeholder');
 			if (fs.existsSync(srcHtmlDir)) {
 				fs.mkdirSync(distHtmlDir, { recursive: true });
 
-// JS files that are now bundled into bundle.js (skip copying)
+// JS files that would be bundled (currently disabled - loading individual scripts)
+			// To re-enable bundling, populate this set and enable the frontend bundle in esbuild
 			const bundledJsFiles = new Set([
-				'boardRenderer.js',
-				'clipboardHandler.js',
-				'debugOverlay.js',
-				'dragDrop.js',
-				'exportMarpUI.js',
-				'foldingStateManager.js',
-				'main.js',
-				'markdownRenderer.js',
-				'menuOperations.js',
-				'navigationHandler.js',
-				'search.js',
-				'submenuGenerator.js',
-				'taskEditor.js',
-				'templateDialog.js',
-				'webview.js'
+				// Bundling disabled for now - all files are loaded individually
+				'main.js'  // Only skip main.js (bundle entry point)
 			]);
 
 // Recursive function to copy directory contents with exclusions
@@ -109,8 +97,8 @@ console.log('Marp watch script placeholder');
 						return;
 					}
 
-					// Skip bundled JS files (they're in bundle.js now)
-					if (file.endsWith('.js') && (bundledJsFiles.has(file) || isUtilsDir)) {
+					// Skip files that are bundled (e.g., main.js entry point)
+					if (file.endsWith('.js') && bundledJsFiles.has(file)) {
 						console.log(`Skipping bundled file: ${srcFile}`);
 						return;
 					}
@@ -262,61 +250,23 @@ async function main() {
 		],
 	});
 
-	// Frontend bundle (main.js -> dist/src/html/bundle.js)
-	const frontendCtx = await esbuild.context({
-		entryPoints: [
-			'src/html/main.js'
-		],
-		bundle: true,
-		format: 'iife',
-		minify: production,
-		sourcemap: !production,
-		sourcesContent: false,
-		platform: 'browser',
-		outfile: 'dist/src/html/bundle.js',
-		// These are loaded from CDN or are globals in the webview
-		external: [],
-		// Define globals that come from external scripts
-		define: {
-			'process.env.NODE_ENV': production ? '"production"' : '"development"'
-		},
-		logLevel: 'silent',
-		plugins: [
-			{
-				name: 'frontend-build-logger',
-				setup(build) {
-					build.onStart(() => {
-						console.log('[frontend] build started');
-					});
-					build.onEnd((result) => {
-						if (result.errors.length > 0) {
-							result.errors.forEach(({ text, location }) => {
-								console.error(`[frontend] ERROR: ${text}`);
-								if (location) {
-									console.error(`    ${location.file}:${location.line}:${location.column}:`);
-								}
-							});
-						} else {
-							console.log('[frontend] build finished successfully');
-						}
-					});
-				},
-			},
-		],
-	});
+	// Frontend bundle is DISABLED - loading individual scripts instead
+	// To re-enable, uncomment the frontendCtx and update watch/rebuild calls
+	// const frontendCtx = await esbuild.context({
+	// 	entryPoints: ['src/html/main.js'],
+	// 	bundle: true,
+	// 	format: 'iife',
+	// 	minify: production,
+	// 	sourcemap: !production,
+	// 	platform: 'browser',
+	// 	outfile: 'dist/src/html/bundle.js',
+	// });
 
 	if (watch) {
-		await Promise.all([
-			backendCtx.watch(),
-			frontendCtx.watch()
-		]);
+		await backendCtx.watch();
 	} else {
-		await Promise.all([
-			backendCtx.rebuild(),
-			frontendCtx.rebuild()
-		]);
+		await backendCtx.rebuild();
 		await backendCtx.dispose();
-		await frontendCtx.dispose();
 	}
 }
 

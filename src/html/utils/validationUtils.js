@@ -377,7 +377,3 @@ if (typeof window !== 'undefined') {
     window.isImageFile = ValidationUtils.isImageFile;
 }
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = ValidationUtils;
-}

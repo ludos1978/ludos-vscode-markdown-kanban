@@ -344,8 +344,8 @@ function postEditMessage(elementType, elementId, columnId, newTitle) {
     }
 }
 
-// Export to window for use by other modules
-window.menuUtils = {
+// Create menuUtils object
+const menuUtils = {
     shouldExecute,
     findColumnInBoard,
     findTaskInBoard,
@@ -365,3 +365,8 @@ window.menuUtils = {
     getIncludeFile,
     postEditMessage
 };
+
+// Global window exposure
+if (typeof window !== 'undefined') {
+    window.menuUtils = menuUtils;
+}

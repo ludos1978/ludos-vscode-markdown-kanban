@@ -231,9 +231,7 @@ class ExportTreeUI {
     }
 }
 
-// Export for use in other modules
+// Global window exposure
 if (typeof window !== 'undefined') {
     window.ExportTreeUI = ExportTreeUI;
-} else {
-    console.error('[kanban.exportTreeUI] window is undefined');
 }

@@ -199,11 +199,6 @@ class FileTypeUtils {
 // Create singleton instance
 const fileTypeUtils = new FileTypeUtils();
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = fileTypeUtils;
-}
-
 // Global window exposure
 if (typeof window !== 'undefined') {
     window.fileTypeUtils = fileTypeUtils;

@@ -209,12 +209,7 @@ class ConfigManager {
 // Create singleton instance
 const configManager = new ConfigManager();
 
-// Make available globally for browser context
+// Global window exposure
 if (typeof window !== 'undefined') {
     window.configManager = configManager;
-}
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = configManager;
 }

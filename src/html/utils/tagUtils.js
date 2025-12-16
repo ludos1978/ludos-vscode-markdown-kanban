@@ -1559,11 +1559,6 @@ class TagUtils {
 // Create singleton instance
 const tagUtils = new TagUtils();
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = tagUtils;
-}
-
 // Global window exposure
 if (typeof window !== 'undefined') {
     window.tagUtils = tagUtils;

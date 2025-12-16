@@ -185,7 +185,7 @@ styleManager.applyTaskSectionHeight = function(height) {
     }
 };
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = styleManager;
+// Global window exposure
+if (typeof window !== 'undefined') {
+    window.styleManager = styleManager;
 }

@@ -91,7 +91,7 @@ class KanbanSearch {
     findAllMatches(searchTerm) {
         const results = [];
         
-        if (!currentBoard || !currentBoard.columns) {
+        if (!window.cachedBoard || !window.cachedBoard.columns) {
             return results;
         }
         
@@ -112,7 +112,7 @@ class KanbanSearch {
         }
         
         // Search through columns
-        currentBoard.columns.forEach((column, columnIndex) => {
+        window.cachedBoard.columns.forEach((column, columnIndex) => {
             // Search column titles
             if (column.title && searchPattern.test(column.title)) {
                 results.push({

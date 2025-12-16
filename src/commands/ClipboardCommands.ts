@@ -50,7 +50,8 @@ export class ClipboardCommands extends BaseMessageCommand {
             'executeFileDropCopy',
             'executeFileDropLink',
             'linkExistingFile',
-            'openMediaFolder'
+            'openMediaFolder',
+            'createDiagramFile'
         ],
         priority: 100
     };
@@ -154,6 +155,17 @@ export class ClipboardCommands extends BaseMessageCommand {
 
                 case 'openMediaFolder':
                     await this.handleOpenMediaFolder(context);
+                    return this.success();
+
+                case 'createDiagramFile':
+                    await this.handleCreateDiagramFile(
+                        message.diagramType,
+                        message.columnId,
+                        message.insertionIndex,
+                        message.dropPosition,
+                        message.sourceFilePath,
+                        context
+                    );
                     return this.success();
 
                 default:
@@ -395,6 +407,156 @@ export class ClipboardCommands extends BaseMessageCommand {
         } catch (error) {
             console.error('[ClipboardCommands] Error opening media folder:', error);
             vscode.window.showErrorMessage(`Failed to open media folder: ${getErrorMessage(error)}`);
+        }
+    }
+
+    /**
+     * Handle creating a new diagram file (Excalidraw or Draw.io)
+     * Shows input dialog for filename, creates the file in the appropriate media folder
+     */
+    private async handleCreateDiagramFile(
+        diagramType: 'excalidraw' | 'drawio',
+        columnId: string,
+        insertionIndex: number,
+        dropPosition: { x: number; y: number },
+        sourceFilePath: string | null,
+        context: CommandContext
+    ): Promise<void> {
+        try {
+            // Determine the source file for media folder calculation
+            let directory: string;
+            let baseFileName: string;
+
+            if (sourceFilePath) {
+                // Use the include file's directory for media folder
+                // sourceFilePath is relative to main file, need to resolve it
+                const mainFilePath = context.fileManager.getFilePath();
+                if (!mainFilePath) {
+                    throw new Error('No main file path available');
+                }
+                const mainDir = path.dirname(mainFilePath);
+                const resolvedSourcePath = path.resolve(mainDir, sourceFilePath);
+                directory = path.dirname(resolvedSourcePath);
+                baseFileName = path.basename(resolvedSourcePath).replace(/\.[^/.]+$/, '');
+            } else {
+                // Use main file's directory
+                const paths = this._getCurrentFilePaths(context);
+                directory = paths.directory;
+                baseFileName = paths.baseFileName;
+            }
+
+            // Show input dialog for the diagram filename
+            const diagramTypeLabel = diagramType === 'excalidraw' ? 'Excalidraw' : 'Draw.io';
+            const defaultName = `diagram-${Date.now()}`;
+
+            const fileName = await vscode.window.showInputBox({
+                prompt: `Enter a name for the new ${diagramTypeLabel} diagram`,
+                value: defaultName,
+                placeHolder: 'diagram-name',
+                validateInput: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Please enter a filename';
+                    }
+                    // Check for invalid characters
+                    if (/[<>:"/\\|?*]/.test(value)) {
+                        return 'Filename contains invalid characters';
+                    }
+                    return null;
+                }
+            });
+
+            if (!fileName) {
+                // User cancelled
+                return;
+            }
+
+            // Create the media folder path
+            const mediaFolderPath = this._getMediaFolderPath(directory, baseFileName);
+            const mediaFolderName = `${baseFileName}-MEDIA`;
+
+            // Determine file extension and create appropriate template
+            let fileExtension: string;
+            let fileContent: string;
+
+            if (diagramType === 'excalidraw') {
+                fileExtension = '.excalidraw';
+                // Empty Excalidraw JSON template
+                fileContent = JSON.stringify({
+                    type: 'excalidraw',
+                    version: 2,
+                    source: 'kanban-board',
+                    elements: [],
+                    appState: {
+                        gridSize: null,
+                        viewBackgroundColor: '#ffffff'
+                    },
+                    files: {}
+                }, null, 2);
+            } else {
+                fileExtension = '.drawio';
+                // Empty Draw.io XML template
+                fileContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="kanban-board" modified="${new Date().toISOString()}" agent="kanban-board" version="1.0">
+  <diagram id="diagram-1" name="Page-1">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+            }
+
+            // Create the full file path
+            const sanitizedFileName = fileName.trim().replace(/[<>:"/\\|?*]/g, '-');
+            const fullFileName = sanitizedFileName + fileExtension;
+            const filePath = path.join(mediaFolderPath, fullFileName);
+
+            // Check if file already exists
+            if (fs.existsSync(filePath)) {
+                const overwrite = await vscode.window.showWarningMessage(
+                    `File "${fullFileName}" already exists. Do you want to overwrite it?`,
+                    'Overwrite',
+                    'Cancel'
+                );
+                if (overwrite !== 'Overwrite') {
+                    return;
+                }
+            }
+
+            // Write the file
+            fs.writeFileSync(filePath, fileContent, 'utf8');
+
+            // Calculate relative path for the markdown link
+            const relativePath = `./${mediaFolderName}/${fullFileName}`;
+
+            // Send success message to frontend to create the task
+            this.postMessage({
+                type: 'diagramFileCreated',
+                success: true,
+                diagramType: diagramType,
+                filePath: filePath,
+                relativePath: relativePath,
+                fileName: fullFileName,
+                columnId: columnId,
+                insertionIndex: insertionIndex,
+                dropPosition: dropPosition
+            });
+
+            // Show success message
+            vscode.window.showInformationMessage(`Created ${diagramTypeLabel} diagram: ${fullFileName}`);
+
+        } catch (error) {
+            console.error('[ClipboardCommands] Error creating diagram file:', error);
+            this.postMessage({
+                type: 'diagramFileCreated',
+                success: false,
+                error: getErrorMessage(error),
+                diagramType: diagramType,
+                dropPosition: dropPosition
+            });
+            vscode.window.showErrorMessage(`Failed to create diagram: ${getErrorMessage(error)}`);
         }
     }
 

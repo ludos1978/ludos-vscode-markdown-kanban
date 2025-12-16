@@ -604,9 +604,127 @@ function shouldThrottleClipboardCheck() {
 }
 
 // =============================================================================
+// DIAGRAM CARD DRAG HANDLERS (Excalidraw, Draw.io)
+// =============================================================================
+
+// Diagram drag state
+let diagramDragState = {
+    isDragging: false,
+    diagramType: null  // 'excalidraw' or 'drawio'
+};
+
+/**
+ * Handle diagram card drag start (Excalidraw or Draw.io)
+ * @param {DragEvent} e - Drag event
+ * @param {string} diagramType - Type of diagram ('excalidraw' or 'drawio')
+ */
+window.handleDiagramCardDragStart = function(e, diagramType) {
+    // Set drag state
+    diagramDragState.isDragging = true;
+    diagramDragState.diagramType = diagramType;
+
+    if (window.dragState) {
+        window.dragState.isDragging = true;
+        window.dragState.draggedDiagramCard = {
+            type: diagramType,
+            id: 'temp-diagram-' + Date.now()
+        };
+    }
+
+    // Set drag data
+    const dragData = JSON.stringify({
+        type: 'diagram-card',
+        diagramType: diagramType
+    });
+    e.dataTransfer.setData('text/plain', `DIAGRAM_CARD:${dragData}`);
+    e.dataTransfer.effectAllowed = 'copy';
+
+    // Add visual feedback
+    e.target.classList.add('dragging');
+};
+
+/**
+ * Handle diagram card drag end
+ */
+window.handleDiagramCardDragEnd = function(e) {
+    // Clear visual feedback
+    e.target.classList.remove('dragging');
+
+    // Clear drag state
+    diagramDragState.isDragging = false;
+    diagramDragState.diagramType = null;
+
+    if (window.dragState) {
+        window.dragState.isDragging = false;
+        window.dragState.draggedDiagramCard = null;
+    }
+};
+
+/**
+ * Handle diagram card drop - creates a new diagram file and task
+ * @param {DragEvent} e - Drop event
+ * @param {string} diagramData - JSON string with diagram type
+ */
+window.handleDiagramCardDrop = function(e, diagramData) {
+    try {
+        const parsedData = JSON.parse(diagramData);
+        const diagramType = parsedData.diagramType;
+
+        // Find target column using hierarchical lookup
+        const dropResult = window.findDropPositionHierarchical
+            ? window.findDropPositionHierarchical(e.clientX, e.clientY, null)
+            : null;
+
+        if (!dropResult || !dropResult.columnId) {
+            vscode.postMessage({
+                type: 'showMessage',
+                text: 'Cannot create diagram: No target column found'
+            });
+            return;
+        }
+
+        // Find the column data to determine include file context
+        const column = window.cachedBoard?.columns?.find(c => c.id === dropResult.columnId);
+        if (!column) {
+            vscode.postMessage({
+                type: 'showMessage',
+                text: 'Cannot create diagram: Column not found'
+            });
+            return;
+        }
+
+        // Determine the source file path for media folder
+        // If column has includeFiles, use the first include file's path
+        // Otherwise, use the main file path
+        let sourceFilePath = null;
+        if (column.includeFiles && column.includeFiles.length > 0) {
+            sourceFilePath = column.includeFiles[0];
+        }
+
+        // Send message to backend to show dialog and create diagram
+        vscode.postMessage({
+            type: 'createDiagramFile',
+            diagramType: diagramType,
+            columnId: dropResult.columnId,
+            insertionIndex: dropResult.insertionIndex,
+            dropPosition: { x: e.clientX, y: e.clientY },
+            sourceFilePath: sourceFilePath  // null means use main file
+        });
+
+    } catch (error) {
+        console.error('Failed to handle diagram card drop:', error);
+        vscode.postMessage({
+            type: 'showMessage',
+            text: 'Failed to create diagram: ' + error.message
+        });
+    }
+};
+
+// =============================================================================
 // GLOBAL EXPORTS
 // =============================================================================
 
 window.setClipboardCardData = setClipboardCardData;
 window.getClipboardCardData = getClipboardCardData;
 window.shouldThrottleClipboardCheck = shouldThrottleClipboardCheck;
+window.diagramDragState = diagramDragState;

@@ -238,10 +238,8 @@ export class IncludeFile extends MarkdownFile {
      * @param mainFilePath Optional path to main kanban file (for dynamic image path resolution)
      */
     public parseToTasks(existingTasks?: KanbanTask[], columnId?: string, mainFilePath?: string): KanbanTask[] {
-        if (this._fileType !== 'include-column') {
-            console.warn(`[IncludeFile] parseToTasks called on non-column include: ${this._fileType}`);
-            return [];
-        }
+        // Note: A file can be used as different include types in different contexts.
+        // Don't restrict parsing based on registered file type - just parse the content.
 
         // Use PresentationParser to convert slides to tasks
         const slides = PresentationParser.parsePresentation(this._content);
@@ -267,13 +265,9 @@ export class IncludeFile extends MarkdownFile {
 
     /**
      * Generate presentation format from tasks (for include-column)
+     * Note: A file can be used in multiple contexts - don't restrict based on registered type
      */
     public generateFromTasks(tasks: KanbanTask[]): string {
-        if (this._fileType !== 'include-column') {
-            console.warn(`[IncludeFile] generateFromTasks called on non-column include: ${this._fileType}`);
-            return this._content;
-        }
-
         // Use unified presentation generator (no YAML for copying)
         return PresentationGenerator.fromTasks(tasks, {
             filterIncludes: true
@@ -283,13 +277,9 @@ export class IncludeFile extends MarkdownFile {
 
     /**
      * Update tasks (regenerate content from tasks and mark as unsaved)
-     * For include-column only
+     * Note: A file can be used in multiple contexts - don't restrict based on registered type
      */
     public updateTasks(tasks: KanbanTask[]): void {
-        if (this._fileType !== 'include-column') {
-            console.warn(`[IncludeFile] updateTasks called on non-column include: ${this._fileType}`);
-            return;
-        }
         const newContent = this.generateFromTasks(tasks);
         this.setContent(newContent, false);
     }
