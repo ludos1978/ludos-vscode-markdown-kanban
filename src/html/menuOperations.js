@@ -2567,12 +2567,12 @@ function toggleColumnTag(columnId, tagName, event) {
     updateTagButtonAppearance(columnId, 'column', tagName, !wasActive);
     updateTagCategoryCounts(columnId, 'column');
 
-    // Recalculate stack heights if visual tags changed
+    // Recalculate stack heights if visual tags changed (only this stack)
     const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
     const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (visualTagsBefore.length !== visualTagsAfter.length) {
         if (typeof window.applyStackedColumnStyles === 'function') {
-            window.applyStackedColumnStyles();
+            window.applyStackedColumnStyles(columnId);
         }
     }
 
@@ -2635,12 +2635,12 @@ function toggleTaskTag(taskId, columnId, tagName, event) {
     updateTagButtonAppearance(taskId, 'task', tagName, !wasActive);
     updateTagCategoryCounts(taskId, 'task', columnId);
 
-    // Recalculate stack heights if visual tags changed
+    // Recalculate stack heights if visual tags changed (only this stack)
     const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
     const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
     if (visualTagsBefore.length !== visualTagsAfter.length) {
         if (typeof window.applyStackedColumnStyles === 'function') {
-            window.applyStackedColumnStyles();
+            window.applyStackedColumnStyles(columnId);
         }
     }
 

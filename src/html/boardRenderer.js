@@ -2088,9 +2088,9 @@ function toggleAllTasksInColumn(columnId) {
         }
     });
 
-    // Recalculate once after all tasks are toggled
+    // Recalculate once after all tasks are toggled (only this stack)
     if (typeof window.applyStackedColumnStyles === 'function') {
-        window.applyStackedColumnStyles();
+        window.applyStackedColumnStyles(columnId);
     }
 
     // Remember this manual state
@@ -3715,9 +3715,10 @@ function setupCompactViewHandler() {
             if (wasCompact !== shouldBeCompact) {
                 const stack = col.closest('.kanban-column-stack');
                 if (stack && typeof window.applyStackedColumnStyles === 'function') {
-                    // Recalculate sticky positions for the stack
+                    // Recalculate sticky positions for this stack only
+                    const colId = col.dataset.columnId;
                     requestAnimationFrame(() => {
-                        window.applyStackedColumnStyles();
+                        window.applyStackedColumnStyles(colId);
                     });
                 }
             }

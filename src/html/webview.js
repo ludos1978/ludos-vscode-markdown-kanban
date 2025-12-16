@@ -2796,10 +2796,10 @@ if (!webviewEventListenersInitialized) {
                             });
                         }
 
-                        // Recalculate stacked column heights after task include content update
+                        // Recalculate stacked column heights after task include content update (only this stack)
                         if (typeof window.applyStackedColumnStyles === 'function') {
                             requestAnimationFrame(() => {
-                                window.applyStackedColumnStyles();
+                                window.applyStackedColumnStyles(foundColumn.id);
                             });
                         }
 
