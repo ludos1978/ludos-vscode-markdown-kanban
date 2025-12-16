@@ -2765,8 +2765,8 @@ function toggleColumnCollapse(columnId, event) {
             window.applyRowHeight(window.currentRowHeight);
         }
         // For 'auto' mode, CSS handles the layout naturally
-        // Apply stacked column styles after state change
-        applyStackedColumnStyles();
+        // Apply stacked column styles after state change (only for this stack)
+        applyStackedColumnStyles(columnId);
     }, 10);
 }
 
@@ -3843,7 +3843,9 @@ function toggleTaskCollapse(taskElement, skipRecalculation = false) {
 
     // Recalculate stacked column heights after collapse/expand (unless skipped for bulk operations)
     if (!skipRecalculation && typeof window.applyStackedColumnStyles === 'function') {
-        window.applyStackedColumnStyles();
+        // Get columnId to only recalculate THIS stack, not all stacks
+        const columnId = getColumnIdFromElement(taskElement);
+        window.applyStackedColumnStyles(columnId);
     }
 
     // Save state immediately
