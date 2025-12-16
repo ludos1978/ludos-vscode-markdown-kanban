@@ -58,8 +58,27 @@ console.log('Marp watch script placeholder');
 			if (fs.existsSync(srcHtmlDir)) {
 				fs.mkdirSync(distHtmlDir, { recursive: true });
 
+// JS files that are now bundled into bundle.js (skip copying)
+			const bundledJsFiles = new Set([
+				'boardRenderer.js',
+				'clipboardHandler.js',
+				'debugOverlay.js',
+				'dragDrop.js',
+				'exportMarpUI.js',
+				'foldingStateManager.js',
+				'main.js',
+				'markdownRenderer.js',
+				'menuOperations.js',
+				'navigationHandler.js',
+				'search.js',
+				'submenuGenerator.js',
+				'taskEditor.js',
+				'templateDialog.js',
+				'webview.js'
+			]);
+
 // Recursive function to copy directory contents with exclusions
-			function copyDirRecursive(src, dist) {
+			function copyDirRecursive(src, dist, isUtilsDir = false) {
 				const files = fs.readdirSync(src);
 				files.forEach(file => {
 					const srcFile = path.join(src, file);
@@ -90,10 +109,18 @@ console.log('Marp watch script placeholder');
 						return;
 					}
 
+					// Skip bundled JS files (they're in bundle.js now)
+					if (file.endsWith('.js') && (bundledJsFiles.has(file) || isUtilsDir)) {
+						console.log(`Skipping bundled file: ${srcFile}`);
+						return;
+					}
+
 					if (stat.isDirectory()) {
+						// Check if this is the utils directory (all files in utils are bundled)
+						const enteringUtils = file === 'utils';
 						// Create subdirectory and copy its contents
 						fs.mkdirSync(distFile, { recursive: true });
-						copyDirRecursive(srcFile, distFile);
+						copyDirRecursive(srcFile, distFile, enteringUtils);
 					} else if (stat.isFile()) {
 						// Copy file
 						fs.copyFileSync(srcFile, distFile);
@@ -215,7 +242,8 @@ console.log('Marp watch script placeholder');
 };
 
 async function main() {
-	const ctx = await esbuild.context({
+	// Backend bundle (extension.ts -> dist/extension.js)
+	const backendCtx = await esbuild.context({
 		entryPoints: [
 			'src/extension.ts'
 		],
@@ -234,11 +262,61 @@ async function main() {
 		],
 	});
 
+	// Frontend bundle (main.js -> dist/src/html/bundle.js)
+	const frontendCtx = await esbuild.context({
+		entryPoints: [
+			'src/html/main.js'
+		],
+		bundle: true,
+		format: 'iife',
+		minify: production,
+		sourcemap: !production,
+		sourcesContent: false,
+		platform: 'browser',
+		outfile: 'dist/src/html/bundle.js',
+		// These are loaded from CDN or are globals in the webview
+		external: [],
+		// Define globals that come from external scripts
+		define: {
+			'process.env.NODE_ENV': production ? '"production"' : '"development"'
+		},
+		logLevel: 'silent',
+		plugins: [
+			{
+				name: 'frontend-build-logger',
+				setup(build) {
+					build.onStart(() => {
+						console.log('[frontend] build started');
+					});
+					build.onEnd((result) => {
+						if (result.errors.length > 0) {
+							result.errors.forEach(({ text, location }) => {
+								console.error(`[frontend] ERROR: ${text}`);
+								if (location) {
+									console.error(`    ${location.file}:${location.line}:${location.column}:`);
+								}
+							});
+						} else {
+							console.log('[frontend] build finished successfully');
+						}
+					});
+				},
+			},
+		],
+	});
+
 	if (watch) {
-		await ctx.watch();
+		await Promise.all([
+			backendCtx.watch(),
+			frontendCtx.watch()
+		]);
 	} else {
-		await ctx.rebuild();
-		await ctx.dispose();
+		await Promise.all([
+			backendCtx.rebuild(),
+			frontendCtx.rebuild()
+		]);
+		await backendCtx.dispose();
+		await frontendCtx.dispose();
 	}
 }
 

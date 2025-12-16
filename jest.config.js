@@ -49,7 +49,10 @@ module.exports = {
     
     // Transform files
     transform: {
-        '^.+\\.js$': 'babel-jest'
+        '^.+\\.js$': 'babel-jest',
+        '^.+\\.ts$': ['ts-jest', {
+            tsconfig: '<rootDir>/tsconfig.json'
+        }]
     },
     
     // Ignore patterns

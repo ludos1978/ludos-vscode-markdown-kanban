@@ -546,6 +546,23 @@ function setupGlobalDragAndDrop() {
         return;
     }
 
+    // GLOBAL ESC key handler to cancel any drag operation
+    // MEMORY FIX: This is added once globally, not per-task handle
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && dragState.isDragging && dragState.draggedTask) {
+            restoreTaskPosition();
+            dragState.draggedTask.classList.remove('dragging', 'drag-preview');
+
+            // Reset drag state
+            dragState.draggedTask = null;
+            dragState.originalTaskParent = null;
+            dragState.originalTaskNextSibling = null;
+            dragState.originalTaskIndex = -1;
+            dragState.isDragging = false;
+            dragState.altKeyPressed = false;
+        }
+    });
+
     // CRITICAL FIX: Prevent text selections from being draggable
     // This prevents the bug where selecting text and dragging creates unintended tasks from text content
     // STRENGTHENED: Now prevents ALL text selection drags, even with Alt key
@@ -2587,25 +2604,7 @@ function setupTaskDragHandle(handle) {
     });
 
     // NOTE: Task dragend handler removed - now handled by unified global dragend handler
-
-    // Add ESC key handler to cancel task drag
-    if (!handle.hasEscListener) {
-        handle.hasEscListener = true;
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape' && dragState.isDragging && dragState.draggedTask) {
-                restoreTaskPosition();
-                dragState.draggedTask.classList.remove('dragging', 'drag-preview');
-                
-                // Reset drag state
-                dragState.draggedTask = null;
-                dragState.originalTaskParent = null;
-                dragState.originalTaskNextSibling = null;
-                dragState.originalTaskIndex = -1;
-                dragState.isDragging = false;
-                dragState.altKeyPressed = false;
-            }
-        });
-    }
+    // NOTE: ESC key handler moved to setupGlobalDragAndDrop() to prevent duplicate listeners
 }
 
 /**

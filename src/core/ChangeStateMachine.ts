@@ -476,112 +476,62 @@ export class ChangeStateMachine {
 
         // Clear frontend cache based on event type
         const event = context.event;
-
-        // Get panel for immediate frontend updates
         const panel = this._webviewPanel?.getPanel();
+        if (!panel) {
+            return ChangeState.LOADING_NEW;
+        }
 
-        if (event.type === 'include_switch') {
-            if (event.target === 'column') {
-                // Column include switch - clear column tasks
-                const column = BoardCrudOperations.findColumnById(board, event.targetId);
-                if (column) {
-                    column.tasks = [];
-                    column.includeFiles = [];
-                    column.includeMode = false;
+        // Find and clear the target (column or task)
+        const target = this._findClearingTarget(board, event);
+        if (!target) {
+            return ChangeState.LOADING_NEW;
+        }
 
-                    // Immediately update frontend to show empty column
-                    if (panel) {
-                        panel.webview.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            columnTitle: column.title,
-                            displayTitle: column.displayTitle,
-                            tasks: [],
-                            includeMode: false,
-                            includeFiles: [],
-                            isLoadingContent: true
-                        });
-                    }
-                }
-            } else if (event.target === 'task') {
-                // Task include switch - clear task description
-                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
-                const task = column?.tasks.find(t => t.id === event.targetId);
-                if (task && column) {
-                    task.includeFiles = [];
-                    task.displayTitle = '';
-                    task.description = '';
-                    task.includeMode = false;
-
-                    // Immediately update frontend to show empty task
-                    if (panel) {
-                        panel.webview.postMessage({
-                            type: 'updateTaskContent',
-                            columnId: column.id,
-                            taskId: task.id,
-                            description: '',
-                            displayTitle: '',
-                            taskTitle: task.title,
-                            originalTitle: task.originalTitle,
-                            includeMode: false,
-                            includeFiles: [],
-                            isLoadingContent: true
-                        });
-                    }
-                }
-            }
-        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
-            // User edit with include switch - determine target from edit type
-            if (event.editType === 'column_title') {
-                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
-                if (column) {
-                    column.tasks = [];
-                    column.includeFiles = [];
-                    column.includeMode = false;
-
-                    // Immediately update frontend to show empty column
-                    if (panel) {
-                        panel.webview.postMessage({
-                            type: 'updateColumnContent',
-                            columnId: column.id,
-                            columnTitle: column.title,
-                            displayTitle: column.displayTitle,
-                            tasks: [],
-                            includeMode: false,
-                            includeFiles: [],
-                            isLoadingContent: true
-                        });
-                    }
-                }
-            } else if (event.editType === 'task_title') {
-                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
-                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
-                if (task && column) {
-                    task.includeFiles = [];
-                    task.displayTitle = '';
-                    task.description = '';
-                    task.includeMode = false;
-
-                    // Immediately update frontend to show empty task
-                    if (panel) {
-                        panel.webview.postMessage({
-                            type: 'updateTaskContent',
-                            columnId: column.id,
-                            taskId: task.id,
-                            description: '',
-                            displayTitle: '',
-                            taskTitle: task.title,
-                            originalTitle: task.originalTitle,
-                            includeMode: false,
-                            includeFiles: [],
-                            isLoadingContent: true
-                        });
-                    }
-                }
-            }
+        // Clear backend state and send loading update to frontend
+        if (target.type === 'column') {
+            target.column.tasks = [];
+            target.column.includeFiles = [];
+            target.column.includeMode = false;
+            this._sendColumnUpdate(panel, target.column, null, true);
+        } else {
+            target.task.includeFiles = [];
+            target.task.displayTitle = '';
+            target.task.description = '';
+            target.task.includeMode = false;
+            this._sendTaskUpdate(panel, target.column, target.task, null, true);
         }
 
         return ChangeState.LOADING_NEW;
+    }
+
+    /**
+     * Find the target (column or task) for cache clearing based on event type
+     */
+    private _findClearingTarget(board: KanbanBoard, event: ChangeEvent):
+        { type: 'column'; column: KanbanColumn } |
+        { type: 'task'; column: KanbanColumn; task: KanbanTask } |
+        null {
+
+        if (event.type === 'include_switch') {
+            if (event.target === 'column') {
+                const column = BoardCrudOperations.findColumnById(board, event.targetId);
+                return column ? { type: 'column', column } : null;
+            } else if (event.target === 'task') {
+                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
+                const task = column?.tasks.find(t => t.id === event.targetId);
+                return task && column ? { type: 'task', column, task } : null;
+            }
+        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
+            if (event.editType === 'column_title') {
+                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
+                return column ? { type: 'column', column } : null;
+            } else if (event.editType === 'task_title') {
+                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
+                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
+                return task && column ? { type: 'task', column, task } : null;
+            }
+        }
+        return null;
     }
 
     private async _handleLoadingNew(context: ChangeContext): Promise<ChangeState> {
@@ -753,32 +703,13 @@ export class ChangeStateMachine {
         event: ChangeEvent,
         context: ChangeContext
     ): void {
-        if (event.type === 'include_switch') {
-            if (event.target === 'column') {
-                const column = BoardCrudOperations.findColumnById(board, event.targetId);
-                if (column) {
-                    this._sendColumnUpdate(panel, column, context);
-                }
-            } else if (event.target === 'task') {
-                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
-                const task = column?.tasks.find(t => t.id === event.targetId);
-                if (task && column) {
-                    this._sendTaskUpdate(panel, column, task, context);
-                }
-            }
-        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
-            if (event.editType === 'column_title') {
-                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
-                if (column) {
-                    this._sendColumnUpdate(panel, column, context);
-                }
-            } else if (event.editType === 'task_title') {
-                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
-                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
-                if (task && column) {
-                    this._sendTaskUpdate(panel, column, task, context);
-                }
-            }
+        const target = this._findClearingTarget(board, event);
+        if (!target) return;
+
+        if (target.type === 'column') {
+            this._sendColumnUpdate(panel, target.column, context);
+        } else {
+            this._sendTaskUpdate(panel, target.column, target.task, context);
         }
     }
 
@@ -848,55 +779,63 @@ export class ChangeStateMachine {
 
     /**
      * Send column update message to frontend
+     * @param isLoadingContent - true when clearing cache (loading state), false when content is ready
      */
     private _sendColumnUpdate(
         panel: vscode.WebviewPanel,
         column: KanbanColumn,
-        context: ChangeContext
+        context: ChangeContext | null,
+        isLoadingContent: boolean = false
     ): void {
         panel.webview.postMessage({
             type: 'updateColumnContent',
             columnId: column.id,
             columnTitle: column.title,
             displayTitle: column.displayTitle,
-            tasks: column.tasks,
-            includeMode: column.includeMode,
-            includeFiles: column.includeFiles,
-            isLoadingContent: false
+            tasks: isLoadingContent ? [] : column.tasks,
+            includeMode: isLoadingContent ? false : column.includeMode,
+            includeFiles: isLoadingContent ? [] : column.includeFiles,
+            isLoadingContent
         });
-        context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
+        if (context) {
+            context.result.frontendMessages.push({ type: 'updateColumnContent', columnId: column.id });
+        }
 
-        // Clear dirty flag
-        if (this._webviewPanel?.clearColumnDirty) {
+        // Clear dirty flag (only when content is ready)
+        if (!isLoadingContent && this._webviewPanel?.clearColumnDirty) {
             this._webviewPanel.clearColumnDirty(column.id);
         }
     }
 
     /**
      * Send task update message to frontend
+     * @param isLoadingContent - true when clearing cache (loading state), false when content is ready
      */
     private _sendTaskUpdate(
         panel: vscode.WebviewPanel,
         column: KanbanColumn,
         task: KanbanTask,
-        context: ChangeContext
+        context: ChangeContext | null,
+        isLoadingContent: boolean = false
     ): void {
         panel.webview.postMessage({
             type: 'updateTaskContent',
             columnId: column.id,
             taskId: task.id,
-            description: task.description,
-            displayTitle: task.displayTitle,
+            description: isLoadingContent ? '' : task.description,
+            displayTitle: isLoadingContent ? '' : task.displayTitle,
             taskTitle: task.title,
             originalTitle: task.originalTitle,
-            includeMode: task.includeMode,
-            includeFiles: task.includeFiles,
-            isLoadingContent: false
+            includeMode: isLoadingContent ? false : task.includeMode,
+            includeFiles: isLoadingContent ? [] : task.includeFiles,
+            isLoadingContent
         });
-        context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
+        if (context) {
+            context.result.frontendMessages.push({ type: 'updateTaskContent', taskId: task.id });
+        }
 
-        // Clear dirty flag
-        if (this._webviewPanel?.clearTaskDirty) {
+        // Clear dirty flag (only when content is ready)
+        if (!isLoadingContent && this._webviewPanel?.clearTaskDirty) {
             this._webviewPanel.clearTaskDirty(task.id);
         }
     }

@@ -1,5 +1,8 @@
 // Unified Menu System - Simple and DRY
 
+// ES Module imports
+import { colorUtils } from './utils/colorUtils.js';
+
 // Declare window properties for TypeScript
 if (typeof window !== 'undefined') {
     window._lastFlushedChanges = null;
@@ -3421,7 +3424,7 @@ function updateCornerBadgesImmediate(elementId, elementType, newTitle) {
 
                 // Calculate text color automatically (matching boardRenderer.js logic)
                 const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
-                const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+                const badgeTextColor = colorUtils ? colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
 
                 const position = config.cornerBadge.position || 'top-right';
                 positions[position].push({
@@ -3971,7 +3974,7 @@ function updateAllVisualTagElements(element, allTags, elementType) {
 
                     // Calculate text color automatically (matching boardRenderer.js logic)
                     const opaqueBadgeColor = badgeColor && badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
-                    const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+                    const badgeTextColor = colorUtils ? colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
 
                     const position = config.cornerBadge.position || 'top-right';
                     positions[position].push({

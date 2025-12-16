@@ -101,7 +101,8 @@
       "Bash(for file in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/src/html/*.js)",
       "Bash(npm test:*)",
       "Bash(npm run lint)",
-      "Bash(uniq:*)"
+      "Bash(uniq:*)",
+      "Bash(npm run test:unit:*)"
     ],
     "deny": [],
     "ask": []

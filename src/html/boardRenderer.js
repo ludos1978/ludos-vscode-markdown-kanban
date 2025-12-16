@@ -1,3 +1,6 @@
+// ES Module imports
+import { colorUtils } from './utils/colorUtils.js';
+
 let scrollPositions = new Map();
 
 // Make folding state variables global for persistence
@@ -4181,8 +4184,8 @@ function generateTagStyles() {
                 const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                 // Calculate text color from the ACTUAL interpolated background
-                const defaultColumnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
-                const defaultColumnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultColumnTextColor, columnBg) : '';
+                const defaultColumnTextColor = colorUtils ? colorUtils.getContrastText(columnBg) : '#000000';
+                const defaultColumnTextShadow = colorUtils ? colorUtils.getContrastShadow(defaultColumnTextColor, columnBg) : '';
 
                 // Default column header background
                 styles += `.kanban-full-height-column:not([data-column-tag]) .column-header {
@@ -4217,8 +4220,8 @@ function generateTagStyles() {
                 const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                 // Calculate text color from the ACTUAL collapsed background
-                const defaultCollapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
-                const defaultCollapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(defaultCollapsedTextColor, columnCollapsedBg) : '';
+                const defaultCollapsedTextColor = colorUtils ? colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                const defaultCollapsedTextShadow = colorUtils ? colorUtils.getContrastShadow(defaultCollapsedTextColor, columnCollapsedBg) : '';
 
                 // Default collapsed column header background
                 styles += `.kanban-full-height-column.collapsed:not([data-column-tag]) .column-header {
@@ -4301,8 +4304,8 @@ function generateTagStyles() {
                     const opaqueBackground = themeColors.background.length === 9 ? themeColors.background.substring(0, 7) : themeColors.background;
 
                     // Calculate automatic text color based on background luminance
-                    const tagTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBackground) : '#000000';
-                    const tagTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(tagTextColor, opaqueBackground) : '';
+                    const tagTextColor = colorUtils ? colorUtils.getContrastText(opaqueBackground) : '#000000';
+                    const tagTextShadow = colorUtils ? colorUtils.getContrastShadow(tagTextColor, opaqueBackground) : '';
 
                     styles += `.kanban-tag[data-tag="${attrTagName}"] {
                         color: ${tagTextColor} !important;
@@ -4331,8 +4334,8 @@ function generateTagStyles() {
                     const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                     // Calculate text color from the ACTUAL interpolated background, not the original color
-                    const columnTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnBg) : '#000000';
-                    const columnTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
+                    const columnTextColor = colorUtils ? colorUtils.getContrastText(columnBg) : '#000000';
+                    const columnTextShadow = colorUtils ? colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
 
                     // Column header background
                     styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-header {
@@ -4368,8 +4371,8 @@ function generateTagStyles() {
                     const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                     // Calculate text color from the ACTUAL collapsed background
-                    const collapsedTextColor = window.colorUtils ? window.colorUtils.getContrastText(columnCollapsedBg) : '#000000';
-                    const collapsedTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
+                    const collapsedTextColor = colorUtils ? colorUtils.getContrastText(columnCollapsedBg) : '#000000';
+                    const collapsedTextShadow = colorUtils ? colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
 
                     // Collapsed column header background
                     styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-header {
@@ -4470,8 +4473,8 @@ function generateTagStyles() {
                         // Calculate automatic text color from header bar background
                         // ALWAYS use automatic calculation, ignore configured labelColor
                         const opaqueHeaderColor = headerColor.length === 9 ? headerColor.substring(0, 7) : headerColor;
-                        const headerTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueHeaderColor) : '#ffffff';
-                        const headerTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(headerTextColor, opaqueHeaderColor) : '';
+                        const headerTextColor = colorUtils ? colorUtils.getContrastText(opaqueHeaderColor) : '#ffffff';
+                        const headerTextShadow = colorUtils ? colorUtils.getContrastShadow(headerTextColor, opaqueHeaderColor) : '';
 
                         // Create a unique class for this header bar - always solid color
                         styles += `.header-bar-${lowerTagName} {
@@ -4518,8 +4521,8 @@ function generateTagStyles() {
                         // Calculate automatic text color from footer bar background
                         // ALWAYS use automatic calculation, ignore configured labelColor
                         const opaqueFooterColor = footerColor.length === 9 ? footerColor.substring(0, 7) : footerColor;
-                        const footerTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueFooterColor) : '#ffffff';
-                        const footerTextShadow = window.colorUtils ? window.colorUtils.getContrastShadow(footerTextColor, opaqueFooterColor) : '';
+                        const footerTextColor = colorUtils ? colorUtils.getContrastText(opaqueFooterColor) : '#ffffff';
+                        const footerTextShadow = colorUtils ? colorUtils.getContrastShadow(footerTextColor, opaqueFooterColor) : '';
 
                         // Create a unique class for this footer bar
                         styles += `.footer-bar-${lowerTagName} {
@@ -4564,7 +4567,7 @@ function generateTagStyles() {
                         // Calculate automatic text color from badge background
                         // ALWAYS use automatic calculation, ignore configured labelColor
                         const opaqueBadgeColor = badgeColor.length === 9 ? badgeColor.substring(0, 7) : badgeColor;
-                        const badgeTextColor = window.colorUtils ? window.colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
+                        const badgeTextColor = colorUtils ? colorUtils.getContrastText(opaqueBadgeColor) : '#ffffff';
 
                         const badgeStyle = config.cornerBadge.style || 'circle';
                         const badgeImage = config.cornerBadge.image || '';
