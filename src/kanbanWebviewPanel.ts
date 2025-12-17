@@ -650,6 +650,8 @@ export class KanbanWebviewPanel {
         this._panel.onDidChangeViewState(
             async e => {
                 if (e.webviewPanel.visible) {
+                    console.log('[Focus] Panel became visible');
+
                     // Panel became visible - send file info
                     this._fileManager.sendFileInfo();
 
@@ -661,21 +663,21 @@ export class KanbanWebviewPanel {
                     await this._refreshAllViewConfiguration();
 
                     // Check include files for external changes (async, non-blocking)
-                    // This catches changes to Excalidraw, DrawIO, and other included files
+                    // Only triggers board update if include FILE CONTENT changed
                     this._checkIncludeFilesForExternalChanges();
 
                     // Check media files (embedded images, diagrams) for external changes
+                    // Only re-renders specific changed media, NOT the full board
                     this._checkMediaFilesForChanges();
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
-                    // This fixes empty view issues after debug restart or workspace restore
-                    // but avoids re-rendering when the view just temporarily lost focus (e.g., showing messages)
                     if (this._fileManager.getDocument()) {
-                        // Only refresh if:
-                        // 1. Board hasn't been initialized yet, OR
-                        // 2. Board is null/undefined (needs initialization)
-                        // Don't refresh just because the panel regained visibility after showing a message
-                        if (!this.getBoard() || !this._context.initialized) {
+                        const hasBoard = !!this.getBoard();
+                        const isInitialized = this._context.initialized;
+                        console.log(`[Focus] Board check: hasBoard=${hasBoard}, initialized=${isInitialized}`);
+
+                        if (!hasBoard || !isInitialized) {
+                            console.log('[Focus] ⚠️ TRIGGERING _ensureBoardAndSendUpdate');
                             this._ensureBoardAndSendUpdate();
                         }
                     }
@@ -1378,29 +1380,45 @@ export class KanbanWebviewPanel {
      */
     private async _checkIncludeFilesForExternalChanges(): Promise<void> {
         if (!this._fileRegistry.isReady()) {
+            console.log('[IncludeCheck] Registry not ready, skipping');
+            return;
+        }
+
+        // Skip during initial board loading - baselines not set yet
+        if (this._context.initialBoardLoad) {
+            console.log('[IncludeCheck] Initial loading in progress, skipping');
             return;
         }
 
         try {
+            // Log what files are in the registry
+            const allFiles = this._fileRegistry.getAll();
+            console.log(`[IncludeCheck] Registry contains ${allFiles.length} file(s):`,
+                allFiles.map(f => `${f.getPath()} (${f.getFileType()})`));
+
             // Check all include files for external changes (mtime comparison)
             const changesMap = await this._fileRegistry.checkAllForExternalChanges();
 
             // Count files that changed
             const changedFiles: string[] = [];
             changesMap.forEach((hasChanged, path) => {
+                console.log(`[IncludeCheck] File ${path}: hasChanged=${hasChanged}`);
                 if (hasChanged) {
                     changedFiles.push(path);
                 }
             });
 
             if (changedFiles.length > 0) {
-                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} externally modified include file(s) on focus:`, changedFiles);
+                console.log(`[IncludeCheck] ⚠️ TRIGGERING BOARD UPDATE for ${changedFiles.length} changed include file(s):`, changedFiles);
 
-                // Reload content for changed include files
+                // Force sync baseline for changed include files
+                // Use forceSyncBaseline() instead of reload() because reload() uses
+                // _readFromDiskWithVerification() which may return the old baseline
+                // in some cases, causing files to be detected as "changed" repeatedly
                 for (const file of this._fileRegistry.getAll()) {
                     if (changesMap.get(file.getPath())) {
-                        // Reload the file content from disk
-                        await file.readFromDisk();
+                        console.log(`[IncludeCheck] Syncing baseline for: ${file.getPath()}`);
+                        await file.forceSyncBaseline();
                     }
                 }
 
@@ -1410,6 +1428,8 @@ export class KanbanWebviewPanel {
 
                 // After reloading include files, update media tracking for any new media references
                 this._updateMediaTrackingFromIncludes();
+            } else {
+                console.log('[IncludeCheck] No include files changed, skipping board update');
             }
         } catch (error) {
             console.error('[KanbanWebviewPanel] Error checking include files for external changes:', error);

@@ -151,7 +151,11 @@ export class IncludeFileCoordinator {
                     const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
                     if (file) {
                         try {
-                            await file.reload();
+                            // Use forceSyncBaseline() instead of reload() to ensure
+                            // baseline is properly set during initial loading.
+                            // reload() uses _readFromDiskWithVerification() which may
+                            // return old baseline in edge cases.
+                            await file.forceSyncBaseline();
                             const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
                             column.tasks = tasks;
                             column.isLoadingContent = false;
@@ -206,7 +210,9 @@ export class IncludeFileCoordinator {
                         const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
                         if (file) {
                             try {
-                                await file.reload();
+                                // Use forceSyncBaseline() instead of reload() to ensure
+                                // baseline is properly set during initial loading
+                                await file.forceSyncBaseline();
                                 const fullFileContent = file.getContent();
                                 const displayTitle = `# include in ${relativePath}`;
 
@@ -272,7 +278,9 @@ export class IncludeFileCoordinator {
             const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
             if (file) {
                 try {
-                    await file.reload();
+                    // Use forceSyncBaseline() instead of reload() to ensure
+                    // baseline is properly set during initial loading
+                    await file.forceSyncBaseline();
                     const content = file.getContent();
 
                     if (this._deps.getPanel()) {

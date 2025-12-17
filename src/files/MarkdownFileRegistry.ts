@@ -551,13 +551,24 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             taskTitle?: string;
         }
     ): IncludeFile | undefined {
-        const existingFile = this.getByRelativePath(relativePath);
+        // First, try to find by relative path (normalized)
+        const existingByRelative = this.getByRelativePath(relativePath);
+        if (existingByRelative) {
+            return existingByRelative as IncludeFile;
+        }
 
-        // If file already registered, return it regardless of type.
-        // A file can be used in multiple contexts (column include in one place,
-        // task include in another). The registered type is just the first usage.
-        if (existingFile) {
-            return existingFile as IncludeFile;
+        // CRITICAL: Also check by absolute path to prevent duplicate registrations
+        // when the same file is referenced with different path formats
+        // (e.g., relative "../foo.md" vs absolute "/path/to/foo.md")
+        const absolutePath = path.isAbsolute(relativePath)
+            ? relativePath
+            : path.resolve(path.dirname(mainFile.getPath()), relativePath);
+
+        const existingByAbsolute = this.get(absolutePath);
+        if (existingByAbsolute) {
+            // File already exists under a different relative path key
+            // Return the existing instance to prevent duplicates
+            return existingByAbsolute as IncludeFile;
         }
 
         // Create and register new include file

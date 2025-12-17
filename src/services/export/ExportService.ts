@@ -1418,8 +1418,10 @@ export class ExportService {
             const markdownContent = sourceDocument.getText();
             const marpClasses = this.extractMarpClassesFromMarkdown(markdownContent, filteredBoard);
 
-            result = PresentationGenerator.fromBoard(filteredBoard, {
-                includeMarpDirectives: true,  // Export always includes Marp directives
+            // For copy mode: no YAML header, no column title slides - just raw content
+            const isCopyMode = options.mode === 'copy';
+            const generatorOptions = {
+                includeMarpDirectives: !isCopyMode,  // Only include Marp directives for export, not copy
                 stripIncludes: true,  // Strip include syntax (content already inlined in board)
                 marp: {
                     theme: options.marpTheme || marpConfig.defaultTheme || 'default',
@@ -1427,7 +1429,16 @@ export class ExportService {
                     localClasses: marpClasses.local.length > 0 ? marpClasses.local : (marpConfig.localClasses || []),
                     perSlideClasses: marpClasses.perSlide
                 }
-            });
+            };
+
+            // For task scope copy: use fromTasks to avoid column header slide
+            // For column/board scope: use fromBoard (includes column titles)
+            if (isCopyMode && options.scope === 'task') {
+                const allTasks = filteredBoard.columns.flatMap(col => col.tasks);
+                result = PresentationGenerator.fromTasks(allTasks, generatorOptions);
+            } else {
+                result = PresentationGenerator.fromBoard(filteredBoard, generatorOptions);
+            }
 
             // Rewrite links if requested
             if (options.linkHandlingMode !== 'no-modify') {

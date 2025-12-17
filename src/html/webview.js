@@ -2467,22 +2467,32 @@ if (!webviewEventListenersInitialized) {
 
                 // Process each changed file
                 message.files.forEach(file => {
+                    console.log(`[Frontend] Processing changed file: ${file.path} (type: ${file.type})`);
+
                     if (file.type === 'diagram') {
                         // Clear diagram cache for this specific file
                         if (typeof window.invalidateDiagramCache === 'function') {
+                            console.log(`[Frontend] Clearing diagram cache for: ${file.path}`);
                             window.invalidateDiagramCache(file.path, 'drawio');
                             window.invalidateDiagramCache(file.path, 'excalidraw');
                         }
                     }
 
                     // For images/diagrams, find and re-render all img elements with matching src
-                    const encodedPath = encodeURI(file.path).replace(/[()]/g, match =>
-                        match === '(' ? '%28' : '%29'
-                    );
+                    // Get just the filename for more reliable matching
+                    const fileName = file.path.split('/').pop();
 
-                    // Find all images referencing this file
-                    const images = document.querySelectorAll(`img[src*="${CSS.escape(file.path)}"], img[src*="${CSS.escape(encodedPath)}"]`);
-                    images.forEach(img => {
+                    // Find all images referencing this file (match by filename, not full path)
+                    // Don't use CSS.escape on paths as it over-escapes and breaks matching
+                    const images = document.querySelectorAll('img');
+                    const matchingImages = Array.from(images).filter(img => {
+                        const src = img.getAttribute('src') || '';
+                        return src.includes(fileName);
+                    });
+                    console.log(`[Frontend] Looking for images containing: ${fileName}`);
+                    console.log(`[Frontend] Found ${matchingImages.length} matching images`);
+
+                    matchingImages.forEach(img => {
                         // Force reload by appending cache-busting timestamp
                         const originalSrc = img.getAttribute('src');
                         if (originalSrc) {
@@ -2490,21 +2500,53 @@ if (!webviewEventListenersInitialized) {
                             const cleanSrc = originalSrc.replace(/[?&]_cb=\d+/, '');
                             // Add new cache buster
                             const separator = cleanSrc.includes('?') ? '&' : '?';
-                            img.setAttribute('src', `${cleanSrc}${separator}_cb=${Date.now()}`);
+                            const newSrc = `${cleanSrc}${separator}_cb=${Date.now()}`;
+                            console.log(`[Frontend] Updating img src: ${originalSrc} -> ${newSrc}`);
+                            img.setAttribute('src', newSrc);
                         }
                     });
 
-                    // For diagram containers, trigger re-render
+                    // For diagram files, find rendered diagram images and trigger re-render
                     if (file.type === 'diagram') {
-                        const diagramContainers = document.querySelectorAll(`[data-diagram-path*="${CSS.escape(file.path)}"]`);
-                        diagramContainers.forEach(container => {
-                            // Trigger re-render by clearing content and re-processing
-                            if (typeof window.renderDiagramInContainer === 'function') {
-                                const diagramType = container.getAttribute('data-diagram-type');
-                                const diagramPath = container.getAttribute('data-diagram-path');
-                                if (diagramType && diagramPath) {
-                                    container.innerHTML = '<div class="diagram-loading">Reloading...</div>';
-                                    window.renderDiagramInContainer(container, diagramType, diagramPath);
+                        // Diagrams are rendered as <img class="diagram-rendered" data-original-src="path">
+                        // inside a container div with class "diagram-placeholder"
+                        const allDiagramImages = document.querySelectorAll('img.diagram-rendered[data-original-src]');
+                        const matchingImages = Array.from(allDiagramImages).filter(img => {
+                            const originalSrc = img.getAttribute('data-original-src') || '';
+                            return originalSrc.includes(fileName);
+                        });
+                        console.log(`[Frontend] Looking for diagram images with data-original-src containing: ${fileName}`);
+                        console.log(`[Frontend] Found ${matchingImages.length} matching diagram images`);
+
+                        matchingImages.forEach(img => {
+                            const originalSrc = img.getAttribute('data-original-src');
+                            if (!originalSrc) return;
+
+                            // Determine diagram type from file extension
+                            let diagramType = 'drawio';
+                            if (originalSrc.endsWith('.excalidraw') ||
+                                originalSrc.endsWith('.excalidraw.json') ||
+                                originalSrc.endsWith('.excalidraw.svg')) {
+                                diagramType = 'excalidraw';
+                            }
+
+                            console.log(`[Frontend] Re-rendering diagram: type=${diagramType}, path=${originalSrc}`);
+
+                            // Get the parent container (diagram-placeholder div)
+                            const container = img.parentElement;
+                            if (container) {
+                                // Show loading state and queue re-render
+                                container.innerHTML = '<div class="diagram-loading">Reloading...</div>';
+
+                                // Queue the diagram for re-rendering using the existing queue system
+                                if (typeof window.queueDiagramRender === 'function') {
+                                    const newId = `diagram-reload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                                    container.id = newId;
+                                    window.queueDiagramRender(newId, originalSrc, diagramType);
+                                    // Trigger queue processing
+                                    if (typeof window.processDiagramQueue === 'function') {
+                                        window.processDiagramQueue();
+                                    }
                                 }
                             }
                         });

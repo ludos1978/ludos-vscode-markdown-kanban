@@ -447,6 +447,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                         return;
                     }
 
+                    console.log(`[MarkdownFile] reload() updating baseline for: ${this._relativePath}`);
                     this._content = content;
                     this._baseline = content;
                     // NOTE: No need to set _hasUnsavedChanges - it's now computed from (_content !== _baseline)
@@ -456,6 +457,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                     this._emitChange('reloaded');
                 } else {
                     // Content unchanged - verification returned baseline, this is a false alarm
+                    console.log(`[MarkdownFile] reload() skipped - content matches baseline for: ${this._relativePath}`);
                     this._hasFileSystemChanges = false;
                     this._lastModified = await this._getFileModifiedTime();
                 }
@@ -473,54 +475,30 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * Retries if file appears unchanged (incomplete write)
      */
     protected async _readFromDiskWithVerification(): Promise<string | null> {
-        const maxRetries = 10;
-        const retryDelay = 100;
+        // Check mtime
+        const currentMtime = await this._getFileModifiedTime();
+        const mtimeChanged = currentMtime && this._lastModified &&
+            currentMtime.getTime() !== this._lastModified.getTime();
 
+        // Check file size
+        const currentSize = await this._getFileSize();
+        const baselineSize = Buffer.byteLength(this._baseline, 'utf8');
+        const sizeChanged = currentSize !== null && currentSize !== baselineSize;
 
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-            // Check file modification time first
-            const currentMtime = await this._getFileModifiedTime();
-            if (currentMtime && this._lastModified) {
-                const mtimeChanged = currentMtime.getTime() !== this._lastModified.getTime();
-
-                if (!mtimeChanged && attempt === 0) {
-                    console.warn(`[${this.getFileType()}] ⚠ File mtime unchanged - false alarm from watcher, keeping content`);
-                    return this._baseline; // Return baseline to keep existing content, prevent reload failure
-                }
-            }
-
-            // Read content
-            const content = await this.readFromDisk();
-
-            if (content === null) {
-                console.error(`[${this.getFileType()}] Read failed on attempt ${attempt + 1}`);
-                return null;
-            }
-
-
-            // Verify content has actually changed
-            if (content !== this._baseline) {
-                return content;
-            }
-
-            // Content unchanged - this could be a false alarm or legitimate no-change
-            // If mtime changed but content is the same, the file was touched but not modified
-            // Return baseline to indicate "no actual change" rather than error
-            if (attempt === 0) {
-                return this._baseline; // Return baseline to skip reload, keep existing content
-            }
-
-            // Content unchanged after waiting - file write may be incomplete, wait and retry
-            if (attempt < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-            } else {
-                // After max retries, content still equals baseline - this is OK, not an error
-                // The file was genuinely not modified (false alarm from watcher)
-                return this._baseline; // Return baseline to keep existing content
-            }
+        // If BOTH mtime and size are unchanged, no change
+        if (!mtimeChanged && !sizeChanged && this._baseline) {
+            console.log(`[${this.getFileType()}] Mtime & size unchanged, no change`);
+            return this._baseline;
         }
 
-        return null;
+        // Either mtime or size changed - read content
+        const content = await this.readFromDisk();
+        if (content === null) {
+            console.error(`[${this.getFileType()}] Read failed`);
+            return null;
+        }
+
+        return content;
     }
 
     /**
@@ -863,6 +841,19 @@ export abstract class MarkdownFile implements vscode.Disposable {
     }
 
     /**
+     * Get file size from disk (fast check for content changes)
+     */
+    protected async _getFileSize(): Promise<number | null> {
+        try {
+            const stat = await fs.promises.stat(this._path);
+            return stat.size;
+        } catch (error) {
+            // File might not exist, which is OK
+            return null;
+        }
+    }
+
+    /**
      * Check if file content has changed on disk
      */
     public async checkForExternalChanges(): Promise<boolean> {
@@ -878,6 +869,32 @@ export abstract class MarkdownFile implements vscode.Disposable {
         }
 
         return hasChanged;
+    }
+
+    /**
+     * Force sync baseline with disk content
+     *
+     * Unlike reload() which uses _readFromDiskWithVerification() (which may return
+     * the old baseline in some cases), this method directly reads from disk and
+     * updates both content and baseline unconditionally.
+     *
+     * Use this after checkForExternalChanges() detects a change to ensure the
+     * baseline is updated and the same file won't be detected as "changed" again.
+     */
+    public async forceSyncBaseline(): Promise<void> {
+        const diskContent = await this.readFromDisk();
+        if (diskContent === null) {
+            console.warn(`[${this.getFileType()}] forceSyncBaseline failed - could not read disk`);
+            return;
+        }
+
+        // Unconditionally update content and baseline to match disk
+        this._content = diskContent;
+        this._baseline = diskContent;
+        this._hasFileSystemChanges = false;
+        this._lastModified = await this._getFileModifiedTime();
+
+        console.log(`[${this.getFileType()}] forceSyncBaseline updated: ${this._relativePath}`);
     }
 
     // ============= EVENT EMISSION =============
