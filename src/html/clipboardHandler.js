@@ -309,6 +309,8 @@ window.handleEmptyColumnDragStart = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
+        window.templateDragState.isDropZone = false;
+        window.templateDragState.lastInStackTarget = null;  // Reset last in-stack target
     }
 
     // Set drag data
@@ -339,58 +341,77 @@ window.handleEmptyColumnDragEnd = function(e) {
         window.clearHighlights();
     }
 
-    // If we have a valid drop target, create empty column using SAME logic as regular column drops
+    // FIX: Use SAME approach as processColumnDrop - use dragState.dropTargetStack/dropTargetBeforeColumn
+    // These DOM elements are stored during dragover and are the reliable source of drop position
+    const dropTargetStack = window.dragState?.dropTargetStack;
+    const dropTargetBeforeColumn = window.dragState?.dropTargetBeforeColumn;
+
+    // DEBUG: Log drop targets
+    console.log('[EmptyColumn DROP] dragState targets:', {
+        hasDropTargetStack: !!dropTargetStack,
+        dropTargetStackClass: dropTargetStack?.className,
+        hasDropTargetBeforeColumn: dropTargetBeforeColumn !== undefined,
+        dropTargetBeforeColumnId: dropTargetBeforeColumn?.dataset?.columnId
+    });
+
+    // If we have valid drop targets from dragState, use those (same as processColumnDrop)
     if (typeof window.templateDragState !== 'undefined' &&
         window.templateDragState.isDragging &&
         window.templateDragState.isEmptyColumn &&
-        window.templateDragState.targetRow !== null &&
-        window.cachedBoard) {
+        window.cachedBoard &&
+        dropTargetStack) {
 
-        const targetRow = window.templateDragState.targetRow || 1;
-        const targetPosition = window.templateDragState.targetPosition;
-        const targetColumnId = window.templateDragState.targetColumnId;
+        // Determine row from the stack's parent row
+        const parentRow = dropTargetStack.closest('.kanban-row');
+        const targetRow = parentRow ? parseInt(parentRow.getAttribute('data-row-number') || '1') : 1;
 
-        // CRITICAL: Determine if we need #stack BEFORE rendering, based on current DOM
-        // This uses the same logic as processColumnDrop's stack normalization
-        let needsStackTag = false;
+        // Check if dropping on a drop zone (new stack) vs within existing stack
+        const isDropZone = dropTargetStack.classList.contains('column-drop-zone-stack');
 
-        if (targetColumnId) {
-            const targetColElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
-            if (targetColElement) {
-                const targetStack = targetColElement.closest('.kanban-column-stack:not(.column-drop-zone-stack)');
-                if (targetStack) {
-                    if (targetPosition === 'after') {
-                        // Inserting after a column in a stack - always need #stack (we're not first)
-                        needsStackTag = true;
-                    } else if (targetPosition === 'before') {
-                        // Inserting before target
-                        const targetData = window.cachedBoard.columns.find(c => c.id === targetColumnId);
-                        if (targetData) {
-                            if (/#stack\b/i.test(targetData.title)) {
-                                // Target has #stack - we're inserting into middle of stack
-                                needsStackTag = true;
-                            } else {
-                                // Target is first in its stack - we become new first, target gets #stack
-                                // Add #stack to target BEFORE rendering so it stays in the same stack
-                                const trimmedTitle = targetData.title.trim();
-                                targetData.title = trimmedTitle ? trimmedTitle + ' #stack' : '#stack';
-                                // New column doesn't need #stack (it becomes the new first)
-                                needsStackTag = false;
-                            }
-                        }
-                    }
+        // Determine insert position from DOM elements
+        let insertBeforeColumnId = null;
+        let insertAfterColumnId = null;
+
+        if (isDropZone) {
+            // Dropping on drop zone - find adjacent columns
+            const prevStack = dropTargetStack.previousElementSibling;
+            const nextStack = dropTargetStack.nextElementSibling;
+
+            if (prevStack && prevStack.classList.contains('kanban-column-stack')) {
+                const lastCol = prevStack.querySelector('.kanban-full-height-column:last-of-type');
+                if (lastCol) {
+                    insertAfterColumnId = lastCol.dataset?.columnId;
+                }
+            } else if (nextStack && nextStack.classList.contains('kanban-column-stack')) {
+                const firstCol = nextStack.querySelector('.kanban-full-height-column:first-of-type');
+                if (firstCol) {
+                    insertBeforeColumnId = firstCol.dataset?.columnId;
+                }
+            }
+        } else {
+            // Dropping within a stack
+            if (dropTargetBeforeColumn) {
+                insertBeforeColumnId = dropTargetBeforeColumn.dataset?.columnId;
+            } else {
+                // Dropping at end of stack - insert after last column
+                const lastCol = dropTargetStack.querySelector('.kanban-full-height-column:last-of-type');
+                if (lastCol) {
+                    insertAfterColumnId = lastCol.dataset?.columnId;
                 }
             }
         }
-        // 'first' or 'last' position means starting a new stack, so no #stack needed
 
-        // Create new column data with correct #stack tag
+        console.log('[EmptyColumn DROP] Position calc:', {
+            targetRow,
+            isDropZone,
+            insertBeforeColumnId,
+            insertAfterColumnId
+        });
+
+        // Create new column data - DON'T set #stack tag here, let normalizeAllStackTags handle it
         let columnTitle = 'New Column';
         if (targetRow > 1) {
             columnTitle = `New Column #row${targetRow}`;
-        }
-        if (needsStackTag) {
-            columnTitle = columnTitle + ' #stack';
         }
 
         const newColumn = {
@@ -400,49 +421,38 @@ window.handleEmptyColumnDragEnd = function(e) {
             settings: {}
         };
 
-        // Find insert position in cachedBoard.columns based on target
+        // Find insert position in cachedBoard.columns
         let insertIndex = window.cachedBoard.columns.length;
 
-        if (targetColumnId) {
-            const targetIdx = window.cachedBoard.columns.findIndex(c => c.id === targetColumnId);
-            if (targetIdx >= 0) {
-                if (targetPosition === 'after') {
-                    insertIndex = targetIdx + 1;
-                } else if (targetPosition === 'before') {
-                    insertIndex = targetIdx;
-                }
+        if (insertBeforeColumnId) {
+            const idx = window.cachedBoard.columns.findIndex(c => c.id === insertBeforeColumnId);
+            if (idx >= 0) {
+                insertIndex = idx;
             }
-        } else if (targetPosition === 'first' || targetPosition === 'last') {
-            // Find position in target row
-            const getColumnRow = (col) => {
-                const rowMatch = col.title?.match(/#row(\d+)/i);
-                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
-            };
-
-            if (targetPosition === 'first') {
-                const firstInRow = window.cachedBoard.columns.findIndex(c => getColumnRow(c) === targetRow);
-                insertIndex = firstInRow >= 0 ? firstInRow : window.cachedBoard.columns.length;
-            } else {
-                // 'last' - find last column in row and insert after it
-                let lastInRowIdx = -1;
-                for (let i = 0; i < window.cachedBoard.columns.length; i++) {
-                    if (getColumnRow(window.cachedBoard.columns[i]) === targetRow) {
-                        lastInRowIdx = i;
-                    }
-                }
-                insertIndex = lastInRowIdx >= 0 ? lastInRowIdx + 1 : window.cachedBoard.columns.length;
+        } else if (insertAfterColumnId) {
+            const idx = window.cachedBoard.columns.findIndex(c => c.id === insertAfterColumnId);
+            if (idx >= 0) {
+                insertIndex = idx + 1;
             }
         }
+
+        console.log('[EmptyColumn DROP] Inserting at index:', insertIndex);
 
         // Insert column into cachedBoard
         window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
 
-        // Re-render the board - this creates the DOM structure with correct stacking
+        // CRITICAL: Sort columns by row to match backend ordering
+        if (typeof window.sortColumnsByRow === 'function') {
+            window.cachedBoard.columns = window.sortColumnsByRow(window.cachedBoard.columns);
+        }
+
+        // Re-render the board - this creates the DOM structure
         if (typeof window.renderBoard === 'function') {
             window.renderBoard();
         }
 
-        // Normalize ALL stack tags to handle edge cases (same as processColumnDrop does)
+        // CRITICAL: Normalize stack tags based on actual DOM structure (same as processColumnDrop)
+        // This is the KEY - let the DOM structure determine the stack tags
         if (typeof window.normalizeAllStackTags === 'function') {
             window.normalizeAllStackTags();
         }
@@ -462,6 +472,14 @@ window.handleEmptyColumnDragEnd = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
+        window.templateDragState.isDropZone = false;
+        window.templateDragState.lastInStackTarget = null;
+    }
+
+    // Clear dragState drop targets
+    if (window.dragState) {
+        window.dragState.dropTargetStack = null;
+        window.dragState.dropTargetBeforeColumn = null;
     }
 
     // Hide any internal drop indicator
@@ -494,6 +512,8 @@ window.handleClipboardColumnDragStart = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
+        window.templateDragState.isDropZone = false;  // Initialize to false - will be updated during drag
+        window.templateDragState.lastInStackTarget = null;  // Reset last in-stack target
     }
 
     // Set drag data
@@ -524,54 +544,86 @@ window.handleClipboardColumnDragEnd = function(e) {
         window.clearHighlights();
     }
 
-    // If we have a valid drop target, create column from clipboard content
+    // FIX: Use SAME approach as processColumnDrop - use dragState.dropTargetStack/dropTargetBeforeColumn
+    // These DOM elements are stored during dragover and are the reliable source of drop position
+    const dropTargetStack = window.dragState?.dropTargetStack;
+    const dropTargetBeforeColumn = window.dragState?.dropTargetBeforeColumn;
+
+    // DEBUG: Log drop targets
+    console.log('[ClipboardColumn DROP] dragState targets:', {
+        hasDropTargetStack: !!dropTargetStack,
+        dropTargetStackClass: dropTargetStack?.className,
+        hasDropTargetBeforeColumn: dropTargetBeforeColumn !== undefined,
+        dropTargetBeforeColumnId: dropTargetBeforeColumn?.dataset?.columnId
+    });
+
+    // If we have valid drop targets from dragState, use those (same as processColumnDrop)
     if (typeof window.templateDragState !== 'undefined' &&
         window.templateDragState.isDragging &&
         window.templateDragState.isClipboardColumn &&
-        window.templateDragState.targetRow !== null &&
-        window.cachedBoard) {
+        window.cachedBoard &&
+        dropTargetStack) {
 
-        const targetRow = window.templateDragState.targetRow || 1;
-        const targetPosition = window.templateDragState.targetPosition;
-        const targetColumnId = window.templateDragState.targetColumnId;
         const clipboardContent = window.templateDragState.clipboardContent;
 
-        // Parse clipboard content into tasks
-        const parsedData = parseClipboardPresentationContent(clipboardContent);
+        // Parse clipboard content into tasks using shared parser
+        if (!window.PresentationParser) {
+            console.error('[ClipboardColumn] PresentationParser not loaded - check script order in webview.html');
+            return;
+        }
+        const parsedData = window.PresentationParser.parseClipboardAsColumn(clipboardContent);
 
-        // Determine if we need #stack tag (same logic as empty column)
-        let needsStackTag = false;
+        // Determine row from the stack's parent row
+        const parentRow = dropTargetStack.closest('.kanban-row');
+        const targetRow = parentRow ? parseInt(parentRow.getAttribute('data-row-number') || '1') : 1;
 
-        if (targetColumnId) {
-            const targetColElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
-            if (targetColElement) {
-                const targetStack = targetColElement.closest('.kanban-column-stack:not(.column-drop-zone-stack)');
-                if (targetStack) {
-                    if (targetPosition === 'after') {
-                        needsStackTag = true;
-                    } else if (targetPosition === 'before') {
-                        const targetData = window.cachedBoard.columns.find(c => c.id === targetColumnId);
-                        if (targetData) {
-                            if (/#stack\b/i.test(targetData.title)) {
-                                needsStackTag = true;
-                            } else {
-                                const trimmedTitle = targetData.title.trim();
-                                targetData.title = trimmedTitle ? trimmedTitle + ' #stack' : '#stack';
-                                needsStackTag = false;
-                            }
-                        }
-                    }
+        // Check if dropping on a drop zone (new stack) vs within existing stack
+        const isDropZone = dropTargetStack.classList.contains('column-drop-zone-stack');
+
+        // Determine insert position from DOM elements
+        let insertBeforeColumnId = null;
+        let insertAfterColumnId = null;
+
+        if (isDropZone) {
+            // Dropping on drop zone - find adjacent columns
+            const prevStack = dropTargetStack.previousElementSibling;
+            const nextStack = dropTargetStack.nextElementSibling;
+
+            if (prevStack && prevStack.classList.contains('kanban-column-stack')) {
+                const lastCol = prevStack.querySelector('.kanban-full-height-column:last-of-type');
+                if (lastCol) {
+                    insertAfterColumnId = lastCol.dataset?.columnId;
+                }
+            } else if (nextStack && nextStack.classList.contains('kanban-column-stack')) {
+                const firstCol = nextStack.querySelector('.kanban-full-height-column:first-of-type');
+                if (firstCol) {
+                    insertBeforeColumnId = firstCol.dataset?.columnId;
+                }
+            }
+        } else {
+            // Dropping within a stack
+            if (dropTargetBeforeColumn) {
+                insertBeforeColumnId = dropTargetBeforeColumn.dataset?.columnId;
+            } else {
+                // Dropping at end of stack - insert after last column
+                const lastCol = dropTargetStack.querySelector('.kanban-full-height-column:last-of-type');
+                if (lastCol) {
+                    insertAfterColumnId = lastCol.dataset?.columnId;
                 }
             }
         }
 
-        // Create column title
+        console.log('[ClipboardColumn DROP] Position calc:', {
+            targetRow,
+            isDropZone,
+            insertBeforeColumnId,
+            insertAfterColumnId
+        });
+
+        // Create column title - DON'T set #stack tag here, let normalizeAllStackTags handle it
         let columnTitle = parsedData.columnTitle || '';
         if (targetRow > 1 && !/#row\d+/i.test(columnTitle)) {
             columnTitle = columnTitle ? `${columnTitle} #row${targetRow}` : `#row${targetRow}`;
-        }
-        if (needsStackTag && !/#stack\b/i.test(columnTitle)) {
-            columnTitle = columnTitle ? `${columnTitle} #stack` : '#stack';
         }
 
         // Create new column with parsed tasks
@@ -582,47 +634,38 @@ window.handleClipboardColumnDragEnd = function(e) {
             settings: {}
         };
 
-        // Find insert position (same logic as empty column)
+        // Find insert position in cachedBoard.columns
         let insertIndex = window.cachedBoard.columns.length;
 
-        if (targetColumnId) {
-            const targetIdx = window.cachedBoard.columns.findIndex(c => c.id === targetColumnId);
-            if (targetIdx >= 0) {
-                if (targetPosition === 'after') {
-                    insertIndex = targetIdx + 1;
-                } else if (targetPosition === 'before') {
-                    insertIndex = targetIdx;
-                }
+        if (insertBeforeColumnId) {
+            const idx = window.cachedBoard.columns.findIndex(c => c.id === insertBeforeColumnId);
+            if (idx >= 0) {
+                insertIndex = idx;
             }
-        } else if (targetPosition === 'first' || targetPosition === 'last') {
-            const getColumnRow = (col) => {
-                const rowMatch = col.title?.match(/#row(\d+)/i);
-                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
-            };
-
-            if (targetPosition === 'first') {
-                const firstInRow = window.cachedBoard.columns.findIndex(c => getColumnRow(c) === targetRow);
-                insertIndex = firstInRow >= 0 ? firstInRow : window.cachedBoard.columns.length;
-            } else {
-                let lastInRowIdx = -1;
-                for (let i = 0; i < window.cachedBoard.columns.length; i++) {
-                    if (getColumnRow(window.cachedBoard.columns[i]) === targetRow) {
-                        lastInRowIdx = i;
-                    }
-                }
-                insertIndex = lastInRowIdx >= 0 ? lastInRowIdx + 1 : window.cachedBoard.columns.length;
+        } else if (insertAfterColumnId) {
+            const idx = window.cachedBoard.columns.findIndex(c => c.id === insertAfterColumnId);
+            if (idx >= 0) {
+                insertIndex = idx + 1;
             }
         }
+
+        console.log('[ClipboardColumn DROP] Inserting at index:', insertIndex);
 
         // Insert column into cachedBoard
         window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
 
-        // Re-render the board
+        // CRITICAL: Sort columns by row to match backend ordering
+        if (typeof window.sortColumnsByRow === 'function') {
+            window.cachedBoard.columns = window.sortColumnsByRow(window.cachedBoard.columns);
+        }
+
+        // Re-render the board - this creates the DOM structure
         if (typeof window.renderBoard === 'function') {
             window.renderBoard();
         }
 
-        // Normalize stack tags
+        // CRITICAL: Normalize stack tags based on actual DOM structure (same as processColumnDrop)
+        // This is the KEY - let the DOM structure determine the stack tags
         if (typeof window.normalizeAllStackTags === 'function') {
             window.normalizeAllStackTags();
         }
@@ -644,6 +687,14 @@ window.handleClipboardColumnDragEnd = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
+        window.templateDragState.isDropZone = false;
+        window.templateDragState.lastInStackTarget = null;
+    }
+
+    // Clear dragState drop targets
+    if (window.dragState) {
+        window.dragState.dropTargetStack = null;
+        window.dragState.dropTargetBeforeColumn = null;
     }
 
     // Hide any internal drop indicator
@@ -652,166 +703,6 @@ window.handleClipboardColumnDragEnd = function(e) {
         indicator.classList.remove('active');
     }
 };
-
-/**
- * Parse clipboard content in presentation format into column title and tasks
- * Mirrors the backend PresentationParser logic exactly
- *
- * Rules:
- * - Split content by \n\n---\n\n (slide separator)
- * - First slide: if it has title only (no content), use as column title
- * - Otherwise, column title is empty
- * - All remaining slides become tasks
- */
-function parseClipboardPresentationContent(content) {
-    if (!content) {
-        return { columnTitle: '', tasks: [] };
-    }
-
-    // Normalize line endings (CRITICAL: must happen first)
-    let workingContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-    // Strip YAML frontmatter if present
-    const yamlMatch = workingContent.match(/^---\n[\s\S]*?\n---\n/);
-    if (yamlMatch) {
-        workingContent = workingContent.substring(yamlMatch[0].length);
-    }
-
-    // CRITICAL: Temporarily replace HTML comments with placeholders
-    // This prevents '---' inside comments from being treated as slide separators
-    const comments = [];
-    const contentWithPlaceholders = workingContent.replace(/<!--[\s\S]*?-->/g, (match) => {
-        const index = comments.length;
-        comments.push(match);
-        return `__COMMENT_PLACEHOLDER_${index}__`;
-    });
-
-    // Split by slide separator (CRITICAL: use [ \t]* not \s* to avoid matching newlines)
-    const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/);
-    const slides = [];
-
-    for (const slideContent of rawSlides) {
-        const parsed = parseSlide(slideContent, comments);
-        slides.push(parsed);
-    }
-
-    // Determine column title and tasks
-    let columnTitle = '';
-    let tasks = [];
-
-    if (slides.length > 0) {
-        const firstSlide = slides[0];
-        // If first slide has title but no content (or only whitespace), use as column title
-        if (firstSlide.title && (!firstSlide.content || firstSlide.content.trim() === '')) {
-            columnTitle = firstSlide.title;
-            // Remaining slides become tasks
-            for (let i = 1; i < slides.length; i++) {
-                tasks.push(slideToTask(slides[i]));
-            }
-        } else {
-            // All slides become tasks
-            for (const slide of slides) {
-                tasks.push(slideToTask(slide));
-            }
-        }
-    }
-
-    return { columnTitle, tasks };
-}
-
-/**
- * Parse a single slide content into title and content
- * @param {string} slideContent - The slide content (may contain comment placeholders)
- * @param {string[]} comments - Array of original HTML comments to restore
- */
-function parseSlide(slideContent, comments) {
-    const lines = slideContent.split('\n');
-
-    // Count leading empty lines
-    let emptyLineCount = 0;
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i] === '') {
-            emptyLineCount++;
-        } else {
-            break;
-        }
-    }
-
-    // Find first content lines
-    const contentLines = [];
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i] !== '') {
-            contentLines.push(i);
-            if (contentLines.length >= 2) break;
-        }
-    }
-
-    let title = undefined;
-    let descriptionStartLine = -1;
-
-    if (contentLines.length >= 1) {
-        if (emptyLineCount < 1) {
-            // First content is title
-            const firstContentLine = lines[contentLines[0]];
-            // Check for structured content patterns that shouldn't be split
-            const hasStructuredContentPattern = /---:|:--:|:---|<!--|\|.*\||^-\s/.test(firstContentLine);
-
-            if (hasStructuredContentPattern) {
-                title = undefined;
-                descriptionStartLine = Math.min(contentLines[0], 3);
-            } else {
-                title = lines[contentLines[0]];
-                const lineAfterTitle = contentLines[0] + 1;
-                if (lineAfterTitle < lines.length && lines[lineAfterTitle] === '') {
-                    descriptionStartLine = contentLines[0] + 2;
-                } else {
-                    descriptionStartLine = contentLines[0] + 1;
-                }
-            }
-        } else {
-            // No title, all is description
-            title = undefined;
-            descriptionStartLine = Math.min(contentLines[0], 3);
-        }
-    } else {
-        title = undefined;
-        descriptionStartLine = lines.length > 0 ? 0 : -1;
-    }
-
-    // Extract description
-    let description = '';
-    if (descriptionStartLine !== -1 && descriptionStartLine < lines.length) {
-        const descriptionLines = [];
-        for (let i = descriptionStartLine; i < lines.length; i++) {
-            descriptionLines.push(lines[i]);
-        }
-        description = descriptionLines.join('\n');
-    }
-
-    // Restore HTML comments from placeholders
-    const restoreComments = (text) => {
-        if (!text || !comments || comments.length === 0) return text;
-        return text.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (match, index) => {
-            return comments[parseInt(index)] || match;
-        });
-    };
-
-    return {
-        title: restoreComments(title),
-        content: restoreComments(description)
-    };
-}
-
-/**
- * Convert parsed slide to task object
- */
-function slideToTask(slide) {
-    return {
-        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: slide.title || '',
-        description: slide.content || ''
-    };
-}
 
 // =============================================================================
 // TEMPLATE MENU DRAG HANDLERS
@@ -903,6 +794,7 @@ window.handleTemplateMenuDragEnd = function(e) {
         window.templateDragState.targetRow = null;
         window.templateDragState.targetPosition = null;
         window.templateDragState.targetColumnId = null;
+        window.templateDragState.isDropZone = false;
     }
 
     // Hide any internal drop indicator

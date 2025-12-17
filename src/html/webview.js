@@ -722,9 +722,9 @@ async function processClipboardText(text) {
     }
     
     // Check if content looks like presentation format (has --- slide separators)
-    // Use same pattern as PresentationParser: \n\n---[ \t]*\n\n
+    // Look for --- on its own line (with optional whitespace), more permissive than parser
     // This allows pasting as a column with multiple tasks
-    const isPresentationFormat = /\n\n---[ \t]*\n\n/.test(text);
+    const isPresentationFormat = /\n---[ \t]*\n/.test(text);
 
     // Regular text content
     const textLines = text.split('\n');
@@ -1445,6 +1445,31 @@ function getColumnRow(title) {
         return Math.max(rowNum, 1); // No upper limit - support unlimited rows
     }
     return 1;
+}
+
+/**
+ * Sort columns by row number, maintaining original order within each row
+ * Mirrors the backend sortColumnsByRow() function from columnUtils.ts
+ * @param {Array} columns - Array of columns with title property
+ * @returns {Array} Sorted array of columns (row 1 first, then row 2, etc.)
+ */
+function sortColumnsByRow(columns) {
+    if (!columns || !Array.isArray(columns)) return columns;
+    return columns
+        .map((column, index) => ({
+            column,
+            index,
+            row: getColumnRow(column.title)
+        }))
+        .sort((a, b) => {
+            // First sort by row number
+            if (a.row !== b.row) {
+                return a.row - b.row;
+            }
+            // Within same row, maintain original order
+            return a.index - b.index;
+        })
+        .map(item => item.column);
 }
 
 // Function to update column row tag
@@ -3906,6 +3931,7 @@ window.filterTagsFromText = filterTagsFromText;
 window.filterTagsForExport = filterTagsForExport;
 window.updateColumnRowTag = updateColumnRowTag;
 window.getColumnRow = getColumnRow;
+window.sortColumnsByRow = sortColumnsByRow;
 
 window.performSort = performSort;
 

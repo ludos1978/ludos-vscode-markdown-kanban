@@ -1570,6 +1570,10 @@ function handleCopyContentResult(result) {
     if (result.success && result.content) {
         if (navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(result.content).then(() => {
+                // Update clipboard card source to reflect new content
+                if (typeof updateClipboardCardSource === 'function') {
+                    setTimeout(() => updateClipboardCardSource(true), 50);
+                }
             }).catch(err => {
                 console.error('[kanban.exportMarpUI.handleCopyContentResult] Failed to copy:', err);
                 vscode.postMessage({
@@ -1586,6 +1590,10 @@ function handleCopyContentResult(result) {
             textarea.select();
             try {
                 document.execCommand('copy');
+                // Update clipboard card source to reflect new content
+                if (typeof updateClipboardCardSource === 'function') {
+                    setTimeout(() => updateClipboardCardSource(true), 50);
+                }
             } catch (err) {
                 console.error('[kanban.exportMarpUI.handleCopyContentResult] Fallback copy failed:', err);
                 vscode.postMessage({

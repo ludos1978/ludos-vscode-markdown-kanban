@@ -1,5 +1,6 @@
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { getErrorMessage } from '../../utils/stringUtils';
 
@@ -67,9 +68,21 @@ export class PlantUMLService {
 
                 // Bypass node-plantuml and spawn Java directly
                 // node-plantuml doesn't work in VS Code extension context
-                const vendorPath = path.join(__dirname, '../../node_modules/node-plantuml/vendor');
+                // After esbuild bundling, __dirname points to dist/, so we need ../node_modules/
+                // (was ../../ which is wrong for bundled code)
+                const vendorPath = path.join(__dirname, '../node_modules/node-plantuml/vendor');
                 const plantumlJar = path.join(vendorPath, 'plantuml-modern.jar');  // Use modern v1.2024.7
 
+                // Debug: log the resolved path
+                console.log('[PlantUML Service] JAR path:', plantumlJar);
+
+                // Verify JAR file exists
+                if (!fs.existsSync(plantumlJar)) {
+                    console.error('[PlantUML Service] JAR file not found at:', plantumlJar);
+                    console.error('[PlantUML Service] __dirname is:', __dirname);
+                    reject(new Error(`PlantUML JAR not found at: ${plantumlJar}. Make sure node-plantuml is installed.`));
+                    return;
+                }
 
                 // Use Smetana layout engine (pure Java, no external dependencies)
                 // Smetana is a built-in Graphviz replacement that works offline

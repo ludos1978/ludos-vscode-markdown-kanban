@@ -199,8 +199,12 @@ let templateDragState = {
     templatePath: null,
     templateName: null,
     targetRow: null,
-    targetPosition: null,  // 'before' | 'after'
-    targetColumnId: null
+    targetPosition: null,  // 'before' | 'after' | 'first' | 'last'
+    targetColumnId: null,
+    isDropZone: false,     // true = dropping on drop zone (new stack), false = dropping within existing stack
+    // FIX: Track the last valid in-stack target position
+    // This prevents the target from being overwritten when mouse briefly crosses a drop zone during release
+    lastInStackTarget: null  // { row, position, columnId } - saved when indicator shows between columns
 };
 
 // External file drop location indicators
@@ -383,6 +387,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetRow = 1;
         }
 
+        // CRITICAL: This is a drop zone - new column will be its own stack (no #stack needed)
+        templateDragState.isDropZone = true;
+
         const prevStack = targetStack.previousElementSibling;
         const nextStack = targetStack.nextElementSibling;
 
@@ -402,6 +409,14 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetPosition = 'first';
             templateDragState.targetColumnId = null;
         }
+
+        // DEBUG: Log template drag state update (drop zone)
+        console.log('[DragOver] Template over DROP ZONE:', {
+            isDropZone: true,
+            targetRow: templateDragState.targetRow,
+            targetPosition: templateDragState.targetPosition,
+            targetColumnId: templateDragState.targetColumnId
+        });
 
         indicator.classList.remove('active');
         return;
@@ -489,6 +504,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         const stackRow = row ? parseInt(row.dataset.rowNumber, 10) || 1 : 1;
         templateDragState.targetRow = stackRow;
 
+        // CRITICAL: This is within an existing stack - may need #stack tag
+        templateDragState.isDropZone = false;
+
         if (beforeColumn) {
             templateDragState.targetPosition = 'before';
             templateDragState.targetColumnId = beforeColumn.dataset?.columnId || null;
@@ -497,6 +515,22 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetPosition = 'after';
             templateDragState.targetColumnId = lastColumn?.dataset?.columnId || null;
         }
+
+        // FIX: Save this as the last valid in-stack target
+        // This will be used at drop time even if mouse briefly crosses a drop zone
+        templateDragState.lastInStackTarget = {
+            row: stackRow,
+            position: templateDragState.targetPosition,
+            columnId: templateDragState.targetColumnId
+        };
+
+        // DEBUG: Log template drag state update (within stack)
+        console.log('[DragOver] Template in stack:', {
+            isDropZone: false,
+            targetRow: stackRow,
+            targetPosition: templateDragState.targetPosition,
+            targetColumnId: templateDragState.targetColumnId
+        });
     }
 }
 
@@ -3541,6 +3575,7 @@ function handleTemplateDragEnd(e) {
     templateDragState.targetRow = null;
     templateDragState.targetPosition = null;
     templateDragState.targetColumnId = null;
+    templateDragState.isDropZone = false;
 }
 
 /**

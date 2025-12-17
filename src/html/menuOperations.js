@@ -2409,6 +2409,14 @@ function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId 
             }
         }
 
+        // CRITICAL: Sort columns by row to match backend ordering
+        // This ensures frontend and backend stay in sync after column insertion
+        if (typeof window.sortColumnsByRow === 'function') {
+            window.cachedBoard.columns = window.sortColumnsByRow(window.cachedBoard.columns);
+            // Recalculate actual insert index after sorting
+            actualInsertIndex = window.cachedBoard.columns.findIndex(col => col.id === newColumn.id);
+        }
+
         // Mark as unsaved
         if (typeof markUnsavedChanges === 'function') {
             markUnsavedChanges();

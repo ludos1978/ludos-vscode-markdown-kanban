@@ -112,7 +112,9 @@
       "Bash(for f in /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/utils/*.js /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/*.js)",
       "Bash(while read f)",
       "Bash(if [ ! -f \"/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/$f\" ])",
-      "Bash(npm run compile:check:*)"
+      "Bash(npm run compile:check:*)",
+      "Bash(node -e \"require(''/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/utils/presentationParser.js'')\")",
+      "Bash(npm run compile:extension:*)"
     ],
     "deny": [],
     "ask": []

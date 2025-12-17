@@ -15,6 +15,7 @@ import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileServi
 import { MediaTracker, ChangedMediaFile } from './services/MediaTracker';
 import { LinkOperations } from './utils/linkOperations';
 import { getErrorMessage } from './utils/stringUtils';
+import { sortColumnsByRow } from './utils/columnUtils';
 import {
     MarkdownFileRegistry,
     FileFactory,
@@ -877,6 +878,7 @@ export class KanbanWebviewPanel {
             'utils/exportTreeUI.js',
             'utils/smartLogger.js',
             'utils/menuUtils.js',
+            'utils/presentationParser.js',
             'markdownRenderer.js',
             'taskEditor.js',
             'boardRenderer.js',
@@ -1478,22 +1480,31 @@ export class KanbanWebviewPanel {
             return;
         }
 
+        // CRITICAL FIX: Sort columns by row before storing to ensure consistency
+        // between board store and generated markdown. This prevents column ordering
+        // mismatches when board is regenerated from markdown (e.g., after blur/focus).
+        // generateMarkdown() uses sortColumnsByRow(), so we must store in same order.
+        const normalizedBoard: KanbanBoard = {
+            ...board,
+            columns: sortColumnsByRow(board.columns)
+        };
+
         // 1. Update board store (without emitting event - we're syncing, not changing)
-        this._boardStore.setBoard(board, false);
+        this._boardStore.setBoard(normalizedBoard, false);
 
         // 2. Update MainKanbanFile's cached board for conflict detection
         const mainFile = this._fileRegistry.getMainFile();
         if (mainFile) {
-            mainFile.setCachedBoardFromWebview(board);
+            mainFile.setCachedBoardFromWebview(normalizedBoard);
         }
 
         // 3. Track changes in include files (updates their cache)
-        await this._fileRegistry.trackIncludeFileUnsavedChanges(board);
+        await this._fileRegistry.trackIncludeFileUnsavedChanges(normalizedBoard);
 
         // 4. Generate markdown and update main file content
         // This causes hasUnsavedChanges() to return true (content !== baseline)
         if (mainFile) {
-            const markdown = MarkdownKanbanParser.generateMarkdown(board);
+            const markdown = MarkdownKanbanParser.generateMarkdown(normalizedBoard);
             mainFile.setContent(markdown, false); // false = don't update baseline
         }
 
