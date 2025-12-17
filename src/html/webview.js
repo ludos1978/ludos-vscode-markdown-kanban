@@ -721,9 +721,10 @@ async function processClipboardText(text) {
         };
     }
     
-    // Check if content looks like presentation format (has --- separators)
+    // Check if content looks like presentation format (has --- slide separators)
+    // Use same pattern as PresentationParser: \n\n---[ \t]*\n\n
     // This allows pasting as a column with multiple tasks
-    const isPresentationFormat = /\n\n---\s*\n\n/.test(text) || /^---\n/.test(text);
+    const isPresentationFormat = /\n\n---[ \t]*\n\n/.test(text);
 
     // Regular text content
     const textLines = text.split('\n');

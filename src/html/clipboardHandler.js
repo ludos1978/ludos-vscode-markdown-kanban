@@ -655,7 +655,7 @@ window.handleClipboardColumnDragEnd = function(e) {
 
 /**
  * Parse clipboard content in presentation format into column title and tasks
- * Mirrors the backend PresentationParser logic
+ * Mirrors the backend PresentationParser logic exactly
  *
  * Rules:
  * - Split content by \n\n---\n\n (slide separator)
@@ -668,7 +668,7 @@ function parseClipboardPresentationContent(content) {
         return { columnTitle: '', tasks: [] };
     }
 
-    // Normalize line endings
+    // Normalize line endings (CRITICAL: must happen first)
     let workingContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
     // Strip YAML frontmatter if present
@@ -677,12 +677,21 @@ function parseClipboardPresentationContent(content) {
         workingContent = workingContent.substring(yamlMatch[0].length);
     }
 
-    // Split by slide separator
-    const rawSlides = workingContent.split(/\n\n---\s*\n\n/);
+    // CRITICAL: Temporarily replace HTML comments with placeholders
+    // This prevents '---' inside comments from being treated as slide separators
+    const comments = [];
+    const contentWithPlaceholders = workingContent.replace(/<!--[\s\S]*?-->/g, (match) => {
+        const index = comments.length;
+        comments.push(match);
+        return `__COMMENT_PLACEHOLDER_${index}__`;
+    });
+
+    // Split by slide separator (CRITICAL: use [ \t]* not \s* to avoid matching newlines)
+    const rawSlides = contentWithPlaceholders.split(/\n\n---[ \t]*\n\n/);
     const slides = [];
 
     for (const slideContent of rawSlides) {
-        const parsed = parseSlide(slideContent);
+        const parsed = parseSlide(slideContent, comments);
         slides.push(parsed);
     }
 
@@ -712,8 +721,10 @@ function parseClipboardPresentationContent(content) {
 
 /**
  * Parse a single slide content into title and content
+ * @param {string} slideContent - The slide content (may contain comment placeholders)
+ * @param {string[]} comments - Array of original HTML comments to restore
  */
-function parseSlide(slideContent) {
+function parseSlide(slideContent, comments) {
     const lines = slideContent.split('\n');
 
     // Count leading empty lines
@@ -777,7 +788,18 @@ function parseSlide(slideContent) {
         description = descriptionLines.join('\n');
     }
 
-    return { title, content: description };
+    // Restore HTML comments from placeholders
+    const restoreComments = (text) => {
+        if (!text || !comments || comments.length === 0) return text;
+        return text.replace(/__COMMENT_PLACEHOLDER_(\d+)__/g, (match, index) => {
+            return comments[parseInt(index)] || match;
+        });
+    };
+
+    return {
+        title: restoreComments(title),
+        content: restoreComments(description)
+    };
 }
 
 /**
