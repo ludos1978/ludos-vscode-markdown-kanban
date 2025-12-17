@@ -418,6 +418,10 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             targetColumnId: templateDragState.targetColumnId
         });
 
+        // CRITICAL: Also set dragState for insertNewColumnAtDropTarget to use
+        dragState.dropTargetStack = targetStack;
+        dragState.dropTargetBeforeColumn = beforeColumn;
+
         indicator.classList.remove('active');
         return;
     }
@@ -1383,101 +1387,268 @@ function setupGlobalDragAndDrop() {
             }
         }
 
-        // Update stack tags in destination stack
-        const destinationStack = columnElement.closest('.kanban-column-stack');
-        if (destinationStack) {
-            const allColumnsInStack = Array.from(destinationStack.querySelectorAll('.kanban-full-height-column'));
-            const columnsInDestStack = allColumnsInStack.filter(col => {
-                return col.closest('.kanban-column-stack') === destinationStack;
-            });
+        // SHARED: Sync data to DOM order
+        syncColumnDataToDOMOrder();
 
-            columnsInDestStack.forEach((col, idx) => {
-                const colId = col.getAttribute('data-column-id');
+        // SHARED: Finalize (normalize tags, recalc heights, update drop zones)
+        finalizeColumnDrop();
 
-                if (idx === 0) {
-                    // First column - remove #stack tag
-                    if (window.cachedBoard) {
-                        const cachedCol = window.cachedBoard.columns.find(c => c.id === colId);
-                        if (cachedCol) {
-                            cachedCol.title = cachedCol.title.replace(/#stack\b/gi, '').replace(/\s+/g, ' ').trim();
-                        }
-                    }
-                    updateColumnTitleDisplay(colId);
-                } else {
-                    // Other columns - ensure they have #stack tag
-                    if (window.cachedBoard) {
-                        const cachedCol = window.cachedBoard.columns.find(c => c.id === colId);
-                        if (cachedCol && !/#stack\b/i.test(cachedCol.title)) {
-                            const trimmedTitle = cachedCol.title.trim();
-                            cachedCol.title = trimmedTitle ? trimmedTitle + ' #stack' : ' #stack';
-                        }
-                    }
-                    updateColumnTitleDisplay(colId);
-                }
-            });
+        // Additional processing specific to column moves (not new columns)
+        const sourceStack = dragState.originalColumnParent;
+        const targetStack = columnElement.closest('.kanban-column-stack');
+
+        // Enforce horizontal folding for stacked columns
+        if (typeof window.enforceFoldModesForStacks === 'function' && targetStack) {
+            window.enforceFoldModesForStacks(targetStack);
         }
+    }
 
-        // Handle the edge case where column is not in any stack
-        const stackContainer = columnElement.closest('.kanban-column-stack');
-        if (!stackContainer) {
-            if (window.cachedBoard) {
-                const cachedColumn = window.cachedBoard.columns.find(col => col.id === columnId);
-                if (cachedColumn) {
-                    cachedColumn.title = cachedColumn.title.replace(/#stack\b/gi, '').replace(/\s+/g, ' ').trim();
-                }
-            }
-        }
+    /**
+     * SHARED: Sync cachedBoard.columns order to match DOM order.
+     * Called after any column position change (move or insert).
+     */
+    function syncColumnDataToDOMOrder() {
+        const boardElement = document.getElementById('kanban-board');
+        if (!boardElement || !window.cachedBoard) return;
 
-        // Update the visual display
-        const titleElement = columnElement.querySelector('.column-title-text');
-        if (titleElement && window.cachedBoard) {
-            const columnData = window.cachedBoard.columns.find(col => col.id === columnId);
-            if (columnData) {
-                const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(columnData, window.filterTagsFromText) : (columnData.title || '');
-                titleElement.innerHTML = renderedTitle;
-            }
-        }
+        const allColumns = Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
+        const newOrder = allColumns.map(col => col.getAttribute('data-column-id'));
 
-        // Reorder columns in cached board to match DOM order
-        if (window.cachedBoard) {
-            const reorderedColumns = newOrder.map(colId =>
-                window.cachedBoard.columns.find(col => col.id === colId)
-            ).filter(Boolean);
+        const reorderedColumns = newOrder.map(colId =>
+            window.cachedBoard.columns.find(col => col.id === colId)
+        ).filter(Boolean);
 
-            window.cachedBoard.columns = reorderedColumns;
-        }
+        window.cachedBoard.columns = reorderedColumns;
+    }
+
+    /**
+     * SHARED: Finalize column drop - normalize tags, recalc heights, update drop zones.
+     * Called after any column position change (move or insert).
+     */
+    function finalizeColumnDrop() {
+        // Normalize stack tags based on DOM structure
+        normalizeAllStackTags();
 
         // Mark as unsaved
         if (typeof markUnsavedChanges === 'function') {
             markUnsavedChanges();
         }
 
-        // Recalculate only affected stacks (column heights unchanged, just positions)
-        // Use immediate recalculation to ensure correct visual update after drop
-        const sourceStack = dragState.originalColumnParent;
-        const targetStack = columnElement.closest('.kanban-column-stack');
-        if (typeof window.recalculateStackHeightsImmediate === 'function') {
-            // Recalculate source stack (column was removed from here)
-            if (sourceStack && sourceStack.classList?.contains('kanban-column-stack') && document.body.contains(sourceStack)) {
-                window.recalculateStackHeightsImmediate(sourceStack);
-            }
-            // Recalculate target stack (column was added here)
-            if (targetStack && targetStack !== sourceStack) {
-                window.recalculateStackHeightsImmediate(targetStack);
-            }
+        // Recalculate stack heights
+        if (typeof window.recalculateAllStackHeights === 'function') {
+            window.recalculateAllStackHeights();
         }
 
-        // Enforce horizontal folding for stacked columns:
-        // If a column is already folded (vertically), convert it to horizontal folding
-        // Do NOT fold unfolded columns
-        if (typeof window.enforceFoldModesForStacks === 'function' && targetStack) {
-            window.enforceFoldModesForStacks(targetStack);
-        }
-
-        // Update drop zones after column reorder
+        // Update drop zones
         if (typeof window.updateStackBottomDropZones === 'function') {
             window.updateStackBottomDropZones();
         }
+    }
+
+    /**
+     * Get the DOM-order index where a new column should be inserted.
+     * Returns the index in cachedBoard.columns where the new column should go.
+     */
+    function getDropTargetIndex() {
+        const boardElement = document.getElementById('kanban-board');
+        if (!boardElement || !dragState.dropTargetStack) {
+            return -1;
+        }
+
+        // Get all columns in DOM order
+        const allColumns = Array.from(boardElement.querySelectorAll('.kanban-full-height-column'));
+
+        if (dragState.dropTargetBeforeColumn) {
+            // Insert BEFORE this column - find its index in DOM order
+            const beforeColId = dragState.dropTargetBeforeColumn.dataset?.columnId;
+            const index = allColumns.findIndex(col => col.dataset?.columnId === beforeColId);
+            return index >= 0 ? index : allColumns.length;
+        } else {
+            // Append at end of stack - find the last column in this stack
+            const stackColumns = dragState.dropTargetStack.querySelectorAll('.kanban-full-height-column');
+            if (stackColumns.length > 0) {
+                const lastColInStack = stackColumns[stackColumns.length - 1];
+                const lastColId = lastColInStack.dataset?.columnId;
+                const index = allColumns.findIndex(col => col.dataset?.columnId === lastColId);
+                return index >= 0 ? index + 1 : allColumns.length;
+            } else {
+                // Empty stack or drop zone - find position based on adjacent stacks
+                const parentRow = dragState.dropTargetStack.closest('.kanban-row');
+                if (parentRow) {
+                    const stacks = Array.from(parentRow.querySelectorAll('.kanban-column-stack'));
+                    const stackIndex = stacks.indexOf(dragState.dropTargetStack);
+
+                    // Find the last column before this stack
+                    for (let i = stackIndex - 1; i >= 0; i--) {
+                        const prevStackCols = stacks[i].querySelectorAll('.kanban-full-height-column');
+                        if (prevStackCols.length > 0) {
+                            const lastCol = prevStackCols[prevStackCols.length - 1];
+                            const lastColId = lastCol.dataset?.columnId;
+                            const index = allColumns.findIndex(col => col.dataset?.columnId === lastColId);
+                            return index >= 0 ? index + 1 : 0;
+                        }
+                    }
+                }
+                return 0;
+            }
+        }
+    }
+
+    /**
+     * Insert a new column at the drop target position.
+     */
+    function insertColumnAtPosition(columnData) {
+        if (!window.cachedBoard || !dragState.dropTargetStack) {
+            console.warn('[insertColumnAtPosition] Missing cachedBoard or dropTargetStack');
+            return false;
+        }
+
+        // Step 1: Calculate insertion index using DOM order
+        const insertIndex = getDropTargetIndex();
+
+        // Step 2: Get row info for the row tag
+        const targetRowElement = dragState.dropTargetStack.closest('.kanban-row');
+        const targetRow = targetRowElement ? parseInt(targetRowElement.getAttribute('data-row-number') || '1') : 1;
+
+        // Step 3: Determine if column needs #stack tag AND if existing column needs #stack added
+        const stackColumns = dragState.dropTargetStack.querySelectorAll('.kanban-full-height-column');
+        const isDropZone = dragState.dropTargetStack.classList.contains('column-drop-zone-stack');
+        let needsStackTag = false;
+        let columnToAddStackTag = null;
+
+        if (!isDropZone && stackColumns.length > 0) {
+            if (dragState.dropTargetBeforeColumn) {
+                const beforeColIndex = Array.from(stackColumns).indexOf(dragState.dropTargetBeforeColumn);
+                needsStackTag = beforeColIndex > 0;
+
+                // If inserting at position 0, the column we're inserting before needs #stack added
+                if (beforeColIndex === 0) {
+                    columnToAddStackTag = dragState.dropTargetBeforeColumn.dataset?.columnId;
+                }
+            } else {
+                // Appending to end of stack - always need #stack
+                needsStackTag = true;
+            }
+        }
+
+        // Add #stack tag to existing column if needed (when inserting at position 0)
+        if (columnToAddStackTag && window.cachedBoard) {
+            const existingCol = window.cachedBoard.columns.find(c => c.id === columnToAddStackTag);
+            if (existingCol && !/#stack\b/i.test(existingCol.title)) {
+                existingCol.title = existingCol.title ? `${existingCol.title} #stack` : '#stack';
+            }
+        }
+
+        // Step 4: Create column data with appropriate tags
+        const newColumnId = columnData.id || `col-${Date.now()}`;
+        let title = columnData.title || '';
+
+        // Add #row tag if needed
+        if (targetRow > 1 && !/#row\d+/i.test(title)) {
+            title = title ? `${title} #row${targetRow}` : `#row${targetRow}`;
+        }
+
+        // Add #stack tag if needed
+        if (needsStackTag && !/#stack\b/i.test(title)) {
+            title = title ? `${title} #stack` : '#stack';
+        }
+
+        const newColumn = {
+            id: newColumnId,
+            title: title,
+            tasks: columnData.tasks || [],
+            settings: columnData.settings || {}
+        };
+
+        // Step 5: Insert at calculated index
+        if (insertIndex >= 0 && insertIndex <= window.cachedBoard.columns.length) {
+            window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
+        } else {
+            window.cachedBoard.columns.push(newColumn);
+        }
+
+        // Step 6: Re-render the board
+        if (typeof window.renderBoard === 'function') {
+            window.renderBoard();
+        }
+
+        // Step 7: Sync and finalize
+        syncColumnDataToDOMOrder();
+
+        requestAnimationFrame(() => {
+            finalizeColumnDrop();
+        });
+
+        return true;
+    }
+
+    /**
+     * Process template column drop (empty column, clipboard column, or template)
+     * Uses the SAME position tracking as processColumnDrop (dragState.dropTargetStack/dropTargetBeforeColumn)
+     */
+    function processTemplateColumnDrop() {
+        console.log('[processTemplateColumnDrop] Called!', {
+            dropTargetStack: !!dragState.dropTargetStack,
+            dropTargetBeforeColumn: dragState.dropTargetBeforeColumn?.dataset?.columnId || 'null'
+        });
+
+        // Check drop target directly (same as processColumnDrop)
+        if (!dragState.dropTargetStack) {
+            console.warn('[processTemplateColumnDrop] No drop target stack');
+            return;
+        }
+
+        if (templateDragState.isEmptyColumn) {
+            // Create empty column - uses dragState.dropTargetStack/dropTargetBeforeColumn directly
+            insertColumnAtPosition({
+                title: 'New Column',
+                tasks: [],
+                settings: {}
+            });
+        } else if (templateDragState.isClipboardColumn) {
+            // Parse clipboard content and create column
+            const clipboardContent = templateDragState.clipboardContent;
+            if (window.PresentationParser && clipboardContent) {
+                const parsedData = window.PresentationParser.parseClipboardAsColumn(clipboardContent);
+                insertColumnAtPosition({
+                    title: parsedData.columnTitle || '',
+                    tasks: parsedData.tasks || [],
+                    settings: {}
+                });
+            }
+        } else if (templateDragState.templatePath) {
+            // Template column - use existing applyTemplateAtPosition (sends to backend)
+            applyTemplateAtPosition();
+        }
+
+        // Reset templateDragState
+        templateDragState.isDragging = false;
+        templateDragState.templatePath = null;
+        templateDragState.templateName = null;
+        templateDragState.isEmptyColumn = false;
+        templateDragState.isClipboardColumn = false;
+        templateDragState.clipboardContent = null;
+        templateDragState.targetRow = null;
+        templateDragState.targetPosition = null;
+        templateDragState.targetColumnId = null;
+        templateDragState.isDropZone = false;
+        templateDragState.lastInStackTarget = null;
+
+        // Clear dragState drop targets
+        dragState.dropTargetStack = null;
+        dragState.dropTargetBeforeColumn = null;
+
+        // Hide indicator
+        hideInternalDropIndicator();
+
+        // Remove board template-dragging class
+        const boardElement = document.getElementById('kanban-board');
+        if (boardElement) {
+            boardElement.classList.remove('template-dragging');
+        }
+
+        // Clear highlights
+        clearHighlights();
     }
 
     function cleanupDragVisuals() {
@@ -1580,7 +1751,23 @@ function setupGlobalDragAndDrop() {
         const wasTask = !!dragState.draggedTask;
         const wasColumn = !!dragState.draggedColumn;
         const wasDragging = dragState.isDragging;
+
+        // Also check for template column drags (empty column, clipboard column, or template)
+        const wasTemplateColumnDrag = typeof templateDragState !== 'undefined' &&
+            templateDragState.isDragging &&
+            (templateDragState.isEmptyColumn || templateDragState.isClipboardColumn || templateDragState.templatePath);
         const droppedOutside = e.dataTransfer?.dropEffect === 'none';
+
+        // DEBUG: Log template drag state
+        console.log('[dragend] Template drag check:', {
+            wasTemplateColumnDrag,
+            templateDragStateIsDragging: typeof templateDragState !== 'undefined' ? templateDragState.isDragging : 'undefined',
+            isEmptyColumn: typeof templateDragState !== 'undefined' ? templateDragState.isEmptyColumn : 'undefined',
+            isClipboardColumn: typeof templateDragState !== 'undefined' ? templateDragState.isClipboardColumn : 'undefined',
+            templatePath: typeof templateDragState !== 'undefined' ? templateDragState.templatePath : 'undefined',
+            dropTargetStack: !!dragState.dropTargetStack,
+            dropTargetBeforeColumn: dragState.dropTargetBeforeColumn
+        });
         const leftView = dragState.leftView;
 
         // Get current position for debugging
@@ -1628,7 +1815,7 @@ function setupGlobalDragAndDrop() {
             if (wasColumn) {
                 restoreColumnToOriginalPosition();
             }
-        } else if (wasDragging) {
+        } else if (wasDragging || wasTemplateColumnDrag) {
             // PROCESS - valid drop, process the changes
             // dragLogger.always('[dragend] Executing PROCESS path');
             if (wasTask) {
@@ -1636,6 +1823,18 @@ function setupGlobalDragAndDrop() {
             }
             if (wasColumn) {
                 processColumnDrop();
+            }
+            // Handle template column drags (empty column, clipboard column, or template)
+            console.log('[dragend] About to check template column drop:', {
+                wasTemplateColumnDrag,
+                hasDropTargetStack: !!dragState.dropTargetStack,
+                willCallProcessTemplateColumnDrop: wasTemplateColumnDrag && dragState.dropTargetStack
+            });
+            if (wasTemplateColumnDrag && dragState.dropTargetStack) {
+                console.log('[dragend] Calling processTemplateColumnDrop()');
+                processTemplateColumnDrop();
+            } else if (wasTemplateColumnDrag && !dragState.dropTargetStack) {
+                console.warn('[dragend] Template drag but NO dropTargetStack!');
             }
         }
 
@@ -3458,6 +3657,10 @@ function setupColumnDragAndDrop() {
             // Update drop target state
             dragState.dropTargetStack = foundStack;
             dragState.dropTargetBeforeColumn = beforeColumn;
+            console.log('[DragOver] Template/Column drop target set:', {
+                stackId: foundStack?.firstElementChild?.dataset?.columnId,
+                beforeColumnId: beforeColumn?.dataset?.columnId || 'end of stack'
+            });
 
             // Only show line indicator for template drags, not column drags
             if (!stillColumnDrag) {
