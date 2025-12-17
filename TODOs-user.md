@@ -1,3 +1,13 @@
+- [ ] after copying a column as markdown. i'd like to be able to drop it as a new column with content out of the copyed content.
+  - if the first task only is a title without a content. it will be used as column title.\
+  - othervise the title of the column is empty\
+  
+  all other content is used to create tasks ( split by --- by the same mechanic as the column import funcitonality already uses)
+  
+  can we reuse the task creation functionality of the column include?
+
+- [ ] it seems as if the board is loaded twice, or at least the height calculation is reset again while loading the board initially. can you verify and analyze?
+
 - [ ] when i copy a task as markdown it doesnt copy the task, but the full board. The same problem is with the column. it should only copy the content as markdown (presentation) which the function is called from!
 
 - [ ] when pressing the save button in the fiel states overview it doesnt allways write the file. this is a force save, which writes the file no matter what any automatic system says!

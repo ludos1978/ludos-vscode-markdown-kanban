@@ -472,6 +472,326 @@ window.handleEmptyColumnDragEnd = function(e) {
 };
 
 // =============================================================================
+// CLIPBOARD COLUMN DRAG HANDLERS
+// =============================================================================
+
+// Clipboard column drag handlers - Creates column with tasks from clipboard content
+window.handleClipboardColumnDragStart = function(e) {
+    // Check if we have presentation format content
+    if (!window.clipboardCardData || !window.clipboardCardData.isPresentationFormat) {
+        e.preventDefault();
+        return;
+    }
+
+    // Use templateDragState - same as column templates
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = true;
+        window.templateDragState.templatePath = null;
+        window.templateDragState.templateName = 'Clipboard Column';
+        window.templateDragState.isEmptyColumn = false;
+        window.templateDragState.isClipboardColumn = true;
+        window.templateDragState.clipboardContent = window.clipboardCardData.content;
+        window.templateDragState.targetRow = null;
+        window.templateDragState.targetPosition = null;
+        window.templateDragState.targetColumnId = null;
+    }
+
+    // Set drag data
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', 'clipboard-column');
+
+    // Visual feedback
+    e.target.classList.add('dragging');
+
+    // Add class to board for drop zone highlighting
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.add('template-dragging');
+    }
+};
+
+window.handleClipboardColumnDragEnd = function(e) {
+    // Clear visual feedback
+    e.target.classList.remove('dragging');
+
+    const boardElement = document.getElementById('kanban-board');
+    if (boardElement) {
+        boardElement.classList.remove('template-dragging');
+    }
+
+    // Clear all tracked highlights efficiently
+    if (typeof window.clearHighlights === 'function') {
+        window.clearHighlights();
+    }
+
+    // If we have a valid drop target, create column from clipboard content
+    if (typeof window.templateDragState !== 'undefined' &&
+        window.templateDragState.isDragging &&
+        window.templateDragState.isClipboardColumn &&
+        window.templateDragState.targetRow !== null &&
+        window.cachedBoard) {
+
+        const targetRow = window.templateDragState.targetRow || 1;
+        const targetPosition = window.templateDragState.targetPosition;
+        const targetColumnId = window.templateDragState.targetColumnId;
+        const clipboardContent = window.templateDragState.clipboardContent;
+
+        // Parse clipboard content into tasks
+        const parsedData = parseClipboardPresentationContent(clipboardContent);
+
+        // Determine if we need #stack tag (same logic as empty column)
+        let needsStackTag = false;
+
+        if (targetColumnId) {
+            const targetColElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
+            if (targetColElement) {
+                const targetStack = targetColElement.closest('.kanban-column-stack:not(.column-drop-zone-stack)');
+                if (targetStack) {
+                    if (targetPosition === 'after') {
+                        needsStackTag = true;
+                    } else if (targetPosition === 'before') {
+                        const targetData = window.cachedBoard.columns.find(c => c.id === targetColumnId);
+                        if (targetData) {
+                            if (/#stack\b/i.test(targetData.title)) {
+                                needsStackTag = true;
+                            } else {
+                                const trimmedTitle = targetData.title.trim();
+                                targetData.title = trimmedTitle ? trimmedTitle + ' #stack' : '#stack';
+                                needsStackTag = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create column title
+        let columnTitle = parsedData.columnTitle || '';
+        if (targetRow > 1 && !/#row\d+/i.test(columnTitle)) {
+            columnTitle = columnTitle ? `${columnTitle} #row${targetRow}` : `#row${targetRow}`;
+        }
+        if (needsStackTag && !/#stack\b/i.test(columnTitle)) {
+            columnTitle = columnTitle ? `${columnTitle} #stack` : '#stack';
+        }
+
+        // Create new column with parsed tasks
+        const newColumn = {
+            id: `col-${Date.now()}`,
+            title: columnTitle,
+            tasks: parsedData.tasks,
+            settings: {}
+        };
+
+        // Find insert position (same logic as empty column)
+        let insertIndex = window.cachedBoard.columns.length;
+
+        if (targetColumnId) {
+            const targetIdx = window.cachedBoard.columns.findIndex(c => c.id === targetColumnId);
+            if (targetIdx >= 0) {
+                if (targetPosition === 'after') {
+                    insertIndex = targetIdx + 1;
+                } else if (targetPosition === 'before') {
+                    insertIndex = targetIdx;
+                }
+            }
+        } else if (targetPosition === 'first' || targetPosition === 'last') {
+            const getColumnRow = (col) => {
+                const rowMatch = col.title?.match(/#row(\d+)/i);
+                return rowMatch ? parseInt(rowMatch[1], 10) : 1;
+            };
+
+            if (targetPosition === 'first') {
+                const firstInRow = window.cachedBoard.columns.findIndex(c => getColumnRow(c) === targetRow);
+                insertIndex = firstInRow >= 0 ? firstInRow : window.cachedBoard.columns.length;
+            } else {
+                let lastInRowIdx = -1;
+                for (let i = 0; i < window.cachedBoard.columns.length; i++) {
+                    if (getColumnRow(window.cachedBoard.columns[i]) === targetRow) {
+                        lastInRowIdx = i;
+                    }
+                }
+                insertIndex = lastInRowIdx >= 0 ? lastInRowIdx + 1 : window.cachedBoard.columns.length;
+            }
+        }
+
+        // Insert column into cachedBoard
+        window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
+
+        // Re-render the board
+        if (typeof window.renderBoard === 'function') {
+            window.renderBoard();
+        }
+
+        // Normalize stack tags
+        if (typeof window.normalizeAllStackTags === 'function') {
+            window.normalizeAllStackTags();
+        }
+
+        // Mark as unsaved
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+    }
+
+    // Reset templateDragState
+    if (typeof window.templateDragState !== 'undefined') {
+        window.templateDragState.isDragging = false;
+        window.templateDragState.templatePath = null;
+        window.templateDragState.templateName = null;
+        window.templateDragState.isEmptyColumn = false;
+        window.templateDragState.isClipboardColumn = false;
+        window.templateDragState.clipboardContent = null;
+        window.templateDragState.targetRow = null;
+        window.templateDragState.targetPosition = null;
+        window.templateDragState.targetColumnId = null;
+    }
+
+    // Hide any internal drop indicator
+    const indicator = document.querySelector('.internal-drop-indicator');
+    if (indicator) {
+        indicator.classList.remove('active');
+    }
+};
+
+/**
+ * Parse clipboard content in presentation format into column title and tasks
+ * Mirrors the backend PresentationParser logic
+ *
+ * Rules:
+ * - Split content by \n\n---\n\n (slide separator)
+ * - First slide: if it has title only (no content), use as column title
+ * - Otherwise, column title is empty
+ * - All remaining slides become tasks
+ */
+function parseClipboardPresentationContent(content) {
+    if (!content) {
+        return { columnTitle: '', tasks: [] };
+    }
+
+    // Normalize line endings
+    let workingContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // Strip YAML frontmatter if present
+    const yamlMatch = workingContent.match(/^---\n[\s\S]*?\n---\n/);
+    if (yamlMatch) {
+        workingContent = workingContent.substring(yamlMatch[0].length);
+    }
+
+    // Split by slide separator
+    const rawSlides = workingContent.split(/\n\n---\s*\n\n/);
+    const slides = [];
+
+    for (const slideContent of rawSlides) {
+        const parsed = parseSlide(slideContent);
+        slides.push(parsed);
+    }
+
+    // Determine column title and tasks
+    let columnTitle = '';
+    let tasks = [];
+
+    if (slides.length > 0) {
+        const firstSlide = slides[0];
+        // If first slide has title but no content (or only whitespace), use as column title
+        if (firstSlide.title && (!firstSlide.content || firstSlide.content.trim() === '')) {
+            columnTitle = firstSlide.title;
+            // Remaining slides become tasks
+            for (let i = 1; i < slides.length; i++) {
+                tasks.push(slideToTask(slides[i]));
+            }
+        } else {
+            // All slides become tasks
+            for (const slide of slides) {
+                tasks.push(slideToTask(slide));
+            }
+        }
+    }
+
+    return { columnTitle, tasks };
+}
+
+/**
+ * Parse a single slide content into title and content
+ */
+function parseSlide(slideContent) {
+    const lines = slideContent.split('\n');
+
+    // Count leading empty lines
+    let emptyLineCount = 0;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i] === '') {
+            emptyLineCount++;
+        } else {
+            break;
+        }
+    }
+
+    // Find first content lines
+    const contentLines = [];
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i] !== '') {
+            contentLines.push(i);
+            if (contentLines.length >= 2) break;
+        }
+    }
+
+    let title = undefined;
+    let descriptionStartLine = -1;
+
+    if (contentLines.length >= 1) {
+        if (emptyLineCount < 1) {
+            // First content is title
+            const firstContentLine = lines[contentLines[0]];
+            // Check for structured content patterns that shouldn't be split
+            const hasStructuredContentPattern = /---:|:--:|:---|<!--|\|.*\||^-\s/.test(firstContentLine);
+
+            if (hasStructuredContentPattern) {
+                title = undefined;
+                descriptionStartLine = Math.min(contentLines[0], 3);
+            } else {
+                title = lines[contentLines[0]];
+                const lineAfterTitle = contentLines[0] + 1;
+                if (lineAfterTitle < lines.length && lines[lineAfterTitle] === '') {
+                    descriptionStartLine = contentLines[0] + 2;
+                } else {
+                    descriptionStartLine = contentLines[0] + 1;
+                }
+            }
+        } else {
+            // No title, all is description
+            title = undefined;
+            descriptionStartLine = Math.min(contentLines[0], 3);
+        }
+    } else {
+        title = undefined;
+        descriptionStartLine = lines.length > 0 ? 0 : -1;
+    }
+
+    // Extract description
+    let description = '';
+    if (descriptionStartLine !== -1 && descriptionStartLine < lines.length) {
+        const descriptionLines = [];
+        for (let i = descriptionStartLine; i < lines.length; i++) {
+            descriptionLines.push(lines[i]);
+        }
+        description = descriptionLines.join('\n');
+    }
+
+    return { title, content: description };
+}
+
+/**
+ * Convert parsed slide to task object
+ */
+function slideToTask(slide) {
+    return {
+        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        title: slide.title || '',
+        description: slide.content || ''
+    };
+}
+
+// =============================================================================
 // TEMPLATE MENU DRAG HANDLERS
 // =============================================================================
 

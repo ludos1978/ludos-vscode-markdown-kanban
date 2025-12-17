@@ -721,14 +721,19 @@ async function processClipboardText(text) {
         };
     }
     
+    // Check if content looks like presentation format (has --- separators)
+    // This allows pasting as a column with multiple tasks
+    const isPresentationFormat = /\n\n---\s*\n\n/.test(text) || /^---\n/.test(text);
+
     // Regular text content
     const textLines = text.split('\n');
     const title = textLines[0].length > 50 ? textLines[0].substring(0, 50) + '...' : textLines[0];
-    
+
     return {
         title: title || 'Clipboard Content',
         content: text,
-        isLink: false
+        isLink: false,
+        isPresentationFormat: isPresentationFormat
     };
 }
 
@@ -768,6 +773,8 @@ async function updateClipboardCardSource(force = false) {
         lastClipboardCheck = now;
         // Update clipboard content
         clipboardCardData = await readClipboardContent();
+        // Also expose to window for clipboard column handler
+        window.clipboardCardData = clipboardCardData;
     }
 
     const clipboardSource = document.getElementById('clipboard-card-source');
@@ -819,6 +826,25 @@ async function updateClipboardCardSource(force = false) {
 
             if (iconSpan) iconSpan.textContent = '📋';
             if (clipboardMenuText) clipboardMenuText.textContent = 'Clipboard';
+        }
+    }
+
+    // Update Clipboard Column source visibility
+    const clipboardColumnSource = document.getElementById('clipboard-column-source');
+    const clipboardColumnText = document.getElementById('clipboard-column-text');
+    if (clipboardColumnSource) {
+        if (clipboardCardData && clipboardCardData.isPresentationFormat) {
+            clipboardColumnSource.classList.remove('faded');
+            if (clipboardColumnText) {
+                // Count slides in the content
+                const slideCount = (clipboardCardData.content.match(/\n\n---\s*\n\n/g) || []).length + 1;
+                clipboardColumnText.textContent = `Clipboard Column (${slideCount} tasks)`;
+            }
+        } else {
+            clipboardColumnSource.classList.add('faded');
+            if (clipboardColumnText) {
+                clipboardColumnText.textContent = 'Clipboard Column';
+            }
         }
     }
 }

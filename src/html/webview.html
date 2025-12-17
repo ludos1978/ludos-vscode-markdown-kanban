@@ -348,6 +348,10 @@
                             <span class="drag-menu-item-icon">📊</span>
                             <span class="drag-menu-item-text">Empty Column</span>
                         </div>
+                        <div id="clipboard-column-source" class="drag-menu-item faded" draggable="true" ondragstart="handleClipboardColumnDragStart(event)" ondragend="handleClipboardColumnDragEnd(event)">
+                            <span class="drag-menu-item-icon">📋</span>
+                            <span class="drag-menu-item-text" id="clipboard-column-text">Clipboard Column</span>
+                        </div>
                         <!-- Templates will be populated dynamically -->
                     </div>
                 </div>
