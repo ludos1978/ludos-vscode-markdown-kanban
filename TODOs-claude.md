@@ -1,1770 +1,1476 @@
-# Cleanup Tasks - Code Simplification & Architecture Improvements
+# Event-Driven Architecture Refactoring - Three C3 Implementation Plans
 
-**Generated:** 2025-12-15
-**Analysis:** Deep code review focusing on simplicity, readability, maintainability
+## Overview
 
----
-
-## Completed Tracks
-
-### Track A: Quick Wins ✅ COMPLETED
-- [x] A1: BoardCrudOperations already used everywhere (verified)
-- [x] A2: Removed empty else blocks
-- [x] A3: Removed duplicate ConfigurationDefaults interface (38 lines → 1 type alias)
-- [x] A4: Fixed base class encapsulation - added `getFileRegistry()` to interfaces
-- [x] A5: Consolidated include file registration via `ensureIncludeRegistered()`
-- [x] A6: Consolidated conflict detection - moved `hasAnyUnsavedChanges()` and `hasConflict()` to base class
-
-### Track B: Memory Leak Fixes ✅ COMPLETED
-- [x] B1: Added initialization guards to webview.js and taskEditor.js
-- [x] B2: Verified setTimeout patterns are correct (debouncing with clearTimeout)
-- [x] B3: Verified requestAnimationFrame patterns (all one-shot frames)
-- [x] B4: Verified disposable cleanup is properly implemented
-- [x] B5: Verified VS Code event subscriptions are properly disposed
-- [x] B6: Added FIFO eviction with size limits (100 entries) to diagram caches
-
-### Track C: Type Safety ✅ COMPLETED (56→2 casts)
-- [x] C1: Fixed 11 `as any` casts (56→45)
-  - Created `CapturedEdit` interface
-  - Made `applyEditToBaseline` public with proper typing
-  - Used `file.isInEditMode()` instead of private field access
-  - Proper type narrowing for event types in ChangeStateMachine
-  - Fixed `UnifiedChangeHandler` to use `getFileRegistry()`
-- [x] C2-C5: All command file casts fixed (45→2)
-  - Created `PanelCommandAccess` interface for typed panel access
-  - Created `MessageHandlerCommandAccess` for handler methods
-  - Added type guards: `hasIncludeFileMethods`, `hasMessageHandler`, `hasConflictService`, `hasConflictResolver`
-  - Remaining 2 casts in PanelContext.ts are unavoidable (dynamic property access)
-
-### Track G: Frontend Cleanup ✅ COMPLETED
-- [x] G1: Merged handlePlantUMLConvert/handleMermaidConvert into unified handler
-- [x] G2: All set* functions now use applyAndSaveSetting pattern
-- [x] G3: Analyzed DOM queries - no severe issues found
-- [x] G4-G5: Analyzed window.* globals (297 refs) - requires bundler/tests (deferred)
-
-### Track E: Architecture Fixes ✅ PARTIAL
-- [x] E1: Reduced console logging (21→8 calls, all guarded behind DEBUG flags)
-  - Removed 13 unconditional debug console.log statements
-  - Remaining 8 are conditional behind DEBUG flags (proper pattern)
-- [x] E2: Markdown generation already consolidated (single source `MarkdownKanbanParser.generateMarkdown()`)
-- [x] E3: Removed 16 empty else blocks across 7 files
-  - debugOverlay.js (4), dragDrop.js (1), menuOperations.js (2), smartLogger.js (1)
-  - webview.js (5), taskEditor.js (1), boardRenderer.js (2)
-- [x] E4: Cleaned up commented-out dead code
-  - Removed board title generation (markdownParser.ts)
-  - Removed disabled flushPendingTagChanges block (webview.js)
-  - Removed empty unload event handler (webview.js)
-
-### Track H: Polish ✅ ANALYZED (Already Good)
-- [x] H1: Magic numbers - Already extracted as named constants (TIMEOUT_MS, MAX_SIZE, etc.)
-- [x] H2: Chained .replace() - Idiomatic patterns (CRLF normalization, tag stripping)
-- [x] H3: Dynamic RegExp - Need runtime values (paths, tags) - can't be pre-cached
-- [x] H4: Null checking - Already consistent with strict equality (`===`/`!==`)
-- [x] H5: Frontend console logging - Already clean (no unguarded `console.log` calls)
-- [x] H6: Error handling patterns - Reasonable (catch-and-log for stability)
-
-**Summary:** Codebase polish is already good. No significant cleanup needed for these patterns.
-
-### Track C: Type Safety (continued) ✅ COMPLETED (45→37→13→2)
-Additional `as any` casts fixed:
-- [x] MessageTypes.ts: 2 fixed (proper type assertions in type guards)
-- [x] fileSearchService.ts: 4 fixed (icon types, TabInputText)
-- [x] extension.ts: 1 fixed (global type declaration for kanbanFileListener)
-- [x] TemplateParser.ts: 2 fixed (Record<string, unknown> for dynamic props)
-- [x] ConfigurationService.ts: 1 fixed (Record<string, unknown>)
-- [x] ExportService.ts: 4 fixed (added marpGlobalClasses, marpLocalClasses to interface)
-
-**Session 2024-12-15: 37→13 casts fixed:**
-- [x] ChangeStateMachine.ts: Created `IFileRegistryForStateMachine`, `IWebviewPanelForStateMachine` interfaces
-- [x] ChangeStateMachine.ts: Typed all method parameters (`KanbanBoard`, `KanbanColumn`, `KanbanTask`, `vscode.WebviewPanel`)
-- [x] ChangeTypes.ts: Fixed `CapturedEdit` to use shared type from FileInterfaces
-- [x] MessageTypes.ts: Added 12 new message types (OpenFileMessage, HandleFileDropMessage, etc.)
-- [x] MessageTypes.ts: Fixed OpenFileLinkMessage, OpenWikiLinkMessage, OpenExternalLinkMessage field names
-- [x] MessageTypes.ts: Updated EditingStoppedMessage to use shared CapturedEdit type
-- [x] FileCommands.ts: Typed all handler methods with specific message types
-- [x] FileManager.ts: Typed handleFileDrop, handleUriDrop, resolveFilePath methods
-- [x] messageHandler.ts: Typed handleEditingStopped, handleMessage, handleBoardUpdate
-- [x] BoardCrudOperations.ts: Created NewTaskInput interface, typed addTask methods
-- [x] kanbanWebviewPanel.ts: 0 casts (was 3+) - all message types fixed
-
-**Session 2024-12-15 (continued): 13→2 casts fixed:**
-- [x] IncludeCommands.ts: 4 casts fixed - using `PanelCommandAccess` interface with type guards
-- [x] DebugCommands.ts: 2 casts fixed - using `hasConflictService` type guard and `PanelCommandAccess`
-- [x] EditModeCommands.ts: 1 cast fixed - using `hasMessageHandler` type guard with `MessageHandlerCommandAccess`
-- [x] PanelCommandAccess.ts: Added `_conflictService` interface, `MessageHandlerCommandAccess` interface, `hasConflictService` type guard
-
-**Remaining 2 actual casts (unavoidable):**
-- PanelContext.ts:207,209 - Dynamic property access `(this as any)[\`_${name}\`]` (TypeScript limitation for computed property names)
-
-### Track I: Command Message Type Safety ✅ COMPLETED (125→107 `: any`)
-Typed all command `execute()` signatures from `message: any` to `message: IncomingMessage`:
-- [x] TaskCommands.ts - Uses IncomingMessage with typed task message types
-- [x] ColumnCommands.ts - Uses IncomingMessage with typed column message types
-- [x] TemplateCommands.ts - Uses IncomingMessage with typed template message types
-- [x] DiagramCommands.ts - Uses IncomingMessage with typed diagram message types
-- [x] UICommands.ts - Uses IncomingMessage with typed UI message types
-- [x] ClipboardCommands.ts - Uses IncomingMessage with typed clipboard message types
-- [x] ExportCommands.ts - Uses IncomingMessage with typed export message types
-- [x] IncludeCommands.ts - Uses IncomingMessage with typed include message types
-- [x] EditModeCommands.ts - Uses IncomingMessage with typed edit mode message types
-- [x] DebugCommands.ts - Uses IncomingMessage with typed debug message types
-- [x] CommandRegistry.ts - Uses IncomingMessage for dispatch
-
-**New message types added to MessageTypes.ts:**
-- Task messages: AddTaskAtPositionMessage, DuplicateTaskMessage, InsertTaskBeforeMessage, etc.
-- Column messages: MoveColumnWithRowUpdateMessage, ReorderColumnsMessage, etc.
-- Template messages: GetTemplatesMessage, ApplyTemplateMessage, SubmitTemplateVariablesMessage
-- Diagram messages: RenderPlantUMLMessage, ConvertPlantUMLToSVGMessage, ConvertMermaidToSVGMessage, etc.
-- UI messages: ShowMessageRequestMessage, ShowErrorMessage, SetPreferenceMessage, etc.
-- Clipboard messages: SaveClipboardImageMessage, PasteImageIntoFieldMessage, DropPosition type, etc.
-- Export messages: StopAutoExportMessage, GetMarpThemesMessage, OpenInMarpPreviewMessage, etc.
-- Include messages: ConfirmDisableIncludeModeMessage, RegisterInlineIncludeMessage, etc.
-- EditMode messages: EditingStartedMessage, EditingStoppedNormalMessage, MarkUnsavedChangesMessage, etc.
-- Debug messages: ForceWriteAllContentMessage, VerifyContentSyncMessage, etc.
+Complete replacement of the current messy sync architecture with a clean event-driven system. **All old code will be deleted** - no wrappers, no facades, no backwards compatibility.
 
 ---
 
-## Phase 1 - Critical Quick Wins (High Impact, Lower Effort)
+# CRITICAL ANALYSIS (After AGENT.md Review)
 
-### Task 1.1: Use BoardCrudOperations Everywhere ✅ VERIFIED
-**Status:** Already using BoardCrudOperations throughout codebase
+## AGENT.md Rules That Affect Our Plans
 
-~~**Problem:** `BoardCrudOperations` class exists with `findColumn()` and `findTask()` methods but is NOT used.~~
+1. **NO LAZY REFACTORINGS** - Must copy complete code and verify line-by-line
+2. **NO WRAPPERS** - Can't leave old code and add wrappers around it
+3. **MUST COMPLETELY FINISH** - Can't stop mid-refactoring
+4. **MUST CHECK EXISTING FUNCTIONS** - Before adding new, verify similar doesn't exist
+5. **KISS** - Keep code simple
+6. **UPDATE agent/FUNCTIONS.md** - After all changes
+7. **SINGLE SOURCE OF TRUTH** - Never store same data in multiple places
 
-**Verified:** Code already uses `BoardCrudOperations.findColumnById()`, `findTaskById()`, etc.
+## Existing Infrastructure Discovered
 
----
+**SaveEventDispatcher** (`src/SaveEventDispatcher.ts`):
+- Already implements handler-based event pattern!
+- Handlers registered by ID
+- Single dispatcher, multiple handlers
+- Currently only for save events
 
-### Task 1.2: Fix `as any` Type Casts ✅ PARTIAL (56→45)
-**Priority:** Critical | **Effort:** Medium | **Impact:** High (Type Safety)
+**WatcherCoordinator** (`src/files/WatcherCoordinator.ts`):
+- Operation queuing/coordination
+- Conflict prevention
+- Singleton pattern
 
-**Progress:** Fixed 11 casts, 45 remaining
-
-**Completed fixes:**
-- [x] `src/core/ChangeStateMachine.ts` - Fixed `_isInEditMode` → `isInEditMode()`, `applyEditToBaseline`, event type narrowing
-- [x] `src/core/UnifiedChangeHandler.ts` - Fixed via `getFileRegistry()` method
-- [x] `src/core/IncludeLoadingProcessor.ts` - Fixed `parseToTasks` with proper type check
-- [x] Created `CapturedEdit` interface in `FileInterfaces.ts`
-- [x] Made `applyEditToBaseline` public in base class
-
-**Remaining (need message type schema updates):**
-- [ ] `src/kanbanWebviewPanel.ts` (13 casts) - Message types don't match actual payload
-- [ ] `src/panel/IncludeFileCoordinator.ts` (6 casts) - Same issue
-- [ ] `src/commands/IncludeCommands.ts` (4 casts) - Panel typing
-- [ ] `src/services/export/ExportService.ts` (4 casts) - Options interface
+**CONCLUSION**: Per AGENT.md rules, we should consider EXTENDING/REFACTORING `SaveEventDispatcher` into a general EventDispatcher rather than creating completely new EventBus system.
 
 ---
 
-### Task 1.3: Use Defined Message Types
-**Priority:** High | **Effort:** Low | **Impact:** Medium
+## Open Questions For Each Plan
 
-**Problem:** `src/core/bridge/MessageTypes.ts` defines 51 message types but they're not consistently used.
+### C3-A (Central EventBus)
+| Question | Risk | Answer Needed |
+|----------|------|---------------|
+| Should we extend SaveEventDispatcher or create new? | Medium | Extend to avoid duplication |
+| How to handle async vs sync events? | Low | All async with try/catch |
+| What happens to ChangeStateMachine dependencies? | High | Need to trace all usages |
+| How to preserve undo/redo functionality? | High | BoardStore must continue working |
 
-**Action:**
-- [ ] Audit all `webviewBridge.send()` calls
-- [ ] Replace `as any` with proper typed messages
-- [ ] Add any missing message type definitions to `MessageTypes.ts`
+### C3-B (Domain Channels)
+| Question | Risk | Answer Needed |
+|----------|------|---------------|
+| Does adding 4 channel files violate KISS? | Medium | Possibly too complex |
+| How to coordinate cross-channel events? | Medium | Orchestrator adds complexity |
+| Why not just use SaveEventDispatcher pattern? | High | No clear benefit over C3-A |
 
----
-
-## Phase 2 - Architecture Fixes (High Impact, Medium Effort)
-
-### Task 2.1: Single Board State Source of Truth
-**Priority:** High | **Effort:** Medium | **Impact:** High
-
-**Problem:** Board state stored in THREE places:
-1. `BoardStore._state.board` - for undo/redo
-2. `MainKanbanFile._board` - parsed board
-3. `MainKanbanFile._cachedBoardFromWebview` - webview's board
-
-**Confusion example (MainKanbanFile.ts:439):**
-```typescript
-const boardToSave = this._cachedBoardFromWebview || this._board;  // Which one?!
-```
-
-**Action:**
-- [ ] Designate `BoardStore` as THE single source of truth
-- [ ] Remove `_board` from `MainKanbanFile` (use BoardStore)
-- [ ] Remove `_cachedBoardFromWebview` from `MainKanbanFile`
-- [ ] Update all board access to go through `BoardStore`
+### C3-C (Reactive Streams)
+| Question | Risk | Answer Needed |
+|----------|------|---------------|
+| Is custom RxJS implementation needed? | High | Adds ~200 lines of new code |
+| Does debounce/throttle justify complexity? | Medium | Maybe not needed |
+| Learning curve for maintenance? | High | Future devs need to understand |
 
 ---
 
-### Task 2.2: Convert Singletons to Dependency Injection
-**Priority:** High | **Effort:** High | **Impact:** High (Testability)
+## Confidence Assessment
 
-**Problem:** 11 singletons with 40+ `getInstance()` calls:
-
-| Singleton | File |
-|-----------|------|
-| `ChangeStateMachine` | `src/core/ChangeStateMachine.ts` |
-| `FileSaveService` | `src/core/FileSaveService.ts` |
-| `UnifiedChangeHandler` | `src/core/UnifiedChangeHandler.ts` |
-| `PluginRegistry` | `src/plugins/registry/PluginRegistry.ts` |
-| `SaveEventDispatcher` | `src/SaveEventDispatcher.ts` |
-| `SaveTransactionManager` | `src/files/SaveTransactionManager.ts` |
-| `WatcherCoordinator` | `src/files/WatcherCoordinator.ts` |
-| `ConfigurationService` | `src/services/ConfigurationService.ts` |
-| `ConflictResolver` | `src/services/ConflictResolver.ts` |
-| `KeybindingService` | `src/services/KeybindingService.ts` |
-
-**Action:**
-- [ ] Create `PanelDependencies` interface with all services
-- [ ] Instantiate services per-panel in `KanbanWebviewPanel` constructor
-- [ ] Pass dependencies via constructor injection
-- [ ] Remove all `getInstance()` calls
-- [ ] Keep only truly global singletons (e.g., `ConfigurationService`)
+| Plan | Confidence I Can Implement | Why |
+|------|---------------------------|-----|
+| **C3-A** | 85% | SaveEventDispatcher already proves pattern works, simplest approach |
+| **C3-B** | 70% | More files/complexity, but manageable |
+| **C3-C** | 60% | Custom Observable implementation is risky, debugging harder |
 
 ---
 
-### Task 2.3: Consolidate Conflict Detection Logic
-**Priority:** Medium-High | **Effort:** Low | **Impact:** Medium
+# DEPENDENCY INVESTIGATION RESULTS
 
-**Problem:** `hasAnyUnsavedChanges()` and `hasConflict()` have nearly identical implementations in:
-- `src/files/MainKanbanFile.ts` (lines 350-394)
-- `src/files/IncludeFile.ts` (lines 375-421)
+## 1. ChangeStateMachine.ts - CRITICAL DEPENDENCY
 
-**Action:**
-- [ ] Move shared logic to `MarkdownFile` base class
-- [ ] Add virtual/abstract methods for file-type-specific differences
-- [ ] Ensure consistent behavior across all file types
-
----
-
-## Phase 3 - Structural Cleanup (Medium Impact)
-
-### Task 3.1: Unify Include File Handling
-**Priority:** High | **Effort:** High | **Impact:** High
-
-**Problem:** Include logic scattered across 4+ files:
-- `src/panel/IncludeFileCoordinator.ts` (400 lines)
-- `src/core/IncludeLoadingProcessor.ts` (415 lines)
-- `src/core/ChangeStateMachine.ts` (300+ lines of include handling)
-- `src/files/MarkdownFileRegistry.ts` (include tracking methods)
-
-**Action:**
-- [ ] Create unified `IncludeFileService` class
-- [ ] Move all include lifecycle management to this service
-- [ ] Simplify `ChangeStateMachine` to delegate to `IncludeFileService`
-- [ ] Remove duplicate column/task finding logic
-
----
-
-### Task 3.2: Clean Up Dual File Services
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** Two overlapping file services:
-- `KanbanFileService` (573 lines) - loading, saving, state, persistence
-- `FileSaveService` (100 lines) - just saving
-
-**Action:**
-- [ ] Keep `FileSaveService` for save operations only
-- [ ] Move panel state persistence from `KanbanFileService` to `PanelContext`
-- [ ] Move document change listening to dedicated `DocumentWatcher` class
-- [ ] Simplify or remove `KanbanFileService`
-
----
-
-### Task 3.3: Fix Circular Dependencies
-**Priority:** Medium-High | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** 55 deep imports and `require()` calls to avoid circular deps.
-
-**Files using `require()` (lazy loading to avoid circular imports):**
-- [ ] `src/files/IncludeFile.ts` - `require('../services/export/PresentationGenerator')`
-- [ ] `src/commands/IncludeCommands.ts` - 3 require() calls
-- [ ] `src/plugins/import/*.ts` - multiple require() calls
-
-**Action:**
-- [ ] Map out dependency graph
-- [ ] Define clear layer boundaries: `core` → `files` → `commands` → `panel`
-- [ ] Create barrel files (index.ts) for each module
-- [ ] Replace `require()` with proper imports after fixing structure
-
----
-
-### Task 3.4: Split CommandContext God Object
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** `CommandContext` interface has 20+ methods/properties - every command gets access to everything.
-
-**Current interface (src/commands/interfaces/MessageCommand.ts):**
-- Core deps (7): fileManager, boardStore, boardOperations, linkHandler, plantUMLService, fileSaveService, getFileRegistry
-- Callbacks (8): onBoardUpdate, onSaveToMarkdown, etc.
-- State (5): setEditingInProgress, markTaskDirty, etc.
-
-**Action:**
-- [ ] Split into focused interfaces:
-  - `BoardContext` - board operations only
-  - `FileContext` - file operations only
-  - `UIContext` - webview operations only
-- [ ] Commands declare which contexts they need
-- [ ] Reduces coupling and improves testability
-
----
-
-## Phase 4 - Polish & Cleanup (Lower Priority)
-
-### Task 4.1: Standardize WebView Messaging
-**Priority:** Medium | **Effort:** Low | **Impact:** Medium
-
-**Problem:** 87 `postMessage` calls with inconsistent patterns:
-- Some use `_webviewBridge.send()`
-- Some use `_webviewBridge.sendBatched()`
-- Some use `panel.webview.postMessage()` directly
-
-**Action:**
-- [ ] Standardize on `WebviewBridge` for ALL messaging
-- [ ] Remove all direct `postMessage()` calls
-- [ ] Document when to use `send()` vs `sendBatched()`
-
----
-
-### Task 4.2: Reduce Console Logging (324 calls)
-**Priority:** Medium | **Effort:** Low | **Impact:** Low
-
-**Problem:** 324 `console.log/warn/error` calls across 54 files.
-
-**Top offenders:**
-- `kanbanWebviewPanel.ts`: 22 calls
-- `ExportCommands.ts`: 23 calls
-- `MarkdownFileRegistry.ts`: 14 calls
-- `ClipboardCommands.ts`: 12 calls
-
-**Action:**
-- [ ] Remove debug logs no longer needed
-- [ ] Use `OutputChannelService` for persistent logs
-- [ ] Add debug flag for verbose logging
-- [ ] Keep only error logs for actual errors
-
----
-
-### Task 4.3: Simplify ChangeStateMachine
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** `ChangeStateMachine` at 1011 lines handles too many concerns:
-- State transitions (main job)
-- Include switch cache clearing
-- Frontend message sending
-- Finding columns/tasks
-- Rollback logic
-
-**Action:**
-- [ ] Extract `IncludeCacheManager` for cache clearing
-- [ ] Extract `FrontendNotifier` for message sending
-- [ ] Keep state machine focused on state transitions only
-
----
-
-### Task 4.4: Consolidate Markdown Generation
-**Priority:** Low-Medium | **Effort:** Low | **Impact:** Low
-
-**Problem:** `generateMarkdown()` called from 6 different places:
-- `MainKanbanFile._generateMarkdownFromBoard()`
-- `kanbanFileService.ts:326`
-- `IncludeCommands.ts:423`
-- `DebugCommands.ts:155,157`
-- `kanbanWebviewPanel.ts:1466`
-
-**Action:**
-- [ ] Create single entry point for markdown generation
-- [ ] All callers go through `MainKanbanFile.generateMarkdown()`
-
----
-
-### Task 4.5: Remove Static State from MarkdownFile
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** `MarkdownFile` has static state shared across ALL instances:
-```typescript
-private static _activeWatchers = new Map<...>();
-```
-
-**Action:**
-- [ ] Move watcher management to non-static `WatcherRegistry`
-- [ ] Create one registry per panel instance
-- [ ] Remove static getters for singletons
-
----
-
-### Task 4.6: Fix Base Class Encapsulation
-**Priority:** Medium | **Effort:** Low | **Impact:** Low
-
-**Problem:** `MarkdownFile.requestStopEditing()` accesses private fields via `as any`:
-```typescript
-const mainFile = this.getFileType() === 'main' ? this as any : (this as any)._parentFile;
-if (mainFile && mainFile._fileRegistry) { ... }
-```
-
-**Action:**
-- [ ] Add abstract method `getFileRegistry(): IMarkdownFileRegistry | undefined`
-- [ ] Implement in `MainKanbanFile` and `IncludeFile`
-- [ ] Remove `as any` casts
-
----
-
-### Task 4.7: Consolidate Include File Registration
-**Priority:** Low-Medium | **Effort:** Low | **Impact:** Low
-
-**Problem:** Similar registration code in:
-- `IncludeLoadingProcessor._ensureColumnIncludeRegistered()` (lines 357-377)
-- `IncludeFileCoordinator.syncIncludeFilesWithRegistry()` (lines 58-85)
-
-**Action:**
-- [ ] Create single `ensureIncludeRegistered(path, type, context)` method
-- [ ] Move to `MarkdownFileRegistry`
-- [ ] Both callers use this single method
-
----
-
-### Task 4.8: Frontend File Cleanup (Future)
-**Priority:** Low | **Effort:** High | **Impact:** Medium
-
-**Problem:** Large frontend files with mixed concerns:
-- `boardRenderer.js` - 5,330 lines
-- `menuOperations.js` - 4,144 lines
-- `webview.js` - 4,183 lines
-- `dragDrop.js` - 4,033 lines
-
-**Also:** 146 `vscode.postMessage()` calls across 11 files without type safety.
-
-**Action (future):**
-- [ ] Break down large files into smaller modules
-- [ ] Create shared message types between frontend/backend
-- [ ] Add validation for frontend messages
-
----
-
-## Phase 5 - Frontend JavaScript Cleanup (Round 4 Findings)
-
-### Task 5.1: Eliminate Global Variable Soup (200+ window.* assignments)
-**Priority:** High | **Effort:** High | **Impact:** High
-
-**Problem:** 200+ `window.*` global variable assignments across frontend files, creating "global soup" where any file can modify shared state without tracking.
-
-**Top offenders:**
-- `menuOperations.js`: 47 window.* exports
-- `exportMarpUI.js`: 63 window.* exports
-- `dragDrop.js`: 17 window.* exports
-- `boardRenderer.js`: 10+ window.* state variables
-
-**Examples of problematic globals:**
-```javascript
-window.cachedBoard = ...              // Board state
-window.hasUnsavedChanges = ...        // Dirty tracking
-window.pendingColumnChanges = new Map()  // Pending changes
-window.collapsedColumns = new Set()   // UI state
-window.currentColumnWidth = ...       // Layout settings
-```
-
-**Action:**
-- [ ] Create `AppState` singleton/module with explicit state
-- [ ] Replace `window.*` with module imports
-- [ ] Use events or callbacks for cross-file communication
-- [ ] Document state ownership (which file owns which state)
-
----
-
-### Task 5.2: Consolidate apply/set Function Pairs (29 duplicated patterns)
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** `webview.js` has 29 near-identical `apply*`/`set*` function pairs:
-
-```javascript
-function applyColumnWidth(size) { /* apply CSS */ }
-function setColumnWidth(size) { applyAndSaveSetting('columnWidth', size, applyColumnWidth); }
-
-function applyLayoutRows(rows) { /* apply CSS */ }
-function setLayoutRows(rows) { applyAndSaveSetting('layoutRows', rows, applyLayoutRows); }
-
-// ... 27 more identical patterns
-```
-
-**All affected settings:**
-- columnWidth, layoutRows, rowHeight, stickyStackMode, tagVisibility
-- htmlCommentRenderMode, htmlContentRenderMode, whitespace, taskMinHeight
-- sectionHeight, taskSectionHeight, fontSize, fontFamily
-
-**Action:**
-- [ ] Create generic `createSettingHandler(key, applyFn)` factory
-- [ ] Replace 29 function pairs with single configuration-driven approach
-- [ ] Example: `const columnWidth = createSettingHandler('columnWidth', applyColumnWidthCSS)`
-
----
-
-### Task 5.3: Reduce DOM Queries (351 occurrences)
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium (Performance)
-
-**Problem:** 351 `document.getElementById`/`document.querySelector` calls, many repeated for same elements.
-
-**Top offenders:**
-- `exportMarpUI.js`: 134 queries
-- `boardRenderer.js`: 50 queries
-- `webview.js`: 41 queries
-- `dragDrop.js`: 35 queries
-- `menuOperations.js`: 34 queries
-
-**Pattern seen frequently:**
-```javascript
-const element = document.getElementById('some-id');
-// ... later in same function ...
-const element = document.getElementById('some-id'); // DUPLICATE!
-```
-
-**Action:**
-- [ ] Cache frequently-accessed DOM elements at module level
-- [ ] Create `DOMCache` utility: `const dom = { board: () => $('#board'), ... }`
-- [ ] Use event delegation instead of per-element queries
-
----
-
-### Task 5.4: Similar Code in handlePlantUMLConvert/handleMermaidConvert
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** `webview.js` lines 47-164 contain two nearly identical functions:
-- `handlePlantUMLConvert(button)` (48 lines)
-- `handleMermaidConvert(button)` (48 lines)
-
-Only differences: cache name, message type, error messages.
-
-**Action:**
-- [ ] Extract common `handleDiagramConvert(type, button)` function
-- [ ] Pass diagram type ('plantuml' | 'mermaid') as parameter
-
----
-
-### Task 5.5: Frontend Message Type Safety
-**Priority:** Medium | **Effort:** Medium | **Impact:** High
-
-**Problem:** 146 `vscode.postMessage()` calls with no type safety:
-```javascript
-vscode.postMessage({
-    type: 'convertPlantUMLToSVG',
-    filePath: currentFilePath,
-    plantUMLCode: code,
-    svgContent: svg
-});
-// No validation that backend expects these exact fields!
-```
-
-**Action:**
-- [ ] Create shared message type definitions (or generate from TypeScript)
-- [ ] Add `sendMessage(type, payload)` wrapper that validates structure
-- [ ] Consider generating JS types from `MessageTypes.ts`
-
----
-
-### Task 5.6: Excessive Function Coupling via Globals
-**Priority:** Medium | **Effort:** High | **Impact:** Medium
-
-**Problem:** Functions communicate via global state instead of parameters:
-
-```javascript
-// In menuOperations.js
-window.cachedBoard = JSON.parse(JSON.stringify(boardToSave));
-window.savedBoardState = JSON.parse(JSON.stringify(boardToSave));
-
-// In boardRenderer.js (different file!)
-if (window.cachedBoard) { ... }
-```
-
-**Impact:** Hard to trace data flow, difficult to test, unexpected side effects.
-
-**Action:**
-- [ ] Pass data explicitly via function parameters
-- [ ] Create clear module boundaries with explicit exports
-- [ ] Document which modules are allowed to modify which state
-
----
-
-## Phase 6 - Error Handling & Code Quality (Round 5 Findings)
-
-### Task 6.1: Standardize Error Handling Pattern
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** 209 `catch` blocks but only 49 `throw new Error` statements. Many catch blocks just log and continue:
+**Location:** `src/core/ChangeStateMachine.ts:643-647`
 
 ```typescript
-// Common pattern (30+ occurrences):
-} catch (error) {
-    console.error(`[Module] Something failed:`, error);
-    // Silently continues - caller doesn't know about failure
-}
-```
-
-**Files with most catch-and-log patterns:**
-- `ExportCommands.ts`: 16 catch blocks
-- `ClipboardCommands.ts`: 12 catch blocks
-- `LinkHandler.ts`: 12 catch blocks
-- `kanbanWebviewPanel.ts`: 10 catch blocks
-- `DiagramCommands.ts`: 9 catch blocks
-- `IncludeCommands.ts`: 9 catch blocks
-
-**Action:**
-- [ ] Define error handling strategy: when to throw vs log
-- [ ] Create custom error classes for different failure types
-- [ ] Use `Result<T, E>` pattern for recoverable errors
-- [ ] Show user-facing errors via `vscode.window.showErrorMessage` (80 existing calls)
-
----
-
-### Task 6.2: Reduce Silent Early Returns (144 occurrences)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 144 functions end with `return; }` without returning a value, making it unclear if they succeeded.
-
-**Example:**
-```typescript
-public async doSomething(): Promise<void> {
-    if (!this._panel) {
-        return;  // Silent failure - caller doesn't know it failed
+if (context.impact.includesSwitched) {
+    const board = this._webviewPanel.getBoard?.();
+    if (board && this._webviewPanel.syncBoardToBackend) {
+        this._webviewPanel.syncBoardToBackend(board);
     }
-    // ... rest of function
 }
 ```
 
-**Action:**
-- [ ] For public methods: return `boolean` or `Result` type
-- [ ] Document expected behavior when preconditions fail
-- [ ] Consider logging when early-returning due to invalid state
+**Analysis:**
+- Called when `includesSwitched` is true (when include file paths change)
+- Gets reference to `syncBoardToBackend` via `_webviewPanel` interface
+- This is a direct interface dependency - must be migrated
+
+**Migration Impact:**
+- Must update `ChangeTypes.ts:40` interface definition
+- ChangeStateMachine must either emit event or call new method
+- CRITICAL: This handles the include file switching scenario
 
 ---
 
-### Task 6.3: Consolidate Null Checking Patterns (66 occurrences)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
+## 2. BoardStore.ts - INDEPENDENT (Safe)
 
-**Problem:** Inconsistent null checking: mix of `!== undefined`, `=== undefined`, `!= null`, `== null`.
+**Location:** `src/core/stores/BoardStore.ts`
 
-**Files with most inconsistency:**
-- `DiagramPreprocessor.ts`: 7 occurrences
-- `BoardCrudOperations.ts`: 6 occurrences
-- `IncludeLoadingProcessor.ts`: 6 occurrences
+**Analysis:**
+- Manages `undoStack` and `redoStack` for undo/redo
+- Manages `dirtyColumns` and `dirtyTasks` for change tracking
+- Has `setBoard()`, `undo()`, `redo()`, `canUndo()`, `canRedo()`
+- **Does NOT call syncBoardToBackend directly**
+- UICommands.ts calls both `boardStore.undo()` AND `syncBoardToBackend()` separately
 
-**Action:**
-- [ ] Standardize on `!== undefined` and `!== null` (strict equality)
-- [ ] Use optional chaining `?.` where appropriate
-- [ ] Consider nullish coalescing `??` for defaults
+**Migration Impact:** NONE - BoardStore is independent
 
 ---
 
-### Task 6.4: Clean Up Deep Clone Pattern
-**Priority:** Low | **Effort:** Low | **Impact:** Low
+## 3. BackupManager.ts - INDEPENDENT (Safe)
 
-**Problem:** Only 1 `JSON.parse(JSON.stringify(...))` in backend (good!), but this pattern is common in frontend.
+**Location:** `src/services/BackupManager.ts`
 
-**Backend location:**
-- `BoardStore.ts:48` - `return JSON.parse(JSON.stringify(board));`
+**Analysis:**
+- Creates backup files based on document content
+- Methods: `createBackup(document)`, `createFileBackup(filePath, content)`
+- Triggered by timer (periodic backup) and explicit calls
+- **Does NOT call or depend on syncBoardToBackend**
 
-**Action:**
-- [ ] Consider `structuredClone()` (modern browsers/Node 17+)
-- [ ] Or create `deepClone<T>(obj: T): T` utility for consistency
-- [ ] Audit frontend for inefficient cloning
-
----
-
-### Task 6.5: User-Facing Error Messages (80 calls)
-**Priority:** Low | **Effort:** Low | **Impact:** Medium
-
-**Problem:** 80 `vscode.window.showErrorMessage/showWarningMessage` calls scattered across codebase with inconsistent formatting.
-
-**Top users:**
-- `extension.ts`: 13 calls
-- `LinkHandler.ts`: 10 calls
-- `TemplateCommands.ts`: 8 calls
-- `IncludeCommands.ts`: 7 calls
-
-**Action:**
-- [ ] Create `UserNotifications` utility class
-- [ ] Standardize message format with file names
-- [ ] Consider adding "Show Details" option for technical errors
+**Migration Impact:** NONE - BackupManager is independent
 
 ---
 
-### Task 6.6: Promise<void> Functions Need Return Values
-**Priority:** Low | **Effort:** Medium | **Impact:** Low
+## 4. MessageHandler/CommandContext - PASSTHROUGH DEPENDENCY
 
-**Problem:** 98 `async` functions returning `Promise<void>` - callers can't distinguish success from failure.
+**Location:** `src/messageHandler.ts:32, 57, 74, 102`
 
-**Example pattern:**
 ```typescript
-async function saveFile(): Promise<void> {
-    try { /* save */ }
-    catch { console.error(...); }  // Returns undefined either way
+// Line 32: Stores reference
+private _syncBoardToBackend: (board: KanbanBoard) => void;
+
+// Line 57: Receives in callbacks
+syncBoardToBackend: (board: KanbanBoard) => void;
+
+// Line 74: Stores from constructor
+this._syncBoardToBackend = callbacks.syncBoardToBackend;
+
+// Line 102: Passes to command context
+syncBoardToBackend: this._syncBoardToBackend,
+```
+
+**Analysis:**
+- MessageHandler receives `syncBoardToBackend` as callback from KanbanWebviewPanel
+- Passes it through to CommandContext for all commands
+- All commands access it via `context.syncBoardToBackend(board)`
+
+**Migration Impact:**
+- Must update `MessageCommand.ts:50` interface
+- Can replace with `context.emitBoardChanged(board)` or similar
+- All 10 command call sites go through this context
+
+---
+
+## 5. Command Call Pattern
+
+**All 10 call sites follow identical pattern:**
+
+```typescript
+// Current pattern in all commands:
+context.syncBoardToBackend(board);
+await context.onBoardUpdate();  // Optional: sends to frontend
+```
+
+**Key insight:** `onBoardUpdate` is bound to `sendBoardUpdate()` at line 410:
+```typescript
+onBoardUpdate: this.sendBoardUpdate.bind(this),
+```
+
+**Two separate concerns:**
+1. `syncBoardToBackend` → Persist board state to files
+2. `onBoardUpdate` → Send current board to frontend webview
+
+---
+
+## COMPLETE CALL SITE ANALYSIS
+
+| # | File | Line | Current Call | After Migration |
+|---|------|------|--------------|-----------------|
+| 1 | `kanbanWebviewPanel.ts` | 422 | Definition passed to MessageHandler | Define `emitBoardChanged()` instead |
+| 2 | `MessageCommand.ts` | 308 | `context.syncBoardToBackend(currentBoard)` | `eventBus.emit('board:changed', ...)` |
+| 3 | `UICommands.ts` | 95 | undo → `context.syncBoardToBackend(previousBoard)` | `eventBus.emit('board:changed', ...)` |
+| 4 | `UICommands.ts` | 123 | redo → `context.syncBoardToBackend(nextBoard)` | `eventBus.emit('board:changed', ...)` |
+| 5 | `EditModeCommands.ts` | 158 | exit edit with cache | `eventBus.emit('board:changed', ...)` |
+| 6 | `EditModeCommands.ts` | 206 | exit edit without cache | `eventBus.emit('board:changed', ...)` |
+| 7 | `TemplateCommands.ts` | 245 | template applied | `eventBus.emit('board:changed', ...)` |
+| 8 | `TemplateCommands.ts` | 353 | template applied | `eventBus.emit('board:changed', ...)` |
+| 9 | `ChangeStateMachine.ts` | 644 | includes switched | `eventBus.emit('board:changed', ...)` |
+| 10 | `messageHandler.ts` | 324 | fallback sync | `eventBus.emit('board:changed', ...)` |
+
+---
+
+## DEPENDENCY SAFETY SUMMARY
+
+| Component | Depends on syncBoardToBackend? | Migration Risk |
+|-----------|-------------------------------|----------------|
+| ChangeStateMachine | **YES** - interface | HIGH - must update interface |
+| BoardStore | NO | NONE |
+| BackupManager | NO | NONE |
+| MessageHandler | YES - passthrough | MEDIUM - update callback |
+| CommandContext | YES - provides to commands | MEDIUM - update interface |
+| All 10 call sites | YES - call it | LOW - find/replace pattern |
+
+---
+
+## RECOMMENDATION FOR PLAN C3-A
+
+Based on dependency analysis, C3-A (Central EventBus) is still the best choice:
+
+1. **SaveEventDispatcher exists** - Can extend the pattern
+2. **Only 2 interfaces need updating** - ChangeTypes.ts and MessageCommand.ts
+3. **BoardStore is independent** - No risk to undo/redo
+4. **BackupManager is independent** - No risk to backups
+5. **All call sites follow same pattern** - Easy migration
+
+**Risk Mitigation:**
+- ChangeStateMachine is the critical dependency
+- Must test include switching thoroughly after migration
+- All other call sites are straightforward replacements
+
+---
+
+## Current State: What Must Be Deleted
+
+### Functions to DELETE (9 total)
+
+| File | Function | Lines | Why Delete |
+|------|----------|-------|------------|
+| `kanbanWebviewPanel.ts` | `_syncMainFileToRegistry()` | ~100 | Replace with `FileStateManager.initialize()` |
+| `kanbanWebviewPanel.ts` | `syncBoardToBackend()` | ~50 | Replace with `board:changed` event |
+| `kanbanWebviewPanel.ts` | `_checkIncludeFilesForExternalChanges()` | ~60 | Replace with `focus:gained` event |
+| `kanbanWebviewPanel.ts` | `_checkMediaFilesForChanges()` | ~25 | Replace with `focus:gained` event |
+| `kanbanWebviewPanel.ts` | `_updateMediaTrackingFromIncludes()` | ~25 | Replace with `file:content-changed` event |
+| `IncludeFileCoordinator.ts` | `syncIncludeFilesWithRegistry()` | ~55 | Replace with `FileStateManager._registerIncludeFiles()` |
+| `IncludeFileCoordinator.ts` | `_updateIncludeFilesContent()` | ~30 | Merge into `FileStateManager._updateAllIncludeContent()` |
+| `MarkdownFileRegistry.ts` | `trackIncludeFileUnsavedChanges()` | ~65 | Merge into `FileStateManager._updateAllIncludeContent()` |
+
+### Call Sites to Migrate (10 total)
+
+| # | Location | Current Call | New Pattern |
+|---|----------|--------------|-------------|
+| 1 | `kanbanWebviewPanel.ts:422` | `syncBoardToBackend(board)` | `emit('board:changed', { board })` |
+| 2 | `MessageCommand.ts:308` | `context.syncBoardToBackend(currentBoard)` | `emit('board:changed', { board })` |
+| 3 | `UICommands.ts:95` | `context.syncBoardToBackend(previousBoard)` | `emit('board:changed', { board })` |
+| 4 | `UICommands.ts:123` | `context.syncBoardToBackend(nextBoard)` | `emit('board:changed', { board })` |
+| 5 | `EditModeCommands.ts:158` | `context.syncBoardToBackend(message.cachedBoard)` | `emit('board:changed', { board })` |
+| 6 | `EditModeCommands.ts:206` | `context.syncBoardToBackend(board)` | `emit('board:changed', { board })` |
+| 7 | `TemplateCommands.ts:245` | `context.syncBoardToBackend(currentBoard)` | `emit('board:changed', { board })` |
+| 8 | `TemplateCommands.ts:353` | `context.syncBoardToBackend(currentBoard)` | `emit('board:changed', { board })` |
+| 9 | `ChangeStateMachine.ts:644` | `this._webviewPanel.syncBoardToBackend(board)` | `emit('board:changed', { board })` |
+| 10 | `messageHandler.ts:324` | `this._syncBoardToBackend(board)` | `emit('board:changed', { board })` |
+
+---
+
+# PLAN C3-A: Central EventBus Architecture
+
+## Quality Rating: ⭐⭐⭐⭐ (4/5)
+## Effort: 5-6 days
+## Complexity: Medium
+## Best For: Projects that want simplicity with good decoupling
+
+### Concept
+
+Single global `EventBus` that all components use. Simple pub/sub pattern. Components emit events and subscribe to events they care about.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SINGLE EventBus                                  │
+│                                                                          │
+│  Events: board:changed, board:loaded, file:content-changed,             │
+│          file:external-change, file:saved, media:changed,               │
+│          include:loaded, focus:gained, error:occurred                   │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        │                           │                           │
+        ▼                           ▼                           ▼
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│  FileStateManager │     │ MediaStateManager │     │ KanbanWebviewPanel│
+│  (file operations)│     │ (media tracking)  │     │ (UI coordination) │
+└───────────────────┘     └───────────────────┘     └───────────────────┘
+```
+
+### New File Structure
+
+```
+src/
+├── core/
+│   ├── events/
+│   │   ├── EventBus.ts              # NEW: Central event bus
+│   │   └── EventTypes.ts            # NEW: All event type definitions
+│   ├── FileStateManager.ts          # NEW: Owns all file state
+│   ├── MediaStateManager.ts         # NEW: Owns media tracking
+│   └── BoardStateManager.ts         # NEW: Owns board state (extracted from BoardStore)
+├── panel/
+│   └── IncludeFileCoordinator.ts    # MODIFIED: Only parsing/formatting, no state
+└── kanbanWebviewPanel.ts            # MODIFIED: UI coordination only
+```
+
+### Implementation Steps
+
+#### Step 1: Create EventBus (Day 1 - 4 hours)
+
+```typescript
+// src/core/events/EventTypes.ts
+export type EventType =
+    | 'board:changed'           // Board state changed (from UI edit)
+    | 'board:loaded'            // Board initially loaded from file
+    | 'board:invalidated'       // Board cache needs refresh
+    | 'file:content-changed'    // File content updated in memory
+    | 'file:external-change'    // File changed on disk externally
+    | 'file:saved'              // File saved to disk
+    | 'media:changed'           // Media file (image/diagram) changed
+    | 'media:tracking-updated'  // Media tracking list updated
+    | 'include:registered'      // Include file added to registry
+    | 'include:loaded'          // Include file content loaded from disk
+    | 'include:content-updated' // Include file content changed
+    | 'focus:gained'            // Panel gained focus
+    | 'focus:lost'              // Panel lost focus
+    | 'error:occurred';         // Error occurred in any component
+
+export interface BaseEvent {
+    type: EventType;
+    source: string;
+    timestamp: number;
 }
 
-// Caller has no idea if save succeeded
-await saveFile();  // Did it work? 🤷
-```
-
-**Action:**
-- [ ] For critical operations: return `Promise<boolean>` or `Promise<Result>`
-- [ ] For fire-and-forget: document that failures are logged only
-- [ ] Use typed error handling for operations that can fail
-
----
-
-## Phase 7 - Type Safety & Testing (Round 6 Findings)
-
-### Task 7.1: NO TEST COVERAGE - Zero Tests
-**Priority:** High | **Effort:** High | **Impact:** High
-
-**Problem:** The codebase has **ZERO test files**. No unit tests, no integration tests, no end-to-end tests.
-
-**Search results:**
-- `src/**/*.test.ts` - No files found
-- `src/**/*.spec.ts` - No files found
-- `test/**/*` - No files found
-
-**Risk:** Any refactoring could introduce regressions undetected.
-
-**Action:**
-- [ ] Set up Jest/Vitest testing framework
-- [ ] Add unit tests for critical modules first:
-  - `BoardCrudOperations` - pure functions, easy to test
-  - `MarkdownKanbanParser` - parsing logic
-  - `BoardStore` - state management
-  - `ConfigurationService` - configuration handling
-- [ ] Add integration tests for file operations
-- [ ] Consider E2E tests for webview interactions
-
----
-
-### Task 7.2: Excessive `any` Types (311 occurrences beyond `as any`) ✅ COMPLETED
-**Priority:** High | **Effort:** High | **Impact:** High
-
-**Status:** Reduced from 311→125→10 (97% reduction)
-
-**Problem:** 311 usages of `any` type (separate from the 56 `as any` casts).
-
-**Session 2024-12-15: 125→10 `: any` fixed:**
-- [x] ExportService.ts: `filterBoard` returns `KanbanBoard`, webviewPanel union types, type narrowing
-- [x] linkOperations.ts: Created `LinkMatchType`, `LinkMatchInfo` interfaces, typed `patterns` array
-- [x] MarkdownFileRegistry.ts: Typed `_messageHandler` as `IMessageHandler`, `fileFactory` as `IFileFactory`
-- [x] LinkHandler.ts: `includeContext` typed as `IncludeContextForResolution`
-- [x] KeybindingService.ts: Created `VSCodeKeybinding` interface, typed `keybindings` array
-- [x] ConcurrencyManager.ts: `reject` parameter typed as `unknown`
-- [x] ImportPlugin.ts: `extensionContext` typed as `vscode.ExtensionContext`, `generateContent` data as `unknown`
-- [x] ExcalidrawService.ts: Created `ExcalidrawElement`, `ExcalidrawData` interfaces (7 params typed)
-- [x] FileInterfaces.ts: Added `IMessageHandler`, `IFileFactory`, `IncludeFileType` exports
-
-**Remaining 10 `: any` (all justified):**
-- 4 in ConfigurationService.ts (dynamic JSON config values)
-- 2 VS Code serialization state (extension.ts, kanbanWebviewPanel.ts)
-- 2 logging functions (messageHandler.ts, PanelContext.ts)
-- 2 standard TypeScript patterns (constructor types, function maps)
-
-**Session 2024-12-15: Unused Variables/Imports Cleanup (55 items):**
-- [x] Removed unused imports: `getOutputChannel`, `getErrorMessage`, `KanbanColumn`, `KanbanTask`, `IncludeMatch`
-- [x] Removed unused functions: `log()` in messageHandler.ts, `_getIncludeMatches()` in markdownParser.ts
-- [x] Removed unused methods: `_extractJsonFromSvg()` in ExcalidrawService.ts, `_findFileIncludeLocation()` in ChangeStateMachine.ts
-- [x] Prefixed 40+ unused parameters with `_` (TypeScript convention for intentionally unused)
-- [x] TypeScript `--noUnusedLocals --noUnusedParameters` now passes cleanly
-
-**Session 2024-12-15: Circular Dependency Fixes (Task 3.3):**
-- [x] Converted 9 `require()` calls to proper `import` statements
-- [x] Fixed: IncludeFile.ts → PresentationGenerator
-- [x] Fixed: ColumnIncludePlugin.ts → PresentationGenerator
-- [x] Fixed: ExportService.ts → PresentationGenerator (2 locations)
-- [x] Fixed: DebugCommands.ts → MarkdownKanbanParser
-- [x] Fixed: IncludeCommands.ts → MarkdownKanbanParser + ExportService (3 locations)
-- [x] Remaining: Only `require('../package.json')` for JSON loading (intentional)
-- [x] Also improved type safety: MessageCommand.ts (4 more `: any` → proper types)
-
-**Session 2024-12-15: File Splitting & Constants (Task 8.1, 7.3):**
-- [x] Task 8.1: Split kanbanWebviewPanel.ts (1803→1664 lines, -139)
-  - Extracted `_sendIncludeFileUpdateToFrontend` → IncludeFileCoordinator
-  - Added `sendIncludeFileUpdateToFrontend()` method to IncludeFileCoordinator
-  - Cleaned up unused imports (KanbanColumn, KanbanTask, MarkdownFile, IncludeFile, etc.)
-- [x] Task 8.2: ExportService analyzed - determined low value split (tightly coupled, ~40% positive)
-- [x] Task 7.3: Created `src/constants/TimeoutConstants.ts` with centralized constants:
-  - STOP_EDITING_TIMEOUT_MS, SEARCH_DEBOUNCE_DELAY_MS, BATCH_FLUSH_DELAY_MS
-  - REVIVAL_TRACKING_CLEAR_DELAY_MS, MAX_UNDO_STACK_SIZE, MAX_BATCH_SIZE
-  - MAX_SEARCH_RESULTS, MAX_RESULTS_PER_PATTERN, MAX_REGEX_RESULTS
-  - EXTERNAL_SERVICE_TIMEOUT_MS
-- [x] Updated files to use TimeoutConstants:
-  - messageHandler.ts, kanbanWebviewPanel.ts, fileSearchService.ts
-  - DrawIOService.ts, PDFService.ts
-- [x] Updated `src/constants/index.ts` to export all constants
-
-**Session 2024-12-15: WebView Messaging & CommandContext (Task 4.1, 3.4):**
-- [x] Task 4.1: Added `getWebviewBridge()` to CommandContext interface
-- [x] Task 4.1: Updated `BaseMessageCommand.postMessage()` to use WebviewBridge
-- [x] Task 4.1: Converted 21 direct `panel.webview.postMessage` calls in command files:
-  - DiagramCommands.ts (12 calls)
-  - ExportCommands.ts (4 calls)
-  - TemplateCommands.ts (3 calls)
-  - UICommands.ts (2 calls)
-- [x] Task 4.1: Remaining 11 non-command calls analyzed - <60% positive to convert (deferred)
-- [x] Task 3.4: Split CommandContext into focused sub-interfaces:
-  - BoardContext: board state operations
-  - FileContext: file operations
-  - UIContext: webview/UI operations
-  - EditContext: edit state tracking
-  - IncludeContext: include file operations
-  - ExportContext: export settings
-  - ServiceContext: specialized services
-- [x] Task 3.4: CommandContext now extends all sub-interfaces (backwards compatible)
-- [x] Task 3.4: Exported new interfaces from commands/interfaces/index.ts
-
-**Top offenders:**
-| File | `any` count |
-|------|-------------|
-| `ChangeStateMachine.ts` | 38 |
-| `kanbanWebviewPanel.ts` | 24 |
-| `TaskCommands.ts` | 21 |
-| `TemplateCommands.ts` | 15 |
-| `messageHandler.ts` | 13 |
-| `ExportService.ts` | 13 |
-| `ColumnCommands.ts` | 12 |
-| `MarkdownFileRegistry.ts` | 10 |
-| `IncludeFileCoordinator.ts` | 9 |
-| `IncludeCommands.ts` | 9 |
-
-**Action:**
-- [ ] Create proper types for message payloads (most `any` is message handling)
-- [ ] Type command execute() parameters properly
-- [ ] Add `unknown` instead of `any` where type is truly unknown
-- [ ] Enable `noImplicitAny` in tsconfig after fixing
-
----
-
-### Task 7.3: Magic Numbers - Extract Constants
-**Priority:** Low | **Effort:** Low | **Impact:** Medium
-
-**Problem:** Hardcoded numeric values scattered across codebase.
-
-**Examples found:**
-```typescript
-// Timeouts (should be configurable or constant)
-const STOP_EDITING_TIMEOUT_MS = 2000;        // messageHandler.ts
-const REVIVAL_TRACKING_CLEAR_DELAY_MS = 5000; // kanbanWebviewPanel.ts
-const TRANSACTION_TIMEOUT_MS = 30000;         // SaveTransactionManager.ts
-const CACHE_TTL = 24 * 60 * 60 * 1000;       // kanbanSidebarProvider.ts
-
-// Limits (should be constants)
-const MAX_UNDO_STACK_SIZE = 100;              // kanbanWebviewPanel.ts, BoardStore.ts
-const MAX_SEARCH_RESULTS = 200;               // fileSearchService.ts
-const MAX_REGEX_RESULTS = 1000;               // fileSearchService.ts
-const maxIterations = 100;                    // VariableProcessor.ts
-
-// Sizes
-const PARTIAL_HASH_SIZE = 1024 * 1024;       // ClipboardCommands.ts (1MB)
-const retryDelay = 100;                       // MarkdownFile.ts
-```
-
-**Action:**
-- [ ] Create `src/constants/Timeouts.ts` for timeout values
-- [ ] Create `src/constants/Limits.ts` for max values
-- [ ] Export all numeric constants with descriptive names
-- [ ] Document why each value was chosen
-
----
-
-### Task 7.4: Duplicate Interface Definitions
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** `ConfigurationService.ts` has nearly identical interfaces:
-
-```typescript
-export interface KanbanConfiguration {
-    enableBackups: boolean;
-    backupInterval: number;
-    // ... 30+ properties
+export interface BoardChangedEvent extends BaseEvent {
+    type: 'board:changed';
+    data: { board: KanbanBoard; trigger: 'edit' | 'undo' | 'redo' | 'template' | 'sort' };
 }
 
-export interface ConfigurationDefaults {
-    enableBackups: boolean;
-    backupInterval: number;
-    // ... 30+ properties (SAME!)
-}
-```
-
-**Action:**
-- [ ] Remove `ConfigurationDefaults` interface
-- [ ] Use `Partial<KanbanConfiguration>` or `Required<KanbanConfiguration>` as needed
-- [ ] Or use single interface with optional properties
-
----
-
-### Task 7.5: Verify Disposable Cleanup (74 occurrences)
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** 74 disposable-related code points. Need to verify all are properly cleaned up.
-
-**Files with most disposable handling:**
-| File | Count |
-|------|-------|
-| `kanbanWebviewPanel.ts` | 23 |
-| `MarkdownFile.ts` | 12 |
-| `MarkdownFileRegistry.ts` | 10 |
-| `fileSearchService.ts` | 7 |
-
-**Common pattern to verify:**
-```typescript
-// Are all these properly disposed?
-this._disposables.push(watcher);
-this._disposables.push(eventHandler);
-// ...
-dispose() {
-    this._disposables.forEach(d => d.dispose());  // Is this called?
-}
-```
-
-**Action:**
-- [ ] Audit `kanbanWebviewPanel.ts` disposal
-- [ ] Verify all file watchers are disposed
-- [ ] Check event listener cleanup
-- [ ] Add dispose() calls to deactivate() in extension.ts
-
----
-
-### Task 7.6: Use Modern Array Methods
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 143 `.length > 0` / `.length === 0` checks that could use cleaner syntax.
-
-**Current pattern:**
-```typescript
-if (array.length > 0) { ... }
-if (array.length === 0) { ... }
-```
-
-**Modern alternative:**
-```typescript
-if (array.length) { ... }      // Truthy check
-if (!array.length) { ... }     // Empty check
-// Or even more explicit:
-if (array.at(0)) { ... }       // Has first element
-```
-
-**Action:**
-- [ ] Low priority - only change during other refactoring
-- [ ] Prefer explicit `.length > 0` for clarity in complex conditions
-
----
-
-## Summary Statistics
-
-| Category | Count |
-|----------|-------|
-| Total Issues | 39 |
-| Critical | 3 |
-| High Priority | 9 |
-| Medium Priority | 16 |
-| Low Priority | 11 |
-| Estimated `as any` to fix | 56→2 (DONE) |
-| **Additional `any` types** | **311→125→10 (DONE)** |
-| Estimated duplicate lookups to remove | 62 |
-| Singletons to refactor | 11 |
-| Console logs to clean | 324 |
-| **Frontend globals to eliminate** | **200+** |
-| **DOM queries to optimize** | **351** |
-| **Frontend message calls** | **146** |
-| **Catch blocks to review** | **209** |
-| **Silent returns to fix** | **144** |
-| **Disposables to verify** | **74** |
-| **Test files** | **0** |
-
----
-
-## Phase 8 - Large File Complexity (Round 7 Findings)
-
-### Task 8.1: Backend Large Files - Method Count Analysis
-**Priority:** Medium | **Effort:** High | **Impact:** High
-
-**Problem:** Several TypeScript files are excessively large with too many methods.
-
-**Backend file complexity:**
-| File | Lines | Methods | Avg Lines/Method |
-|------|-------|---------|------------------|
-| `kanbanWebviewPanel.ts` | 1,786 | 65+ | ~27 |
-| `ExportService.ts` | 1,761 | ~30 | ~58 |
-| `ChangeStateMachine.ts` | 1,011 | 35+ | ~29 |
-| `MarkdownFile.ts` | 866 | ~25 | ~35 |
-| `ClipboardCommands.ts` | 742 | ~15 | ~49 |
-| `MarkdownFileRegistry.ts` | 699 | ~20 | ~35 |
-
-**`kanbanWebviewPanel.ts` - 65+ methods including:**
-- Panel management (createOrShow, revive, getPanelForDocument)
-- State management (syncStateFromFileService, setEditingInProgress)
-- File operations (loadMarkdownFile, saveToMarkdown)
-- UI coordination (sendBoardUpdate, refreshWebviewContent)
-- Event handlers (_setupEventListeners, _handleWebviewReady)
-- Dirty tracking (markColumnDirty, markTaskDirty, clearColumnDirty)
-
-**Action:**
-- [ ] Extract `PanelLifecycleManager` from `kanbanWebviewPanel.ts`
-- [ ] Extract `DirtyTrackingService` (mark/clear dirty methods)
-- [ ] Extract `FileOperationsCoordinator` (load/save/sync)
-- [ ] Keep panel as thin orchestrator
-
----
-
-### Task 8.2: Frontend Large Files - Function Count Analysis
-**Priority:** Medium | **Effort:** High | **Impact:** High
-
-**Problem:** Frontend JavaScript files have excessive function counts.
-
-**Frontend file complexity:**
-| File | Lines | Functions | Avg Lines/Function |
-|------|-------|-----------|-------------------|
-| `boardRenderer.js` | 5,330 | 73 | ~73 |
-| `webview.js` | 4,183 | 73 | ~57 |
-| `menuOperations.js` | 4,144 | 76 | ~54 |
-| `dragDrop.js` | 4,033 | 58 | ~69 |
-| `markdownRenderer.js` | 1,937 | ~30 | ~65 |
-| `exportMarpUI.js` | 1,918 | ~40 | ~48 |
-
-**`boardRenderer.js` - 73 functions including:**
-- DOM creation (createColumnElement, createTaskElement)
-- Tag operations (getActiveTagsInTitle, getAllTagsInUse, generateTagMenuItems)
-- Folding (toggleColumnCollapse, toggleAllColumns, applyFoldingStates)
-- Stack management (applyStackedColumnStyles, enforceFoldModesForStacks)
-- Rendering (renderBoard, renderSingleColumn, debouncedRenderBoard)
-
-**Action:**
-- [ ] Split `boardRenderer.js` into:
-  - `columnRenderer.js` - Column DOM creation
-  - `taskRenderer.js` - Task DOM creation
-  - `tagManager.js` - Tag operations
-  - `foldingManager.js` - Folding state
-  - `stackManager.js` - Stack layout
-- [ ] Split `menuOperations.js` into:
-  - `taskMenu.js` - Task context menu
-  - `columnMenu.js` - Column context menu
-  - `boardMenu.js` - Board-level menus
-- [ ] Split `dragDrop.js` into:
-  - `taskDrag.js` - Task drag operations
-  - `columnDrag.js` - Column drag operations
-  - `dropZones.js` - Drop zone management
-
----
-
-### Task 8.3: `ChangeStateMachine` - Too Many States
-**Priority:** Medium | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** State machine has 35+ methods handling 13 states with complex transitions.
-
-**Current states:**
-```
-IDLE → RECEIVING_CHANGE → ANALYZING_IMPACT → CHECKING_EDIT_STATE →
-CAPTURING_EDIT → CHECKING_UNSAVED → PROMPTING_USER → SAVING_UNSAVED →
-CLEARING_CACHE → LOADING_NEW → UPDATING_BACKEND → SYNCING_FRONTEND →
-COMPLETE / CANCELLED / ERROR
-```
-
-**State handler methods (each 30-100 lines):**
-- `_handleReceivingChange`
-- `_handleAnalyzingImpact`
-- `_handleCheckingEditState`
-- `_handleCapturingEdit`
-- `_handleCheckingUnsaved`
-- `_handlePromptingUser`
-- `_handleSavingUnsaved`
-- `_handleClearingCache`
-- `_handleLoadingNew`
-- `_handleUpdatingBackend`
-- `_handleSyncingFrontend`
-- `_handleComplete`
-- `_handleCancelled`
-- `_handleError`
-
-**Action:**
-- [ ] Extract state handlers into separate strategy classes
-- [ ] Create `StateHandler` interface
-- [ ] Use `Map<ChangeState, StateHandler>` for dispatch
-- [ ] Simplify main state machine to just transition logic
-
----
-
-### Task 8.4: `ExportService` - Static Methods Anti-Pattern
-**Priority:** Low | **Effort:** Medium | **Impact:** Medium
-
-**Problem:** `ExportService` (1,761 lines) uses only static methods - no instance state.
-
-**Pattern:**
-```typescript
-export class ExportService {
-    private static readonly TASK_INCLUDE_PATTERN = /.../ ;
-    private static exportedFiles = new Map<string, string>();
-
-    private static applyTagFiltering(...) { ... }
-    private static applySpeakerNoteTransform(...) { ... }
-    // ALL methods are static!
-}
-```
-
-**Issues:**
-- Can't be dependency-injected
-- Difficult to test (can't mock)
-- Global state (`exportedFiles` map)
-- Not really OOP - just namespaced functions
-
-**Action:**
-- [ ] Convert to instance methods
-- [ ] Inject dependencies (ConfigurationService, etc.)
-- [ ] Make `exportedFiles` an instance field
-- [ ] Or: Convert to module with exported functions (simpler)
-
----
-
-### Task 8.5: Total Frontend Code - 28,000 Lines JavaScript
-**Priority:** Low | **Effort:** High | **Impact:** Medium
-
-**Problem:** 28,000 lines of frontend JavaScript without:
-- Module system (all global functions)
-- Type checking
-- Build step
-- Minification/bundling
-
-**Total frontend JS:**
-```
-boardRenderer.js    5,330
-webview.js          4,183
-menuOperations.js   4,144
-dragDrop.js         4,033
-markdownRenderer.js 1,937
-exportMarpUI.js     1,918
-taskEditor.js       1,719
-debugOverlay.js     1,494
-clipboardHandler.js   612
-+ 10 more files
-─────────────────────────
-Total:             27,905 lines
-```
-
-**Future consideration:**
-- [ ] Consider TypeScript for frontend
-- [ ] Consider bundler (esbuild, webpack)
-- [ ] Consider framework (Preact, Svelte - small footprint)
-- [ ] Or: Keep vanilla JS but add JSDoc types
-
----
-
-## Summary Statistics
-
-| Category | Count |
-|----------|-------|
-| Total Issues | 44 |
-| Critical | 3 |
-| High Priority | 11 |
-| Medium Priority | 18 |
-| Low Priority | 12 |
-| Estimated `as any` to fix | 56→2 (DONE) |
-| **Additional `any` types** | **311→125→10 (DONE)** |
-| Estimated duplicate lookups to remove | 62 |
-| Singletons to refactor | 11 |
-| Console logs to clean | 324 |
-| **Frontend globals to eliminate** | **200+** |
-| **DOM queries to optimize** | **351** |
-| **Frontend message calls** | **146** |
-| **Catch blocks to review** | **209** |
-| **Silent returns to fix** | **144** |
-| **Disposables to verify** | **74** |
-| **Test files** | **0** |
-| **Backend TS lines** | **~30,000** |
-| **Frontend JS lines** | **~28,000** |
-| **Frontend functions** | **280+** |
-
----
-
-## Phase 9 - Memory Leaks & Cleanup (Round 8 Findings)
-
-### Task 9.1: Frontend Event Listener Leak (114 add vs 12 remove)
-**Priority:** High | **Effort:** Medium | **Impact:** High (Memory)
-
-**Problem:** Frontend adds 114 event listeners but only removes 12 - potential memory leaks.
-
-**Event listener imbalance by file:**
-| File | addEventListener | removeEventListener | Delta |
-|------|-----------------|--------------------:|------:|
-| `webview.js` | 34 | 4 | **+30** |
-| `dragDrop.js` | 29 | 3 | **+26** |
-| `taskEditor.js` | 14 | 3 | **+11** |
-| `menuOperations.js` | 10 | 0 | **+10** |
-| `exportMarpUI.js` | 10 | 0 | **+10** |
-| `debugOverlay.js` | 6 | 0 | **+6** |
-| `markdownRenderer.js` | 5 | 0 | **+5** |
-| `boardRenderer.js` | 4 | 2 | **+2** |
-| `templateDialog.js` | 2 | 0 | **+2** |
-| **TOTAL** | **114** | **12** | **+102** |
-
-**Risk:** Each board render may add new listeners without removing old ones.
-
-**Action:**
-- [ ] Audit all `addEventListener` calls in frontend
-- [ ] Add corresponding `removeEventListener` for dynamic listeners
-- [ ] Use event delegation instead of per-element listeners
-- [ ] Create cleanup functions for board re-renders
-
----
-
-### Task 9.2: Map/Set Without Clear (28 new, 25 clear)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 28 `new Map()`/`new Set()` creations but only 25 `.clear()` calls - some may grow unbounded.
-
-**Collections that may grow:**
-- `exportedFiles` in ExportService (static Map)
-- `plantumlRenderCache` / `mermaidRenderCache` in frontend
-- File registry collections
-
-**Action:**
-- [ ] Audit all Map/Set for bounded size or clear on operation complete
-- [ ] Add max size limits for caches
-- [ ] Clear export caches after export completes
-
----
-
-### Task 9.3: Empty Else Blocks (Dead Code)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 2 empty else blocks found (dead code):
-
-**Locations:**
-```typescript
-// MarkdownFile.ts:733-734
-} else {
+export interface FileExternalChangeEvent extends BaseEvent {
+    type: 'file:external-change';
+    data: { changedFiles: Array<{ path: string; type: 'main' | 'include' }> };
 }
 
-// kanbanWebviewPanel.ts:574-575
-} else {
+export interface MediaChangedEvent extends BaseEvent {
+    type: 'media:changed';
+    data: { changedFiles: Array<{ path: string; absolutePath: string; type: string }> };
+}
+
+// ... more event interfaces
+
+export type AppEvent = BoardChangedEvent | FileExternalChangeEvent | MediaChangedEvent | /* ... */;
+```
+
+```typescript
+// src/core/events/EventBus.ts
+export class EventBus {
+    private _listeners = new Map<EventType, Set<(event: AppEvent) => void>>();
+    private _eventLog: AppEvent[] = [];
+    private _maxLogSize = 100;
+
+    on<T extends AppEvent>(type: T['type'], handler: (event: T) => void): () => void {
+        if (!this._listeners.has(type)) {
+            this._listeners.set(type, new Set());
+        }
+        this._listeners.get(type)!.add(handler as any);
+        return () => this._listeners.get(type)?.delete(handler as any);
+    }
+
+    emit<T extends AppEvent>(event: T): void {
+        // Log for debugging
+        this._eventLog.push(event);
+        if (this._eventLog.length > this._maxLogSize) {
+            this._eventLog.shift();
+        }
+        console.log(`[EventBus] ${event.type} from ${event.source}`, event);
+
+        // Notify listeners
+        const handlers = this._listeners.get(event.type);
+        if (handlers) {
+            for (const handler of handlers) {
+                try {
+                    handler(event);
+                } catch (error) {
+                    this.emit({
+                        type: 'error:occurred',
+                        source: 'EventBus',
+                        timestamp: Date.now(),
+                        data: { error, originalEvent: event }
+                    } as any);
+                }
+            }
+        }
+    }
+
+    // Debug helpers
+    getEventLog(): AppEvent[] { return [...this._eventLog]; }
+    clearLog(): void { this._eventLog = []; }
+}
+
+// Singleton instance
+export const eventBus = new EventBus();
+```
+
+#### Step 2: Create FileStateManager (Day 1-2 - 8 hours)
+
+```typescript
+// src/core/FileStateManager.ts
+import { eventBus } from './events/EventBus';
+
+export class FileStateManager {
+    private _mainFile: MainKanbanFile | null = null;
+    private _includeFiles = new Map<string, IncludeFile>();
+    private _registry: MarkdownFileRegistry;
+    private _subscriptions: (() => void)[] = [];
+
+    constructor(registry: MarkdownFileRegistry) {
+        this._registry = registry;
+        this._setupEventListeners();
+    }
+
+    private _setupEventListeners(): void {
+        // When board changes, persist to files
+        this._subscriptions.push(
+            eventBus.on('board:changed', async (event) => {
+                await this._persistBoardToFiles(event.data.board);
+            })
+        );
+
+        // When focus gained, check for external changes
+        this._subscriptions.push(
+            eventBus.on('focus:gained', async () => {
+                await this._checkForExternalChanges();
+            })
+        );
+    }
+
+    // === PUBLIC API ===
+
+    async initialize(document: vscode.TextDocument): Promise<KanbanBoard> {
+        // 1. Create/load main file
+        this._mainFile = await this._initializeMainFile(document);
+
+        // 2. Parse initial board
+        const board = this._mainFile.getBoard();
+        if (!board || !board.valid) {
+            throw new Error('Failed to parse kanban board');
+        }
+
+        // 3. Register all include files
+        await this._registerAllIncludes(board);
+
+        // 4. Load all include content from disk
+        await this._loadAllIncludeContent();
+
+        // 5. Emit board loaded event
+        eventBus.emit({
+            type: 'board:loaded',
+            source: 'FileStateManager',
+            timestamp: Date.now(),
+            data: { board }
+        });
+
+        return board;
+    }
+
+    dispose(): void {
+        this._subscriptions.forEach(unsub => unsub());
+        this._subscriptions = [];
+        this._includeFiles.clear();
+        this._mainFile = null;
+    }
+
+    // === PRIVATE: Board → Files ===
+
+    private async _persistBoardToFiles(board: KanbanBoard): Promise<void> {
+        if (!this._mainFile) return;
+
+        // 1. Update ALL include files (column, task, AND regular)
+        await this._updateAllIncludeContent(board);
+
+        // 2. Generate markdown from board
+        const markdown = MarkdownKanbanParser.generateMarkdown(board);
+
+        // 3. Update main file in-memory
+        this._mainFile.setContent(markdown, false);
+
+        // 4. Emit content changed event (for MediaStateManager to react)
+        eventBus.emit({
+            type: 'file:content-changed',
+            source: 'FileStateManager',
+            timestamp: Date.now(),
+            data: {
+                mainFileContent: markdown,
+                includeFiles: Array.from(this._includeFiles.values()).map(f => ({
+                    path: f.getPath(),
+                    content: f.getContent()
+                }))
+            }
+        });
+    }
+
+    private async _updateAllIncludeContent(board: KanbanBoard): Promise<void> {
+        // Column includes
+        for (const column of board.columns) {
+            if (column.includeFiles?.length) {
+                for (const path of column.includeFiles) {
+                    const file = this._includeFiles.get(this._normalizePath(path));
+                    if (file) {
+                        const content = file.generateFromTasks(column.tasks);
+                        if (content.trim() || !file.getContent()?.trim()) {
+                            file.setContent(content, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Task includes
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles?.length) {
+                    for (const path of task.includeFiles) {
+                        const file = this._includeFiles.get(this._normalizePath(path));
+                        if (file) {
+                            const content = task.description || '';
+                            if (content.trim() || !file.getContent()?.trim()) {
+                                file.setContent(content, false);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Regular includes - ensure loaded (THIS FIXES THE BUG!)
+        for (const [path, file] of this._includeFiles) {
+            if (file.getFileType() === 'include-regular') {
+                if (!file.getContent()) {
+                    await file.forceSyncBaseline();
+                }
+            }
+        }
+    }
+
+    // === PRIVATE: External Change Detection ===
+
+    private async _checkForExternalChanges(): Promise<void> {
+        const changedFiles: Array<{ path: string; type: 'main' | 'include' }> = [];
+
+        // Check main file
+        if (this._mainFile) {
+            const mainChanged = await this._mainFile.checkForExternalChanges();
+            if (mainChanged) {
+                await this._mainFile.forceSyncBaseline();
+                changedFiles.push({ path: this._mainFile.getPath(), type: 'main' });
+            }
+        }
+
+        // Check all include files
+        for (const [path, file] of this._includeFiles) {
+            const changed = await file.checkForExternalChanges();
+            if (changed) {
+                await file.forceSyncBaseline();
+                changedFiles.push({ path, type: 'include' });
+            }
+        }
+
+        if (changedFiles.length > 0) {
+            eventBus.emit({
+                type: 'file:external-change',
+                source: 'FileStateManager',
+                timestamp: Date.now(),
+                data: { changedFiles }
+            });
+        }
+    }
+
+    // ... helper methods
 }
 ```
 
-**Action:**
-- [ ] Remove empty else blocks
-- [ ] Check if logic was intended but not implemented
+#### Step 3: Create MediaStateManager (Day 2 - 4 hours)
 
----
-
-### Task 9.4: Consistent Log Prefix Pattern (Good Practice)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
-
-**Positive Finding:** Console logs consistently use `[ModuleName]` prefix pattern.
-
-**Examples:**
 ```typescript
-console.error('[ChangeStateMachine] Fatal error:', error);
-console.warn('[MarkdownFileRegistry] generateBoard() - No main file found');
-console.error('[DiagramCommands.handleRenderPlantUML] No panel available');
+// src/core/MediaStateManager.ts
+import { eventBus } from './events/EventBus';
+
+export class MediaStateManager {
+    private _tracker: MediaTracker | null = null;
+    private _subscriptions: (() => void)[] = [];
+
+    constructor() {
+        this._setupEventListeners();
+    }
+
+    private _setupEventListeners(): void {
+        // Scan content when files change
+        this._subscriptions.push(
+            eventBus.on('file:content-changed', (event) => {
+                this._updateTracking(event.data.mainFileContent, event.data.includeFiles);
+            })
+        );
+
+        // Check for media changes on focus
+        this._subscriptions.push(
+            eventBus.on('focus:gained', () => {
+                this._checkForChanges();
+            })
+        );
+
+        // Initial setup when board loads
+        this._subscriptions.push(
+            eventBus.on('board:loaded', (event) => {
+                // MediaTracker is created per-board, so we might need to initialize here
+            })
+        );
+    }
+
+    initialize(kanbanFilePath: string): void {
+        this._tracker?.dispose();
+        this._tracker = new MediaTracker(kanbanFilePath);
+
+        // Set up callback for real-time changes (file watchers)
+        this._tracker.setOnMediaChanged((changedFiles) => {
+            eventBus.emit({
+                type: 'media:changed',
+                source: 'MediaStateManager',
+                timestamp: Date.now(),
+                data: { changedFiles }
+            });
+        });
+    }
+
+    private _updateTracking(mainContent: string, includeFiles: Array<{ path: string; content: string }>): void {
+        if (!this._tracker) return;
+
+        // Track from main file
+        this._tracker.updateTrackedFiles(mainContent);
+
+        // Track from all includes
+        for (const file of includeFiles) {
+            if (file.content) {
+                this._tracker.addTrackedFiles(file.content);
+            }
+        }
+
+        // Set up file watchers
+        this._tracker.setupFileWatchers();
+
+        eventBus.emit({
+            type: 'media:tracking-updated',
+            source: 'MediaStateManager',
+            timestamp: Date.now(),
+            data: { trackedCount: this._tracker.getTrackedFiles().length }
+        });
+    }
+
+    private _checkForChanges(): void {
+        if (!this._tracker) return;
+
+        // This internally triggers the callback if files changed
+        this._tracker.checkForChanges();
+    }
+
+    dispose(): void {
+        this._subscriptions.forEach(unsub => unsub());
+        this._tracker?.dispose();
+    }
+}
 ```
 
-**Status:** ✅ Already following good practice - no action needed.
+#### Step 4: Update KanbanWebviewPanel (Day 3 - 6 hours)
 
----
+```typescript
+// src/kanbanWebviewPanel.ts - SIMPLIFIED
+export class KanbanWebviewPanel {
+    private _fileStateManager: FileStateManager;
+    private _mediaStateManager: MediaStateManager;
+    private _subscriptions: (() => void)[] = [];
 
-### Task 9.5: VS Code Event Subscriptions (7 onDid* listeners)
-**Priority:** Medium | **Effort:** Low | **Impact:** Medium
+    constructor(/* ... */) {
+        // Create managers
+        this._fileStateManager = new FileStateManager(this._fileRegistry);
+        this._mediaStateManager = new MediaStateManager();
 
-**Problem:** 7 `vscode.workspace.onDid*` subscriptions - need to verify disposal.
+        this._setupEventListeners();
+    }
 
-**Locations:**
-| File | Count |
-|------|-------|
-| `kanbanWebviewPanel.ts` | 2 |
-| `extension.ts` | 1 |
-| `SaveEventDispatcher.ts` | 1 |
-| `kanbanSidebarProvider.ts` | 1 |
-| `kanbanFileService.ts` | 1 |
-| `ConfigurationService.ts` | 1 |
+    private _setupEventListeners(): void {
+        // React to external file changes - update UI
+        this._subscriptions.push(
+            eventBus.on('file:external-change', () => {
+                this._boardStore.invalidateCache();
+                this.sendBoardUpdate(false, true);
+            })
+        );
 
-**Action:**
-- [ ] Verify all VS Code event subscriptions are pushed to `_disposables`
-- [ ] Check `dispose()` is called on deactivation
-- [ ] Cross-reference with Task 7.5 (74 disposables to verify)
+        // React to media changes - notify frontend
+        this._subscriptions.push(
+            eventBus.on('media:changed', (event) => {
+                this._panel?.webview.postMessage({
+                    type: 'mediaFilesChanged',
+                    changedFiles: event.data.changedFiles
+                });
+            })
+        );
+    }
 
----
+    // Called when loading a file
+    async loadMarkdownFile(document: vscode.TextDocument): Promise<void> {
+        const board = await this._fileStateManager.initialize(document);
+        this._mediaStateManager.initialize(document.uri.fsPath);
+        this._boardStore.setBoard(board, false);
+        this.sendBoardUpdate(false, false);
+    }
 
-### Task 9.6: Comments as Section Headers (1,959 occurrences)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
+    // Called when panel gains focus - SIMPLIFIED!
+    private _handleFocus(): void {
+        eventBus.emit({
+            type: 'focus:gained',
+            source: 'KanbanWebviewPanel',
+            timestamp: Date.now()
+        });
+    }
 
-**Finding:** 1,959 comment lines starting with `// [A-Z]` - many are section headers.
-
-**Top files:**
-| File | Section Comments |
-|------|-----------------|
-| `ExportService.ts` | 222 |
-| `kanbanWebviewPanel.ts` | 219 |
-| `ChangeStateMachine.ts` | 88 |
-| `MainKanbanFile.ts` | 81 |
-| `MarkdownFile.ts` | 64 |
-| `MarpExportService.ts` | 59 |
-
-**Status:** This is fine - shows good documentation effort. Consider JSDoc for public APIs.
-
----
-
-## Phase 10 - Timer Leaks & Async Patterns (Round 9 Findings)
-
-### Task 10.1: setTimeout Timer Leak (93 set vs 42 clear = +51 potential leaks)
-**Priority:** High | **Effort:** Medium | **Impact:** High (Memory/Performance)
-
-**Problem:** 93 `setTimeout()` calls but only 42 `clearTimeout()` calls - potential memory/performance issues.
-
-**Timer imbalance by file:**
-| File | setTimeout | clearTimeout | Delta |
-|------|-----------|------------:|------:|
-| `webview.js` | 25 | 1 | **+24** |
-| `menuOperations.js` | 11 | 12 | **-1** ✓ |
-| `boardRenderer.js` | 8 | 5 | **+3** |
-| `taskEditor.js` | 7 | 4 | **+3** |
-| `dragDrop.js` | 5 | 0 | **+5** |
-| `markdownRenderer.js` | 5 | 0 | **+5** |
-| `activityIndicator.js` | 5 | 0 | **+5** |
-| `debugOverlay.js` | 4 | 4 | **0** ✓ |
-| Backend TS files | 13 | 16 | **-3** ✓ |
-| **TOTAL** | **93** | **42** | **+51** |
-
-**Risk:** Timers may fire after components are removed, causing errors or unexpected behavior.
-
-**Action:**
-- [ ] Audit all `setTimeout` calls in frontend
-- [ ] Store timer IDs for cleanup: `this.timerId = setTimeout(...)`
-- [ ] Add corresponding `clearTimeout` in cleanup/dispose functions
-- [ ] Consider using debounce utility for repeated timeouts
-
----
-
-### Task 10.2: Frontend Console Logging (135 calls)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 135 console log calls in frontend JavaScript (separate from 324 backend calls = 459 total).
-
-**Frontend log calls by file:**
-| File | Count |
-|------|-------|
-| `webview.js` | 30 |
-| `boardRenderer.js` | 23 |
-| `markdownRenderer.js` | 17 |
-| `dragDrop.js` | 15 |
-| `menuOperations.js` | 14 |
-| `exportMarpUI.js` | 11 |
-| `markdown-it-include-browser.js` | 9 |
-| `taskEditor.js` | 7 |
-
-**Action:**
-- [ ] Create frontend `Logger` utility with debug flag
-- [ ] Remove development debug logs
-- [ ] Keep only error logs for actual errors
-- [ ] Consider `window.DEBUG_MODE` flag
-
----
-
-### Task 10.3: Chained .replace() Calls (26 occurrences)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
-
-**Problem:** 26 chained `.replace().replace()` patterns that could be simplified.
-
-**Example:**
-```javascript
-str.replace(/pattern1/, '').replace(/pattern2/, '').replace(/pattern3/, '')
+    // Called from commands/message handlers
+    public onBoardChanged(board: KanbanBoard, trigger: string): void {
+        this._boardStore.setBoard(board, false);
+        eventBus.emit({
+            type: 'board:changed',
+            source: 'KanbanWebviewPanel',
+            timestamp: Date.now(),
+            data: { board, trigger }
+        });
+    }
+}
 ```
 
-**Files with most chained replaces:**
-- `dragDrop.js`: 6
-- `exportMarpUI.js`: 6
-- `MainKanbanFile.ts`: 2
-- `menuOperations.js`: 2
+#### Step 5: Migrate All Call Sites (Day 4 - 4 hours)
 
-**Action:**
-- [ ] Consider using single regex with alternation: `/pattern1|pattern2/g`
-- [ ] Or create `replaceAll(str, replacements)` utility
-- [ ] Low priority - only refactor during other changes
+Replace all 10 call sites:
 
----
+```typescript
+// BEFORE (all 10 locations):
+context.syncBoardToBackend(board);
 
-### Task 10.4: Inconsistent Null Return Pattern (115 `return null` vs 12 `return undefined`)
-**Priority:** Low | **Effort:** Low | **Impact:** Low
+// AFTER (all 10 locations):
+eventBus.emit({
+    type: 'board:changed',
+    source: 'CommandName',  // Different per location
+    timestamp: Date.now(),
+    data: { board, trigger: 'edit' }  // trigger varies
+});
 
-**Problem:** Inconsistent return values for "not found" scenarios:
-- 115 `return null` occurrences
-- 12 `return undefined` occurrences
+// OR use helper method on panel:
+context.onBoardChanged(board, 'edit');
+```
 
-**Top files with `return null`:**
-| File | Count |
-|------|-------|
-| `tagUtils.js` (frontend) | 26 |
-| `boardRenderer.js` | 11 |
-| `webview.js` | 9 |
-| `DiagramPreprocessor.ts` | 7 |
-| `dragDrop.js` | 6 |
+#### Step 6: Delete Old Code (Day 5 - 4 hours)
 
-**Action:**
-- [ ] Standardize on `null` for explicit "not found" (intentional absence)
-- [ ] Use `undefined` for "not set" (default/missing)
-- [ ] Document convention in contributing guide
-- [ ] Low priority - consistency only
+1. Delete `_syncMainFileToRegistry()` from `kanbanWebviewPanel.ts`
+2. Delete `syncBoardToBackend()` from `kanbanWebviewPanel.ts`
+3. Delete `_checkIncludeFilesForExternalChanges()` from `kanbanWebviewPanel.ts`
+4. Delete `_checkMediaFilesForChanges()` from `kanbanWebviewPanel.ts`
+5. Delete `_updateMediaTrackingFromIncludes()` from `kanbanWebviewPanel.ts`
+6. Delete `syncIncludeFilesWithRegistry()` from `IncludeFileCoordinator.ts`
+7. Delete `_updateIncludeFilesContent()` from `IncludeFileCoordinator.ts`
+8. Delete `trackIncludeFileUnsavedChanges()` from `MarkdownFileRegistry.ts`
 
----
+#### Step 7: Testing (Day 5-6 - 8 hours)
 
-### Task 10.5: JSDoc Coverage Analysis (Positive Finding)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
+- Test initial load
+- Test editing tasks
+- Test undo/redo
+- Test template drops
+- Test focus/blur cycles
+- Test external file changes
+- Test media file changes
+- Test include file changes
 
-**Positive Finding:** Good JSDoc documentation coverage:
-- 575 `@param` tags across 59 files
-- 248 `@returns` tags across 54 files
+### Pros
+- Simple pub/sub pattern - easy to understand
+- Single event bus - one place to debug
+- Good decoupling
+- Moderate complexity
 
-**Best documented files:**
-- `tagUtils.js`: 60 @param, 48 @returns
-- `validationUtils.js`: 27 @param, 17 @returns
-- `menuOperations.js`: 30 @param
-
-**Status:** ✅ Good documentation practice - maintain this standard.
-
----
-
-### Task 10.6: No Deep Import Violations (Positive Finding)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
-
-**Positive Finding:** No `../../../` deep import patterns found.
-
-**Status:** ✅ Import structure is clean - no action needed.
+### Cons
+- All events share one bus - could get noisy
+- Less type safety than domain-specific channels
+- Global singleton (testability concerns)
 
 ---
 
-### Task 10.7: No Suppression Comments (Positive Finding)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
+# PLAN C3-B: Domain-Driven Event Channels
 
-**Positive Finding:** Zero occurrences of:
-- `// eslint-disable`
-- `// @ts-ignore`
-- `// @ts-nocheck`
+## Quality Rating: ⭐⭐⭐⭐½ (4.5/5)
+## Effort: 6-7 days
+## Complexity: Medium-High
+## Best For: Large projects with multiple developers
 
-**Status:** ✅ Code quality is good - not suppressing linting errors.
+### Concept
 
----
+Instead of one EventBus, create **separate event channels** for each domain. Each channel is strongly typed and focused on one concern.
 
-### Task 10.8: requestAnimationFrame Without Cancel (34 vs 0)
-**Priority:** Medium | **Effort:** Low | **Impact:** Medium (Memory)
+```
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  BoardChannel   │  │   FileChannel   │  │  MediaChannel   │
+│                 │  │                 │  │                 │
+│ board:changed   │  │ file:loaded     │  │ media:changed   │
+│ board:loaded    │  │ file:saved      │  │ media:tracked   │
+│ board:invalid   │  │ file:external   │  │                 │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  Orchestrator   │
+                    │  (coordinates)  │
+                    └─────────────────┘
+```
 
-**Problem:** 34 `requestAnimationFrame()` calls but 0 `cancelAnimationFrame()` calls.
+### New File Structure
 
-**File breakdown:**
-| File | requestAnimationFrame |
-|------|----------------------|
-| `boardRenderer.js` | 14 |
-| `taskEditor.js` | 10 |
-| `webview.js` | 4 |
-| `menuOperations.js` | 4 |
-| `dragDrop.js` | 1 |
-| `debugOverlay.js` | 1 |
+```
+src/
+├── core/
+│   ├── channels/
+│   │   ├── BoardChannel.ts          # Board-specific events
+│   │   ├── FileChannel.ts           # File-specific events
+│   │   ├── MediaChannel.ts          # Media-specific events
+│   │   ├── UIChannel.ts             # UI-specific events (focus, etc)
+│   │   └── index.ts                 # Export all channels
+│   ├── managers/
+│   │   ├── FileStateManager.ts      # Subscribes to BoardChannel, emits to FileChannel
+│   │   ├── MediaStateManager.ts     # Subscribes to FileChannel, emits to MediaChannel
+│   │   └── Orchestrator.ts          # Coordinates cross-channel communication
+│   └── types/
+│       └── Events.ts                # All event type definitions
+```
 
-**Risk:** Animation frames may fire after components are removed or re-rendered.
+### Implementation Steps
 
-**Action:**
-- [ ] Store animation frame IDs for cleanup
-- [ ] Add `cancelAnimationFrame` in component cleanup
-- [ ] Consider using a wrapper utility for managed animation frames
+#### Step 1: Create Typed Event Channels (Day 1 - 6 hours)
 
----
+```typescript
+// src/core/channels/Channel.ts
+export class TypedChannel<TEvents extends Record<string, any>> {
+    private _name: string;
+    private _listeners = new Map<keyof TEvents, Set<(data: any) => void>>();
 
-### Task 10.9: Dynamic RegExp Creation (70 occurrences)
-**Priority:** Low | **Effort:** Medium | **Impact:** Low (Performance)
+    constructor(name: string) {
+        this._name = name;
+    }
 
-**Problem:** 70 `new RegExp()` calls - some may be inefficient if created repeatedly.
+    on<K extends keyof TEvents>(event: K, handler: (data: TEvents[K]) => void): () => void {
+        if (!this._listeners.has(event)) {
+            this._listeners.set(event, new Set());
+        }
+        this._listeners.get(event)!.add(handler);
+        return () => this._listeners.get(event)?.delete(handler);
+    }
 
-**Top files:**
-| File | new RegExp() |
-|------|-------------|
-| `tagUtils.js` (frontend) | 24 |
-| `linkOperations.ts` | 15 |
-| `ExportService.ts` | 9 |
-| `exportMarpUI.js` | 4 |
+    emit<K extends keyof TEvents>(event: K, data: TEvents[K]): void {
+        console.log(`[${this._name}] ${String(event)}`, data);
+        const handlers = this._listeners.get(event);
+        handlers?.forEach(h => h(data));
+    }
+}
+```
 
-**Pattern to check:**
-```javascript
-// Inefficient - RegExp created on each call
-function findTag(tag) {
-    return text.match(new RegExp(`#${tag}`));  // Creates RegExp every call
+```typescript
+// src/core/channels/BoardChannel.ts
+interface BoardEvents {
+    'changed': { board: KanbanBoard; trigger: 'edit' | 'undo' | 'redo' | 'template' | 'sort' };
+    'loaded': { board: KanbanBoard };
+    'invalidated': { reason: string };
+    'saved': { board: KanbanBoard };
 }
 
-// Efficient - RegExp cached
-const tagPattern = new RegExp(`#${tag}`);  // Created once
+export const boardChannel = new TypedChannel<BoardEvents>('Board');
 ```
 
-**Action:**
-- [ ] Audit dynamic RegExp creation in loops
-- [ ] Cache RegExp patterns that are used repeatedly
-- [ ] Low priority - only optimize if performance issues
+```typescript
+// src/core/channels/FileChannel.ts
+interface FileEvents {
+    'main:loaded': { file: MainKanbanFile; content: string };
+    'main:content-changed': { content: string };
+    'main:external-change': { newContent: string };
+    'include:registered': { path: string; type: 'column' | 'task' | 'regular' };
+    'include:loaded': { path: string; content: string };
+    'include:content-changed': { path: string; content: string };
+    'include:external-change': { path: string; newContent: string };
+    'all-includes:loaded': { files: Array<{ path: string; content: string }> };
+}
 
----
-
-### Task 10.10: Modern JavaScript Patterns (Positive Findings)
-**Priority:** Info | **Effort:** N/A | **Impact:** N/A
-
-**Positive Findings:**
-1. **No `.bind(this)`** - Using arrow functions consistently (modern pattern)
-2. **Good loop usage** - Mix of 293 for loops and 299 forEach (appropriate for use cases)
-3. **No `var` declarations** - All `let`/`const` usage (modern)
-
-**Status:** ✅ Following modern JavaScript conventions.
-
----
-
-## Summary Statistics
-
-| Category | Count |
-|----------|-------|
-| Total Issues | 55 |
-| Critical | 3 |
-| High Priority | 13 |
-| Medium Priority | 21 |
-| Low Priority | 18 |
-| Estimated `as any` to fix | 56→2 (DONE) |
-| **Additional `any` types** | **311→125→10 (DONE)** |
-| Estimated duplicate lookups to remove | 62 |
-| Singletons to refactor | 11 |
-| Console logs to clean (backend) | 324 |
-| **Console logs to clean (frontend)** | **135** |
-| **Total console logs** | **459** |
-| **Frontend globals to eliminate** | **200+** |
-| **DOM queries to optimize** | **351** |
-| **Frontend message calls** | **146** |
-| **Catch blocks to review** | **209** |
-| **Silent returns to fix** | **144** |
-| **Disposables to verify** | **74** |
-| **Test files** | **0** |
-| **Backend TS lines** | **~30,000** |
-| **Frontend JS lines** | **~28,000** |
-| **Frontend functions** | **490** |
-| **Event listener leak (add-remove)** | **+102** |
-| **setTimeout leak (set-clear)** | **+51** |
-| **requestAnimationFrame leak** | **+34** |
-| **Dynamic RegExp creation** | **70** |
-
----
-
----
-
-# OPTIMIZED EXECUTION PLAN
-
-## Execution Strategy
-
-The tasks are reorganized into **5 Tracks** that can be worked on independently, plus a **dependency graph** showing what must come before what.
-
-### Key Insights:
-1. **Tests first paradox**: Major architecture changes need tests, but we have zero tests
-2. **Memory leaks are isolated**: Can fix without affecting other code
-3. **Type safety enables testing**: Fix types → write tests → refactor architecture
-4. **Frontend is separate**: Can be worked on in parallel with backend
-
----
-
-## Track A: Zero-Risk Quick Wins (Do First)
-*These changes don't alter behavior, just improve code quality*
-
-| Order | Task | Effort | Description |
-|-------|------|--------|-------------|
-| A1 | **1.1** | Low | Use BoardCrudOperations everywhere (62 replacements) |
-| A2 | **9.3** | 5 min | Remove 2 empty else blocks |
-| A3 | **7.4** | Low | Remove duplicate ConfigurationDefaults interface |
-| A4 | **4.6** | Low | Fix base class encapsulation (add abstract method) |
-| A5 | **4.7** | Low | Consolidate include file registration |
-| A6 | **2.3** | Low | Consolidate conflict detection (move to base class) |
-
-**Estimated time**: 2-4 hours
-**Risk**: None - pure refactoring, no behavior change
-
----
-
-## Track B: Memory Leak Fixes (High Priority)
-*Fix these early to prevent runtime issues*
-
-| Order | Task | Effort | Description |
-|-------|------|--------|-------------|
-| B1 | **9.1** | Medium | Fix event listener leaks (+102 leaking) |
-| B2 | **10.1** | Medium | Fix setTimeout leaks (+51 leaking) |
-| B3 | **10.8** | Low | Fix requestAnimationFrame leaks (+34 leaking) |
-| B4 | **7.5** | Medium | Verify disposable cleanup (74 points) |
-| B5 | **9.5** | Low | Verify VS Code event subscriptions (7 points) |
-| B6 | **9.2** | Low | Add Map/Set size limits for caches |
-
-**Estimated time**: 4-6 hours
-**Risk**: Low - isolated fixes, testable immediately
-**Can run in parallel with**: Track A
-
----
-
-## Track C: Type Safety Foundation (Required for Tests) ✅ COMPLETED
-*Fix types before writing tests - types help catch test issues*
-
-| Order | Task | Effort | Description | Status |
-|-------|------|--------|-------------|--------|
-| C1 | **1.2** | Medium | Fix 56 `as any` casts | ✅ 56→2 |
-| C2 | **1.3** | Low | Use defined message types (51 types exist) | ✅ Done |
-| C3 | **4.1** | Low | Standardize webview messaging | ✅ Done |
-| C4 | **7.2** | High | Fix 311 additional `any` types | ✅ 311→10 |
-| C5 | **5.5** | Medium | Frontend message type safety | Deferred (JS) |
-
-**Completed**: Track C is essentially done. Only 10 justified `: any` remain.
-**Estimated time**: 8-12 hours → **Actual: ~4 hours across sessions**
-**Risk**: Low - type changes caught by compiler
-**Dependency**: Complete Track A first (cleaner code to type) ✅
-
----
-
-## Track D: Test Infrastructure (Critical Enabler)
-*Must have tests before major architecture changes*
-
-| Order | Task | Effort | Description |
-|-------|------|--------|-------------|
-| D1 | **7.1** | High | Set up Jest/Vitest, add first tests |
-
-**Priority test targets** (pure functions, easy to test):
-1. `BoardCrudOperations` - findColumn, findTask, addColumn, etc.
-2. `MarkdownKanbanParser` - parsing logic
-3. `BoardStore` - state management
-4. `DateTimeUtils` - date formatting
-5. `stringUtils` - string helpers
-
-**Estimated time**: 8-16 hours (framework + initial tests)
-**Risk**: None - only adding, not changing
-**Dependency**: Complete Track C first (types help write tests)
-
----
-
-## Track E: Architecture Fixes (Requires Tests)
-*Do these only after Track D provides test coverage*
-
-| Order | Task | Effort | Risk | Description |
-|-------|------|--------|------|-------------|
-| E1 | **2.1** | Medium | High | Single board state source of truth |
-| E2 | **3.2** | Medium | Medium | Clean up dual file services |
-| E3 | **4.5** | Medium | Medium | Remove static state from MarkdownFile |
-| E4 | **3.3** | Medium | Medium | Fix circular dependencies |
-| E5 | **3.4** | Medium | Low | Split CommandContext god object |
-| E6 | **3.1** | High | High | Unify include file handling |
-| E7 | **2.2** | High | High | Convert singletons to DI |
-
-**Estimated time**: 20-40 hours
-**Risk**: High - behavior changes possible
-**Dependency**: Must have tests from Track D first!
-
----
-
-## Track F: Large File Splits (Requires Tests)
-*Structural changes that need test coverage*
-
-| Order | Task | Effort | Description |
-|-------|------|--------|-------------|
-| F1 | **4.3** | Medium | Simplify ChangeStateMachine (extract concerns) |
-| F2 | **8.3** | Medium | Extract state handlers to strategy classes |
-| F3 | **8.1** | High | Split kanbanWebviewPanel.ts (1,786 lines) |
-| F4 | **8.4** | Medium | Convert ExportService static methods |
-
-**Estimated time**: 16-24 hours
-**Risk**: Medium - structural, but testable
-**Dependency**: Must have tests from Track D first!
-
----
-
-## Track G: Frontend Cleanup (Parallel Track)
-*Can work independently from backend*
-
-| Order | Task | Effort | Description |
-|-------|------|--------|-------------|
-| G1 | **5.4** | Low | Merge handlePlantUMLConvert/handleMermaidConvert |
-| G2 | **5.2** | Medium | Consolidate 29 apply/set function pairs |
-| G3 | **5.3** | Medium | Reduce 351 DOM queries with caching |
-| G4 | **5.1** | High | Eliminate 200+ window.* globals |
-| G5 | **5.6** | High | Fix function coupling via globals |
-| G6 | **8.2** | High | Split large frontend files |
-| G7 | **8.5** | High | Consider frontend build system |
-
-**Estimated time**: 20-30 hours
-**Risk**: Medium - isolated to frontend
-**Can run in parallel with**: Tracks A-F
-
----
-
-## Track H: Polish (Do Last)
-*Low priority cleanup - do when other work is done*
-
-| Task | Effort | Description |
-|------|--------|-------------|
-| **4.2** | Low | Reduce 459 console logs |
-| **10.2** | Low | Frontend console logging |
-| **6.1** | Medium | Standardize error handling |
-| **6.2** | Low | Reduce silent early returns |
-| **6.3** | Low | Consolidate null checking |
-| **6.4** | Low | Clean up deep clone pattern |
-| **6.5** | Low | Standardize user-facing errors |
-| **6.6** | Medium | Add return values to Promise<void> |
-| **7.3** | Low | Extract magic numbers to constants |
-| **7.6** | Low | Use modern array methods |
-| **10.3** | Low | Simplify chained .replace() |
-| **10.4** | Low | Standardize null vs undefined |
-| **10.9** | Low | Cache dynamic RegExp |
-| **4.4** | Low | Consolidate markdown generation |
-
-**Estimated time**: 8-12 hours
-**Risk**: None
-**Do when**: Other tracks complete or during downtime
-
----
-
-## Dependency Graph
-
-```
-Track A (Quick Wins) ──────────────────────────────────────┐
-     │                                                      │
-     ▼                                                      │
-Track B (Memory Leaks) ─── can run in parallel ────────────┤
-     │                                                      │
-     ▼                                                      │
-Track C (Type Safety) ─────────────────────────────────────┤
-     │                                                      │
-     ▼                                                      │
-Track D (Tests) ◄──────────────────────────────────────────┘
-     │
-     ├─────────────┬─────────────┐
-     ▼             ▼             ▼
-Track E       Track F       Track G (parallel)
-(Architecture) (File Splits)  (Frontend)
-     │             │             │
-     └─────────────┴─────────────┘
-                   │
-                   ▼
-              Track H (Polish)
+export const fileChannel = new TypedChannel<FileEvents>('File');
 ```
 
+```typescript
+// src/core/channels/MediaChannel.ts
+interface MediaEvents {
+    'tracking:updated': { trackedFiles: MediaFileInfo[] };
+    'files:changed': { changedFiles: ChangedMediaFile[] };
+    'watcher:setup': { count: number };
+}
+
+export const mediaChannel = new TypedChannel<MediaEvents>('Media');
+```
+
+```typescript
+// src/core/channels/UIChannel.ts
+interface UIEvents {
+    'focus:gained': {};
+    'focus:lost': {};
+    'webview:ready': {};
+    'webview:destroyed': {};
+}
+
+export const uiChannel = new TypedChannel<UIEvents>('UI');
+```
+
+#### Step 2: Create Orchestrator (Day 2 - 4 hours)
+
+```typescript
+// src/core/managers/Orchestrator.ts
+import { boardChannel, fileChannel, mediaChannel, uiChannel } from '../channels';
+
+export class Orchestrator {
+    private _subscriptions: (() => void)[] = [];
+
+    constructor() {
+        this._setupCrossChannelCommunication();
+    }
+
+    private _setupCrossChannelCommunication(): void {
+        // When board changes → file needs to persist
+        this._subscriptions.push(
+            boardChannel.on('changed', (data) => {
+                // FileStateManager listens to this directly
+            })
+        );
+
+        // When file content changes → media needs to scan
+        this._subscriptions.push(
+            fileChannel.on('main:content-changed', (data) => {
+                // MediaStateManager listens to this directly
+            })
+        );
+
+        // When external file change detected → board needs invalidation
+        this._subscriptions.push(
+            fileChannel.on('main:external-change', () => {
+                boardChannel.emit('invalidated', { reason: 'External file change' });
+            })
+        );
+
+        // When focus gained → check for external changes
+        this._subscriptions.push(
+            uiChannel.on('focus:gained', () => {
+                // FileStateManager and MediaStateManager listen directly
+            })
+        );
+    }
+
+    dispose(): void {
+        this._subscriptions.forEach(unsub => unsub());
+    }
+}
+```
+
+#### Step 3: Update Managers to Use Channels (Day 3-4 - 8 hours)
+
+```typescript
+// src/core/managers/FileStateManager.ts
+import { boardChannel, fileChannel, uiChannel } from '../channels';
+
+export class FileStateManager {
+    private _subscriptions: (() => void)[] = [];
+
+    constructor() {
+        this._setupSubscriptions();
+    }
+
+    private _setupSubscriptions(): void {
+        // React to board changes
+        this._subscriptions.push(
+            boardChannel.on('changed', async ({ board }) => {
+                await this._persistBoardToFiles(board);
+            })
+        );
+
+        // React to focus
+        this._subscriptions.push(
+            uiChannel.on('focus:gained', async () => {
+                await this._checkForExternalChanges();
+            })
+        );
+    }
+
+    private async _persistBoardToFiles(board: KanbanBoard): Promise<void> {
+        // ... update files ...
+
+        // Emit to file channel
+        fileChannel.emit('main:content-changed', { content: markdown });
+
+        for (const [path, content] of updatedIncludes) {
+            fileChannel.emit('include:content-changed', { path, content });
+        }
+    }
+}
+```
+
+#### Step 4-7: Same as C3-A (migrate call sites, delete old code, test)
+
+### Pros
+- **Strong typing** per channel - better IDE support
+- **Separation of concerns** - each channel is focused
+- **Easier debugging** - filter by channel
+- **Better for teams** - clear ownership of channels
+
+### Cons
+- More files to create
+- Cross-channel coordination needed
+- Slightly more complex than single bus
+
 ---
 
-## Recommended Sprint Plan
+# PLAN C3-C: Reactive Streams (RxJS-style)
 
-### Sprint 1: Foundation (1-2 days)
-- [ ] Complete Track A (all quick wins)
-- [ ] Start Track B (memory leaks)
-- [ ] Start Track G1-G2 (simple frontend fixes)
+## Quality Rating: ⭐⭐⭐⭐⭐ (5/5)
+## Effort: 7-8 days
+## Complexity: High
+## Best For: Complex async flows, need for debounce/throttle/merge
 
-### Sprint 2: Safety Net (2-3 days)
-- [ ] Complete Track B (memory leaks)
-- [ ] Complete Track C (type safety)
-- [ ] Continue Track G3-G4
+### Concept
 
-### Sprint 3: Test Infrastructure (2-3 days)
-- [ ] Complete Track D (testing framework + initial tests)
-- [ ] Add tests for modules you'll refactor next
+Use **Observable streams** instead of simple events. Each stream can be transformed, combined, debounced, etc. Gives maximum control over async flows.
 
-### Sprint 4: Architecture (3-5 days)
-- [ ] Track E1-E3 (lower risk architecture)
-- [ ] Add tests as you refactor
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Reactive Streams                               │
+│                                                                          │
+│  boardChanges$ ──┬──► debounce(300ms) ──► persistToFiles$               │
+│                  │                                                       │
+│  focusEvents$ ───┴──► throttle(1000ms) ──► checkExternalChanges$        │
+│                                                                          │
+│  fileChanges$ ──────► merge(mainFile$, includes$) ──► updateMedia$      │
+│                                                                          │
+│  mediaChanges$ ─────► distinctUntilChanged() ──► notifyFrontend$        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-### Sprint 5: Major Refactoring (3-5 days)
-- [ ] Track E4-E7 (higher risk architecture)
-- [ ] Track F (file splits)
+### New File Structure
 
-### Sprint 6: Polish (ongoing)
-- [ ] Track H tasks as time permits
-- [ ] Complete remaining Track G tasks
+```
+src/
+├── core/
+│   ├── streams/
+│   │   ├── Observable.ts            # Minimal RxJS-like implementation
+│   │   ├── operators.ts             # map, filter, debounce, throttle, merge
+│   │   ├── BoardStreams.ts          # Board-related streams
+│   │   ├── FileStreams.ts           # File-related streams
+│   │   ├── MediaStreams.ts          # Media-related streams
+│   │   └── UIStreams.ts             # UI-related streams
+│   ├── managers/
+│   │   ├── FileStateManager.ts      # Subscribes to streams
+│   │   ├── MediaStateManager.ts     # Subscribes to streams
+│   │   └── StreamCoordinator.ts     # Wires streams together
+```
+
+### Implementation Steps
+
+#### Step 1: Create Minimal Observable Implementation (Day 1 - 6 hours)
+
+```typescript
+// src/core/streams/Observable.ts
+export type Observer<T> = (value: T) => void;
+export type Unsubscribe = () => void;
+
+export class Observable<T> {
+    private _subscribers = new Set<Observer<T>>();
+
+    subscribe(observer: Observer<T>): Unsubscribe {
+        this._subscribers.add(observer);
+        return () => this._subscribers.delete(observer);
+    }
+
+    next(value: T): void {
+        this._subscribers.forEach(observer => observer(value));
+    }
+
+    // Operators return new Observables
+    pipe<R>(...operators: Array<(source: Observable<any>) => Observable<any>>): Observable<R> {
+        return operators.reduce((acc, op) => op(acc), this as any) as Observable<R>;
+    }
+}
+
+export class Subject<T> extends Observable<T> {
+    emit(value: T): void {
+        this.next(value);
+    }
+}
+
+export class BehaviorSubject<T> extends Subject<T> {
+    constructor(private _value: T) {
+        super();
+    }
+
+    get value(): T { return this._value; }
+
+    next(value: T): void {
+        this._value = value;
+        super.next(value);
+    }
+}
+```
+
+```typescript
+// src/core/streams/operators.ts
+export function map<T, R>(fn: (value: T) => R) {
+    return (source: Observable<T>): Observable<R> => {
+        const result = new Observable<R>();
+        source.subscribe(value => result.next(fn(value)));
+        return result;
+    };
+}
+
+export function filter<T>(predicate: (value: T) => boolean) {
+    return (source: Observable<T>): Observable<T> => {
+        const result = new Observable<T>();
+        source.subscribe(value => {
+            if (predicate(value)) result.next(value);
+        });
+        return result;
+    };
+}
+
+export function debounce<T>(ms: number) {
+    return (source: Observable<T>): Observable<T> => {
+        const result = new Observable<T>();
+        let timeout: NodeJS.Timeout | null = null;
+        source.subscribe(value => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => result.next(value), ms);
+        });
+        return result;
+    };
+}
+
+export function throttle<T>(ms: number) {
+    return (source: Observable<T>): Observable<T> => {
+        const result = new Observable<T>();
+        let lastEmit = 0;
+        source.subscribe(value => {
+            const now = Date.now();
+            if (now - lastEmit >= ms) {
+                lastEmit = now;
+                result.next(value);
+            }
+        });
+        return result;
+    };
+}
+
+export function merge<T>(...sources: Observable<T>[]): Observable<T> {
+    const result = new Observable<T>();
+    sources.forEach(source => source.subscribe(value => result.next(value)));
+    return result;
+}
+
+export function distinctUntilChanged<T>(compare?: (a: T, b: T) => boolean) {
+    return (source: Observable<T>): Observable<T> => {
+        const result = new Observable<T>();
+        let last: T | undefined;
+        let hasLast = false;
+        const eq = compare || ((a, b) => a === b);
+        source.subscribe(value => {
+            if (!hasLast || !eq(last!, value)) {
+                hasLast = true;
+                last = value;
+                result.next(value);
+            }
+        });
+        return result;
+    };
+}
+```
+
+#### Step 2: Create Domain Streams (Day 2 - 4 hours)
+
+```typescript
+// src/core/streams/BoardStreams.ts
+import { Subject, BehaviorSubject } from './Observable';
+
+export interface BoardChange {
+    board: KanbanBoard;
+    trigger: 'edit' | 'undo' | 'redo' | 'template' | 'sort';
+    timestamp: number;
+}
+
+export const boardChanges$ = new Subject<BoardChange>();
+export const currentBoard$ = new BehaviorSubject<KanbanBoard | null>(null);
+export const boardInvalidated$ = new Subject<{ reason: string }>();
+```
+
+```typescript
+// src/core/streams/FileStreams.ts
+export interface FileChange {
+    path: string;
+    content: string;
+    type: 'main' | 'include';
+    timestamp: number;
+}
+
+export interface ExternalChange {
+    path: string;
+    type: 'main' | 'include';
+    newContent: string;
+}
+
+export const fileContentChanged$ = new Subject<FileChange>();
+export const externalFileChanges$ = new Subject<ExternalChange>();
+export const allIncludesLoaded$ = new Subject<{ files: Map<string, string> }>();
+```
+
+```typescript
+// src/core/streams/MediaStreams.ts
+export interface MediaChange {
+    changedFiles: Array<{ path: string; absolutePath: string; type: string }>;
+}
+
+export const mediaFilesChanged$ = new Subject<MediaChange>();
+export const mediaTrackingUpdated$ = new Subject<{ count: number }>();
+```
+
+```typescript
+// src/core/streams/UIStreams.ts
+export const focusGained$ = new Subject<void>();
+export const focusLost$ = new Subject<void>();
+export const webviewReady$ = new Subject<void>();
+```
+
+#### Step 3: Create Stream Coordinator (Day 3 - 6 hours)
+
+```typescript
+// src/core/managers/StreamCoordinator.ts
+import { boardChanges$, boardInvalidated$ } from '../streams/BoardStreams';
+import { fileContentChanged$, externalFileChanges$ } from '../streams/FileStreams';
+import { mediaFilesChanged$ } from '../streams/MediaStreams';
+import { focusGained$ } from '../streams/UIStreams';
+import { debounce, throttle, merge, map, filter } from '../streams/operators';
+
+export class StreamCoordinator {
+    private _subscriptions: (() => void)[] = [];
+    private _fileStateManager: FileStateManager;
+    private _mediaStateManager: MediaStateManager;
+
+    constructor(
+        fileStateManager: FileStateManager,
+        mediaStateManager: MediaStateManager
+    ) {
+        this._fileStateManager = fileStateManager;
+        this._mediaStateManager = mediaStateManager;
+        this._setupStreamPipelines();
+    }
+
+    private _setupStreamPipelines(): void {
+        // Board changes → debounced file persistence
+        // Prevents rapid-fire updates during fast typing
+        const debouncedBoardChanges$ = boardChanges$.pipe(
+            debounce(100)  // Wait 100ms after last change
+        );
+
+        this._subscriptions.push(
+            debouncedBoardChanges$.subscribe(async ({ board }) => {
+                await this._fileStateManager.persistBoardToFiles(board);
+            })
+        );
+
+        // Focus events → throttled external change check
+        // Prevents checking too frequently
+        const throttledFocus$ = focusGained$.pipe(
+            throttle(1000)  // Max once per second
+        );
+
+        this._subscriptions.push(
+            throttledFocus$.subscribe(async () => {
+                await this._fileStateManager.checkForExternalChanges();
+                this._mediaStateManager.checkForChanges();
+            })
+        );
+
+        // File content changes → media tracking update
+        this._subscriptions.push(
+            fileContentChanged$.subscribe(({ content, path, type }) => {
+                this._mediaStateManager.updateTracking(content);
+            })
+        );
+
+        // External changes → board invalidation
+        this._subscriptions.push(
+            externalFileChanges$.pipe(
+                filter(change => change.type === 'main')
+            ).subscribe(() => {
+                boardInvalidated$.next({ reason: 'External file change' });
+            })
+        );
+
+        // Media changes → notify frontend (already distinct)
+        this._subscriptions.push(
+            mediaFilesChanged$.pipe(
+                distinctUntilChanged((a, b) =>
+                    JSON.stringify(a.changedFiles) === JSON.stringify(b.changedFiles)
+                )
+            ).subscribe(({ changedFiles }) => {
+                // Notify frontend
+            })
+        );
+    }
+
+    dispose(): void {
+        this._subscriptions.forEach(unsub => unsub());
+    }
+}
+```
+
+#### Step 4: Update FileStateManager (Day 4 - 4 hours)
+
+```typescript
+// src/core/managers/FileStateManager.ts
+import { fileContentChanged$, externalFileChanges$, allIncludesLoaded$ } from '../streams/FileStreams';
+
+export class FileStateManager {
+    // No internal subscriptions - StreamCoordinator calls methods directly
+
+    async persistBoardToFiles(board: KanbanBoard): Promise<void> {
+        // ... update files ...
+
+        // Emit to stream
+        fileContentChanged$.next({
+            path: this._mainFile!.getPath(),
+            content: markdown,
+            type: 'main',
+            timestamp: Date.now()
+        });
+    }
+
+    async checkForExternalChanges(): Promise<void> {
+        // ... check files ...
+
+        if (changedFiles.length > 0) {
+            for (const file of changedFiles) {
+                externalFileChanges$.next({
+                    path: file.path,
+                    type: file.type,
+                    newContent: file.content
+                });
+            }
+        }
+    }
+}
+```
+
+#### Step 5: Update KanbanWebviewPanel (Day 5 - 4 hours)
+
+```typescript
+// src/kanbanWebviewPanel.ts
+import { boardChanges$, boardInvalidated$ } from './core/streams/BoardStreams';
+import { mediaFilesChanged$ } from './core/streams/MediaStreams';
+import { focusGained$ } from './core/streams/UIStreams';
+
+export class KanbanWebviewPanel {
+    private _streamCoordinator: StreamCoordinator;
+    private _subscriptions: (() => void)[] = [];
+
+    constructor() {
+        // ... setup ...
+
+        this._setupStreamSubscriptions();
+    }
+
+    private _setupStreamSubscriptions(): void {
+        // React to board invalidation
+        this._subscriptions.push(
+            boardInvalidated$.subscribe(() => {
+                this._boardStore.invalidateCache();
+                this.sendBoardUpdate(false, true);
+            })
+        );
+
+        // React to media changes
+        this._subscriptions.push(
+            mediaFilesChanged$.subscribe(({ changedFiles }) => {
+                this._panel?.webview.postMessage({
+                    type: 'mediaFilesChanged',
+                    changedFiles
+                });
+            })
+        );
+    }
+
+    // Called when board changes
+    public onBoardChanged(board: KanbanBoard, trigger: string): void {
+        this._boardStore.setBoard(board, false);
+        boardChanges$.next({ board, trigger, timestamp: Date.now() });
+    }
+
+    // Called on focus
+    private _handleFocus(): void {
+        focusGained$.next();
+    }
+}
+```
+
+#### Step 6-8: Migrate call sites, delete old code, test
+
+### Pros
+- **Powerful operators** - debounce, throttle, merge, etc.
+- **Composable** - build complex flows from simple streams
+- **Best async handling** - perfect for timing-sensitive operations
+- **Familiar pattern** - many devs know RxJS
+
+### Cons
+- **Highest complexity** - need to understand reactive programming
+- **Learning curve** - team needs training
+- **Custom implementation** - or add RxJS dependency
+- **Debugging** - stream flows can be hard to trace
 
 ---
 
-## Quick Reference: What to Work on Next
+# FINAL COMPARISON
 
-**If you want low-risk quick wins**: Start with Track A
-**If you're seeing memory issues**: Jump to Track B
-**If you want to enable testing**: Do Track C then D
-**If frontend is painful**: Work on Track G (independent)
-**If you need to refactor architecture**: Must complete D first!
+| Aspect | C3-A (EventBus) | C3-B (Channels) | C3-C (Streams) |
+|--------|-----------------|-----------------|----------------|
+| **Complexity** | Medium | Medium-High | High |
+| **Effort** | 5-6 days | 6-7 days | 7-8 days |
+| **Type Safety** | Good | Excellent | Good |
+| **Async Control** | Basic | Basic | Excellent |
+| **Testability** | Good | Good | Excellent |
+| **Debugging** | Easy | Easy | Medium |
+| **Learning Curve** | Low | Low-Medium | High |
+| **Best For** | Most projects | Large teams | Complex async flows |
+
+---
+
+# CHECKLIST FOR ALL PLANS
+
+## Before Starting
+- [ ] Create feature branch
+- [ ] Set up test coverage baseline
+- [ ] Document current behavior
+
+## During Implementation
+- [ ] Write unit tests for new code
+- [ ] Keep old code working until new code is tested
+- [ ] Migrate one call site at a time
+- [ ] Run full test suite after each change
+
+## After Completion
+- [ ] All 9 old functions deleted
+- [ ] All 10 call sites migrated
+- [ ] No duplicate logic remains
+- [ ] Test coverage maintained or improved
+- [ ] Documentation updated
+
+## Test Scenarios
+- [ ] Initial load - board displays correctly
+- [ ] Edit task - changes persist
+- [ ] Undo/redo - works correctly
+- [ ] Template drop - new card added
+- [ ] Focus/blur - no unnecessary reloads
+- [ ] External file change - detected and updated
+- [ ] Media file change - re-rendered
+- [ ] Include file change - content updated
+- [ ] Regular include - no longer causes bug
+- [ ] Save - all files saved correctly
