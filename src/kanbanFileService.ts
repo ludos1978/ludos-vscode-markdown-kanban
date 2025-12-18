@@ -160,7 +160,7 @@ export class KanbanFileService {
     /**
      * Load markdown file and parse into board structure
      */
-    public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false): Promise<void> {
+    public async loadMarkdownFile(document: vscode.TextDocument, forceReload: boolean = false): Promise<void> {
 
         // STATE MACHINE: Don't reload during save operations
         if (this._saveState !== SaveState.IDLE) {
@@ -197,20 +197,9 @@ export class KanbanFileService {
 
         if (!isInitialLoad && !isDifferentDocument && !forceReload) {
             // 🚫 NEVER auto-reload: Preserve existing board state
-
-            // But notify user if external changes detected (but NOT on editor focus)
-            const lastVersion = this._context.lastDocumentVersion;
-            const hasExternalChanges = lastVersion !== -1 &&
-                                     lastVersion < document.version &&
-                                     this._saveState === SaveState.IDLE &&
-                                     !isFromEditorFocus; // Don't show dialog on editor focus
-
-            // External changes are now handled by the unified file watcher system
-            // The UnifiedChangeHandler and individual file watchers detect and resolve conflicts
-            if (!hasExternalChanges) {
-                // Only update version if no external changes were detected (to avoid blocking future detections)
-                this._context.setLastDocumentVersion(document.version);
-            }
+            // External changes are handled by the unified file watcher system
+            // (UnifiedChangeHandler and individual file watchers detect and resolve conflicts)
+            this._context.setLastDocumentVersion(document.version);
             return;
         }
 
@@ -425,7 +414,7 @@ export class KanbanFileService {
             this._saveState = SaveState.IDLE;
 
             // Reload the file after successful initialization (forceReload=true to bypass early-return check)
-            await this.loadMarkdownFile(document, false, true);
+            await this.loadMarkdownFile(document, true);
 
             vscode.window.showInformationMessage('Kanban board initialized successfully');
         } catch (error) {

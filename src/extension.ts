@@ -253,15 +253,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Note: External file change detection is handled by MarkdownFile instances via their built-in watchers
 
-	// Listen for active editor changes
+	// Listen for active editor changes - sets context for VS Code UI (menus, keybindings)
+	// NOTE: External file change detection is handled by file watchers and focus:gained event
 	const activeEditorChangeListener = vscode.window.onDidChangeActiveTextEditor((editor) => {
 		if (editor && editor.document.languageId === 'markdown' && fileListenerEnabled) {
 			vscode.commands.executeCommand('setContext', 'markdownKanbanActive', true);
-			// If panel exists for this document and not locked, reload
-			const panel = KanbanWebviewPanel.getPanelForDocument(editor.document.uri.toString());
-			if (panel && !panel.isFileLocked()) {
-				panel.loadMarkdownFile(editor.document, true); // isFromEditorFocus = true
-			}
 		} else {
 			vscode.commands.executeCommand('setContext', 'markdownKanbanActive', false);
 		}

@@ -49,42 +49,32 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from '../markdownParser';
 /**
  * Main State Machine Class
  *
- * Singleton that orchestrates all file change operations through
+ * Per-panel instance that orchestrates all file change operations through
  * a unified state machine flow.
+ *
+ * NOTE: NOT a singleton - each panel must create its own instance to avoid
+ * cross-panel data contamination when multiple boards are open.
  */
 export class ChangeStateMachine {
-    private static instance: ChangeStateMachine;
     private _currentState: ChangeState = ChangeState.IDLE;
     private _currentContext?: ChangeContext;
     private _isProcessing: boolean = false;
     private _eventQueue: ChangeEvent[] = [];
 
-    // Dependencies (injected)
-    private _fileRegistry: IFileRegistryForStateMachine | null = null;
-    private _webviewPanel: IWebviewPanelForStateMachine | null = null;
+    // Dependencies (injected via constructor)
+    private _fileRegistry: IFileRegistryForStateMachine;
+    private _webviewPanel: IWebviewPanelForStateMachine;
     private _fileSaveService: FileSaveService;
-    private _includeProcessor: IncludeLoadingProcessor | null = null;
-
-    private constructor() {
-        this._fileSaveService = FileSaveService.getInstance();
-    }
-
-    public static getInstance(): ChangeStateMachine {
-        if (!ChangeStateMachine.instance) {
-            ChangeStateMachine.instance = new ChangeStateMachine();
-        }
-        return ChangeStateMachine.instance;
-    }
+    private _includeProcessor: IncludeLoadingProcessor;
 
     /**
-     * Initialize with dependencies
-     * Note: The actual parameters must be MarkdownFileRegistry and KanbanWebviewPanel instances
-     * which implement the interfaces used here. We cast to concrete types for IncludeLoadingProcessor
-     * which requires additional methods.
+     * Create a new ChangeStateMachine for a specific panel.
+     * Each panel must have its own instance to prevent cross-panel contamination.
      */
-    public initialize(fileRegistry: IFileRegistryForStateMachine, webviewPanel: IWebviewPanelForStateMachine): void {
+    constructor(fileRegistry: IFileRegistryForStateMachine, webviewPanel: IWebviewPanelForStateMachine) {
         this._fileRegistry = fileRegistry;
         this._webviewPanel = webviewPanel;
+        this._fileSaveService = FileSaveService.getInstance();
         // Cast to concrete types for IncludeLoadingProcessor which needs full implementations
         this._includeProcessor = new IncludeLoadingProcessor({
             fileRegistry: fileRegistry as unknown as import('../files/MarkdownFileRegistry').MarkdownFileRegistry,

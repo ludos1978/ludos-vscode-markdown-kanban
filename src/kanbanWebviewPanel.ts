@@ -335,8 +335,9 @@ export class KanbanWebviewPanel {
         );
 
         // Initialize unified change state machine (Phase 6)
-        this._stateMachine = ChangeStateMachine.getInstance();
-        this._stateMachine.initialize(this._fileRegistry, this);
+        // Create panel-specific state machine instance (NOT singleton)
+        // Each panel needs its own instance to prevent cross-panel data contamination
+        this._stateMachine = new ChangeStateMachine(this._fileRegistry, this);
 
         // Initialize include file coordinator (Phase 2)
         this._includeCoordinator = new IncludeFileCoordinator({
@@ -764,14 +765,14 @@ export class KanbanWebviewPanel {
         this._restoreStateFromFileService();
     }
 
-    public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
+    public async loadMarkdownFile(document: vscode.TextDocument, forceReload: boolean = false) {
         // RACE-4: Wrap entire operation with lock to prevent concurrent file loads
         return this._concurrency.withLock('loadMarkdownFile', async () => {
             // CRITICAL: Set initial board load flag BEFORE loading main file
             // This prevents the main file's 'reloaded' event from triggering board regeneration
             this._context.setInitialBoardLoad(true);
 
-            await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
+            await this._fileService.loadMarkdownFile(document, forceReload);
             this._restoreStateFromFileService();
 
             // Phase 1: Create or update MainKanbanFile instance
