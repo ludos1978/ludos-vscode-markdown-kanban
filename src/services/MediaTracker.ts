@@ -7,7 +7,7 @@
  *
  * Supported media types:
  * - Diagrams: .drawio, .dio, .excalidraw
- * - Images: .png, .jpg, .jpeg, .gif, .svg, .webp, .bmp, .ico
+ * - Images: .png, .jpg, .jpeg, .gif, .svg, .webp, .avif, .bmp, .ico
  * - Audio: .mp3, .wav, .ogg, .m4a, .flac, .aac
  * - Video: .mp4, .webm, .mov, .avi, .mkv
  * - Documents: .pdf
@@ -53,6 +53,7 @@ export class MediaTracker {
         '.gif': 'image',
         '.svg': 'image',
         '.webp': 'image',
+        '.avif': 'image',
         '.bmp': 'image',
         '.ico': 'image',
         // Audio
@@ -406,6 +407,7 @@ export class MediaTracker {
                 if (mediaType === 'diagram') {
                     const isDrawIO = this._isDrawIOFile(relativePath);
                     const isExcalidraw = this._isExcalidrawFile(relativePath);
+                    console.log(`[MediaTracker] addTrackedFiles: diagram "${relativePath}" isDrawIO=${isDrawIO}, isExcalidraw=${isExcalidraw}`);
                     if (isDrawIO || isExcalidraw) {
                         this._watchFile(relativePath, entry);
                     }

@@ -1364,15 +1364,23 @@ export class KanbanWebviewPanel {
      */
     private _updateMediaTrackingFromIncludes(): void {
         if (!this._mediaTracker) {
+            console.log('[MediaTracker] _updateMediaTrackingFromIncludes: No media tracker');
             return;
         }
 
         // Get all include files and add their media references to tracking
         const includeFiles = this._fileRegistry.getIncludeFiles();
+        console.log(`[MediaTracker] _updateMediaTrackingFromIncludes: Processing ${includeFiles.length} include file(s)`);
+
         for (const includeFile of includeFiles) {
             const content = includeFile.getContent();
+            const path = includeFile.getPath();
+            console.log(`[MediaTracker] Include file "${path}": content length=${content?.length || 0}`);
             if (content) {
-                this._mediaTracker.addTrackedFiles(content);
+                const added = this._mediaTracker.addTrackedFiles(content);
+                if (added.length > 0) {
+                    console.log(`[MediaTracker] Added ${added.length} media file(s) from include: ${added.join(', ')}`);
+                }
             }
         }
     }
