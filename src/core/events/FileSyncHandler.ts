@@ -31,6 +31,8 @@ export interface FileSyncOptions {
     force: boolean;
     /** Skip if initial board load is in progress */
     skipDuringInitialLoad?: boolean;
+    /** Skip sending board update (use during init when loadMarkdownFile already sent it) */
+    skipBoardUpdate?: boolean;
 }
 
 /**
@@ -88,7 +90,7 @@ export class FileSyncHandler {
      * @returns Result with lists of changed files
      */
     public async reloadExternallyModifiedFiles(options: FileSyncOptions): Promise<FileSyncResult> {
-        const { force, skipDuringInitialLoad = false } = options;
+        const { force, skipDuringInitialLoad = false, skipBoardUpdate = false } = options;
 
         const result: FileSyncResult = {
             includeFilesChanged: false,
@@ -120,8 +122,10 @@ export class FileSyncHandler {
             result.mediaFilesChanged = mediaResult.hasChanges;
             result.changedMediaFiles = mediaResult.changedFiles;
 
-            // Step 3: If any changes, send board update
-            if (result.includeFilesChanged || force) {
+            // Step 3: If any changes, send board update (unless skipped during init)
+            // During initial load, loadMarkdownFile() already sent the board update
+            // so we only need to send include content, not another full board update
+            if ((result.includeFilesChanged || force) && !skipBoardUpdate) {
                 this._deps.boardStore.invalidateCache();
                 this._deps.sendBoardUpdate(false, true);
 

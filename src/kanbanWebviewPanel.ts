@@ -1051,9 +1051,10 @@ export class KanbanWebviewPanel {
             // The only difference is force=true (load all) vs force=false (check and reload changed)
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
             // CRITICAL: Must await to hold lock and prevent duplicate initialization from editor focus events
+            // CRITICAL: skipBoardUpdate=true because loadMarkdownFile() already sent the board update
             if (this._fileSyncHandler) {
                 try {
-                    await this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true });
+                    await this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true, skipBoardUpdate: true });
                     console.log('[_initializeBoardFromDocument] Include files loaded via FileSyncHandler (unified path)');
                 } catch (error) {
                     console.error('[_initializeBoardFromDocument] Error loading include content:', error);
