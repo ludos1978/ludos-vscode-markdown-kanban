@@ -631,17 +631,17 @@ export class ChangeStateMachine {
             }
         }
 
-        // CRITICAL FIX: Sync board to backend for include switches
+        // CRITICAL FIX: Emit board:changed event for include switches
         // When an include file is switched, the task/column title in the main file
         // changes (e.g., !!!include(old.md)!!! -> !!!include(new.md)!!!), so the
         // main file content needs to be updated for unsaved detection
         if (context.impact.includesSwitched) {
             const mainFile = this._fileRegistry?.getMainFile();
             if (mainFile && this._webviewPanel) {
-                // Get current board and sync to backend (updates _content for unsaved detection)
+                // Get current board and emit change event (triggers BoardSyncHandler)
                 const board = this._webviewPanel.getBoard?.();
-                if (board && this._webviewPanel.syncBoardToBackend) {
-                    this._webviewPanel.syncBoardToBackend(board);
+                if (board && this._webviewPanel.emitBoardChanged) {
+                    this._webviewPanel.emitBoardChanged(board, 'include-switch');
                 }
             }
         }

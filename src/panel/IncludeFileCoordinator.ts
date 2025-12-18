@@ -103,207 +103,20 @@ export class IncludeFileCoordinator {
             );
         }
 
-        // Update content of existing include files with board changes
-        this._updateIncludeFilesContent(board);
+        // NOTE: Content loading is handled by FileSyncHandler.syncAllFiles()
+        // which is called after registration completes.
     }
 
-    // ============= CONTENT LOADING =============
-
-    /**
-     * Mark all columns/tasks with includes as loading
-     */
-    markIncludesAsLoading(board: KanbanBoard): void {
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                column.isLoadingContent = true;
-            }
-        }
-
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    task.isLoadingContent = true;
-                }
-            }
-        }
-    }
-
-    /**
-     * Load and parse content from all include files, sending incremental updates
-     */
-    async loadIncludeContentAsync(board: KanbanBoard): Promise<void> {
-        const mainFilePath = this._deps.getMainFile()?.getPath();
-
-        // Load column includes
-        await this._loadColumnIncludes(board, mainFilePath);
-
-        // Load task includes
-        await this._loadTaskIncludes(board);
-
-        // Load regular includes
-        await this._loadRegularIncludes();
-    }
-
-    private async _loadColumnIncludes(board: KanbanBoard, mainFilePath: string | undefined): Promise<void> {
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const relativePath of column.includeFiles) {
-                    const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                    if (file) {
-                        try {
-                            // Use forceSyncBaseline() instead of reload() to ensure
-                            // baseline is properly set during initial loading.
-                            // reload() uses _readFromDiskWithVerification() which may
-                            // return old baseline in edge cases.
-                            await file.forceSyncBaseline();
-                            const tasks = file.parseToTasks(column.tasks, column.id, mainFilePath);
-                            column.tasks = tasks;
-                            column.isLoadingContent = false;
-
-                            if (this._deps.state.includeSwitchInProgress) {
-                                continue;
-                            }
-
-                            if (this._deps.getPanel()) {
-                                const columnMsg: UpdateColumnContentExtendedMessage = {
-                                    type: 'updateColumnContent',
-                                    columnId: column.id,
-                                    tasks: tasks,
-                                    columnTitle: column.title,
-                                    displayTitle: column.displayTitle,
-                                    includeMode: true,
-                                    includeFiles: column.includeFiles,
-                                    isLoadingContent: false
-                                };
-                                this._deps.webviewBridge.sendBatched(columnMsg);
-                            }
-                        } catch (error) {
-                            console.error(`[IncludeFileCoordinator] Failed to load column include ${relativePath}:`, error);
-                            column.isLoadingContent = false;
-
-                            if (this._deps.getPanel()) {
-                                const errorMsg: UpdateColumnContentExtendedMessage = {
-                                    type: 'updateColumnContent',
-                                    columnId: column.id,
-                                    tasks: [],
-                                    columnTitle: column.title,
-                                    displayTitle: column.displayTitle,
-                                    includeMode: true,
-                                    includeFiles: column.includeFiles,
-                                    isLoadingContent: false,
-                                    loadError: true
-                                };
-                                this._deps.webviewBridge.send(errorMsg);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private async _loadTaskIncludes(board: KanbanBoard): Promise<void> {
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-                        if (file) {
-                            try {
-                                // Use forceSyncBaseline() instead of reload() to ensure
-                                // baseline is properly set during initial loading
-                                await file.forceSyncBaseline();
-                                const fullFileContent = file.getContent();
-                                const displayTitle = `# include in ${relativePath}`;
-
-                                task.displayTitle = displayTitle;
-                                task.description = fullFileContent;
-                                task.isLoadingContent = false;
-                                file.setContent(fullFileContent, true);
-
-                                if (this._deps.state.includeSwitchInProgress) {
-                                    continue;
-                                }
-
-                                if (this._deps.getPanel()) {
-                                    const taskMsg: UpdateTaskContentExtendedMessage = {
-                                        type: 'updateTaskContent',
-                                        columnId: column.id,
-                                        taskId: task.id,
-                                        description: fullFileContent,
-                                        displayTitle: displayTitle,
-                                        taskTitle: task.title,
-                                        originalTitle: task.originalTitle,
-                                        includeMode: true,
-                                        includeFiles: task.includeFiles,
-                                        isLoadingContent: false
-                                    };
-                                    this._deps.webviewBridge.send(taskMsg);
-                                }
-                            } catch (error) {
-                                console.error(`[IncludeFileCoordinator] Failed to load task include ${relativePath}:`, error);
-                                task.isLoadingContent = false;
-
-                                if (this._deps.getPanel()) {
-                                    const errorMsg: UpdateTaskContentExtendedMessage = {
-                                        type: 'updateTaskContent',
-                                        columnId: column.id,
-                                        taskId: task.id,
-                                        description: '',
-                                        displayTitle: task.displayTitle || '',
-                                        taskTitle: task.title,
-                                        originalTitle: task.originalTitle,
-                                        includeMode: true,
-                                        includeFiles: task.includeFiles,
-                                        isLoadingContent: false,
-                                        loadError: true
-                                    };
-                                    this._deps.webviewBridge.send(errorMsg);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private async _loadRegularIncludes(): Promise<void> {
-        const mainFile = this._deps.fileRegistry.getMainFile();
-        if (!mainFile) return;
-
-        const regularIncludes = mainFile.getIncludedFiles();
-
-        for (const relativePath of regularIncludes) {
-            const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
-            if (file) {
-                try {
-                    // Use forceSyncBaseline() instead of reload() to ensure
-                    // baseline is properly set during initial loading
-                    await file.forceSyncBaseline();
-                    const content = file.getContent();
-
-                    if (this._deps.getPanel()) {
-                        const includeMsg: UpdateIncludeContentMessage = {
-                            type: 'updateIncludeContent',
-                            filePath: relativePath,
-                            content: content
-                        };
-                        this._deps.webviewBridge.sendBatched(includeMsg);
-                    }
-                } catch (error) {
-                    console.error(`[IncludeFileCoordinator] Failed to load regular include ${relativePath}:`, error);
-                }
-            }
-        }
-
-        if (regularIncludes.length > 0 && this._deps.getPanel()) {
-            const updatedMsg: IncludesUpdatedMessage = {
-                type: 'includesUpdated'
-            };
-            this._deps.webviewBridge.sendBatched(updatedMsg);
-        }
-    }
+    // NOTE: The following functions have been migrated to FileSyncHandler:
+    // - markIncludesAsLoading() - No longer needed with unified sync approach
+    // - loadIncludeContentAsync() - Replaced by FileSyncHandler.syncAllFiles({ force: true })
+    // - _loadColumnIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
+    // - _loadTaskIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
+    // - _loadRegularIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
+    //
+    // INIT and FOCUS now use the SAME unified code path:
+    // - INIT: FileSyncHandler.syncAllFiles({ force: true })  - Load all files
+    // - FOCUS: FileSyncHandler.syncAllFiles({ force: false }) - Check and reload changed files
 
     // ============= INCLUDE SWITCH =============
 
@@ -485,39 +298,7 @@ export class IncludeFileCoordinator {
         }
     }
 
-    // ============= PRIVATE HELPERS =============
-
-    /**
-     * Update content of existing include files with board changes
-     * Note: A file can be used in multiple contexts - use board context, not file type
-     */
-    private _updateIncludeFilesContent(board: KanbanBoard): void {
-        // Update column include files
-        for (const column of board.columns) {
-            if (column.includeFiles && column.includeFiles.length > 0) {
-                for (const relativePath of column.includeFiles) {
-                    const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                    if (file) {
-                        const columnIncludeFile = file as IncludeFile;
-                        columnIncludeFile.updateTasks(column.tasks);
-                    }
-                }
-            }
-        }
-
-        // Update task include files
-        for (const column of board.columns) {
-            for (const task of column.tasks) {
-                if (task.includeFiles && task.includeFiles.length > 0) {
-                    for (const relativePath of task.includeFiles) {
-                        const file = this._deps.fileRegistry.getByRelativePath(relativePath);
-                        if (file) {
-                            const taskContent = task.description || '';
-                            file.setContent(taskContent, false);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // NOTE: _updateIncludeFilesContent() has been deleted.
+    // Content updates during INIT are handled by FileSyncHandler.syncAllFiles({ force: true })
+    // Content updates during EDIT are handled by BoardSyncHandler._updateIncludeFileContent()
 }

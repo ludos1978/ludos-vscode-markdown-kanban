@@ -155,7 +155,7 @@ export class EditModeCommands extends BaseMessageCommand {
                 case 'markUnsavedChanges':
                     // Legacy message type from frontend - sync board if provided
                     if (message.cachedBoard) {
-                        context.syncBoardToBackend(message.cachedBoard);
+                        context.emitBoardChanged(message.cachedBoard, 'edit');
                     }
                     return this.success();
 
@@ -203,7 +203,7 @@ export class EditModeCommands extends BaseMessageCommand {
                     if (board) {
                         context.boardStore.saveStateForUndo(board);
                         context.boardOperations.performAutomaticSort(board);
-                        context.syncBoardToBackend(board);
+                        context.emitBoardChanged(board, 'sort');
                         await context.onBoardUpdate();
                     }
                     return this.success();

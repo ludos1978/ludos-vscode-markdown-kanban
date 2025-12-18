@@ -7,6 +7,7 @@ import { KanbanBoard } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
+import { BoardChangeTrigger } from './core/events';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
 import * as vscode from 'vscode';
@@ -29,7 +30,7 @@ export class MessageHandler {
     private _setUndoRedoOperation: (isOperation: boolean) => void;
     private _getWebviewPanel: () => any;
     private _getWebviewBridge: (() => any) | undefined;
-    private _syncBoardToBackend: (board: KanbanBoard) => void;
+    private _emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
     private _autoExportSettings: NewExportOptions | null = null;
 
     // Command Pattern: Registry for message handlers
@@ -54,7 +55,7 @@ export class MessageHandler {
             setUndoRedoOperation: (isOperation: boolean) => void;
             getWebviewPanel: () => any;
             getWebviewBridge?: () => any;
-            syncBoardToBackend: (board: KanbanBoard) => void;
+            emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
         }
     ) {
         this._fileManager = fileManager;
@@ -71,7 +72,7 @@ export class MessageHandler {
         this._setUndoRedoOperation = callbacks.setUndoRedoOperation;
         this._getWebviewPanel = callbacks.getWebviewPanel;
         this._getWebviewBridge = callbacks.getWebviewBridge;
-        this._syncBoardToBackend = callbacks.syncBoardToBackend;
+        this._emitBoardChanged = callbacks.emitBoardChanged;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
         this._commandRegistry = new CommandRegistry();
@@ -99,7 +100,7 @@ export class MessageHandler {
             setUndoRedoOperation: this._setUndoRedoOperation,
             getWebviewPanel: this._getWebviewPanel,
             getWebviewBridge: () => this._getWebviewBridge?.() ?? this._getWebviewPanel()?._webviewBridge,
-            syncBoardToBackend: this._syncBoardToBackend,
+            emitBoardChanged: this._emitBoardChanged,
             getAutoExportSettings: () => this._autoExportSettings,
             setAutoExportSettings: (settings: NewExportOptions | null) => { this._autoExportSettings = settings; },
 
@@ -320,8 +321,8 @@ export class MessageHandler {
                 panel.syncIncludeFilesWithBoard(board);
             }
 
-            // Sync board to backend (updates _content for unsaved detection)
-            this._syncBoardToBackend(board);
+            // Emit board:changed event (updates _content for unsaved detection)
+            this._emitBoardChanged(board, 'edit');
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);

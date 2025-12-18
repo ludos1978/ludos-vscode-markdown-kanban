@@ -15,7 +15,6 @@ import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileServi
 import { MediaTracker, ChangedMediaFile } from './services/MediaTracker';
 import { LinkOperations } from './utils/linkOperations';
 import { getErrorMessage } from './utils/stringUtils';
-import { sortColumnsByRow } from './utils/columnUtils';
 import {
     MarkdownFileRegistry,
     FileFactory,
@@ -24,6 +23,7 @@ import {
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
+import { BoardSyncHandler, FileSyncHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import {
     BoardUpdateMessage,
     UpdateIncludeContentMessage,
@@ -97,6 +97,8 @@ export class KanbanWebviewPanel {
 
     private _boardStore: BoardStore;
     private _webviewBridge: WebviewBridge;
+    private _boardSyncHandler: BoardSyncHandler | null = null;
+    private _fileSyncHandler: FileSyncHandler | null = null;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -419,7 +421,7 @@ export class KanbanWebviewPanel {
                 },
                 getWebviewPanel: () => this,
                 getWebviewBridge: () => this._webviewBridge,
-                syncBoardToBackend: (board: KanbanBoard) => this.syncBoardToBackend(board)
+                emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
             }
         );
 
@@ -436,6 +438,28 @@ export class KanbanWebviewPanel {
 
         // Listen for document close events
         this._setupDocumentCloseListener();
+
+        // Initialize event-driven board sync handler
+        this._boardSyncHandler = new BoardSyncHandler({
+            boardStore: this._boardStore,
+            fileRegistry: this._fileRegistry,
+            getMediaTracker: () => this._mediaTracker,
+            backupManager: this._backupManager,
+            getDocument: () => this._fileManager.getDocument()
+        });
+
+        // Initialize file sync handler (handles focus:gained and unified sync)
+        this._fileSyncHandler = new FileSyncHandler({
+            fileRegistry: this._fileRegistry,
+            boardStore: this._boardStore,
+            getMediaTracker: () => this._mediaTracker,
+            getWebviewBridge: () => this._webviewBridge,
+            getBoard: () => this.getBoard(),
+            panelContext: this._context,
+            sendBoardUpdate: (isFullRefresh, applyDefaultFolding) =>
+                this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
+            emitBoardLoaded: (board) => this.emitBoardLoaded(board)
+        });
 
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
@@ -663,13 +687,9 @@ export class KanbanWebviewPanel {
                     // This ensures settings (shortcuts, tag colors, layout, etc.) are always up-to-date
                     await this._refreshAllViewConfiguration();
 
-                    // Check include files for external changes (async, non-blocking)
-                    // Only triggers board update if include FILE CONTENT changed
-                    this._checkIncludeFilesForExternalChanges();
-
-                    // Check media files (embedded images, diagrams) for external changes
-                    // Only re-renders specific changed media, NOT the full board
-                    this._checkMediaFilesForChanges();
+                    // Emit focus:gained event - FileSyncHandler handles both include and media file checks
+                    // This is the unified code path for external change detection
+                    eventBus.emitSync(createEvent('focus:gained', 'KanbanWebviewPanel'));
 
                     // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
                     if (this._fileManager.getDocument()) {
@@ -1001,8 +1021,8 @@ export class KanbanWebviewPanel {
         // Setup file watchers for diagram files (real-time change detection)
         this._mediaTracker.setupFileWatchers();
 
-        // NOTE: Media tracking updates are handled in syncBoardToBackend()
-        // which is called after every board change. This is more reliable than
+        // NOTE: Media tracking updates are handled by BoardSyncHandler
+        // which handles board:changed events. This is more reliable than
         // event listeners and ensures new diagrams get watchers immediately.
 
         // Load include files if board is available
@@ -1011,24 +1031,24 @@ export class KanbanWebviewPanel {
             // Step 1: Create include file instances in registry
             this._includeCoordinator.syncIncludeFilesWithRegistry(board);
 
-            // Step 2: Mark includes as loading (sets loading flags on columns/tasks)
-            this._includeCoordinator.markIncludesAsLoading(board);
-
-            // Step 3: Load content asynchronously (will send updates as each include loads)
-            // Don't await - let it run in background while we send initial board
+            // Step 2: Load include content using the UNIFIED FileSyncHandler
+            // This is the SAME code path used by FOCUS (focus:gained event)
+            // The only difference is force=true (load all) vs force=false (check and reload changed)
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
-
-            this._includeCoordinator.loadIncludeContentAsync(board)
-                .then(() => {
-                    this._context.setInitialBoardLoad(false);
-
-                    // After include files are loaded, also track their media references
-                    this._updateMediaTrackingFromIncludes();
-                })
-                .catch(error => {
-                    console.error('[_syncMainFileToRegistry] Error loading include content:', error);
-                    this._context.setInitialBoardLoad(false);
-                });
+            if (this._fileSyncHandler) {
+                this._fileSyncHandler.syncAllFiles({ force: true })
+                    .then(() => {
+                        this._context.setInitialBoardLoad(false);
+                        console.log('[_syncMainFileToRegistry] Include files loaded via FileSyncHandler (unified path)');
+                    })
+                    .catch(error => {
+                        console.error('[_syncMainFileToRegistry] Error loading include content:', error);
+                        this._context.setInitialBoardLoad(false);
+                    });
+            } else {
+                console.warn('[_syncMainFileToRegistry] FileSyncHandler not available');
+                this._context.setInitialBoardLoad(false);
+            }
         } else {
             console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
         }
@@ -1362,135 +1382,12 @@ export class KanbanWebviewPanel {
         this._webviewBridge.send(message);
     }
 
-    /**
-     * Update media tracking to include media from include files
-     * Called after include files are loaded asynchronously
-     */
-    private _updateMediaTrackingFromIncludes(): void {
-        if (!this._mediaTracker) {
-            console.log('[MediaTracker] _updateMediaTrackingFromIncludes: No media tracker');
-            return;
-        }
-
-        // Get all include files and add their media references to tracking
-        const includeFiles = this._fileRegistry.getIncludeFiles();
-        console.log(`[MediaTracker] _updateMediaTrackingFromIncludes: Processing ${includeFiles.length} include file(s)`);
-
-        for (const includeFile of includeFiles) {
-            const content = includeFile.getContent();
-            const path = includeFile.getPath();
-            console.log(`[MediaTracker] Include file "${path}": content length=${content?.length || 0}`);
-            if (content) {
-                const added = this._mediaTracker.addTrackedFiles(content);
-                if (added.length > 0) {
-                    console.log(`[MediaTracker] Added ${added.length} media file(s) from include: ${added.join(', ')}`);
-                }
-            }
-        }
-    }
-
-    /**
-     * Check media files (embedded images, diagrams) for external changes.
-     * Called when view gains focus to detect changes to Excalidraw, DrawIO, images, etc.
-     *
-     * UNIFIED SYSTEM: This just triggers checkForChanges() which:
-     * 1. Compares mtimes for all tracked files
-     * 2. Updates cache for changed files
-     * 3. Triggers _onMediaChanged callback (same path as file watchers)
-     * 4. Callback sends notification to frontend
-     *
-     * Only re-renders files that have actually changed (mtime comparison)
-     */
-    private _checkMediaFilesForChanges(): void {
-        if (!this._mediaTracker) {
-            console.log('[MediaTracker] No media tracker initialized');
-            return;
-        }
-
-        try {
-            // NOTE: We don't re-scan content here anymore.
-            // New diagram refs are tracked via the content change listener (onDidChange).
-            // This method only checks for MTIME changes on already-tracked files.
-
-            // Debug: Log what files are being tracked
-            const trackedFiles = this._mediaTracker.getTrackedFiles();
-            console.log(`[MediaTracker] Checking ${trackedFiles.length} tracked file(s):`,
-                trackedFiles.map(f => `${f.path} (${f.type})`));
-
-            // UNIFIED: checkForChanges() handles everything including notification via callback
-            // No need to send message here - the _onMediaChanged callback (set in _syncMainFileToRegistry)
-            // will notify the frontend through the same path used by file watchers
-            this._mediaTracker.checkForChanges();
-        } catch (error) {
-            console.error('[KanbanWebviewPanel] Error checking media files for changes:', error);
-        }
-    }
-
-    /**
-     * Check all include files (markdown) for external changes (async, non-blocking)
-     * Called when view gains focus to detect changes to include file CONTENT.
-     * If changes are found, reloads the affected files and sends a board update.
-     *
-     * NOTE: Media files (DrawIO, Excalidraw, images) are handled by MediaTracker,
-     * NOT by this method. This only handles include file markdown content changes.
-     */
-    private async _checkIncludeFilesForExternalChanges(): Promise<void> {
-        if (!this._fileRegistry.isReady()) {
-            console.log('[IncludeCheck] Registry not ready, skipping');
-            return;
-        }
-
-        // Skip during initial board loading - baselines not set yet
-        if (this._context.initialBoardLoad) {
-            console.log('[IncludeCheck] Initial loading in progress, skipping');
-            return;
-        }
-
-        try {
-            // Log what files are in the registry
-            const allFiles = this._fileRegistry.getAll();
-            console.log(`[IncludeCheck] Registry contains ${allFiles.length} file(s):`,
-                allFiles.map(f => `${f.getPath()} (${f.getFileType()})`));
-
-            // Check all include files for external changes (mtime comparison)
-            const changesMap = await this._fileRegistry.checkAllForExternalChanges();
-
-            // Count files that changed
-            const changedFiles: string[] = [];
-            changesMap.forEach((hasChanged, path) => {
-                console.log(`[IncludeCheck] File ${path}: hasChanged=${hasChanged}`);
-                if (hasChanged) {
-                    changedFiles.push(path);
-                }
-            });
-
-            if (changedFiles.length > 0) {
-                console.log(`[IncludeCheck] ⚠️ TRIGGERING BOARD UPDATE for ${changedFiles.length} changed include file(s):`, changedFiles);
-
-                // Force sync baseline for changed include files
-                // Use forceSyncBaseline() instead of reload() because reload() uses
-                // _readFromDiskWithVerification() which may return the old baseline
-                // in some cases, causing files to be detected as "changed" repeatedly
-                for (const file of this._fileRegistry.getAll()) {
-                    if (changesMap.get(file.getPath())) {
-                        console.log(`[IncludeCheck] Syncing baseline for: ${file.getPath()}`);
-                        await file.forceSyncBaseline();
-                    }
-                }
-
-                // Invalidate board cache and send update for include file content changes
-                this._boardStore.invalidateCache();
-                this.sendBoardUpdate(false, true);
-
-                // After reloading include files, update media tracking for any new media references
-                this._updateMediaTrackingFromIncludes();
-            } else {
-                console.log('[IncludeCheck] No include files changed, skipping board update');
-            }
-        } catch (error) {
-            console.error('[KanbanWebviewPanel] Error checking include files for external changes:', error);
-        }
-    }
+    // NOTE: The following functions have been migrated to event handlers:
+    // - _updateMediaTrackingFromIncludes() → BoardSyncHandler (handles 'board:loaded')
+    // - _checkMediaFilesForChanges() → FileSyncHandler (handles 'focus:gained')
+    // - _checkIncludeFilesForExternalChanges() → FileSyncHandler (handles 'focus:gained')
+    //
+    // INIT and FOCUS pathways now use the same unified code path in FileSyncHandler.
 
     /**
      * Get board (single source of truth)
@@ -1522,59 +1419,30 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Sync board state from frontend to backend
+     * Emit board:changed event to sync board state
      *
-     * Updates _content in MainKanbanFile which triggers hash comparison
-     * for unsaved change detection. Also creates backup.
+     * Emits an event that BoardSyncHandler handles.
+     * This handles: board store update, include file sync, markdown generation,
+     * media tracking, and backup creation.
      *
-     * @param board - The board state to sync to backend
+     * @param board - The board state that changed
+     * @param trigger - What caused the change (edit, undo, redo, template, etc.)
      */
-    public async syncBoardToBackend(board: KanbanBoard): Promise<void> {
-        if (!this._fileRegistry.isReady()) {
-            return;
-        }
+    public emitBoardChanged(board: KanbanBoard, trigger: BoardChangeTrigger = 'edit'): void {
+        eventBus.emitSync(createEvent('board:changed', 'KanbanWebviewPanel', {
+            board,
+            trigger
+        }));
+    }
 
-        // CRITICAL FIX: Sort columns by row before storing to ensure consistency
-        // between board store and generated markdown. This prevents column ordering
-        // mismatches when board is regenerated from markdown (e.g., after blur/focus).
-        // generateMarkdown() uses sortColumnsByRow(), so we must store in same order.
-        const normalizedBoard: KanbanBoard = {
-            ...board,
-            columns: sortColumnsByRow(board.columns)
-        };
-
-        // 1. Update board store (without emitting event - we're syncing, not changing)
-        this._boardStore.setBoard(normalizedBoard, false);
-
-        // 2. Update MainKanbanFile's cached board for conflict detection
-        const mainFile = this._fileRegistry.getMainFile();
-        if (mainFile) {
-            mainFile.setCachedBoardFromWebview(normalizedBoard);
-        }
-
-        // 3. Track changes in include files (updates their cache)
-        await this._fileRegistry.trackIncludeFileUnsavedChanges(normalizedBoard);
-
-        // 4. Generate markdown and update main file content
-        // This causes hasUnsavedChanges() to return true (content !== baseline)
-        if (mainFile) {
-            const markdown = MarkdownKanbanParser.generateMarkdown(normalizedBoard);
-            mainFile.setContent(markdown, false); // false = don't update baseline
-
-            // 4b. Update media tracking - discover new diagram refs in the updated content
-            // This ensures newly created diagrams get file watchers immediately
-            if (this._mediaTracker) {
-                this._mediaTracker.updateTrackedFiles(markdown);
-                this._updateMediaTrackingFromIncludes();
-            }
-        }
-
-        // 5. Create backup if minimum interval has passed
-        const document = this._fileManager.getDocument();
-        if (document) {
-            this._backupManager.createBackup(document, { label: 'auto' })
-                .catch(error => console.error('Backend sync backup failed:', error));
-        }
+    /**
+     * Emit board:loaded event after initial board load completes
+     * This triggers media tracking updates for include files
+     */
+    public emitBoardLoaded(board: KanbanBoard): void {
+        eventBus.emitSync(createEvent('board:loaded', 'KanbanWebviewPanel', {
+            board
+        }));
     }
 
     /**
@@ -1830,6 +1698,18 @@ export class KanbanWebviewPanel {
         if (this._mediaTracker) {
             this._mediaTracker.dispose();
             this._mediaTracker = null;
+        }
+
+        // Dispose event-driven board sync handler
+        if (this._boardSyncHandler) {
+            this._boardSyncHandler.dispose();
+            this._boardSyncHandler = null;
+        }
+
+        // Dispose file sync handler
+        if (this._fileSyncHandler) {
+            this._fileSyncHandler.dispose();
+            this._fileSyncHandler = null;
         }
 
         this._fileRegistry.dispose();

@@ -2,7 +2,7 @@
 
 This document lists all functions and methods in the TypeScript codebase for the Markdown Kanban extension.
 
-**Last Updated:** 2025-12-14
+**Last Updated:** 2025-12-18
 
 ## Format
 Each entry follows: `path_to_filename-classname_functionname` or `path_to_filename-functionname` (when not in a class)
@@ -61,41 +61,76 @@ Each entry follows: `path_to_filename-classname_functionname` or `path_to_filena
 
 ---
 
-### syncBoardToBackend: Renamed from markUnsavedChanges (2025-12-14)
+### Event-Driven Board Sync: EventBus Architecture (2025-12-18)
 
 **Files:**
-- [src/commands/interfaces/MessageCommand.ts](src/commands/interfaces/MessageCommand.ts)
-- [src/messageHandler.ts](src/messageHandler.ts)
-- [src/kanbanWebviewPanel.ts](src/kanbanWebviewPanel.ts)
-- All command files in [src/commands/](src/commands/)
+- [src/core/events/EventBus.ts](src/core/events/EventBus.ts) - Central pub/sub event bus
+- [src/core/events/EventTypes.ts](src/core/events/EventTypes.ts) - Event type definitions
+- [src/core/events/BoardSyncHandler.ts](src/core/events/BoardSyncHandler.ts) - Handles board:changed, board:loaded events
+- [src/core/events/FileSyncHandler.ts](src/core/events/FileSyncHandler.ts) - Handles focus:gained, unified INIT/FOCUS sync
+- [src/kanbanWebviewPanel.ts](src/kanbanWebviewPanel.ts) - Emits events, creates handlers
+- [src/commands/interfaces/MessageCommand.ts](src/commands/interfaces/MessageCommand.ts) - `BoardContext.emitBoardChanged`
+- All command files in [src/commands/](src/commands/) - Use `context.emitBoardChanged()`
 
-**Purpose:** Renamed `markUnsavedChanges(hasChanges, board?)` to `syncBoardToBackend(board)` to reflect actual functionality.
+**Purpose:** Replaced direct sync function calls with event-driven architecture for cleaner decoupling.
 
-**Old Signature (misleading):**
+**Old Pattern (DELETED):**
 ```typescript
-markUnsavedChanges: (hasChanges: boolean, cachedBoard?: any) => void;
+// Commands called this directly
+context.syncBoardToBackend(board);
 ```
 
-**New Signature (clear):**
+**New Pattern:**
 ```typescript
-syncBoardToBackend: (board: KanbanBoard) => void;
+// Commands emit events
+context.emitBoardChanged(board, 'edit');  // or 'undo', 'redo', 'template', 'sort', etc.
 ```
 
-**What It Actually Does:**
-1. Updates `boardStore` with the board
-2. Updates `MainKanbanFile.cachedBoardFromWebview` for conflict detection
-3. Tracks include file changes
-4. Generates markdown and updates `MainKanbanFile._content`
-5. Creates backup
+**What BoardSyncHandler Does (handles board:changed events):**
+1. Normalizes board (sorts columns by row)
+2. Updates `boardStore` with the board
+3. Updates `MainKanbanFile.cachedBoardFromWebview` for conflict detection
+4. Updates include file content from board
+5. Generates markdown and updates `MainKanbanFile._content`
+6. Updates media tracking
+7. Creates auto-backup
 
-**Why Renamed:**
-- Unsaved changes are detected via hash comparison (`_content !== _baseline`)
-- The old function didn't "mark" anything - it synced board state to backend
-- The `hasChanges` parameter was meaningless (ignored when false, required board when true)
-- Calling without a board did nothing (just logged warning)
+**Event Types:**
+- `board:changed` - Board state changed (triggers full sync)
+- `board:loaded` - Board initially loaded (triggers media tracking update)
+- `focus:gained` - Panel gained focus (triggers external change detection)
+- `file:content-changed` - File content updated in memory
+- `media:changed` - Media file changed
 
-**Added Public Method:**
-- `KanbanWebviewPanel.syncBoardToBackend(board)` - Public method for use by ChangeStateMachine
+**Handler Subscriptions:**
+
+*BoardSyncHandler:*
+- `board:changed` - Performs full sync (normalize, save, backup)
+- `board:loaded` - Updates media tracking for include files
+
+*FileSyncHandler:*
+- `focus:gained` - Checks for external file changes and reloads if needed
+
+**Unified INIT/FOCUS Code Path:**
+Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncAllFiles()`:
+- INIT: `syncAllFiles({ force: true })` - Load all include files
+- FOCUS: `syncAllFiles({ force: false })` - Check and reload only changed files
+
+**Migrated Functions:**
+- `syncBoardToBackend()` → `BoardSyncHandler._handleBoardChanged()`
+- `trackIncludeFileUnsavedChanges()` → `BoardSyncHandler._updateIncludeFileContent()`
+- `_updateMediaTrackingFromIncludes()` → `BoardSyncHandler._updateMediaTrackingFromIncludes()`
+- `_checkIncludeFilesForExternalChanges()` → `FileSyncHandler._syncIncludeFiles()`
+- `_checkMediaFilesForChanges()` → `FileSyncHandler._syncMediaFiles()`
+- `loadIncludeContentAsync()` → `FileSyncHandler.syncAllFiles({ force: true })`
+
+**Benefits:**
+- Decoupled components (commands don't need to know sync details)
+- Single handler for all board changes
+- Easy to add new listeners for events
+- Better debugging via event log
+- No more duplicate code (all sync logic in handlers)
+- **INIT and FOCUS share the same unified code path**
 
 ---
 

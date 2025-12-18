@@ -242,7 +242,7 @@ export class TemplateCommands extends BaseMessageCommand {
             currentBoard.columns.splice(insertIndex, 0, emptyColumn);
 
             // Sync to backend and update frontend
-            context.syncBoardToBackend(currentBoard);
+            context.emitBoardChanged(currentBoard, 'template');
             await context.onBoardUpdate();
 
             log(`createEmptyColumn: Created empty column "${columnTitle}" at index ${insertIndex}, row ${targetRow}, stack=${needsStackTag}`);
@@ -350,7 +350,7 @@ export class TemplateCommands extends BaseMessageCommand {
             log(`applyTemplateWithVariables: Added ${columnsWithTags.length} columns at end of board`);
 
             // Sync to backend and update frontend
-            context.syncBoardToBackend(currentBoard);
+            context.emitBoardChanged(currentBoard, 'template');
             await context.onBoardUpdate();
 
             // Send updated board to frontend WITH position info for DOM manipulation

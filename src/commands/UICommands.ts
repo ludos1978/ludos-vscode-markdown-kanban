@@ -92,7 +92,7 @@ export class UICommands extends BaseMessageCommand {
         const previousBoard = context.boardStore.undo();
         if (previousBoard) {
             context.setBoard(previousBoard);
-            context.syncBoardToBackend(previousBoard);
+            context.emitBoardChanged(previousBoard, 'undo');
             await context.onBoardUpdate();
         }
 
@@ -120,7 +120,7 @@ export class UICommands extends BaseMessageCommand {
         const nextBoard = context.boardStore.redo();
         if (nextBoard) {
             context.setBoard(nextBoard);
-            context.syncBoardToBackend(nextBoard);
+            context.emitBoardChanged(nextBoard, 'redo');
             await context.onBoardUpdate();
         }
 

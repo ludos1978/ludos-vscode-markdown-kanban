@@ -1,0 +1,227 @@
+/**
+ * BoardSyncHandler - Handles board:changed events
+ *
+ * Contains the logic previously in syncBoardToBackend().
+ * Subscribes to 'board:changed' events and syncs board state to files.
+ *
+ * Responsibilities:
+ * 1. Normalize board (sort columns by row)
+ * 2. Update BoardStore
+ * 3. Update MainKanbanFile's cached board
+ * 4. Update include file content from board
+ * 5. Generate markdown and update main file content
+ * 6. Update media tracking
+ * 7. Create auto-backup
+ */
+
+import * as vscode from 'vscode';
+import { eventBus, BoardChangedEvent, BoardLoadedEvent, createEvent } from './index';
+import { KanbanBoard, MarkdownKanbanParser } from '../../markdownParser';
+import { BoardStore } from '../stores';
+import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
+import { IncludeFile } from '../../files/IncludeFile';
+import { MediaTracker } from '../../services/MediaTracker';
+import { BackupManager } from '../../services/BackupManager';
+import { sortColumnsByRow } from '../../utils/columnUtils';
+
+/**
+ * Dependencies required by BoardSyncHandler
+ */
+export interface BoardSyncDependencies {
+    boardStore: BoardStore;
+    fileRegistry: MarkdownFileRegistry;
+    getMediaTracker: () => MediaTracker | null;  // Getter because MediaTracker is created lazily
+    backupManager: BackupManager;
+    getDocument: () => vscode.TextDocument | undefined;
+}
+
+export class BoardSyncHandler {
+    private _deps: BoardSyncDependencies;
+    private _unsubscribeChanged: (() => void) | null = null;
+    private _unsubscribeLoaded: (() => void) | null = null;
+
+    constructor(deps: BoardSyncDependencies) {
+        this._deps = deps;
+        this._subscribe();
+    }
+
+    /**
+     * Subscribe to board events
+     */
+    private _subscribe(): void {
+        // Subscribe to board:changed for sync operations
+        this._unsubscribeChanged = eventBus.on('board:changed', async (event: BoardChangedEvent) => {
+            await this._handleBoardChanged(event);
+        });
+
+        // Subscribe to board:loaded for post-initialization media tracking
+        this._unsubscribeLoaded = eventBus.on('board:loaded', (event: BoardLoadedEvent) => {
+            this._handleBoardLoaded(event);
+        });
+    }
+
+    /**
+     * Handle board:loaded event - update media tracking after initial load
+     */
+    private _handleBoardLoaded(_event: BoardLoadedEvent): void {
+        // After board loads and include files are ready, update media tracking
+        this._updateMediaTrackingFromIncludes();
+    }
+
+    /**
+     * Handle board:changed event - sync board state to files
+     *
+     * This is the logic previously in syncBoardToBackend()
+     */
+    private async _handleBoardChanged(event: BoardChangedEvent): Promise<void> {
+        const { board, trigger } = event.data;
+
+        if (!this._deps.fileRegistry.isReady()) {
+            return;
+        }
+
+        // 1. Normalize board: Sort columns by row before storing
+        // This ensures consistency between board store and generated markdown.
+        // generateMarkdown() uses sortColumnsByRow(), so we must store in same order.
+        const normalizedBoard: KanbanBoard = {
+            ...board,
+            columns: sortColumnsByRow(board.columns)
+        };
+
+        // 2. Update BoardStore (without emitting event - we're syncing, not changing)
+        this._deps.boardStore.setBoard(normalizedBoard, false);
+
+        // 3. Update MainKanbanFile's cached board for conflict detection
+        const mainFile = this._deps.fileRegistry.getMainFile();
+        if (mainFile) {
+            mainFile.setCachedBoardFromWebview(normalizedBoard);
+        }
+
+        // 4. Track changes in include files (updates their in-memory content)
+        await this._updateIncludeFileContent(normalizedBoard);
+
+        // 5. Generate markdown and update main file content
+        if (mainFile) {
+            const markdown = MarkdownKanbanParser.generateMarkdown(normalizedBoard);
+            mainFile.setContent(markdown, false); // false = don't update baseline
+
+            // 5b. Update media tracking
+            const mediaTracker = this._deps.getMediaTracker();
+            if (mediaTracker) {
+                mediaTracker.updateTrackedFiles(markdown);
+                this._updateMediaTrackingFromIncludes();
+            }
+
+            // 6. Emit file:content-changed event for other handlers
+            const includeFiles = this._deps.fileRegistry.getIncludeFiles();
+            eventBus.emitSync(createEvent('file:content-changed', 'BoardSyncHandler', {
+                mainFileContent: markdown,
+                includeFiles: includeFiles.map(f => ({
+                    path: f.getPath(),
+                    content: f.getContent() || ''
+                }))
+            }));
+        }
+
+        // 7. Create auto-backup if minimum interval has passed
+        const document = this._deps.getDocument();
+        if (document) {
+            this._deps.backupManager.createBackup(document, { label: 'auto' })
+                .catch(error => console.error('[BoardSyncHandler] Backup failed:', error));
+        }
+    }
+
+    /**
+     * Update include file content from board state
+     *
+     * This is the logic previously in trackIncludeFileUnsavedChanges()
+     */
+    private async _updateIncludeFileContent(board: KanbanBoard): Promise<void> {
+        // Update column include files with current task content
+        for (const column of board.columns) {
+            if (column.includeFiles && column.includeFiles.length > 0) {
+                for (const relativePath of column.includeFiles) {
+                    const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+                    if (file) {
+                        const content = file.generateFromTasks(column.tasks);
+                        const currentContent = file.getContent();
+                        const baseline = file.getBaseline();
+
+                        // CRITICAL PROTECTION: Never replace existing content with empty
+                        if (!content.trim() && currentContent.trim()) {
+                            console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe column content to empty`);
+                            continue;
+                        }
+
+                        // Only update if content differs from baseline
+                        if (content !== baseline) {
+                            file.setContent(content, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update task include files with current task content
+        for (const column of board.columns) {
+            for (const task of column.tasks) {
+                if (task.includeFiles && task.includeFiles.length > 0) {
+                    for (const relativePath of task.includeFiles) {
+                        const file = this._deps.fileRegistry.getByRelativePath(relativePath) as IncludeFile;
+                        if (file) {
+                            const fullContent = task.description || '';
+                            const currentContent = file.getContent();
+                            const baseline = file.getBaseline();
+
+                            // CRITICAL PROTECTION: Never replace existing content with empty
+                            if (!fullContent.trim() && currentContent.trim()) {
+                                console.warn(`[BoardSyncHandler] PROTECTED: Refusing to wipe task content to empty`);
+                                continue;
+                            }
+
+                            // Only update if content differs from baseline
+                            if (fullContent !== baseline) {
+                                file.setTaskDescription(fullContent);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Update media tracking from include files
+     *
+     * This is the logic previously in _updateMediaTrackingFromIncludes()
+     */
+    private _updateMediaTrackingFromIncludes(): void {
+        const mediaTracker = this._deps.getMediaTracker();
+        if (!mediaTracker) {
+            return;
+        }
+
+        const includeFiles = this._deps.fileRegistry.getIncludeFiles();
+
+        for (const includeFile of includeFiles) {
+            const content = includeFile.getContent();
+            if (content) {
+                mediaTracker.addTrackedFiles(content);
+            }
+        }
+    }
+
+    /**
+     * Dispose handler and unsubscribe from events
+     */
+    public dispose(): void {
+        if (this._unsubscribeChanged) {
+            this._unsubscribeChanged();
+            this._unsubscribeChanged = null;
+        }
+        if (this._unsubscribeLoaded) {
+            this._unsubscribeLoaded();
+            this._unsubscribeLoaded = null;
+        }
+    }
+}

@@ -19,6 +19,7 @@ import { IncomingMessage } from '../../core/bridge/MessageTypes';
 import { WebviewBridge } from '../../core/bridge/WebviewBridge';
 import { NewExportOptions } from '../../services/export/ExportService';
 import { CapturedEdit } from '../../files/FileInterfaces';
+import { BoardChangeTrigger } from '../../core/events';
 import * as vscode from 'vscode';
 
 /**
@@ -47,7 +48,8 @@ export interface BoardContext {
     getCurrentBoard: () => KanbanBoard | undefined;
     setBoard: (board: KanbanBoard) => void;
     setUndoRedoOperation: (isOperation: boolean) => void;
-    syncBoardToBackend: (board: KanbanBoard) => void;
+    /** Emit board:changed event to sync board state */
+    emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
     onBoardUpdate: () => Promise<void>;
 }
 
@@ -305,7 +307,7 @@ export abstract class BaseMessageCommand implements MessageCommand {
         if (success) {
             const currentBoard = context.getCurrentBoard();
             if (currentBoard) {
-                context.syncBoardToBackend(currentBoard);
+                context.emitBoardChanged(currentBoard, 'edit');
             }
             if (sendUpdate) {
                 await context.onBoardUpdate();

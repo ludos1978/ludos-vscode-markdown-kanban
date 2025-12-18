@@ -11,6 +11,7 @@ import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { KanbanBoard, KanbanTask } from '../markdownParser';
 import { CapturedEdit } from '../files/FileInterfaces';
+import { BoardChangeTrigger } from './events';
 
 // Re-export for consumers
 export { CapturedEdit };
@@ -37,7 +38,8 @@ export interface IWebviewPanelForStateMachine {
     getBoard(): KanbanBoard | undefined;
     getPanel(): vscode.WebviewPanel | undefined;
     syncIncludeFilesWithBoard?(board: KanbanBoard): void;
-    syncBoardToBackend?(board: KanbanBoard): void;
+    /** Emit board:changed event to sync board state */
+    emitBoardChanged?(board: KanbanBoard, trigger?: BoardChangeTrigger): void;
     invalidateBoardCache?(): void;
     refreshWebviewContent?(): Promise<void>;
     clearColumnDirty?(columnId: string): void;
