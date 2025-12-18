@@ -1454,7 +1454,10 @@ function setupGlobalDragAndDrop() {
      */
     function insertColumnAtPosition(columnData) {
         if (!window.cachedBoard || !dragState.dropTargetStack) {
-            console.warn('[insertColumnAtPosition] Missing cachedBoard or dropTargetStack');
+            console.warn('[insertColumnAtPosition] Missing cachedBoard or dropTargetStack', {
+                hasCachedBoard: !!window.cachedBoard,
+                hasDropTargetStack: !!dragState.dropTargetStack
+            });
             return false;
         }
 
@@ -1462,6 +1465,13 @@ function setupGlobalDragAndDrop() {
         const targetStackFirstColId = dragState.dropTargetStack.querySelector('.kanban-full-height-column')?.dataset?.columnId;
         const beforeColumnId = dragState.dropTargetBeforeColumn?.dataset?.columnId || null;
         const isDropZone = dragState.dropTargetStack.classList.contains('column-drop-zone-stack');
+
+        console.log('[insertColumnAtPosition] Target info:', {
+            isDropZone,
+            targetStackFirstColId,
+            beforeColumnId,
+            dropTargetStackClasses: dragState.dropTargetStack.className
+        });
 
         // Get row number for #row tag
         const targetRowElement = dragState.dropTargetStack.closest('.kanban-row');
@@ -3485,6 +3495,11 @@ function setupColumnDragAndDrop() {
                 if (dropZone) {
                     addHighlight(dropZone, 'drag-over');
                     dragState.pendingDropZone = dropZone;
+
+                    // CRITICAL: Set dropTargetStack for insertColumnAtPosition() to work correctly
+                    // Empty column and clipboard column drops use this to position the new column
+                    dragState.dropTargetStack = foundStack;
+                    dragState.dropTargetBeforeColumn = null;  // No specific before column in drop zone
 
                     // For template drags, set target position
                     if (stillTemplateDrag) {

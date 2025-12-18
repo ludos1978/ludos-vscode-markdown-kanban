@@ -31,8 +31,8 @@ export class VariableProcessor {
     }
 
     /**
-     * Substitute variables in a filename
-     * Same as substitute but ensures result is valid for filenames
+     * Substitute variables in a filename or path
+     * Ensures result is valid for filenames while preserving path separators
      */
     public static substituteFilename(
         filename: string,
@@ -41,8 +41,11 @@ export class VariableProcessor {
     ): string {
         let result = this.substitute(filename, values, variables);
 
-        // Sanitize for filesystem (remove/replace invalid characters)
-        result = result.replace(/[<>:"/\\|?*]/g, '_');
+        // Sanitize for filesystem - replace invalid characters
+        // Note: We preserve '/' as it's a valid path separator on all platforms
+        // (Windows also accepts forward slashes in paths)
+        // Invalid characters on Windows: < > : " \ | ? *
+        result = result.replace(/[<>:"\\|?*]/g, '_');
 
         return result;
     }

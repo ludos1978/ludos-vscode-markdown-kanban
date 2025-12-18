@@ -15,6 +15,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 interface MediaFileEntry {
     mtime: number;
@@ -75,12 +76,22 @@ export class MediaTracker {
     private _kanbanDir: string;
     private _cachePath: string;
     private _cache: MediaCacheData;
+    private _fileWatchers: Map<string, vscode.FileSystemWatcher> = new Map();
+    private _onMediaChanged?: (files: ChangedMediaFile[]) => void;
 
     constructor(kanbanPath: string) {
         this._kanbanPath = kanbanPath;
         this._kanbanDir = path.dirname(kanbanPath);
         this._cachePath = this._getCachePath(kanbanPath);
         this._cache = this._loadCache();
+    }
+
+    /**
+     * Set callback for when media files change
+     * This enables real-time detection of changes to diagram files
+     */
+    public setOnMediaChanged(callback: (files: ChangedMediaFile[]) => void): void {
+        this._onMediaChanged = callback;
     }
 
     /**
@@ -135,10 +146,38 @@ export class MediaTracker {
 
     /**
      * Get file type from extension
+     * Handles compound extensions like .excalidraw.json and .excalidraw.svg
      */
     private _getMediaType(filePath: string): 'diagram' | 'image' | 'audio' | 'video' | 'document' | null {
+        const lowerPath = filePath.toLowerCase();
+
+        // Check for compound excalidraw extensions first
+        if (lowerPath.endsWith('.excalidraw.json') ||
+            lowerPath.endsWith('.excalidraw.svg') ||
+            lowerPath.endsWith('.excalidraw')) {
+            return 'diagram';
+        }
+
         const ext = path.extname(filePath).toLowerCase();
         return MediaTracker.MEDIA_EXTENSIONS[ext] || null;
+    }
+
+    /**
+     * Check if a file is an excalidraw file (handles compound extensions)
+     */
+    private _isExcalidrawFile(filePath: string): boolean {
+        const lowerPath = filePath.toLowerCase();
+        return lowerPath.endsWith('.excalidraw') ||
+               lowerPath.endsWith('.excalidraw.json') ||
+               lowerPath.endsWith('.excalidraw.svg');
+    }
+
+    /**
+     * Check if a file is a drawio file
+     */
+    private _isDrawIOFile(filePath: string): boolean {
+        const lowerPath = filePath.toLowerCase();
+        return lowerPath.endsWith('.drawio') || lowerPath.endsWith('.dio');
     }
 
     /**
@@ -367,9 +406,125 @@ export class MediaTracker {
     }
 
     /**
+     * Setup file watchers for diagram files (drawio, excalidraw)
+     * This enables real-time detection of changes when editing diagram files
+     */
+    public setupFileWatchers(): void {
+        console.log(`[MediaTracker] Setting up file watchers. Cache has ${Object.keys(this._cache.files).length} files`);
+
+        for (const [relativePath, entry] of Object.entries(this._cache.files)) {
+            // Only watch diagram files (drawio, excalidraw)
+            if (entry.type !== 'diagram') {
+                continue;
+            }
+
+            const isDrawIO = this._isDrawIOFile(relativePath);
+            const isExcalidraw = this._isExcalidrawFile(relativePath);
+
+            console.log(`[MediaTracker] Checking diagram: ${relativePath}, isDrawIO=${isDrawIO}, isExcalidraw=${isExcalidraw}`);
+
+            // Check if it's a drawio or excalidraw file using proper detection
+            if (!isDrawIO && !isExcalidraw) {
+                console.log(`[MediaTracker] Skipping non-diagram file: ${relativePath}`);
+                continue;
+            }
+
+            this._watchFile(relativePath, entry);
+        }
+
+        console.log(`[MediaTracker] Setup file watchers for ${this._fileWatchers.size} diagram file(s)`);
+    }
+
+    /**
+     * Watch a single file for changes
+     */
+    private _watchFile(relativePath: string, entry: MediaFileEntry): void {
+        // Skip if already watching
+        if (this._fileWatchers.has(relativePath)) {
+            console.log(`[MediaTracker] Already watching: ${relativePath}`);
+            return;
+        }
+
+        const absolutePath = this._resolveMediaPath(relativePath);
+        console.log(`[MediaTracker] Creating watcher for: ${absolutePath}`);
+
+        try {
+            const watcher = vscode.workspace.createFileSystemWatcher(absolutePath);
+
+            watcher.onDidChange(async () => {
+                console.log(`[MediaTracker] File changed: ${relativePath}`);
+                await this._handleFileChange(relativePath, entry);
+            });
+
+            watcher.onDidDelete(() => {
+                console.log(`[MediaTracker] File deleted: ${relativePath}`);
+                // Remove from cache
+                delete this._cache.files[relativePath];
+                this._saveCache();
+                // Remove watcher
+                this._disposeWatcher(relativePath);
+            });
+
+            this._fileWatchers.set(relativePath, watcher);
+            console.log(`[MediaTracker] Watcher created successfully for: ${relativePath}`);
+        } catch (error) {
+            console.warn(`[MediaTracker] Failed to watch file ${relativePath}:`, error);
+        }
+    }
+
+    /**
+     * Handle file change event
+     */
+    private async _handleFileChange(relativePath: string, entry: MediaFileEntry): Promise<void> {
+        const absolutePath = this._resolveMediaPath(relativePath);
+        const newMtime = this._getFileMtime(absolutePath);
+
+        if (newMtime === null) return;
+
+        // Update cache
+        const oldMtime = entry.mtime;
+        entry.mtime = newMtime;
+        this._saveCache();
+
+        // Notify listeners
+        if (this._onMediaChanged && newMtime !== oldMtime) {
+            const changedFile: ChangedMediaFile = {
+                path: relativePath,
+                absolutePath: absolutePath,
+                type: entry.type,
+                oldMtime: oldMtime,
+                newMtime: newMtime
+            };
+            this._onMediaChanged([changedFile]);
+        }
+    }
+
+    /**
+     * Dispose a single file watcher
+     */
+    private _disposeWatcher(relativePath: string): void {
+        const watcher = this._fileWatchers.get(relativePath);
+        if (watcher) {
+            watcher.dispose();
+            this._fileWatchers.delete(relativePath);
+        }
+    }
+
+    /**
+     * Dispose all file watchers
+     */
+    private _disposeAllWatchers(): void {
+        for (const [, watcher] of this._fileWatchers) {
+            watcher.dispose();
+        }
+        this._fileWatchers.clear();
+    }
+
+    /**
      * Dispose and save final state
      */
     public dispose(): void {
+        this._disposeAllWatchers();
         this._saveCache();
     }
 }

@@ -384,12 +384,13 @@ export class TemplateCommands extends BaseMessageCommand {
         variables: Record<string, string | number>
     ): KanbanColumn[] {
         return template.columns.map((col: TemplateColumn) => {
-            // Process title
+            // Process title - preserves all tags including #stack
             const processedTitle = VariableProcessor.substitute(
                 col.title,
                 variables,
                 template.variables
             );
+            console.log(`[TemplateCommands.processTemplateColumns] Column title: "${col.title}" -> "${processedTitle}"`);
 
             // Process tasks
             const processedTasks = (col.tasks || []).map((task: TemplateTask) => {

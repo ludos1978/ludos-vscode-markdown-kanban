@@ -963,11 +963,32 @@ export class KanbanWebviewPanel {
         // Tracks modification times of embedded media (images, diagrams, audio, video)
         this._mediaTracker = new MediaTracker(filePath);
 
+        // Set up callback for real-time media file change detection
+        this._mediaTracker.setOnMediaChanged((changedFiles) => {
+            console.log(`[MediaTracker] Real-time change detected for ${changedFiles.length} file(s):`,
+                changedFiles.map(f => f.path));
+
+            // Send changed file paths to frontend for selective re-rendering
+            if (this._panel) {
+                this._panel.webview.postMessage({
+                    type: 'mediaFilesChanged',
+                    changedFiles: changedFiles.map(f => ({
+                        path: f.path,
+                        absolutePath: f.absolutePath,
+                        type: f.type
+                    }))
+                });
+            }
+        });
+
         // Update tracked media files from current content
         const content = mainFile.getContent();
         if (content) {
             this._mediaTracker.updateTrackedFiles(content);
         }
+
+        // Setup file watchers for diagram files (real-time change detection)
+        this._mediaTracker.setupFileWatchers();
 
         // Load include files if board is available
         const board = this.getBoard();

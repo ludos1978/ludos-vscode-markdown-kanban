@@ -54,7 +54,7 @@
 	- agent/FUNCTIONS.md for the functions in the project.
 	- agent/DATASTRUCTURE.md for the data structures.
 	- agent/DATAINSTANCES.md for the instances of data.
-
+ 
 - Never keep any obsolete code! Rewrite code to make it use new data styles completely or remove it completely. Do not create any compatiblity layers or conversions from old data styles!
 - Keep reports short and concise or leave them out if it's already mentioned in the answer.
 - Do not use delays or delayed calls anywhere, except for visual effects that have no functional background. Never use delays to create an order of execution. it's fine to use delays (timers) if it's just a visual information to the user.

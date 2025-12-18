@@ -265,6 +265,24 @@ export class DiagramCommands extends BaseMessageCommand {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
+            // Check if the DrawIO file is empty (only has default root cells)
+            const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
+            const isEmptyDiagram = this.isEmptyDrawIOFile(fileContent);
+
+            if (isEmptyDiagram) {
+                // Return a placeholder SVG for empty diagrams
+                const placeholderSvg = this.createEmptyDrawIOPlaceholder();
+                const pngDataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
+
+                this.postMessage({
+                    type: 'drawioRenderSuccess',
+                    requestId,
+                    svgDataUrl: pngDataUrl,
+                    fileMtime
+                });
+                return;
+            }
+
             // Determine cache location based on file context
             const cacheDir = this.getDrawIOCacheDir(absolutePath, context);
             const cacheFileName = this.getDrawIOCacheFileName(absolutePath, fileMtime);
@@ -381,6 +399,39 @@ export class DiagramCommands extends BaseMessageCommand {
             // Ignore cleanup errors
             console.warn('[DrawIO Backend] Cache cleanup warning:', error);
         }
+    }
+
+    /**
+     * Check if a DrawIO file is empty (only contains default root cells)
+     * Empty DrawIO files have mxCell elements with id="0" and id="1" only
+     */
+    private isEmptyDrawIOFile(content: string): boolean {
+        try {
+            // Count mxCell elements - empty diagrams only have 2 (id=0 and id=1)
+            const mxCellMatches = content.match(/<mxCell\s+id="[^"]*"/g);
+            if (!mxCellMatches) {
+                return true; // No cells at all = empty
+            }
+            // Default cells are id="0" (root) and id="1" (default layer)
+            // Any additional cells mean the diagram has content
+            return mxCellMatches.length <= 2;
+        } catch {
+            return false; // If we can't parse, assume not empty
+        }
+    }
+
+    /**
+     * Create a placeholder SVG for empty DrawIO diagrams
+     */
+    private createEmptyDrawIOPlaceholder(): string {
+        const width = 400;
+        const height = 300;
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2" rx="8"/>
+  <text x="${width / 2}" y="${height / 2 - 10}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#6c757d">Empty Draw.io Diagram</text>
+  <text x="${width / 2}" y="${height / 2 + 15}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#adb5bd">Click to edit</text>
+</svg>`;
     }
 
     // ============= EXCALIDRAW HANDLERS =============
