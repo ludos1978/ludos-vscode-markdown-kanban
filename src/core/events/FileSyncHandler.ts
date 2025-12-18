@@ -1,5 +1,5 @@
 /**
- * FileSyncHandler - Unified handler for file synchronization events
+ * FileSyncHandler - Detects and reloads externally modified files
  *
  * Combines INIT and FOCUS pathways into a single reusable code path.
  *
@@ -7,12 +7,12 @@
  * - `focus:gained` - Check for external file changes when panel gains focus
  *
  * Public methods:
- * - `syncAllFiles(force)` - Called by INIT path with force=true, by FOCUS with force=false
+ * - `reloadExternallyModifiedFiles(options)` - Called by INIT (force=true) and FOCUS (force=false)
  *
- * Replaces:
+ * Replaces (deleted functions):
  * - `_checkIncludeFilesForExternalChanges()` from KanbanWebviewPanel
  * - `_checkMediaFilesForChanges()` from KanbanWebviewPanel
- * - Parts of `_syncMainFileToRegistry()` related to include file loading
+ * - Parts of `_initializeBoardFromDocument()` related to include file loading
  */
 
 import { eventBus, FocusGainedEvent, createEvent } from './index';
@@ -72,18 +72,22 @@ export class FileSyncHandler {
     private _subscribe(): void {
         // Subscribe to focus:gained for external change detection
         this._unsubscribeFocus = eventBus.on('focus:gained', async (_event: FocusGainedEvent) => {
-            await this.syncAllFiles({ force: false, skipDuringInitialLoad: true });
+            await this.reloadExternallyModifiedFiles({ force: false, skipDuringInitialLoad: true });
         });
     }
 
     /**
-     * Unified sync method - called by both INIT and FOCUS pathways
+     * Reload files that were modified externally (outside VS Code)
+     *
+     * Called by both INIT and FOCUS pathways:
+     * - INIT: force=true → reload all files regardless of mtime
+     * - FOCUS: force=false → only reload files with changed mtime
      *
      * @param options.force - If true, reload all files. If false, only reload changed files.
-     * @param options.skipDuringInitialLoad - If true, skip sync during initial board load
-     * @returns Result of sync operation
+     * @param options.skipDuringInitialLoad - If true, skip during initial board load
+     * @returns Result with lists of changed files
      */
-    public async syncAllFiles(options: FileSyncOptions): Promise<FileSyncResult> {
+    public async reloadExternallyModifiedFiles(options: FileSyncOptions): Promise<FileSyncResult> {
         const { force, skipDuringInitialLoad = false } = options;
 
         const result: FileSyncResult = {
@@ -106,13 +110,13 @@ export class FileSyncHandler {
         }
 
         try {
-            // Step 1: Sync include files (markdown content)
-            const includeResult = await this._syncIncludeFiles(force);
+            // Step 1: Check and reload include files that changed externally
+            const includeResult = await this._reloadChangedIncludeFiles(force);
             result.includeFilesChanged = includeResult.hasChanges;
             result.changedIncludeFiles = includeResult.changedFiles;
 
-            // Step 2: Sync media files (images, diagrams)
-            const mediaResult = this._syncMediaFiles();
+            // Step 2: Check media files for external changes
+            const mediaResult = this._checkMediaForExternalChanges();
             result.mediaFilesChanged = mediaResult.hasChanges;
             result.changedMediaFiles = mediaResult.changedFiles;
 
@@ -138,12 +142,12 @@ export class FileSyncHandler {
     }
 
     /**
-     * Sync include files - check for external changes and reload if needed
+     * Check include files for external changes and reload if needed
      *
      * @param force - If true, reload all files regardless of mtime
      * @returns Object with hasChanges flag and list of changed file paths
      */
-    private async _syncIncludeFiles(force: boolean): Promise<{ hasChanges: boolean; changedFiles: string[] }> {
+    private async _reloadChangedIncludeFiles(force: boolean): Promise<{ hasChanges: boolean; changedFiles: string[] }> {
         const changedFiles: string[] = [];
 
         // Log registry contents for debugging
@@ -189,14 +193,14 @@ export class FileSyncHandler {
     }
 
     /**
-     * Sync media files - check for external changes
+     * Check media files (images, diagrams) for external changes
      *
      * Note: Media changes are handled via MediaTracker's callback mechanism,
      * so we just trigger the check here.
      *
      * @returns Object with hasChanges flag and list of changed file paths
      */
-    private _syncMediaFiles(): { hasChanges: boolean; changedFiles: string[] } {
+    private _checkMediaForExternalChanges(): { hasChanges: boolean; changedFiles: string[] } {
         const mediaTracker = this._deps.getMediaTracker();
         if (!mediaTracker) {
             console.log('[FileSyncHandler] No media tracker initialized');

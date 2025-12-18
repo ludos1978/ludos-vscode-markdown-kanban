@@ -1,3 +1,9 @@
+- [ ] found problems:
+- when i modify a column that has tasks and i add a columninclude. it should be able to add the existing tasks into the included board (as these othervise get lost when the include is added). this was working before, but isnt anymore.
+- when i modify the board, it sometimes allways exits editing, i cant modify the board anymore.
+- when i have a save conflict and i save my changes as backup and load from external, a popup should show up with the backup file link to open.
+- when dropping a task from the sources on the info header it doesnt do the positional highlight reliably. it maybe does it once, but not the second time i use that feature.
+
 - [ ] after copying a column as markdown. i'd like to be able to drop it as a new column with content out of the copyed content.
   - if the first task only is a title without a content. it will be used as column title.\
   - othervise the title of the column is empty\

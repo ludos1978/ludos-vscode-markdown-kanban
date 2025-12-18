@@ -50,9 +50,12 @@ export class IncludeFileCoordinator {
     // ============= INCLUDE FILE REGISTRATION =============
 
     /**
-     * Sync include files with registry - creates instances for all includes in the board
+     * Register all include files from the board into the file registry
+     *
+     * Scans the board for column includes, task includes, and regular includes,
+     * and creates IncludeFile instances in the registry for each one.
      */
-    syncIncludeFilesWithRegistry(board: KanbanBoard): void {
+    registerBoardIncludeFiles(board: KanbanBoard): void {
         const mainFile = this._deps.fileRegistry.getMainFile();
         if (!mainFile) {
             console.warn(`[IncludeFileCoordinator] Cannot sync include files - no main file in registry`);
@@ -103,20 +106,20 @@ export class IncludeFileCoordinator {
             );
         }
 
-        // NOTE: Content loading is handled by FileSyncHandler.syncAllFiles()
+        // NOTE: Content loading is handled by FileSyncHandler.reloadExternallyModifiedFiles()
         // which is called after registration completes.
     }
 
     // NOTE: The following functions have been migrated to FileSyncHandler:
     // - markIncludesAsLoading() - No longer needed with unified sync approach
-    // - loadIncludeContentAsync() - Replaced by FileSyncHandler.syncAllFiles({ force: true })
-    // - _loadColumnIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
-    // - _loadTaskIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
-    // - _loadRegularIncludes() - Logic now in FileSyncHandler._syncIncludeFiles()
+    // - loadIncludeContentAsync() - Replaced by FileSyncHandler.reloadExternallyModifiedFiles({ force: true })
+    // - _loadColumnIncludes() - Logic now in FileSyncHandler._reloadChangedIncludeFiles()
+    // - _loadTaskIncludes() - Logic now in FileSyncHandler._reloadChangedIncludeFiles()
+    // - _loadRegularIncludes() - Logic now in FileSyncHandler._reloadChangedIncludeFiles()
     //
     // INIT and FOCUS now use the SAME unified code path:
-    // - INIT: FileSyncHandler.syncAllFiles({ force: true })  - Load all files
-    // - FOCUS: FileSyncHandler.syncAllFiles({ force: false }) - Check and reload changed files
+    // - INIT: FileSyncHandler.reloadExternallyModifiedFiles({ force: true })  - Load all files
+    // - FOCUS: FileSyncHandler.reloadExternallyModifiedFiles({ force: false }) - Check and reload changed
 
     // ============= INCLUDE SWITCH =============
 
@@ -299,6 +302,6 @@ export class IncludeFileCoordinator {
     }
 
     // NOTE: _updateIncludeFilesContent() has been deleted.
-    // Content updates during INIT are handled by FileSyncHandler.syncAllFiles({ force: true })
-    // Content updates during EDIT are handled by BoardSyncHandler._updateIncludeFileContent()
+    // Content updates during INIT are handled by FileSyncHandler.reloadExternallyModifiedFiles({ force: true })
+    // Content updates during EDIT are handled by BoardSyncHandler._propagateEditsToIncludeFiles()
 }

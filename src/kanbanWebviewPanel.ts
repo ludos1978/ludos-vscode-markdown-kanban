@@ -652,10 +652,10 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Sync state from file service to panel state
+     * Restore panel state from file service
      * Called after any file service operation to keep states in sync
      */
-    private _syncStateFromFileService(): void {
+    private _restoreStateFromFileService(): void {
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
         // STATE-2: Cache board if available
@@ -761,7 +761,7 @@ export class KanbanWebviewPanel {
 
     private async _ensureBoardAndSendUpdate() {
         await this._fileService.ensureBoardAndSendUpdate();
-        this._syncStateFromFileService();
+        this._restoreStateFromFileService();
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, isFromEditorFocus: boolean = false, forceReload: boolean = false) {
@@ -772,10 +772,10 @@ export class KanbanWebviewPanel {
             this._context.setInitialBoardLoad(true);
 
             await this._fileService.loadMarkdownFile(document, isFromEditorFocus, forceReload);
-            this._syncStateFromFileService();
+            this._restoreStateFromFileService();
 
             // Phase 1: Create or update MainKanbanFile instance
-            await this._syncMainFileToRegistry(document);
+            await this._initializeBoardFromDocument(document);
         });
     }
 
@@ -836,12 +836,12 @@ export class KanbanWebviewPanel {
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
         await this._fileService.saveToMarkdown(updateVersionTracking, triggerSave);
-        this._syncStateFromFileService();
+        this._restoreStateFromFileService();
     }
 
     private async initializeFile() {
         await this._fileService.initializeFile();
-        this._syncStateFromFileService();
+        this._restoreStateFromFileService();
     }
 
     private _getHtmlForWebview() {
@@ -952,9 +952,9 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Load main file to registry (create or update MainKanbanFile instance)
+     * Initialize board from document - creates MainKanbanFile and registers include files
      */
-    private async _syncMainFileToRegistry(document: vscode.TextDocument): Promise<void> {
+    private async _initializeBoardFromDocument(document: vscode.TextDocument): Promise<void> {
         const filePath = document.uri.fsPath;
 
         // Check if MainKanbanFile already exists
@@ -1029,28 +1029,28 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (board && board.valid) {
             // Step 1: Create include file instances in registry
-            this._includeCoordinator.syncIncludeFilesWithRegistry(board);
+            this._includeCoordinator.registerBoardIncludeFiles(board);
 
             // Step 2: Load include content using the UNIFIED FileSyncHandler
             // This is the SAME code path used by FOCUS (focus:gained event)
             // The only difference is force=true (load all) vs force=false (check and reload changed)
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
             if (this._fileSyncHandler) {
-                this._fileSyncHandler.syncAllFiles({ force: true })
+                this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true })
                     .then(() => {
                         this._context.setInitialBoardLoad(false);
-                        console.log('[_syncMainFileToRegistry] Include files loaded via FileSyncHandler (unified path)');
+                        console.log('[_initializeBoardFromDocument] Include files loaded via FileSyncHandler (unified path)');
                     })
                     .catch(error => {
-                        console.error('[_syncMainFileToRegistry] Error loading include content:', error);
+                        console.error('[_initializeBoardFromDocument] Error loading include content:', error);
                         this._context.setInitialBoardLoad(false);
                     });
             } else {
-                console.warn('[_syncMainFileToRegistry] FileSyncHandler not available');
+                console.warn('[_initializeBoardFromDocument] FileSyncHandler not available');
                 this._context.setInitialBoardLoad(false);
             }
         } else {
-            console.warn(`[_syncMainFileToRegistry] Skipping include file sync - board not available or invalid`);
+            console.warn(`[_initializeBoardFromDocument] Skipping include file sync - board not available or invalid`);
         }
 
         // Log registry statistics

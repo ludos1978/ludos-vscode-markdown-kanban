@@ -97,8 +97,8 @@ export class BoardSyncHandler {
             mainFile.setCachedBoardFromWebview(normalizedBoard);
         }
 
-        // 4. Track changes in include files (updates their in-memory content)
-        await this._updateIncludeFileContent(normalizedBoard);
+        // 4. Propagate board edits to include files (updates their in-memory content)
+        await this._propagateEditsToIncludeFiles(normalizedBoard);
 
         // 5. Generate markdown and update main file content
         if (mainFile) {
@@ -132,11 +132,13 @@ export class BoardSyncHandler {
     }
 
     /**
-     * Update include file content from board state
+     * Propagate board edits to include files
      *
-     * This is the logic previously in trackIncludeFileUnsavedChanges()
+     * When user edits tasks in the webview, this writes those changes to the
+     * corresponding include files (column includes and task includes).
+     * This is the reverse of loading include content into the board.
      */
-    private async _updateIncludeFileContent(board: KanbanBoard): Promise<void> {
+    private async _propagateEditsToIncludeFiles(board: KanbanBoard): Promise<void> {
         // Update column include files with current task content
         for (const column of board.columns) {
             if (column.includeFiles && column.includeFiles.length > 0) {
