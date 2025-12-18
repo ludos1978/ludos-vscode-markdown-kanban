@@ -647,6 +647,10 @@ export class KanbanWebviewPanel {
 
     private _initialize() {
         if (!this._context.initialized) {
+            // CRITICAL: Reset webviewReady before setting new HTML
+            // During panel revival, VS Code's cached webview may have already sent webviewReady
+            // before we replace the HTML. This ensures we wait for the NEW webview's ready message.
+            this._context.setWebviewReady(false);
             this._panel.webview.html = this._getHtmlForWebview();
             this._context.setInitialized(true);
         }
@@ -750,6 +754,16 @@ export class KanbanWebviewPanel {
         } else if (wasAlreadyReady) {
             // Webview was recreated by VS Code - ALL messages sent since last webviewReady were lost!
             // Re-send EVERYTHING the webview needs:
+
+            // CRITICAL: Only re-send if we actually have a board to send
+            // During panel revival, the board hasn't been loaded yet - initialization will handle it
+            // Also skip during initialBoardLoad - that code path will send the board update
+            const board = this.getBoard();
+            if (!board || !board.valid || this._context.initialBoardLoad) {
+                // No board yet or initialization in progress - skip, initialization will send it
+                return;
+            }
+
             console.log('[WebviewReady] Webview was recreated by VS Code - re-sending all state');
 
             // 1. File info (filename, path, locked status)
@@ -1052,6 +1066,7 @@ export class KanbanWebviewPanel {
             }
         } else {
             console.warn(`[_initializeBoardFromDocument] Skipping include file sync - board not available or invalid`);
+            this._context.setInitialBoardLoad(false);
         }
 
         // Log registry statistics
