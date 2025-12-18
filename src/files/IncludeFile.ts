@@ -317,7 +317,7 @@ export class IncludeFile extends MarkdownFile {
      * Create backup of current content for include files
      * Since include files don't have TextDocuments, we write directly to a backup file
      */
-    public async createBackup(label: string = 'manual'): Promise<void> {
+    public async createBackup(label: string = 'manual'): Promise<string | null> {
 
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -332,9 +332,11 @@ export class IncludeFile extends MarkdownFile {
 
             // Write current content to backup file
             await fs.promises.writeFile(backupPath, this._content, 'utf8');
+
+            return backupPath;
         } catch (error) {
-            console.error(`[${this.getFileType()}] ✗ Failed to create backup:`, error);
-            throw error;
+            console.error(`[${this.getFileType()}] Failed to create backup:`, error);
+            return null;
         }
     }
 

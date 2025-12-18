@@ -1035,16 +1035,16 @@ export class KanbanWebviewPanel {
             // This is the SAME code path used by FOCUS (focus:gained event)
             // The only difference is force=true (load all) vs force=false (check and reload changed)
             // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
+            // CRITICAL: Must await to hold lock and prevent duplicate initialization from editor focus events
             if (this._fileSyncHandler) {
-                this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true })
-                    .then(() => {
-                        this._context.setInitialBoardLoad(false);
-                        console.log('[_initializeBoardFromDocument] Include files loaded via FileSyncHandler (unified path)');
-                    })
-                    .catch(error => {
-                        console.error('[_initializeBoardFromDocument] Error loading include content:', error);
-                        this._context.setInitialBoardLoad(false);
-                    });
+                try {
+                    await this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true });
+                    console.log('[_initializeBoardFromDocument] Include files loaded via FileSyncHandler (unified path)');
+                } catch (error) {
+                    console.error('[_initializeBoardFromDocument] Error loading include content:', error);
+                } finally {
+                    this._context.setInitialBoardLoad(false);
+                }
             } else {
                 console.warn('[_initializeBoardFromDocument] FileSyncHandler not available');
                 this._context.setInitialBoardLoad(false);

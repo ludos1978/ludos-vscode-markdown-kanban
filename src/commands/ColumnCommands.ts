@@ -33,6 +33,7 @@ import { PresentationGenerator } from '../services/export/PresentationGenerator'
 import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { MarkdownFile } from '../files/MarkdownFile';
 
 /**
  * Column Commands Handler
@@ -223,9 +224,12 @@ ${tasksContent}`;
                     const includeFilePath = newIncludeFiles[0];
                     if (includeFilePath) {
                         try {
-                            const { absolutePath, content } = await this.generateAppendTasksContent(column, includeFilePath, context);
+                            // Note: Must normalize the path key for consistent lookup
+                            // IncludeLoadingProcessor uses MarkdownFile.normalizeRelativePath for lookups
+                            const { content } = await this.generateAppendTasksContent(column, includeFilePath, context);
                             preloadedContent = new Map<string, string>();
-                            preloadedContent.set(absolutePath, content);
+                            const normalizedKey = MarkdownFile.normalizeRelativePath(includeFilePath);
+                            preloadedContent.set(normalizedKey, content);
                         } catch (error) {
                             vscode.window.showErrorMessage(`Failed to generate tasks content: ${getErrorMessage(error)}`);
                             this.postMessage({

@@ -188,7 +188,15 @@ export class IncludeLoadingProcessor {
         const tasks: KanbanTask[] = [];
 
         for (const relativePath of loadingFiles) {
-            const preloadedContent = preloadedContentMap?.get(relativePath);
+            // Normalize path for consistent Map lookup (matches normalization in ColumnCommands)
+            const normalizedPath = MarkdownFile.normalizeRelativePath(relativePath);
+            const preloadedContent = preloadedContentMap?.get(normalizedPath);
+
+            if (preloadedContentMap && preloadedContent) {
+                console.log(`[IncludeLoadingProcessor] Using preloaded content for: ${relativePath} (${preloadedContent.length} chars)`);
+            } else if (preloadedContentMap) {
+                console.log(`[IncludeLoadingProcessor] No preloaded content for: ${relativePath} (normalized: ${normalizedPath}), will load from disk`);
+            }
 
             // Ensure file is registered with correct type
             await this._ensureColumnIncludeRegistered(relativePath, targetColumn, fileFactory, mainFile);

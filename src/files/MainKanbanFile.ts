@@ -413,11 +413,16 @@ export class MainKanbanFile extends MarkdownFile {
             // CRITICAL: Check shouldCreateBackup FIRST because backup-and-reload sets both shouldCreateBackup AND shouldReload
             if (resolution.shouldCreateBackup) {
                 // Create backup of current content, then reload
-                await this.createBackup('conflict');
+                const backupPath = await this.createBackup('conflict');
                 await this.reload();
                 this._emitChange('conflict');
                 this._cachedBoardFromWebview = undefined;
                 this._hasFileSystemChanges = false;
+
+                // Show notification with link to open backup file
+                if (backupPath) {
+                    this._showBackupNotification(backupPath);
+                }
             } else if (resolution.shouldSave) {
                 // save() method marks itself as legitimate automatically
                 await this.save();  // save() already clears cached board

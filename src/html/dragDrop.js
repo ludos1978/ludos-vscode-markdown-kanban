@@ -3143,6 +3143,10 @@ function setupDragAndDrop() {
         draggedClipboardCard: null,
         draggedEmptyCard: null
     };
+
+    // CRITICAL: Update window.dragState to match local dragState
+    // Clipboard/empty card handlers use window.dragState, so they must reference the same object
+    window.dragState = dragState;
     
     // Only set up global drag/drop once to prevent multiple listeners
     if (!dragDropInitialized) {

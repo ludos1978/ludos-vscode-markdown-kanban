@@ -605,9 +605,14 @@ export abstract class MarkdownFile implements vscode.Disposable {
             if (resolution.shouldCreateBackup) {
                 // resolveConflict('backup') creates backup AND reloads
                 // Create backup of current content, then reload
-                await this.createBackup('conflict');
+                const backupPath = await this.createBackup('conflict');
                 await this.reload();
                 this._emitChange('conflict');
+
+                // Show notification with link to open backup file
+                if (backupPath) {
+                    this._showBackupNotification(backupPath);
+                }
             } else if (resolution.shouldSave) {
                 // save() method marks itself as legitimate automatically
                 await this.save();
@@ -625,8 +630,9 @@ export abstract class MarkdownFile implements vscode.Disposable {
     /**
      * Create backup of current content
      * (Subclasses can override with specific implementation)
+     * @returns The backup file path if successful, null if failed
      */
-    public async createBackup(label: string = 'manual'): Promise<void> {
+    public async createBackup(label: string = 'manual'): Promise<string | null> {
 
         try {
             // Get the VS Code TextDocument for this file
@@ -634,22 +640,42 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
             if (!document) {
                 console.error(`[${this.getFileType()}] Cannot create backup - failed to open document: ${this._relativePath}`);
-                return;
+                return null;
             }
 
             // Use BackupManager to create the backup
             const backupManager = new BackupManager();
-            const success = await backupManager.createBackup(document, {
+            const backupPath = await backupManager.createBackup(document, {
                 label: label,
                 forceCreate: true  // Always create backup for conflict resolution
             });
 
-            if (!success) {
-                console.warn(`[${this.getFileType()}] ⚠️  Backup creation returned false: ${this._relativePath}`);
+            if (!backupPath) {
+                console.warn(`[${this.getFileType()}] Backup creation returned null: ${this._relativePath}`);
             }
+
+            return backupPath;
         } catch (error) {
-            console.error(`[${this.getFileType()}] ❌ Failed to create backup:`, error);
+            console.error(`[${this.getFileType()}] Failed to create backup:`, error);
+            return null;
         }
+    }
+
+    /**
+     * Show notification with link to open backup file
+     */
+    protected _showBackupNotification(backupPath: string): void {
+        const fileName = path.basename(backupPath);
+        vscode.window.showInformationMessage(
+            `Your changes have been saved to backup: ${fileName}`,
+            'Open Backup'
+        ).then(choice => {
+            if (choice === 'Open Backup') {
+                vscode.workspace.openTextDocument(backupPath).then(doc => {
+                    vscode.window.showTextDocument(doc);
+                });
+            }
+        });
     }
 
     // ============= FILE WATCHING & CHANGE DETECTION =============

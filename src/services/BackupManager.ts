@@ -19,20 +19,21 @@ export class BackupManager {
 
     /**
      * Create a backup of the given document
+     * @returns The backup file path if successful, null if failed or skipped
      */
-    public async createBackup(document: vscode.TextDocument, options: BackupOptions = {}): Promise<boolean> {
+    public async createBackup(document: vscode.TextDocument, options: BackupOptions = {}): Promise<string | null> {
         try {
             // Safety check: ensure document is valid
             if (!document) {
                 console.warn('[BackupManager] Cannot create backup - document is undefined');
-                return false;
+                return null;
             }
 
             const enableBackups = configService.getConfig('enableBackups');
             const defaultIntervalMinutes = configService.getConfig('backupInterval');
 
             if (!enableBackups && !options.forceCreate) {
-                return false;
+                return null;
             }
 
             const now = new Date();
@@ -44,7 +45,7 @@ export class BackupManager {
                 const intervalMs = intervalMinutes * 60 * 1000;
 
                 if (timeSinceLastBackup < intervalMs) {
-                    return false;
+                    return null;
                 }
             }
 
@@ -53,7 +54,7 @@ export class BackupManager {
 
             // Skip backup if content hasn't changed (unless forced)
             if (!options.forceCreate && this._lastContentHash === contentHash) {
-                return false;
+                return null;
             }
 
             const backupPath = this.generateBackupPath(document, options.label || 'backup');
@@ -77,11 +78,11 @@ export class BackupManager {
             // Clean up old backups
             await this.cleanupOldBackups(document);
 
-            return true;
+            return backupPath;
         } catch (error) {
             console.error('[BackupManager] Failed to create backup:', error);
             vscode.window.showWarningMessage(`Failed to create backup: ${error}`);
-            return false;
+            return null;
         }
     }
 
