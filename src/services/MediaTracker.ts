@@ -274,6 +274,9 @@ export class MediaTracker {
         const mediaRefs = this.extractMediaReferences(content);
         console.log(`[MediaTracker] Found ${mediaRefs.length} media reference(s) in content:`, mediaRefs);
 
+        // Track which files are no longer referenced (for watcher cleanup)
+        const oldFiles = new Set(Object.keys(this._cache.files));
+
         const trackedFiles: string[] = [];
         const newCache: Record<string, MediaFileEntry> = {};
 
@@ -290,7 +293,13 @@ export class MediaTracker {
                     type: mediaType
                 };
                 trackedFiles.push(relativePath);
+                oldFiles.delete(relativePath); // Still referenced, don't cleanup
             }
+        }
+
+        // Dispose watchers for files that are no longer tracked
+        for (const removedPath of oldFiles) {
+            this._disposeWatcher(removedPath);
         }
 
         this._cache.files = newCache;
@@ -301,10 +310,14 @@ export class MediaTracker {
     }
 
     /**
-     * Check for changed files by comparing current mtimes with cached mtimes
-     * Returns list of files that have changed
+     * Check for changed files by comparing current mtimes with cached mtimes.
+     * This is the UNIFIED change detection method - both focus-based polling
+     * and file watchers ultimately notify through _onMediaChanged callback.
+     *
+     * @param triggerCallback - If true (default), triggers _onMediaChanged callback when changes found
+     * @returns List of files that have changed
      */
-    public checkForChanges(): ChangedMediaFile[] {
+    public checkForChanges(triggerCallback: boolean = true): ChangedMediaFile[] {
         const changedFiles: ChangedMediaFile[] = [];
 
         for (const [relativePath, entry] of Object.entries(this._cache.files)) {
@@ -337,6 +350,11 @@ export class MediaTracker {
             this._saveCache();
             console.log(`[MediaTracker] Detected ${changedFiles.length} changed media file(s):`,
                 changedFiles.map(f => f.path));
+
+            // UNIFIED: Notify through single callback (same path as file watchers)
+            if (triggerCallback && this._onMediaChanged) {
+                this._onMediaChanged(changedFiles);
+            }
         }
 
         return changedFiles;
@@ -364,11 +382,21 @@ export class MediaTracker {
 
             const mtime = this._getFileMtime(absolutePath);
             if (mtime !== null) {
-                this._cache.files[relativePath] = {
+                const entry: MediaFileEntry = {
                     mtime: mtime,
                     type: mediaType
                 };
+                this._cache.files[relativePath] = entry;
                 addedFiles.push(relativePath);
+
+                // Set up file watcher for newly added diagram files (real-time change detection)
+                if (mediaType === 'diagram') {
+                    const isDrawIO = this._isDrawIOFile(relativePath);
+                    const isExcalidraw = this._isExcalidrawFile(relativePath);
+                    if (isDrawIO || isExcalidraw) {
+                        this._watchFile(relativePath, entry);
+                    }
+                }
             }
         }
 

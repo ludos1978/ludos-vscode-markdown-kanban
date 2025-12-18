@@ -2514,11 +2514,13 @@ if (!webviewEventListenersInitialized) {
         case 'mediaFilesChanged':
             // Handle media files that have changed externally (detected via mtime comparison)
             // Only re-renders the specific files that changed, not everything
-            if (message.files && message.files.length > 0) {
-                console.log(`[Frontend] Media files changed:`, message.files.map(f => f.path));
+            // Backend sends "changedFiles", support both for compatibility
+            const changedMediaFiles = message.changedFiles || message.files;
+            if (changedMediaFiles && changedMediaFiles.length > 0) {
+                console.log(`[Frontend] Media files changed:`, changedMediaFiles.map(f => f.path));
 
                 // Process each changed file
-                message.files.forEach(file => {
+                changedMediaFiles.forEach(file => {
                     console.log(`[Frontend] Processing changed file: ${file.path} (type: ${file.type})`);
 
                     if (file.type === 'diagram') {
@@ -2605,7 +2607,7 @@ if (!webviewEventListenersInitialized) {
                     }
                 });
 
-                console.log(`[Frontend] Processed ${message.files.length} changed media file(s)`);
+                console.log(`[Frontend] Processed ${changedMediaFiles.length} changed media file(s)`);
             }
             break;
 

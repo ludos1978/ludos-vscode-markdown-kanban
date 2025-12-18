@@ -1367,8 +1367,15 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Check media files (embedded images, diagrams) for external changes
+     * Check media files (embedded images, diagrams) for external changes.
      * Called when view gains focus to detect changes to Excalidraw, DrawIO, images, etc.
+     *
+     * UNIFIED SYSTEM: This just triggers checkForChanges() which:
+     * 1. Compares mtimes for all tracked files
+     * 2. Updates cache for changed files
+     * 3. Triggers _onMediaChanged callback (same path as file watchers)
+     * 4. Callback sends notification to frontend
+     *
      * Only re-renders files that have actually changed (mtime comparison)
      */
     private _checkMediaFilesForChanges(): void {
@@ -1383,26 +1390,10 @@ export class KanbanWebviewPanel {
             console.log(`[MediaTracker] Checking ${trackedFiles.length} tracked file(s):`,
                 trackedFiles.map(f => `${f.path} (${f.type})`));
 
-            // Check which media files have changed since last check
-            const changedFiles = this._mediaTracker.checkForChanges();
-
-            if (changedFiles.length > 0) {
-                console.log(`[KanbanWebviewPanel] Detected ${changedFiles.length} changed media file(s):`,
-                    changedFiles.map(f => f.path));
-
-                // Send changed file paths to frontend for selective re-rendering
-                // Only these specific files will have their diagram cache cleared
-                if (this._panel) {
-                    this._panel.webview.postMessage({
-                        type: 'mediaFilesChanged',
-                        files: changedFiles.map(f => ({
-                            path: f.path,
-                            absolutePath: f.absolutePath,
-                            type: f.type
-                        }))
-                    });
-                }
-            }
+            // UNIFIED: checkForChanges() handles everything including notification via callback
+            // No need to send message here - the _onMediaChanged callback (set in _syncMainFileToRegistry)
+            // will notify the frontend through the same path used by file watchers
+            this._mediaTracker.checkForChanges();
         } catch (error) {
             console.error('[KanbanWebviewPanel] Error checking media files for changes:', error);
         }
