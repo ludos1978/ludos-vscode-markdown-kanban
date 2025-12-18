@@ -300,12 +300,22 @@ export class MediaTracker {
             const mtime = this._getFileMtime(absolutePath);
             if (mtime !== null) {
                 console.log(`[MediaTracker] Tracking "${relativePath}" - mtime=${mtime}`);
-                newCache[relativePath] = {
+                const entry: MediaFileEntry = {
                     mtime: mtime,
                     type: mediaType
                 };
+                newCache[relativePath] = entry;
                 trackedFiles.push(relativePath);
                 oldFiles.delete(relativePath); // Still referenced, don't cleanup
+
+                // Set up file watcher for diagram files (if not already watching)
+                if (mediaType === 'diagram') {
+                    const isDrawIO = this._isDrawIOFile(relativePath);
+                    const isExcalidraw = this._isExcalidrawFile(relativePath);
+                    if (isDrawIO || isExcalidraw) {
+                        this._watchFile(relativePath, entry);
+                    }
+                }
             } else {
                 console.log(`[MediaTracker] File not found: "${absolutePath}"`);
             }

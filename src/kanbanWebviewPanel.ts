@@ -1001,6 +1001,10 @@ export class KanbanWebviewPanel {
         // Setup file watchers for diagram files (real-time change detection)
         this._mediaTracker.setupFileWatchers();
 
+        // NOTE: Media tracking updates are handled in syncBoardToBackend()
+        // which is called after every board change. This is more reliable than
+        // event listeners and ensures new diagrams get watchers immediately.
+
         // Load include files if board is available
         const board = this.getBoard();
         if (board && board.valid) {
@@ -1404,6 +1408,10 @@ export class KanbanWebviewPanel {
         }
 
         try {
+            // NOTE: We don't re-scan content here anymore.
+            // New diagram refs are tracked via the content change listener (onDidChange).
+            // This method only checks for MTIME changes on already-tracked files.
+
             // Debug: Log what files are being tracked
             const trackedFiles = this._mediaTracker.getTrackedFiles();
             console.log(`[MediaTracker] Checking ${trackedFiles.length} tracked file(s):`,
@@ -1552,6 +1560,13 @@ export class KanbanWebviewPanel {
         if (mainFile) {
             const markdown = MarkdownKanbanParser.generateMarkdown(normalizedBoard);
             mainFile.setContent(markdown, false); // false = don't update baseline
+
+            // 4b. Update media tracking - discover new diagram refs in the updated content
+            // This ensures newly created diagrams get file watchers immediately
+            if (this._mediaTracker) {
+                this._mediaTracker.updateTrackedFiles(markdown);
+                this._updateMediaTrackingFromIncludes();
+            }
         }
 
         // 5. Create backup if minimum interval has passed
