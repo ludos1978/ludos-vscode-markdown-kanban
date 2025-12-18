@@ -961,6 +961,13 @@ export class KanbanWebviewPanel {
 
         // Initialize MediaTracker for this kanban file
         // Tracks modification times of embedded media (images, diagrams, audio, video)
+        // IMPORTANT: Dispose old tracker before creating new one to cleanup file watchers
+        if (this._mediaTracker) {
+            console.log('[MediaTracker] Disposing old MediaTracker before creating new one');
+            this._mediaTracker.dispose();
+            this._mediaTracker = null;
+        }
+        console.log(`[MediaTracker] Creating new MediaTracker for: ${filePath}`);
         this._mediaTracker = new MediaTracker(filePath);
 
         // Set up callback for real-time media file change detection
@@ -983,8 +990,12 @@ export class KanbanWebviewPanel {
 
         // Update tracked media files from current content
         const content = mainFile.getContent();
+        console.log(`[MediaTracker] Main file content length: ${content?.length || 0}`);
         if (content) {
-            this._mediaTracker.updateTrackedFiles(content);
+            const trackedFiles = this._mediaTracker.updateTrackedFiles(content);
+            console.log(`[MediaTracker] Tracking ${trackedFiles.length} media files from main file`);
+        } else {
+            console.warn(`[MediaTracker] No content from main file - skipping media tracking`);
         }
 
         // Setup file watchers for diagram files (real-time change detection)

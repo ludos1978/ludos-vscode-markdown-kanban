@@ -138,9 +138,11 @@ export class MediaTracker {
     private _saveCache(): void {
         try {
             this._cache.lastUpdated = new Date().toISOString();
-            fs.writeFileSync(this._cachePath, JSON.stringify(this._cache, null, 2), 'utf8');
+            const cacheContent = JSON.stringify(this._cache, null, 2);
+            console.log(`[MediaTracker] Saving cache to ${this._cachePath} with ${Object.keys(this._cache.files).length} files`);
+            fs.writeFileSync(this._cachePath, cacheContent, 'utf8');
         } catch (error) {
-            console.error(`[MediaTracker] Failed to save cache: ${error}`);
+            console.error(`[MediaTracker] Failed to save cache to ${this._cachePath}:`, error);
         }
     }
 
@@ -216,7 +218,9 @@ export class MediaTracker {
 
         while ((match = imageRegex.exec(content)) !== null) {
             const filePath = match[1];
-            if (this._getMediaType(filePath)) {
+            const mediaType = this._getMediaType(filePath);
+            console.log(`[MediaTracker] extractMediaReferences: found image ref "${filePath}", mediaType=${mediaType}`);
+            if (mediaType) {
                 mediaFiles.add(filePath);
             }
         }
@@ -271,6 +275,7 @@ export class MediaTracker {
      * Returns list of all tracked files
      */
     public updateTrackedFiles(content: string): string[] {
+        console.log(`[MediaTracker] updateTrackedFiles called with content length: ${content?.length || 0}`);
         const mediaRefs = this.extractMediaReferences(content);
         console.log(`[MediaTracker] Found ${mediaRefs.length} media reference(s) in content:`, mediaRefs);
 
@@ -284,16 +289,24 @@ export class MediaTracker {
             const absolutePath = this._resolveMediaPath(relativePath);
             const mediaType = this._getMediaType(relativePath);
 
-            if (!mediaType) continue;
+            console.log(`[MediaTracker] Processing: "${relativePath}" -> type=${mediaType}, absolutePath="${absolutePath}"`);
+
+            if (!mediaType) {
+                console.log(`[MediaTracker] Skipping "${relativePath}" - unsupported media type`);
+                continue;
+            }
 
             const mtime = this._getFileMtime(absolutePath);
             if (mtime !== null) {
+                console.log(`[MediaTracker] Tracking "${relativePath}" - mtime=${mtime}`);
                 newCache[relativePath] = {
                     mtime: mtime,
                     type: mediaType
                 };
                 trackedFiles.push(relativePath);
                 oldFiles.delete(relativePath); // Still referenced, don't cleanup
+            } else {
+                console.log(`[MediaTracker] File not found: "${absolutePath}"`);
             }
         }
 
