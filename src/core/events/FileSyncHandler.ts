@@ -122,17 +122,29 @@ export class FileSyncHandler {
             result.mediaFilesChanged = mediaResult.hasChanges;
             result.changedMediaFiles = mediaResult.changedFiles;
 
-            // Step 3: If any changes, send board update (unless skipped during init)
-            // During initial load, loadMarkdownFile() already sent the board update
-            // so we only need to send include content, not another full board update
-            if ((result.includeFilesChanged || force) && !skipBoardUpdate) {
-                this._deps.boardStore.invalidateCache();
-                this._deps.sendBoardUpdate(false, true);
+            // Step 3: Send updates to webview
+            if (result.includeFilesChanged || force) {
+                if (skipBoardUpdate) {
+                    // During initial load, loadMarkdownFile() already sent the board update.
+                    // We only need to send include content, not another full board update.
+                    // This avoids redundant rendering while still delivering include content.
+                    this._sendIncludeContentOnly();
 
-                // Emit board:loaded to trigger media tracking update
-                const board = this._deps.getBoard();
-                if (board) {
-                    this._deps.emitBoardLoaded(board);
+                    // Still emit board:loaded for media tracking
+                    const board = this._deps.getBoard();
+                    if (board) {
+                        this._deps.emitBoardLoaded(board);
+                    }
+                } else {
+                    // Normal path: send full board update (includes include content)
+                    this._deps.boardStore.invalidateCache();
+                    this._deps.sendBoardUpdate(false, true);
+
+                    // Emit board:loaded to trigger media tracking update
+                    const board = this._deps.getBoard();
+                    if (board) {
+                        this._deps.emitBoardLoaded(board);
+                    }
                 }
             }
 
@@ -228,6 +240,35 @@ export class FileSyncHandler {
         } catch (error) {
             console.error('[FileSyncHandler] Error checking media files:', error);
             return { hasChanges: false, changedFiles: [] };
+        }
+    }
+
+    /**
+     * Send include content to webview without triggering a full board update.
+     * Used during initialization when loadMarkdownFile() already sent the board.
+     */
+    private _sendIncludeContentOnly(): void {
+        const webviewBridge = this._deps.getWebviewBridge();
+        if (!webviewBridge) {
+            console.warn('[FileSyncHandler] No webview bridge available for sending include content');
+            return;
+        }
+
+        const includeFiles = this._deps.fileRegistry.getIncludeFiles();
+        if (includeFiles.length === 0) {
+            console.log('[FileSyncHandler] No include files to send');
+            return;
+        }
+
+        console.log(`[FileSyncHandler] Sending ${includeFiles.length} include file(s) content (without board update)`);
+
+        for (const file of includeFiles) {
+            const message = {
+                type: 'updateIncludeContent' as const,
+                filePath: file.getRelativePath(),
+                content: file.getContent()
+            };
+            webviewBridge.sendBatched(message);
         }
     }
 
