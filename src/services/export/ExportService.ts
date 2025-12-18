@@ -15,7 +15,7 @@ import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
-import { KanbanBoard, KanbanTask } from '../../board/KanbanTypes';
+import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
 
 /**
  * Export options - SINGLE unified system for ALL exports
@@ -28,7 +28,9 @@ export interface NewExportOptions {
     scope?: 'board' | 'column' | 'task';
 
     // SELECTION: Specific item to export (for column/task scope)
+    // columnId is preferred over columnIndex for reliable lookup (avoids sync issues)
     selection?: {
+        columnId?: string;
         columnIndex?: number;
         taskId?: string;
     };
@@ -1281,22 +1283,39 @@ export class ExportService {
             return board;
         }
 
-        if (options.scope === 'column' && options.selection?.columnIndex !== undefined) {
-            const columnIndex = options.selection.columnIndex;
-            if (columnIndex >= 0 && columnIndex < board.columns.length) {
+        if (options.scope === 'column') {
+            // Prefer columnId for reliable lookup (avoids frontend/backend sync issues)
+            let column: KanbanColumn | undefined;
+            if (options.selection?.columnId) {
+                column = board.columns.find((c: KanbanColumn) => c.id === options.selection!.columnId);
+            } else if (options.selection?.columnIndex !== undefined) {
+                const columnIndex = options.selection.columnIndex;
+                if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                    column = board.columns[columnIndex];
+                }
+            }
+            if (column) {
                 return {
                     ...board,
-                    columns: [board.columns[columnIndex]]
+                    columns: [column]
                 };
             }
         }
 
-        if (options.scope === 'task' && options.selection?.columnIndex !== undefined && options.selection?.taskId) {
-            const columnIndex = options.selection.columnIndex;
-            const taskId = options.selection.taskId;
+        if (options.scope === 'task' && options.selection?.taskId) {
+            // Prefer columnId for reliable lookup (avoids frontend/backend sync issues)
+            let column: KanbanColumn | undefined;
+            if (options.selection?.columnId) {
+                column = board.columns.find((c: KanbanColumn) => c.id === options.selection!.columnId);
+            } else if (options.selection?.columnIndex !== undefined) {
+                const columnIndex = options.selection.columnIndex;
+                if (columnIndex >= 0 && columnIndex < board.columns.length) {
+                    column = board.columns[columnIndex];
+                }
+            }
 
-            if (columnIndex >= 0 && columnIndex < board.columns.length) {
-                const column = board.columns[columnIndex];
+            if (column) {
+                const taskId = options.selection.taskId;
                 const task = column.tasks?.find((t: KanbanTask) => t.id === taskId);
 
                 if (task) {

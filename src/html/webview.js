@@ -2813,12 +2813,24 @@ if (!webviewEventListenersInitialized) {
             showTemplateVariableDialog(message);
             break;
         case 'templateApplied':
-            // Template was applied successfully - refresh board
+            // Template was applied successfully
+            // Use SAME approach as insertColumnAtPosition (via handleTemplateApplied in dragDrop.js):
+            // 1. Render (columns at end)
+            // 2. Move columns to correct DOM position
+            // 3. syncColumnDataToDOMOrder()
+            // 4. finalizeColumnDrop() which calls normalizeAllStackTags()
             if (message.board) {
                 window.cachedBoard = message.board;
                 if (typeof window.renderBoard === 'function') {
                     window.renderBoard();
                 }
+
+                // Use the SAME function from dragDrop.js that has access to syncColumnDataToDOMOrder and finalizeColumnDrop
+                requestAnimationFrame(() => {
+                    if (typeof window.handleTemplateApplied === 'function') {
+                        window.handleTemplateApplied(message);
+                    }
+                });
             }
             break;
         case 'updateColumnContent':

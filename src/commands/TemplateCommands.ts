@@ -135,7 +135,8 @@ export class TemplateCommands extends BaseMessageCommand {
                     targetRow: message.targetRow,
                     insertAfterColumnId: message.insertAfterColumnId,
                     insertBeforeColumnId: message.insertBeforeColumnId,
-                    position: message.position
+                    position: message.position,
+                    isDropZone: message.isDropZone
                 });
                 return this.success({ hasVariables: true });
             } else {
@@ -317,56 +318,54 @@ export class TemplateCommands extends BaseMessageCommand {
                 return this.failure('No board available');
             }
 
-            // Find insertion point
+            // Get target row for #row tag
             const targetRow = message.targetRow || 1;
-            let insertIndex = currentBoard.columns.length;
 
-            if (message.insertAfterColumnId) {
-                const afterIndex = currentBoard.columns.findIndex(c => c.id === message.insertAfterColumnId);
-                if (afterIndex >= 0) {
-                    insertIndex = afterIndex + 1;
-                }
-            } else if (message.insertBeforeColumnId) {
-                const beforeIndex = currentBoard.columns.findIndex(c => c.id === message.insertBeforeColumnId);
-                if (beforeIndex >= 0) {
-                    insertIndex = beforeIndex;
-                }
-            } else if (message.position === 'first') {
-                const firstInRow = currentBoard.columns.findIndex(c => {
-                    const rowMatch = c.title.match(/#row(\d+)/i);
-                    const colRow = rowMatch ? parseInt(rowMatch[1], 10) : 1;
-                    return colRow === targetRow;
-                });
-                insertIndex = firstInRow >= 0 ? firstInRow : currentBoard.columns.length;
-            }
+            // Add ONLY #row tag - #stack is handled by frontend's normalizeAllStackTags()
+            // This uses the SAME approach as insertColumnAtPosition:
+            // 1. Add columns at END of board
+            // 2. Frontend moves them in DOM to correct position
+            // 3. Frontend calls syncColumnDataToDOMOrder() and normalizeAllStackTags()
+            const columnsWithTags = processedColumns.map((col) => {
+                let title = col.title;
 
-            // Add row tag to columns if needed
-            const columnsWithRow = processedColumns.map(col => {
-                if (targetRow > 1 && !/#row\d+/i.test(col.title)) {
-                    col.title = `${col.title} #row${targetRow}`;
+                // Add #row tag if needed
+                if (targetRow > 1 && !/#row\d+/i.test(title)) {
+                    title = `${title} #row${targetRow}`;
                 }
+
+                col.title = title;
                 return col;
             });
+
+            // Collect new column IDs for frontend to position them
+            const newColumnIds = columnsWithTags.map(col => col.id);
 
             // Save undo state
             context.boardStore.saveStateForUndo(currentBoard);
 
-            // Insert columns into board
-            currentBoard.columns.splice(insertIndex, 0, ...columnsWithRow);
+            // Add columns at END of board (same approach as insertColumnAtPosition)
+            // Frontend will move them to correct DOM position and call normalizeAllStackTags
+            currentBoard.columns.push(...columnsWithTags);
+            log(`applyTemplateWithVariables: Added ${columnsWithTags.length} columns at end of board`);
 
             // Sync to backend and update frontend
             context.syncBoardToBackend(currentBoard);
             await context.onBoardUpdate();
 
-            // Send updated board to frontend
+            // Send updated board to frontend WITH position info for DOM manipulation
             this.postMessage({
                 type: 'templateApplied',
-                board: currentBoard
+                board: currentBoard,
+                newColumnIds: newColumnIds,
+                insertAfterColumnId: message.insertAfterColumnId,
+                insertBeforeColumnId: message.insertBeforeColumnId,
+                isDropZone: message.isDropZone
             });
 
-            log(`applyTemplateWithVariables: Applied template with ${columnsWithRow.length} columns`);
+            log(`applyTemplateWithVariables: Applied template with ${columnsWithTags.length} columns`);
 
-            return this.success({ columnsAdded: columnsWithRow.length });
+            return this.success({ columnsAdded: columnsWithTags.length });
 
         } catch (error) {
             console.error('[TemplateCommands.applyTemplateWithVariables] Error:', error);

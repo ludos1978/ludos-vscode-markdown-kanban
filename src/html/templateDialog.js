@@ -177,6 +177,8 @@ function submitTemplateVariables(templateInfo, values) {
             insertAfterColumnId: templateInfo.insertAfterColumnId,
             insertBeforeColumnId: templateInfo.insertBeforeColumnId,
             position: templateInfo.position,
+            // isDropZone indicates dropping between stacks (new stack) vs within a stack (join stack)
+            isDropZone: templateInfo.isDropZone || false,
             variables: values
         });
     }

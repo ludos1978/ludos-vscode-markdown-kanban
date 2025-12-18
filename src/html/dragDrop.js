@@ -1439,9 +1439,25 @@ function setupGlobalDragAndDrop() {
             window.recalculateAllStackHeights();
         }
 
-        // Update drop zones
+        // Update drop zones - both stack-bottom zones AND between-stack drop zones
         if (typeof window.updateStackBottomDropZones === 'function') {
             window.updateStackBottomDropZones();
+        }
+
+        // Recreate drop zone stacks (between columns) for all rows and the board
+        const boardElement = document.getElementById('kanban-board');
+        if (boardElement) {
+            // Update drop zones for each row
+            const rows = boardElement.querySelectorAll('.kanban-row');
+            rows.forEach(row => {
+                cleanupAndRecreateDropZones(row);
+            });
+
+            // Update drop zones for board level (row 1 columns not in a .kanban-row)
+            const hasRowContainers = rows.length > 0;
+            if (!hasRowContainers) {
+                cleanupAndRecreateDropZones(boardElement);
+            }
         }
     }
 
@@ -1582,12 +1598,109 @@ function setupGlobalDragAndDrop() {
         syncColumnDataToDOMOrder();
 
         // Step 7: Finalize - normalizeAllStackTags() will fix #stack tags (same as processColumnDrop)
-        requestAnimationFrame(() => {
-            finalizeColumnDrop();
-        });
+        // IMPORTANT: Call directly (not in requestAnimationFrame) to match processColumnDrop behavior
+        finalizeColumnDrop();
 
         return true;
     }
+
+    /**
+     * Handle template columns after they're applied by backend
+     * Uses the SAME approach as insertColumnAtPosition:
+     * - Move columns in DOM to correct position
+     * - syncColumnDataToDOMOrder()
+     * - finalizeColumnDrop() which calls normalizeAllStackTags()
+     *
+     * @param {object} message - The templateApplied message from backend
+     */
+    function handleTemplateApplied(message) {
+        if (!message.newColumnIds || message.newColumnIds.length === 0) return;
+
+        const { newColumnIds, insertAfterColumnId, insertBeforeColumnId, isDropZone } = message;
+
+        if (isDropZone) {
+            // Drop zone: each template column stays in its own stack, just position between stacks
+            let lastMovedStack = null;
+
+            if (insertAfterColumnId) {
+                const afterCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertAfterColumnId}"]`);
+                lastMovedStack = afterCol?.closest('.kanban-column-stack');
+
+                if (lastMovedStack) {
+                    for (const colId of newColumnIds) {
+                        const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                        const colStack = colElement?.closest('.kanban-column-stack');
+                        if (colStack && colStack !== lastMovedStack) {
+                            lastMovedStack.parentNode.insertBefore(colStack, lastMovedStack.nextElementSibling);
+                            lastMovedStack = colStack; // Track for next iteration
+                        }
+                    }
+                }
+            } else if (insertBeforeColumnId) {
+                const beforeCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertBeforeColumnId}"]`);
+                const beforeStack = beforeCol?.closest('.kanban-column-stack');
+
+                if (beforeStack) {
+                    for (const colId of newColumnIds) {
+                        const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                        const colStack = colElement?.closest('.kanban-column-stack');
+                        if (colStack && colStack !== beforeStack) {
+                            beforeStack.parentNode.insertBefore(colStack, beforeStack);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Not a drop zone: move columns INTO an existing stack (same as insertColumnAtPosition)
+            let targetStack = null;
+            let beforeColumn = null;
+
+            if (insertAfterColumnId) {
+                const afterCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertAfterColumnId}"]`);
+                targetStack = afterCol?.closest('.kanban-column-stack');
+                beforeColumn = afterCol?.nextElementSibling;
+            } else if (insertBeforeColumnId) {
+                beforeColumn = document.querySelector(`.kanban-full-height-column[data-column-id="${insertBeforeColumnId}"]`);
+                targetStack = beforeColumn?.closest('.kanban-column-stack');
+            }
+
+            if (targetStack) {
+                for (const colId of newColumnIds) {
+                    const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                    if (!colElement) continue;
+
+                    const sourceStack = colElement.closest('.kanban-column-stack');
+
+                    // Move column to target (same as insertColumnAtPosition)
+                    if (targetStack !== sourceStack) {
+                        if (beforeColumn) {
+                            targetStack.insertBefore(colElement, beforeColumn);
+                        } else {
+                            targetStack.appendChild(colElement);
+                        }
+
+                        // Clean up empty source stack
+                        if (sourceStack && !sourceStack.querySelector('.kanban-full-height-column')) {
+                            sourceStack.remove();
+                        }
+                    } else if (beforeColumn) {
+                        targetStack.insertBefore(colElement, beforeColumn);
+                    }
+
+                    // Update beforeColumn for next column (insert after this one)
+                    beforeColumn = colElement.nextElementSibling;
+                }
+            }
+        }
+
+        // Use the SAME finalization as processColumnDrop
+        // IMPORTANT: Call directly (not in requestAnimationFrame) to match processColumnDrop behavior
+        syncColumnDataToDOMOrder();
+        finalizeColumnDrop();
+    }
+
+    // Expose handleTemplateApplied to window for webview.js to call
+    window.handleTemplateApplied = handleTemplateApplied;
 
     /**
      * Process template column drop (empty column, clipboard column, or template)
@@ -3872,7 +3985,9 @@ function applyTemplateAtPosition() {
             targetRow: templateDragState.targetRow || 1,
             insertAfterColumnId: templateDragState.targetPosition === 'after' ? templateDragState.targetColumnId : null,
             insertBeforeColumnId: templateDragState.targetPosition === 'before' ? templateDragState.targetColumnId : null,
-            position: templateDragState.targetPosition
+            position: templateDragState.targetPosition,
+            // isDropZone indicates dropping between stacks (new stack) vs within a stack (join stack)
+            isDropZone: templateDragState.isDropZone || false
         });
     }
 }

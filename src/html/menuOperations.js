@@ -1784,12 +1784,15 @@ function sortColumn(columnId, sortType) {
 async function copyColumnAsMarkdown(columnId) {
     closeAllMenus();
 
-    if (!currentBoard?.columns) {return;}
-    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    // Use window.cachedBoard directly to ensure we have the latest board state
+    const board = window.cachedBoard;
+    if (!board?.columns) {return;}
+    const columnIndex = board.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
     // Use NEW unified export system with presentation format
     // mergeIncludes: true is required to use board-based path which respects scope/selection
+    // Send BOTH columnId and columnIndex - backend prefers columnId for reliable lookup
     vscode.postMessage({
         type: 'export',
         options: {
@@ -1800,6 +1803,7 @@ async function copyColumnAsMarkdown(columnId) {
             packAssets: false,
             mergeIncludes: true,
             selection: {
+                columnId: columnId,
                 columnIndex: columnIndex
             }
         }
@@ -1809,12 +1813,15 @@ async function copyColumnAsMarkdown(columnId) {
 async function copyTaskAsMarkdown(taskId, columnId) {
     closeAllMenus();
 
-    if (!currentBoard?.columns) {return;}
-    const columnIndex = currentBoard.columns.findIndex(c => c.id === columnId);
+    // Use window.cachedBoard directly to ensure we have the latest board state
+    const board = window.cachedBoard;
+    if (!board?.columns) {return;}
+    const columnIndex = board.columns.findIndex(c => c.id === columnId);
     if (columnIndex === -1) {return;}
 
     // Use NEW unified export system with presentation format
     // mergeIncludes: true is required to use board-based path which respects scope/selection
+    // Send BOTH columnId and columnIndex - backend prefers columnId for reliable lookup
     vscode.postMessage({
         type: 'export',
         options: {
@@ -1825,6 +1832,7 @@ async function copyTaskAsMarkdown(taskId, columnId) {
             packAssets: false,
             mergeIncludes: true,
             selection: {
+                columnId: columnId,
                 columnIndex: columnIndex,
                 taskId: taskId
             }

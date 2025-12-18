@@ -651,6 +651,8 @@ export interface ApplyTemplateMessage extends BaseMessage {
     insertAfterColumnId?: string;
     insertBeforeColumnId?: string;
     position?: 'first' | 'last';
+    /** True if dropping on a drop zone (between stacks) - creates new stack, not joining existing */
+    isDropZone?: boolean;
 }
 
 /**
@@ -665,6 +667,8 @@ export interface SubmitTemplateVariablesMessage extends BaseMessage {
     insertAfterColumnId?: string;
     insertBeforeColumnId?: string;
     position?: 'first' | 'last';
+    /** True if dropping on a drop zone (between stacks) - creates new stack, not joining existing */
+    isDropZone?: boolean;
 }
 
 /**
