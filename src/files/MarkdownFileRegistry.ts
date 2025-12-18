@@ -497,6 +497,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                         column.tasks = tasks;
                     } else {
                         console.warn(`[MarkdownFileRegistry] generateBoard() - Column include not found: ${relativePath}`);
+                        // Show error task so user knows what's wrong
+                        column.tasks = [{
+                            id: `error-${column.id}-${Date.now()}`,
+                            title: 'Include Error',
+                            description: `**Error:** Column include file not found: \`${relativePath}\``
+                        }];
                     }
                 }
             }
@@ -512,6 +518,8 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                             task.description = file.getContent();
                         } else {
                             console.warn(`[MarkdownFileRegistry] generateBoard() - Task include not found: ${relativePath}`);
+                            // Show error in task so user knows what's wrong
+                            task.description = `**Error:** Include file not found: \`${relativePath}\``;
                         }
                     }
                 }

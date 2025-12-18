@@ -715,12 +715,27 @@ export class KanbanWebviewPanel {
      * Handle webviewReady message - webview is ready to receive board updates
      */
     private _handleWebviewReady(): void {
+        // CRITICAL FIX: Detect if webview was silently recreated by VS Code
+        // If webviewReady is already true, VS Code recreated the webview (memory pressure, etc.)
+        // Any messages sent while we thought the webview was ready were lost!
+        const wasAlreadyReady = this._context.webviewReady;
+
         this._context.setWebviewReady(true);
 
         // Send any pending board update (consume and clear atomically)
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
+        } else if (wasAlreadyReady) {
+            // Webview was recreated by VS Code - ALL messages sent since last webviewReady were lost!
+            // Re-send EVERYTHING the webview needs:
+            console.log('[WebviewReady] Webview was recreated by VS Code - re-sending all state');
+
+            // 1. File info (filename, path, locked status)
+            this._fileManager.sendFileInfo();
+
+            // 2. Full board update (includes _refreshAllViewConfiguration internally)
+            this.sendBoardUpdate(false, true);
         }
     }
 
