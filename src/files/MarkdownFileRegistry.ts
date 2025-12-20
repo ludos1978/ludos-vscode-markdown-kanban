@@ -685,27 +685,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
     }
 
-    /**
-     * Get include files by type
-     */
-    public getIncludeFilesByType(type: 'regular' | 'column' | 'task'): string[] {
-        const files = this.getIncludeFiles();
-        return files
-            .filter(file => {
-                if (type === 'column') return file.getFileType() === 'include-column';
-                if (type === 'task') return file.getFileType() === 'include-task';
-                return file.getFileType() === 'include-regular';
-            })
-            .map(file => file.getRelativePath());
-    }
-
-    /**
-     * Get all include file paths
-     */
-    public getAllIncludeFilePaths(): string[] {
-        return this.getIncludeFiles().map(f => f.getRelativePath());
-    }
-
     // ============= CLEANUP =============
 
     /**
