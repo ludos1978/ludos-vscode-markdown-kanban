@@ -95,8 +95,7 @@ export class SaveEventDispatcher implements vscode.Disposable {
      * @param id The handler ID to unregister
      */
     public unregisterHandler(id: string): void {
-        if (this.handlers.delete(id)) {
-        }
+        this.handlers.delete(id);
     }
 
     /**

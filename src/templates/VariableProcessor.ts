@@ -152,7 +152,7 @@ export class VariableProcessor {
      * - {#if variable}content{#else}other{/if}
      * - Nested conditionals
      */
-    public static processConditionals(
+    private static processConditionals(
         content: string,
         values: Record<string, string | number>
     ): string {

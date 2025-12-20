@@ -361,11 +361,6 @@ export class MarpExportService {
         // Always allow local files (required for images)
         args.push('--allow-local-files');
 
-        // Watch mode: add --watch flag
-        // if (options.watchMode) {
-        //     args.push('--watch');
-        // }
-
         // Browser setting - prioritize options.additionalArgs, then config
         let browser: string | undefined;
 

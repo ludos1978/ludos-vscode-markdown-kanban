@@ -16,7 +16,6 @@ import { ExportService, NewExportOptions } from '../services/export/ExportServic
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
 import { ConfigurationService } from '../services/ConfigurationService';
-import { SaveEventDispatcher } from '../SaveEventDispatcher';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage } from '../utils/stringUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';
@@ -331,13 +330,9 @@ export class ExportCommands extends BaseMessageCommand {
      */
     private async handleStopAutoExport(context: CommandContext): Promise<void> {
         try {
-            // Unregister from SaveEventDispatcher (legacy)
+            // Dispose the onDidChange subscription
             const doc = context.fileManager.getDocument();
             if (doc) {
-                const coordinator = SaveEventDispatcher.getInstance();
-                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
-
-                // Also dispose the onDidChange subscription
                 const docPath = doc.uri.fsPath;
                 const subscription = autoExportSubscriptions.get(docPath);
                 if (subscription) {
@@ -370,15 +365,8 @@ export class ExportCommands extends BaseMessageCommand {
     /**
      * Stop auto-export for other kanban files (not generated files from current export)
      */
-    private async handleStopAutoExportForOtherKanbanFiles(_currentKanbanFilePath: string, context: CommandContext, protectExportedPath?: string): Promise<void> {
+    private async handleStopAutoExportForOtherKanbanFiles(_currentKanbanFilePath: string, _context: CommandContext, protectExportedPath?: string): Promise<void> {
         try {
-            // Unregister from SaveEventDispatcher
-            const doc = context.fileManager.getDocument();
-            if (doc) {
-                const coordinator = SaveEventDispatcher.getInstance();
-                coordinator.unregisterHandler(`auto-export-${doc.uri.fsPath}`);
-            }
-
             // Stop Marp watch processes for OTHER files (not the current export)
             if (protectExportedPath) {
                 MarpExportService.stopAllMarpWatchesExcept(protectExportedPath);

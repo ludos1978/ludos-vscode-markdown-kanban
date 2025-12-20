@@ -19,7 +19,6 @@ export interface TemplateVariable {
 export interface TemplateColumn {
     title: string;
     tasks: TemplateTask[];
-    tags?: string[];        // Tags extracted from title (e.g., #stack)
 }
 
 /**
@@ -237,12 +236,10 @@ export class TemplateParser {
                 }
 
                 const fullTitle = columnMatch[1].trim();
-                const tags = this.extractTags(fullTitle);
 
                 currentColumn = {
                     title: fullTitle,
-                    tasks: [],
-                    tags
+                    tasks: []
                 };
                 continue;
             }
@@ -295,18 +292,6 @@ export class TemplateParser {
         }
 
         return columns;
-    }
-
-    /**
-     * Extract hashtags from title
-     */
-    private static extractTags(title: string): string[] {
-        const tags: string[] = [];
-        const matches = title.matchAll(/#(\w+)/g);
-        for (const match of matches) {
-            tags.push(match[1]);
-        }
-        return tags;
     }
 
     /**
