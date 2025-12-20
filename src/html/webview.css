@@ -23,12 +23,6 @@
   --current-week-border-style: solid;
   --current-week-glow-size: 0 0 10px;
 
-  /* Compact view - smaller fonts and padding when content outside viewport */
-  --compact-font-size: 0.85em;
-  --compact-visibility-threshold: 0.3; /* Apply when < 30% visible */
-  --compact-column-footer-padding: var(--whitespace-div4);
-  --compact-column-margin-height: var(--whitespace-div4);
-  
   
   /* --board-background: var(--vscode-titleBar-activeBackground); */
   --board-background: var(--vscode-editor-background);
@@ -970,36 +964,12 @@ body.small-card-fonts .task-title-container .markdown-content img {
   padding: 0;
 }
 
-/* Make fonts smaller and padding smaller when content (detected via column-inner) is outside viewport */
-.kanban-full-height-column.compact-view {
-  font-size: var(--compact-font-size);
-}
-
-.kanban-full-height-column.compact-view .column-footer {
-  padding-top: var(--compact-column-footer-padding);
-}
-
-.kanban-full-height-column.compact-view .column-header {
-  padding-bottom: var(--compact-column-footer-padding);
-}
-
-.kanban-full-height-column.compact-view .column-margin {
-  height: var(--compact-column-margin-height);
-}
-
-.kanban-full-height-column.compact-view .column-title-section {
-	padding: var(--whitespace-div4) var(--whitespace-div4) 0 var(--whitespace-div4);
-	gap: var(--whitespace-div4);
-}
 
 .kanban-full-height-column.collapsed-vertical .column-title-section {
 	flex-direction: column !important;
 	align-items: center;
 }
 
-.kanban-column-stack .kanban-full-height-column.compact-view .column-margin {
-	height: var(--whitespace-div4);
-}
 
 .column-inner {
   /* This is the scrollable container for sticky positioning */

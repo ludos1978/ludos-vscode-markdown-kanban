@@ -1987,12 +1987,6 @@ function renderBoard(options = null) {
     // Setup compact view detection for ALL columns
     // DISABLED: Causes severe performance issues with expensive scroll handlers
     // - Runs querySelectorAll on every scroll event
-    // - Calls getBoundingClientRect() forcing layout recalculations
-    // - With 50 columns = 500 forced layouts per second during scroll
-    // - Feature is currently disabled anyway (see setupCompactViewHandler)
-    // DEFERRED: Replace with IntersectionObserver (see tmp/CLEANUP-2-DEFERRED-ISSUES.md #3)
-    // Recommendation: Remove entirely OR wait for user request before reimplementing
-    // setupCompactViewHandler();
 }
 
 function getFoldAllButtonState(columnId) {
@@ -3662,89 +3656,6 @@ function setupStackedColumnScrollHandler(columnsData) {
 }
 window.setupStackedColumnScrollHandler = setupStackedColumnScrollHandler;
 
-/**
- * Setup compact view handler for ALL columns (not just stacked)
- * Detects when column-inner is mostly outside viewport and adds compact-view class
- */
-function setupCompactViewHandler() {
-    // Remove existing handler if any
-    if (window.compactViewScrollHandler) {
-        window.removeEventListener('scroll', window.compactViewScrollHandler, true);
-    }
-
-    // Clear any existing debounce timer
-    if (window.compactViewDebounceTimer) {
-        clearTimeout(window.compactViewDebounceTimer);
-    }
-
-    const calculateCompactView = () => {
-        const viewportHeight = window.innerHeight;
-
-        // Get ALL columns on the board
-        const allColumns = document.querySelectorAll('.kanban-full-height-column');
-
-        allColumns.forEach(col => {
-            const columnInner = col.querySelector('.column-inner');
-
-            if (!columnInner) return;
-
-            const innerRect = columnInner.getBoundingClientRect();
-            const innerTop = innerRect.top;
-            const innerBottom = innerRect.bottom;
-
-            // Check if column-inner is COMPLETELY outside the viewport
-            // getBoundingClientRect() is relative to viewport: 0 = top of screen, viewportHeight = bottom of screen
-            // Compact view only when entire bounding box is out of view
-            const isCompletelyAbove = innerBottom <= 0;
-            const isCompletelyBelow = innerTop >= viewportHeight;
-            const isCompletelyOutside = isCompletelyAbove || isCompletelyBelow;
-
-            // Track if compact state changed
-            const wasCompact = col.classList.contains('compact-view');
-            const shouldBeCompact = isCompletelyOutside;
-
-            // Apply compact-view class when less than threshold is visible
-            // DISABLED
-            // if (shouldBeCompact) {
-            //     col.classList.add('compact-view');
-            // } else {
-            //     col.classList.remove('compact-view');
-            // }
-
-            // If compact state changed and column is in a stack, recalculate positions
-            if (wasCompact !== shouldBeCompact) {
-                const stack = col.closest('.kanban-column-stack');
-                if (stack && typeof window.applyStackedColumnStyles === 'function') {
-                    // Recalculate sticky positions for this stack only
-                    const colId = col.dataset.columnId;
-                    requestAnimationFrame(() => {
-                        window.applyStackedColumnStyles(colId);
-                    });
-                }
-            }
-        });
-    };
-
-    const scrollHandler = () => {
-        // Clear existing timer
-        if (window.compactViewDebounceTimer) {
-            clearTimeout(window.compactViewDebounceTimer);
-        }
-
-        // Set new timer with 100ms debounce
-        window.compactViewDebounceTimer = setTimeout(calculateCompactView, 100);
-    };
-
-    // Store handler reference
-    window.compactViewScrollHandler = scrollHandler;
-
-    // Attach scroll listener
-    window.addEventListener('scroll', scrollHandler, true);
-
-    // Run once immediately (no debounce for initial calculation)
-    calculateCompactView();
-}
-window.setupCompactViewHandler = setupCompactViewHandler;
 
 /**
  * Toggles a task between collapsed and expanded states

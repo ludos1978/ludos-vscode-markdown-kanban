@@ -8,7 +8,7 @@
  */
 
 // Unified State (replaces PanelStateModel + DocumentStateModel)
-export { PanelContext, PanelContextSnapshot, PendingBoardUpdate } from './PanelContext';
+export { PanelContext, PendingBoardUpdate } from './PanelContext';
 
 // Foundation (Phase 1)
 export { ConcurrencyManager } from './ConcurrencyManager';

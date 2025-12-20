@@ -15,15 +15,6 @@ export interface PendingBoardUpdate {
     isFullRefresh: boolean;
 }
 
-/**
- * Serializable state for panel restoration
- */
-export interface PanelContextSnapshot {
-    lastDocumentVersion: number;
-    lastDocumentUri?: string;
-    trackedDocumentUri?: string;
-    panelId: string;
-}
 
 /**
  * PanelContext - Unified panel state management
@@ -173,32 +164,6 @@ export class PanelContext {
         const update = this._pendingBoardUpdate;
         this._pendingBoardUpdate = null;
         return update;
-    }
-
-    // ============= SERIALIZATION =============
-
-    toSnapshot(): PanelContextSnapshot {
-        return {
-            lastDocumentVersion: this._lastDocumentVersion,
-            lastDocumentUri: this._lastDocumentUri,
-            trackedDocumentUri: this._trackedDocumentUri,
-            panelId: this._panelId
-        };
-    }
-
-    fromSnapshot(snapshot: PanelContextSnapshot): void {
-        this._lastDocumentVersion = snapshot.lastDocumentVersion;
-        this._lastDocumentUri = snapshot.lastDocumentUri;
-        this._trackedDocumentUri = snapshot.trackedDocumentUri;
-        this._panelId = snapshot.panelId;
-    }
-
-    static fromSnapshot(snapshot: PanelContextSnapshot, debugMode: boolean = false): PanelContext {
-        const ctx = new PanelContext(snapshot.panelId, debugMode);
-        ctx._lastDocumentVersion = snapshot.lastDocumentVersion;
-        ctx._lastDocumentUri = snapshot.lastDocumentUri;
-        ctx._trackedDocumentUri = snapshot.trackedDocumentUri;
-        return ctx;
     }
 
     // ============= PRIVATE HELPERS =============

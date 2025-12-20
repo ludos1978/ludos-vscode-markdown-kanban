@@ -40,24 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let fileListenerEnabled = true;
 
-	// Function to get file listener status
-	const getFileListenerStatus = () => {
-		return fileListenerEnabled;
-	};
-
-	// Function to toggle file listener
-	const setFileListenerStatus = (enabled: boolean) => {
-		fileListenerEnabled = enabled;
-		const status = fileListenerEnabled ? 'enabled' : 'disabled';
-		vscode.window.showInformationMessage(`Kanban auto-switching ${status}`);
-	};
-
-	// Expose these functions to the KanbanWebviewPanel
-	globalThis.kanbanFileListener = {
-		getStatus: getFileListenerStatus,
-		setStatus: setFileListenerStatus
-	};
-
 
 	// Register webview panel serializer (for restoring panel state)
 	if (vscode.window.registerWebviewPanelSerializer) {

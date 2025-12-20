@@ -3076,63 +3076,6 @@ function retryLastFlushedChanges() {
     return true;
 }
 
-/**
- * Applies pending changes locally without saving to backend
- * Purpose: Update local board state before drag operations
- * Used by: Drag and drop operations that need consistent state
- * Side effects: Updates currentBoard data, keeps pending changes intact
- * Note: Does not send messages to VS Code or clear pending changes
- */
-function applyPendingChangesLocally() {
-    
-    if (!window.cachedBoard) {
-        return;
-    }
-    
-    let changesApplied = 0;
-    
-    // Apply column changes locally
-    if (window.pendingColumnChanges && window.pendingColumnChanges.size > 0) {
-        window.pendingColumnChanges.forEach(({ title, columnId }) => {
-            const column = window.cachedBoard.columns.find(col => col.id === columnId);
-            if (column && column.title !== title) {
-                column.title = title;
-                changesApplied++;
-            }
-        });
-    }
-    
-    // Apply task changes locally
-    if (window.pendingTaskChanges && window.pendingTaskChanges.size > 0) {
-        window.pendingTaskChanges.forEach(({ taskId, columnId, taskData }) => {
-            // Search for task in ALL columns, not just the stored columnId
-            // This is critical for drag operations where task moves between columns
-            let task = null;
-            let actualColumn = null;
-            
-            for (const column of window.cachedBoard.columns) {
-                task = column.tasks.find(t => t.id === taskId);
-                if (task) {
-                    actualColumn = column;
-                    break;
-                }
-            }
-            
-            if (task && actualColumn) {
-                if (taskData.title !== undefined && task.title !== taskData.title) {
-                    task.title = taskData.title;
-                    changesApplied++;
-                }
-                if (taskData.description !== undefined && task.description !== taskData.description) {
-                    task.description = taskData.description;
-                    changesApplied++;
-                }
-            }
-        });
-    }
-    
-    return changesApplied;
-}
 
 // Function to handle save errors from the backend
 function handleSaveError(errorMessage) {
@@ -3733,8 +3676,6 @@ window.moveTaskDown = moveTaskDown;
 window.moveTaskToBottom = moveTaskToBottom;
 window.deleteTask = deleteTask;
 
-// Legacy/compatibility functions - marked for removal
-window.applyPendingChangesLocally = applyPendingChangesLocally;
 // Update visual tag state - handles borders and other tag-based styling
 function updateVisualTagState(element, allTags, elementType, isCollapsed) {
 
