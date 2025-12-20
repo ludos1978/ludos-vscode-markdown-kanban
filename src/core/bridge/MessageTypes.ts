@@ -1432,6 +1432,33 @@ export interface ResolveAndCopyPathMessage extends BaseMessage {
     path: string;
 }
 
+/**
+ * Convert paths in a single file
+ */
+export interface ConvertPathsMessage extends BaseMessage {
+    type: 'convertPaths';
+    filePath?: string;
+    isMainFile?: boolean;
+    direction: 'relative' | 'absolute';
+}
+
+/**
+ * Convert paths in main file and all include files
+ */
+export interface ConvertAllPathsMessage extends BaseMessage {
+    type: 'convertAllPaths';
+    direction: 'relative' | 'absolute';
+}
+
+/**
+ * Convert a single image/link path
+ */
+export interface ConvertSinglePathMessage extends BaseMessage {
+    type: 'convertSinglePath';
+    imagePath: string;
+    direction: 'relative' | 'absolute';
+}
+
 // ============= TYPE UNIONS =============
 
 /**
@@ -1590,7 +1617,11 @@ export type IncomingMessage =
     | ForceWriteAllContentMessage
     | VerifyContentSyncMessage
     | GetTrackedFilesDebugInfoMessage
-    | ClearTrackedFilesCacheMessage;
+    | ClearTrackedFilesCacheMessage
+    // Path conversion messages
+    | ConvertPathsMessage
+    | ConvertAllPathsMessage
+    | ConvertSinglePathMessage;
 
 /**
  * Message type string literals for type-safe checking

@@ -3224,6 +3224,50 @@ if (!webviewEventListenersInitialized) {
             }
             break;
 
+        case 'pathsConverted':
+            // Handle single file path conversion result
+            {
+                const convertedFileName = message.filePath?.split('/').pop() || 'file';
+                if (message.converted > 0) {
+                    console.log(`[Paths] Converted ${message.converted} paths in ${convertedFileName}`);
+                    // Refresh debug overlay to show updated state
+                    if (typeof window.refreshDebugOverlay === 'function') {
+                        setTimeout(() => window.refreshDebugOverlay(), 500);
+                    }
+                }
+                if (message.warnings && message.warnings.length > 0) {
+                    console.warn('[Paths] Conversion warnings:', message.warnings);
+                }
+            }
+            break;
+
+        case 'allPathsConverted':
+            // Handle bulk path conversion result
+            if (message.converted > 0) {
+                console.log(`[Paths] Converted ${message.converted} paths in ${message.filesModified} file(s)`);
+                // Refresh debug overlay to show updated state
+                if (typeof window.refreshDebugOverlay === 'function') {
+                    setTimeout(() => window.refreshDebugOverlay(), 500);
+                }
+            }
+            if (message.warnings && message.warnings.length > 0) {
+                console.warn('[Paths] Conversion warnings:', message.warnings);
+            }
+            break;
+
+        case 'singlePathConverted':
+            // Handle single path conversion result
+            if (message.converted) {
+                console.log(`[Paths] Converted: ${message.originalPath} -> ${message.newPath}`);
+                // Refresh debug overlay to show updated state
+                if (typeof window.refreshDebugOverlay === 'function') {
+                    setTimeout(() => window.refreshDebugOverlay(), 500);
+                }
+            } else {
+                console.log(`[Paths] ${message.message}`);
+            }
+            break;
+
         case 'autoExportStopped':
             // Hide the auto-export button when auto-export is stopped
             const autoExportBtn = document.getElementById('auto-export-btn');
@@ -3766,6 +3810,66 @@ function selectFile() {
     // Save current state before potentially switching files
     saveCurrentFoldingState();
     vscode.postMessage({ type: 'selectFile' });
+}
+
+/**
+ * Convert paths in main file to relative format
+ */
+function convertPathsToRelative() {
+    vscode.postMessage({ type: 'convertPaths', direction: 'relative', isMainFile: true });
+}
+
+/**
+ * Convert paths in main file to absolute format
+ */
+function convertPathsToAbsolute() {
+    vscode.postMessage({ type: 'convertPaths', direction: 'absolute', isMainFile: true });
+}
+
+/**
+ * Toggle the image path menu visibility
+ * Called from inline onclick handlers in rendered markdown
+ */
+function toggleImagePathMenu(container, imagePath) {
+    // Close any other open menus
+    document.querySelectorAll('.image-path-menu.visible').forEach(menu => {
+        if (menu.parentElement !== container) {
+            menu.classList.remove('visible');
+        }
+    });
+
+    const menu = container.querySelector('.image-path-menu');
+    if (menu) {
+        menu.classList.toggle('visible');
+
+        // Close menu when clicking outside
+        if (menu.classList.contains('visible')) {
+            const closeHandler = (e) => {
+                if (!container.contains(e.target)) {
+                    menu.classList.remove('visible');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+    }
+}
+
+/**
+ * Convert a single image path
+ * Called from inline onclick handlers in rendered markdown
+ */
+function convertSinglePath(imagePath, direction) {
+    // Close all menus
+    document.querySelectorAll('.image-path-menu.visible').forEach(menu => {
+        menu.classList.remove('visible');
+    });
+
+    vscode.postMessage({
+        type: 'convertSinglePath',
+        imagePath: imagePath,
+        direction: direction
+    });
 }
 
 function updateWhitespace(value) {

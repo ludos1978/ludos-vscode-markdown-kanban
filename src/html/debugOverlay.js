@@ -909,6 +909,13 @@ function createFileStatesList(allFiles) {
                 <button onclick="reloadAllIncludedFiles()" class="debug-btn" title="Reload all included files from disk">
                     🔄 Reload All
                 </button>
+                <span class="debug-btn-separator">|</span>
+                <button onclick="convertAllPaths('relative')" class="debug-btn" title="Convert all paths to relative format">
+                    📁 All to Relative
+                </button>
+                <button onclick="convertAllPaths('absolute')" class="debug-btn" title="Convert all paths to absolute format">
+                    📂 All to Absolute
+                </button>
             </div>
             <table class="files-table">
                 <thead>
@@ -1020,6 +1027,8 @@ function createFileStatesList(allFiles) {
                                     <div class="action-buttons">
                                         <button onclick="saveIndividualFile('${file.path}', ${file.isMainFile}, true)" class="action-btn save-btn" title="Force save file (writes unconditionally)">💾</button>
                                         <button onclick="reloadIndividualFile('${file.path}', ${file.isMainFile})" class="action-btn reload-btn" title="Reload file from disk">🔄</button>
+                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'relative')" class="action-btn" title="Convert paths to relative format">📁</button>
+                                        <button onclick="convertFilePaths('${file.path}', ${file.isMainFile}, 'absolute')" class="action-btn" title="Convert paths to absolute format">📂</button>
                                     </div>
                                 </td>
                                 <td class="col-image">
@@ -1096,6 +1105,36 @@ function reloadIndividualFile(filePath, isMainFile) {
             type: 'reloadIndividualFile',
             filePath: filePath,
             isMainFile: isMainFile
+        });
+    }
+}
+
+/**
+ * Convert paths in a specific file
+ * @param {string} filePath - The file path to convert
+ * @param {boolean} isMainFile - Whether this is the main file
+ * @param {'relative'|'absolute'} direction - The conversion direction
+ */
+function convertFilePaths(filePath, isMainFile, direction) {
+    if (window.vscode) {
+        window.vscode.postMessage({
+            type: 'convertPaths',
+            filePath: filePath,
+            isMainFile: isMainFile,
+            direction: direction
+        });
+    }
+}
+
+/**
+ * Convert all paths in main file and all includes
+ * @param {'relative'|'absolute'} direction - The conversion direction
+ */
+function convertAllPaths(direction) {
+    if (window.vscode) {
+        window.vscode.postMessage({
+            type: 'convertAllPaths',
+            direction: direction
         });
     }
 }

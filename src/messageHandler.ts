@@ -9,7 +9,7 @@ import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
 import { BoardChangeTrigger } from './core/events';
 // Command Pattern: Registry and commands for message handling
-import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands } from './commands';
+import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands, PathCommands } from './commands';
 import * as vscode from 'vscode';
 import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage } from './core/bridge/MessageTypes';
 import { CapturedEdit } from './files/FileInterfaces';
@@ -133,6 +133,7 @@ export class MessageHandler {
         this._commandRegistry.register(new EditModeCommands());
         this._commandRegistry.register(new TemplateCommands());
         this._commandRegistry.register(new DebugCommands());
+        this._commandRegistry.register(new PathCommands());
 
         // Initialize the registry with context
         this._commandRegistry.initialize(this._commandContext);

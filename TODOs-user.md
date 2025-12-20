@@ -1,8 +1,8 @@
-- [ ] when i delete the top column in a stack, the stack below it should have it's #stack tag removed.
+- [x] when i delete the top column in a stack, the stack below it should have it's #stack tag removed. in all other cases there is no need to change anything
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
-- [ ] add a feature to convert paths in a single or multiple images in the whole document to convert from absolute to relative paths. and from relative to absolute paths. each image should get a button on the top-right (a breadcrumbs menu), with the option to convert the path type. also add the feature to the "File States Overview" system where each file can be individually modified from relative to absolute paths. have a dropdown menu and a convert button.
+- [ ] add a feature to convert individual or multiple images-paths or referenced document-paths in any of the documents (main or included kanban baords) that allows converting from absolute to relative paths and from relative to absolute paths. each document should get a button on the top-right (an individual breadcrumbs menu), with the option to convert the path type. detect the path type and give the option to convert it to the other tyep. also add the feature to the "File States Overview" system where each (kanban or markdown) file can be individually modified from relative to absolute paths, have both options (convert all to relative paths and convert all to absolute paths). and add one button to convert the main file and all included files.
 
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 

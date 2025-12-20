@@ -30,3 +30,4 @@ export { IncludeCommands } from './IncludeCommands';
 export { EditModeCommands } from './EditModeCommands';
 export { TemplateCommands } from './TemplateCommands';
 export { DebugCommands } from './DebugCommands';
+export { PathCommands } from './PathCommands';

@@ -1952,6 +1952,7 @@ function renderBoard(options = null) {
                 window.updateAllVisualTagElements(element, tags, elementType);
             }
         });
+
     }, 20);
 
     // Setup compact view detection for ALL columns

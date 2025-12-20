@@ -4087,6 +4087,81 @@ blockquote {
   object-fit: contain;
 }
 
+/* Image path conversion overlay */
+.image-path-overlay-container {
+  position: relative;
+  display: inline-block;
+}
+
+.image-path-overlay-container .image-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-path-overlay-container:hover .image-menu-btn {
+  opacity: 1;
+}
+
+.image-path-overlay-container .image-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.image-path-menu {
+  position: absolute;
+  top: 32px;
+  right: 4px;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  min-width: 160px;
+  display: none;
+}
+
+.image-path-menu.visible {
+  display: block;
+}
+
+.image-path-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-menu-foreground, #cccccc);
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.image-path-menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.image-path-menu-divider {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, #454545);
+  margin: 4px 0;
+}
+
 .markdown-content a[href$=".pdf"],
 .markdown-content a[href$=".doc"],
 .markdown-content a[href$=".docx"],
