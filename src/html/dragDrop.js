@@ -233,6 +233,50 @@ function createDropIndicator() {
 }
 
 /**
+ * SHARED HELPER: Position the drop indicator at an insertion point
+ * Used by both showDropIndicator and showInternalTaskDropIndicator
+ *
+ * @param {HTMLElement} indicator - The drop indicator element
+ * @param {HTMLElement} tasksContainer - The tasks container
+ * @param {HTMLElement|null} afterElement - Element to insert before, or null for end
+ * @param {HTMLElement|null} skipElement - Element to skip when finding last task
+ */
+function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement = null) {
+    const containerRect = tasksContainer.getBoundingClientRect();
+
+    // Calculate insertion Y based on afterElement
+    let insertionY;
+    if (!afterElement) {
+        // Drop at end - position after last task or at add button
+        const addButton = tasksContainer.querySelector('.add-task-btn');
+        if (addButton) {
+            insertionY = addButton.getBoundingClientRect().top - 2;
+        } else {
+            // Find last non-skipped task
+            const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+            let lastTask = null;
+            for (const task of tasks) {
+                if (task !== skipElement) lastTask = task;
+            }
+            if (lastTask) {
+                insertionY = lastTask.getBoundingClientRect().bottom + 2;
+            } else {
+                insertionY = containerRect.top + 10;
+            }
+        }
+    } else {
+        insertionY = afterElement.getBoundingClientRect().top - 2;
+    }
+
+    // Position the indicator
+    indicator.style.position = 'fixed';
+    indicator.style.left = (containerRect.left + 10) + 'px';
+    indicator.style.width = (containerRect.width - 20) + 'px';
+    indicator.style.top = insertionY + 'px';
+    indicator.classList.add('active');
+}
+
+/**
  * UNIFIED: Show drop indicator at a position within a tasks container
  * Used by both internal task drags and external file drags
  *
@@ -245,11 +289,9 @@ function showDropIndicator(tasksContainer, clientY, skipElement = null, column =
     if (!tasksContainer) return;
 
     const indicator = createDropIndicator();
-    const containerRect = tasksContainer.getBoundingClientRect();
 
     // Find insertion point by comparing mouse Y to task midpoints
     const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
-    let insertionY = containerRect.top + 10; // Default: top of container
     let afterElement = null;
 
     for (const task of tasks) {
@@ -261,35 +303,13 @@ function showDropIndicator(tasksContainer, clientY, skipElement = null, column =
 
         if (clientY < taskMidpoint) {
             // Insert BEFORE this task
-            insertionY = taskRect.top - 2;
             afterElement = task;
             break;
         }
     }
 
-    // If no task found (inserting at end), position after last task or at add button
-    if (!afterElement) {
-        const addButton = tasksContainer.querySelector('.add-task-btn');
-        if (addButton) {
-            insertionY = addButton.getBoundingClientRect().top - 2;
-        } else {
-            // Find last non-skipped task
-            let lastTask = null;
-            for (const task of tasks) {
-                if (task !== skipElement) lastTask = task;
-            }
-            if (lastTask) {
-                insertionY = lastTask.getBoundingClientRect().bottom + 2;
-            }
-        }
-    }
-
-    // Position the indicator
-    indicator.style.position = 'fixed';
-    indicator.style.left = (containerRect.left + 10) + 'px';
-    indicator.style.width = (containerRect.width - 20) + 'px';
-    indicator.style.top = insertionY + 'px';
-    indicator.classList.add('active');
+    // Use shared helper for positioning
+    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement);
 
     // Store drop target for internal drags
     dragState.dropTargetContainer = tasksContainer;
@@ -347,9 +367,7 @@ function createInternalDropIndicator() {
     return createDropIndicator();
 }
 
-// UNIFIED: showInternalTaskDropIndicator now uses showDropIndicator
-// Note: The old function took (tasksContainer, afterElement) but the unified one
-// calculates afterElement from clientY. For backwards compat, we simulate the old behavior.
+// UNIFIED: showInternalTaskDropIndicator now uses shared positioning helper
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     if (!tasksContainer) return;
 
@@ -359,39 +377,8 @@ function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     dragState.dropTargetContainer = tasksContainer;
     dragState.dropTargetAfterElement = afterElement;
 
-    // Get container dimensions
-    const containerRect = tasksContainer.getBoundingClientRect();
-
-    // Calculate insertion Y based on afterElement
-    let insertionY;
-    if (!afterElement) {
-        // Drop at end
-        const addButton = tasksContainer.querySelector('.add-task-btn');
-        if (addButton) {
-            insertionY = addButton.getBoundingClientRect().top - 2;
-        } else {
-            // Find last non-dragged task
-            const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
-            let lastTask = null;
-            for (const task of tasks) {
-                if (task !== dragState.draggedTask) lastTask = task;
-            }
-            if (lastTask) {
-                insertionY = lastTask.getBoundingClientRect().bottom + 2;
-            } else {
-                insertionY = containerRect.top + 10;
-            }
-        }
-    } else {
-        insertionY = afterElement.getBoundingClientRect().top - 2;
-    }
-
-    // Position the indicator
-    indicator.style.position = 'fixed';
-    indicator.style.left = (containerRect.left + 10) + 'px';
-    indicator.style.width = (containerRect.width - 20) + 'px';
-    indicator.style.top = insertionY + 'px';
-    indicator.classList.add('active');
+    // Use shared helper for positioning (skipElement = draggedTask for internal drags)
+    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, dragState.draggedTask);
 }
 
 function showInternalColumnDropIndicator(targetStack, beforeColumn) {
