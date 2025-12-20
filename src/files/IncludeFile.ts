@@ -205,22 +205,6 @@ export class IncludeFile extends MarkdownFile {
         await changeHandler.handleExternalChange(this, changeType);
     }
 
-    // ============= PARENT NOTIFICATION =============
-
-    /**
-     * Notify parent file that this include has changed
-     * (Subclasses can override for specific behavior)
-     */
-    protected async notifyParentOfChange(): Promise<void> {
-
-        // Trigger parent to reload/reparse
-        // The parent will re-read this include file and update the board
-        if (this._parentFile) {
-            // Check if parent needs to be reloaded (side effect: marks parent as having external changes)
-            await this._parentFile.checkForExternalChanges();
-        }
-    }
-
     // ============= BACKUP =============
 
     /**
@@ -373,11 +357,4 @@ export class IncludeFile extends MarkdownFile {
         };
     }
 
-    // ============= OVERRIDES =============
-
-    /**
-     * Note: We don't override save() or reload() to call notifyParentOfChange()
-     * The event system handles updates via onDidChange listeners in _handleFileRegistryChange
-     * This prevents redundant parent notifications and board re-parsing
-     */
 }
