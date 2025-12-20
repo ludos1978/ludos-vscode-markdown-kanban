@@ -113,63 +113,32 @@ export class IncludeLoadingProcessor {
         }
     }
 
-    /**
-     * Handle the case where all includes are being removed (newFiles is empty)
-     */
-    handleIncludeRemoval(
-        targetColumn: KanbanColumn | null,
-        targetTask: KanbanTask | null,
-        isColumnSwitch: boolean
-    ): void {
-        if (isColumnSwitch && targetColumn) {
-            targetColumn.includeFiles = [];
-            targetColumn.includeMode = false;
-            targetColumn.displayTitle = targetColumn.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-        } else if (targetTask) {
-            targetTask.includeFiles = [];
-            targetTask.includeMode = false;
-            targetTask.displayTitle = targetTask.title.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-            targetTask.originalTitle = targetTask.title;
-            targetTask.description = '';
-        }
-    }
+    // ============= UNIFIED LOADING (SINGLE CODE PATH) =============
 
     /**
-     * Handle the case where includes are already loaded (no new files to load)
-     * This restores properties that were cleared by CLEARING_CACHE state
+     * Unified loading function - SINGLE code path for ALL include loading scenarios.
+     *
+     * This function:
+     * 1. Handles removal (empty includeFiles)
+     * 2. ALWAYS reloads content from disk (or uses preloaded content)
+     * 3. Parses content to tasks (column) or description (task)
+     *
+     * There is NO distinction between "new" vs "already loaded" files.
+     * This eliminates the bug where cached empty files weren't reloaded.
      */
-    handleAlreadyLoadedIncludes(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: KanbanColumn | null,
-        targetTask: KanbanTask | null,
-        isColumnSwitch: boolean,
-        newFiles: string[]
-    ): void {
-        if (targetTask) {
-            this._restoreTaskIncludeFromLoadedFile(event, targetTask, newFiles);
-        } else if (isColumnSwitch && targetColumn) {
-            this._restoreColumnIncludeFromLoadedFiles(event, targetColumn, newFiles);
-        }
-    }
+    async unifiedLoad(params: {
+        target: { type: 'column'; column: KanbanColumn } | { type: 'task'; column: KanbanColumn; task: KanbanTask };
+        includeFiles: string[];
+        preloadedContent?: Map<string, string>;
+        newTitle?: string;
+        context: ChangeContext;
+    }): Promise<void> {
+        const { target, includeFiles, preloadedContent, newTitle, context } = params;
 
-    /**
-     * Load new column include files and parse to tasks
-     */
-    async loadColumnIncludes(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: KanbanColumn,
-        loadingFiles: string[],
-        context: ChangeContext
-    ): Promise<void> {
-        // Update column properties
-        targetColumn.includeFiles = loadingFiles;
-        targetColumn.includeMode = loadingFiles.length > 0;
-
-        // Update title and displayTitle if provided
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            targetColumn.title = event.newTitle;
-            targetColumn.originalTitle = event.newTitle;
-            targetColumn.displayTitle = this._generateColumnDisplayTitle(event.newTitle, loadingFiles);
+        // Handle removal case (empty includeFiles)
+        if (includeFiles.length === 0) {
+            this._clearTarget(target, newTitle);
+            return;
         }
 
         // Get dependencies
@@ -177,92 +146,146 @@ export class IncludeLoadingProcessor {
         const mainFile = this._fileRegistry.getMainFile();
 
         if (!fileFactory || !mainFile) {
-            console.error(`[IncludeLoadingProcessor] Missing dependencies (fileFactory or mainFile)`);
+            console.error(`[IncludeLoadingProcessor.unifiedLoad] Missing dependencies`);
             return;
         }
 
-        // Get preloaded content map if available
-        const preloadedContentMap = event.type === 'include_switch' ? event.preloadedContent : undefined;
+        if (target.type === 'column') {
+            await this._loadColumnContent(target.column, includeFiles, preloadedContent, newTitle, mainFile, fileFactory, context);
+        } else {
+            await this._loadTaskContent(target.column, target.task, includeFiles[0], newTitle, mainFile, fileFactory, context);
+        }
+    }
+
+    /**
+     * Clear target when includes are being removed
+     */
+    private _clearTarget(
+        target: { type: 'column'; column: KanbanColumn } | { type: 'task'; column: KanbanColumn; task: KanbanTask },
+        newTitle?: string
+    ): void {
+        if (target.type === 'column') {
+            const column = target.column;
+            column.includeFiles = [];
+            column.includeMode = false;
+            column.tasks = [];
+            if (newTitle !== undefined) {
+                column.title = newTitle;
+                column.originalTitle = newTitle;
+                column.displayTitle = newTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+            }
+        } else {
+            const task = target.task;
+            task.includeFiles = [];
+            task.includeMode = false;
+            task.description = '';
+            if (newTitle !== undefined) {
+                task.title = newTitle;
+                task.originalTitle = newTitle;
+                task.displayTitle = newTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
+            }
+        }
+    }
+
+    /**
+     * Load column include content - ALWAYS reloads from disk
+     */
+    private async _loadColumnContent(
+        column: KanbanColumn,
+        includeFiles: string[],
+        preloadedContent: Map<string, string> | undefined,
+        newTitle: string | undefined,
+        mainFile: MainKanbanFile,
+        fileFactory: FileFactory,
+        context: ChangeContext
+    ): Promise<void> {
+        // Update column properties
+        column.includeFiles = includeFiles;
+        column.includeMode = true;
+
+        if (newTitle !== undefined) {
+            column.title = newTitle;
+            column.originalTitle = newTitle;
+            column.displayTitle = this._generateColumnDisplayTitle(newTitle, includeFiles);
+        }
 
         // Load all files and collect tasks
         const tasks: KanbanTask[] = [];
 
-        for (const relativePath of loadingFiles) {
-            // Normalize path for consistent Map lookup (matches normalization in ColumnCommands)
-            const normalizedPath = MarkdownFile.normalizeRelativePath(relativePath);
-            const preloadedContent = preloadedContentMap?.get(normalizedPath);
+        for (const relativePath of includeFiles) {
+            // Ensure file is registered
+            this._fileRegistry.ensureIncludeRegistered(
+                relativePath,
+                'include-column',
+                fileFactory,
+                mainFile,
+                { columnId: column.id, columnTitle: column.title }
+            );
 
-            if (preloadedContentMap && preloadedContent) {
-                console.log(`[IncludeLoadingProcessor] Using preloaded content for: ${relativePath} (${preloadedContent.length} chars)`);
-            } else if (preloadedContentMap) {
-                console.log(`[IncludeLoadingProcessor] No preloaded content for: ${relativePath} (normalized: ${normalizedPath}), will load from disk`);
-            }
-
-            // Ensure file is registered with correct type
-            await this._ensureColumnIncludeRegistered(relativePath, targetColumn, fileFactory, mainFile);
-
-            // Load content and parse tasks
             const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file) {
-                await this._loadFileContent(file, preloadedContent);
-
-                // Cast to IncludeFile and parse as tasks
-                // Note: A file can be used in multiple contexts (column include in one place,
-                // task include in another). Don't check file type - just parse the content.
-                const includeFile = file as IncludeFile;
-                const mainFilePath = mainFile.getPath();
-                const contentLength = includeFile.getContent()?.length || 0;
-                const fileTasks = includeFile.parseToTasks(targetColumn.tasks, targetColumn.id, mainFilePath);
-
-                // Debug: Log if content was loaded but no tasks were parsed
-                if (contentLength > 0 && fileTasks.length === 0) {
-                    console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
-                } else if (contentLength === 0) {
-                    console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
-                }
-
-                tasks.push(...fileTasks);
-            } else {
+            if (!file) {
                 console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
+                continue;
             }
+
+            // ALWAYS load content - NO distinction between "new" vs "already loaded"
+            const normalizedPath = MarkdownFile.normalizeRelativePath(relativePath);
+            const preloaded = preloadedContent?.get(normalizedPath);
+
+            if (preloaded !== undefined) {
+                file.setContent(preloaded, false); // Mark as unsaved
+            } else {
+                await file.reload(); // ALWAYS reload from disk
+            }
+
+            // Parse to tasks
+            const includeFile = file as IncludeFile;
+            const mainFilePath = mainFile.getPath();
+            const fileTasks = includeFile.parseToTasks(column.tasks, column.id, mainFilePath);
+
+            // Debug logging
+            const contentLength = includeFile.getContent()?.length || 0;
+            if (contentLength > 0 && fileTasks.length === 0) {
+                console.warn(`[IncludeLoadingProcessor] File has content (${contentLength} chars) but parsed to 0 tasks: ${relativePath}`);
+            } else if (contentLength === 0) {
+                console.warn(`[IncludeLoadingProcessor] File has no content after reload: ${relativePath}`);
+            }
+
+            tasks.push(...fileTasks);
+            context.result.updatedFiles.push(relativePath);
         }
 
-        targetColumn.tasks = tasks;
-        context.result.updatedFiles.push(...loadingFiles);
+        column.tasks = tasks;
     }
 
     /**
-     * Load a new task include file and set task description
+     * Load task include content - ALWAYS reloads from disk
      */
-    async loadTaskInclude(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: KanbanColumn,
-        targetTask: KanbanTask,
-        loadingFiles: string[],
+    private async _loadTaskContent(
+        column: KanbanColumn,
+        task: KanbanTask,
+        relativePath: string,
+        newTitle: string | undefined,
+        mainFile: MainKanbanFile,
+        fileFactory: FileFactory,
         context: ChangeContext
     ): Promise<void> {
-        const relativePath = loadingFiles[0]; // Task includes are single file
+        // Ensure file is registered
+        this._fileRegistry.ensureIncludeRegistered(
+            relativePath,
+            'include-task',
+            fileFactory,
+            mainFile,
+            { columnId: column.id, taskId: task.id, taskTitle: task.title }
+        );
 
-        // Get dependencies
-        const fileFactory = this._webviewPanel.fileFactory;
-        const mainFile = this._fileRegistry.getMainFile();
-
-        if (!fileFactory || !mainFile) {
-            console.error(`[IncludeLoadingProcessor] Missing dependencies (fileFactory or mainFile)`);
-            return;
-        }
-
-        // Ensure file is registered with correct type
-        await this._ensureTaskIncludeRegistered(relativePath, targetColumn, targetTask, fileFactory, mainFile);
-
-        // Load content
         const file = this._fileRegistry.getByRelativePath(relativePath);
         if (!file) {
             console.error(`[IncludeLoadingProcessor] File not found after registration: ${relativePath}`);
             return;
         }
 
-        // Always reload from disk for task includes
+        // ALWAYS reload from disk
         await file.reload();
 
         const fullFileContent = file.getContent();
@@ -272,89 +295,40 @@ export class IncludeLoadingProcessor {
         }
 
         // Update task properties
-        targetTask.includeMode = true;
-        targetTask.includeFiles = loadingFiles;
-        targetTask.displayTitle = `# include in ${relativePath}`;
-        targetTask.description = fullFileContent;
+        task.includeMode = true;
+        task.includeFiles = [relativePath];
+        task.displayTitle = `# include in ${relativePath}`;
+        task.description = fullFileContent;
 
-        // Update title if provided
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            targetTask.title = event.newTitle;
-            targetTask.originalTitle = event.newTitle;
+        if (newTitle !== undefined) {
+            task.title = newTitle;
+            task.originalTitle = newTitle;
         }
 
-        // Sync file baseline with task content
+        // Sync file baseline
         file.setContent(fullFileContent, true);
-
         context.result.updatedFiles.push(relativePath);
     }
 
+    // ============= PATH NORMALIZATION HELPERS =============
+
+    /**
+     * Calculate files being unloaded with proper path normalization
+     */
+    calculateUnloadingFiles(oldFiles: string[], newFiles: string[]): string[] {
+        const normalizedNew = new Set(newFiles.map(MarkdownFile.normalizeRelativePath));
+        return oldFiles.filter(f => !normalizedNew.has(MarkdownFile.normalizeRelativePath(f)));
+    }
+
+    /**
+     * Calculate files being loaded with proper path normalization
+     */
+    calculateLoadingFiles(oldFiles: string[], newFiles: string[]): string[] {
+        const normalizedOld = new Set(oldFiles.map(MarkdownFile.normalizeRelativePath));
+        return newFiles.filter(f => !normalizedOld.has(MarkdownFile.normalizeRelativePath(f)));
+    }
+
     // ============= PRIVATE HELPERS =============
-
-    private _restoreTaskIncludeFromLoadedFile(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetTask: KanbanTask,
-        newFiles: string[]
-    ): void {
-        const relativePath = newFiles[0];
-        const file = this._fileRegistry.getByRelativePath(relativePath);
-
-        if (!file) {
-            console.error(`[IncludeLoadingProcessor] File not found in registry: ${relativePath}`);
-            return;
-        }
-
-        const fullFileContent = file.getContent();
-        if (!fullFileContent || fullFileContent.length === 0) {
-            console.error(`[IncludeLoadingProcessor] File has no content: ${relativePath}`);
-            return;
-        }
-
-        // Restore all properties
-        targetTask.includeMode = true;
-        targetTask.includeFiles = newFiles;
-        targetTask.displayTitle = `# include in ${relativePath}`;
-        targetTask.description = fullFileContent;
-
-        // Update title if provided
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            targetTask.title = event.newTitle;
-            targetTask.originalTitle = event.newTitle;
-        }
-    }
-
-    private _restoreColumnIncludeFromLoadedFiles(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: KanbanColumn,
-        newFiles: string[]
-    ): void {
-        targetColumn.includeFiles = newFiles;
-        targetColumn.includeMode = true;
-
-        // Update title if provided
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            targetColumn.title = event.newTitle;
-            targetColumn.originalTitle = event.newTitle;
-            targetColumn.displayTitle = this._generateColumnDisplayTitle(event.newTitle, newFiles);
-        }
-
-        // Re-load tasks from already-loaded files
-        // Note: A file can be used in multiple contexts - use it regardless of registered type
-        const mainFile = this._fileRegistry.getMainFile();
-        const mainFilePath = mainFile?.getPath();
-        const tasks: KanbanTask[] = [];
-
-        for (const relativePath of newFiles) {
-            const file = this._fileRegistry.getByRelativePath(relativePath);
-            if (file) {
-                const columnIncludeFile = file as IncludeFile;
-                const fileTasks = columnIncludeFile.parseToTasks([], targetColumn.id, mainFilePath);
-                tasks.push(...fileTasks);
-            }
-        }
-
-        targetColumn.tasks = tasks;
-    }
 
     private _generateColumnDisplayTitle(title: string, files: string[]): string {
         const includeMatches = title.match(INCLUDE_SYNTAX.REGEX);
@@ -370,47 +344,5 @@ export class IncludeLoadingProcessor {
         }
 
         return title;
-    }
-
-    private async _ensureColumnIncludeRegistered(
-        relativePath: string,
-        targetColumn: KanbanColumn,
-        fileFactory: FileFactory,
-        mainFile: MainKanbanFile
-    ): Promise<void> {
-        this._fileRegistry.ensureIncludeRegistered(
-            relativePath,
-            'include-column',
-            fileFactory,
-            mainFile,
-            { columnId: targetColumn.id, columnTitle: targetColumn.title }
-        );
-    }
-
-    private async _ensureTaskIncludeRegistered(
-        relativePath: string,
-        targetColumn: KanbanColumn,
-        targetTask: KanbanTask,
-        fileFactory: FileFactory,
-        mainFile: MainKanbanFile
-    ): Promise<void> {
-        this._fileRegistry.ensureIncludeRegistered(
-            relativePath,
-            'include-task',
-            fileFactory,
-            mainFile,
-            { columnId: targetColumn.id, taskId: targetTask.id, taskTitle: targetTask.title }
-        );
-    }
-
-    private async _loadFileContent(file: MarkdownFile, preloadedContent: string | undefined): Promise<void> {
-        if (preloadedContent !== undefined) {
-            // Use preloaded content (marks as unsaved)
-            file.setContent(preloadedContent, false);
-        } else {
-            // Always reload from disk during include switch
-            // User was already prompted about unsaved changes in PROMPTING_USER state
-            await file.reload();
-        }
     }
 }

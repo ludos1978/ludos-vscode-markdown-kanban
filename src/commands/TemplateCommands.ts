@@ -349,8 +349,35 @@ export class TemplateCommands extends BaseMessageCommand {
             currentBoard.columns.push(...columnsWithTags);
             log(`applyTemplateWithVariables: Added ${columnsWithTags.length} columns at end of board`);
 
-            // Sync to backend and update frontend
+            // Sync to backend first (registers files, generates markdown)
             context.emitBoardChanged(currentBoard, 'template');
+
+            // CRITICAL FIX: Trigger include switches for columns/tasks with includes
+            // This uses the standard state machine path (unifiedLoad) to load content
+            for (const column of columnsWithTags) {
+                // Handle column-level includes
+                if (column.includeFiles && column.includeFiles.length > 0) {
+                    await context.handleIncludeSwitch({
+                        columnId: column.id,
+                        oldFiles: [],
+                        newFiles: column.includeFiles,
+                        newTitle: column.title
+                    });
+                }
+
+                // Handle task-level includes
+                for (const task of column.tasks) {
+                    if (task.includeFiles && task.includeFiles.length > 0 && task.includeMode) {
+                        await context.handleIncludeSwitch({
+                            taskId: task.id,
+                            oldFiles: [],
+                            newFiles: task.includeFiles,
+                            newTitle: task.title
+                        });
+                    }
+                }
+            }
+
             await context.onBoardUpdate();
 
             // Send updated board to frontend WITH position info for DOM manipulation

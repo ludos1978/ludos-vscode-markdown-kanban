@@ -1,10 +1,10 @@
-- [ ] found problems:
+- [x] found problems:
 - when i modify a column that has tasks and i add a columninclude. it should be able to add the existing tasks into the included board (as these othervise get lost when the include is added). this was working before, but isnt anymore.
 - when i modify the board, it sometimes allways immediately exits editing when i click a editable field, i cant modify the board anymore.
 - when i have a save conflict and i save my changes as backup and load from external, a popup should show up with the backup file link to open.
 - when dropping a task from the sources on the info header it doesnt do the positional highlight reliably. it maybe does it once, but not the second time i use that feature.
 
-- [ ] after copying a column as markdown. i'd like to be able to drop it as a new column with content out of the copyed content.
+- [x] after copying a column as markdown. i'd like to be able to drop it as a new column with content out of the copyed content.
   - if the first task only is a title without a content. it will be used as column title.\
   - othervise the title of the column is empty\
   
@@ -12,18 +12,18 @@
   
   can we reuse the task creation functionality of the column include?
 
-- [ ] it seems as if the board is loaded twice, or at least the height calculation is reset again while loading the board initially. can you verify and analyze?
+- [x] it seems as if the board is loaded twice, or at least the height calculation is reset again while loading the board initially. can you verify and analyze?
 
-- [ ] when i copy a task as markdown it doesnt copy the task, but the full board. The same problem is with the column. it should only copy the content as markdown (presentation) which the function is called from!
+- [x] when i copy a task as markdown it doesnt copy the task, but the full board. The same problem is with the column. it should only copy the content as markdown (presentation) which the function is called from!
 
-- [ ] when pressing the save button in the fiel states overview it doesnt allways write the file. this is a force save, which writes the file no matter what any automatic system says!
+- [x] when pressing the save button in the fiel states overview it doesnt allways write the file. this is a force save, which writes the file no matter what any automatic system says!
 
 - [ ] when switching from one columninclude to another, it doesnt load the content if it's not already in the cache. alwayss immediately remove the old content after asking to save changed content. then emtpy the columns tasks, then fill up as soon as the data is available. verify the current order, make 3 suggestions how to fix the problem with quality rating. do not add new functions, fix the existing flow
 
 
 - [x] did this about 30 times: do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems
 
-- [ ] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!
+- [x] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!
 
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 

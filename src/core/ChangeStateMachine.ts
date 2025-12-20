@@ -112,8 +112,8 @@ export class ChangeStateMachine {
             const context = this._createInitialContext(event);
             this._currentContext = context;
 
-            // Start state machine from RECEIVING_CHANGE
-            await this._transitionTo(ChangeState.RECEIVING_CHANGE, context);
+            // Start state machine from VALIDATE
+            await this._transitionTo(ChangeState.VALIDATE, context);
 
             // State machine will automatically transition through all states
             // until reaching COMPLETE, CANCELLED, or ERROR
@@ -188,38 +188,14 @@ export class ChangeStateMachine {
      */
     private async _executeStateHandler(state: ChangeState, context: ChangeContext): Promise<ChangeState | null> {
         switch (state) {
-            case ChangeState.RECEIVING_CHANGE:
-                return await this._handleReceivingChange(context);
+            case ChangeState.VALIDATE:
+                return await this._handleValidate(context);
 
-            case ChangeState.ANALYZING_IMPACT:
-                return await this._handleAnalyzingImpact(context);
+            case ChangeState.LOAD:
+                return await this._handleLoad(context);
 
-            case ChangeState.CHECKING_EDIT_STATE:
-                return await this._handleCheckingEditState(context);
-
-            case ChangeState.CAPTURING_EDIT:
-                return await this._handleCapturingEdit(context);
-
-            case ChangeState.CHECKING_UNSAVED:
-                return await this._handleCheckingUnsaved(context);
-
-            case ChangeState.PROMPTING_USER:
-                return await this._handlePromptingUser(context);
-
-            case ChangeState.SAVING_UNSAVED:
-                return await this._handleSavingUnsaved(context);
-
-            case ChangeState.CLEARING_CACHE:
-                return await this._handleClearingCache(context);
-
-            case ChangeState.LOADING_NEW:
-                return await this._handleLoadingNew(context);
-
-            case ChangeState.UPDATING_BACKEND:
-                return await this._handleUpdatingBackend(context);
-
-            case ChangeState.SYNCING_FRONTEND:
-                return await this._handleSyncingFrontend(context);
+            case ChangeState.UPDATE:
+                return await this._handleUpdate(context);
 
             case ChangeState.COMPLETE:
                 return await this._handleComplete(context);
@@ -235,18 +211,266 @@ export class ChangeStateMachine {
         }
     }
 
-    // ============= STATE HANDLERS =============
+    // ============= SIMPLIFIED STATE HANDLERS (4 states) =============
 
-    private async _handleReceivingChange(_context: ChangeContext): Promise<ChangeState> {
-        // Event already captured in context during creation
-        return ChangeState.ANALYZING_IMPACT;
+    /**
+     * VALIDATE: Consolidated validation state
+     * - Analyze impact
+     * - Capture active edit
+     * - Check unsaved changes in files being unloaded
+     * - Prompt user if needed
+     * - Save if requested
+     */
+    private async _handleValidate(context: ChangeContext): Promise<ChangeState> {
+        // 1. Analyze impact
+        await this._analyzeImpact(context);
+
+        // 2. Check if user is currently editing
+        let isEditing = false;
+        let editedFile: MarkdownFile | undefined;
+
+        for (const file of context.impact.affectedFiles) {
+            if (file.isInEditMode()) {
+                isEditing = true;
+                editedFile = file;
+                break;
+            }
+        }
+
+        if (this._webviewPanel?.isEditingInProgress?.()) {
+            isEditing = true;
+        }
+
+        context.editCapture = { wasEditing: isEditing, editedFile };
+
+        // 3. Capture edit if editing
+        if (isEditing && this._fileRegistry?.requestStopEditing) {
+            try {
+                const capturedEdit = await this._fileRegistry.requestStopEditing();
+                if (capturedEdit?.value !== undefined) {
+                    context.editCapture.capturedValue = capturedEdit;
+                    if (editedFile) {
+                        await editedFile.applyEditToBaseline(capturedEdit);
+                    }
+                }
+            } catch (error) {
+                console.error(`[State:VALIDATE] Error capturing edit:`, error);
+            }
+        }
+
+        // 4. If not an include switch, skip unsaved check
+        if (!context.impact.includesSwitched) {
+            return ChangeState.LOAD;
+        }
+
+        // 5. Check for unsaved changes in files being unloaded
+        const unsavedFiles: MarkdownFile[] = [];
+        for (const relativePath of context.switches.unloadingFiles) {
+            const file = this._fileRegistry?.getByRelativePath(relativePath);
+            if (file?.hasUnsavedChanges()) {
+                unsavedFiles.push(file);
+            }
+        }
+
+        if (unsavedFiles.length === 0) {
+            return ChangeState.LOAD;
+        }
+
+        context.unsaved.files = unsavedFiles;
+
+        // 6. Prompt user for unsaved files
+        const fileList = unsavedFiles.map(f => f.getRelativePath()).join('\n');
+        const choice = await vscode.window.showWarningMessage(
+            `The following include files have unsaved changes:\n${fileList}\n\nDo you want to save them before unloading?`,
+            { modal: true },
+            'Save',
+            'Discard',
+            'Cancel'
+        );
+
+        if (choice === 'Cancel' || choice === undefined) {
+            context.unsaved.userChoice = 'cancel';
+            return ChangeState.CANCELLED;
+        }
+
+        // 7. Save if requested
+        if (choice === 'Save') {
+            context.unsaved.userChoice = 'save';
+            for (const file of unsavedFiles) {
+                try {
+                    await this._fileSaveService.saveFile(file);
+                    context.result.updatedFiles.push(file.getRelativePath());
+                } catch (error) {
+                    console.error(`[State:VALIDATE] Error saving ${file.getRelativePath()}:`, error);
+                }
+            }
+        } else {
+            context.unsaved.userChoice = 'discard';
+        }
+
+        return ChangeState.LOAD;
     }
 
-    private async _handleAnalyzingImpact(context: ChangeContext): Promise<ChangeState> {
+    /**
+     * LOAD: Consolidated loading state
+     * - Clear old include content
+     * - Load new include content (using unifiedLoad - ALWAYS reloads)
+     */
+    private async _handleLoad(context: ChangeContext): Promise<ChangeState> {
+        // Set cache protection flag
+        if (context.impact.includesSwitched && this._webviewPanel) {
+            this._webviewPanel.setIncludeSwitchInProgress(true);
+        }
 
+        // If not an include switch, skip to update
+        if (!context.impact.includesSwitched) {
+            return ChangeState.UPDATE;
+        }
+
+        // Get board and store in context
+        const board = this._webviewPanel?.getBoard();
+        context.modifiedBoard = board;
+
+        if (!board) {
+            return ChangeState.UPDATE;
+        }
+
+        // Clear backend cache for unloading files
+        for (const relativePath of context.switches.unloadingFiles) {
+            const file = this._fileRegistry?.getByRelativePath(relativePath);
+            if (file) {
+                file.discardChanges();
+            }
+        }
+
+        // Send loading state to frontend (clear old content)
+        const panel = this._webviewPanel?.getPanel();
+        const event = context.event;
+        const target = this._findClearingTarget(board, event);
+
+        if (target && panel) {
+            if (target.type === 'column') {
+                target.column.tasks = [];
+                target.column.includeFiles = [];
+                target.column.includeMode = false;
+                this._sendColumnUpdate(panel, target.column, null, true);
+            } else {
+                target.task.includeFiles = [];
+                target.task.displayTitle = '';
+                target.task.description = '';
+                target.task.includeMode = false;
+                this._sendTaskUpdate(panel, target.column, target.task, null, true);
+            }
+        }
+
+        // Load new includes using unified loading (ALWAYS reloads)
+        const switchEvent = event as IncludeSwitchEvent | UserEditEvent;
+        const resolvedTarget = this._includeProcessor.resolveTarget(switchEvent, board);
+
+        if (!resolvedTarget.found) {
+            console.error(`[State:LOAD] Could not find target column/task`);
+            return ChangeState.UPDATE;
+        }
+
+        const { targetColumn, targetTask, isColumnSwitch } = resolvedTarget;
+        const newFiles = context.switches.newFiles;
+        const preloadedContent = event.type === 'include_switch' ? event.preloadedContent : undefined;
+        const newTitle = event.type === 'include_switch' ? event.newTitle : undefined;
+
+        // Build target for unifiedLoad
+        const loadTarget = isColumnSwitch && targetColumn
+            ? { type: 'column' as const, column: targetColumn }
+            : targetTask && targetColumn
+                ? { type: 'task' as const, column: targetColumn, task: targetTask }
+                : null;
+
+        if (loadTarget) {
+            await this._includeProcessor.unifiedLoad({
+                target: loadTarget,
+                includeFiles: newFiles,
+                preloadedContent,
+                newTitle,
+                context
+            });
+        }
+
+        return ChangeState.UPDATE;
+    }
+
+    /**
+     * UPDATE: Consolidated update state
+     * - Sync file registry
+     * - Update main file content
+     * - Emit events
+     * - Send frontend updates
+     */
+    private async _handleUpdate(context: ChangeContext): Promise<ChangeState> {
+        // 1. Sync file registry
+        if (this._webviewPanel?.syncIncludeFilesWithBoard) {
+            try {
+                const board = this._webviewPanel.getBoard();
+                if (board) {
+                    this._webviewPanel.syncIncludeFilesWithBoard(board);
+                }
+            } catch (error) {
+                console.error(`[State:UPDATE] Error syncing file registry:`, error);
+            }
+        }
+
+        // 2. Update MainKanbanFile content
+        if (context.impact.includesSwitched || context.impact.mainFileChanged) {
+            const mainFile = this._fileRegistry?.getMainFile();
+            const board = context.modifiedBoard || this._webviewPanel?.getBoard();
+
+            if (mainFile && board && 'updateFromBoard' in mainFile) {
+                (mainFile as import('../files/MainKanbanFile').MainKanbanFile).updateFromBoard(board);
+            }
+        }
+
+        // 3. Emit board:changed event for include switches
+        if (context.impact.includesSwitched && this._webviewPanel) {
+            const board = this._webviewPanel.getBoard?.();
+            if (board && this._webviewPanel.emitBoardChanged) {
+                this._webviewPanel.emitBoardChanged(board, 'include-switch');
+            }
+        }
+
+        // 4. Invalidate board cache if needed (NOT for include switches)
+        if (context.event.type !== 'include_switch' && this._webviewPanel?.invalidateBoardCache) {
+            this._webviewPanel.invalidateBoardCache();
+        }
+
+        // 5. Send frontend updates
+        const panel = this._webviewPanel?.getPanel();
+        const event = context.event;
+        const board = context.modifiedBoard || this._webviewPanel?.getBoard();
+
+        if (board && panel) {
+            if (context.impact.includesSwitched) {
+                this._sendIncludeSwitchUpdate(panel, board, event, context);
+            } else if (context.impact.mainFileChanged && event.type === 'file_system_change') {
+                if (this._webviewPanel?.refreshWebviewContent) {
+                    await this._webviewPanel.refreshWebviewContent();
+                    context.result.frontendMessages.push({ type: 'fullBoardRefresh' });
+                }
+            } else if (context.impact.includeFilesChanged && event.type === 'file_system_change') {
+                context.result.frontendMessages.push({ type: 'autonomousFileUpdate' });
+            } else if (event.type === 'user_edit' || event.type === 'save') {
+                context.result.frontendMessages.push({ type: 'noUpdateNeeded' });
+            }
+        }
+
+        return ChangeState.COMPLETE;
+    }
+
+    // ============= IMPACT ANALYSIS HELPER =============
+
+    /**
+     * Analyze impact of the change event
+     */
+    private async _analyzeImpact(context: ChangeContext): Promise<void> {
         const event = context.event;
 
-        // Analyze impact based on event type
         if (event.type === 'file_system_change') {
             const file = event.file;
             const fileType = file.getFileType();
@@ -261,7 +485,6 @@ export class ChangeStateMachine {
             context.impact.includeFilesChanged = false;
             context.impact.includesSwitched = true;
 
-            // Calculate files being unloaded
             const oldFiles = this._fileRegistry
                 ? event.oldFiles.map(path =>
                     this._fileRegistry!.getByRelativePath(path)
@@ -270,14 +493,14 @@ export class ChangeStateMachine {
 
             context.impact.affectedFiles = oldFiles;
 
-            // Store switch info in context
+            // Use normalized path comparison
             context.switches.oldFiles = event.oldFiles;
             context.switches.newFiles = event.newFiles;
-            context.switches.unloadingFiles = event.oldFiles.filter(
-                old => !event.newFiles.includes(old)
+            context.switches.unloadingFiles = this._includeProcessor.calculateUnloadingFiles(
+                event.oldFiles, event.newFiles
             );
-            context.switches.loadingFiles = event.newFiles.filter(
-                nf => !event.oldFiles.includes(nf)
+            context.switches.loadingFiles = this._includeProcessor.calculateLoadingFiles(
+                event.oldFiles, event.newFiles
             );
 
         } else if (event.type === 'user_edit') {
@@ -289,14 +512,13 @@ export class ChangeStateMachine {
             context.impact.affectedFiles = mainFile ? [mainFile] : [];
 
             if (event.params.includeSwitch) {
-                // Also an include switch
                 context.switches.oldFiles = event.params.includeSwitch.oldFiles;
                 context.switches.newFiles = event.params.includeSwitch.newFiles;
-                context.switches.unloadingFiles = context.switches.oldFiles.filter(
-                    old => !context.switches.newFiles.includes(old)
+                context.switches.unloadingFiles = this._includeProcessor.calculateUnloadingFiles(
+                    context.switches.oldFiles, context.switches.newFiles
                 );
-                context.switches.loadingFiles = context.switches.newFiles.filter(
-                    nf => !context.switches.oldFiles.includes(nf)
+                context.switches.loadingFiles = this._includeProcessor.calculateLoadingFiles(
+                    context.switches.oldFiles, context.switches.newFiles
                 );
             }
 
@@ -309,189 +531,6 @@ export class ChangeStateMachine {
             context.impact.includesSwitched = false;
             context.impact.affectedFiles = [file];
         }
-
-        return ChangeState.CHECKING_EDIT_STATE;
-    }
-
-    private async _handleCheckingEditState(context: ChangeContext): Promise<ChangeState> {
-        // Check if user is currently editing any affected files
-        let isEditing = false;
-        let editedFile: MarkdownFile | undefined;
-
-        for (const file of context.impact.affectedFiles) {
-            if (file.isInEditMode()) {
-                isEditing = true;
-                editedFile = file;
-                break;
-            }
-        }
-
-        // Also check if webview panel indicates editing in progress
-        if (this._webviewPanel && this._webviewPanel.isEditingInProgress && this._webviewPanel.isEditingInProgress()) {
-            isEditing = true;
-        }
-
-        context.editCapture = {
-            wasEditing: isEditing,
-            editedFile: editedFile
-        };
-
-        if (isEditing) {
-            return ChangeState.CAPTURING_EDIT;
-        } else {
-            return ChangeState.CHECKING_UNSAVED;
-        }
-    }
-
-    private async _handleCapturingEdit(context: ChangeContext): Promise<ChangeState> {
-        // Request the file registry to stop editing and capture the value
-        if (this._fileRegistry && this._fileRegistry.requestStopEditing) {
-            try {
-                const capturedEdit = await this._fileRegistry.requestStopEditing();
-
-                if (capturedEdit && capturedEdit.value !== undefined) {
-                    context.editCapture!.capturedValue = capturedEdit;
-
-                    // Apply to baseline of the edited file
-                    if (context.editCapture!.editedFile) {
-                        const file = context.editCapture!.editedFile;
-                        await file.applyEditToBaseline(capturedEdit);
-                    }
-                }
-            } catch (error) {
-                console.error(`[State:CAPTURING_EDIT] Error capturing edit:`, error);
-                // Continue anyway - don't block the flow
-            }
-        }
-
-        return ChangeState.CHECKING_UNSAVED;
-    }
-
-    private async _handleCheckingUnsaved(context: ChangeContext): Promise<ChangeState> {
-        // Only check if includes are being switched
-        if (!context.impact.includesSwitched) {
-            return ChangeState.CLEARING_CACHE;
-        }
-
-        // Get files being unloaded
-        const unloadingFiles = context.switches.unloadingFiles;
-
-        if (unloadingFiles.length === 0) {
-            return ChangeState.CLEARING_CACHE;
-        }
-
-        // Check each unloading file for unsaved changes
-        const unsavedFiles: MarkdownFile[] = [];
-
-        for (const relativePath of unloadingFiles) {
-            const file = this._fileRegistry?.getByRelativePath(relativePath);
-            if (file && file.hasUnsavedChanges()) {
-                unsavedFiles.push(file);
-            }
-        }
-
-        if (unsavedFiles.length === 0) {
-            return ChangeState.CLEARING_CACHE;
-        }
-
-        context.unsaved.files = unsavedFiles;
-
-        return ChangeState.PROMPTING_USER;
-    }
-
-    private async _handlePromptingUser(context: ChangeContext): Promise<ChangeState> {
-        const unsavedFiles = context.unsaved.files;
-        const fileList = unsavedFiles.map(f => f.getRelativePath()).join('\n');
-
-        // Show VSCode dialog with Save/Discard/Cancel options
-        const choice = await vscode.window.showWarningMessage(
-            `The following include files have unsaved changes:\n${fileList}\n\nDo you want to save them before unloading?`,
-            { modal: true },
-            'Save',
-            'Discard',
-            'Cancel'
-        );
-
-        // Store choice in context
-        if (choice === 'Save') {
-            context.unsaved.userChoice = 'save';
-            return ChangeState.SAVING_UNSAVED;
-        } else if (choice === 'Discard') {
-            context.unsaved.userChoice = 'discard';
-            return ChangeState.CLEARING_CACHE;
-        } else {
-            // User clicked Cancel or closed dialog
-            context.unsaved.userChoice = 'cancel';
-            return ChangeState.CANCELLED;
-        }
-    }
-
-    private async _handleSavingUnsaved(context: ChangeContext): Promise<ChangeState> {
-        const unsavedFiles = context.unsaved.files;
-
-        for (const file of unsavedFiles) {
-            try {
-                await this._fileSaveService.saveFile(file);
-                context.result.updatedFiles.push(file.getRelativePath());
-            } catch (error) {
-                console.error(`[State:SAVING_UNSAVED] Error saving ${file.getRelativePath()}:`, error);
-                // Continue with other files even if one fails
-            }
-        }
-
-        return ChangeState.CLEARING_CACHE;
-    }
-
-    private async _handleClearingCache(context: ChangeContext): Promise<ChangeState> {
-        // Only clear cache if includes are being switched
-        if (!context.impact.includesSwitched) {
-            return ChangeState.LOADING_NEW;
-        }
-
-        const unloadingFiles = context.switches.unloadingFiles;
-        const board = this._webviewPanel?.getBoard();
-
-        if (!board) {
-            return ChangeState.LOADING_NEW;
-        }
-
-        // Clear backend cache for unloading files
-        for (const relativePath of unloadingFiles) {
-            const file = this._fileRegistry?.getByRelativePath(relativePath);
-            if (file) {
-                // Discard any uncommitted changes (revert to baseline/disk)
-                file.discardChanges();
-            }
-        }
-
-        // Clear frontend cache based on event type
-        const event = context.event;
-        const panel = this._webviewPanel?.getPanel();
-        if (!panel) {
-            return ChangeState.LOADING_NEW;
-        }
-
-        // Find and clear the target (column or task)
-        const target = this._findClearingTarget(board, event);
-        if (!target) {
-            return ChangeState.LOADING_NEW;
-        }
-
-        // Clear backend state and send loading update to frontend
-        if (target.type === 'column') {
-            target.column.tasks = [];
-            target.column.includeFiles = [];
-            target.column.includeMode = false;
-            this._sendColumnUpdate(panel, target.column, null, true);
-        } else {
-            target.task.includeFiles = [];
-            target.task.displayTitle = '';
-            target.task.description = '';
-            target.task.includeMode = false;
-            this._sendTaskUpdate(panel, target.column, target.task, null, true);
-        }
-
-        return ChangeState.LOADING_NEW;
     }
 
     /**
@@ -524,165 +563,7 @@ export class ChangeStateMachine {
         return null;
     }
 
-    private async _handleLoadingNew(context: ChangeContext): Promise<ChangeState> {
-        // CRITICAL FIX: Set flag to block cache invalidation during include switch
-        if (context.impact.includesSwitched && this._webviewPanel) {
-            this._webviewPanel.setIncludeSwitchInProgress(true);
-        }
-
-        // Only load new files if includes are being switched
-        if (!context.impact.includesSwitched) {
-            return ChangeState.UPDATING_BACKEND;
-        }
-
-        // Get board and store in context (prevents stale board after cache invalidation)
-        const board = this._webviewPanel?.getBoard();
-        context.modifiedBoard = board;
-
-        if (!board || !this._includeProcessor) {
-            return ChangeState.UPDATING_BACKEND;
-        }
-
-        // This handler is only called for include_switch and user_edit events
-        // Assert the narrower type for the include processor methods
-        const event = context.event as IncludeSwitchEvent | UserEditEvent;
-        const loadingFiles = context.switches.loadingFiles;
-
-        // Resolve target column/task
-        const target = this._includeProcessor.resolveTarget(event, board);
-        if (!target.found) {
-            console.error(`[State:LOADING_NEW] Could not find target column/task`);
-            return ChangeState.UPDATING_BACKEND;
-        }
-
-        const { targetColumn, targetTask, isColumnSwitch } = target;
-
-        // Update title if provided in event
-        this._includeProcessor.updateTargetTitle(event, targetColumn, targetTask, isColumnSwitch);
-
-        // Handle empty loadingFiles (removal or already-loaded)
-        if (loadingFiles.length === 0) {
-            const newFiles = context.switches.newFiles;
-
-            if (newFiles.length === 0) {
-                // TRUE REMOVAL: user removed all includes
-                this._includeProcessor.handleIncludeRemoval(targetColumn, targetTask, isColumnSwitch);
-            } else {
-                // ALREADY LOADED: restore from loaded files
-                this._includeProcessor.handleAlreadyLoadedIncludes(
-                    event, targetColumn, targetTask, isColumnSwitch, newFiles
-                );
-            }
-
-            return ChangeState.UPDATING_BACKEND;
-        }
-
-        // Load new include files
-        if (isColumnSwitch && targetColumn) {
-            await this._includeProcessor.loadColumnIncludes(event, targetColumn, loadingFiles, context);
-        } else if (targetTask && targetColumn) {
-            // Task includes require both targetTask and targetColumn (task belongs to column)
-            await this._includeProcessor.loadTaskInclude(event, targetColumn, targetTask, loadingFiles, context);
-        }
-
-        return ChangeState.UPDATING_BACKEND;
-    }
-
-    private async _handleUpdatingBackend(context: ChangeContext): Promise<ChangeState> {
-        // Sync file registry (create instances for new files)
-        if (this._webviewPanel && this._webviewPanel.syncIncludeFilesWithBoard) {
-            try {
-                const board = this._webviewPanel.getBoard();
-                if (board) {
-                    this._webviewPanel.syncIncludeFilesWithBoard(board);
-                }
-            } catch (error) {
-                console.error(`[State:UPDATING_BACKEND] Error syncing file registry:`, error);
-            }
-        }
-
-        // CRITICAL FIX: Update MainKanbanFile content when includes are modified
-        // This ensures that removing a column include updates the file's markdown content
-        if (context.impact.includesSwitched || context.impact.mainFileChanged) {
-            const mainFile = this._fileRegistry?.getMainFile();
-            const board = context.modifiedBoard || this._webviewPanel?.getBoard();
-
-            if (mainFile && board && 'updateFromBoard' in mainFile) {
-                (mainFile as import('../files/MainKanbanFile').MainKanbanFile).updateFromBoard(board);
-            }
-        }
-
-        // Mark main file as having unsaved changes if user made edits
-        if (context.impact.mainFileChanged && context.event.type === 'user_edit') {
-            const mainFile = this._fileRegistry?.getMainFile();
-            if (mainFile) {
-                // The file's internal state already reflects the change
-                // No need to explicitly mark it - setContent() already did that
-            }
-        }
-
-        // CRITICAL FIX: Emit board:changed event for include switches
-        // When an include file is switched, the task/column title in the main file
-        // changes (e.g., !!!include(old.md)!!! -> !!!include(new.md)!!!), so the
-        // main file content needs to be updated for unsaved detection
-        if (context.impact.includesSwitched) {
-            const mainFile = this._fileRegistry?.getMainFile();
-            if (mainFile && this._webviewPanel) {
-                // Get current board and emit change event (triggers BoardSyncHandler)
-                const board = this._webviewPanel.getBoard?.();
-                if (board && this._webviewPanel.emitBoardChanged) {
-                    this._webviewPanel.emitBoardChanged(board, 'include-switch');
-                }
-            }
-        }
-
-        // Invalidate board cache if needed
-        // CRITICAL: Don't invalidate for include switches - board is already updated in-memory
-        // Cache MUST stay in sync with UI. Disk will be out of sync until user saves (that's OK).
-        // DEFENSE IN DEPTH: Event type check prevents the call, _includeSwitchInProgress flag blocks if called
-        if (context.event.type !== 'include_switch' && this._webviewPanel && this._webviewPanel.invalidateBoardCache) {
-            this._webviewPanel.invalidateBoardCache();
-        }
-
-        return ChangeState.SYNCING_FRONTEND;
-    }
-
-    private async _handleSyncingFrontend(context: ChangeContext): Promise<ChangeState> {
-        // Only send updates if we have a webview panel
-        if (!this._webviewPanel) {
-            return ChangeState.COMPLETE;
-        }
-
-        const panel = this._webviewPanel.getPanel();
-        const event = context.event;
-
-        // CRITICAL FIX: Use the modified board from context instead of calling getBoard()
-        // After cache invalidation, getBoard() would regenerate from disk with stale data
-        const board = context.modifiedBoard || this._webviewPanel.getBoard();
-
-        if (!board) {
-            return ChangeState.COMPLETE;
-        }
-
-        // Determine what type of update to send based on event type and impact
-        if (context.impact.includesSwitched && panel) {
-            this._sendIncludeSwitchUpdate(panel, board, event, context);
-        } else if (context.impact.mainFileChanged && event.type === 'file_system_change') {
-            // Main file changed externally - send full board refresh
-            if (this._webviewPanel.refreshWebviewContent) {
-                await this._webviewPanel.refreshWebviewContent();
-                context.result.frontendMessages.push({ type: 'fullBoardRefresh' });
-            }
-        } else if (context.impact.includeFilesChanged && event.type === 'file_system_change') {
-            // Include file changed - handled autonomously by file instance
-            context.result.frontendMessages.push({ type: 'autonomousFileUpdate' });
-        } else if (event.type === 'user_edit' || event.type === 'save') {
-            // No frontend update needed
-            context.result.frontendMessages.push({ type: 'noUpdateNeeded' });
-        }
-
-        return ChangeState.COMPLETE;
-    }
+    // ============= FRONTEND UPDATE HELPERS =============
 
     /**
      * Send appropriate update for include switch events

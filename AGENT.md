@@ -61,6 +61,7 @@
 - Do not add default values for cases where default values cannot be read (for example from config), instead throw warnings or errors!
 
 - If you have to implement a function that is very similar to an existing feature. First verify if the existing functionality could be refactored so the old system still works very well, while allowing to reuse the functionality for the new feature. Only do the refactoring if the old system is very safe to still run properly. Inform the user about your actions first and after implementing it, make sure to have him test the new and the old functionality!
+- when refactoring, do not create wrappers.
 
 
 ## Error handling:

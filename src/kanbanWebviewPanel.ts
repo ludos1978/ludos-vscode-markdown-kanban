@@ -1484,7 +1484,7 @@ export class KanbanWebviewPanel {
      * Set include switch in-progress flag
      *
      * When true, blocks cache invalidation to prevent ID regeneration during include switches.
-     * State machine sets this to true at start of LOADING_NEW, false at COMPLETE.
+     * State machine sets this to true at start of LOAD state, false at COMPLETE.
      */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
         this._context.setIncludeSwitchInProgress(inProgress);

@@ -176,39 +176,37 @@ Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncA
 
 ## Recent Critical Fixes & New Functions (Phase 1-6)
 
-### Phase 6: State Machine Architecture (2025-11-02)
+### Phase 6: State Machine Architecture (2025-11-02) - Simplified (2025-12-20)
 
 #### STATE-MACHINE: Unified Change Handler
 **File:** [src/core/ChangeStateMachine.ts](src/core/ChangeStateMachine.ts)
 - **New**: `ChangeStateMachine` - SINGLE ENTRY POINT for all file changes in the system
 - **Why**: Eliminates scattered entry points (file watcher, user edits, saves, switches)
-- **Solution**: State machine with 15 states guarantees consistent execution order
+- **Solution**: Simplified state machine with 4 states (VALIDATE → LOAD → UPDATE → COMPLETE)
 - **Impact**: All changes follow predictable flow, unsaved check ALWAYS executed before switches
 - **Architecture**: See [STATE_MACHINE_DESIGN.md](../STATE_MACHINE_DESIGN.md) for complete design
-- **Migration**: See [STATE_MACHINE_MIGRATION_GUIDE.md](../STATE_MACHINE_MIGRATION_GUIDE.md) for implementation guide
+
+**Simplified States (2025-12-20):**
+| State | Responsibility |
+|-------|---------------|
+| `VALIDATE` | Capture edits, check unsaved, prompt user, save if needed |
+| `LOAD` | Clear old includes, register files, reload content, parse |
+| `UPDATE` | Update backend, emit events, sync frontend |
+| `COMPLETE` | Clear flags, return success |
+| `CANCELLED` | Handle user cancellation |
+| `ERROR` | Handle errors and rollback |
 
 **Public Methods:**
-- `getInstance()` - Get singleton instance
-- `initialize(fileRegistry, webviewPanel)` - Inject dependencies
+- `constructor(fileRegistry, webviewPanel)` - Create per-panel instance (NOT singleton)
 - `processChange(event)` - **SINGLE ENTRY POINT** - Process any file change event
-- `getCurrentState()` - Get current state (for debugging/testing)
-- `getCurrentContext()` - Get current context (for debugging/testing)
 
 **State Handlers (Private):**
-- `_handleReceivingChange()` - Capture event information
-- `_handleAnalyzingImpact()` - Classify change type and determine affected files
-- `_handleCheckingEditState()` - Check if user is editing affected files
-- `_handleCapturingEdit()` - Capture user's current edit to baseline
-- `_handleCheckingUnsaved()` - Check for unsaved files being unloaded (ALWAYS executed)
-- `_handlePromptingUser()` - Show Save/Discard/Cancel dialog for unsaved changes
-- `_handleSavingUnsaved()` - Save unsaved files per user request
-- `_handleClearingCache()` - Clear frontend & backend cache for old includes
-- `_handleLoadingNew()` - Load new include file content from disk
-- `_handleUpdatingBackend()` - Update board state and file registry
-- `_handleSyncingFrontend()` - Send targeted updates to webview
-- `_handleComplete()` - Log success and return to IDLE
+- `_handleValidate()` - Analyze impact, capture edit, check unsaved, prompt user, save
+- `_handleLoad()` - Clear cache, load includes using unifiedLoad (ALWAYS reloads)
+- `_handleUpdate()` - Sync registry, update main file, emit events, send frontend updates
+- `_handleComplete()` - Clear flags and return to IDLE
 - `_handleCancelled()` - Handle user cancellation
-- `_handleError()` - Handle errors and attempt recovery
+- `_handleError()` - Handle errors and attempt rollback
 
 **Event Types:**
 - `FileSystemChangeEvent` - External file modifications
@@ -219,7 +217,6 @@ Both INIT (initial load) and FOCUS (window focus) now use `FileSyncHandler.syncA
 **Documentation:**
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Complete architecture overview
 - [STATE_MACHINE_DESIGN.md](../STATE_MACHINE_DESIGN.md) - State machine specification
-- [STATE_MACHINE_MIGRATION_GUIDE.md](../STATE_MACHINE_MIGRATION_GUIDE.md) - Migration guide
 
 ---
 

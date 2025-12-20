@@ -59,19 +59,19 @@ export interface StateMachineStatusMessage {
 
 // ============= STATE DEFINITIONS =============
 
+/**
+ * Simplified state machine states
+ *
+ * VALIDATE: Capture edits, check unsaved, prompt user, save if needed
+ * LOAD: Clear old includes, register files, ALWAYS reload content, parse
+ * UPDATE: Update backend, emit events, sync frontend
+ * COMPLETE/CANCELLED/ERROR: Terminal states
+ */
 export enum ChangeState {
     IDLE = 'IDLE',
-    RECEIVING_CHANGE = 'RECEIVING_CHANGE',
-    ANALYZING_IMPACT = 'ANALYZING_IMPACT',
-    CHECKING_EDIT_STATE = 'CHECKING_EDIT_STATE',
-    CAPTURING_EDIT = 'CAPTURING_EDIT',
-    CHECKING_UNSAVED = 'CHECKING_UNSAVED',
-    PROMPTING_USER = 'PROMPTING_USER',
-    SAVING_UNSAVED = 'SAVING_UNSAVED',
-    CLEARING_CACHE = 'CLEARING_CACHE',
-    LOADING_NEW = 'LOADING_NEW',
-    UPDATING_BACKEND = 'UPDATING_BACKEND',
-    SYNCING_FRONTEND = 'SYNCING_FRONTEND',
+    VALIDATE = 'VALIDATE',
+    LOAD = 'LOAD',
+    UPDATE = 'UPDATE',
     COMPLETE = 'COMPLETE',
     CANCELLED = 'CANCELLED',
     ERROR = 'ERROR'
