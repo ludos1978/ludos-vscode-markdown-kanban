@@ -552,27 +552,6 @@ export class MarpExportService {
     }
 
     /**
-     * Get Marp CLI version
-     * @returns Version string or null if not available
-     */
-    static async getMarpVersion(): Promise<string | null> {
-        try {
-            // Try to read package.json from node_modules
-            const fs = await import('fs');
-            const path = await import('path');
-            const pkgPath = path.join(__dirname, '../../node_modules/@marp-team/marp-cli/package.json');
-            if (fs.existsSync(pkgPath)) {
-                const pkgContent = fs.readFileSync(pkgPath, 'utf-8');
-                const pkg = JSON.parse(pkgContent);
-                return pkg.version;
-            }
-            return null;
-        } catch (err) {
-            return null;
-        }
-    }
-
-    /**
      * Get available Marp themes
      * @returns Promise that resolves to an array of available theme names
      */

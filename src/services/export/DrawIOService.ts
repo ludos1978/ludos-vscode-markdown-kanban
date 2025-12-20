@@ -215,21 +215,4 @@ export class DrawIOService {
         });
     }
 
-    /**
-     * Get recommended CLI installation command for current platform
-     */
-    getInstallationInstructions(): string {
-        const platform = process.platform;
-
-        switch (platform) {
-            case 'darwin':
-                return 'Install via Homebrew: brew install --cask drawio';
-            case 'win32':
-                return 'Download from: https://github.com/jgraph/drawio-desktop/releases';
-            case 'linux':
-                return 'Install via package manager or download from: https://github.com/jgraph/drawio-desktop/releases';
-            default:
-                return 'Download from: https://github.com/jgraph/drawio-desktop/releases';
-        }
-    }
 }

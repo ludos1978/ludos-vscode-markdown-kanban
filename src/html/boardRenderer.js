@@ -3005,12 +3005,6 @@ function enforceFoldModesForStacks(stackElement = null) {
 let recalculateStackHeightsTimer = null;
 let pendingStackElement = null;
 
-// Debug: Force recalculation of all stack heights (call from console)
-window.debugForceRecalc = () => {
-    document.querySelectorAll('.kanban-column-stack').forEach(stack => {
-        recalculateStackHeightsImmediate(stack);
-    });
-};
 
 // COLUMN RESIZE OBSERVER: Automatically recalculates stack heights when column content changes
 // This handles all dynamic content: images, diagrams, text changes, etc.

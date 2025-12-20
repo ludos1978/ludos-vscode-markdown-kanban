@@ -79,35 +79,6 @@ export class PresentationGenerator {
     }
 
     /**
-     * Generate presentation from a single column
-     *
-     * @param column - Kanban column
-     * @param options - Generation options
-     * @returns Presentation markdown string (column title slide + task slides)
-     */
-    static fromColumn(column: KanbanColumn, options: PresentationOptions = {}): string {
-        const slideContents: string[] = [];
-
-        // Column title slide (title only, no description)
-        let columnTitle = column.displayTitle ?? column.title;
-        if (options.stripIncludes) {
-            columnTitle = columnTitle.replace(INCLUDE_SYNTAX.REGEX, '').trim();
-        }
-        slideContents.push(columnTitle + '\n\n');
-
-        // Task slides
-        let tasks = column.tasks;
-        if (options.filterIncludes) {
-            tasks = tasks.filter(task => !task.includeMode && !task.includeFiles);
-        }
-        for (const task of tasks) {
-            slideContents.push(this.taskToSlideContent(task, options));
-        }
-
-        return this.formatOutput(slideContents, options);
-    }
-
-    /**
      * Generate presentation from multiple columns
      *
      * @param columns - Array of kanban columns

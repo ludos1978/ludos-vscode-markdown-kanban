@@ -379,20 +379,4 @@ ${svgElements}</svg>`;
         }
     }
 
-    /**
-     * Check if excalidraw conversion is available
-     * Returns true if library is properly integrated
-     */
-    async isAvailable(): Promise<boolean> {
-        // Excalidraw is a bundled dependency, so it's always "available"
-        // But conversion quality depends on library integration status
-        return true;
-    }
-
-    /**
-     * Get supported file extensions
-     */
-    getSupportedExtensions(): string[] {
-        return ['.excalidraw', '.excalidraw.json', '.excalidraw.svg'];
-    }
 }

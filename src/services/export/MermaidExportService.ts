@@ -188,16 +188,6 @@ export class MermaidExportService {
         this.isProcessingQueue = false;
     }
 
-    /**
-     * Get status info for debugging
-     */
-    getStatus(): { pending: number; queued: number; processing: boolean } {
-        return {
-            pending: this.pendingRequests.size,
-            queued: this.requestQueue.length,
-            processing: this.isProcessingQueue
-        };
-    }
 }
 
 // Singleton instance for easy access across the application

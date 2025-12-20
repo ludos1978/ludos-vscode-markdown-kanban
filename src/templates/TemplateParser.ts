@@ -42,7 +42,6 @@ export interface TemplateDefinition {
     variables: TemplateVariable[];
     columns: TemplateColumn[];
     path: string;           // Absolute path to template folder
-    files: string[];        // List of files/folders to copy (relative to template folder)
 }
 
 /**
@@ -58,17 +57,13 @@ export class TemplateParser {
         const metadata = this.parseFrontmatter(frontmatter);
         const columns = this.parseBody(body);
 
-        // Extract files to copy (all files in template folder except template.md)
-        const files = this.extractFilesToCopy(templateFolder);
-
         return {
             name: metadata.name || path.basename(templateFolder),
             description: metadata.description,
             icon: metadata.icon,
             variables: metadata.variables || [],
             columns,
-            path: templateFolder,
-            files
+            path: templateFolder
         };
     }
 
@@ -324,15 +319,5 @@ export class TemplateParser {
             includes.push(match[1]);
         }
         return includes;
-    }
-
-    /**
-     * Get list of files/folders to copy from template folder
-     * Excludes template.md itself
-     */
-    private static extractFilesToCopy(_templateFolder: string): string[] {
-        // This will be populated during actual template application
-        // For now, return empty - the FileCopyService will scan the folder
-        return [];
     }
 }
