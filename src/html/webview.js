@@ -2449,18 +2449,16 @@ if (!webviewEventListenersInitialized) {
                 const safePath = escapeFilePath(message.relativePath);
                 const markdownLink = `![](${safePath})`;
 
-                createNewTaskWithContent(
-                    imageFileName,
-                    message.dropPosition,
-                    markdownLink
-                );
+                createTasksWithContent([{
+                    title: imageFileName,
+                    description: markdownLink
+                }], message.dropPosition);
             } else {
                 // Create error task if save failed
-                createNewTaskWithContent(
-                    'Clipboard Image (Error)',
-                    message.dropPosition,
-                    `Failed to save image: ${message.error || 'Unknown error'}`
-                );
+                createTasksWithContent([{
+                    title: 'Clipboard Image (Error)',
+                    description: `Failed to save image: ${message.error || 'Unknown error'}`
+                }], message.dropPosition);
             }
             break;
 
@@ -2473,13 +2471,10 @@ if (!webviewEventListenersInitialized) {
                 const diagramLink = `![](${safeDiagramPath})`;
 
                 // Use explicit column and position from the message
-                createNewTaskWithContent(
-                    diagramFileName,
-                    message.dropPosition,
-                    diagramLink,
-                    message.columnId,
-                    message.insertionIndex
-                );
+                createTasksWithContent([{
+                    title: diagramFileName,
+                    description: diagramLink
+                }], message.dropPosition, message.columnId, message.insertionIndex);
             } else {
                 // Show error if diagram creation failed
                 vscode.postMessage({
@@ -2622,11 +2617,10 @@ if (!webviewEventListenersInitialized) {
                     ? `![${message.originalFileName}](${safePath})`
                     : `[${message.originalFileName}](${safePath})`;
 
-                createNewTaskWithContent(
-                    originalName,
-                    message.dropPosition,
-                    markdownLink
-                );
+                createTasksWithContent([{
+                    title: originalName,
+                    description: markdownLink
+                }], message.dropPosition);
 
                 // Show notification
                 if (message.wasCopied && window.activityManager) {
@@ -2648,11 +2642,10 @@ if (!webviewEventListenersInitialized) {
                 }
             } else {
                 console.error('[File-Drop] Failed to save file:', message.error);
-                createNewTaskWithContent(
-                    message.originalFileName || 'File',
-                    message.dropPosition,
-                    `Error: ${message.error}`
-                );
+                createTasksWithContent([{
+                    title: message.originalFileName || 'File',
+                    description: `Error: ${message.error}`
+                }], message.dropPosition);
             }
             break;
 
@@ -2667,11 +2660,10 @@ if (!webviewEventListenersInitialized) {
                     ? `![${message.originalFileName}](${safePath})`
                     : `[${message.originalFileName}](${safePath})`;
 
-                createNewTaskWithContent(
-                    originalName,
-                    message.dropPosition,
-                    markdownLink
-                );
+                createTasksWithContent([{
+                    title: originalName,
+                    description: markdownLink
+                }], message.dropPosition);
 
                 // Show notification
                 if (window.activityManager) {
@@ -2685,11 +2677,10 @@ if (!webviewEventListenersInitialized) {
                 }
             } else {
                 console.error('[File-Drop] Failed to save file from contents:', message.error);
-                createNewTaskWithContent(
-                    message.originalFileName || 'File',
-                    message.dropPosition,
-                    `Error: ${message.error}`
-                );
+                createTasksWithContent([{
+                    title: message.originalFileName || 'File',
+                    description: `Error: ${message.error}`
+                }], message.dropPosition);
             }
             break;
 
@@ -2710,11 +2701,10 @@ if (!webviewEventListenersInitialized) {
                 const safePath = escapeFilePath(message.relativePath);
                 const markdownLink = `![](${safePath})`;
 
-                createNewTaskWithContent(
-                    originalName,
-                    message.dropPosition,
-                    markdownLink
-                );
+                createTasksWithContent([{
+                    title: originalName,
+                    description: markdownLink
+                }], message.dropPosition);
 
                 // Show notification based on what happened
                 if (message.wasCopied && window.activityManager) {
@@ -2740,11 +2730,10 @@ if (!webviewEventListenersInitialized) {
             } else {
                 console.error('[Image-Drop] Failed to save image:', message.error);
                 // Create error task if save failed
-                createNewTaskWithContent(
-                    'Dropped Image (Error)',
-                    message.dropPosition,
-                    `Failed to save image: ${message.error || 'Unknown error'}`
-                );
+                createTasksWithContent([{
+                    title: 'Dropped Image (Error)',
+                    description: `Failed to save image: ${message.error || 'Unknown error'}`
+                }], message.dropPosition);
             }
             break;
         case 'insertSnippetContent':
@@ -3731,7 +3720,10 @@ function insertFileLink(fileInfo) {
         vscode.postMessage({ type: 'showMessage', text: `Inserted ${isImage ? 'image' : 'file'} link: ${fileName}` });
     } else {
         // Create new task with the file link
-        createNewTaskWithContent(markdownLink, fileInfo.dropPosition, isImage ? markdownLink : '');
+        createTasksWithContent([{
+            title: markdownLink,
+            description: isImage ? markdownLink : ''
+        }], fileInfo.dropPosition);
         vscode.postMessage({ type: 'showMessage', text: `Created new task with ${isImage ? 'image' : 'file'} link: ${fileName}` });
     }
 }

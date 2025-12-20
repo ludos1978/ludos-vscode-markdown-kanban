@@ -27,9 +27,6 @@
  * Local state variables track initialization and drop processing.
  */
 
-// Add debugging flag
-let lastIndicatorUpdate = 0;
-const INDICATOR_UPDATE_THROTTLE = 100; // milliseconds
 const DEBUG_DROP = false;
 
 
@@ -108,8 +105,6 @@ function readPartialFileForHash(file) {
     });
 }
 
-// PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag)
-// REMOVED: internalDropIndicator - now using unified dropIndicator (line 41)
 
 // Use centralized DragStateManager instead of local state
 // The dragStateManager is already available globally as window.dragState
@@ -765,11 +760,7 @@ function setupGlobalDragAndDrop() {
                 handleVSCodeUriDrop(e, textData2);
             } else {
                 // Plain text - create a new card
-                createNewTaskWithContent(
-                    textData2,
-                    { x: e.clientX, y: e.clientY },
-                    ''
-                );
+                createTasksWithContent([{ title: textData2, description: '' }], { x: e.clientX, y: e.clientY });
             }
             return;
         }
@@ -2108,43 +2099,18 @@ function handleClipboardCardDrop(e, clipboardData) {
             }
         }
 
-        createNewTaskWithContent(
-            title,
-            { x: e.clientX, y: e.clientY },
-            description
-        );
+        createTasksWithContent([{ title, description }], { x: e.clientX, y: e.clientY });
     } catch (error) {
-        // Failed to parse clipboard data
-        // Fallback: treat as plain text
-        createNewTaskWithContent(
-            'Clipboard Content',
-            { x: e.clientX, y: e.clientY },
-            typeof clipboardData === 'string' ? clipboardData : 'Clipboard content'
-        );
+        // Failed to parse clipboard data - treat as plain text
+        createTasksWithContent([{
+            title: 'Clipboard Content',
+            description: typeof clipboardData === 'string' ? clipboardData : 'Clipboard content'
+        }], { x: e.clientX, y: e.clientY });
     }
 }
 
 function handleEmptyCardDrop(e, emptyCardData) {
-
-    try {
-        const parsedData = JSON.parse(emptyCardData);
-
-        // Create empty task
-
-        createNewTaskWithContent(
-            '',
-            { x: e.clientX, y: e.clientY },
-            ''
-        );
-    } catch (error) {
-        // Failed to parse empty card data
-        // Fallback: create empty task anyway
-        createNewTaskWithContent(
-            '',
-            { x: e.clientX, y: e.clientY },
-            ''
-        );
-    }
+    createTasksWithContent([{ title: '', description: '' }], { x: e.clientX, y: e.clientY });
 }
 
 function handleMultipleFilesDrop(e, filesContent) {
@@ -2196,7 +2162,7 @@ function handleMultipleFilesDrop(e, filesContent) {
     });
 
     // Batch create all tasks at once (single render)
-    createMultipleTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
+    createTasksWithContent(tasksData, { x: e.clientX, y: e.clientY });
 }
 
 function handleClipboardImageDrop(e, imageData) {
@@ -2209,11 +2175,7 @@ function handleClipboardImageDrop(e, imageData) {
 
         if (!base64Data) {
             console.error('No image data found in parsed data');
-            createNewTaskWithContent(
-                'Clipboard Image',
-                { x: e.clientX, y: e.clientY },
-                'Failed to save image: No image data found'
-            );
+            createTasksWithContent([{ title: 'Clipboard Image', description: 'Failed to save image: No image data found' }], { x: e.clientX, y: e.clientY });
             return;
         }
 
@@ -2224,11 +2186,7 @@ function handleClipboardImageDrop(e, imageData) {
 
     } catch (error) {
         console.error('Failed to handle clipboard image drop:', error);
-        createNewTaskWithContent(
-            'Clipboard Image',
-            { x: e.clientX, y: e.clientY },
-            'Failed to process clipboard image'
-        );
+        createTasksWithContent([{ title: 'Clipboard Image', description: 'Failed to process clipboard image' }], { x: e.clientX, y: e.clientY });
     }
 }
 
@@ -2284,13 +2242,7 @@ function processImageSave(e, base64Data, imageType, md5Hash) {
 
     } catch (error) {
         console.error('Failed to process clipboard image save:', error);
-
-        // Fallback: create a text card indicating the error
-        createNewTaskWithContent(
-            'Clipboard Image',
-            { x: e.clientX, y: e.clientY },
-            'Failed to process clipboard image'
-        );
+        createTasksWithContent([{ title: 'Clipboard Image', description: 'Failed to process clipboard image' }], { x: e.clientX, y: e.clientY });
     }
 }
 
@@ -2361,20 +2313,12 @@ function executeFileObjectCopy(dropId, isImage) {
                 });
             } catch (error) {
                 console.error('[Image-Drop] Failed to process image:', error);
-                createNewTaskWithContent(
-                    fileName,
-                    dropPosition,
-                    `![${fileName}](${fileName}) - Failed to copy image`
-                );
+                createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to copy image` }], dropPosition);
             }
         };
         reader.onerror = function(error) {
             console.error('[Image-Drop] FileReader error:', error);
-            createNewTaskWithContent(
-                fileName,
-                dropPosition,
-                `![${fileName}](${fileName}) - Failed to read image`
-            );
+            createTasksWithContent([{ title: fileName, description: `![${fileName}](${fileName}) - Failed to read image` }], dropPosition);
         };
         reader.readAsDataURL(file);
     } else {
@@ -2394,20 +2338,12 @@ function executeFileObjectCopy(dropId, isImage) {
                 });
             } catch (error) {
                 console.error('[File-Drop] Failed to process file:', error);
-                createNewTaskWithContent(
-                    fileName,
-                    dropPosition,
-                    `[${fileName}](${fileName}) - Failed to copy file`
-                );
+                createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to copy file` }], dropPosition);
             }
         };
         reader.onerror = function(error) {
             console.error('[File-Drop] FileReader error:', error);
-            createNewTaskWithContent(
-                fileName,
-                dropPosition,
-                `[${fileName}](${fileName}) - Failed to read file`
-            );
+            createTasksWithContent([{ title: fileName, description: `[${fileName}](${fileName}) - Failed to read file` }], dropPosition);
         };
         reader.readAsArrayBuffer(file);
     }
@@ -2563,121 +2499,13 @@ function getActiveTextEditor() {
 }
 
 /**
- * Creates new task from dropped content
- * Purpose: Convert external drops to tasks
- * Used by: File drops, clipboard drops, empty card drops
- * @param {string} content - Task title content
- * @param {Object} dropPosition - Column and index info
- * @param {string} description - Optional description
- * Side effects: Sends create task message to VS Code
- */
-function createNewTaskWithContent(content, dropPosition, description = '', explicitColumnId = null, explicitInsertionIndex = null) {
-
-    // Check board availability - NEW CACHE SYSTEM
-
-    if (!window.cachedBoard) {
-        // No cached board available
-        vscode.postMessage({
-            type: 'showMessage',
-            text: 'Cannot create task: No board loaded'
-        });
-        return;
-    }
-
-    if (!window.cachedBoard.columns || window.cachedBoard.columns.length === 0) {
-        // Board has no columns
-        vscode.postMessage({
-            type: 'showMessage',
-            text: 'Cannot create task: No columns available'
-        });
-        return;
-    }
-
-    // Find target column using hierarchical lookup
-    let targetColumnId = explicitColumnId;
-    let insertionIndex = explicitInsertionIndex !== null ? explicitInsertionIndex : -1;
-
-    // Only calculate position if explicit values not provided
-    if (targetColumnId === null) {
-        // Use hierarchical position finder: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
-        const dropResult = findDropPositionHierarchical(dropPosition.x, dropPosition.y, null);
-
-        if (dropResult) {
-            targetColumnId = dropResult.columnId;
-            insertionIndex = dropResult.insertionIndex;
-
-            // Unfold the column if it's collapsed
-            if (dropResult.columnElement && dropResult.columnElement.classList.contains('collapsed')) {
-                if (typeof unfoldColumnIfCollapsed === 'function') {
-                    unfoldColumnIfCollapsed(targetColumnId);
-                }
-            }
-        }
-    }
-    
-    if (targetColumnId) {
-        // Create new task with cache-first approach (no VS Code message)
-        // Ensure all task fields are strings, not blobs or other objects
-        const newTask = {
-            id: `temp-drop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title: typeof content === 'string' ? content : 'New Task',
-            description: typeof description === 'string' ? description : ''
-        };
-
-        // Find the target column in cached board
-        const targetColumn = window.cachedBoard.columns.find(col => col.id === targetColumnId);
-        if (targetColumn) {
-            // Insert task into cache
-            if (insertionIndex >= 0 && insertionIndex <= targetColumn.tasks.length) {
-                targetColumn.tasks.splice(insertionIndex, 0, newTask);
-            } else {
-                targetColumn.tasks.push(newTask);
-                insertionIndex = targetColumn.tasks.length - 1;
-            }
-
-            // Mark as unsaved changes
-            if (typeof markUnsavedChanges === 'function') {
-                markUnsavedChanges();
-            }
-
-            // Update refresh button to show unsaved state
-            if (typeof updateRefreshButtonState === 'function') {
-                updateRefreshButtonState('unsaved', 1);
-            }
-
-            // PERFORMANCE: Use incremental DOM update instead of full re-render
-            if (typeof window.addSingleTaskToDOM === 'function') {
-                window.addSingleTaskToDOM(targetColumnId, newTask, insertionIndex);
-            } else {
-                // Fallback to full render if incremental function not available
-                if (typeof renderBoard === 'function') {
-                    renderBoard();
-                }
-            }
-
-            // Recalculate affected stack after adding task (cache already invalidated by addSingleTaskToDOM)
-            const targetColumnElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
-            const targetStack = targetColumnElement?.closest('.kanban-column-stack');
-            if (targetStack && typeof window.recalculateStackHeightsDebounced === 'function') {
-                window.recalculateStackHeightsDebounced(targetStack);
-            }
-        }
-    } else {
-        // Could not find suitable column
-        vscode.postMessage({ 
-            type: 'showMessage', 
-            text: 'Could not find a suitable column. Please ensure at least one column is not collapsed.' 
-        });
-    }
-}
-
-
-/**
- * Batch create multiple tasks at once (optimized for performance)
+ * UNIFIED: Create one or more tasks at a drop position
  * @param {Array} tasksData - Array of {title, description} objects
  * @param {Object} dropPosition - Drop position {x, y}
+ * @param {string|null} explicitColumnId - Optional explicit column ID (overrides position-based lookup)
+ * @param {number} explicitInsertionIndex - Optional explicit insertion index (overrides position-based calculation)
  */
-function createMultipleTasksWithContent(tasksData, dropPosition) {
+function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null, explicitInsertionIndex = -1) {
     if (!tasksData || tasksData.length === 0) {
         return;
     }
@@ -2699,21 +2527,24 @@ function createMultipleTasksWithContent(tasksData, dropPosition) {
         return;
     }
 
-    // Calculate target column and insertion index ONCE using hierarchical lookup
-    let targetColumnId = null;
-    let insertionIndex = -1;
+    // Use explicit values if provided, otherwise calculate from drop position
+    let targetColumnId = explicitColumnId;
+    let insertionIndex = explicitInsertionIndex;
 
-    // Use hierarchical position finder: Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
-    const dropResult = findDropPositionHierarchical(dropPosition.x, dropPosition.y, null);
+    if (!targetColumnId) {
+        // Calculate target column and insertion index using hierarchical lookup
+        // Row (Y) → Stack (X) → Column (X) → Task (Y midpoint)
+        const dropResult = findDropPositionHierarchical(dropPosition.x, dropPosition.y, null);
 
-    if (dropResult) {
-        targetColumnId = dropResult.columnId;
-        insertionIndex = dropResult.insertionIndex;
+        if (dropResult) {
+            targetColumnId = dropResult.columnId;
+            insertionIndex = dropResult.insertionIndex;
 
-        // Unfold the column if it's collapsed
-        if (dropResult.columnElement && dropResult.columnElement.classList.contains('collapsed')) {
-            if (typeof unfoldColumnIfCollapsed === 'function') {
-                unfoldColumnIfCollapsed(targetColumnId);
+            // Unfold the column if it's collapsed
+            if (dropResult.columnElement && dropResult.columnElement.classList.contains('collapsed')) {
+                if (typeof unfoldColumnIfCollapsed === 'function') {
+                    unfoldColumnIfCollapsed(targetColumnId);
+                }
             }
         }
     }
@@ -3557,15 +3388,10 @@ function setupColumnDragAndDrop() {
             // Clear previous highlights
             cleanupDropZoneHighlights();
 
-            // For task/clipboard/emptycard drags, clear drop target and hide indicator at start
+            // For task/clipboard/emptycard drags, reset drop state at start of each dragover
             // If no valid target is found, task returns to original position with no highlight
             if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
-                dragState.dropTargetContainer = null;
-                dragState.dropTargetAfterElement = null;
-                // Hide the visual indicator - it will be shown again only if valid target found
-                if (dropIndicator) {
-                    dropIndicator.classList.remove('active');
-                }
+                hideDropIndicator();
             }
 
             // STEP 1: Find ROW by Y coordinate (direct DOM query)
