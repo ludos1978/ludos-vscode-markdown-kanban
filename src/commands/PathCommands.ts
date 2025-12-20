@@ -106,19 +106,12 @@ export class PathCommands extends BaseMessageCommand {
             return this.success({ converted: 0, skipped: result.skipped });
         }
 
-        // Update file content (marks as unsaved)
+        // Update file content in cache (marks as unsaved, does NOT save to disk)
         file.setContent(result.content, false);
 
-        // Auto-save the file after conversion
-        await context.fileSaveService.saveFile(file);
-
-        // Emit board changed event if main file was modified
-        if (message.isMainFile || !message.filePath) {
-            const board = context.getCurrentBoard();
-            if (board) {
-                context.emitBoardChanged(board, 'edit');
-            }
-        }
+        // Invalidate board cache and refresh webview to show updated paths
+        context.boardStore.invalidateCache();
+        await context.onBoardUpdate();
 
         // Notify frontend
         this.postMessage({
@@ -128,8 +121,7 @@ export class PathCommands extends BaseMessageCommand {
             converted: result.converted,
             skipped: result.skipped,
             warnings: result.warnings,
-            message: `Converted ${result.converted} paths to ${message.direction} format`,
-            saved: true
+            message: `Converted ${result.converted} paths to ${message.direction} format`
         });
 
         return this.success({
@@ -172,7 +164,6 @@ export class PathCommands extends BaseMessageCommand {
 
             if (result.converted > 0) {
                 mainFile.setContent(result.content, false);
-                await context.fileSaveService.saveFile(mainFile);
                 convertedFiles.push(mainFile.getRelativePath());
             }
 
@@ -196,7 +187,6 @@ export class PathCommands extends BaseMessageCommand {
 
             if (result.converted > 0) {
                 file.setContent(result.content, false);
-                await context.fileSaveService.saveFile(file);
                 convertedFiles.push(file.getRelativePath());
             }
 
@@ -205,12 +195,10 @@ export class PathCommands extends BaseMessageCommand {
             allWarnings.push(...result.warnings.map(w => `[${file.getRelativePath()}] ${w}`));
         }
 
-        // Emit board changed event if any file was modified
+        // Invalidate board cache and refresh webview to show updated paths
         if (totalConverted > 0) {
-            const board = context.getCurrentBoard();
-            if (board) {
-                context.emitBoardChanged(board, 'edit');
-            }
+            context.boardStore.invalidateCache();
+            await context.onBoardUpdate();
         }
 
         // Notify frontend
@@ -235,7 +223,7 @@ export class PathCommands extends BaseMessageCommand {
     }
 
     /**
-     * Convert a single path in the main file
+     * Convert a single path in any file (main or includes)
      */
     private async handleConvertSinglePath(
         message: ConvertSinglePathMessage,
@@ -246,17 +234,42 @@ export class PathCommands extends BaseMessageCommand {
             return this.failure('File registry not available');
         }
 
+        const conversionService = PathConversionService.getInstance();
+        const imagePath = message.imagePath;
+
+        // Collect all files to search
+        const allFiles: MarkdownFile[] = [];
         const mainFile = fileRegistry.getMainFile();
-        if (!mainFile) {
-            return this.failure('Main file not found');
+        if (mainFile) {
+            allFiles.push(mainFile);
+        }
+        allFiles.push(...fileRegistry.getIncludeFiles());
+
+        // Search for the path in all files
+        let foundFile: MarkdownFile | null = null;
+        let foundContent: string = '';
+
+        // Escape the path for regex
+        const escapedPath = imagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedPath, 'g');
+
+        for (const file of allFiles) {
+            const content = file.getContent();
+            if (regex.test(content)) {
+                foundFile = file;
+                foundContent = content;
+                break;
+            }
+            // Reset regex lastIndex for next test
+            regex.lastIndex = 0;
         }
 
-        const basePath = path.dirname(mainFile.getPath());
-        const content = mainFile.getContent();
-        const conversionService = PathConversionService.getInstance();
+        if (!foundFile) {
+            console.log(`[PathCommands] Path not found in any file: ${imagePath}`);
+            return this.failure('Path not found in any file');
+        }
 
-        // Find and replace the specific path
-        const imagePath = message.imagePath;
+        const basePath = path.dirname(foundFile.getPath());
         let newPath: string;
 
         if (message.direction === 'relative') {
@@ -278,41 +291,33 @@ export class PathCommands extends BaseMessageCommand {
             return this.success({ converted: false });
         }
 
-        // Replace the path in content (escape special regex chars)
-        const escapedPath = imagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedPath, 'g');
-        const newContent = content.replace(regex, newPath);
+        // Replace the path in content
+        regex.lastIndex = 0;
+        const newContent = foundContent.replace(regex, newPath);
 
-        if (newContent === content) {
-            return this.failure('Path not found in file content');
-        }
+        // Update file content in cache (marks as unsaved, does NOT save to disk)
+        foundFile.setContent(newContent, false);
 
-        // Update file content
-        mainFile.setContent(newContent, false);
-
-        // Auto-save the file
-        await context.fileSaveService.saveFile(mainFile);
-
-        // Emit board changed event
-        const board = context.getCurrentBoard();
-        if (board) {
-            context.emitBoardChanged(board, 'edit');
-        }
+        // Invalidate board cache and refresh webview to show updated paths
+        context.boardStore.invalidateCache();
+        await context.onBoardUpdate();
 
         // Notify frontend
         this.postMessage({
             type: 'singlePathConverted',
             originalPath: imagePath,
             newPath: newPath,
+            filePath: foundFile.getRelativePath(),
             direction: message.direction,
             converted: true,
-            message: `Converted path to ${message.direction} format`
+            message: `Converted path to ${message.direction} format in ${foundFile.getRelativePath()}`
         });
 
         return this.success({
             converted: true,
             originalPath: imagePath,
-            newPath: newPath
+            newPath: newPath,
+            filePath: foundFile.getRelativePath()
         });
     }
 }
