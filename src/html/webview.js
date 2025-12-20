@@ -3831,8 +3831,8 @@ function convertPathsToAbsolute() {
  * Called from inline onclick handlers in rendered markdown
  */
 function toggleImagePathMenu(container, imagePath) {
-    // Close any other open menus
-    document.querySelectorAll('.image-path-menu.visible').forEach(menu => {
+    // Close any other open menus (both image and include)
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
         if (menu.parentElement !== container) {
             menu.classList.remove('visible');
         }
@@ -3856,12 +3856,41 @@ function toggleImagePathMenu(container, imagePath) {
 }
 
 /**
- * Convert a single image path
+ * Toggle the include path menu visibility
+ * Called from inline onclick handlers in rendered include links
+ */
+function toggleIncludePathMenu(container, includePath) {
+    // Close any other open menus (both image and include)
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
+        if (menu.parentElement !== container) {
+            menu.classList.remove('visible');
+        }
+    });
+
+    const menu = container.querySelector('.include-path-menu');
+    if (menu) {
+        menu.classList.toggle('visible');
+
+        // Close menu when clicking outside
+        if (menu.classList.contains('visible')) {
+            const closeHandler = (e) => {
+                if (!container.contains(e.target)) {
+                    menu.classList.remove('visible');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+    }
+}
+
+/**
+ * Convert a single path (image or include)
  * Called from inline onclick handlers in rendered markdown
  */
 function convertSinglePath(imagePath, direction) {
-    // Close all menus
-    document.querySelectorAll('.image-path-menu.visible').forEach(menu => {
+    // Close all menus (both image and include)
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
 

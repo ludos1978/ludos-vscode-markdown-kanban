@@ -1400,8 +1400,7 @@ class TagUtils {
             // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
             const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
-            const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-            const linkHtml = `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleColumnIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
+            const linkHtml = generateIncludeLinkWithMenu(fileName, displayText, 'column');
 
             const fileNameWithoutExt = baseFileName.replace(/\.[^/.]+$/, '');
             const additionalTitle = (column.displayTitle && column.displayTitle !== fileNameWithoutExt) ? column.displayTitle : '';
@@ -1447,9 +1446,8 @@ class TagUtils {
                     }
 
                     const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
-                    const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
-                    return `<span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="handleColumnIncludeClick(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>`;
+                    return generateIncludeLinkWithMenu(filePath, displayText, 'column');
                 });
 
                 return result;
@@ -1505,10 +1503,8 @@ class TagUtils {
             // Format: "!(...path/filename.ext)!" or "!(filename.ext)!" if no path
             const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
 
-            const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-
             // Just return the include link - displayTitle is not shown because it's the file content, not metadata
-            return `<span class="columninclude-link" data-file-path="${escapeHtml(fileName)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(fileName)}')" title="Alt+click to open file: ${escapeHtml(fileName)}">${escapeHtml(displayText)}</span>`;
+            return generateIncludeLinkWithMenu(fileName, displayText, 'task');
         } else {
             // Normal task - render displayTitle which may contain %INCLUDE_BADGE:filepath% placeholder
             const displayTitle = task.displayTitle || (task.title ? (window.filterTagsFromText ? window.filterTagsFromText(task.title) : task.title) : '');
@@ -1546,14 +1542,35 @@ class TagUtils {
                 }
 
                 const displayText = pathPart ? `!(${pathPart}/${displayFileName})!` : `!(${displayFileName})!`;
-                const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
-                return `<span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="handleTaskIncludeClick(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>`;
+                return generateIncludeLinkWithMenu(filePath, displayText, 'task');
             });
 
             return rendered;
         }
     }
+}
+
+/**
+ * Generate include link HTML with path conversion overlay menu
+ * @param {string} filePath - The file path for the include
+ * @param {string} displayText - The text to display in the link
+ * @param {string} clickHandler - 'column' or 'task' to determine which click handler to use
+ * @returns {string} HTML string with include link wrapped in overlay container
+ */
+function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
+    const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' : 'handleColumnIncludeClick';
+
+    return `<span class="include-path-overlay-container">
+        <span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
+        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Convert path">☰</button>
+        <div class="include-path-menu">
+            <button class="include-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'relative')">📁 Convert to Relative</button>
+            <button class="include-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'absolute')">📂 Convert to Absolute</button>
+        </div>
+    </span>`;
 }
 
 // Create singleton instance
