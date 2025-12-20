@@ -93,26 +93,6 @@ export class IncludeLoadingProcessor {
         };
     }
 
-    /**
-     * Update target title if provided in event
-     */
-    updateTargetTitle(
-        event: IncludeSwitchEvent | UserEditEvent,
-        targetColumn: KanbanColumn | null,
-        targetTask: KanbanTask | null,
-        isColumnSwitch: boolean
-    ): void {
-        if (event.type === 'include_switch' && event.newTitle !== undefined) {
-            if (isColumnSwitch && targetColumn) {
-                targetColumn.title = event.newTitle;
-                targetColumn.originalTitle = event.newTitle;
-            } else if (targetTask) {
-                targetTask.title = event.newTitle;
-                targetTask.originalTitle = event.newTitle;
-            }
-        }
-    }
-
     // ============= UNIFIED LOADING (SINGLE CODE PATH) =============
 
     /**

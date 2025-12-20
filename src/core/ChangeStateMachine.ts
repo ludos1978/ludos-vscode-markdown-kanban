@@ -343,27 +343,9 @@ export class ChangeStateMachine {
             }
         }
 
-        // Send loading state to frontend (clear old content)
+        // Resolve target ONCE (used for both clearing and loading)
         const panel = this._webviewPanel?.getPanel();
         const event = context.event;
-        const target = this._findClearingTarget(board, event);
-
-        if (target && panel) {
-            if (target.type === 'column') {
-                target.column.tasks = [];
-                target.column.includeFiles = [];
-                target.column.includeMode = false;
-                this._sendColumnUpdate(panel, target.column, null, true);
-            } else {
-                target.task.includeFiles = [];
-                target.task.displayTitle = '';
-                target.task.description = '';
-                target.task.includeMode = false;
-                this._sendTaskUpdate(panel, target.column, target.task, null, true);
-            }
-        }
-
-        // Load new includes using unified loading (ALWAYS reloads)
         const switchEvent = event as IncludeSwitchEvent | UserEditEvent;
         const resolvedTarget = this._includeProcessor.resolveTarget(switchEvent, board);
 
@@ -373,16 +355,34 @@ export class ChangeStateMachine {
         }
 
         const { targetColumn, targetTask, isColumnSwitch } = resolvedTarget;
-        const newFiles = context.switches.newFiles;
-        const preloadedContent = event.type === 'include_switch' ? event.preloadedContent : undefined;
-        const newTitle = event.type === 'include_switch' ? event.newTitle : undefined;
 
-        // Build target for unifiedLoad
+        // Build unified target format
         const loadTarget = isColumnSwitch && targetColumn
             ? { type: 'column' as const, column: targetColumn }
             : targetTask && targetColumn
                 ? { type: 'task' as const, column: targetColumn, task: targetTask }
                 : null;
+
+        // Send loading state to frontend (clear old content for UX)
+        if (loadTarget && panel) {
+            if (loadTarget.type === 'column') {
+                loadTarget.column.tasks = [];
+                loadTarget.column.includeFiles = [];
+                loadTarget.column.includeMode = false;
+                this._sendColumnUpdate(panel, loadTarget.column, null, true);
+            } else {
+                loadTarget.task.includeFiles = [];
+                loadTarget.task.displayTitle = '';
+                loadTarget.task.description = '';
+                loadTarget.task.includeMode = false;
+                this._sendTaskUpdate(panel, loadTarget.column, loadTarget.task, null, true);
+            }
+        }
+
+        // Load new includes using unified loading (ALWAYS reloads)
+        const newFiles = context.switches.newFiles;
+        const preloadedContent = event.type === 'include_switch' ? event.preloadedContent : undefined;
+        const newTitle = event.type === 'include_switch' ? event.newTitle : undefined;
 
         if (loadTarget) {
             await this._includeProcessor.unifiedLoad({
@@ -533,36 +533,6 @@ export class ChangeStateMachine {
         }
     }
 
-    /**
-     * Find the target (column or task) for cache clearing based on event type
-     */
-    private _findClearingTarget(board: KanbanBoard, event: ChangeEvent):
-        { type: 'column'; column: KanbanColumn } |
-        { type: 'task'; column: KanbanColumn; task: KanbanTask } |
-        null {
-
-        if (event.type === 'include_switch') {
-            if (event.target === 'column') {
-                const column = BoardCrudOperations.findColumnById(board, event.targetId);
-                return column ? { type: 'column', column } : null;
-            } else if (event.target === 'task') {
-                const column = event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : undefined;
-                const task = column?.tasks.find(t => t.id === event.targetId);
-                return task && column ? { type: 'task', column, task } : null;
-            }
-        } else if (event.type === 'user_edit' && event.params.includeSwitch) {
-            if (event.editType === 'column_title') {
-                const column = event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : undefined;
-                return column ? { type: 'column', column } : null;
-            } else if (event.editType === 'task_title') {
-                const column = event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : undefined;
-                const task = event.params.taskId ? column?.tasks.find(t => t.id === event.params.taskId) : undefined;
-                return task && column ? { type: 'task', column, task } : null;
-            }
-        }
-        return null;
-    }
-
     // ============= FRONTEND UPDATE HELPERS =============
 
     /**
@@ -574,13 +544,17 @@ export class ChangeStateMachine {
         event: ChangeEvent,
         context: ChangeContext
     ): void {
-        const target = this._findClearingTarget(board, event);
-        if (!target) return;
+        // Use resolveTarget (single source of truth for target resolution)
+        const switchEvent = event as IncludeSwitchEvent | UserEditEvent;
+        const resolved = this._includeProcessor.resolveTarget(switchEvent, board);
+        if (!resolved.found) return;
 
-        if (target.type === 'column') {
-            this._sendColumnUpdate(panel, target.column, context);
-        } else {
-            this._sendTaskUpdate(panel, target.column, target.task, context);
+        const { targetColumn, targetTask, isColumnSwitch } = resolved;
+
+        if (isColumnSwitch && targetColumn) {
+            this._sendColumnUpdate(panel, targetColumn, context);
+        } else if (targetTask && targetColumn) {
+            this._sendTaskUpdate(panel, targetColumn, targetTask, context);
         }
     }
 
