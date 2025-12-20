@@ -42,7 +42,6 @@ export abstract class MarkdownFile implements vscode.Disposable {
     // ============= BACKEND STATE (File System & VS Code Editor) =============
     protected _exists: boolean = true;
     protected _lastModified: Date | null = null;
-    protected _isDirtyInEditor: boolean = false;       // VS Code editor has unsaved changes
     protected _documentVersion: number = 0;
     protected _hasFileSystemChanges: boolean = false;  // File changed on disk outside VS Code
 
@@ -360,7 +359,8 @@ export abstract class MarkdownFile implements vscode.Disposable {
     }
 
     public isDirtyInEditor(): boolean {
-        return this._isDirtyInEditor;
+        // Delegates to actual VS Code document dirty check
+        return this.isDocumentDirtyInVSCode();
     }
 
     /**

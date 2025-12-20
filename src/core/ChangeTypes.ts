@@ -9,7 +9,7 @@
 
 import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
-import { KanbanBoard, KanbanTask } from '../markdownParser';
+import { KanbanBoard } from '../markdownParser';
 import { CapturedEdit } from '../files/FileInterfaces';
 import { BoardChangeTrigger } from './events';
 
@@ -173,21 +173,6 @@ export interface ChangeContext {
 
     // Modified board reference (to avoid re-fetching stale data)
     modifiedBoard?: KanbanBoard;
-
-    // Rollback data for error recovery
-    rollback?: {
-        columnId?: string;
-        taskId?: string;
-        taskColumnId?: string;
-        oldState: {
-            title?: string;
-            tasks?: KanbanTask[];
-            includeFiles?: string[];
-            includeMode?: boolean;
-            description?: string;
-            displayTitle?: string;
-        };
-    };
 
     // Metadata
     startTime: number;

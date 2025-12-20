@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 import { FileSaveService } from './FileSaveService';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
 
 // Re-export types from ChangeTypes for backwards compatibility
 export {
@@ -585,22 +584,11 @@ export class ChangeStateMachine {
         console.error(`[State:ERROR] State history: ${context.stateHistory.join(' → ')}`);
         console.error(`[State:ERROR] Event type: ${context.event.type}`);
 
-        // Perform rollback if we have saved state
-        if (context.rollback && this._webviewPanel) {
-            const panel = this._webviewPanel.getPanel();
-            const board = this._webviewPanel.getBoard();
-
-            if (panel && board) {
-                this._performRollback(panel, board, context);
-            }
-        }
-
-        // Show error dialog to user with warning about rollback
+        // Show error dialog to user
         const errorMessage = context.result.error?.message || 'Unknown error';
-        const rollbackMsg = context.rollback ? ' The operation has been undone.' : '';
 
         await vscode.window.showWarningMessage(
-            `${errorMessage}${rollbackMsg}`,
+            errorMessage,
             { modal: false },
             'OK'
         );
@@ -682,43 +670,6 @@ export class ChangeStateMachine {
         // Clear dirty flag (only when content is ready)
         if (!isLoadingContent && this._webviewPanel?.clearTaskDirty) {
             this._webviewPanel.clearTaskDirty(task.id);
-        }
-    }
-
-    /**
-     * Perform rollback on error - restore state and notify frontend
-     */
-    private _performRollback(panel: vscode.WebviewPanel, board: KanbanBoard, context: ChangeContext): void {
-        const rollback = context.rollback!;
-
-        if (rollback.columnId) {
-            const column = BoardCrudOperations.findColumnById(board, rollback.columnId);
-            if (column) {
-                // Restore backend board state
-                column.title = rollback.oldState.title || column.title;
-                column.displayTitle = rollback.oldState.displayTitle || column.displayTitle;
-                column.tasks = rollback.oldState.tasks || [];
-                column.includeFiles = rollback.oldState.includeFiles || [];
-                column.includeMode = rollback.oldState.includeMode || false;
-
-                // Send update to frontend
-                this._sendColumnUpdate(panel, column, context);
-            }
-        } else if (rollback.taskId && rollback.taskColumnId) {
-            const column = BoardCrudOperations.findColumnById(board, rollback.taskColumnId);
-            const task = column?.tasks.find(t => t.id === rollback.taskId);
-
-            if (task && column) {
-                // Restore backend board state
-                task.title = rollback.oldState.title || task.title;
-                task.description = rollback.oldState.description || '';
-                task.displayTitle = rollback.oldState.displayTitle || '';
-                task.includeFiles = rollback.oldState.includeFiles || [];
-                task.includeMode = rollback.oldState.includeMode || false;
-
-                // Send update to frontend
-                this._sendTaskUpdate(panel, column, task, context);
-            }
         }
     }
 

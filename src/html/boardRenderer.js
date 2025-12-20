@@ -930,36 +930,6 @@ function getActiveTagsInTitle(text) {
     return tags;
 }
 
-// Add a new function to get full tag content (including operators)
-/**
- * Extracts complete tag content including parameters (e.g., #tag=value)
- * Purpose: Preserves full tag syntax for operations
- * Used by: Tag manipulation operations
- * @param {string} text - Text containing tags
- * @returns {Array<string>} Complete tag strings with parameters
- */
-function getFullTagContent(text) {
-    if (!text) {return [];}
-
-    const tags = [];
-
-    // Match standard tags including full gather expressions
-    // Must start with alphanumeric or underscore to exclude pure symbol tags like ++, --, etc.
-    const standardMatches = text.match(/#(?!row\d+\b)(gather_[a-zA-Z0-9_&|=><-]+|[a-zA-Z0-9_][a-zA-Z0-9_-]*)/g) || [];
-    standardMatches.forEach(tag => {
-        tags.push(tag.substring(1));
-    });
-
-    // Match special positivity tags: #++, #+, #ø, #-, #--
-    // Use negative lookahead to ensure - doesn't match when it's part of --
-    const positivityMatches = text.match(/#(\+\+|--|\+|ø|Ø|-(?!-))/g) || [];
-    positivityMatches.forEach(tag => {
-        tags.push(tag.substring(1));
-    });
-
-    return tags;
-}
-
 // Helper function to collect all tags currently in use across the board
 /**
  * Collects all unique tags currently used in the board
@@ -4028,19 +3998,6 @@ function getTagConfig(tagName) {
     }
 
     return null;
-}
-
-/**
- * Escape special characters in tag names for CSS attribute selectors
- * Dots, colons, brackets, etc. need to be escaped in CSS
- * @param {string} tagName - Tag name to escape
- * @returns {string} Escaped tag name
- */
-function escapeCSSAttributeValue(tagName) {
-    if (!tagName) return '';
-    // Escape special CSS characters that need escaping in attribute selectors
-    // Characters: . + - ( ) [ ] { } * ^ $ | \ / : ; , = > < ~ ! @ # % & ' " ?
-    return tagName.replace(/([.+\-()[\]{}*^$|\\/:;,=><~!@#%&'"?øØ])/g, '\\$1');
 }
 
 // Generate dynamic CSS for tag colors and additional styles
