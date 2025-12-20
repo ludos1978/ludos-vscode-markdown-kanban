@@ -316,11 +316,6 @@ export class MessageHandler {
             // Set the updated board (now that we've handled unsaved changes)
             this._setBoard(board);
 
-            // Sync include files with registry to create any new include file instances
-            if (panel && panel.syncIncludeFilesWithBoard) {
-                panel.syncIncludeFilesWithBoard(board);
-            }
-
             // Emit board:changed event (updates _content for unsaved detection)
             this._emitBoardChanged(board, 'edit');
 

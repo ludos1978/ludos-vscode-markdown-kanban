@@ -199,13 +199,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         return this._filesByRelativePath.has(normalized);
     }
 
-    /**
-     * Get number of registered files
-     */
-    public size(): number {
-        return this._files.size;
-    }
-
     // ============= TYPE-SPECIFIC QUERIES =============
 
     /**

@@ -8,9 +8,6 @@ import {
     extractDate,
     extractPersonNames,
     hasSticky,
-    getTodayString,
-    isWithinDays,
-    isOverdue,
     getDatePropertyValue
 } from './DateTimeUtils';
 

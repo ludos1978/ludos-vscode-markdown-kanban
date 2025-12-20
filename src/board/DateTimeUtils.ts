@@ -60,42 +60,6 @@ export function extractPersonNames(text: string): string[] {
 }
 
 /**
- * Get today's date in YYYY-MM-DD format
- */
-export function getTodayString(): string {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * Check if a date is within N days from today
- */
-export function isWithinDays(dateStr: string, days: number): boolean {
-    const date = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const futureDate = new Date(today);
-    futureDate.setDate(futureDate.getDate() + days);
-
-    return date >= today && date <= futureDate;
-}
-
-/**
- * Check if a date is overdue (before today)
- */
-export function isOverdue(dateStr: string): boolean {
-    const date = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-
-    return date < today;
-}
-
-/**
  * Get a specific property value from a date
  * @param property - The property to extract (day, weekday, month, etc.)
  * @param dateStr - Date string in YYYY-MM-DD format

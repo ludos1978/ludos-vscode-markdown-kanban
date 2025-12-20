@@ -35,10 +35,6 @@ export class BoardCrudOperations {
         });
     }
 
-    public getOriginalTaskOrder(columnId: string): string[] | undefined {
-        return this._originalTaskOrder.get(columnId);
-    }
-
     private findColumn(board: KanbanBoard, columnId: string): KanbanColumn | undefined {
         return board.columns.find(col => col.id === columnId);
     }

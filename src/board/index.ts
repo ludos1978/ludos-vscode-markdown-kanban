@@ -18,9 +18,6 @@ export {
     extractDate,
     hasSticky,
     extractPersonNames,
-    getTodayString,
-    isWithinDays,
-    isOverdue,
     getDatePropertyValue
 } from './DateTimeUtils';
 
