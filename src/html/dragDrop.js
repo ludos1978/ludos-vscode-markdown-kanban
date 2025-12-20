@@ -252,7 +252,7 @@ function _positionDropIndicator(indicator, left, width, top) {
 
 /**
  * TASK-SPECIFIC HELPER: Calculate position for task insertion and show indicator
- * Used by showDropIndicator and showInternalTaskDropIndicator
+ * Used by showTaskDropIndicator
  *
  * @param {HTMLElement} indicator - The drop indicator element
  * @param {HTMLElement} tasksContainer - The tasks container
@@ -291,41 +291,46 @@ function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, ski
 }
 
 /**
- * UNIFIED: Show drop indicator at a position within a tasks container
- * Used by both internal task drags and external file drags
+ * UNIFIED: Show task drop indicator
+ * Single function for ALL task drop indicators (internal and external)
  *
  * @param {HTMLElement} tasksContainer - The tasks container element
- * @param {number} clientY - Mouse Y position (for finding insert position)
- * @param {HTMLElement|null} skipElement - Element to skip (e.g., dragged task)
- * @param {HTMLElement|null} column - Column element (for highlighting)
+ * @param {Object} options - Configuration options
+ * @param {number} [options.clientY] - Mouse Y position (calculates afterElement)
+ * @param {HTMLElement} [options.afterElement] - Direct afterElement (skips calculation)
+ * @param {HTMLElement} [options.skipElement] - Element to skip in calculations
+ * @param {HTMLElement} [options.column] - Column element (for highlighting)
  */
-function showDropIndicator(tasksContainer, clientY, skipElement = null, column = null) {
+function showTaskDropIndicator(tasksContainer, options = {}) {
     if (!tasksContainer) return;
 
+    const { clientY, afterElement: providedAfterElement, skipElement, column } = options;
     const indicator = createDropIndicator();
 
-    // Find insertion point by comparing mouse Y to task midpoints
-    const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
-    let afterElement = null;
+    let afterElement = providedAfterElement;
 
-    for (const task of tasks) {
-        // Skip the dragged task (for internal drags)
-        if (skipElement && task === skipElement) continue;
+    // Calculate afterElement from clientY if not provided directly
+    if (afterElement === undefined && clientY !== undefined) {
+        const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+        afterElement = null;
 
-        const taskRect = task.getBoundingClientRect();
-        const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
+        for (const task of tasks) {
+            if (skipElement && task === skipElement) continue;
 
-        if (clientY < taskMidpoint) {
-            // Insert BEFORE this task
-            afterElement = task;
-            break;
+            const taskRect = task.getBoundingClientRect();
+            const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
+
+            if (clientY < taskMidpoint) {
+                afterElement = task;
+                break;
+            }
         }
     }
 
-    // Use shared helper for positioning
-    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement);
+    // Position the indicator
+    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, skipElement || dragState.draggedTask);
 
-    // Store drop target for internal drags
+    // Store drop target state
     dragState.dropTargetContainer = tasksContainer;
     dragState.dropTargetAfterElement = afterElement;
 
@@ -341,18 +346,15 @@ function showDropIndicator(tasksContainer, clientY, skipElement = null, column =
 
 /**
  * UNIFIED: Hide drop indicator and clear ALL related state
- * This is the SINGLE hide function - no separate internal/external versions
  */
 function hideDropIndicator() {
     if (dropIndicator) {
         dropIndicator.classList.remove('active');
     }
 
-    // Clear external drag column highlights
     clearHighlights();
     currentExternalDropColumn = null;
 
-    // Clear ALL drop target state
     dragState.dropTargetContainer = null;
     dragState.dropTargetAfterElement = null;
     dragState.dropTargetStack = null;
@@ -370,54 +372,21 @@ function cleanupDropIndicator() {
     }
 }
 
-// CONVENIENCE WRAPPER: Show indicator for external drops (column + clientY)
-function showExternalDropIndicator(column, clientY) {
-    const tasksContainer = column.querySelector('.tasks-container');
-    showDropIndicator(tasksContainer, clientY, null, column);
-}
-
-
-// ============================================================================
-// SPECIFIC DROP INDICATOR FUNCTIONS (Using unified core)
-// ============================================================================
-
-/**
- * Show drop indicator for internal task drags (has afterElement pre-calculated)
- */
-function showInternalTaskDropIndicator(tasksContainer, afterElement) {
-    if (!tasksContainer) return;
-
-    const indicator = createDropIndicator();
-
-    // Store drop target state
-    dragState.dropTargetContainer = tasksContainer;
-    dragState.dropTargetAfterElement = afterElement;
-
-    // Use shared helper for positioning
-    _positionTaskDropIndicator(indicator, tasksContainer, afterElement, dragState.draggedTask);
-}
-
 /**
  * Show drop indicator for column drags (between columns in a stack)
+ * Note: Column positioning is fundamentally different from task positioning,
+ * so this remains a separate function but uses the same core indicator.
  */
-function showInternalColumnDropIndicator(targetStack, beforeColumn) {
+function showColumnDropIndicator(targetStack, beforeColumn) {
     const indicator = createDropIndicator();
 
-    // Direct DOM queries - NO CACHE
     let insertionY, stackLeft, stackWidth;
 
-    // For template drags over drop zones, don't show indicator - drop zone highlight is sufficient
+    // For template drags over drop zones, don't show indicator
     const isTemplateDrag = typeof templateDragState !== 'undefined' && templateDragState.isDragging;
     if (isTemplateDrag && targetStack.classList.contains('column-drop-zone-stack')) {
-        // CRITICAL: Still need to set templateDragState for the drop zone!
         const row = targetStack.closest('.kanban-row');
-        if (row) {
-            templateDragState.targetRow = parseInt(row.dataset.rowNumber, 10) || 1;
-        } else {
-            templateDragState.targetRow = 1;
-        }
-
-        // CRITICAL: This is a drop zone - new column will be its own stack (no #stack needed)
+        templateDragState.targetRow = row ? parseInt(row.dataset.rowNumber, 10) || 1 : 1;
         templateDragState.isDropZone = true;
 
         const prevStack = targetStack.previousElementSibling;
@@ -440,23 +409,13 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetColumnId = null;
         }
 
-        // DEBUG: Log template drag state update (drop zone)
-        console.log('[DragOver] Template over DROP ZONE:', {
-            isDropZone: true,
-            targetRow: templateDragState.targetRow,
-            targetPosition: templateDragState.targetPosition,
-            targetColumnId: templateDragState.targetColumnId
-        });
-
-        // CRITICAL: Also set dragState for insertNewColumnAtDropTarget to use
         dragState.dropTargetStack = targetStack;
         dragState.dropTargetBeforeColumn = beforeColumn;
-
         indicator.classList.remove('active');
         return;
     }
 
-    // Handle drop zone stacks (for column drags)
+    // Handle drop zone stacks
     if (targetStack.classList.contains('column-drop-zone-stack')) {
         indicator.classList.remove('active');
         dragState.dropTargetStack = targetStack;
@@ -464,21 +423,15 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         return;
     }
 
-    // Direct DOM query for columns in stack
     const columnsInStack = targetStack.querySelectorAll(':scope > .kanban-full-height-column');
 
     if (!beforeColumn) {
-        // Drop at end of stack (after last column)
-        // Find last non-dragged column
         let lastCol = null;
         for (const col of columnsInStack) {
-            if (col !== dragState.draggedColumn) {
-                lastCol = col;
-            }
+            if (col !== dragState.draggedColumn) lastCol = col;
         }
 
         if (lastCol) {
-            // Direct DOM query for position
             const colRect = lastCol.getBoundingClientRect();
             const bottomMargin = lastCol.querySelector('.column-margin-bottom');
 
@@ -493,20 +446,17 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
                 insertionY = colRect.bottom;
             }
         } else if (dragState.draggedColumn && dragState.draggedColumn.parentNode === targetStack) {
-            // Only dragged column in stack - use its position
             const draggedRect = dragState.draggedColumn.getBoundingClientRect();
             stackLeft = draggedRect.left;
             stackWidth = draggedRect.width;
             insertionY = draggedRect.bottom + 5;
         } else {
-            // Empty stack
             indicator.classList.remove('active');
             dragState.dropTargetStack = targetStack;
             dragState.dropTargetBeforeColumn = beforeColumn;
             return;
         }
     } else {
-        // Drop before specific column - direct DOM query
         const colRect = beforeColumn.getBoundingClientRect();
         const topMargin = beforeColumn.querySelector('.column-margin:not(.column-margin-bottom)');
 
@@ -522,20 +472,15 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         }
     }
 
-    // UNIFIED: Use shared positioning helper for column indicator
     _positionDropIndicator(indicator, stackLeft + 10, stackWidth - 20, insertionY);
 
-    // CRITICAL: Always store drop target!
     dragState.dropTargetStack = targetStack;
     dragState.dropTargetBeforeColumn = beforeColumn;
 
-    // For template drags, also update templateDragState with target position
     if (isTemplateDrag && typeof templateDragState !== 'undefined') {
         const row = targetStack.closest('.kanban-row');
         const stackRow = row ? parseInt(row.dataset.rowNumber, 10) || 1 : 1;
         templateDragState.targetRow = stackRow;
-
-        // CRITICAL: This is within an existing stack - may need #stack tag
         templateDragState.isDropZone = false;
 
         if (beforeColumn) {
@@ -547,23 +492,14 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             templateDragState.targetColumnId = lastColumn?.dataset?.columnId || null;
         }
 
-        // FIX: Save this as the last valid in-stack target
-        // This will be used at drop time even if mouse briefly crosses a drop zone
         templateDragState.lastInStackTarget = {
             row: stackRow,
             position: templateDragState.targetPosition,
             columnId: templateDragState.targetColumnId
         };
-
-        // DEBUG: Log template drag state update (within stack)
-        console.log('[DragOver] Template in stack:', {
-            isDropZone: false,
-            targetRow: stackRow,
-            targetPosition: templateDragState.targetPosition,
-            targetColumnId: templateDragState.targetColumnId
-        });
     }
 }
+
 
 /**
  * Cleans up all drop zone highlight classes
@@ -889,7 +825,8 @@ function setupGlobalDragAndDrop() {
             const dropResult = findDropPositionHierarchical(e.clientX, e.clientY, null);
 
             if (dropResult && dropResult.columnElement) {
-                showExternalDropIndicator(dropResult.columnElement, e.clientY);
+                const tasksContainer = dropResult.columnElement.querySelector('.tasks-container');
+                showTaskDropIndicator(tasksContainer, { clientY: e.clientY, column: dropResult.columnElement });
             } else {
                 hideDropIndicator();
             }
@@ -3702,7 +3639,7 @@ function setupColumnDragAndDrop() {
                         }
                     }
                 }
-                showInternalColumnDropIndicator(foundStack, null);
+                showColumnDropIndicator(foundStack, null);
                 return;
             }
 
@@ -3827,7 +3764,7 @@ function setupColumnDragAndDrop() {
                         columnId: targetColumn?.dataset?.columnId
                     });
                 }
-                showInternalTaskDropIndicator(tasksContainer, afterElement);
+                showTaskDropIndicator(tasksContainer, { afterElement });
                 return;
             }
 
@@ -3880,7 +3817,7 @@ function setupColumnDragAndDrop() {
 
             // Only show line indicator for template drags, not column drags
             if (!stillColumnDrag) {
-                showInternalColumnDropIndicator(foundStack, beforeColumn);
+                showColumnDropIndicator(foundStack, beforeColumn);
             }
 
             // For template drags, update target info
