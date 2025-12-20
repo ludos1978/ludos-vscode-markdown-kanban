@@ -1069,9 +1069,6 @@ export class KanbanWebviewPanel {
             console.warn(`[_initializeBoardFromDocument] Skipping include file sync - board not available or invalid`);
             this._context.setInitialBoardLoad(false);
         }
-
-        // Log registry statistics
-        this._fileRegistry.logStatistics();
     }
 
     /**

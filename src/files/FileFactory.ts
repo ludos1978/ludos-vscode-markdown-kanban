@@ -57,15 +57,13 @@ export class FileFactory {
      * @param relativePath - Relative path to the include file
      * @param parentFile - Parent MainKanbanFile
      * @param context - Import context specifying where the include was found
-     * @param isInline - Whether this is an inline include
      * @returns Created file instance
      * @throws Error if no plugin can handle the file
      */
     public createIncludeViaPlugin(
         relativePath: string,
         parentFile: MainKanbanFile,
-        context: ImportContext,
-        isInline: boolean = false
+        context: ImportContext
     ): IncludeFile {
         const plugin = this._pluginRegistry.findImportPlugin(relativePath, context);
 
@@ -78,8 +76,7 @@ export class FileFactory {
 
         return plugin.createFile(relativePath, parentFile, {
             conflictResolver: this.conflictResolver,
-            backupManager: this.backupManager,
-            isInline
+            backupManager: this.backupManager
         }) as IncludeFile;
     }
 
@@ -91,15 +88,13 @@ export class FileFactory {
      * @param relativePath - Relative path to the include file
      * @param parentFile - Parent MainKanbanFile
      * @param type - Include type ('include-regular', 'include-column', 'include-task')
-     * @param isInline - Whether this is an inline include
      * @returns Created file instance
      * @throws Error if no plugin can handle the file
      */
     public createInclude(
         relativePath: string,
         parentFile: MainKanbanFile,
-        type: IncludeFileType,
-        isInline: boolean = false
+        type: IncludeFileType
     ): IncludeFile {
         // Map type to context location
         const contextLocation = this._typeToContextLocation(type);
@@ -109,7 +104,7 @@ export class FileFactory {
         };
 
         // Use plugin-based creation (no fallback)
-        return this.createIncludeViaPlugin(relativePath, parentFile, context, isInline);
+        return this.createIncludeViaPlugin(relativePath, parentFile, context);
     }
 
     /**
@@ -121,22 +116,19 @@ export class FileFactory {
      * @param relativePath - Relative path to the include file
      * @param parentFile - Parent MainKanbanFile
      * @param fileType - Include file type
-     * @param isInline - Whether this is an inline include
      * @returns Created IncludeFile instance
      */
     public createIncludeDirect(
         relativePath: string,
         parentFile: MainKanbanFile,
-        fileType: IncludeFileType,
-        isInline: boolean = false
+        fileType: IncludeFileType
     ): IncludeFile {
         return new IncludeFile(
             relativePath,
             parentFile,
             this.conflictResolver,
             this.backupManager,
-            fileType,
-            isInline
+            fileType
         );
     }
 

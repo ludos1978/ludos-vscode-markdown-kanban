@@ -41,26 +41,13 @@ export class IncludeFile extends MarkdownFile {
     protected _parentFile: IMainKanbanFile;          // Reference to parent kanban file
     protected _absolutePath: string;                 // Cached absolute path
 
-    // ============= INCLUDE-SPECIFIC STATE =============
-    protected _isInline: boolean = false;           // True for inline includes (embedded in parent)
-
-    // ============= COLUMN/TASK ASSOCIATION =============
-    // Note: _columnId is used by BOTH column includes (the column itself)
-    // AND task includes (which column contains the task)
-    private _columnId?: string;                     // ID of the column (or containing column for tasks)
-    private _columnTitle?: string;                  // Title of the column (for include-column)
-
-    // ============= TASK ASSOCIATION (for include-task) =============
-    private _taskId?: string;                       // ID of the task this belongs to
-    private _taskTitle?: string;                    // Title of the task
 
     constructor(
         relativePath: string,
         parentFile: IMainKanbanFile,
         conflictResolver: ConflictResolver,
         backupManager: BackupManager,
-        fileType: IncludeFileType,
-        isInline: boolean = false
+        fileType: IncludeFileType
     ) {
         // Decode URL-encoded characters (e.g., %20 -> space)
         const decodedRelativePath = safeDecodeURIComponent(relativePath);
@@ -72,12 +59,6 @@ export class IncludeFile extends MarkdownFile {
         this._fileType = fileType;
         this._parentFile = parentFile;
         this._absolutePath = absolutePath;
-        this._isInline = isInline;
-
-        // Regular includes are always inline
-        if (fileType === 'include-regular') {
-            this._isInline = true;
-        }
     }
 
     // ============= FILE TYPE =============
@@ -110,68 +91,6 @@ export class IncludeFile extends MarkdownFile {
 
         const parentDir = path.dirname(parentPath);
         return path.resolve(parentDir, relativePath);
-    }
-
-    // ============= COLUMN ASSOCIATION (used by both column and task includes) =============
-
-    /**
-     * Set the column ID this include belongs to
-     * For column includes: the column itself
-     * For task includes: the column containing the task
-     */
-    public setColumnId(columnId: string): void {
-        this._columnId = columnId;
-    }
-
-    /**
-     * Get the column ID
-     */
-    public getColumnId(): string | undefined {
-        return this._columnId;
-    }
-
-    /**
-     * Set the column title
-     */
-    public setColumnTitle(title: string): void {
-        this._columnTitle = title;
-    }
-
-    /**
-     * Get the column title
-     */
-    public getColumnTitle(): string | undefined {
-        return this._columnTitle;
-    }
-
-    // ============= TASK ASSOCIATION (for include-task) =============
-
-    /**
-     * Set the task ID this include belongs to
-     */
-    public setTaskId(taskId: string): void {
-        this._taskId = taskId;
-    }
-
-    /**
-     * Get the task ID
-     */
-    public getTaskId(): string | undefined {
-        return this._taskId;
-    }
-
-    /**
-     * Set the task title
-     */
-    public setTaskTitle(title: string): void {
-        this._taskTitle = title;
-    }
-
-    /**
-     * Get the task title
-     */
-    public getTaskTitle(): string | undefined {
-        return this._taskTitle;
     }
 
     // ============= CONTENT OPERATIONS (for include-task) =============
@@ -245,8 +164,8 @@ export class IncludeFile extends MarkdownFile {
         const slides = PresentationParser.parsePresentation(this._content);
         const tasks = PresentationParser.slidesToTasks(slides, this._path, mainFilePath);
 
-        // Use provided columnId if available, otherwise fall back to stored _columnId
-        const effectiveColumnId = columnId || this._columnId;
+        // Use provided columnId for task ID generation
+        const effectiveColumnId = columnId;
 
         // CRITICAL: Match by POSITION, not title - tasks identified by position
         return tasks.map((task, index) => {
@@ -273,15 +192,6 @@ export class IncludeFile extends MarkdownFile {
             filterIncludes: true
             // Note: includeMarpDirectives defaults to false (no YAML when copying)
         });
-    }
-
-    /**
-     * Update tasks (regenerate content from tasks and mark as unsaved)
-     * Note: A file can be used in multiple contexts - don't restrict based on registered type
-     */
-    public updateTasks(tasks: KanbanTask[]): void {
-        const newContent = this.generateFromTasks(tasks);
-        this.setContent(newContent, false);
     }
 
     // ============= EXTERNAL CHANGE HANDLING =============

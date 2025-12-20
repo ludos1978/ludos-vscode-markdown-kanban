@@ -58,8 +58,7 @@ export class RegularIncludePlugin extends AbstractImportPlugin {
             parentFile,
             dependencies.conflictResolver,
             dependencies.backupManager,
-            'include-regular',
-            true  // Always inline for regular includes
+            'include-regular'
         );
     }
 }

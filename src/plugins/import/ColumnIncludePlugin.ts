@@ -69,8 +69,7 @@ export class ColumnIncludePlugin extends AbstractImportPlugin {
             parentFile,
             dependencies.conflictResolver,
             dependencies.backupManager,
-            'include-column',
-            dependencies.isInline ?? false
+            'include-column'
         );
     }
 

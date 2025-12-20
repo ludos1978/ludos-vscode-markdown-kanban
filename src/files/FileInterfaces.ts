@@ -82,7 +82,6 @@ export interface IFileFactory {
     createIncludeDirect(
         relativePath: string,
         parentFile: IMainKanbanFile,
-        fileType: IncludeFileType,
-        isInline: boolean
+        fileType: IncludeFileType
     ): IIncludeFile;
 }

@@ -98,7 +98,6 @@ export interface IncludeMatch {
 export interface PluginDependencies {
     conflictResolver: ConflictResolver;
     backupManager: BackupManager;
-    isInline?: boolean;
 }
 
 /**

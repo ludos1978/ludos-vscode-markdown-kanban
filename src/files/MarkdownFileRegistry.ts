@@ -230,35 +230,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         return this.getByType(IncludeFile);
     }
 
-    /**
-     * Get column include files
-     */
-    public getColumnIncludeFiles(): IncludeFile[] {
-        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-column');
-    }
-
-    /**
-     * Get task include files
-     */
-    public getTaskIncludeFiles(): IncludeFile[] {
-        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-task');
-    }
-
-    /**
-     * Get regular include files
-     */
-    public getRegularIncludeFiles(): IncludeFile[] {
-        return this.getIncludeFiles().filter(f => f.getFileType() === 'include-regular');
-    }
-
     // ============= STATE QUERIES =============
-
-    /**
-     * Get files with conflicts
-     */
-    public getFilesWithConflicts(): MarkdownFile[] {
-        return this.getAll().filter(f => f.hasConflict());
-    }
 
     /**
      * Get files with unsaved changes
@@ -267,37 +239,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         return this.getAll().filter(f => f.hasUnsavedChanges());
     }
 
-    /**
-     * Get files with external changes
-     */
-    public getFilesWithExternalChanges(): MarkdownFile[] {
-        return this.getAll().filter(f => f.hasExternalChanges());
-    }
-
-    /**
-     * Get files that need reload
-     */
-    public getFilesThatNeedReload(): MarkdownFile[] {
-        return this.getAll().filter(f => f.needsReload());
-    }
-
-    /**
-     * Get files in edit mode
-     */
-    public getFilesInEditMode(): MarkdownFile[] {
-        return this.getAll().filter(f => f.isInEditMode());
-    }
-
     // ============= BULK OPERATIONS =============
-
-    /**
-     * Save all files with unsaved changes
-     */
-    public async saveAll(): Promise<void> {
-        const filesToSave = this.getFilesWithUnsavedChanges();
-
-        await Promise.all(filesToSave.map(f => this._fileSaveService.saveFile(f)));
-    }
 
     /**
      * Force write ALL files unconditionally (emergency recovery)
@@ -345,20 +287,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         return results;
     }
 
-    /**
-     * Start watching all files
-     */
-    public startWatchingAll(): void {
-        this.getAll().forEach(f => f.startWatching());
-    }
-
-    /**
-     * Stop watching all files
-     */
-    public stopWatchingAll(): void {
-        this.getAll().forEach(f => f.stopWatching());
-    }
-
     // ============= CONVENIENCE METHODS (merged from FileRegistryAdapter) =============
 
     /**
@@ -403,45 +331,6 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         const includeStatus = this.getIncludeFilesUnsavedStatus();
 
         return mainHasChanges || includeStatus.hasChanges;
-    }
-
-    // ============= STATISTICS =============
-
-    /**
-     * Get registry statistics
-     */
-    public getStatistics(): {
-        total: number;
-        mainFiles: number;
-        includeFiles: number;
-        columnIncludes: number;
-        taskIncludes: number;
-        regularIncludes: number;
-        withConflicts: number;
-        withUnsavedChanges: number;
-        withExternalChanges: number;
-        inEditMode: number;
-    } {
-        return {
-            total: this.size(),
-            mainFiles: this.getByType(MainKanbanFile).length,
-            includeFiles: this.getIncludeFiles().length,
-            columnIncludes: this.getColumnIncludeFiles().length,
-            taskIncludes: this.getTaskIncludeFiles().length,
-            regularIncludes: this.getRegularIncludeFiles().length,
-            withConflicts: this.getFilesWithConflicts().length,
-            withUnsavedChanges: this.getFilesWithUnsavedChanges().length,
-            withExternalChanges: this.getFilesWithExternalChanges().length,
-            inEditMode: this.getFilesInEditMode().length
-        };
-    }
-
-    /**
-     * Log current statistics
-     */
-    public logStatistics(): void {
-        // Stats available via getStatistics() for debugging
-        this.getStatistics();
     }
 
     // ============= BOARD GENERATION (STATE-2) =============
@@ -550,7 +439,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     public ensureIncludeRegistered(
         relativePath: string,
         fileType: IncludeFileType,
-        fileFactory: { createIncludeDirect: (path: string, mainFile: MainKanbanFile, type: IncludeFileType, isInline: boolean) => IncludeFile },
+        fileFactory: { createIncludeDirect: (path: string, mainFile: MainKanbanFile, type: IncludeFileType) => IncludeFile },
         mainFile: MainKanbanFile,
         context: {
             columnId?: string;
@@ -580,26 +469,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         }
 
         // Create and register new include file
-        const isInline = fileType === 'include-regular';
-        const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, isInline);
-
-        // Set context based on file type
-        if (fileType === 'include-column' && context.columnId) {
-            includeFile.setColumnId(context.columnId);
-            if (context.columnTitle) {
-                includeFile.setColumnTitle(context.columnTitle);
-            }
-        } else if (fileType === 'include-task') {
-            if (context.taskId) {
-                includeFile.setTaskId(context.taskId);
-            }
-            if (context.taskTitle) {
-                includeFile.setTaskTitle(context.taskTitle);
-            }
-            if (context.columnId) {
-                includeFile.setColumnId(context.columnId);
-            }
-        }
+        const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType);
 
         this.register(includeFile);
         includeFile.startWatching();
@@ -677,7 +547,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
                 : 'include-regular';
 
             // Create and register (cast to IncludeFile for full type support)
-            const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType, true) as IncludeFile;
+            const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType) as IncludeFile;
             this.register(includeFile);
             includeFile.startWatching();
         } catch (error) {

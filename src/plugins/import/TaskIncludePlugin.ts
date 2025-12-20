@@ -56,8 +56,7 @@ export class TaskIncludePlugin extends AbstractImportPlugin {
             parentFile,
             dependencies.conflictResolver,
             dependencies.backupManager,
-            'include-task',
-            dependencies.isInline ?? false
+            'include-task'
         );
     }
 }
