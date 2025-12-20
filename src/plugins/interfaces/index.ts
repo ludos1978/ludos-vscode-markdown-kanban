@@ -26,6 +26,5 @@ export {
     ExportPluginMetadata,
     ExportFormat,
     ExportOptions,
-    ExportResult,
-    PreviewOptions
+    ExportResult
 } from './ExportPlugin';

@@ -110,19 +110,6 @@ export interface ExportResult {
     };
 }
 
-/**
- * Options for preview generation
- */
-export interface PreviewOptions {
-    /** Format to preview */
-    formatId: string;
-
-    /** Maximum preview size (for images) */
-    maxSize?: { width: number; height: number };
-
-    /** Quality for lossy formats (0-100) */
-    quality?: number;
-}
 
 /**
  * Export Plugin Interface
@@ -160,12 +147,6 @@ export interface ExportPlugin {
      */
     isAvailable?(): Promise<boolean>;
 
-    /**
-     * Get version information for external tools
-     *
-     * @returns Version string or null if not available
-     */
-    getToolVersion?(): Promise<string | null>;
 
     /**
      * Export a board to the specified format
@@ -176,26 +157,6 @@ export interface ExportPlugin {
      */
     export(board: KanbanBoard, options: ExportOptions): Promise<ExportResult>;
 
-    /**
-     * Generate a preview of the export (optional)
-     *
-     * @param board - Board to preview
-     * @param options - Preview options
-     * @returns HTML string for preview display
-     */
-    preview?(board: KanbanBoard, options: PreviewOptions): Promise<string>;
-
-    /**
-     * Stop any active watch processes for a file (optional)
-     *
-     * @param filePath - File path to stop watching
-     */
-    stopWatch?(filePath: string): Promise<void>;
-
-    /**
-     * Stop all active watch processes (optional)
-     */
-    stopAllWatches?(): Promise<void>;
 
     /**
      * Check if a file is being watched (optional)

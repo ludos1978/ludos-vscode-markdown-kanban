@@ -235,9 +235,6 @@ export class TaskCommands extends BaseMessageCommand {
                 }
             }
 
-            // COLUMN INCLUDE: Update column include file content when tasks within it are edited
-            if (columnHasInclude) {
-                            }
         }
 
         return this.success();
@@ -349,9 +346,6 @@ export class TaskCommands extends BaseMessageCommand {
                 message.newIndex
             )
         );
-        // Sync both source and destination columns (in case either is a column include)
-                if (message.toColumnId !== message.fromColumnId) {
-                    }
         return this.success();
     }
 
@@ -368,9 +362,6 @@ export class TaskCommands extends BaseMessageCommand {
                 message.toColumnId
             )
         );
-        // Sync both source and destination columns (in case either is a column include)
-                if (message.toColumnId !== message.fromColumnId) {
-                    }
         return this.success();
     }
 
@@ -476,10 +467,6 @@ export class TaskCommands extends BaseMessageCommand {
             ),
             { sendUpdate: false }
         );
-
-        // Sync column include content if this task is in a column include
-        if (columnHasTaskInclude) {
-                    }
 
         context.setEditingInProgress(false);
 

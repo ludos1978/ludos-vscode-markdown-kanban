@@ -93,13 +93,6 @@ export class MarpExportPlugin implements ExportPlugin {
     }
 
     /**
-     * Get Marp CLI version
-     */
-    async getToolVersion(): Promise<string | null> {
-        return MarpExportService.getMarpVersion();
-    }
-
-    /**
      * Export board to specified format
      *
      * Delegates to MarpExportService.export()
@@ -158,20 +151,6 @@ export class MarpExportPlugin implements ExportPlugin {
                 }
             };
         }
-    }
-
-    /**
-     * Stop watch process for a file
-     */
-    async stopWatch(filePath: string): Promise<void> {
-        MarpExportService.stopMarpWatch(filePath);
-    }
-
-    /**
-     * Stop all watch processes
-     */
-    async stopAllWatches(): Promise<void> {
-        MarpExportService.stopAllMarpWatches();
     }
 
     /**
