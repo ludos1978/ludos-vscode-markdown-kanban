@@ -37,7 +37,8 @@ const DEBUG_DROP = false;
 let dragDropInitialized = false;
 let isProcessingDrop = false; // Prevent multiple simultaneous drops
 let currentExternalDropColumn = null;
-let externalDropIndicator = null;
+// UNIFIED: Single drop indicator for both internal and external drags
+let dropIndicator = null;
 
 // PERFORMANCE: Track highlighted elements to avoid querySelectorAll on cleanup
 const highlightedElements = new Set();
@@ -108,7 +109,7 @@ function readPartialFileForHash(file) {
 }
 
 // PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag)
-let internalDropIndicator = null;
+// REMOVED: internalDropIndicator - now using unified dropIndicator (line 41)
 
 // Use centralized DragStateManager instead of local state
 // The dragStateManager is already available globally as window.dragState
@@ -207,165 +208,188 @@ let templateDragState = {
     lastInStackTarget: null  // { row, position, columnId } - saved when indicator shows between columns
 };
 
-// External file drop location indicators
-function createExternalDropIndicator() {
-    if (externalDropIndicator) {
-        return externalDropIndicator;
+// ============================================================================
+// UNIFIED DROP INDICATOR SYSTEM
+// ============================================================================
+// Single indicator for ALL drop types: internal tasks, external files, etc.
+
+function createDropIndicator() {
+    // SAFETY CHECK: Verify indicator is still in DOM
+    if (dropIndicator && !document.body.contains(dropIndicator)) {
+        console.warn('[DragDrop] Drop indicator was removed from DOM, recreating...');
+        dropIndicator = null;
+    }
+
+    if (dropIndicator) {
+        return dropIndicator;
     }
 
     const indicator = document.createElement('div');
-    indicator.className = 'external-drop-indicator';
+    indicator.className = 'drop-indicator';
     document.body.appendChild(indicator);
-    externalDropIndicator = indicator;
+    dropIndicator = indicator;
 
     return indicator;
 }
 
-function showExternalDropIndicator(column, clientY) {
-    // Clear previous highlights when switching to a different column
-    if (currentExternalDropColumn && currentExternalDropColumn !== column) {
-        clearHighlights();
-    }
-    const indicator = createExternalDropIndicator();
-    const tasksContainer = column.querySelector('.tasks-container');
-    
-    if (!tasksContainer) {return;}
-    
-    // Calculate insertion position
+/**
+ * UNIFIED: Show drop indicator at a position within a tasks container
+ * Used by both internal task drags and external file drags
+ *
+ * @param {HTMLElement} tasksContainer - The tasks container element
+ * @param {number} clientY - Mouse Y position (for finding insert position)
+ * @param {HTMLElement|null} skipElement - Element to skip (e.g., dragged task)
+ * @param {HTMLElement|null} column - Column element (for highlighting)
+ */
+function showDropIndicator(tasksContainer, clientY, skipElement = null, column = null) {
+    if (!tasksContainer) return;
+
+    const indicator = createDropIndicator();
     const containerRect = tasksContainer.getBoundingClientRect();
-    
-    // Find insertion point between tasks
-    const tasks = Array.from(tasksContainer.children);
-    let insertionY = containerRect.top;
-    
-    if (tasks.length === 0) {
-        insertionY = containerRect.top + 10;
-    } else {
-        let foundPosition = false;
-        for (let i = 0; i < tasks.length; i++) {
-            const taskRect = tasks[i].getBoundingClientRect();
-            const taskCenter = taskRect.top + taskRect.height / 2;
-            
-            if (clientY < taskCenter) {
-                insertionY = taskRect.top - 2;
-                foundPosition = true;
-                break;
+
+    // Find insertion point by comparing mouse Y to task midpoints
+    const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
+    let insertionY = containerRect.top + 10; // Default: top of container
+    let afterElement = null;
+
+    for (const task of tasks) {
+        // Skip the dragged task (for internal drags)
+        if (skipElement && task === skipElement) continue;
+
+        const taskRect = task.getBoundingClientRect();
+        const taskMidpoint = (taskRect.top + taskRect.bottom) / 2;
+
+        if (clientY < taskMidpoint) {
+            // Insert BEFORE this task
+            insertionY = taskRect.top - 2;
+            afterElement = task;
+            break;
+        }
+    }
+
+    // If no task found (inserting at end), position after last task or at add button
+    if (!afterElement) {
+        const addButton = tasksContainer.querySelector('.add-task-btn');
+        if (addButton) {
+            insertionY = addButton.getBoundingClientRect().top - 2;
+        } else {
+            // Find last non-skipped task
+            let lastTask = null;
+            for (const task of tasks) {
+                if (task !== skipElement) lastTask = task;
+            }
+            if (lastTask) {
+                insertionY = lastTask.getBoundingClientRect().bottom + 2;
             }
         }
-        
-        if (!foundPosition && tasks.length > 0) {
-            const lastTaskRect = tasks[tasks.length - 1].getBoundingClientRect();
-            insertionY = lastTaskRect.bottom + 2;
-        }
     }
-    
+
     // Position the indicator
-    const columnRect = column.getBoundingClientRect();
     indicator.style.position = 'fixed';
-    indicator.style.left = (columnRect.left + columnRect.width * 0.1) + 'px';
-    indicator.style.right = 'auto';
-    indicator.style.width = (columnRect.width * 0.8) + 'px';
+    indicator.style.left = (containerRect.left + 10) + 'px';
+    indicator.style.width = (containerRect.width - 20) + 'px';
     indicator.style.top = insertionY + 'px';
     indicator.classList.add('active');
 
-    // Add highlight to column using tracking system
-    addHighlight(column, 'external-drag-over');
-    currentExternalDropColumn = column;
+    // Store drop target for internal drags
+    dragState.dropTargetContainer = tasksContainer;
+    dragState.dropTargetAfterElement = afterElement;
+
+    // Add column highlight for external drags
+    if (column) {
+        if (currentExternalDropColumn && currentExternalDropColumn !== column) {
+            clearHighlights();
+        }
+        addHighlight(column, 'external-drag-over');
+        currentExternalDropColumn = column;
+    }
 }
 
-function hideExternalDropIndicator() {
-    if (externalDropIndicator) {
-        externalDropIndicator.classList.remove('active');
-        externalDropIndicator.style.display = 'none';
+function hideDropIndicator() {
+    if (dropIndicator) {
+        dropIndicator.classList.remove('active');
     }
 
-    // Clear all tracked highlights (includes external-drag-over)
+    // Clear external drag column highlights
     clearHighlights();
     currentExternalDropColumn = null;
 }
 
+function cleanupDropIndicator() {
+    hideDropIndicator();
+    if (dropIndicator) {
+        dropIndicator.remove();
+        dropIndicator = null;
+    }
+}
+
+// BACKWARDS COMPATIBILITY: Aliases for existing code
+function showExternalDropIndicator(column, clientY) {
+    const tasksContainer = column.querySelector('.tasks-container');
+    showDropIndicator(tasksContainer, clientY, null, column);
+}
+
+function hideExternalDropIndicator() {
+    hideDropIndicator();
+}
+
 function cleanupExternalDropIndicators() {
-
-    hideExternalDropIndicator();
-    if (externalDropIndicator) {
-        externalDropIndicator.remove();
-        externalDropIndicator = null;
-    }
+    cleanupDropIndicator();
 }
 
 // ============================================================================
-// PERFORMANCE OPTIMIZATION: Internal Drop Indicator (Tasks & Columns)
+// INTERNAL DROP INDICATOR FUNCTIONS (Now using unified system)
 // ============================================================================
-// Shows where task/column will be dropped WITHOUT moving it during drag
-// Eliminates DOM reflows and layout thrashing for massive performance gains
+// These functions wrap the unified drop indicator for backwards compatibility
 
+// UNIFIED: createInternalDropIndicator now just uses createDropIndicator
 function createInternalDropIndicator() {
-    if (internalDropIndicator) {
-        return internalDropIndicator;
-    }
-
-    const indicator = document.createElement('div');
-    indicator.className = 'internal-drop-indicator';
-    document.body.appendChild(indicator);
-    internalDropIndicator = indicator;
-
-    return indicator;
+    return createDropIndicator();
 }
 
+// UNIFIED: showInternalTaskDropIndicator now uses showDropIndicator
+// Note: The old function took (tasksContainer, afterElement) but the unified one
+// calculates afterElement from clientY. For backwards compat, we simulate the old behavior.
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
-    const indicator = createInternalDropIndicator();
+    if (!tasksContainer) return;
+
+    const indicator = createDropIndicator();
 
     // CRITICAL: Always store drop target FIRST!
     dragState.dropTargetContainer = tasksContainer;
     dragState.dropTargetAfterElement = afterElement;
 
-    // Direct DOM queries - NO CACHE
-    let insertionY;
-    let containerLeft, containerWidth;
-
-    // Get container dimensions from direct DOM query
+    // Get container dimensions
     const containerRect = tasksContainer.getBoundingClientRect();
-    containerLeft = containerRect.left;
-    containerWidth = containerRect.width;
 
-    // Get tasks and add button via direct DOM query
-    const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
-    const addButton = tasksContainer.querySelector('.add-task-btn');
-
+    // Calculate insertion Y based on afterElement
+    let insertionY;
     if (!afterElement) {
         // Drop at end
+        const addButton = tasksContainer.querySelector('.add-task-btn');
         if (addButton) {
-            const addBtnRect = addButton.getBoundingClientRect();
-            insertionY = addBtnRect.top - 2;
-        } else if (tasks.length > 0) {
+            insertionY = addButton.getBoundingClientRect().top - 2;
+        } else {
             // Find last non-dragged task
+            const tasks = tasksContainer.querySelectorAll(':scope > .task-item');
             let lastTask = null;
             for (const task of tasks) {
-                if (task !== dragState.draggedTask) {
-                    lastTask = task;
-                }
+                if (task !== dragState.draggedTask) lastTask = task;
             }
             if (lastTask) {
-                const lastRect = lastTask.getBoundingClientRect();
-                insertionY = lastRect.bottom + 2;
+                insertionY = lastTask.getBoundingClientRect().bottom + 2;
             } else {
-                // Only dragged task in container
                 insertionY = containerRect.top + 10;
             }
-        } else {
-            // Empty container
-            insertionY = containerRect.top + 10;
         }
     } else {
-        // Drop before afterElement - direct DOM query
-        const afterRect = afterElement.getBoundingClientRect();
-        insertionY = afterRect.top - 2;
+        insertionY = afterElement.getBoundingClientRect().top - 2;
     }
 
     // Position the indicator
     indicator.style.position = 'fixed';
-    indicator.style.left = (containerLeft + 10) + 'px';
-    indicator.style.width = (containerWidth - 20) + 'px';
+    indicator.style.left = (containerRect.left + 10) + 'px';
+    indicator.style.width = (containerRect.width - 20) + 'px';
     indicator.style.top = insertionY + 'px';
     indicator.classList.add('active');
 }
@@ -539,8 +563,9 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
 }
 
 function hideInternalDropIndicator() {
-    if (internalDropIndicator) {
-        internalDropIndicator.classList.remove('active');
+    // UNIFIED: Use dropIndicator instead of internalDropIndicator
+    if (dropIndicator) {
+        dropIndicator.classList.remove('active');
     }
 
     // Clear stored drop targets
@@ -552,10 +577,8 @@ function hideInternalDropIndicator() {
 
 function cleanupInternalDropIndicator() {
     hideInternalDropIndicator();
-    if (internalDropIndicator) {
-        internalDropIndicator.remove();
-        internalDropIndicator = null;
-    }
+    // UNIFIED: Use cleanupDropIndicator
+    cleanupDropIndicator();
 }
 
 /**
@@ -693,6 +716,16 @@ function setupGlobalDragAndDrop() {
     function handleExternalDrop(e) {
         // Handle external drop event
 
+        // DIAGNOSTIC: Log drop event details
+        console.log('[DragDrop] handleExternalDrop called', {
+            hasFiles: e.dataTransfer?.files?.length > 0,
+            filesCount: e.dataTransfer?.files?.length,
+            types: Array.from(e.dataTransfer?.types || []),
+            isDragging: dragState.isDragging,
+            hasTask: !!dragState.draggedTask,
+            hasColumn: !!dragState.draggedColumn
+        });
+
         // Prevent default browser behavior
         e.preventDefault();
 
@@ -703,7 +736,8 @@ function setupGlobalDragAndDrop() {
             !dragState.draggedEmptyCard;
 
         if (isInternalDrag) {
-                return;
+            console.log('[DragDrop] handleExternalDrop - skipping (isInternalDrag)');
+            return;
         }
 
         // Check if this is a template drag - let template handlers handle it
@@ -779,6 +813,10 @@ function setupGlobalDragAndDrop() {
 
         // Priority 2: Check for files
         if (dt.files && dt.files.length > 0) {
+            console.log('[DragDrop] handleExternalDrop - handling as FILES', {
+                filesCount: dt.files.length,
+                firstFileName: dt.files[0]?.name
+            });
             handleVSCodeFileDrop(e, dt.files);
             return;
         }
@@ -821,9 +859,17 @@ function setupGlobalDragAndDrop() {
         // Priority 4: Check for URI list
         const uriList = dt.getData('text/uri-list');
         if (uriList) {
+            console.log('[DragDrop] handleExternalDrop - handling as URI-LIST', {
+                uriList: uriList.substring(0, 200)
+            });
             handleVSCodeUriDrop(e, uriList);
             return;
         }
+
+        console.log('[DragDrop] handleExternalDrop - NO HANDLER MATCHED', {
+            textData2: textData2?.substring(0, 100),
+            types: Array.from(dt.types || [])
+        });
         
     }
     
@@ -841,6 +887,15 @@ function setupGlobalDragAndDrop() {
         // Skip visual indicators for template drags - they use column drop zones
         if (typeof templateDragState !== 'undefined' && templateDragState.isDragging) {
             return; // Don't show external drop indicators during template drags
+        }
+
+        // DIAGNOSTIC: Log external file drag handling (once per session)
+        if (!window._externalDragLogged) {
+            window._externalDragLogged = true;
+            console.log('[DragDrop] EXTERNAL FILE DRAG detected - showing position indicator', {
+                hasFiles: e.dataTransfer?.types?.includes('Files'),
+                types: Array.from(e.dataTransfer?.types || [])
+            });
         }
 
         // Show drop indicators for external drags using hierarchical lookup
@@ -1860,12 +1915,17 @@ function setupGlobalDragAndDrop() {
 
     // Global dragend handler - UNIFIED APPROACH
     document.addEventListener('dragend', function(e) {
-        // dragLogger.always('[dragend] Event fired', {
-        //     hasTask: !!dragState.draggedTask,
-        //     hasColumn: !!dragState.draggedColumn,
-        //     isDragging: dragState.isDragging,
-        //     dropEffect: e.dataTransfer?.dropEffect
-        // });
+        // DIAGNOSTIC: Reset log flags for next drag session
+        window._dragoverLogCount = 0;
+        window._currentDragSessionLogged = false;
+        window._dropAtEndLogged = false;
+        window._indicatorShownLogged = false;
+        window._externalDragLogged = false;
+        window._externalInWrongHandlerLogged = false;
+        console.log('[DragDrop] Dragend fired', {
+            hasTask: !!dragState.draggedTask,
+            isDragging: dragState.isDragging
+        });
 
         // 1. CAPTURE STATE BEFORE ANY CLEANUP
         const wasTask = !!dragState.draggedTask;
@@ -2937,10 +2997,14 @@ function setupTaskDragHandle(handle) {
     handle.draggable = true;
 
     handle.addEventListener('dragstart', e => {
+        // DIAGNOSTIC: Trace dragstart events
+        console.log('[DragDrop] Task dragstart fired', { target: e.target?.className });
+
         const taskItem = e.target && e.target.closest ? e.target.closest('.task-item') : null;
 
         if (taskItem) {
             e.stopPropagation();
+            console.log('[DragDrop] Task dragstart - taskItem found', { taskId: taskItem.dataset.taskId });
 
             // CRITICAL FIX: Clear any text selection to prevent it from being dragged instead of the task
             // This prevents the bug where selecting text and then dragging creates unintended tasks
@@ -3527,6 +3591,23 @@ function setupColumnDragAndDrop() {
         // Handle column drags, template drags, task drags, clipboard drags, empty card drags
         if (!isColumnDrag && !isTemplateDrag && !isTaskDrag && !isClipboardDrag && !isEmptyCardDrag) {return;}
 
+        // DIAGNOSTIC: Check if this handler is processing something it shouldn't
+        const hasFiles = e.dataTransfer?.types?.includes('Files');
+        if (hasFiles && !window._externalInWrongHandlerLogged) {
+            window._externalInWrongHandlerLogged = true;
+            console.warn('[DragDrop] WARNING: External file drag in INTERNAL handler!', {
+                isTemplateDrag, isColumnDrag, isTaskDrag, isClipboardDrag, isEmptyCardDrag,
+                types: Array.from(e.dataTransfer?.types || [])
+            });
+        }
+
+        // DIAGNOSTIC: Log first dragover of each drag (use counter to avoid spam)
+        if (!window._dragoverLogCount) window._dragoverLogCount = 0;
+        if (window._dragoverLogCount < 3) {
+            console.log('[DragDrop] Dragover processing', { isTaskDrag, draggedTask: !!dragState.draggedTask });
+            window._dragoverLogCount++;
+        }
+
         e.preventDefault();
 
         // Update Alt key state during drag (for task-like drags)
@@ -3565,8 +3646,8 @@ function setupColumnDragAndDrop() {
                 dragState.dropTargetContainer = null;
                 dragState.dropTargetAfterElement = null;
                 // Hide the visual indicator - it will be shown again only if valid target found
-                if (internalDropIndicator) {
-                    internalDropIndicator.classList.remove('active');
+                if (dropIndicator) {
+                    dropIndicator.classList.remove('active');
                 }
             }
 
@@ -3656,6 +3737,15 @@ function setupColumnDragAndDrop() {
             if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
                 const columnsArray = Array.from(columns);
 
+                // DIAGNOSTIC: Log once per drag session (not every frame)
+                if (!window._currentDragSessionLogged) {
+                    window._currentDragSessionLogged = true;
+                    console.log('[DragDrop] NEW DRAG SESSION - Task drag start', {
+                        draggedTaskId: dragState.draggedTask?.dataset?.taskId,
+                        indicatorInDOM: dropIndicator ? document.body.contains(dropIndicator) : false
+                    });
+                }
+
                 let targetColumn = null;
                 let dropAtEnd = false;
 
@@ -3707,6 +3797,16 @@ function setupColumnDragAndDrop() {
 
                 // If over column-title or folded column, highlight title and drop at end
                 if (dropAtEnd) {
+                    // DIAGNOSTIC: Log ONCE when dropAtEnd path is taken
+                    if (!window._dropAtEndLogged) {
+                        window._dropAtEndLogged = true;
+                        console.log('[DragDrop] dropAtEnd=true - NOT showing indicator line', {
+                            isFolded,
+                            mouseY,
+                            columnId: targetColumn?.dataset?.columnId,
+                            reason: isFolded ? 'Column is folded' : 'Mouse over column-title (RULE 1)'
+                        });
+                    }
                     const columnTitle = targetColumn.querySelector('.column-title');
                     if (columnTitle) {
                         addHighlight(columnTitle, 'task-drop-target');
@@ -3740,6 +3840,13 @@ function setupColumnDragAndDrop() {
                 }
 
                 // If no task found, afterElement stays null (drop at end)
+                if (!window._indicatorShownLogged) {
+                    window._indicatorShownLogged = true;
+                    console.log('[DragDrop] SUCCESS - Showing position indicator', {
+                        afterElementId: afterElement?.dataset?.taskId,
+                        columnId: targetColumn?.dataset?.columnId
+                    });
+                }
                 showInternalTaskDropIndicator(tasksContainer, afterElement);
                 return;
             }

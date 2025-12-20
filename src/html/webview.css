@@ -3869,7 +3869,24 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border: 1px solid var(--vscode-charts-blue);
 }
 
-/* PERFORMANCE: Internal task/column drop indicator (no DOM moves during drag) */
+/* UNIFIED: Single drop indicator for all drag types (tasks, external files, etc.) */
+.drop-indicator {
+  position: fixed;
+  height: 3px;
+  background-color: var(--vscode-focusBorder);
+  border-radius: 2px;
+  z-index: 10000; /* Above everything */
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 6px var(--vscode-focusBorder);
+  will-change: transform, opacity, top, left;
+}
+
+.drop-indicator.active {
+  display: block;
+}
+
+/* LEGACY: Internal drop indicator (now unified, kept for backwards compat) */
 .internal-drop-indicator {
   position: fixed;
   height: 3px;
