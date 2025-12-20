@@ -233,8 +233,26 @@ function createDropIndicator() {
 }
 
 /**
- * SHARED HELPER: Position the drop indicator at an insertion point
- * Used by both showDropIndicator and showInternalTaskDropIndicator
+ * CORE UNIFIED HELPER: Position the drop indicator at exact coordinates
+ * This is the SINGLE source of truth for drop indicator positioning.
+ * ALL drop indicator functions MUST use this helper.
+ *
+ * @param {HTMLElement} indicator - The drop indicator element
+ * @param {number} left - Left position in pixels
+ * @param {number} width - Width in pixels
+ * @param {number} top - Top position in pixels
+ */
+function _positionDropIndicator(indicator, left, width, top) {
+    indicator.style.position = 'fixed';
+    indicator.style.left = left + 'px';
+    indicator.style.width = width + 'px';
+    indicator.style.top = top + 'px';
+    indicator.classList.add('active');
+}
+
+/**
+ * TASK-SPECIFIC HELPER: Calculate position for task insertion and show indicator
+ * Used by showDropIndicator and showInternalTaskDropIndicator
  *
  * @param {HTMLElement} indicator - The drop indicator element
  * @param {HTMLElement} tasksContainer - The tasks container
@@ -268,12 +286,8 @@ function _positionTaskDropIndicator(indicator, tasksContainer, afterElement, ski
         insertionY = afterElement.getBoundingClientRect().top - 2;
     }
 
-    // Position the indicator
-    indicator.style.position = 'fixed';
-    indicator.style.left = (containerRect.left + 10) + 'px';
-    indicator.style.width = (containerRect.width - 20) + 'px';
-    indicator.style.top = insertionY + 'px';
-    indicator.classList.add('active');
+    // Use unified positioning helper
+    _positionDropIndicator(indicator, containerRect.left + 10, containerRect.width - 20, insertionY);
 }
 
 /**
@@ -325,6 +339,10 @@ function showDropIndicator(tasksContainer, clientY, skipElement = null, column =
     }
 }
 
+/**
+ * UNIFIED: Hide drop indicator and clear ALL related state
+ * This is the SINGLE hide function - no separate internal/external versions
+ */
 function hideDropIndicator() {
     if (dropIndicator) {
         dropIndicator.classList.remove('active');
@@ -333,8 +351,17 @@ function hideDropIndicator() {
     // Clear external drag column highlights
     clearHighlights();
     currentExternalDropColumn = null;
+
+    // Clear ALL drop target state
+    dragState.dropTargetContainer = null;
+    dragState.dropTargetAfterElement = null;
+    dragState.dropTargetStack = null;
+    dragState.dropTargetBeforeColumn = null;
 }
 
+/**
+ * UNIFIED: Remove drop indicator from DOM entirely
+ */
 function cleanupDropIndicator() {
     hideDropIndicator();
     if (dropIndicator) {
@@ -343,46 +370,38 @@ function cleanupDropIndicator() {
     }
 }
 
-// BACKWARDS COMPATIBILITY: Aliases for existing code
+// CONVENIENCE WRAPPER: Show indicator for external drops (column + clientY)
 function showExternalDropIndicator(column, clientY) {
     const tasksContainer = column.querySelector('.tasks-container');
     showDropIndicator(tasksContainer, clientY, null, column);
 }
 
-function hideExternalDropIndicator() {
-    hideDropIndicator();
-}
-
-function cleanupExternalDropIndicators() {
-    cleanupDropIndicator();
-}
 
 // ============================================================================
-// INTERNAL DROP INDICATOR FUNCTIONS (Now using unified system)
+// SPECIFIC DROP INDICATOR FUNCTIONS (Using unified core)
 // ============================================================================
-// These functions wrap the unified drop indicator for backwards compatibility
 
-// UNIFIED: createInternalDropIndicator now just uses createDropIndicator
-function createInternalDropIndicator() {
-    return createDropIndicator();
-}
-
-// UNIFIED: showInternalTaskDropIndicator now uses shared positioning helper
+/**
+ * Show drop indicator for internal task drags (has afterElement pre-calculated)
+ */
 function showInternalTaskDropIndicator(tasksContainer, afterElement) {
     if (!tasksContainer) return;
 
     const indicator = createDropIndicator();
 
-    // CRITICAL: Always store drop target FIRST!
+    // Store drop target state
     dragState.dropTargetContainer = tasksContainer;
     dragState.dropTargetAfterElement = afterElement;
 
-    // Use shared helper for positioning (skipElement = draggedTask for internal drags)
+    // Use shared helper for positioning
     _positionTaskDropIndicator(indicator, tasksContainer, afterElement, dragState.draggedTask);
 }
 
+/**
+ * Show drop indicator for column drags (between columns in a stack)
+ */
 function showInternalColumnDropIndicator(targetStack, beforeColumn) {
-    const indicator = createInternalDropIndicator();
+    const indicator = createDropIndicator();
 
     // Direct DOM queries - NO CACHE
     let insertionY, stackLeft, stackWidth;
@@ -503,11 +522,8 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
         }
     }
 
-    // Show horizontal indicator for column stacking
-    indicator.style.left = (stackLeft + 10) + 'px';
-    indicator.style.width = (stackWidth - 20) + 'px';
-    indicator.style.top = insertionY + 'px';
-    indicator.classList.add('active');
+    // UNIFIED: Use shared positioning helper for column indicator
+    _positionDropIndicator(indicator, stackLeft + 10, stackWidth - 20, insertionY);
 
     // CRITICAL: Always store drop target!
     dragState.dropTargetStack = targetStack;
@@ -547,25 +563,6 @@ function showInternalColumnDropIndicator(targetStack, beforeColumn) {
             targetColumnId: templateDragState.targetColumnId
         });
     }
-}
-
-function hideInternalDropIndicator() {
-    // UNIFIED: Use dropIndicator instead of internalDropIndicator
-    if (dropIndicator) {
-        dropIndicator.classList.remove('active');
-    }
-
-    // Clear stored drop targets
-    dragState.dropTargetContainer = null;
-    dragState.dropTargetAfterElement = null;
-    dragState.dropTargetStack = null;
-    dragState.dropTargetBeforeColumn = null;
-}
-
-function cleanupInternalDropIndicator() {
-    hideInternalDropIndicator();
-    // UNIFIED: Use cleanupDropIndicator
-    cleanupDropIndicator();
 }
 
 /**
@@ -737,9 +734,7 @@ function setupGlobalDragAndDrop() {
         
         // Always clean up visual indicators
         hideDropFeedback();
-        hideExternalDropIndicator();
-        hideInternalDropIndicator();
-        // Note: clearHighlights() already called by hideExternalDropIndicator()
+        hideDropIndicator();
 
         const dt = e.dataTransfer;
         if (!dt) {
@@ -896,7 +891,7 @@ function setupGlobalDragAndDrop() {
             if (dropResult && dropResult.columnElement) {
                 showExternalDropIndicator(dropResult.columnElement, e.clientY);
             } else {
-                hideExternalDropIndicator();
+                hideDropIndicator();
             }
             showDropFeedback();
         }
@@ -929,8 +924,7 @@ function setupGlobalDragAndDrop() {
 
         if (isReallyLeaving || (!boardContainer.contains(e.relatedTarget) && e.relatedTarget !== null)) {
             hideDropFeedback();
-            hideExternalDropIndicator();
-            hideInternalDropIndicator();
+            hideDropIndicator();
             cleanupDropZoneHighlights();
         }
     }, false);
@@ -973,8 +967,7 @@ function setupGlobalDragAndDrop() {
             e.preventDefault();
             // Clean up indicators if drop happens outside board
             hideDropFeedback();
-            hideExternalDropIndicator();
-            hideInternalDropIndicator();
+            hideDropIndicator();
             cleanupDropZoneHighlights();
         }
     }, false);
@@ -1801,7 +1794,7 @@ function setupGlobalDragAndDrop() {
         dragState.dropTargetBeforeColumn = null;
 
         // Hide indicator
-        hideInternalDropIndicator();
+        hideDropIndicator();
 
         // Remove board template-dragging class
         const boardElement = document.getElementById('kanban-board');
@@ -1815,7 +1808,7 @@ function setupGlobalDragAndDrop() {
 
     function cleanupDragVisuals() {
         // PERFORMANCE: Hide internal drop indicator
-        hideInternalDropIndicator();
+        hideDropIndicator();
 
         // Remove visual feedback from tasks
         if (dragState.draggedTask) {
@@ -1862,7 +1855,7 @@ function setupGlobalDragAndDrop() {
 
         // Hide drop feedback and indicators
         hideDropFeedback();
-        hideExternalDropIndicator();
+        hideDropIndicator();
     }
 
     function resetDragState() {
