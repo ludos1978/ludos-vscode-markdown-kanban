@@ -1754,6 +1754,12 @@ function deleteColumn(columnId) {
 
                 columnElement.remove();
 
+                // Normalize stack tags - ensures first column in stack has no #stack tag
+                // This handles the case where deleting the top column makes the second column the new top
+                if (typeof window.normalizeAllStackTags === 'function') {
+                    window.normalizeAllStackTags();
+                }
+
                 // Recalculate stack heights after column deletion
                 if (stack && typeof recalculateStackHeightsDebounced === 'function') {
                     recalculateStackHeightsDebounced(stack);
