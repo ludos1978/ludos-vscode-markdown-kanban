@@ -87,9 +87,6 @@ export class KanbanWebviewPanel {
     public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
 
-    // Timer for periodic unsaved changes check (lifecycle concern, not state)
-    private _unsavedChangesCheckInterval?: NodeJS.Timeout;
-
     private _conflictResolver: ConflictResolver;
 
     // Media file change tracking (diagrams, images, audio, video)
@@ -1571,27 +1568,13 @@ export class KanbanWebviewPanel {
     }
 
     private tryAutoLoadActiveMarkdown() {
-        // Try to find the active markdown document in the editor
+        // Only auto-load the currently active markdown document in the editor
+        // Don't auto-load random open markdown files (caused wrong files to load on revival)
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document.languageId === 'markdown') {
             this.loadMarkdownFile(activeEditor.document);
-            return;
         }
-
-        // If no active markdown editor, look for any open markdown document
-        const openMarkdownDocs = vscode.workspace.textDocuments.filter(doc =>
-            doc.languageId === 'markdown' && !doc.isUntitled
-        );
-
-        if (openMarkdownDocs.length > 0) {
-            // TEMP DISABLED: Don't auto-load random markdown files
-            // This was causing wrong files to be loaded on revival
-            // this.loadMarkdownFile(openMarkdownDocs[0]);
-            return;
-        }
-
-        // No markdown documents available - panel will remain empty
-        // User can manually select a file to load
+        // If no active markdown editor, panel remains empty - user can manually select a file
     }
 
     /**
@@ -1683,12 +1666,6 @@ export class KanbanWebviewPanel {
             mainFileForDispose.discardChanges();
         }
         this._context.setClosingPrevented(false);
-
-        // Stop unsaved changes monitoring
-        if (this._unsavedChangesCheckInterval) {
-            clearInterval(this._unsavedChangesCheckInterval);
-            this._unsavedChangesCheckInterval = undefined;
-        }
 
         this._webviewBridge.dispose();
 

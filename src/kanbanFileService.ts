@@ -50,9 +50,6 @@ export interface KanbanFileServiceCallbacks {
  * defense-in-depth change detection (replaces _isUpdatingFromPanel flag)
  */
 export class KanbanFileService {
-    // Service-specific state (not shared)
-    private _lastKnownFileContent: string = '';
-
     // State machine for tracking save operations
     private _saveState: SaveState = SaveState.IDLE;
 
@@ -100,7 +97,6 @@ export class KanbanFileService {
         isUpdatingFromPanel: boolean;
         hasUnsavedChanges: boolean;
         cachedBoardFromWebview: KanbanBoard | null;
-        lastKnownFileContent: string;
     } {
         // Query main file for unsaved changes (single source of truth)
         const mainFile = this.fileRegistry.getMainFile();
@@ -112,8 +108,7 @@ export class KanbanFileService {
         return {
             isUpdatingFromPanel,
             hasUnsavedChanges: hasUnsavedChanges,
-            cachedBoardFromWebview: this._cachedBoardFromWebview,
-            lastKnownFileContent: this._lastKnownFileContent
+            cachedBoardFromWebview: this._cachedBoardFromWebview
         };
     }
 
@@ -264,9 +259,6 @@ export class KanbanFileService {
             this.setBoard(parseResult.board);
             // Registry now handles include content automatically via generateBoard()
 
-            // Update our baseline of known file content
-            this.updateKnownFileContent(document.getText());
-
             // Clean up any duplicate row tags
             const currentBoard = this.board();
             if (currentBoard) {
@@ -344,9 +336,6 @@ export class KanbanFileService {
             mainFile.updateFromBoard(currentBoard, true, true);
             // NOTE: No need for second setContent call - updateFromBoard already updated baseline
         }
-
-        // Update known file content
-        this.updateKnownFileContent(markdown);
 
         // Notify frontend that save is complete (may fail if webview is disposed during close)
         const panelInstance = this.panel();
@@ -513,13 +502,6 @@ export class KanbanFileService {
         };
 
         dispatcher.registerHandler(handler);
-    }
-
-    /**
-     * Update the known file content baseline
-     */
-    public updateKnownFileContent(content: string): void {
-        this._lastKnownFileContent = content;
     }
 
     /**

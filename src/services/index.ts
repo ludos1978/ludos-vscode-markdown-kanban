@@ -5,7 +5,6 @@
 
 // Path and file utilities
 export { PathResolver } from './PathResolver';
-export { FileWriter, FileWriteOptions, FileWriteResult } from './FileWriter';
 export { KeybindingService } from './KeybindingService';
 
 // Link handling

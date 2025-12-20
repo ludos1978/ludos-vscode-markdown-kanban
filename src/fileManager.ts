@@ -29,10 +29,6 @@ export interface FileDropInfo {
     dropPosition?: EditorDropPosition;
 }
 
-export interface ImagePathMapping {
-    [originalPath: string]: string;
-}
-
 export interface FileResolutionResult {
     resolvedPath: string;
     exists: boolean;
@@ -440,55 +436,5 @@ export class FileManager {
         }
 
         return imagePath;
-    }
-
-    /**
-     * Check if a file path is a media file (image, video, or audio)
-     */
-    private isMediaFile(filePath: string): boolean {
-        return FileTypeUtils.isMediaFile(filePath);
-    }
-
-    /**
-     * Generate image path mappings for the webview without modifying content
-     * Returns a map of original paths to webview URIs
-     */
-    public async generateImagePathMappings(content: string): Promise<ImagePathMapping> {
-        const mappings: ImagePathMapping = {};
-        if (!content) {return mappings;}
-
-        // Only process if we have a document to work with
-        if (!this._document) {
-            return mappings;
-        }
-
-        // Find all media references in the content (images, videos, audio)
-        const mediaRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-        let match;
-        
-        while ((match = mediaRegex.exec(content)) !== null) {
-            const filePath = match[2];
-            
-            // Skip if already processed or if it's a special URI
-            if (mappings[filePath] || 
-                filePath.startsWith('vscode-webview://') || 
-                filePath.startsWith('data:') ||
-                filePath.startsWith('http://') || 
-                filePath.startsWith('https://')) {
-                continue;
-            }
-            
-            // Check if this is a media file (image, video, audio)
-            const isMediaFile = this.isMediaFile(filePath);
-            if (isMediaFile) {
-                // Resolve the file path to a webview URI (works for images, videos, audio)
-                const webviewUri = await this.resolveImageForDisplay(filePath);
-                if (webviewUri !== filePath) {
-                    mappings[filePath] = webviewUri;
-                }
-            }
-        }
-        
-        return mappings;
     }
 }
