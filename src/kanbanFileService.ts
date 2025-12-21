@@ -61,6 +61,10 @@ export class KanbanFileService {
     // Shared panel context (single source of truth with panel)
     private _context: PanelContext;
 
+    // Debounce timer for document change reparse (prevents rapid reparses during undo/redo)
+    private _documentChangeDebounceTimer: NodeJS.Timeout | null = null;
+    private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 150;
+
     constructor(
         private fileManager: FileManager,
         private fileRegistry: MarkdownFileRegistry,
@@ -418,7 +422,7 @@ export class KanbanFileService {
      */
     public setupDocumentChangeListener(disposables: vscode.Disposable[]): void {
         // Listen for document changes
-        const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
+        const changeDisposable = vscode.workspace.onDidChangeTextDocument(async (event) => {
             const currentDocument = this.fileManager.getDocument();
             if (currentDocument && event.document === currentDocument) {
                 // Registry tracks editor changes automatically via file watchers
@@ -433,6 +437,35 @@ export class KanbanFileService {
                         isDirty: event.document.isDirty,
                         version: event.document.version
                     });
+                }
+
+                // UNDO SUPPORT: Check if document content differs from our cache
+                // This happens when user undoes a WorkspaceEdit operation
+                // Debounced to prevent rapid reparses during multiple undo/redo operations
+                const mainFile = this.fileRegistry.getMainFile();
+                if (mainFile) {
+                    const documentContent = event.document.getText();
+                    const cachedContent = mainFile.getContent();
+                    if (documentContent !== cachedContent) {
+                        // Clear any pending debounce timer
+                        if (this._documentChangeDebounceTimer) {
+                            clearTimeout(this._documentChangeDebounceTimer);
+                        }
+                        // Debounce the reparse
+                        this._documentChangeDebounceTimer = setTimeout(async () => {
+                            this._documentChangeDebounceTimer = null;
+                            // Re-check content diff (may have changed during debounce)
+                            const currentDocContent = event.document.getText();
+                            const currentCacheContent = mainFile.getContent();
+                            if (currentDocContent !== currentCacheContent) {
+                                console.log('[KanbanFileService] Document content changed (possibly undo), syncing cache and reparsing');
+                                // Sync cache from document
+                                mainFile.setContent(currentDocContent, false);
+                                // Trigger full board refresh
+                                await this.sendBoardUpdate(false, true);
+                            }
+                        }, KanbanFileService.DOCUMENT_CHANGE_DEBOUNCE_MS);
+                    }
                 }
             }
 

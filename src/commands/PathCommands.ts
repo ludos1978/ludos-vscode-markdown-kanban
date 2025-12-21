@@ -268,22 +268,28 @@ export class PathCommands extends BaseMessageCommand {
         // Search for the path in all files
         let foundFile: MarkdownFile | null = null;
         let foundContent: string = '';
+        let actualPathInContent: string = imagePath;
 
-        // Escape the path for regex
-        const escapedPath = imagePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedPath, 'g');
+        // Try multiple path variations (with/without ./ prefix)
+        const pathVariations = [
+            imagePath,
+            imagePath.startsWith('./') ? imagePath.substring(2) : './' + imagePath
+        ];
 
         for (const file of allFiles) {
             const content = file.getContent();
             console.log(`[PathCommands] Checking file: ${file.getRelativePath()}, content length: ${content.length}`);
-            if (regex.test(content)) {
-                foundFile = file;
-                foundContent = content;
-                console.log(`[PathCommands] Found path in file: ${file.getRelativePath()}`);
-                break;
+
+            for (const pathVariation of pathVariations) {
+                if (content.includes(pathVariation)) {
+                    foundFile = file;
+                    foundContent = content;
+                    actualPathInContent = pathVariation;
+                    console.log(`[PathCommands] Found path "${pathVariation}" in file: ${file.getRelativePath()}`);
+                    break;
+                }
             }
-            // Reset regex lastIndex for next test
-            regex.lastIndex = 0;
+            if (foundFile) break;
         }
 
         if (!foundFile) {
@@ -299,17 +305,18 @@ export class PathCommands extends BaseMessageCommand {
         const basePath = path.dirname(foundFile.getPath());
         let newPath: string;
 
+        // Use the actual path found in content for conversion
         if (message.direction === 'relative') {
-            newPath = conversionService.toRelativePath(imagePath, basePath);
+            newPath = conversionService.toRelativePath(actualPathInContent, basePath);
         } else {
-            newPath = conversionService.toAbsolutePath(imagePath, basePath);
+            newPath = conversionService.toAbsolutePath(actualPathInContent, basePath);
         }
 
         // If no change needed
-        if (newPath === imagePath) {
+        if (newPath === actualPathInContent) {
             this.postMessage({
                 type: 'singlePathConverted',
-                originalPath: imagePath,
+                originalPath: actualPathInContent,
                 newPath: newPath,
                 direction: message.direction,
                 converted: false,
@@ -318,11 +325,10 @@ export class PathCommands extends BaseMessageCommand {
             return this.success({ converted: false });
         }
 
-        // Replace the path in content
-        regex.lastIndex = 0;
-        const newContent = foundContent.replace(regex, newPath);
+        // Replace the actual path in content (use string replace, not regex)
+        const newContent = foundContent.split(actualPathInContent).join(newPath);
 
-        console.log(`[PathCommands] Replacing "${imagePath}" with "${newPath}"`);
+        console.log(`[PathCommands] Replacing "${actualPathInContent}" with "${newPath}"`);
         console.log(`[PathCommands] Old content length: ${foundContent.length}, New content length: ${newContent.length}`);
         console.log(`[PathCommands] Content changed: ${foundContent !== newContent}`);
 
@@ -330,21 +336,17 @@ export class PathCommands extends BaseMessageCommand {
         foundFile.setContent(newContent, false);
         console.log(`[PathCommands] File content updated in cache for: ${foundFile.getRelativePath()}`);
 
-        // Invalidate board cache and refresh webview to show updated paths
-        // Skip refresh for not-found images to avoid reloading the entire board
-        if (!message.skipRefresh) {
-            context.boardStore.invalidateCache();
-            console.log(`[PathCommands] Board cache invalidated, calling onBoardUpdate...`);
-            await context.onBoardUpdate();
-            console.log(`[PathCommands] onBoardUpdate completed`);
-        } else {
-            console.log(`[PathCommands] Skipping board refresh (skipRefresh=true)`);
-        }
+        // Always invalidate board cache and refresh webview to show updated paths
+        // This is needed for includes to update their displayed path
+        context.boardStore.invalidateCache();
+        console.log(`[PathCommands] Board cache invalidated, calling onBoardUpdate...`);
+        await context.onBoardUpdate();
+        console.log(`[PathCommands] onBoardUpdate completed`);
 
         // Notify frontend
         this.postMessage({
             type: 'singlePathConverted',
-            originalPath: imagePath,
+            originalPath: actualPathInContent,
             newPath: newPath,
             filePath: foundFile.getRelativePath(),
             direction: message.direction,
@@ -354,7 +356,7 @@ export class PathCommands extends BaseMessageCommand {
 
         return this.success({
             converted: true,
-            originalPath: imagePath,
+            originalPath: actualPathInContent,
             newPath: newPath,
             filePath: foundFile.getRelativePath()
         });

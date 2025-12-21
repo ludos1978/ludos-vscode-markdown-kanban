@@ -3920,30 +3920,68 @@ function toggleImagePathMenu(container, imagePath) {
 /**
  * Toggle the include path menu visibility
  * Called from inline onclick handlers in rendered include links
+ * Creates a floating menu appended to body to escape stacking context issues
  */
 function toggleIncludePathMenu(container, includePath) {
+    // Remove any existing floating menu
+    const existingMenu = document.getElementById('floating-include-path-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+
     // Close any other open menus (both image and include)
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
-        if (menu.parentElement !== container) {
-            menu.classList.remove('visible');
-        }
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
+        menu.classList.remove('visible');
     });
 
-    const menu = container.querySelector('.include-path-menu');
-    if (menu) {
-        menu.classList.toggle('visible');
+    // Get button position for menu placement
+    const button = container.querySelector('.include-menu-btn');
+    if (!button) return;
 
-        // Close menu when clicking outside
-        if (menu.classList.contains('visible')) {
-            const closeHandler = (e) => {
-                if (!container.contains(e.target)) {
-                    menu.classList.remove('visible');
-                    document.removeEventListener('click', closeHandler);
-                }
-            };
-            setTimeout(() => document.addEventListener('click', closeHandler), 0);
-        }
+    const rect = button.getBoundingClientRect();
+    const isAbsolutePath = includePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(includePath);
+    const escapedPath = includePath.replace(/'/g, "\\'").replace(/"/g, '\\"');
+
+    // Create floating menu
+    const menu = document.createElement('div');
+    menu.id = 'floating-include-path-menu';
+    menu.className = 'include-path-menu visible';
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 2) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '999999';
+    menu.dataset.includePath = includePath;
+
+    menu.innerHTML = `
+        <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+        <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+        <button class="include-path-menu-item disabled" disabled>🔎 Search for File</button>
+        <div class="include-path-menu-divider"></div>
+        <button class="include-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
+        <button class="include-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
+        <div class="include-path-menu-divider"></div>
+        <button class="include-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
+    `;
+
+    document.body.appendChild(menu);
+
+    // Adjust position if menu goes off screen
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
     }
+    if (menuRect.bottom > window.innerHeight) {
+        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
+    }
+
+    // Close menu when clicking outside
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !container.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
 }
 
 /**
@@ -3953,10 +3991,12 @@ function toggleIncludePathMenu(container, includePath) {
 function convertSinglePath(imagePath, direction, skipRefresh = false) {
     console.log(`[convertSinglePath] Called with path: "${imagePath}", direction: ${direction}, skipRefresh: ${skipRefresh}`);
 
-    // Close all menus (both image and include)
+    // Close all menus (both image and include) - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'convertSinglePath',
@@ -3973,10 +4013,12 @@ function convertSinglePath(imagePath, direction, skipRefresh = false) {
 function openPath(filePath) {
     console.log(`[openPath] Called with path: "${filePath}"`);
 
-    // Close all menus (both image and include)
+    // Close all menus (both image and include) - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'openPath',
@@ -3991,10 +4033,12 @@ function openPath(filePath) {
 function revealPathInExplorer(filePath) {
     console.log(`[revealPathInExplorer] Called with path: "${filePath}"`);
 
-    // Close all menus (both image and include)
+    // Close all menus (both image and include) - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'revealPathInExplorer',
@@ -4113,10 +4157,12 @@ function toggleImageNotFoundMenu(container) {
 function searchForFile(filePath) {
     console.log(`[searchForFile] Called with path: "${filePath}"`);
 
-    // Close all menus
+    // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'searchForFile',
@@ -4131,10 +4177,12 @@ function searchForFile(filePath) {
 function browseForImage(oldPath) {
     console.log(`[browseForImage] Called with oldPath: "${oldPath}"`);
 
-    // Close all menus
+    // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'browseForImage',
@@ -4149,10 +4197,12 @@ function browseForImage(oldPath) {
 function deleteFromMarkdown(path) {
     console.log(`[deleteFromMarkdown] Called with path: "${path}"`);
 
-    // Close all menus
+    // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
 
     vscode.postMessage({
         type: 'deleteFromMarkdown',
