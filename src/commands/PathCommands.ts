@@ -1,21 +1,24 @@
 /**
  * Path Commands
  *
- * Handles path conversion operations:
+ * Handles path conversion and file operations:
  * - convertPaths: Convert paths in a single file
  * - convertAllPaths: Convert paths in main file and all includes
+ * - revealPathInExplorer: Open file in system file explorer
  *
  * @module commands/PathCommands
  */
 
+import * as vscode from 'vscode';
 import * as path from 'path';
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
 import { PathConversionService, ConversionResult } from '../services/PathConversionService';
 import { getErrorMessage } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
-import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, IncomingMessage } from '../core/bridge/MessageTypes';
+import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, RevealPathInExplorerMessage, IncomingMessage } from '../core/bridge/MessageTypes';
+import { safeFileUri } from '../utils/uriUtils';
 
-type PathCommandMessage = ConvertPathsMessage | ConvertAllPathsMessage | ConvertSinglePathMessage;
+type PathCommandMessage = ConvertPathsMessage | ConvertAllPathsMessage | ConvertSinglePathMessage | OpenPathMessage | RevealPathInExplorerMessage;
 
 /**
  * Path Commands Handler
@@ -27,7 +30,7 @@ export class PathCommands extends BaseMessageCommand {
         id: 'path-commands',
         name: 'Path Commands',
         description: 'Handles path conversion between absolute and relative formats',
-        messageTypes: ['convertPaths', 'convertAllPaths', 'convertSinglePath'],
+        messageTypes: ['convertPaths', 'convertAllPaths', 'convertSinglePath', 'openPath', 'revealPathInExplorer'],
         priority: 100
     };
 
@@ -40,6 +43,10 @@ export class PathCommands extends BaseMessageCommand {
                     return await this.handleConvertAllPaths(message, context);
                 case 'convertSinglePath':
                     return await this.handleConvertSinglePath(message, context);
+                case 'openPath':
+                    return await this.handleOpenPath(message, context);
+                case 'revealPathInExplorer':
+                    return await this.handleRevealPathInExplorer(message, context);
                 default:
                     return this.failure(`Unknown path command: ${(message as { type: string }).type}`);
             }
@@ -237,6 +244,8 @@ export class PathCommands extends BaseMessageCommand {
         const conversionService = PathConversionService.getInstance();
         const imagePath = message.imagePath;
 
+        console.log(`[PathCommands] convertSinglePath called with path: "${imagePath}", direction: ${message.direction}`);
+
         // Collect all files to search
         const allFiles: MarkdownFile[] = [];
         const mainFile = fileRegistry.getMainFile();
@@ -244,6 +253,8 @@ export class PathCommands extends BaseMessageCommand {
             allFiles.push(mainFile);
         }
         allFiles.push(...fileRegistry.getIncludeFiles());
+
+        console.log(`[PathCommands] Searching in ${allFiles.length} files`);
 
         // Search for the path in all files
         let foundFile: MarkdownFile | null = null;
@@ -255,9 +266,11 @@ export class PathCommands extends BaseMessageCommand {
 
         for (const file of allFiles) {
             const content = file.getContent();
+            console.log(`[PathCommands] Checking file: ${file.getRelativePath()}, content length: ${content.length}`);
             if (regex.test(content)) {
                 foundFile = file;
                 foundContent = content;
+                console.log(`[PathCommands] Found path in file: ${file.getRelativePath()}`);
                 break;
             }
             // Reset regex lastIndex for next test
@@ -266,6 +279,11 @@ export class PathCommands extends BaseMessageCommand {
 
         if (!foundFile) {
             console.log(`[PathCommands] Path not found in any file: ${imagePath}`);
+            // Log first 200 chars of each file for debugging
+            for (const file of allFiles) {
+                const content = file.getContent();
+                console.log(`[PathCommands] File ${file.getRelativePath()} content preview: ${content.substring(0, 200)}`);
+            }
             return this.failure('Path not found in any file');
         }
 
@@ -295,12 +313,19 @@ export class PathCommands extends BaseMessageCommand {
         regex.lastIndex = 0;
         const newContent = foundContent.replace(regex, newPath);
 
+        console.log(`[PathCommands] Replacing "${imagePath}" with "${newPath}"`);
+        console.log(`[PathCommands] Old content length: ${foundContent.length}, New content length: ${newContent.length}`);
+        console.log(`[PathCommands] Content changed: ${foundContent !== newContent}`);
+
         // Update file content in cache (marks as unsaved, does NOT save to disk)
         foundFile.setContent(newContent, false);
+        console.log(`[PathCommands] File content updated in cache for: ${foundFile.getRelativePath()}`);
 
         // Invalidate board cache and refresh webview to show updated paths
         context.boardStore.invalidateCache();
+        console.log(`[PathCommands] Board cache invalidated, calling onBoardUpdate...`);
         await context.onBoardUpdate();
+        console.log(`[PathCommands] onBoardUpdate completed`);
 
         // Notify frontend
         this.postMessage({
@@ -319,5 +344,77 @@ export class PathCommands extends BaseMessageCommand {
             newPath: newPath,
             filePath: foundFile.getRelativePath()
         });
+    }
+
+    /**
+     * Open a file path directly (in VS Code or default app)
+     */
+    private async handleOpenPath(
+        message: OpenPathMessage,
+        context: CommandContext
+    ): Promise<CommandResult> {
+        const filePath = message.filePath;
+        console.log(`[PathCommands] openPath called with path: "${filePath}"`);
+
+        // If the path is relative, resolve it against the main file's directory
+        let resolvedPath = filePath;
+        if (!path.isAbsolute(filePath)) {
+            const fileRegistry = this.getFileRegistry();
+            const mainFile = fileRegistry?.getMainFile();
+            if (mainFile) {
+                const basePath = path.dirname(mainFile.getPath());
+                resolvedPath = path.resolve(basePath, filePath);
+            } else {
+                return this.failure('Cannot resolve relative path: main file not found');
+            }
+        }
+
+        console.log(`[PathCommands] Opening path with system default app: "${resolvedPath}"`);
+
+        try {
+            const fileUri = safeFileUri(resolvedPath, 'PathCommands-openPath');
+            // Use openExternal to open with the system's default application
+            await vscode.env.openExternal(fileUri);
+            return this.success({ opened: true, path: resolvedPath });
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            console.error(`[PathCommands] Error opening path:`, error);
+            return this.failure(`Failed to open file: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Reveal a file path in the system file explorer (Finder on macOS, Explorer on Windows)
+     */
+    private async handleRevealPathInExplorer(
+        message: RevealPathInExplorerMessage,
+        context: CommandContext
+    ): Promise<CommandResult> {
+        const filePath = message.filePath;
+        console.log(`[PathCommands] revealPathInExplorer called with path: "${filePath}"`);
+
+        // If the path is relative, resolve it against the main file's directory
+        let resolvedPath = filePath;
+        if (!path.isAbsolute(filePath)) {
+            const fileRegistry = this.getFileRegistry();
+            const mainFile = fileRegistry?.getMainFile();
+            if (mainFile) {
+                const basePath = path.dirname(mainFile.getPath());
+                resolvedPath = path.resolve(basePath, filePath);
+            } else {
+                return this.failure('Cannot resolve relative path: main file not found');
+            }
+        }
+
+        console.log(`[PathCommands] Revealing path in explorer: "${resolvedPath}"`);
+
+        try {
+            await vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolvedPath, 'PathCommands-revealInExplorer'));
+            return this.success({ revealed: true, path: resolvedPath });
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            console.error(`[PathCommands] Error revealing path in explorer:`, error);
+            return this.failure(`Failed to reveal in file explorer: ${errorMessage}`);
+        }
     }
 }

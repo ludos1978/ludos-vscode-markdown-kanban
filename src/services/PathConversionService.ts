@@ -133,6 +133,14 @@ export class PathConversionService {
         // Decode URL-encoded paths
         const decoded = safeDecodeURIComponent(absolutePath);
 
+        // Skip URLs
+        if (this.isUrl(decoded)) return absolutePath;
+
+        // Skip already relative paths - they're already in the target format
+        if (!this.isAbsolutePath(decoded)) {
+            return absolutePath;
+        }
+
         // Calculate relative path
         const relative = path.relative(basePath, decoded);
 

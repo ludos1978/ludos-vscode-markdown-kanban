@@ -3895,8 +3895,8 @@ function handleLinkOrImageOpen(event, target, taskId = null, columnId = null) {
 // Global click handlers that check for Alt key
 function handleColumnTitleClick(event, columnId) {
     if (event.altKey) {
-        // Alt+click: open link/image
-        if (handleLinkOrImageOpen(event, event.target, taskId, columnId)) {return;}
+        // Alt+click: open link/image (no taskId for column titles)
+        if (handleLinkOrImageOpen(event, event.target, null, columnId)) {return;}
         return; // Don't edit if Alt is pressed
     }
 

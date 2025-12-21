@@ -1469,7 +1469,12 @@ class TagUtils {
      * @returns {string} HTML string for display
      */
     getTaskDisplayTitle(task) {
+        // Debug: log task include properties
+        if (task.includeFiles || task.includeMode) {
+            console.log(`[getTaskDisplayTitle] Task "${task.id}": includeMode=${task.includeMode}, includeFiles=${JSON.stringify(task.includeFiles)}, title="${task.title?.substring(0, 50)}"`);
+        }
         if (task.includeMode && task.includeFiles && task.includeFiles.length > 0) {
+            console.log(`[getTaskDisplayTitle] Task "${task.id}" meets all conditions - generating menu`);
             // For taskinclude, show as inline badge "!(...path/filename.ext)!" format - same as column includes
             const fileName = task.includeFiles[0];
             const parts = fileName.split('/').length > 1 ? fileName.split('/') : fileName.split('\\');
@@ -1563,12 +1568,19 @@ function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
     const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' : 'handleColumnIncludeClick';
 
+    // Determine if path is absolute (Unix: starts with /, Windows: starts with drive letter like C:\)
+    const isAbsolutePath = filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
+
+    // Disable "Convert to Relative" if already relative, disable "Convert to Absolute" if already absolute
     return `<span class="include-path-overlay-container">
         <span class="columninclude-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
-        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Convert path">☰</button>
+        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
         <div class="include-path-menu">
-            <button class="include-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'relative')">📁 Convert to Relative</button>
-            <button class="include-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'absolute')">📂 Convert to Absolute</button>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+            <div class="include-path-menu-divider"></div>
+            <button class="include-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative')"` : 'disabled'}>📁 Convert to Relative</button>
+            <button class="include-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute')"`}>📂 Convert to Absolute</button>
         </div>
     </span>`;
 }

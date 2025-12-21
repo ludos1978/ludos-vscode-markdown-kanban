@@ -4151,9 +4151,16 @@ blockquote {
   white-space: nowrap;
 }
 
-.image-path-menu-item:hover {
+.image-path-menu-item:hover:not(:disabled) {
   background: var(--vscode-menu-selectionBackground, #094771);
   color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.image-path-menu-item:disabled,
+.image-path-menu-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--vscode-disabledForeground, #888888);
 }
 
 .image-path-menu-divider {
@@ -4226,9 +4233,22 @@ blockquote {
   white-space: nowrap;
 }
 
-.include-path-menu-item:hover {
+.include-path-menu-item:hover:not(:disabled) {
   background: var(--vscode-menu-selectionBackground, #094771);
   color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.include-path-menu-item:disabled,
+.include-path-menu-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--vscode-disabledForeground, #888888);
+}
+
+.include-path-menu-divider {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, #454545);
+  margin: 4px 0;
 }
 
 .markdown-content a[href$=".pdf"],

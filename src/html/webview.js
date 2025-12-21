@@ -3889,6 +3889,8 @@ function toggleIncludePathMenu(container, includePath) {
  * Called from inline onclick handlers in rendered markdown
  */
 function convertSinglePath(imagePath, direction) {
+    console.log(`[convertSinglePath] Called with path: "${imagePath}", direction: ${direction}`);
+
     // Close all menus (both image and include)
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
@@ -3898,6 +3900,42 @@ function convertSinglePath(imagePath, direction) {
         type: 'convertSinglePath',
         imagePath: imagePath,
         direction: direction
+    });
+}
+
+/**
+ * Open a file path directly (in VS Code or default app)
+ * Called from inline onclick handlers in rendered markdown
+ */
+function openPath(filePath) {
+    console.log(`[openPath] Called with path: "${filePath}"`);
+
+    // Close all menus (both image and include)
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
+        menu.classList.remove('visible');
+    });
+
+    vscode.postMessage({
+        type: 'openPath',
+        filePath: filePath
+    });
+}
+
+/**
+ * Reveal a file path in the system file explorer (Finder on macOS, Explorer on Windows)
+ * Called from inline onclick handlers in rendered markdown
+ */
+function revealPathInExplorer(filePath) {
+    console.log(`[revealPathInExplorer] Called with path: "${filePath}"`);
+
+    // Close all menus (both image and include)
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
+        menu.classList.remove('visible');
+    });
+
+    vscode.postMessage({
+        type: 'revealPathInExplorer',
+        filePath: filePath
     });
 }
 

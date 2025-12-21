@@ -1459,6 +1459,22 @@ export interface ConvertSinglePathMessage extends BaseMessage {
     direction: 'relative' | 'absolute';
 }
 
+/**
+ * Open a file path directly
+ */
+export interface OpenPathMessage extends BaseMessage {
+    type: 'openPath';
+    filePath: string;
+}
+
+/**
+ * Reveal a file path in the system file explorer
+ */
+export interface RevealPathInExplorerMessage extends BaseMessage {
+    type: 'revealPathInExplorer';
+    filePath: string;
+}
+
 // ============= TYPE UNIONS =============
 
 /**
@@ -1621,7 +1637,9 @@ export type IncomingMessage =
     // Path conversion messages
     | ConvertPathsMessage
     | ConvertAllPathsMessage
-    | ConvertSinglePathMessage;
+    | ConvertSinglePathMessage
+    | OpenPathMessage
+    | RevealPathInExplorerMessage;
 
 /**
  * Message type string literals for type-safe checking

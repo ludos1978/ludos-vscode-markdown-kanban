@@ -1,3 +1,6 @@
+- gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
+- add an option to open the file or the path in the file explorer (finder) where the file is in!
+
 - [x] when i delete the top column in a stack, the stack below it should have it's #stack tag removed. in all other cases there is no need to change anything
 
 - [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 

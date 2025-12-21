@@ -1915,13 +1915,20 @@ function renderMarkdown(text, includeContext) {
             // Escape the path for use in onclick handlers
             const escapedPath = originalSrc.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
 
+            // Determine if path is absolute (Unix: starts with /, Windows: starts with drive letter like C:\)
+            const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
+
             // Wrap with overlay container for path conversion menu
+            // Disable "Convert to Relative" if already relative, disable "Convert to Absolute" if already absolute
             return `<div class="image-path-overlay-container">
                 ${imgTag}
-                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Convert path">☰</button>
+                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
                 <div class="image-path-menu">
-                    <button class="image-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'relative')">📁 Convert to Relative</button>
-                    <button class="image-path-menu-item" onclick="convertSinglePath('${escapedPath}', 'absolute')">📂 Convert to Absolute</button>
+                    <button class="image-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+                    <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+                    <div class="image-path-menu-divider"></div>
+                    <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative')"` : 'disabled'}>📁 Convert to Relative</button>
+                    <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute')"`}>📂 Convert to Absolute</button>
                 </div>
             </div>`;
         };
