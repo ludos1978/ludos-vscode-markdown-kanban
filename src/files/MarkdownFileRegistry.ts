@@ -168,7 +168,17 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * registry.getByRelativePath("FOLDER/FILE.MD")
      */
     public getByRelativePath(relativePath: string): MarkdownFile | undefined {
-        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        // Handle absolute paths by converting to relative first
+        let pathToLookup = relativePath;
+        if (path.isAbsolute(relativePath)) {
+            const mainFile = this.getMainFile();
+            if (mainFile) {
+                const baseDir = path.dirname(mainFile.getPath());
+                pathToLookup = path.relative(baseDir, relativePath);
+            }
+        }
+
+        const normalized = MarkdownFile.normalizeRelativePath(pathToLookup);
         return this._filesByRelativePath.get(normalized);
     }
 
@@ -195,7 +205,17 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns true if file exists in registry
      */
     public hasByRelativePath(relativePath: string): boolean {
-        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        // Handle absolute paths by converting to relative first
+        let pathToLookup = relativePath;
+        if (path.isAbsolute(relativePath)) {
+            const mainFile = this.getMainFile();
+            if (mainFile) {
+                const baseDir = path.dirname(mainFile.getPath());
+                pathToLookup = path.relative(baseDir, relativePath);
+            }
+        }
+
+        const normalized = MarkdownFile.normalizeRelativePath(pathToLookup);
         return this._filesByRelativePath.has(normalized);
     }
 
@@ -430,7 +450,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns The registered include file, or undefined if registration failed
      */
     public ensureIncludeRegistered(
-        relativePath: string,
+        inputPath: string,
         fileType: IncludeFileType,
         fileFactory: { createIncludeDirect: (path: string, mainFile: MainKanbanFile, type: IncludeFileType) => IncludeFile },
         mainFile: MainKanbanFile,
@@ -441,6 +461,13 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             taskTitle?: string;
         }
     ): IncludeFile | undefined {
+        // Convert absolute path to relative if needed
+        let relativePath = inputPath;
+        if (path.isAbsolute(inputPath)) {
+            const baseDir = path.dirname(mainFile.getPath());
+            relativePath = path.relative(baseDir, inputPath);
+        }
+
         // First, try to find by relative path (normalized)
         const existingByRelative = this.getByRelativePath(relativePath);
         if (existingByRelative) {
@@ -450,9 +477,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         // CRITICAL: Also check by absolute path to prevent duplicate registrations
         // when the same file is referenced with different path formats
         // (e.g., relative "../foo.md" vs absolute "/path/to/foo.md")
-        const absolutePath = path.isAbsolute(relativePath)
-            ? relativePath
-            : path.resolve(path.dirname(mainFile.getPath()), relativePath);
+        const absolutePath = path.resolve(path.dirname(mainFile.getPath()), relativePath);
 
         const existingByAbsolute = this.get(absolutePath);
         if (existingByAbsolute) {
@@ -461,7 +486,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
             return existingByAbsolute as IncludeFile;
         }
 
-        // Create and register new include file
+        // Create and register new include file with relative path
         const includeFile = fileFactory.createIncludeDirect(relativePath, mainFile, fileType);
 
         this.register(includeFile);

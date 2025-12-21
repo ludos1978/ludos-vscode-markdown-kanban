@@ -1,3 +1,5 @@
+- move the delete button from the "image not found hover" to the burger menu on the image.
+
 - gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
 - add an option to open the file or the path in the file explorer (finder) where the file is in!
 

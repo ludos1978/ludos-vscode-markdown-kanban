@@ -65,3 +65,33 @@ export function safeDecodeURIComponent(str: string): string {
         return str;
     }
 }
+
+/**
+ * URL-encode a file path for safe use in markdown links.
+ * Encodes each path component separately to handle spaces and special characters.
+ * Mirrors the frontend's ValidationUtils.escapeFilePath() function.
+ *
+ * @param filePath - The file path to encode
+ * @returns URL-encoded file path safe for markdown links
+ */
+export function encodeFilePath(filePath: string): string {
+    if (!filePath) return '';
+
+    // Convert Windows backslashes to forward slashes
+    let normalizedPath = toForwardSlashes(filePath);
+
+    // Split on slashes, encode each part, then rejoin
+    const pathParts = normalizedPath.split('/');
+    const encodedParts = pathParts.map(part => {
+        // Don't encode empty parts (from leading slashes or double slashes)
+        if (!part) return part;
+
+        // Don't encode Windows drive letters (C:, D:, etc.)
+        if (/^[a-zA-Z]:$/.test(part)) return part;
+
+        // URL encode the part
+        return encodeURIComponent(part);
+    });
+
+    return encodedParts.join('/');
+}

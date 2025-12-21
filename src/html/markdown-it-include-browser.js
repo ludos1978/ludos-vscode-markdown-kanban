@@ -19,6 +19,34 @@
   const fileCache = new Map();
   const pendingRequests = new Set();
 
+  // Helper function to detect if path is absolute
+  function isAbsolutePath(filePath) {
+    return filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
+  }
+
+  // Helper function to generate include link with burger menu (matching generateIncludeLinkWithMenu in tagUtils.js)
+  function generateIncludeLinkWithMenu(filePath, displayText, clickHandler) {
+    const escapedPath = filePath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const handlerFn = clickHandler === 'task' ? 'handleTaskIncludeClick' :
+                      clickHandler === 'column' ? 'handleColumnIncludeClick' : 'handleRegularIncludeClick';
+    const isAbsolute = isAbsolutePath(filePath);
+
+    return `<span class="include-path-overlay-container">
+        <span class="include-filename-link" data-file-path="${escapeHtml(filePath)}" onclick="${handlerFn}(event, '${escapeHtml(filePath)}')" title="Alt+click to open file: ${escapeHtml(filePath)}">${escapeHtml(displayText)}</span>
+        <button class="include-menu-btn" onclick="event.stopPropagation(); toggleIncludePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+        <div class="include-path-menu">
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+            <button class="include-path-menu-item disabled" disabled>🔎 Search for File</button>
+            <div class="include-path-menu-divider"></div>
+            <button class="include-path-menu-item${isAbsolute ? '' : ' disabled'}" ${isAbsolute ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
+            <button class="include-path-menu-item${isAbsolute ? ' disabled' : ''}" ${isAbsolute ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
+            <div class="include-path-menu-divider"></div>
+            <button class="include-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
+        </div>
+    </span>`;
+  }
+
   function markdownItInclude(md, options = {}) {
     const defaultOptions = {
       root: '',
@@ -113,18 +141,15 @@
       try {
         const rendered = md.render(content);
 
-        // Create filename display (show just the basename)
+        // Create filename display (show just the basename) with burger menu
         const fileName = filePath.split('/').pop() || filePath;
+        const displayText = `include(${fileName})`;
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
         return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
           <div class="include-title-bar">
-            <span class="include-filename-link"
-                  data-file-path="${escapeHtml(filePath)}"
-                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
-                  title="Alt+click to open file: ${escapeHtml(filePath)}">
-              include(${escapeHtml(fileName)})
-            </span>
+            ${includeLink}
           </div>
           <div class="include-content-area">
             ${rendered}
@@ -144,6 +169,9 @@
 
         // Return the raw content escaped as fallback
         const fileName = filePath.split('/').pop() || filePath;
+        const displayText = `include(${fileName}) - PARSE ERROR`;
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
+
         const errorLinesHtml = errorLocation ? errorLocation.lines.map(l =>
           `<div style="margin: 4px 0;"><strong>Line ${l.lineNumber}:</strong> <span style="font-family: monospace; background: #5a1d1d !important; color: #fff !important; padding: 2px 6px; border-radius: 3px;">${escapeHtml(l.content)}</span></div>`
         ).join('') : '';
@@ -156,12 +184,7 @@
 
         return `<div class="include-container include-error" data-include-file="${escapeHtml(filePath)}">
           <div class="include-title-bar">
-            <span class="include-filename-link"
-                  data-file-path="${escapeHtml(filePath)}"
-                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
-                  title="Alt+click to open file: ${escapeHtml(filePath)}">
-              include(${escapeHtml(fileName)}) - PARSE ERROR
-            </span>
+            ${includeLink}
           </div>
           <div class="include-content-area">
             ${errorLocation ? `<div class="include-error-info" style="border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100); border-radius: 4px; padding: 8px; margin-bottom: 12px;">
@@ -188,18 +211,15 @@
       try {
         const rendered = md.render(content);
 
-        // Create filename display (show just the basename)
+        // Create filename display (show just the basename) with burger menu
         const fileName = filePath.split('/').pop() || filePath;
+        const displayText = `include(${fileName})`;
+        const includeLink = generateIncludeLinkWithMenu(filePath, displayText, 'regular');
 
         // Build bordered container with title bar
         return `<div class="include-container" data-include-file="${escapeHtml(filePath)}">
           <div class="include-title-bar">
-            <span class="include-filename-link"
-                  data-file-path="${escapeHtml(filePath)}"
-                  onclick="handleRegularIncludeClick(event, '${escapeHtml(filePath)}')"
-                  title="Alt+click to open file: ${escapeHtml(filePath)}">
-              include(${escapeHtml(fileName)})
-            </span>
+            ${includeLink}
           </div>
           <div class="include-content-area">
             ${rendered}

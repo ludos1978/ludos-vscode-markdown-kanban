@@ -1276,24 +1276,66 @@ body.small-card-fonts .task-title-container .markdown-content img {
   cursor: pointer;
 }
 
-.image-not-found::before {
-  content: '📷 Image not found';
-}
-
-.image-not-found::after {
-  content: '🔍';
-  font-size: 12px;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-
 .image-not-found:hover {
   background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2));
   border-color: var(--vscode-focusBorder, #007acc);
 }
 
-.image-not-found:hover::after {
-  opacity: 1;
+/* Image not found container with burger menu */
+.image-not-found-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Burger menu button inside the image-not-found box - always visible */
+.image-not-found .image-menu-btn {
+  position: static !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin-left: 6px;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: none !important;
+  border-radius: 3px !important;
+  color: white !important;
+  font-size: 11px !important;
+  cursor: pointer;
+  opacity: 1 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.image-not-found .image-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+.image-not-found-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+  pointer-events: auto;
+}
+
+.image-not-found-menu.visible {
+  display: block;
+}
+
+.image-not-found-menu .image-path-menu-item {
+  pointer-events: auto;
+}
+
+.image-not-found-menu .image-path-menu-item:not(.disabled):not(:disabled) {
+  cursor: pointer;
 }
 
 /* Left side controls (drag handle, collapse toggle) */
@@ -4129,8 +4171,10 @@ blockquote {
   border: 1px solid var(--vscode-menu-border, #454545);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: 1000;
   min-width: 160px;
+  max-width: 220px;
+  width: max-content;
   display: none;
 }
 
@@ -4211,7 +4255,7 @@ blockquote {
   border: 1px solid var(--vscode-menu-border, #454545);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: 1000;
   min-width: 160px;
   display: none;
 }
@@ -5690,6 +5734,13 @@ s {
     border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
     font-size: 0.9em;
     font-family: var(--vscode-font-family);
+    position: relative;
+    overflow: visible;
+}
+
+/* Allow menu to escape include-container when visible */
+.include-container:has(.include-path-menu.visible) {
+    overflow: visible;
 }
 
 .include-filename-link {

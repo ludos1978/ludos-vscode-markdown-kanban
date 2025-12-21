@@ -1457,6 +1457,7 @@ export interface ConvertSinglePathMessage extends BaseMessage {
     type: 'convertSinglePath';
     imagePath: string;
     direction: 'relative' | 'absolute';
+    skipRefresh?: boolean;
 }
 
 /**
@@ -1468,11 +1469,35 @@ export interface OpenPathMessage extends BaseMessage {
 }
 
 /**
+ * Search for a file by name
+ */
+export interface SearchForFileMessage extends BaseMessage {
+    type: 'searchForFile';
+    filePath: string;
+}
+
+/**
  * Reveal a file path in the system file explorer
  */
 export interface RevealPathInExplorerMessage extends BaseMessage {
     type: 'revealPathInExplorer';
     filePath: string;
+}
+
+/**
+ * Browse for an image file to replace a broken image path
+ */
+export interface BrowseForImageMessage extends BaseMessage {
+    type: 'browseForImage';
+    oldPath: string;
+}
+
+/**
+ * Delete an element (image, link, include) from the markdown source
+ */
+export interface DeleteFromMarkdownMessage extends BaseMessage {
+    type: 'deleteFromMarkdown';
+    path: string;
 }
 
 // ============= TYPE UNIONS =============
@@ -1639,7 +1664,10 @@ export type IncomingMessage =
     | ConvertAllPathsMessage
     | ConvertSinglePathMessage
     | OpenPathMessage
-    | RevealPathInExplorerMessage;
+    | SearchForFileMessage
+    | RevealPathInExplorerMessage
+    | BrowseForImageMessage
+    | DeleteFromMarkdownMessage;
 
 /**
  * Message type string literals for type-safe checking
