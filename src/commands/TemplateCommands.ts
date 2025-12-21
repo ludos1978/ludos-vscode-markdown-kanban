@@ -21,6 +21,7 @@ import { FileCopyService } from '../templates/FileCopyService';
 import { KanbanColumn } from '../board/KanbanTypes';
 import { IdGenerator } from '../utils/idGenerator';
 import { getErrorMessage } from '../utils/stringUtils';
+import { UndoCapture } from '../core/stores/UndoCapture';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -174,8 +175,10 @@ export class TemplateCommands extends BaseMessageCommand {
                 return this.failure('No current board');
             }
 
-            // Save undo state
-            context.boardStore.saveStateForUndo(currentBoard);
+            // Save undo state (full board change - adding new column)
+            context.boardStore.saveUndoEntry(
+                UndoCapture.forFullBoard(currentBoard, 'createEmptyColumn')
+            );
 
             // Helper to get row from column title
             const getColumnRow = (col: KanbanColumn): number => {
@@ -341,8 +344,10 @@ export class TemplateCommands extends BaseMessageCommand {
             // Collect new column IDs for frontend to position them
             const newColumnIds = columnsWithTags.map(col => col.id);
 
-            // Save undo state
-            context.boardStore.saveStateForUndo(currentBoard);
+            // Save undo state (full board change - adding template columns)
+            context.boardStore.saveUndoEntry(
+                UndoCapture.forFullBoard(currentBoard, 'applyTemplate')
+            );
 
             // Add columns at END of board (same approach as insertColumnAtPosition)
             // Frontend will move them to correct DOM position and call normalizeAllStackTags

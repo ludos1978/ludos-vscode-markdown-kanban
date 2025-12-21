@@ -4,4 +4,4 @@
  * Centralized state management stores.
  */
 
-export { BoardStore, BoardState, BoardStoreOptions } from './BoardStore';
+export { BoardStore, BoardState, BoardStoreOptions, UndoEntry, UndoCapture, ResolvedTarget } from './BoardStore';

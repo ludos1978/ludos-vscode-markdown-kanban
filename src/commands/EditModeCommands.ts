@@ -20,6 +20,7 @@
 import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { hasMessageHandler } from '../types/PanelCommandAccess';
+import { UndoCapture } from '../core/stores/UndoCapture';
 
 /**
  * Edit Mode Commands Handler
@@ -201,7 +202,9 @@ export class EditModeCommands extends BaseMessageCommand {
                     // Perform automatic sort on board
                     const board = context.getCurrentBoard();
                     if (board) {
-                        context.boardStore.saveStateForUndo(board);
+                        context.boardStore.saveUndoEntry(
+                            UndoCapture.forFullBoard(board, 'performSort')
+                        );
                         context.boardOperations.performAutomaticSort(board);
                         context.emitBoardChanged(board, 'sort');
                         await context.onBoardUpdate();

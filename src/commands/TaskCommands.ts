@@ -32,6 +32,7 @@ import {
 import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { TaskActions } from '../actions';
 
 /**
  * Task Commands Handler
@@ -203,15 +204,10 @@ export class TaskCommands extends BaseMessageCommand {
         }
 
         // Regular task edit (no include changes)
-        await this.performBoardAction(
+        await this.executeAction(
             context,
-            () => context.boardOperations.editTask(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId,
-                message.taskData
-            ),
-            { sendUpdate: false }
+            TaskActions.update(message.taskId, message.columnId, message.taskData),
+            { sendUpdates: false }
         );
 
         // If this is a task include and description was updated, update the file instance
@@ -244,185 +240,133 @@ export class TaskCommands extends BaseMessageCommand {
      * Handle addTask message
      */
     private async handleAddTask(message: AddTaskMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.addTask(
-                context.getCurrentBoard()!,
-                message.columnId,
-                message.taskData
-            )
+            TaskActions.add(message.columnId, message.taskData)
         );
-                return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to add task');
     }
 
     /**
      * Handle addTaskAtPosition message
      */
     private async handleAddTaskAtPosition(message: AddTaskAtPositionMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.addTaskAtPosition(
-                context.getCurrentBoard()!,
-                message.columnId,
-                message.taskData,
-                message.insertionIndex
-            )
+            TaskActions.add(message.columnId, message.taskData, message.insertionIndex)
         );
-                return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to add task');
     }
 
     /**
      * Handle deleteTask message
      */
     private async handleDeleteTask(message: DeleteTaskMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.deleteTask(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            ),
-            { sendUpdate: false }
+            TaskActions.remove(message.taskId, message.columnId),
+            { sendUpdates: false }
         );
-                return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to delete task');
     }
 
     /**
      * Handle duplicateTask message
      */
     private async handleDuplicateTask(message: DuplicateTaskMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.duplicateTask(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.duplicate(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to duplicate task');
     }
 
     /**
      * Handle insertTaskBefore message
      */
     private async handleInsertTaskBefore(message: InsertTaskBeforeMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.insertTaskBefore(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.insertBefore(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to insert task');
     }
 
     /**
      * Handle insertTaskAfter message
      */
     private async handleInsertTaskAfter(message: InsertTaskAfterMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.insertTaskAfter(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.insertAfter(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to insert task');
     }
 
     /**
      * Handle moveTask message
      */
     private async handleMoveTask(message: MoveTaskMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTask(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.fromColumnId,
-                message.toColumnId,
-                message.newIndex
-            )
+            TaskActions.move(message.taskId, message.fromColumnId, message.toColumnId, message.newIndex)
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
      * Handle moveTaskToColumn message
      */
     private async handleMoveTaskToColumn(message: MoveTaskToColumnMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTaskToColumn(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.fromColumnId,
-                message.toColumnId
-            )
+            TaskActions.moveToColumn(message.taskId, message.fromColumnId, message.toColumnId)
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
      * Handle moveTaskToTop message
      */
     private async handleMoveTaskToTop(message: MoveTaskToTopMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTaskToTop(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.moveToTop(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
      * Handle moveTaskUp message
      */
     private async handleMoveTaskUp(message: MoveTaskUpMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTaskUp(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.moveUp(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
      * Handle moveTaskDown message
      */
     private async handleMoveTaskDown(message: MoveTaskDownMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTaskDown(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.moveDown(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
      * Handle moveTaskToBottom message
      */
     private async handleMoveTaskToBottom(message: MoveTaskToBottomMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveTaskToBottom(
-                context.getCurrentBoard()!,
-                message.taskId,
-                message.columnId
-            )
+            TaskActions.moveToBottom(message.taskId, message.columnId)
         );
-                return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move task');
     }
 
     /**
@@ -457,15 +401,10 @@ export class TaskCommands extends BaseMessageCommand {
         }
 
         // Regular title edit without include syntax
-        await this.performBoardAction(
+        await this.executeAction(
             context,
-            () => context.boardOperations.editTask(
-                currentBoard!,
-                message.taskId,
-                message.columnId,
-                { title: message.title }
-            ),
-            { sendUpdate: false }
+            TaskActions.updateTitle(message.taskId, message.columnId, message.title),
+            { sendUpdates: false }
         );
 
         context.setEditingInProgress(false);
@@ -496,10 +435,10 @@ export class TaskCommands extends BaseMessageCommand {
             updateData.title = newContent;
         }
 
-        await this.performBoardAction(
+        await this.executeAction(
             context,
-            () => context.boardOperations.editTask(board, taskId, columnId, updateData),
-            { sendUpdate: false }
+            TaskActions.update(taskId, columnId, updateData),
+            { sendUpdates: false }
         );
 
         return this.success();

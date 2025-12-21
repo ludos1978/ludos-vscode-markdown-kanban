@@ -21,7 +21,7 @@ import {
     FileChangeEvent
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
-import { BoardStore } from './core/stores';
+import { BoardStore, UndoCapture } from './core/stores';
 import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import {
@@ -466,7 +466,20 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (!board || !board.valid) { return; }
 
-        this._boardStore.saveStateForUndo(board);
+        // Save undo state with proper target info for targeted undo/redo
+        if (taskId && columnId) {
+            this._boardStore.saveUndoEntry(
+                UndoCapture.forTask(board, taskId, columnId, 'replaceLink')
+            );
+        } else if (columnId) {
+            this._boardStore.saveUndoEntry(
+                UndoCapture.forColumn(board, columnId, 'replaceLink')
+            );
+        } else {
+            this._boardStore.saveUndoEntry(
+                UndoCapture.forFullBoard(board, 'replaceLink')
+            );
+        }
 
         let modified = false;
 

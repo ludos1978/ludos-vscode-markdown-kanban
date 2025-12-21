@@ -18,9 +18,13 @@ import {
     ShowErrorMessage,
     ShowInfoMessage,
     SetPreferenceMessage,
-    SetContextMessage
+    SetContextMessage,
+    UpdateTaskContentExtendedMessage,
+    UpdateColumnContentExtendedMessage
 } from '../core/bridge/MessageTypes';
 import { getErrorMessage } from '../utils/stringUtils';
+import { ResolvedTarget } from '../core/stores/BoardStore';
+import { KanbanBoard } from '../markdownParser';
 import * as vscode from 'vscode';
 
 /**
@@ -89,11 +93,16 @@ export class UICommands extends BaseMessageCommand {
     private async handleUndo(context: CommandContext): Promise<CommandResult> {
         context.setUndoRedoOperation(true);
 
-        const previousBoard = context.boardStore.undo();
-        if (previousBoard) {
-            context.setBoard(previousBoard);
-            context.emitBoardChanged(previousBoard, 'undo');
-            await context.onBoardUpdate();
+        const result = context.boardStore.undo();
+        if (result) {
+            context.setBoard(result.board);
+            context.emitBoardChanged(result.board, 'undo');
+
+            // Use targeted update if single element changed, otherwise full update
+            const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);
+            if (!didTargetedUpdate) {
+                await context.onBoardUpdate();
+            }
         }
 
         context.setUndoRedoOperation(false);
@@ -117,11 +126,16 @@ export class UICommands extends BaseMessageCommand {
     private async handleRedo(context: CommandContext): Promise<CommandResult> {
         context.setUndoRedoOperation(true);
 
-        const nextBoard = context.boardStore.redo();
-        if (nextBoard) {
-            context.setBoard(nextBoard);
-            context.emitBoardChanged(nextBoard, 'redo');
-            await context.onBoardUpdate();
+        const result = context.boardStore.redo();
+        if (result) {
+            context.setBoard(result.board);
+            context.emitBoardChanged(result.board, 'redo');
+
+            // Use targeted update if single element changed, otherwise full update
+            const didTargetedUpdate = await this.tryTargetedUpdate(result.board, result.targets, context);
+            if (!didTargetedUpdate) {
+                await context.onBoardUpdate();
+            }
         }
 
         context.setUndoRedoOperation(false);
@@ -137,6 +151,71 @@ export class UICommands extends BaseMessageCommand {
         }
 
         return this.success();
+    }
+
+    /**
+     * Try to send targeted update for single element changes
+     * @returns true if targeted update was sent, false otherwise (needs full update)
+     */
+    private async tryTargetedUpdate(
+        board: KanbanBoard,
+        targets: ResolvedTarget[],
+        _context: CommandContext
+    ): Promise<boolean> {
+        // Guard against undefined/null board or targets
+        if (!board || !targets) {
+            return false;
+        }
+
+        // Only support single-element targeted updates for now
+        if (targets.length !== 1) {
+            return false;
+        }
+
+        const target = targets[0];
+
+        if (target.type === 'task' && target.columnId) {
+            // Find the task in the restored board
+            const column = board.columns.find(c => c.id === target.columnId);
+            const task = column?.tasks.find(t => t.id === target.id);
+
+            if (task && column) {
+                const message: UpdateTaskContentExtendedMessage = {
+                    type: 'updateTaskContent',
+                    columnId: column.id,
+                    taskId: task.id,
+                    description: task.description,
+                    displayTitle: task.displayTitle,
+                    taskTitle: task.title,
+                    originalTitle: task.originalTitle,
+                    includeMode: task.includeMode || false,
+                    includeFiles: task.includeFiles,
+                    regularIncludeFiles: task.regularIncludeFiles
+                };
+                this.postMessage(message);
+                return true;
+            }
+        } else if (target.type === 'column') {
+            // Find the column in the restored board
+            const column = board.columns.find(c => c.id === target.id);
+
+            if (column) {
+                const message: UpdateColumnContentExtendedMessage = {
+                    type: 'updateColumnContent',
+                    columnId: column.id,
+                    tasks: column.tasks,
+                    columnTitle: column.title,
+                    displayTitle: column.displayTitle,
+                    includeMode: column.includeMode || false,
+                    includeFiles: column.includeFiles
+                };
+                this.postMessage(message);
+                return true;
+            }
+        }
+
+        // Couldn't find element in board, fall back to full update
+        return false;
     }
 
     /**

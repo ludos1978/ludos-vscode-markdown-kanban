@@ -17,6 +17,10 @@
 
 import * as vscode from 'vscode';
 import { KanbanBoard } from '../../markdownParser';
+import { UndoEntry, UndoCapture, ResolvedTarget } from './UndoCapture';
+
+// Re-export for consumers
+export { UndoEntry, UndoCapture, ResolvedTarget };
 
 // ============= TYPES =============
 
@@ -29,10 +33,10 @@ export interface BoardState {
     dirtyColumns: Set<string>;
     /** Task IDs with unrendered changes */
     dirtyTasks: Set<string>;
-    /** Undo history stack */
-    undoStack: KanbanBoard[];
-    /** Redo history stack */
-    redoStack: KanbanBoard[];
+    /** Undo history stack with target metadata */
+    undoStack: UndoEntry[];
+    /** Redo history stack with target metadata */
+    redoStack: UndoEntry[];
 }
 
 export interface BoardStoreOptions {
@@ -46,6 +50,10 @@ export interface BoardStoreOptions {
 
 function deepCloneBoard(board: KanbanBoard): KanbanBoard {
     return JSON.parse(JSON.stringify(board));
+}
+
+function createLegacyUndoEntry(board: KanbanBoard): UndoEntry {
+    return UndoCapture.inferred(board, 'legacy');
 }
 
 // ============= MAIN CLASS =============
@@ -163,13 +171,13 @@ export class BoardStore implements vscode.Disposable {
     // ============= UNDO/REDO =============
 
     /**
-     * Save current board state for undo
+     * Save an UndoEntry to the undo stack
+     * This is the new primary method for saving undo state
      */
-    saveStateForUndo(board?: KanbanBoard): void {
-        const boardToSave = board ?? this._state.board;
-        if (!boardToSave || !boardToSave.valid) { return; }
+    saveUndoEntry(entry: UndoEntry): void {
+        if (!entry.board || !entry.board.valid) { return; }
 
-        this._state.undoStack.push(deepCloneBoard(boardToSave));
+        this._state.undoStack.push(entry);
         if (this._state.undoStack.length > this._maxUndoStackSize) {
             this._state.undoStack.shift();
         }
@@ -178,10 +186,23 @@ export class BoardStore implements vscode.Disposable {
     }
 
     /**
-     * Undo to previous state
-     * @returns The restored board, or null if nothing to undo
+     * Save current board state for undo (legacy method for compatibility)
+     * Creates an inferred UndoEntry without target metadata
+     * @deprecated Use saveUndoEntry with proper UndoCapture instead
      */
-    undo(): KanbanBoard | null {
+    saveStateForUndo(board?: KanbanBoard): void {
+        const boardToSave = board ?? this._state.board;
+        if (!boardToSave || !boardToSave.valid) { return; }
+
+        const entry = createLegacyUndoEntry(boardToSave);
+        this.saveUndoEntry(entry);
+    }
+
+    /**
+     * Undo to previous state
+     * @returns Object containing restored board and targets for targeted update
+     */
+    undo(): { board: KanbanBoard; targets: ResolvedTarget[] } | null {
         if (this._state.undoStack.length === 0) {
             vscode.window.showInformationMessage('Nothing to undo');
             return null;
@@ -189,23 +210,28 @@ export class BoardStore implements vscode.Disposable {
 
         const currentBoard = this._state.board;
         if (currentBoard && currentBoard.valid) {
-            this._state.redoStack.push(deepCloneBoard(currentBoard));
+            // Create a redo entry from current state
+            // We don't have target info for redo, so use inferred
+            this._state.redoStack.push(createLegacyUndoEntry(currentBoard));
         }
 
-        const restoredBoard = this._state.undoStack.pop()!;
-        this._state.board = restoredBoard;
+        const restoredEntry = this._state.undoStack.pop()!;
+        this._state.board = restoredEntry.board;
         this._state.cacheValid = true;
 
         this._sendUndoRedoStatus();
 
-        return restoredBoard;
+        return {
+            board: restoredEntry.board,
+            targets: restoredEntry.targets
+        };
     }
 
     /**
      * Redo to next state
-     * @returns The restored board, or null if nothing to redo
+     * @returns Object containing restored board and targets for targeted update
      */
-    redo(): KanbanBoard | null {
+    redo(): { board: KanbanBoard; targets: ResolvedTarget[] } | null {
         if (this._state.redoStack.length === 0) {
             vscode.window.showInformationMessage('Nothing to redo');
             return null;
@@ -213,16 +239,20 @@ export class BoardStore implements vscode.Disposable {
 
         const currentBoard = this._state.board;
         if (currentBoard && currentBoard.valid) {
-            this._state.undoStack.push(deepCloneBoard(currentBoard));
+            // Create an undo entry from current state
+            this._state.undoStack.push(createLegacyUndoEntry(currentBoard));
         }
 
-        const restoredBoard = this._state.redoStack.pop()!;
-        this._state.board = restoredBoard;
+        const restoredEntry = this._state.redoStack.pop()!;
+        this._state.board = restoredEntry.board;
         this._state.cacheValid = true;
 
         this._sendUndoRedoStatus();
 
-        return restoredBoard;
+        return {
+            board: restoredEntry.board,
+            targets: restoredEntry.targets
+        };
     }
 
     /**

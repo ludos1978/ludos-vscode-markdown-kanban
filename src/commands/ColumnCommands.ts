@@ -34,6 +34,7 @@ import { safeFileUri } from '../utils/uriUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownFile } from '../files/MarkdownFile';
+import { ColumnActions } from '../actions';
 
 /**
  * Column Commands Handler
@@ -270,10 +271,10 @@ ${tasksContent}`;
             }
         } else {
             // Regular title edit without include syntax
-            await this.performBoardAction(
+            await this.executeAction(
                 context,
-                () => context.boardOperations.editColumnTitle(currentBoard, columnId, newTitle),
-                { sendUpdate: false }
+                ColumnActions.updateTitle(columnId, newTitle),
+                { sendUpdates: false }
             );
 
             context.setEditingInProgress(false);
@@ -286,45 +287,33 @@ ${tasksContent}`;
      * Handle addColumn message
      */
     private async handleAddColumn(message: AddColumnMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.addColumn(
-                context.getCurrentBoard()!,
-                message.title
-            )
+            ColumnActions.add({ title: message.title })
         );
-        return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to add column');
     }
 
     /**
      * Handle deleteColumn message
      */
     private async handleDeleteColumn(message: DeleteColumnMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.deleteColumn(
-                context.getCurrentBoard()!,
-                message.columnId
-            )
+            ColumnActions.remove(message.columnId)
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to delete column');
     }
 
     /**
      * Handle moveColumn message
      */
     private async handleMoveColumn(message: MoveColumnMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveColumn(
-                context.getCurrentBoard()!,
-                message.fromIndex,
-                message.toIndex,
-                message.fromRow,
-                message.toRow
-            )
+            ColumnActions.move(message.fromIndex, message.toIndex)
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move column');
     }
 
     /**
@@ -364,45 +353,33 @@ ${tasksContent}`;
      * Handle insertColumnBefore message
      */
     private async handleInsertColumnBefore(message: InsertColumnBeforeMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.insertColumnBefore(
-                context.getCurrentBoard()!,
-                message.columnId,
-                message.title
-            )
+            ColumnActions.insertBefore(message.columnId, message.title)
         );
-        return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to insert column');
     }
 
     /**
      * Handle insertColumnAfter message
      */
     private async handleInsertColumnAfter(message: InsertColumnAfterMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.insertColumnAfter(
-                context.getCurrentBoard()!,
-                message.columnId,
-                message.title
-            )
+            ColumnActions.insertAfter(message.columnId, message.title)
         );
-        return this.success();
+        return result.success ? this.success(result.result) : this.failure(result.error || 'Failed to insert column');
     }
 
     /**
      * Handle sortColumn message
      */
     private async handleSortColumn(message: SortColumnMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.sortColumn(
-                context.getCurrentBoard()!,
-                message.columnId,
-                message.sortType
-            )
+            ColumnActions.sortTasks(message.columnId, message.sortType)
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to sort column');
     }
 
     /**

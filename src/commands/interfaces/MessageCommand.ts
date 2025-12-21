@@ -20,6 +20,7 @@ import { WebviewBridge } from '../../core/bridge/WebviewBridge';
 import { NewExportOptions } from '../../services/export/ExportService';
 import { CapturedEdit } from '../../files/FileInterfaces';
 import { BoardChangeTrigger } from '../../core/events';
+import { ActionExecutor, BoardAction, ExecuteOptions, ActionResult } from '../../actions';
 import * as vscode from 'vscode';
 
 /**
@@ -315,5 +316,35 @@ export abstract class BaseMessageCommand implements MessageCommand {
         }
 
         return success;
+    }
+
+    /**
+     * Execute a board action using the action system.
+     * Actions declare their targets for proper undo/redo handling and targeted updates.
+     *
+     * @param context - Command execution context
+     * @param action - The action to execute
+     * @param options - Optional execution options
+     * @returns Action result with success status
+     */
+    protected async executeAction<T>(
+        context: CommandContext,
+        action: BoardAction<T>,
+        options?: ExecuteOptions
+    ): Promise<ActionResult<T>> {
+        const webviewBridge = context.getWebviewBridge();
+        if (!webviewBridge) {
+            return { success: false, error: 'No webview bridge available' };
+        }
+
+        const executor = new ActionExecutor({
+            getBoard: () => context.getCurrentBoard(),
+            setBoard: (board) => context.setBoard(board),
+            boardStore: context.boardStore,
+            webviewBridge,
+            emitBoardChanged: (board, trigger) => context.emitBoardChanged(board, trigger)
+        });
+
+        return executor.execute(action, options);
     }
 }
