@@ -18,3 +18,6 @@ export { IncludeFileCoordinator, IncludeCoordinatorDependencies } from './Includ
 
 // Webview Management (Phase 3)
 export { WebviewManager, WebviewManagerDependencies } from './WebviewManager';
+
+// Handler Lifecycle (Phase 4)
+export { HandlerRegistry, RegisteredHandlers } from './HandlerRegistry';
