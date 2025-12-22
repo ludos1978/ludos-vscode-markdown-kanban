@@ -1884,6 +1884,10 @@ function renderMarkdown(text, includeContext) {
                 const normalizedPath = '/' + originalSrc.replace(/\\/g, '/');
                 const encodedPath = encodeURI(normalizedPath);
                 displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
+            } else if (originalSrc && originalSrc.startsWith('/')) {
+                // Unix absolute path (/Users/...) - convert to webview URI
+                const encodedPath = encodeURI(originalSrc);
+                displaySrc = `https://file%2B.vscode-resource.vscode-cdn.net${encodedPath}`;
             }
 
             // Store original src for click handling

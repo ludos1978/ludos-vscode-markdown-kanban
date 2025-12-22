@@ -55,14 +55,19 @@ export class WebviewManager {
         const currentPaths = new Set(currentRoots.map(r => r.toString()));
         const newPaths = new Set(localResourceRoots.map(r => r.toString()));
 
+        console.log(`[WebviewManager] updatePermissions: currentRoots=${currentRoots.length}, newRoots=${localResourceRoots.length}`);
+        console.log(`[WebviewManager] updatePermissions: current paths:`, [...currentPaths]);
+        console.log(`[WebviewManager] updatePermissions: new paths:`, [...newPaths]);
+
         const hasChanges = currentPaths.size !== newPaths.size ||
             [...newPaths].some(p => !currentPaths.has(p));
 
         if (!hasChanges) {
-            console.log('[WebviewManager] updatePermissions: no changes, skipping');
+            console.log('[WebviewManager] updatePermissions: no changes, skipping HTML reload');
             return;
         }
 
+        console.log('[WebviewManager] updatePermissions: changes detected, updating options');
         panel.webview.options = {
             enableScripts: true,
             localResourceRoots: localResourceRoots,
@@ -71,7 +76,7 @@ export class WebviewManager {
 
         // Only reload HTML if initialized (to apply new permissions)
         if (this._deps.isInitialized()) {
-            console.log('[WebviewManager] updatePermissions: permissions changed, reloading HTML');
+            console.log('[WebviewManager] updatePermissions: reloading HTML');
             panel.webview.html = this._deps.getHtmlForWebview();
         }
     }
@@ -79,7 +84,6 @@ export class WebviewManager {
     /**
      * Update webview permissions to include asset directories from the board
      * Called before sending board updates to ensure all assets can be loaded
-     * Only adds new paths (never removes), does NOT reload HTML (would lose pending messages)
      */
     updatePermissionsForAssets(): void {
         const panel = this._deps.getPanel();
@@ -87,35 +91,19 @@ export class WebviewManager {
 
         const localResourceRoots = this._buildLocalResourceRoots(true);
 
-        // Check if there are new paths to add
-        const currentRoots = panel.webview.options.localResourceRoots || [];
-        const currentPaths = new Set(currentRoots.map(r => r.toString()));
+        // Debug: log what roots we're setting
+        console.log(`[WebviewManager] updatePermissionsForAssets: setting ${localResourceRoots.length} roots:`);
+        localResourceRoots.forEach((root, i) => {
+            console.log(`  [${i}] ${root.fsPath}`);
+        });
 
-        // Find new paths that aren't already in current roots
-        const newRoots: vscode.Uri[] = [];
-        for (const root of localResourceRoots) {
-            if (!currentPaths.has(root.toString())) {
-                newRoots.push(root);
-            }
-        }
-
-        if (newRoots.length === 0) {
-            // No new paths, nothing to do
-            return;
-        }
-
-        // Merge: keep all current paths + add new ones
-        const mergedRoots = [...currentRoots, ...newRoots];
-
-        // Just update options - VS Code applies new localResourceRoots to subsequent requests
-        // Do NOT reload HTML here - that would cause the board update message to be lost
+        // Set options with all required roots (workspace + document + assets)
+        // Do NOT reload HTML - just update options before sending board update
         panel.webview.options = {
             enableScripts: true,
-            localResourceRoots: mergedRoots,
+            localResourceRoots: localResourceRoots,
             enableCommandUris: true
         };
-
-        console.log(`[WebviewManager] updatePermissionsForAssets: added ${newRoots.length} new asset directories (no HTML reload)`);
     }
 
     /**
