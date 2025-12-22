@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 
-import { MarkdownKanbanParser, KanbanBoard } from './markdownParser';
+import { KanbanBoard } from './markdownParser';
 import { FileManager } from './fileManager';
-import { BoardOperations, BoardCrudOperations } from './board';
+import { BoardOperations } from './board';
 import { LinkHandler } from './services/LinkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './services/BackupManager';
@@ -19,7 +18,7 @@ import {
     FileChangeEvent
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
-import { BoardStore, UndoCapture } from './core/stores';
+import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
@@ -502,9 +501,6 @@ export class KanbanWebviewPanel {
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
-    // NOTE: handleLinkReplacement has been moved to LinkReplacementHandler
-    // It now receives 'link:replace-requested' events via EventBus
-
     /**
      * Setup listener for document close events to handle graceful degradation
      */
@@ -717,9 +713,6 @@ export class KanbanWebviewPanel {
         this._restoreStateFromFileService();
     }
 
-    // NOTE: _getHtmlForWebview has been moved to WebviewManager.generateHtml()
-    // NOTE: _initializeBoardFromDocument has been moved to BoardInitializationHandler
-
     /**
      * Initialize board from document - delegates to BoardInitializationHandler
      */
@@ -787,11 +780,8 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * PUBLIC API: Handle include file switch triggered by user edit (column/task title)
-     * Routes through the unified change state machine (Phase 6)
-     * Changes always apply - use undo to revert if needed
-     *
-     * @param params Switch parameters (columnId or taskId with old/new files)
+     * Handle include file switch triggered by user edit (column/task title)
+     * Delegates to IncludeFileCoordinator
      */
     public async handleIncludeSwitch(params: {
         columnId?: string;
@@ -799,39 +789,13 @@ export class KanbanWebviewPanel {
         oldFiles: string[];
         newFiles: string[];
         newTitle?: string;
-        /** Pre-loaded content for include files (bypasses registry caching) */
         preloadedContent?: Map<string, string>;
     }): Promise<void> {
-        // Delegate to include coordinator
         return this._includeCoordinator.handleIncludeSwitch(params);
     }
 
     /**
-     * SWITCH-1: UNIFIED COLUMN INCLUDE SWITCH
-     *
-     * Single unified function for ALL column include file switching operations.
-     * This is THE ONLY way to switch column include files - ensures consistency.
-     *
-     * Complete flow in ONE place:
-     * 1. Save undo state (via board action)
-     * 2. Prompt for unsaved changes in old files
-     * 3. Cleanup old files (stopWatching + unregister)
-     * 4. Update board state (title + includeFiles)
-     * 5. Register new file instances
-     * 6. Load new content (with FOUNDATION-2 cancellation)
-     * 7. Send updateColumnContent to frontend
-     * 8. Send full boardUpdate
-     * 9. Mark unsaved changes
-     *
-     * @param columnId The column ID to update
-     * @param oldFiles Array of old include file paths (for cleanup)
-     * @param newFiles Array of new include file paths (to load)
-     * @param newTitle The new column title (contains !!!include()!!! syntax)
-     * @param onComplete Optional callback when all async operations complete (RACE-1 fix)
-     * @throws Error if column not found or user cancels
-     */
-    /**
-     * Handle file registry change events - ROUTES TO UNIFIED HANDLER
+     * Handle file registry change events
      */
     private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
 
@@ -906,13 +870,6 @@ export class KanbanWebviewPanel {
             await this._webviewUpdateService.refreshAllConfiguration();
         }
     }
-
-    // NOTE: The following functions have been migrated to event handlers/services:
-    // - _updateMediaTrackingFromIncludes() → BoardSyncHandler (handles 'board:loaded')
-    // - _checkMediaFilesForChanges() → FileSyncHandler (handles 'focus:gained')
-    // - _checkIncludeFilesForExternalChanges() → FileSyncHandler (handles 'focus:gained')
-    //
-    // INIT and FOCUS pathways now use the same unified code path in FileSyncHandler.
 
     /**
      * Get board (single source of truth)
