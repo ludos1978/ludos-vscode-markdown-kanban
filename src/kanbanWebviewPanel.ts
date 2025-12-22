@@ -9,7 +9,7 @@ import { MessageHandler } from './messageHandler';
 import { BackupManager } from './services/BackupManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './services/ConflictResolver';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
-import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
+import { KanbanFileService } from './kanbanFileService';
 import { MediaTracker } from './services/MediaTracker';
 import { getErrorMessage } from './utils/stringUtils';
 import {
@@ -50,59 +50,34 @@ export class KanbanWebviewPanel {
     private _extensionContext: vscode.ExtensionContext;
     private _disposables: vscode.Disposable[] = [];
 
-    // Main components
     private _fileManager: FileManager;
     private _boardOperations: BoardOperations;
     private _linkHandler: LinkHandler;
     private _messageHandler: MessageHandler;
-
     private _backupManager: BackupManager;
     private _fileService: KanbanFileService;
-
-    // File abstraction system
     private _fileRegistry: MarkdownFileRegistry;
     private _fileFactory: FileFactory;
-
     private _stateMachine: ChangeStateMachine;
-
-    // Panel architecture components (Phase 1, 2 & 3)
-    private _context: PanelContext;  // Unified state: panel flags + document tracking
+    private _context: PanelContext;
     private _concurrency: ConcurrencyManager;
     private _includeCoordinator: IncludeFileCoordinator;
     private _webviewManager: WebviewManager;
-
-    // Public getter for backwards compatibility with external code
-    public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
-    public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
-
     private _conflictResolver: ConflictResolver;
-
-    // Media file change tracking (diagrams, images, audio, video)
     private _mediaTracker: MediaTracker | null = null;
-
     private _boardStore: BoardStore;
     private _webviewBridge: WebviewBridge;
-
-    // Handler registry manages all event handlers and services
     private _handlerRegistry: HandlerRegistry;
 
-    // Public getter for webview to allow proper access from messageHandler
-    public get webview(): vscode.Webview {
-        return this._panel.webview;
-    }
+    public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
+    public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
+    public get webview(): vscode.Webview { return this._panel.webview; }
 
-    // Method to force refresh webview content (useful during development)
     public async refreshWebviewContent() {
-        const board = this.getBoard();
-        if (this._panel && board) {
-            // Reset webviewReady since HTML reload will create new webview context
-            this._context.setWebviewReady(false);
-
-            this._panel.webview.html = this._webviewManager.generateHtml();
-
-            // Queue board update - will be sent when webview sends 'webviewReady'
-            this.sendBoardUpdate(false, true);
-        }
+        if (!this._panel || !this.getBoard()) return;
+        this._context.setWebviewReady(false);
+        this._panel.webview.html = this._webviewManager.generateHtml();
+        this.sendBoardUpdate(false, true);
     }
 
     public static createOrShow(extensionUri: vscode.Uri, context: vscode.ExtensionContext, document?: vscode.TextDocument) {
@@ -300,30 +275,28 @@ export class KanbanWebviewPanel {
         this._setupEventListeners();
         this._setupWorkspaceChangeListener();
         this._setupDocumentCloseListener();
+        this._registerHandlers();
+    }
 
+    private _registerHandlers(): void {
         this._handlerRegistry.registerBoardSync(new BoardSyncHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, getMediaTracker: () => this._mediaTracker,
             backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument()
         }));
-
         this._handlerRegistry.registerFileSync(new FileSyncHandler({
             fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,
             getWebviewBridge: () => this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context,
             sendBoardUpdate: (isFullRefresh, applyDefaultFolding) => this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         }));
-
         this._handlerRegistry.registerLinkReplacement(new LinkReplacementHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard()
         }));
-
         this._handlerRegistry.registerUnsavedChanges(new UnsavedChangesService(this._fileRegistry));
-
         this._handlerRegistry.registerWebviewUpdate(new WebviewUpdateService({
             boardStore: this._boardStore, webviewBridge: this._webviewBridge, fileRegistry: this._fileRegistry,
             webviewManager: this._webviewManager, panelContext: this._context, getBoard: () => this.getBoard(), hasPanel: () => !!this._panel
         }));
-
         this._handlerRegistry.registerBoardInit(new BoardInitializationHandler({
             fileRegistry: this._fileRegistry, fileFactory: this._fileFactory, includeCoordinator: this._includeCoordinator,
             panelContext: this._context, getFileSyncHandler: () => this._handlerRegistry.getFileSync(),
@@ -404,15 +377,16 @@ export class KanbanWebviewPanel {
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
-        } else if (wasAlreadyReady) {
-            // Webview was recreated - re-send state
-            const board = this.getBoard();
-            if (!board || !board.valid || this._context.initialBoardLoad) return;
-
-            this._fileManager.sendFileInfo();
-            this.sendBoardUpdate(false, true);
-            this._boardStore.resendUndoRedoStatus();
+            return;
         }
+        if (!wasAlreadyReady) return;
+
+        const board = this.getBoard();
+        if (!board?.valid || this._context.initialBoardLoad) return;
+
+        this._fileManager.sendFileInfo();
+        this.sendBoardUpdate(false, true);
+        this._boardStore.resendUndoRedoStatus();
     }
 
     private async _ensureBoardAndSendUpdate() {
