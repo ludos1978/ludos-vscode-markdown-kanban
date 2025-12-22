@@ -304,9 +304,19 @@ export class BoardStore implements vscode.Disposable {
     }
 
     /**
+     * Get undo stack size (for debugging)
+     */
+    getUndoStackSize(): number {
+        return this._state.undoStack.length;
+    }
+
+    /**
      * Clear undo/redo history
      */
     clearHistory(): void {
+        const stackTrace = new Error().stack?.split('\n').slice(2, 5).join(' <- ') || 'unknown';
+        console.log(`[BoardStore] clearHistory: clearing ${this._state.undoStack.length} undo entries, ${this._state.redoStack.length} redo entries`);
+        console.log(`[BoardStore] clearHistory from: ${stackTrace}`);
         this._state.undoStack = [];
         this._state.redoStack = [];
         this._sendUndoRedoStatus();
@@ -322,12 +332,22 @@ export class BoardStore implements vscode.Disposable {
         }
     }
 
+    /**
+     * Resend undo/redo status to the webview
+     * Called when webview is recreated to re-sync the canUndo/canRedo state
+     */
+    resendUndoRedoStatus(): void {
+        console.log(`[BoardStore] resendUndoRedoStatus: canUndo=${this.canUndo()}, canRedo=${this.canRedo()}, stackSize=${this._state.undoStack.length}`);
+        this._sendUndoRedoStatus();
+    }
+
     // ============= LIFECYCLE =============
 
     /**
      * Dispose the store
      */
     dispose(): void {
+        console.log(`[BoardStore] dispose: clearing ${this._state.undoStack.length} undo entries, ${this._state.redoStack.length} redo entries`);
         this._state.undoStack = [];
         this._state.redoStack = [];
         this._state.dirtyColumns.clear();

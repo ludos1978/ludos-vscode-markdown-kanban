@@ -1244,6 +1244,17 @@ function setupGlobalDragAndDrop() {
             return;
         }
 
+        // Capture undo state BEFORE modifying the board
+        // Column drops modify order, row tags, and #stack tags - all need to be undoable
+        if (window.cachedBoard) {
+            vscode.postMessage({
+                type: 'saveUndoState',
+                operation: 'moveColumnViaDrag',
+                columnId: columnId,
+                currentBoard: window.cachedBoard
+            });
+        }
+
         // dragLogger.always('[processColumnDrop] Processing column drop');
 
         // PERFORMANCE: Move column to drop target NOW (was stored during dragover)
@@ -1439,6 +1450,14 @@ function setupGlobalDragAndDrop() {
             });
             return false;
         }
+
+        // Capture undo state BEFORE modifying the board
+        // Column insertion modifies columns array, row tags, and #stack tags - all need to be undoable
+        vscode.postMessage({
+            type: 'saveUndoState',
+            operation: 'insertColumnAtPosition',
+            currentBoard: window.cachedBoard
+        });
 
         // Step 1: Save target info BEFORE render destroys DOM references
         const targetStackFirstColId = dragState.dropTargetStack.querySelector('.kanban-full-height-column')?.dataset?.columnId;
@@ -2560,6 +2579,17 @@ function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null
             return;
         }
 
+        // Capture undo state BEFORE modifying the board
+        // This is a cache-first operation, so we need to explicitly save undo state
+        const taskCount = window.cachedBoard.columns.reduce((sum, c) => sum + (c.tasks?.length || 0), 0);
+        console.log(`[DragDrop] createTasksWithContent: sending saveUndoState with taskCount=${taskCount}`);
+        vscode.postMessage({
+            type: 'saveUndoState',
+            operation: 'createTasksFromDrop',
+            columnId: targetColumnId,
+            currentBoard: window.cachedBoard
+        });
+
         // Create all tasks at once
         const newTasks = tasksData.map((taskData, index) => ({
             id: `temp-drop-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2577,8 +2607,10 @@ function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null
         } else {
             targetColumn.tasks.push(...newTasks);
         }
+        const newTaskCount = window.cachedBoard.columns.reduce((sum, c) => sum + (c.tasks?.length || 0), 0);
+        console.log(`[DragDrop] createTasksWithContent: after adding ${newTasks.length} task(s), newTaskCount=${newTaskCount}`);
 
-        // Mark as unsaved changes
+        // Mark as unsaved changes (syncs modified board to backend)
         if (typeof markUnsavedChanges === 'function') {
             markUnsavedChanges();
         }

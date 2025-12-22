@@ -109,6 +109,9 @@ export class KanbanWebviewPanel {
             // Reset webviewReady since HTML reload will create new webview context
             this._context.setWebviewReady(false);
 
+            const stackTrace = new Error().stack?.split('\n').slice(2, 6).join('\n') || 'unknown';
+            console.log(`[WEBVIEW RELOAD] refreshWebviewContent() called from:\n${stackTrace}`);
+            vscode.window.showWarningMessage('[WEBVIEW RELOAD] refreshWebviewContent() - see console for stack trace');
             this._panel.webview.html = this._getHtmlForWebview();
 
             // Queue board update - will be sent when webview sends 'webviewReady'
@@ -659,6 +662,9 @@ export class KanbanWebviewPanel {
             // During panel revival, VS Code's cached webview may have already sent webviewReady
             // before we replace the HTML. This ensures we wait for the NEW webview's ready message.
             this._context.setWebviewReady(false);
+            const stackTrace = new Error().stack?.split('\n').slice(2, 6).join('\n') || 'unknown';
+            console.log(`[WEBVIEW RELOAD] _initialize() called from:\n${stackTrace}`);
+            vscode.window.showInformationMessage('[WEBVIEW RELOAD] _initialize() - see console for stack trace');
             this._panel.webview.html = this._getHtmlForWebview();
             this._context.setInitialized(true);
         }
@@ -772,13 +778,18 @@ export class KanbanWebviewPanel {
                 return;
             }
 
-            console.log('[WebviewReady] Webview was recreated by VS Code - re-sending all state');
+            const stackTrace = new Error().stack?.split('\n').slice(2, 6).join('\n') || 'unknown';
+            console.log(`[WEBVIEW RELOAD] VS Code recreated webview, detected in _handleWebviewReady:\n${stackTrace}`);
+            vscode.window.showErrorMessage('[WEBVIEW RELOAD] VS Code recreated webview! - see console for details');
 
             // 1. File info (filename, path, locked status)
             this._fileManager.sendFileInfo();
 
             // 2. Full board update (includes _refreshAllViewConfiguration internally)
             this.sendBoardUpdate(false, true);
+
+            // 3. Undo/redo status - CRITICAL: webview's canUndo/canRedo variables reset to false on recreation
+            this._boardStore.resendUndoRedoStatus();
         }
     }
 

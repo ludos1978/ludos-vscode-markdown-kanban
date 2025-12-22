@@ -1588,15 +1588,18 @@ function cleanupRowTags() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[WEBVIEW INIT] DOMContentLoaded fired, webviewEventListenersInitialized=' + webviewEventListenersInitialized);
     // MEMORY SAFETY: Skip initialization if already done (prevents duplicate listeners on webview revival)
     if (webviewEventListenersInitialized) {
         // Still send ready message and setup drag/drop (idempotent operations)
+        console.log('[WEBVIEW INIT] REVIVAL PATH - sending webviewReady (already initialized)');
         vscode.postMessage({ type: 'webviewReady' });
         vscode.postMessage({ type: 'requestFileInfo' });
         setupDragAndDrop();
         return;
     }
     webviewEventListenersInitialized = true;
+    console.log('[WEBVIEW INIT] FIRST INIT - setting webviewEventListenersInitialized=true');
 
     // Request available Marp classes on load
     vscode.postMessage({
@@ -1798,11 +1801,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Notify backend that webview is ready to receive messages
     // This implements request-response pattern - backend queues board updates until this is received
+    console.log('[WEBVIEW INIT] END OF FIRST INIT - sending webviewReady');
     vscode.postMessage({ type: 'webviewReady' });
     vscode.postMessage({ type: 'requestFileInfo' });
 
     // Setup drag and drop
     setupDragAndDrop();
+    console.log('[WEBVIEW INIT] DOMContentLoaded handler complete');
 });
 
 // Helper function to check if we're currently in editing mode
@@ -2305,6 +2310,7 @@ if (!webviewEventListenersInitialized) {
             }
             break;
         case 'undoRedoStatus':
+            console.log(`[Webview] undoRedoStatus received: canUndo=${message.canUndo}, canRedo=${message.canRedo}`);
             canUndo = message.canUndo;
             canRedo = message.canRedo;
             updateUndoRedoButtons();
@@ -3624,12 +3630,16 @@ document.addEventListener('keydown', (e) => {
  * Side effects: Sends undo message to VS Code
  */
 function undo() {
+    console.log(`[Webview] undo() called: canUndo=${canUndo}`);
     if (canUndo) {
         try {
             vscode.postMessage({ type: 'undo' });
+            console.log('[Webview] undo message sent to backend');
         } catch (error) {
-            // Silently handle error
+            console.error('[Webview] undo failed:', error);
         }
+    } else {
+        console.log('[Webview] undo blocked: canUndo is false');
     }
 }
 

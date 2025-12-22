@@ -91,6 +91,7 @@ export class UICommands extends BaseMessageCommand {
      * Handle undo command
      */
     private async handleUndo(context: CommandContext): Promise<CommandResult> {
+        console.log(`[UICommands] handleUndo: canUndo=${context.boardStore.canUndo()}, stackSize=${context.boardStore.getUndoStackSize()}`);
         context.setUndoRedoOperation(true);
 
         const result = context.boardStore.undo();
