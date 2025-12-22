@@ -21,7 +21,7 @@ import {
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore, UndoCapture } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
+import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
 import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
@@ -90,6 +90,7 @@ export class KanbanWebviewPanel {
     private _linkReplacementHandler: LinkReplacementHandler | null = null;
     private _unsavedChangesService: UnsavedChangesService | null = null;
     private _webviewUpdateService: WebviewUpdateService | null = null;
+    private _boardInitHandler: BoardInitializationHandler | null = null;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -474,6 +475,30 @@ export class KanbanWebviewPanel {
             hasPanel: () => !!this._panel
         });
 
+        // Initialize BoardInitializationHandler (extracted board init logic)
+        this._boardInitHandler = new BoardInitializationHandler({
+            fileRegistry: this._fileRegistry,
+            fileFactory: this._fileFactory,
+            includeCoordinator: this._includeCoordinator,
+            panelContext: this._context,
+            getFileSyncHandler: () => this._fileSyncHandler,
+            getBoard: () => this.getBoard(),
+            getPanel: () => this._panel,
+            onMediaChanged: (changedFiles) => {
+                // Send changed file paths to frontend for selective re-rendering
+                if (this._panel) {
+                    this._panel.webview.postMessage({
+                        type: 'mediaFilesChanged',
+                        changedFiles: changedFiles.map(f => ({
+                            path: f.path,
+                            absolutePath: f.absolutePath,
+                            type: f.type
+                        }))
+                    });
+                }
+            }
+        });
+
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
@@ -693,128 +718,26 @@ export class KanbanWebviewPanel {
     }
 
     // NOTE: _getHtmlForWebview has been moved to WebviewManager.generateHtml()
-    // It is now called via this._webviewManager.generateHtml()
+    // NOTE: _initializeBoardFromDocument has been moved to BoardInitializationHandler
 
     /**
-     * Initialize board from document - creates MainKanbanFile and registers include files
+     * Initialize board from document - delegates to BoardInitializationHandler
      */
     private async _initializeBoardFromDocument(document: vscode.TextDocument): Promise<void> {
-        const filePath = document.uri.fsPath;
-
-        // Check if MainKanbanFile already exists
-        let mainFile = this._fileRegistry.getMainFile();
-
-        if (!mainFile || mainFile.getPath() !== filePath) {
-            // Clear existing files if switching to a different file
-            if (mainFile && mainFile.getPath() !== filePath) {
-                this._fileRegistry.clear();
-            }
-
-            // Create new MainKanbanFile instance
-            mainFile = this._fileFactory.createMainFile(filePath);
-            this._fileRegistry.register(mainFile);
-            mainFile.startWatching();
+        if (!this._boardInitHandler) {
+            console.error('[KanbanWebviewPanel] BoardInitializationHandler not initialized');
+            return;
         }
 
-        // Load content into file instance directly from document/disk
-        try {
-            await mainFile.reload();
-        } catch (error) {
-            console.error(`[KanbanWebviewPanel] Failed to load MainKanbanFile content:`, error);
-        }
+        const result = await this._boardInitHandler.initializeFromDocument(
+            document,
+            this._mediaTracker
+        );
 
-        // Initialize MediaTracker for this kanban file
-        // Tracks modification times of embedded media (images, diagrams, audio, video)
-        // IMPORTANT: Dispose old tracker before creating new one to cleanup file watchers
-        if (this._mediaTracker) {
-            console.log('[MediaTracker] Disposing old MediaTracker before creating new one');
-            this._mediaTracker.dispose();
-            this._mediaTracker = null;
-        }
-        console.log(`[MediaTracker] Creating new MediaTracker for: ${filePath}`);
-        this._mediaTracker = new MediaTracker(filePath);
-
-        // Set up callback for real-time media file change detection
-        this._mediaTracker.setOnMediaChanged((changedFiles) => {
-            console.log(`[MediaTracker] Real-time change detected for ${changedFiles.length} file(s):`,
-                changedFiles.map(f => f.path));
-
-            // Send changed file paths to frontend for selective re-rendering
-            if (this._panel) {
-                this._panel.webview.postMessage({
-                    type: 'mediaFilesChanged',
-                    changedFiles: changedFiles.map(f => ({
-                        path: f.path,
-                        absolutePath: f.absolutePath,
-                        type: f.type
-                    }))
-                });
-            }
-        });
-
-        // Update tracked media files from current content
-        const content = mainFile.getContent();
-        console.log(`[MediaTracker] Main file content length: ${content?.length || 0}`);
-        if (content) {
-            const trackedFiles = this._mediaTracker.updateTrackedFiles(content);
-            console.log(`[MediaTracker] Tracking ${trackedFiles.length} media files from main file`);
-        } else {
-            console.warn(`[MediaTracker] No content from main file - skipping media tracking`);
-        }
-
-        // Setup file watchers for diagram files (real-time change detection)
-        this._mediaTracker.setupFileWatchers();
-
-        // NOTE: Media tracking updates are handled by BoardSyncHandler
-        // which handles board:changed events. This is more reliable than
-        // event listeners and ensures new diagrams get watchers immediately.
-
-        // Load include files if board is available
-        const board = this.getBoard();
-        if (board && board.valid) {
-            // Step 1: Create include file instances in registry
-            this._includeCoordinator.registerBoardIncludeFiles(board);
-
-            // Step 2: Load include content using the UNIFIED FileSyncHandler
-            // This is the SAME code path used by FOCUS (focus:gained event)
-            // The only difference is force=true (load all) vs force=false (check and reload changed)
-            // NOTE: _isInitialBoardLoad flag already set in loadMarkdownFile()
-            // CRITICAL: Must await to hold lock and prevent duplicate initialization from editor focus events
-            // CRITICAL: skipBoardUpdate=true because loadMarkdownFile() already sent the board update
-            if (this._fileSyncHandler) {
-                try {
-                    await this._fileSyncHandler.reloadExternallyModifiedFiles({ force: true, skipBoardUpdate: true });
-                    console.log('[_initializeBoardFromDocument] Include files loaded via FileSyncHandler (unified path)');
-                } catch (error) {
-                    console.error('[_initializeBoardFromDocument] Error loading include content:', error);
-                } finally {
-                    this._context.setInitialBoardLoad(false);
-                }
-            } else {
-                console.warn('[_initializeBoardFromDocument] FileSyncHandler not available');
-                this._context.setInitialBoardLoad(false);
-            }
-        } else {
-            console.warn(`[_initializeBoardFromDocument] Skipping include file sync - board not available or invalid`);
-            this._context.setInitialBoardLoad(false);
-        }
+        // Store the returned MediaTracker
+        this._mediaTracker = result.mediaTracker;
     }
 
-    /**
-     * UNIFIED CONTENT CHANGE HANDLER (State Machine Integrated)
-     *
-     * Single entry point for ALL content changes (external, edits, switches)
-     *
-     * Flow: STABLE → DETECTING_CHANGES → ANALYZING → COORDINATING_INCLUDES → UPDATING_UI → STABLE
-     *
-     * Benefits:
-     * - State tracking for debugging
-     * - Race condition prevention via coordinator locking (replaces _withLock)
-     * - Rollback capability on errors
-     * - Change type metadata tracking
-     *
-     * NOTE: This does NOT save files - saving is separate, user-triggered
-     */
     /**
      * Set editing in progress flag to block board regenerations
      */
