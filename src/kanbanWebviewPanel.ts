@@ -14,13 +14,12 @@ import { MediaTracker } from './services/MediaTracker';
 import { getErrorMessage } from './utils/stringUtils';
 import {
     MarkdownFileRegistry,
-    FileFactory,
-    FileChangeEvent
+    FileFactory
 } from './files';
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
+import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitializationHandler, FileRegistryChangeHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
 import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
@@ -90,6 +89,7 @@ export class KanbanWebviewPanel {
     private _unsavedChangesService: UnsavedChangesService | null = null;
     private _webviewUpdateService: WebviewUpdateService | null = null;
     private _boardInitHandler: BoardInitializationHandler | null = null;
+    private _fileRegistryChangeHandler: FileRegistryChangeHandler | null = null;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -352,12 +352,17 @@ export class KanbanWebviewPanel {
             isInitialized: () => this._context.initialized
         });
 
-        // Subscribe to registry change events
-        this._disposables.push(
-            this._fileRegistry.onDidChange((event) => {
-                this._handleFileRegistryChange(event);
-            })
-        );
+        // Initialize FileRegistryChangeHandler (extracted file registry change logic)
+        this._fileRegistryChangeHandler = new FileRegistryChangeHandler({
+            fileRegistry: this._fileRegistry,
+            boardStore: this._boardStore,
+            panelContext: this._context,
+            concurrencyManager: this._concurrency,
+            includeCoordinator: this._includeCoordinator,
+            getBoard: () => this.getBoard(),
+            invalidateBoardCache: () => this.invalidateBoardCache(),
+            sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh)
+        });
 
         // Initialize KanbanFileService with grouped callbacks
         const fileServiceCallbacks: KanbanFileServiceCallbacks = {
@@ -795,73 +800,6 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Handle file registry change events
-     */
-    private async _handleFileRegistryChange(event: FileChangeEvent): Promise<void> {
-
-        const file = event.file;
-        const fileType = file.getFileType();
-
-        // CRITICAL: Only route EXTERNAL changes to unified handler
-        // 'content' events are internal cache updates from user edits - DON'T reload!
-        // 'external' events are from file watchers - DO reload!
-        // 'reloaded' events are explicit reload requests - DO reload!
-        if (event.changeType === 'content' || event.changeType === 'saved') {
-            // Internal cache update - do NOT trigger reload
-            return;
-        }
-
-        // UNIFIED APPROACH: All files (main + includes) handle external changes autonomously
-        // 'external' events → File's handleExternalChange() handles it → emits 'reloaded'
-        // 'reloaded' events → Update frontend
-
-        if (event.changeType === 'external') {
-            // All files handle external changes independently via handleExternalChange()
-            // They will show dialogs, reload, and emit 'reloaded' event
-            // We just wait for the 'reloaded' event to update frontend
-            return;
-        }
-
-        // Handle 'reloaded' events for all file types
-        if (fileType === 'main') {
-            if (event.changeType === 'reloaded') {
-                // CRITICAL: Skip 'reloaded' events during initial board load
-                if (this._context.initialBoardLoad) {
-                    return;
-                }
-
-                // Main file reloaded from disk, regenerate board and update frontend
-                this.invalidateBoardCache();
-                const board = this.getBoard();
-                if (board) {
-                    // Use sendBoardUpdate to ensure image mappings are regenerated
-                    await this.sendBoardUpdate(false, true);
-                }
-            }
-        } else if (fileType === 'include-column' || fileType === 'include-task' || fileType === 'include-regular') {
-
-            if (event.changeType === 'reloaded') {
-                // CRITICAL: Skip 'reloaded' events during initial board load
-                // These are just loading content for the first time, not actual changes
-                if (this._context.initialBoardLoad) {
-                    return;
-                }
-
-                // RACE-3: Only process if this event is newer than last processed
-                // When multiple external changes happen rapidly, reloads can complete out of order.
-                // This ensures only the newest data is applied to the frontend.
-                if (!this._concurrency.isEventNewer(file.getRelativePath(), event.timestamp)) {
-                    return;
-                }
-
-                // File has been reloaded (either from external change or manual reload)
-                // Send updated content to frontend via coordinator
-                this._includeCoordinator.sendIncludeFileUpdateToFrontend(file);
-            }
-        }
-    }
-
-    /**
      * Refresh configuration - delegates to WebviewUpdateService
      * See WebviewUpdateService.refreshAllConfiguration() for implementation details
      */
@@ -1120,6 +1058,12 @@ export class KanbanWebviewPanel {
         if (this._webviewUpdateService) {
             this._webviewUpdateService.dispose();
             this._webviewUpdateService = null;
+        }
+
+        // Dispose file registry change handler
+        if (this._fileRegistryChangeHandler) {
+            this._fileRegistryChangeHandler.dispose();
+            this._fileRegistryChangeHandler = null;
         }
 
         // UnsavedChangesService doesn't need disposal (no subscriptions)

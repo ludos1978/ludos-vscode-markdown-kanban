@@ -32,3 +32,4 @@ export { FileSyncHandler, FileSyncDependencies, FileSyncOptions, FileSyncResult 
 // NEW: Event-driven handlers
 export { LinkReplacementHandler, LinkReplacementDependencies } from './LinkReplacementHandler';
 export { BoardInitializationHandler, BoardInitializationDependencies, BoardInitializationResult } from './BoardInitializationHandler';
+export { FileRegistryChangeHandler, FileRegistryChangeDependencies } from './FileRegistryChangeHandler';
