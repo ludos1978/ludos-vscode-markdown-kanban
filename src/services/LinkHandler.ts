@@ -5,21 +5,25 @@ import { FileManager, IncludeContextForResolution } from '../fileManager';
 import { FileSearchService } from '../fileSearchService';
 import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
+import { eventBus, createEvent, LinkReplaceRequestedEvent } from '../core/events';
 
 export class LinkHandler {
     private _fileManager: FileManager;
     private _fileSearchService: FileSearchService;
-    private _onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void>;
 
+    /**
+     * Constructor - now uses event-driven approach instead of callbacks
+     *
+     * Previously: received onRequestLinkReplacement callback
+     * Now: emits 'link:replace-requested' events via EventBus
+     */
     constructor(
         fileManager: FileManager,
-        _webview: vscode.Webview,
-        onRequestLinkReplacement: (originalPath: string, newPath: string, isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) => Promise<void>
+        _webview: vscode.Webview
     ) {
         this._fileManager = fileManager;
         // Provide extension root so FileSearchService can load icon assets
         this._fileSearchService = new FileSearchService(this._fileManager.getExtensionUri());
-        this._onRequestLinkReplacement = onRequestLinkReplacement;
     }
     /**
      * Enhanced file link handler with workspace-relative path support
@@ -255,6 +259,12 @@ export class LinkHandler {
         }
     }
 
+    /**
+     * Apply link replacement by emitting an event
+     *
+     * Previously: called _onRequestLinkReplacement callback
+     * Now: emits 'link:replace-requested' event via EventBus
+     */
     private async applyLinkReplacement(originalPath: string, replacementUri: vscode.Uri, taskId?: string, columnId?: string, linkIndex?: number) {
         const document = this._fileManager.getDocument();
         if (!document) {
@@ -278,8 +288,15 @@ export class LinkHandler {
                        originalPath.includes('.svg') || originalPath.includes('.bmp') ||
                        originalPath.includes('.webp');
 
-        // Call the callback to handle replacement in the backend
-        await this._onRequestLinkReplacement(originalPath, configuredPath, isImage, taskId, columnId, linkIndex);
+        // Emit event for link replacement (handled by LinkReplacementHandler)
+        eventBus.emitSync(createEvent<LinkReplaceRequestedEvent>('link:replace-requested', 'LinkHandler', {
+            originalPath,
+            newPath: configuredPath,
+            isImage,
+            taskId,
+            columnId,
+            linkIndex
+        }));
 
         vscode.window.showInformationMessage(`Link updated: ${originalPath} → ${configuredPath}`);
     }

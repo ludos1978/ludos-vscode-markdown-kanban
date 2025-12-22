@@ -18,8 +18,16 @@ export {
     MediaChangedEvent,
     FocusGainedEvent,
     FocusLostEvent,
+    // NEW: Event-driven architecture events
+    LinkReplaceRequestedEvent,
+    WebviewUpdateRequestedEvent,
+    WebviewHtmlRequestedEvent,
+    PanelClosingEvent,
+    ConfigRefreshRequestedEvent,
     AppEvent,
     createEvent,
 } from './EventTypes';
 export { BoardSyncHandler, BoardSyncDependencies } from './BoardSyncHandler';
 export { FileSyncHandler, FileSyncDependencies, FileSyncOptions, FileSyncResult } from './FileSyncHandler';
+// NEW: Event-driven handlers
+export { LinkReplacementHandler, LinkReplacementDependencies } from './LinkReplacementHandler';

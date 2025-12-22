@@ -23,7 +23,8 @@ import {
 import { ChangeStateMachine } from './core/ChangeStateMachine';
 import { BoardStore, UndoCapture } from './core/stores';
 import { WebviewBridge } from './core/bridge';
-import { BoardSyncHandler, FileSyncHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
+import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
+import { UnsavedChangesService } from './services/UnsavedChangesService';
 import {
     BoardUpdateMessage,
     UpdateIncludeContentMessage,
@@ -96,6 +97,9 @@ export class KanbanWebviewPanel {
     private _webviewBridge: WebviewBridge;
     private _boardSyncHandler: BoardSyncHandler | null = null;
     private _fileSyncHandler: FileSyncHandler | null = null;
+    // NEW: Event-driven handlers
+    private _linkReplacementHandler: LinkReplacementHandler | null = null;
+    private _unsavedChangesService: UnsavedChangesService | null = null;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -109,7 +113,7 @@ export class KanbanWebviewPanel {
             // Reset webviewReady since HTML reload will create new webview context
             this._context.setWebviewReady(false);
 
-            this._panel.webview.html = this._getHtmlForWebview();
+            this._panel.webview.html = this._webviewManager.generateHtml();
 
             // Queue board update - will be sent when webview sends 'webviewReady'
             this.sendBoardUpdate(false, true);
@@ -351,11 +355,11 @@ export class KanbanWebviewPanel {
         // Initialize webview manager (Phase 3)
         this._webviewManager = new WebviewManager({
             extensionUri: this._extensionUri,
+            extensionContext: this._extensionContext,
             getPanel: () => this._panel,
             getDocument: () => this._fileManager.getDocument(),
             getBoard: () => this.getBoard(),
-            isInitialized: () => this._context.initialized,
-            getHtmlForWebview: () => this._getHtmlForWebview()
+            isInitialized: () => this._context.initialized
         });
 
         // Subscribe to registry change events
@@ -390,11 +394,10 @@ export class KanbanWebviewPanel {
             KanbanWebviewPanel.panels
         );
 
-        // Initialize LinkHandler
+        // Initialize LinkHandler (now uses event-driven approach, no callback needed)
         this._linkHandler = new LinkHandler(
             this._fileManager,
-            this._panel.webview,
-            this.handleLinkReplacement.bind(this)
+            this._panel.webview
         );
 
         // Set up document change listener to track external unsaved modifications
@@ -459,154 +462,22 @@ export class KanbanWebviewPanel {
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         });
 
+        // Initialize LinkReplacementHandler (event-driven link replacement)
+        this._linkReplacementHandler = new LinkReplacementHandler({
+            boardStore: this._boardStore,
+            fileRegistry: this._fileRegistry,
+            webviewBridge: this._webviewBridge,
+            getBoard: () => this.getBoard()
+        });
+
+        // Initialize UnsavedChangesService (extracted unsaved changes logic)
+        this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
+
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
-    private async handleLinkReplacement(originalPath: string, newPath: string, _isImage: boolean, taskId?: string, columnId?: string, linkIndex?: number) {
-        const board = this.getBoard();
-        if (!board || !board.valid) { return; }
-
-        // Capture undo state BEFORE modification (but don't save yet - only save if modification succeeds)
-        let undoEntry: import('./core/stores/UndoCapture').UndoEntry;
-        if (taskId && columnId) {
-            undoEntry = UndoCapture.forTask(board, taskId, columnId, 'replaceLink');
-        } else if (columnId) {
-            undoEntry = UndoCapture.forColumn(board, columnId, 'replaceLink');
-        } else {
-            undoEntry = UndoCapture.forFullBoard(board, 'replaceLink');
-        }
-
-        let modified = false;
-
-        // URL encode the new path for proper markdown links
-        const encodedNewPath = encodeURI(newPath).replace(/[()]/g, (match) => {
-            return match === '(' ? '%28' : '%29';
-        });
-
-        // If we have specific context, target only that link instance
-        if (taskId && columnId) {
-            // Find the specific column and task
-            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
-            if (!targetColumn) {
-                console.warn(`Column ${columnId} not found for link replacement`);
-                return;
-            }
-
-            const targetTask = targetColumn.tasks.find(task => task.id === taskId);
-            if (!targetTask) {
-                console.warn(`Task ${taskId} not found for link replacement`);
-                return;
-            }
-
-            // Replace only the specific occurrence by index in the specific task
-            // Check task title first
-            const updatedTitle = LinkOperations.replaceSingleLink(targetTask.title, originalPath, encodedNewPath, linkIndex);
-            if (updatedTitle !== targetTask.title) {
-                targetTask.title = updatedTitle;
-                modified = true;
-            }
-            // If not found in title and task has description, check description
-            else if (targetTask.description) {
-                const updatedDescription = LinkOperations.replaceSingleLink(targetTask.description, originalPath, encodedNewPath, linkIndex);
-                if (updatedDescription !== targetTask.description) {
-                    targetTask.description = updatedDescription;
-                    modified = true;
-                }
-            }
-        }
-        // If no specific context but we have a columnId, target only that column
-        else if (columnId && !taskId) {
-            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
-            if (!targetColumn) {
-                console.warn(`Column ${columnId} not found for link replacement`);
-                return;
-            }
-
-            // Replace only the specific occurrence by index in the column title
-            const updatedTitle = LinkOperations.replaceSingleLink(targetColumn.title, originalPath, encodedNewPath, linkIndex);
-            if (updatedTitle !== targetColumn.title) {
-                targetColumn.title = updatedTitle;
-                modified = true;
-            }
-        }
-        // Fallback: global replacement (original behavior)
-        else {
-            // Helper function to replace link in text with precise strikethrough placement
-            const replaceLink = (text: string): string => {
-                return LinkOperations.replaceSingleLink(text, originalPath, encodedNewPath);
-            };
-
-            // Search and replace in all columns and tasks
-            for (const column of board.columns) {
-                const newTitle = replaceLink(column.title);
-                if (newTitle !== column.title) {
-                    column.title = newTitle;
-                    modified = true;
-                }
-
-                for (const task of column.tasks) {
-                    const newTaskTitle = replaceLink(task.title);
-                    if (newTaskTitle !== task.title) {
-                        task.title = newTaskTitle;
-                        modified = true;
-                    }
-
-                    if (task.description) {
-                        const newDescription = replaceLink(task.description);
-                        if (newDescription !== task.description) {
-                            task.description = newDescription;
-                            modified = true;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (modified) {
-            // Only save undo entry AFTER modification succeeds
-            this._boardStore.saveUndoEntry(undoEntry);
-
-            // Mark as having unsaved changes but don't auto-save
-            // The user will need to manually save to persist the changes
-            const mainFile = this._fileRegistry.getMainFile();
-            if (mainFile && board) {
-                // CRITICAL: use updateFromBoard to update BOTH content AND board object
-                mainFile.updateFromBoard(board);
-            }
-
-            // OPTIMIZATION: Send targeted update instead of full board redraw
-            if (taskId && columnId) {
-                // Find the updated task and send targeted update
-                const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
-                const targetTask = targetColumn?.tasks.find(task => task.id === taskId);
-                if (targetTask) {
-                    this._webviewBridge.sendBatched({
-                        type: 'updateTaskContent',
-                        taskId: taskId,
-                        columnId: columnId,
-                        task: targetTask,
-                        imageMappings: {}
-                    });
-                    return;
-                }
-            } else if (columnId && !taskId) {
-                // Find the updated column and send targeted update
-                const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
-                if (targetColumn) {
-                    this._webviewBridge.sendBatched({
-                        type: 'updateColumnContent',
-                        columnId: columnId,
-                        column: targetColumn,
-                        imageMappings: {}
-                    });
-                    return;
-                }
-            }
-
-            // Fallback to full board update if no specific target
-            await this.sendBoardUpdate();
-        }
-    }
+    // NOTE: handleLinkReplacement has been moved to LinkReplacementHandler
+    // It now receives 'link:replace-requested' events via EventBus
 
     /**
      * Setup listener for document close events to handle graceful degradation
@@ -659,7 +530,7 @@ export class KanbanWebviewPanel {
             // During panel revival, VS Code's cached webview may have already sent webviewReady
             // before we replace the HTML. This ensures we wait for the NEW webview's ready message.
             this._context.setWebviewReady(false);
-            this._panel.webview.html = this._getHtmlForWebview();
+            this._panel.webview.html = this._webviewManager.generateHtml();
             this._context.setInitialized(true);
         }
     }
@@ -868,112 +739,8 @@ export class KanbanWebviewPanel {
         this._restoreStateFromFileService();
     }
 
-    private _getHtmlForWebview() {
-        const filePath = vscode.Uri.file(path.join(this._extensionContext.extensionPath, 'src', 'html', 'webview.html'));
-        let html = fs.readFileSync(filePath.fsPath, 'utf8');
-
-        const cspSource = this._panel.webview.cspSource;
-
-        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none'; worker-src blob:; child-src blob:;">`;
-
-        if (!html.includes('Content-Security-Policy')) {
-            html = html.replace('<head>', `<head>\n    ${cspMeta}`);
-        }
-
-        // Build comprehensive localResourceRoots including asset directories
-        const localResourceRoots = this._webviewManager.buildLocalResourceRoots(true);
-
-        // Add document-specific paths if available
-        if (this._fileManager.getDocument()) {
-            const document = this._fileManager.getDocument()!;
-            const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-
-            const baseHref = this._panel.webview.asWebviewUri(documentDir).toString() + '/';
-            html = html.replace(/<head>/, `<head><base href="${baseHref}">`);
-
-            // Use local markdown-it from dist/src/html (bundled with extension)
-            try {
-                const markdownItPath = vscode.Uri.joinPath(this._extensionUri, 'dist', 'src', 'html', 'markdown-it.min.js');
-                if (fs.existsSync(markdownItPath.fsPath)) {
-                    const markdownItUri = this._panel.webview.asWebviewUri(markdownItPath);
-                    html = html.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/markdown-it\/[^"]+\/markdown-it\.min\.js"><\/script>/, `<script src="${markdownItUri}"></script>`);
-                }
-            } catch (error) {
-                console.warn('[KanbanWebviewPanel] Failed to load local markdown-it:', error);
-            }
-        }
-
-        // Apply the enhanced localResourceRoots
-        this._panel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: localResourceRoots
-        };
-        
-        
-        const webviewDir = this._panel.webview.asWebviewUri(
-            vscode.Uri.file(path.join(this._extensionContext.extensionPath, 'dist', 'src', 'html'))
-        );
-
-        // Add cache-busting timestamp for development
-        const timestamp = Date.now();
-        const isDevelopment = !this._extensionContext.extensionMode || this._extensionContext.extensionMode === vscode.ExtensionMode.Development;
-        const cacheBuster = isDevelopment ? `?v=${timestamp}` : '';
-        
-        html = html.replace(/href="webview\.css"/, `href="${webviewDir}/webview.css${cacheBuster}"`);
-        
-        // Replace all JavaScript file references
-        const jsFiles = [
-            'utils/colorUtils.js',
-            'utils/fileTypeUtils.js',
-            'utils/tagUtils.js',
-            'utils/configManager.js',
-            'utils/styleManager.js',
-            'utils/menuManager.js',
-            'utils/dragStateManager.js',
-            'utils/validationUtils.js',
-            'utils/modalUtils.js',
-            'utils/activityIndicator.js',
-            'utils/exportTreeBuilder.js',
-            'utils/exportTreeUI.js',
-            'utils/smartLogger.js',
-            'utils/menuUtils.js',
-            'utils/presentationParser.js',
-            'markdownRenderer.js',
-            'taskEditor.js',
-            'boardRenderer.js',
-            'dragDrop.js',
-            'menuOperations.js',
-            'search.js',
-            'debugOverlay.js',
-            'clipboardHandler.js',
-            'navigationHandler.js',
-            'foldingStateManager.js',
-            'templateDialog.js',
-            'exportMarpUI.js',
-            'webview.js',
-            'markdown-it-media-browser.js',
-            'markdown-it-multicolumn-browser.js',
-            'markdown-it-mark-browser.js',
-            'markdown-it-sub-browser.js',
-            'markdown-it-sup-browser.js',
-            'markdown-it-ins-browser.js',
-            'markdown-it-strikethrough-alt-browser.js',
-            'markdown-it-underline-browser.js',
-            'markdown-it-abbr-browser.js',
-            'markdown-it-container-browser.js',
-            'markdown-it-include-browser.js',
-            'markdown-it-image-figures-browser.js'
-        ];
-        
-        jsFiles.forEach(jsFile => {
-            html = html.replace(
-                new RegExp(`src="${jsFile}"`, 'g'), 
-                `src="${webviewDir}/${jsFile}${cacheBuster}"`
-            );
-        });
-
-        return html;
-    }
+    // NOTE: _getHtmlForWebview has been moved to WebviewManager.generateHtml()
+    // It is now called via this._webviewManager.generateHtml()
 
     /**
      * Initialize board from document - creates MainKanbanFile and registers include files
@@ -1511,71 +1278,47 @@ export class KanbanWebviewPanel {
             }
         }
 
-        // Query current unsaved changes state from MarkdownFile
-        const mainFile = this._fileRegistry.getMainFile();
-        const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
+        // Use UnsavedChangesService for unsaved changes handling
+        if (!this._unsavedChangesService) {
+            this.dispose();
+            return;
+        }
 
-        // Get include files unsaved status
-        const includeStatus = this._fileRegistry.getIncludeFilesUnsavedStatus();
+        // Check for unsaved changes
+        const unsavedInfo = this._unsavedChangesService.checkForUnsavedChanges();
 
         // If no unsaved changes, allow close
-        if (!hasUnsavedChanges && !includeStatus.hasChanges) {
+        if (!unsavedInfo.hasMainFileChanges && !unsavedInfo.hasIncludeFileChanges) {
             this.dispose();
             return;
         }
 
-        // Build message for unsaved changes
-        let message = '';
-        if (hasUnsavedChanges && includeStatus.hasChanges) {
-            message = `You have unsaved changes in the main file and in column include files:\n${includeStatus.changedFiles.join('\n')}\n\nDo you want to save before closing?`;
-        } else if (hasUnsavedChanges) {
-            message = `You have unsaved changes in the main file. Do you want to save before closing?`;
-        } else if (includeStatus.hasChanges) {
-            message = `You have unsaved changes in column include files:\n${includeStatus.changedFiles.join('\n')}\n\nDo you want to save before closing?`;
-        }
+        // Show dialog and get user choice
+        const choice = await this._unsavedChangesService.showUnsavedChangesDialog(unsavedInfo);
 
-        const saveAndClose = 'Save and close';
-        const closeWithoutSaving = 'Close without saving';
-        const cancel = 'Cancel (Esc)';
+        switch (choice) {
+            case 'save':
+                try {
+                    await this.saveToMarkdown(true, true);
+                } catch (error) {
+                    console.error('[PanelClose] Save failed:', error);
+                    vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`);
+                }
+                this.dispose();
+                break;
 
-        const choice = await vscode.window.showWarningMessage(
-            message,
-            { modal: true },
-            saveAndClose,
-            closeWithoutSaving,
-            cancel
-        );
+            case 'discard':
+                this._unsavedChangesService.discardAllChanges();
+                this.dispose();
+                break;
 
-        if (!choice || choice === cancel) {
-            // User cancelled, but panel is already disposed by VS Code
-            // Still need to run our cleanup
-            console.warn('[PanelClose] User cancelled, but panel already disposed - discarding unsaved changes');
-            if (mainFile) {
-                mainFile.discardChanges();
-            }
-            this.dispose();
-            return;
-        }
-
-        if (choice === saveAndClose) {
-            // Save all changes and then close
-            try {
-                await this.saveToMarkdown(true, true); // Save with version tracking and trigger save
-            } catch (error) {
-                console.error('[PanelClose] Save failed:', error);
-                // Panel is already disposed by VS Code, but still run our cleanup
-                vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`);
-            }
-            // CRITICAL: Always call dispose() to clean up, even if save failed
-            // We're in onDidDispose handler - panel is already disposed by VS Code
-            this.dispose();
-        } else if (choice === closeWithoutSaving) {
-            // Discard changes and close
-            if (mainFile) {
-                mainFile.discardChanges();
-            }
-            // Include files are handled by their own discard logic
-            this.dispose();
+            case 'cancel':
+            default:
+                // User cancelled, but panel is already disposed by VS Code
+                console.warn('[PanelClose] User cancelled, but panel already disposed - discarding unsaved changes');
+                this._unsavedChangesService.discardAllChanges();
+                this.dispose();
+                break;
         }
     }
 
@@ -1603,49 +1346,9 @@ export class KanbanWebviewPanel {
      * This creates a safety backup before prompting the user
      */
     public async saveUnsavedChangesBackup(): Promise<void> {
-        try {
-            // Save main file backup
-            const mainFile = this._fileRegistry.getMainFile();
-            if (mainFile && mainFile.hasUnsavedChanges()) {
-                const uri = this.getCurrentDocumentUri();
-                if (uri) {
-                    const filePath = uri.fsPath;
-                    const content = mainFile.getContent();
-
-                    // Create backup filename: "file.md" -> ".file-unsavedchanges.md" (hidden)
-                    const ext = path.extname(filePath);
-                    const baseName = path.basename(filePath, ext);
-                    const dirName = path.dirname(filePath);
-                    const backupPath = path.join(dirName, `.${baseName}-unsavedchanges${ext}`);
-
-                    fs.writeFileSync(backupPath, content, 'utf8');
-                }
-            }
-
-            // Save include files backups
-            const includeStatus = this._fileRegistry.getIncludeFilesUnsavedStatus();
-            if (includeStatus.hasChanges) {
-                for (const fileWithChanges of includeStatus.changedFiles) {
-                    const includeFile = this._fileRegistry.getIncludeFile(fileWithChanges);
-                    if (includeFile && includeFile.hasUnsavedChanges()) {
-                        const filePath = includeFile.getPath();
-                        if (filePath) {
-                            const content = includeFile.getContent();
-
-                            // Create backup filename: "include.md" -> ".include-unsavedchanges.md" (hidden)
-                            const ext = path.extname(filePath);
-                            const baseName = path.basename(filePath, ext);
-                            const dirName = path.dirname(filePath);
-                            const backupPath = path.join(dirName, `.${baseName}-unsavedchanges${ext}`);
-
-                            fs.writeFileSync(backupPath, content, 'utf8');
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('[KanbanWebviewPanel] Failed to save unsaved changes backup:', error);
-            // Don't throw - we want to continue with the close process even if backup fails
+        // Delegate to UnsavedChangesService
+        if (this._unsavedChangesService) {
+            await this._unsavedChangesService.saveBackups(this.getCurrentDocumentUri());
         }
     }
 
@@ -1714,6 +1417,15 @@ export class KanbanWebviewPanel {
             this._fileSyncHandler.dispose();
             this._fileSyncHandler = null;
         }
+
+        // Dispose link replacement handler
+        if (this._linkReplacementHandler) {
+            this._linkReplacementHandler.dispose();
+            this._linkReplacementHandler = null;
+        }
+
+        // UnsavedChangesService doesn't need disposal (no subscriptions)
+        this._unsavedChangesService = null;
 
         this._fileRegistry.dispose();
         this._boardStore.dispose();

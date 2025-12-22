@@ -1,11 +1,12 @@
 /**
- * WebviewManager - Handles webview permissions, configuration, and asset management
+ * WebviewManager - Handles webview permissions, configuration, asset management, and HTML generation
  *
  * Consolidates:
  * - Resource permission management (localResourceRoots)
  * - Asset directory scanning
  * - Layout preset configuration
  * - Webview option updates
+ * - HTML generation for webview (moved from KanbanWebviewPanel)
  *
  * @module panel/WebviewManager
  */
@@ -21,11 +22,11 @@ import { configService } from '../services/ConfigurationService';
  */
 export interface WebviewManagerDependencies {
     extensionUri: vscode.Uri;
+    extensionContext: vscode.ExtensionContext;
     getPanel: () => vscode.WebviewPanel | undefined;
     getDocument: () => vscode.TextDocument | undefined;
     getBoard: () => KanbanBoard | undefined;
     isInitialized: () => boolean;
-    getHtmlForWebview: () => string;
 }
 
 /**
@@ -70,7 +71,7 @@ export class WebviewManager {
 
         // Only reload HTML if initialized (to apply new permissions)
         if (this._deps.isInitialized()) {
-            panel.webview.html = this._deps.getHtmlForWebview();
+            panel.webview.html = this.generateHtml();
         }
     }
 
@@ -242,5 +243,134 @@ export class WebviewManager {
      */
     getLayoutPresetsConfiguration(): Record<string, any> {
         return configService.getConfig('layoutPresets', {});
+    }
+
+    // ============= HTML GENERATION =============
+
+    /**
+     * Generate HTML for the webview
+     * Moved from KanbanWebviewPanel._getHtmlForWebview() (~105 lines)
+     *
+     * Handles:
+     * - Loading base HTML template
+     * - Adding Content Security Policy
+     * - Setting base href for relative paths
+     * - Replacing script/CSS references with webview URIs
+     * - Cache busting in development mode
+     */
+    generateHtml(): string {
+        const panel = this._deps.getPanel();
+        if (!panel) {
+            return '<html><body>Panel not available</body></html>';
+        }
+
+        const extensionPath = this._deps.extensionContext.extensionPath;
+        const filePath = vscode.Uri.file(path.join(extensionPath, 'src', 'html', 'webview.html'));
+        let html = fs.readFileSync(filePath.fsPath, 'utf8');
+
+        const cspSource = panel.webview.cspSource;
+
+        // Content Security Policy
+        const cspMeta = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data: blob:; media-src ${cspSource} https: data: blob:; script-src ${cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; frame-src 'none'; worker-src blob:; child-src blob:;">`;
+
+        if (!html.includes('Content-Security-Policy')) {
+            html = html.replace('<head>', `<head>\n    ${cspMeta}`);
+        }
+
+        // Build comprehensive localResourceRoots including asset directories
+        const localResourceRoots = this._buildLocalResourceRoots(true);
+
+        // Add document-specific paths if available
+        const document = this._deps.getDocument();
+        if (document) {
+            const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
+            const baseHref = panel.webview.asWebviewUri(documentDir).toString() + '/';
+            html = html.replace(/<head>/, `<head><base href="${baseHref}">`);
+
+            // Use local markdown-it from dist/src/html (bundled with extension)
+            try {
+                const markdownItPath = vscode.Uri.joinPath(this._deps.extensionUri, 'dist', 'src', 'html', 'markdown-it.min.js');
+                if (fs.existsSync(markdownItPath.fsPath)) {
+                    const markdownItUri = panel.webview.asWebviewUri(markdownItPath);
+                    html = html.replace(
+                        /<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/markdown-it\/[^"]+\/markdown-it\.min\.js"><\/script>/,
+                        `<script src="${markdownItUri}"></script>`
+                    );
+                }
+            } catch (error) {
+                console.warn('[WebviewManager] Failed to load local markdown-it:', error);
+            }
+        }
+
+        // Apply the enhanced localResourceRoots
+        panel.webview.options = {
+            enableScripts: true,
+            localResourceRoots: localResourceRoots
+        };
+
+        const webviewDir = panel.webview.asWebviewUri(
+            vscode.Uri.file(path.join(extensionPath, 'dist', 'src', 'html'))
+        );
+
+        // Add cache-busting timestamp for development
+        const timestamp = Date.now();
+        const extensionMode = this._deps.extensionContext.extensionMode;
+        const isDevelopment = !extensionMode || extensionMode === vscode.ExtensionMode.Development;
+        const cacheBuster = isDevelopment ? `?v=${timestamp}` : '';
+
+        html = html.replace(/href="webview\.css"/, `href="${webviewDir}/webview.css${cacheBuster}"`);
+
+        // Replace all JavaScript file references
+        const jsFiles = [
+            'utils/colorUtils.js',
+            'utils/fileTypeUtils.js',
+            'utils/tagUtils.js',
+            'utils/configManager.js',
+            'utils/styleManager.js',
+            'utils/menuManager.js',
+            'utils/dragStateManager.js',
+            'utils/validationUtils.js',
+            'utils/modalUtils.js',
+            'utils/activityIndicator.js',
+            'utils/exportTreeBuilder.js',
+            'utils/exportTreeUI.js',
+            'utils/smartLogger.js',
+            'utils/menuUtils.js',
+            'utils/presentationParser.js',
+            'markdownRenderer.js',
+            'taskEditor.js',
+            'boardRenderer.js',
+            'dragDrop.js',
+            'menuOperations.js',
+            'search.js',
+            'debugOverlay.js',
+            'clipboardHandler.js',
+            'navigationHandler.js',
+            'foldingStateManager.js',
+            'templateDialog.js',
+            'exportMarpUI.js',
+            'webview.js',
+            'markdown-it-media-browser.js',
+            'markdown-it-multicolumn-browser.js',
+            'markdown-it-mark-browser.js',
+            'markdown-it-sub-browser.js',
+            'markdown-it-sup-browser.js',
+            'markdown-it-ins-browser.js',
+            'markdown-it-strikethrough-alt-browser.js',
+            'markdown-it-underline-browser.js',
+            'markdown-it-abbr-browser.js',
+            'markdown-it-container-browser.js',
+            'markdown-it-include-browser.js',
+            'markdown-it-image-figures-browser.js'
+        ];
+
+        jsFiles.forEach(jsFile => {
+            html = html.replace(
+                new RegExp(`src="${jsFile}"`, 'g'),
+                `src="${webviewDir}/${jsFile}${cacheBuster}"`
+            );
+        });
+
+        return html;
     }
 }

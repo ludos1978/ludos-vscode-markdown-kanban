@@ -19,7 +19,13 @@ export type EventType =
     | 'file:saved'              // File saved to disk
     | 'media:changed'           // Media file (image/diagram) changed
     | 'focus:gained'            // Panel gained focus
-    | 'focus:lost';             // Panel lost focus
+    | 'focus:lost'              // Panel lost focus
+    // === NEW: Event-driven architecture events ===
+    | 'link:replace-requested'  // Link replacement needed in board content
+    | 'webview:update-requested' // Webview needs board update sent
+    | 'webview:html-requested'  // Webview HTML generation needed
+    | 'panel:closing'           // Panel is about to close (check unsaved)
+    | 'config:refresh-requested'; // Configuration refresh needed
 
 /**
  * Trigger types for board changes
@@ -128,6 +134,55 @@ export interface FocusLostEvent extends BaseEvent {
     type: 'focus:lost';
 }
 
+// === NEW: Event-driven architecture event interfaces ===
+
+/**
+ * Link replace requested event - emitted when a link needs to be replaced in board content
+ */
+export interface LinkReplaceRequestedEvent extends BaseEvent {
+    type: 'link:replace-requested';
+    data: {
+        originalPath: string;
+        newPath: string;
+        isImage: boolean;
+        taskId?: string;
+        columnId?: string;
+        linkIndex?: number;
+    };
+}
+
+/**
+ * Webview update requested event - emitted when webview needs a board update
+ */
+export interface WebviewUpdateRequestedEvent extends BaseEvent {
+    type: 'webview:update-requested';
+    data: {
+        applyDefaultFolding?: boolean;
+        isFullRefresh?: boolean;
+    };
+}
+
+/**
+ * Webview HTML requested event - emitted when webview HTML needs to be generated
+ */
+export interface WebviewHtmlRequestedEvent extends BaseEvent {
+    type: 'webview:html-requested';
+}
+
+/**
+ * Panel closing event - emitted when panel is about to close
+ */
+export interface PanelClosingEvent extends BaseEvent {
+    type: 'panel:closing';
+}
+
+/**
+ * Config refresh requested event - emitted when configuration needs refresh
+ */
+export interface ConfigRefreshRequestedEvent extends BaseEvent {
+    type: 'config:refresh-requested';
+}
+
 /**
  * Union type of all events
  */
@@ -140,7 +195,13 @@ export type AppEvent =
     | FileSavedEvent
     | MediaChangedEvent
     | FocusGainedEvent
-    | FocusLostEvent;
+    | FocusLostEvent
+    // NEW: Event-driven architecture events
+    | LinkReplaceRequestedEvent
+    | WebviewUpdateRequestedEvent
+    | WebviewHtmlRequestedEvent
+    | PanelClosingEvent
+    | ConfigRefreshRequestedEvent;
 
 /**
  * Helper to create events with common fields pre-filled
