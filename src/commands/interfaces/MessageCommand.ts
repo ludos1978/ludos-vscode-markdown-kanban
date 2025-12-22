@@ -8,7 +8,7 @@
  */
 
 import { FileManager } from '../../fileManager';
-import { BoardStore } from '../../core/stores';
+import { BoardStore, UndoCapture } from '../../core/stores';
 import { BoardOperations } from '../../board';
 import { LinkHandler } from '../../services/LinkHandler';
 import { KanbanBoard } from '../../markdownParser';
@@ -299,13 +299,17 @@ export abstract class BaseMessageCommand implements MessageCommand {
             return false;
         }
 
-        if (saveUndo) {
-            context.boardStore.saveStateForUndo(board);
-        }
+        // Clone board state BEFORE modification for potential undo
+        // We need to clone now because action() mutates the board in place
+        const undoEntry = saveUndo ? UndoCapture.inferred(board, 'edit') : null;
 
         const success = action();
 
         if (success) {
+            // Only save undo entry AFTER action succeeds
+            if (undoEntry) {
+                context.boardStore.saveUndoEntry(undoEntry);
+            }
             const currentBoard = context.getCurrentBoard();
             if (currentBoard) {
                 context.emitBoardChanged(currentBoard, 'edit');

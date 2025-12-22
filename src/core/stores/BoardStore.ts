@@ -52,6 +52,24 @@ function deepCloneBoard(board: KanbanBoard): KanbanBoard {
     return JSON.parse(JSON.stringify(board));
 }
 
+/**
+ * Get a fingerprint of the board for debug logging
+ * Uses task content to create a unique identifier
+ */
+function getBoardFingerprint(board: KanbanBoard): string {
+    const colCount = board.columns?.length ?? 0;
+    const taskCount = board.columns?.reduce((sum, c) => sum + (c.tasks?.length ?? 0), 0) ?? 0;
+    // Get total length of all task titles and descriptions as a content fingerprint
+    let contentLen = 0;
+    for (const col of board.columns ?? []) {
+        contentLen += col.title?.length ?? 0;
+        for (const task of col.tasks ?? []) {
+            contentLen += (task.title?.length ?? 0) + (task.description?.length ?? 0);
+        }
+    }
+    return `cols=${colCount},tasks=${taskCount},contentLen=${contentLen}`;
+}
+
 function createLegacyUndoEntry(board: KanbanBoard): UndoEntry {
     return UndoCapture.inferred(board, 'legacy');
 }
@@ -177,6 +195,13 @@ export class BoardStore implements vscode.Disposable {
     saveUndoEntry(entry: UndoEntry): void {
         if (!entry.board || !entry.board.valid) { return; }
 
+        // Debug logging to track undo entry sources and content
+        const savedBoardFP = getBoardFingerprint(entry.board);
+        const currentBoardFP = this._state.board ? getBoardFingerprint(this._state.board) : 'null';
+        const stackTrace = new Error().stack?.split('\n').slice(2, 5).join(' <- ') || 'unknown';
+        console.log(`[BoardStore] saveUndoEntry: op=${entry.source?.operation || 'unknown'}, saving=${savedBoardFP}, current=${currentBoardFP}, newStackSize=${this._state.undoStack.length + 1}`);
+        console.log(`[BoardStore] saveUndoEntry from: ${stackTrace}`);
+
         this._state.undoStack.push(entry);
         if (this._state.undoStack.length > this._maxUndoStackSize) {
             this._state.undoStack.shift();
@@ -209,6 +234,12 @@ export class BoardStore implements vscode.Disposable {
         }
 
         const currentBoard = this._state.board;
+        const currentFP = currentBoard ? getBoardFingerprint(currentBoard) : 'null';
+
+        // Log the stack contents before undo
+        const stackContents = this._state.undoStack.map((e, i) => `[${i}]=${getBoardFingerprint(e.board)}`).join(', ');
+        console.log(`[BoardStore] undo: current=${currentFP}, stackSize=${this._state.undoStack.length}, stack=[${stackContents}]`);
+
         if (currentBoard && currentBoard.valid) {
             // Create a redo entry from current state
             // We don't have target info for redo, so use inferred
@@ -216,6 +247,9 @@ export class BoardStore implements vscode.Disposable {
         }
 
         const restoredEntry = this._state.undoStack.pop()!;
+        const restoredFP = getBoardFingerprint(restoredEntry.board);
+        console.log(`[BoardStore] undo: popped=${restoredFP}, op=${restoredEntry.source?.operation}, newStackSize=${this._state.undoStack.length}`);
+
         this._state.board = restoredEntry.board;
         this._state.cacheValid = true;
 

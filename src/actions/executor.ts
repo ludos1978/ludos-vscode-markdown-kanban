@@ -81,11 +81,8 @@ export class ActionExecutor {
             return { success: false, error: 'No board available' };
         }
 
-        // Save undo state before modification
-        if (saveUndo) {
-            const entry = this.createUndoEntry(board, action);
-            this.deps.boardStore.saveUndoEntry(entry);
-        }
+        // Capture undo entry BEFORE modification (but don't save yet)
+        const undoEntry = saveUndo ? this.createUndoEntry(board, action) : null;
 
         // Execute the action
         let result: T;
@@ -102,6 +99,11 @@ export class ActionExecutor {
         const success = this.isSuccess(result);
         if (!success) {
             return { success: false, result };
+        }
+
+        // Only save undo entry AFTER action succeeds
+        if (undoEntry) {
+            this.deps.boardStore.saveUndoEntry(undoEntry);
         }
 
         // Emit board changed event

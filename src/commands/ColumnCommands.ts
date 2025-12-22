@@ -35,6 +35,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { ColumnActions } from '../actions';
+import { UndoCapture } from '../core/stores/UndoCapture';
 
 /**
  * Column Commands Handler
@@ -250,6 +251,14 @@ ${tasksContent}`;
 
             // Stop editing before switch
             await context.requestStopEditing();
+
+            // Capture undo state BEFORE include switch (include switches bypass action system)
+            const currentBoard = context.getCurrentBoard();
+            if (currentBoard) {
+                context.boardStore.saveUndoEntry(
+                    UndoCapture.forColumn(currentBoard, columnId, 'includeSwitch')
+                );
+            }
 
             try {
                 await context.handleIncludeSwitch({

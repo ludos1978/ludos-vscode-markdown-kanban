@@ -1771,10 +1771,14 @@ function deleteColumn(columnId) {
                 }
             }
 
-            // Mark board as having unsaved changes
-            markUnsavedChanges();
+            // NOTE: We intentionally do NOT call markUnsavedChanges() here.
+            // The deleteColumn message goes through the action system, which properly
+            // handles undo state capture BEFORE applying changes via ColumnActions.remove.
+            // Calling markUnsavedChanges() would sync the already-modified board to backend
+            // BEFORE deleteColumn is processed, causing undo to capture the wrong "before" state.
+            // See: ColumnCommands.ts handleDeleteColumn() for backend handling.
 
-            // Send message to VS Code for undo tracking
+            // Send message to VS Code - action system handles undo capture and board sync
             vscode.postMessage({ type: 'deleteColumn', columnId });
 
         }
@@ -2312,10 +2316,14 @@ function deleteTask(taskId, columnId) {
                 }
             }
 
-            // Mark board as having unsaved changes
-            markUnsavedChanges();
+            // NOTE: We intentionally do NOT call markUnsavedChanges() here.
+            // The deleteTask message goes through the action system, which properly
+            // handles undo state capture BEFORE applying changes via TaskActions.remove.
+            // Calling markUnsavedChanges() would sync the already-modified board to backend
+            // BEFORE deleteTask is processed, causing undo to capture the wrong "before" state.
+            // See: TaskCommands.ts handleDeleteTask() for backend handling.
 
-            // Send message to VS Code for undo tracking - use the actual column where task was found
+            // Send message to VS Code - action system handles undo capture and board sync
             vscode.postMessage({ type: 'deleteTask', taskId, columnId: foundColumn.id });
 
         }

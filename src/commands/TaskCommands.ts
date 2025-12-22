@@ -33,6 +33,7 @@ import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { TaskActions } from '../actions';
+import { UndoCapture } from '../core/stores/UndoCapture';
 
 /**
  * Task Commands Handler
@@ -150,6 +151,15 @@ export class TaskCommands extends BaseMessageCommand {
 
         // Stop editing before switch
         await context.requestStopEditing();
+
+        // Capture undo state BEFORE include switch (include switches bypass action system)
+        const board = context.getCurrentBoard();
+        const column = board ? BoardCrudOperations.findColumnContainingTask(board, taskId) : null;
+        if (board && column) {
+            context.boardStore.saveUndoEntry(
+                UndoCapture.forTask(board, taskId, column.id, 'includeSwitch')
+            );
+        }
 
         try {
             await context.handleIncludeSwitch({

@@ -840,10 +840,6 @@ class TaskEditor {
                     if (column.title !== newTitle) {
                         // Create context for this edit
                         const editContext = `column-title-${columnId}`;
-
-                        // Save undo state BEFORE making the change
-                        this.saveUndoStateImmediately('editColumnTitle', null, columnId);
-
                         this.lastEditContext = editContext;
 
                         // Check for include syntax in column header (location-based column include)
@@ -859,10 +855,10 @@ class TaskEditor {
                         const hadIncludes = oldIncludeMatches.length > 0;
                         const hasOrHadIncludes = hasIncludes || hadIncludes;
 
-                        column.title = newTitle;
-
                         // If column has/had includes, send to backend (add/change/remove)
+                        // Backend handles undo via action system - don't save undo here
                         if (hasOrHadIncludes) {
+                            column.title = newTitle;
                             // Get column element first
                             const columnElement = element.closest('.kanban-full-height-column');
 
@@ -960,6 +956,24 @@ class TaskEditor {
                             return;
                         }
 
+                        // Non-include column title edit - send to backend action system for proper undo handling
+                        // NOTE: We intentionally do NOT call saveUndoStateImmediately() here.
+                        // The editColumnTitle message goes through the action system, which properly
+                        // handles undo state capture BEFORE applying changes via ColumnActions.updateTitle.
+                        // Calling saveUndoStateImmediately() would create a duplicate undo entry with
+                        // potentially stale board state due to timing issues.
+                        // See: ColumnCommands.ts handleEditColumnTitleUnified() for backend handling.
+
+                        // Update local state for immediate visual feedback
+                        column.title = newTitle;
+
+                        // Send to backend - action system handles undo capture and board sync
+                        vscode.postMessage({
+                            type: 'editColumnTitle',
+                            columnId: columnId,
+                            title: newTitle
+                        });
+
                         // Check if this edit affects layout and trigger board refresh if needed
                         const originalTitle = element.getAttribute('data-original-title') || '';
                         const layoutChanged = this.hasLayoutChanged(originalTitle, newTitle);
@@ -991,10 +1005,11 @@ class TaskEditor {
                             }
                         }
 
-                        // Mark as unsaved since we made a change
-                        if (typeof markUnsavedChanges === 'function') {
-                            markUnsavedChanges();
-                        }
+                        // NOTE: We intentionally do NOT call markUnsavedChanges() here.
+                        // The editColumnTitle message triggers emitBoardChanged() in the backend,
+                        // which handles board sync. Calling markUnsavedChanges() would sync the
+                        // already-modified local board BEFORE the action executes, causing undo
+                        // to capture the wrong "before" state.
                     }
 
                     // Update display IMMEDIATELY while editor is still open (matching task edit pattern lines 1149-1178)
@@ -1119,8 +1134,8 @@ class TaskEditor {
 
                         if (newIncludeMatches.length > 0 || hasIncludeChanges) {
                             // This involves include syntax (new include, changed include, or removing include)
+                            // Backend handles undo via action system - don't save undo here
                             const editContext = `${type}-${taskId}-${columnId}`;
-                            this.saveUndoStateImmediately('editTaskTitle', taskId, columnId);
                             this.lastEditContext = editContext;
 
                             task.title = value;
@@ -1156,38 +1171,29 @@ class TaskEditor {
                             return;
                         } else {
                             // Regular task title editing
+                            // Note: Backend handles undo via editTask message sent at end of edit
                             if (task.title !== value) {
                                 const editContext = `${type}-${taskId}-${columnId}`;
-                                this.saveUndoStateImmediately('editTaskTitle', taskId, columnId);
                                 this.lastEditContext = editContext;
-
                                 task.title = value;
-                                // No backend message needed for regular titles
                             }
                         }
                     } else if (type === 'task-description') {
                         // Handle task description
+                        // Note: Backend handles undo via editTask message sent at end of edit
                         if (task.includeMode) {
                             // FIX BUG #1: No-parsing approach
                             // The description field contains the COMPLETE file content - don't parse it!
                             // displayTitle stays as "# include in path" (UI indicator only)
                             const editContext = `${type}-${taskId}-${columnId}`;
-                            this.saveUndoStateImmediately('editTaskDescription', taskId, columnId);
                             this.lastEditContext = editContext;
-
-                            // Update description only - NO PARSING!
                             task.description = value;  // Complete file content
                         } else {
                             // Regular task description handling
                             const currentRawValue = task.description || '';
                             if (currentRawValue !== value) {
                                 const editContext = `${type}-${taskId}-${columnId}`;
-
-                                // Save undo state BEFORE making the change
-                                this.saveUndoStateImmediately('editTaskDescription', taskId, columnId);
                                 this.lastEditContext = editContext;
-
-                                // Update description
                                 task.description = value;
                             }
                         }
@@ -1208,14 +1214,12 @@ class TaskEditor {
                     }
 
 
-                    if (wasChanged) {
-                        if (typeof markUnsavedChanges === 'function') {
-                            markUnsavedChanges();
-                        } else {
-                            console.error('[TaskEditor] markUnsavedChanges function not available!');
-                        }
-                        // Note: markUnsavedChanges() sends the complete updated board data
-                    }
+                    // NOTE: We intentionally do NOT call markUnsavedChanges() here for task edits.
+                    // The editTask message (sent below at end of edit) goes through the action system,
+                    // which properly handles undo state capture BEFORE applying changes.
+                    // Calling markUnsavedChanges() would sync the already-modified board to backend
+                    // BEFORE editTask is processed, causing undo to capture the wrong "before" state.
+                    // See: editTask is sent at lines 1314-1320 and handles board sync via emitBoardChanged.
 
                     if (this.currentEditor.displayElement) {
                         if (value.trim()) {

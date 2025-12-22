@@ -1,6 +1,8 @@
-- move the delete button from the "image not found hover" to the burger menu on the image.
+- [ ] the marp presentation that can be exported should have it's video playback system modified. It should automatically stop videos when the slide is changed (it can allways stop all videos). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
 
-- gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
+- [ ] move the delete button from the "image not found hover" to the burger menu on the image.
+
+- [ ] gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
 - add an option to open the file or the path in the file explorer (finder) where the file is in!
 
 - [x] when i delete the top column in a stack, the stack below it should have it's #stack tag removed. in all other cases there is no need to change anything

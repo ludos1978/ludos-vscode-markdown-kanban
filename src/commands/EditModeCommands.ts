@@ -161,9 +161,13 @@ export class EditModeCommands extends BaseMessageCommand {
                     return this.success();
 
                 case 'saveUndoState':
+                    // NOTE: This message type should rarely be used - most operations save their own undo state.
+                    // Only use when explicitly needed for operations that don't have built-in undo handling.
                     const boardToSave = message.currentBoard || context.getCurrentBoard();
                     if (boardToSave) {
-                        context.boardStore.saveStateForUndo(boardToSave);
+                        context.boardStore.saveUndoEntry(
+                            UndoCapture.forFullBoard(boardToSave, 'saveUndoState')
+                        );
                     }
                     return this.success();
 
@@ -202,12 +206,16 @@ export class EditModeCommands extends BaseMessageCommand {
                     // Perform automatic sort on board
                     const board = context.getCurrentBoard();
                     if (board) {
-                        context.boardStore.saveUndoEntry(
-                            UndoCapture.forFullBoard(board, 'performSort')
-                        );
-                        context.boardOperations.performAutomaticSort(board);
-                        context.emitBoardChanged(board, 'sort');
-                        await context.onBoardUpdate();
+                        // Capture undo state BEFORE modification (but don't save yet)
+                        const undoEntry = UndoCapture.forFullBoard(board, 'performSort');
+                        const sortMadeChanges = context.boardOperations.performAutomaticSort(board);
+
+                        // Only save undo entry and emit changes if sort actually changed something
+                        if (sortMadeChanges) {
+                            context.boardStore.saveUndoEntry(undoEntry);
+                            context.emitBoardChanged(board, 'sort');
+                            await context.onBoardUpdate();
+                        }
                     }
                     return this.success();
 

@@ -466,19 +466,14 @@ export class KanbanWebviewPanel {
         const board = this.getBoard();
         if (!board || !board.valid) { return; }
 
-        // Save undo state with proper target info for targeted undo/redo
+        // Capture undo state BEFORE modification (but don't save yet - only save if modification succeeds)
+        let undoEntry: import('./core/stores/UndoCapture').UndoEntry;
         if (taskId && columnId) {
-            this._boardStore.saveUndoEntry(
-                UndoCapture.forTask(board, taskId, columnId, 'replaceLink')
-            );
+            undoEntry = UndoCapture.forTask(board, taskId, columnId, 'replaceLink');
         } else if (columnId) {
-            this._boardStore.saveUndoEntry(
-                UndoCapture.forColumn(board, columnId, 'replaceLink')
-            );
+            undoEntry = UndoCapture.forColumn(board, columnId, 'replaceLink');
         } else {
-            this._boardStore.saveUndoEntry(
-                UndoCapture.forFullBoard(board, 'replaceLink')
-            );
+            undoEntry = UndoCapture.forFullBoard(board, 'replaceLink');
         }
 
         let modified = false;
@@ -568,6 +563,9 @@ export class KanbanWebviewPanel {
         }
 
         if (modified) {
+            // Only save undo entry AFTER modification succeeds
+            this._boardStore.saveUndoEntry(undoEntry);
+
             // Mark as having unsaved changes but don't auto-save
             // The user will need to manually save to persist the changes
             const mainFile = this._fileRegistry.getMainFile();
