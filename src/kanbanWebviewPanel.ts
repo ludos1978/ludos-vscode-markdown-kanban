@@ -108,224 +108,130 @@ export class KanbanWebviewPanel {
     public static createOrShow(extensionUri: vscode.Uri, context: vscode.ExtensionContext, document?: vscode.TextDocument) {
         const column = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
 
-        // Check if a panel already exists for this document
         if (document) {
             const existingPanel = KanbanWebviewPanel.panels.get(document.uri.toString());
-            if (existingPanel && existingPanel._panel) {
-                // Panel exists, just reveal it
+            if (existingPanel?._panel) {
                 existingPanel._panel.reveal(column);
-                
-                // Update the file info to ensure context is maintained
                 existingPanel._fileManager.sendFileInfo();
-                
-                // Ensure the board is up to date
                 existingPanel.loadMarkdownFile(document);
                 return;
             }
         }
 
-        // Create a new panel
-        const localResourceRoots = [extensionUri];
-        
-        // Add all workspace folders
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            workspaceFolders.forEach(folder => {
-                localResourceRoots.push(folder.uri);
-            });
-        }
-        
-        // Add document directory if it's outside workspace folders
-        if (document) {
-            const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
-            const isInWorkspace = workspaceFolders?.some(folder => 
-                documentDir.fsPath.startsWith(folder.uri.fsPath)
-            );
-            
-            if (!isInWorkspace) {
-                localResourceRoots.push(documentDir);
-            }
-        }
-        
-        // Create panel with file-specific title
+        const localResourceRoots = KanbanWebviewPanel._buildResourceRoots(extensionUri, document);
         const fileName = document ? path.basename(document.fileName) : 'Markdown Kanban';
+
         const panel = vscode.window.createWebviewPanel(
             KanbanWebviewPanel.viewType,
             `Kanban: ${fileName}`,
             column,
-            {
-                enableScripts: true,
-                localResourceRoots: localResourceRoots,
-                retainContextWhenHidden: true,
-                enableCommandUris: true
-            }
+            { enableScripts: true, localResourceRoots, retainContextWhenHidden: true, enableCommandUris: true }
         );
 
         const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
 
-        // Store the panel in the map and load document
         if (document) {
             const docUri = document.uri.toString();
-            kanbanPanel._context.setTrackedDocumentUri(docUri);  // Track the URI for cleanup
+            kanbanPanel._context.setTrackedDocumentUri(docUri);
             KanbanWebviewPanel.panels.set(docUri, kanbanPanel);
-            // Load immediately - webview will request data when ready
             kanbanPanel.loadMarkdownFile(document);
         }
     }
 
-    // Static set to track document URIs being revived to prevent duplicates
+    private static _buildResourceRoots(extensionUri: vscode.Uri, document?: vscode.TextDocument): vscode.Uri[] {
+        const roots = [extensionUri];
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+
+        if (workspaceFolders) {
+            workspaceFolders.forEach(folder => roots.push(folder.uri));
+        }
+
+        if (document) {
+            const documentDir = vscode.Uri.file(path.dirname(document.uri.fsPath));
+            const isInWorkspace = workspaceFolders?.some(folder =>
+                documentDir.fsPath.startsWith(folder.uri.fsPath)
+            );
+            if (!isInWorkspace) roots.push(documentDir);
+        }
+
+        return roots;
+    }
+
     private static _revivedUris: Set<string> = new Set();
 
     public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext, state?: any) {
-        // ENHANCED: Set comprehensive permissions on revive
-        const localResourceRoots = [extensionUri];
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            workspaceFolders.forEach(folder => {
-                localResourceRoots.push(folder.uri);
-            });
-        }
-        
-        panel.webview.options = {
-            enableScripts: true,
-            localResourceRoots: localResourceRoots,
-        };
+        const localResourceRoots = KanbanWebviewPanel._buildResourceRoots(extensionUri);
+        panel.webview.options = { enableScripts: true, localResourceRoots };
 
         const kanbanPanel = new KanbanWebviewPanel(panel, extensionUri, context);
-
-        // Try to restore the previously loaded document from state
-        // First check the serializer state parameter, then check workspace state for recent panels
-        let documentUri = state?.documentUri;
-
-        if (!documentUri) {
-            // Fallback: Look for panel states in workspace that haven't been revived yet
-            const allKeys = context.globalState.keys();
-            // Look for both old kanban_panel_* keys and new kanban_doc_* keys
-            const panelKeys = allKeys.filter(key => key.startsWith('kanban_panel_') || key.startsWith('kanban_doc_'));
-
-            if (panelKeys.length > 0) {
-                // Find available panel states, prioritizing recent ones
-                const availableStates: Array<{ uri: string; time: number }> = [];
-
-                for (const key of panelKeys) {
-                    const panelState = context.globalState.get<PersistedPanelState>(key);
-                    if (panelState?.documentUri && !KanbanWebviewPanel._revivedUris.has(panelState.documentUri)) {
-                        availableStates.push({
-                            uri: panelState.documentUri,
-                            time: panelState.lastAccessed || 0
-                        });
-                    }
-                }
-
-                // Sort by most recent and use the first available
-                if (availableStates.length > 0) {
-                    availableStates.sort((a, b) => b.time - a.time);
-                    documentUri = availableStates[0].uri;
-                    // Mark this URI as revived to prevent other panels from using it
-                    KanbanWebviewPanel._revivedUris.add(documentUri);
-
-                    // Clear the revival tracking after a short delay (panels should be revived quickly)
-                    setTimeout(() => {
-                        KanbanWebviewPanel._revivedUris.clear();
-                    }, REVIVAL_TRACKING_CLEAR_DELAY_MS);
-                }
-            }
-        } else {
-            // State was provided by webview serialization - this is the preferred path
-            // Mark as revived to prevent fallback logic from using it
-            KanbanWebviewPanel._revivedUris.add(documentUri);
-        }
+        let documentUri = state?.documentUri || KanbanWebviewPanel._findUnrevivedDocumentUri(context);
 
         if (documentUri) {
-            // CRITICAL: Use async IIFE to properly handle promise rejections
-            // The revive() method is not async, so we need to handle errors ourselves
+            KanbanWebviewPanel._revivedUris.add(documentUri);
+            setTimeout(() => KanbanWebviewPanel._revivedUris.clear(), REVIVAL_TRACKING_CLEAR_DELAY_MS);
+
             (async () => {
                 try {
                     const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
                     await kanbanPanel.loadMarkdownFile(document);
-                } catch (error) {
-                    // This catches both openTextDocument failures (file not found) and loadMarkdownFile failures
-                    console.warn('[Panel Revive] Failed to load document:', documentUri, error);
-                    // Fallback: try to find an active markdown document
+                } catch {
                     kanbanPanel.tryAutoLoadActiveMarkdown();
                 }
             })();
         } else {
-            // No state available, try to auto-load active markdown document
             kanbanPanel.tryAutoLoadActiveMarkdown();
         }
-        // Don't store in map yet - will be stored when document is loaded
     }
 
-    // Add this method to get a panel by document URI:
+    private static _findUnrevivedDocumentUri(context: vscode.ExtensionContext): string | undefined {
+        const panelKeys = context.globalState.keys().filter(key =>
+            key.startsWith('kanban_panel_') || key.startsWith('kanban_doc_')
+        );
+
+        const availableStates = panelKeys
+            .map(key => context.globalState.get<PersistedPanelState>(key))
+            .filter((s): s is PersistedPanelState =>
+                !!s?.documentUri && !KanbanWebviewPanel._revivedUris.has(s.documentUri)
+            )
+            .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+
+        return availableStates[0]?.documentUri;
+    }
+
     public static getPanelForDocument(documentUri: string): KanbanWebviewPanel | undefined {
         return KanbanWebviewPanel.panels.get(documentUri);
     }
 
-    // Add this method to get all panels:
     public static getAllPanels(): KanbanWebviewPanel[] {
         return Array.from(KanbanWebviewPanel.panels.values());
     }
 
-    public getPanelId(): string {
-        return this._context.panelId;
-    }
-
-    public getPanel(): vscode.WebviewPanel {
-        return this._panel;
-    }
-
-    public hasUnsavedChanges(): boolean {
-        // Query main file for unsaved changes (single source of truth)
-        const mainFile = this._fileRegistry.getMainFile();
-        return mainFile?.hasUnsavedChanges() || false;
-    }
+    public getPanelId(): string { return this._context.panelId; }
+    public getPanel(): vscode.WebviewPanel { return this._panel; }
+    public hasUnsavedChanges(): boolean { return this._fileRegistry.getMainFile()?.hasUnsavedChanges() || false; }
 
     private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         this._panel = panel;
         this._extensionUri = extensionUri;
         this._extensionContext = context;
 
-        // Initialize panel architecture components (Phase 1)
         const isDevelopment = !context.extensionMode || context.extensionMode === vscode.ExtensionMode.Development;
-        this._context = new PanelContext(undefined, isDevelopment);  // Unified state model
+        this._context = new PanelContext(undefined, isDevelopment);
         this._concurrency = new ConcurrencyManager(isDevelopment);
 
-        this._boardStore = new BoardStore({
-            webview: this._panel.webview,
-            maxUndoStackSize: MAX_UNDO_STACK_SIZE
-        });
-
-        this._webviewBridge = new WebviewBridge({
-            maxBatchSize: MAX_BATCH_SIZE,
-            batchFlushDelay: BATCH_FLUSH_DELAY_MS,
-            debug: isDevelopment
-        });
+        this._boardStore = new BoardStore({ webview: this._panel.webview, maxUndoStackSize: MAX_UNDO_STACK_SIZE });
+        this._webviewBridge = new WebviewBridge({ maxBatchSize: MAX_BATCH_SIZE, batchFlushDelay: BATCH_FLUSH_DELAY_MS, debug: isDevelopment });
         this._webviewBridge.setWebview(this._panel.webview);
 
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
-
-        // Get the conflict resolver instance
         this._conflictResolver = ConflictResolver.getInstance();
 
-        // Initialize file abstraction system
         this._fileRegistry = new MarkdownFileRegistry();
-        this._fileFactory = new FileFactory(
-            this._fileManager,
-            this._conflictResolver,
-            this._backupManager,
-            this._fileRegistry
-        );
-
-        // Initialize unified change state machine (Phase 6)
-        // Create panel-specific state machine instance (NOT singleton)
-        // Each panel needs its own instance to prevent cross-panel data contamination
+        this._fileFactory = new FileFactory(this._fileManager, this._conflictResolver, this._backupManager, this._fileRegistry);
         this._stateMachine = new ChangeStateMachine(this._fileRegistry, this);
 
-        // Initialize include file coordinator (Phase 2)
         this._includeCoordinator = new IncludeFileCoordinator({
             fileRegistry: this._fileRegistry,
             fileFactory: this._fileFactory,
@@ -337,7 +243,6 @@ export class KanbanWebviewPanel {
             getMainFile: () => this._fileRegistry.getMainFile()
         });
 
-        // Initialize webview manager (Phase 3)
         this._webviewManager = new WebviewManager({
             extensionUri: this._extensionUri,
             extensionContext: this._extensionContext,
@@ -347,10 +252,7 @@ export class KanbanWebviewPanel {
             isInitialized: () => this._context.initialized
         });
 
-        // Initialize handler registry
         this._handlerRegistry = new HandlerRegistry();
-
-        // Initialize FileRegistryChangeHandler (extracted file registry change logic)
         this._handlerRegistry.registerFileRegistryChange(new FileRegistryChangeHandler({
             fileRegistry: this._fileRegistry,
             boardStore: this._boardStore,
@@ -362,78 +264,43 @@ export class KanbanWebviewPanel {
             sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh)
         }));
 
-        // Initialize KanbanFileService with grouped callbacks
-        const fileServiceCallbacks: KanbanFileServiceCallbacks = {
-            getBoard: () => this.getBoard(),
-            setBoard: (board) => this._boardStore.setBoard(board, false),
-            sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
-            getPanel: () => this._panel,
-            getContext: () => this._extensionContext,
-            showConflictDialog: (context) => this.showConflictDialog(context),
-            updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
-            clearUndoRedo: () => this._boardStore.clearHistory(),
-            getPanelInstance: () => this
-        };
-
         this._fileService = new KanbanFileService(
-            this._fileManager,
-            this._fileRegistry,
-            this._fileFactory,
-            this._backupManager,
-            this._boardOperations,
-            fileServiceCallbacks,
-            this._context,  // Shared panel context
-            KanbanWebviewPanel.panelStates,
-            KanbanWebviewPanel.panels
+            this._fileManager, this._fileRegistry, this._fileFactory, this._backupManager, this._boardOperations,
+            {
+                getBoard: () => this.getBoard(),
+                setBoard: (board) => this._boardStore.setBoard(board, false),
+                sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
+                getPanel: () => this._panel,
+                getContext: () => this._extensionContext,
+                showConflictDialog: (ctx) => this.showConflictDialog(ctx),
+                updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
+                clearUndoRedo: () => this._boardStore.clearHistory(),
+                getPanelInstance: () => this
+            },
+            this._context, KanbanWebviewPanel.panelStates, KanbanWebviewPanel.panels
         );
 
-        // Initialize LinkHandler (now uses event-driven approach, no callback needed)
-        this._linkHandler = new LinkHandler(
-            this._fileManager,
-            this._panel.webview
-        );
-
-        // Set up document change listener to track external unsaved modifications
+        this._linkHandler = new LinkHandler(this._fileManager, this._panel.webview);
         this.setupDocumentChangeListener();
 
-        // Initialize message handler with callbacks
-        this._messageHandler = new MessageHandler(
-            this._fileManager,
-            this._boardStore,
-            this._boardOperations,
-            this._linkHandler,
-            {
-                onBoardUpdate: this.sendBoardUpdate.bind(this),
-                onSaveToMarkdown: this.saveToMarkdown.bind(this),
-                onInitializeFile: this.initializeFile.bind(this),
-                getCurrentBoard: () => this.getBoard(),
-                setBoard: (board: KanbanBoard) => {
-                    this._boardStore.setBoard(board, true);
-                },
-                setUndoRedoOperation: (isOperation: boolean) => {
-                    this._context.setUndoRedoOperation(isOperation);
-                },
-                getWebviewPanel: () => this,
-                getWebviewBridge: () => this._webviewBridge,
-                emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
-            }
-        );
+        this._messageHandler = new MessageHandler(this._fileManager, this._boardStore, this._boardOperations, this._linkHandler, {
+            onBoardUpdate: this.sendBoardUpdate.bind(this),
+            onSaveToMarkdown: this.saveToMarkdown.bind(this),
+            onInitializeFile: this.initializeFile.bind(this),
+            getCurrentBoard: () => this.getBoard(),
+            setBoard: (board: KanbanBoard) => this._boardStore.setBoard(board, true),
+            setUndoRedoOperation: (isOperation: boolean) => this._context.setUndoRedoOperation(isOperation),
+            getWebviewPanel: () => this,
+            getWebviewBridge: () => this._webviewBridge,
+            emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
+        });
 
-        // Connect message handler to file registry (for stopping edit mode during conflicts)
         this._fileRegistry.setMessageHandler(this._messageHandler);
-
-        // Note: No initializeState() call needed - PanelContext is shared directly
-
         this._initialize();
         this._setupEventListeners();
-
-        // ENHANCED: Listen for workspace folder changes
         this._setupWorkspaceChangeListener();
-
-        // Listen for document close events
         this._setupDocumentCloseListener();
 
-        // Initialize event-driven board sync handler
         this._handlerRegistry.registerBoardSync(new BoardSyncHandler({
             boardStore: this._boardStore,
             fileRegistry: this._fileRegistry,
@@ -575,106 +442,48 @@ export class KanbanWebviewPanel {
     }
 
     private _setupEventListeners() {
-        // Handle panel disposal - check for unsaved changes first
-        this._panel.onDidDispose(async () => {
-            await this._handlePanelClose();
+        this._panel.onDidDispose(() => this._handlePanelClose(), null, this._disposables);
+
+        this._panel.onDidChangeViewState(async e => {
+            if (e.webviewPanel.visible) {
+                this._fileManager.sendFileInfo();
+                this.syncDirtyItems();
+                await this.refreshConfiguration();
+                eventBus.emitSync(createEvent('focus:gained', 'KanbanWebviewPanel'));
+
+                if (this._fileManager.getDocument() && (!this.getBoard() || !this._context.initialized)) {
+                    this._ensureBoardAndSendUpdate();
+                }
+            }
         }, null, this._disposables);
 
-        // View state change handler
-        this._panel.onDidChangeViewState(
-            async e => {
-                if (e.webviewPanel.visible) {
-                    console.log('[Focus] Panel became visible');
-
-                    // Panel became visible - send file info
-                    this._fileManager.sendFileInfo();
-
-                    // Sync any pending DOM updates (items with unrendered changes)
-                    this.syncDirtyItems();
-
-                    // ⚠️ REFRESH ALL CONFIGURATION when view gains focus
-                    // This ensures settings (shortcuts, tag colors, layout, etc.) are always up-to-date
-                    await this.refreshConfiguration();
-
-                    // Emit focus:gained event - FileSyncHandler handles both include and media file checks
-                    // This is the unified code path for external change detection
-                    eventBus.emitSync(createEvent('focus:gained', 'KanbanWebviewPanel'));
-
-                    // Only ensure board content is sent in specific cases to avoid unnecessary re-renders
-                    if (this._fileManager.getDocument()) {
-                        const hasBoard = !!this.getBoard();
-                        const isInitialized = this._context.initialized;
-                        console.log(`[Focus] Board check: hasBoard=${hasBoard}, initialized=${isInitialized}`);
-
-                        if (!hasBoard || !isInitialized) {
-                            console.log('[Focus] ⚠️ TRIGGERING _ensureBoardAndSendUpdate');
-                            this._ensureBoardAndSendUpdate();
-                        }
-                    }
-                }
-                // Note: Unsaved changes are now handled via page visibility events in webview.js
-            },
-            null,
-            this._disposables
-        );
-
-        this._panel.webview.onDidReceiveMessage(
-            async (message) => {
-                // Handle webviewReady at panel level - controls when board updates are sent
-                if (message.type === 'webviewReady') {
-                    this._handleWebviewReady();
-                    return;
-                }
-
-                try {
-                    await this._messageHandler.handleMessage(message);
-                } catch (error) {
-                    console.error(`[PANEL] Error handling message ${message.type}:`, error);
-                    if (error instanceof Error) {
-                        console.error('[PANEL] Stack trace:', error.stack);
-                    }
-                }
-            },
-            null,
-            this._disposables
-        );
+        this._panel.webview.onDidReceiveMessage(async (message) => {
+            if (message.type === 'webviewReady') {
+                this._handleWebviewReady();
+                return;
+            }
+            try {
+                await this._messageHandler.handleMessage(message);
+            } catch (error) {
+                console.error(`[PANEL] Error handling message ${message.type}:`, error);
+            }
+        }, null, this._disposables);
     }
 
-    /**
-     * Handle webviewReady message - webview is ready to receive board updates
-     */
     private _handleWebviewReady(): void {
-        // CRITICAL FIX: Detect if webview was silently recreated by VS Code
-        // If webviewReady is already true, VS Code recreated the webview (memory pressure, etc.)
-        // Any messages sent while we thought the webview was ready were lost!
         const wasAlreadyReady = this._context.webviewReady;
-
         this._context.setWebviewReady(true);
 
-        // Send any pending board update (consume and clear atomically)
         const pendingUpdate = this._context.consumePendingBoardUpdate();
         if (pendingUpdate) {
             this.sendBoardUpdate(pendingUpdate.applyDefaultFolding, pendingUpdate.isFullRefresh);
         } else if (wasAlreadyReady) {
-            // Webview was recreated by VS Code - ALL messages sent since last webviewReady were lost!
-            // Re-send EVERYTHING the webview needs:
-
-            // CRITICAL: Only re-send if we actually have a board to send
-            // During panel revival, the board hasn't been loaded yet - initialization will handle it
-            // Also skip during initialBoardLoad - that code path will send the board update
+            // Webview was recreated - re-send state
             const board = this.getBoard();
-            if (!board || !board.valid || this._context.initialBoardLoad) {
-                // No board yet or initialization in progress - skip, initialization will send it
-                return;
-            }
+            if (!board || !board.valid || this._context.initialBoardLoad) return;
 
-            // 1. File info (filename, path, locked status)
             this._fileManager.sendFileInfo();
-
-            // 2. Full board update (includes _refreshAllViewConfiguration internally)
             this.sendBoardUpdate(false, true);
-
-            // 3. Undo/redo status - CRITICAL: webview's canUndo/canRedo variables reset to false on recreation
             this._boardStore.resendUndoRedoStatus();
         }
     }
