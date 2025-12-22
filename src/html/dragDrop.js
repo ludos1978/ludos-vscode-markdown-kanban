@@ -2581,8 +2581,6 @@ function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null
 
         // Capture undo state BEFORE modifying the board
         // This is a cache-first operation, so we need to explicitly save undo state
-        const taskCount = window.cachedBoard.columns.reduce((sum, c) => sum + (c.tasks?.length || 0), 0);
-        console.log(`[DragDrop] createTasksWithContent: sending saveUndoState with taskCount=${taskCount}`);
         vscode.postMessage({
             type: 'saveUndoState',
             operation: 'createTasksFromDrop',
@@ -2607,8 +2605,6 @@ function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null
         } else {
             targetColumn.tasks.push(...newTasks);
         }
-        const newTaskCount = window.cachedBoard.columns.reduce((sum, c) => sum + (c.tasks?.length || 0), 0);
-        console.log(`[DragDrop] createTasksWithContent: after adding ${newTasks.length} task(s), newTaskCount=${newTaskCount}`);
 
         // Mark as unsaved changes (syncs modified board to backend)
         if (typeof markUnsavedChanges === 'function') {
