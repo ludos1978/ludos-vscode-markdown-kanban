@@ -302,143 +302,70 @@ export class KanbanWebviewPanel {
         this._setupDocumentCloseListener();
 
         this._handlerRegistry.registerBoardSync(new BoardSyncHandler({
-            boardStore: this._boardStore,
-            fileRegistry: this._fileRegistry,
-            getMediaTracker: () => this._mediaTracker,
-            backupManager: this._backupManager,
-            getDocument: () => this._fileManager.getDocument()
+            boardStore: this._boardStore, fileRegistry: this._fileRegistry, getMediaTracker: () => this._mediaTracker,
+            backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument()
         }));
 
-        // Initialize file sync handler (handles focus:gained and unified sync)
         this._handlerRegistry.registerFileSync(new FileSyncHandler({
-            fileRegistry: this._fileRegistry,
-            boardStore: this._boardStore,
-            getMediaTracker: () => this._mediaTracker,
-            getWebviewBridge: () => this._webviewBridge,
-            getBoard: () => this.getBoard(),
-            panelContext: this._context,
-            sendBoardUpdate: (isFullRefresh, applyDefaultFolding) =>
-                this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
+            fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,
+            getWebviewBridge: () => this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context,
+            sendBoardUpdate: (isFullRefresh, applyDefaultFolding) => this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         }));
 
-        // Initialize LinkReplacementHandler (event-driven link replacement)
         this._handlerRegistry.registerLinkReplacement(new LinkReplacementHandler({
-            boardStore: this._boardStore,
-            fileRegistry: this._fileRegistry,
-            webviewBridge: this._webviewBridge,
-            getBoard: () => this.getBoard()
+            boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard()
         }));
 
-        // Initialize UnsavedChangesService (extracted unsaved changes logic)
         this._handlerRegistry.registerUnsavedChanges(new UnsavedChangesService(this._fileRegistry));
 
-        // Initialize WebviewUpdateService (extracted webview update logic)
         this._handlerRegistry.registerWebviewUpdate(new WebviewUpdateService({
-            boardStore: this._boardStore,
-            webviewBridge: this._webviewBridge,
-            fileRegistry: this._fileRegistry,
-            webviewManager: this._webviewManager,
-            panelContext: this._context,
-            getBoard: () => this.getBoard(),
-            hasPanel: () => !!this._panel
+            boardStore: this._boardStore, webviewBridge: this._webviewBridge, fileRegistry: this._fileRegistry,
+            webviewManager: this._webviewManager, panelContext: this._context, getBoard: () => this.getBoard(), hasPanel: () => !!this._panel
         }));
 
-        // Initialize BoardInitializationHandler (extracted board init logic)
         this._handlerRegistry.registerBoardInit(new BoardInitializationHandler({
-            fileRegistry: this._fileRegistry,
-            fileFactory: this._fileFactory,
-            includeCoordinator: this._includeCoordinator,
-            panelContext: this._context,
-            getFileSyncHandler: () => this._handlerRegistry.getFileSync(),
-            getBoard: () => this.getBoard(),
-            getPanel: () => this._panel,
-            onMediaChanged: (changedFiles) => {
-                // Send changed file paths to frontend for selective re-rendering
-                if (this._panel) {
-                    this._panel.webview.postMessage({
-                        type: 'mediaFilesChanged',
-                        changedFiles: changedFiles.map(f => ({
-                            path: f.path,
-                            absolutePath: f.absolutePath,
-                            type: f.type
-                        }))
-                    });
-                }
-            }
+            fileRegistry: this._fileRegistry, fileFactory: this._fileFactory, includeCoordinator: this._includeCoordinator,
+            panelContext: this._context, getFileSyncHandler: () => this._handlerRegistry.getFileSync(),
+            getBoard: () => this.getBoard(), getPanel: () => this._panel,
+            onMediaChanged: (files) => this._panel?.webview.postMessage({
+                type: 'mediaFilesChanged', changedFiles: files.map(f => ({ path: f.path, absolutePath: f.absolutePath, type: f.type }))
+            })
         }));
-
-        // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
-    /**
-     * Setup listener for document close events to handle graceful degradation
-     */
     private _setupDocumentCloseListener() {
-        // Listen for document close events
-        const documentCloseListener = vscode.workspace.onDidCloseTextDocument(async (document) => {
-            const currentDocument = this._fileManager.getDocument();
-
-            if (currentDocument && currentDocument.uri.toString() === document.uri.toString()) {
-                // DO NOT close the panel when the document is closed!
-                // The kanban should stay open and functional
-                // Clear document reference but keep file path for display
+        this._disposables.push(vscode.workspace.onDidCloseTextDocument(document => {
+            const currentDoc = this._fileManager.getDocument();
+            if (currentDoc?.uri.toString() === document.uri.toString()) {
                 this._fileManager.clearDocument();
                 this._fileManager.sendFileInfo();
             }
-        });
-
-        this._disposables.push(documentCloseListener);
+        }));
     }
 
-    /**
-     * Setup listener for workspace folder changes to update webview permissions
-     */
     private _setupWorkspaceChangeListener() {
-        // Listen for workspace folder changes
-        const workspaceChangeListener = vscode.workspace.onDidChangeWorkspaceFolders(_event => {
-                this._webviewManager.updatePermissions();
-        });
-        
-        this._disposables.push(workspaceChangeListener);
+        this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => this._webviewManager.updatePermissions()));
     }
 
-    // Public methods for external access
-    public isFileLocked(): boolean {
-        return this._fileManager.isFileLocked();
-    }
-
-    public toggleFileLock(): void {
-        this._fileManager.toggleFileLock();
-    }
-
-    public getCurrentDocumentUri(): vscode.Uri | undefined {
-        return this._fileManager.getCurrentDocumentUri();
-    }
+    public isFileLocked(): boolean { return this._fileManager.isFileLocked(); }
+    public toggleFileLock(): void { this._fileManager.toggleFileLock(); }
+    public getCurrentDocumentUri(): vscode.Uri | undefined { return this._fileManager.getCurrentDocumentUri(); }
 
     private _initialize() {
         if (!this._context.initialized) {
-            // CRITICAL: Reset webviewReady before setting new HTML
-            // During panel revival, VS Code's cached webview may have already sent webviewReady
-            // before we replace the HTML. This ensures we wait for the NEW webview's ready message.
             this._context.setWebviewReady(false);
             this._panel.webview.html = this._webviewManager.generateHtml();
             this._context.setInitialized(true);
         }
     }
 
-    /**
-     * Restore panel state from file service
-     * Called after any file service operation to keep states in sync
-     */
     private _restoreStateFromFileService(): void {
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        // STATE-2: Cache board if available
         if (state.cachedBoardFromWebview) {
             this._boardStore.setBoard(state.cachedBoardFromWebview, false);
         }
-        // Document state fields are now in shared PanelContext - no sync needed
     }
 
     private _setupEventListeners() {
@@ -494,26 +421,16 @@ export class KanbanWebviewPanel {
     }
 
     public async loadMarkdownFile(document: vscode.TextDocument, forceReload: boolean = false) {
-        // RACE-4: Wrap entire operation with lock to prevent concurrent file loads
         return this._concurrency.withLock('loadMarkdownFile', async () => {
-            // CRITICAL: Set initial board load flag BEFORE loading main file
-            // This prevents the main file's 'reloaded' event from triggering board regeneration
             this._context.setInitialBoardLoad(true);
-
             await this._fileService.loadMarkdownFile(document, forceReload);
             this._restoreStateFromFileService();
-
-            // Phase 1: Create or update MainKanbanFile instance
             await this._initializeBoardFromDocument(document);
         });
     }
 
-    // Delegate to WebviewUpdateService
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        const webviewUpdate = this._handlerRegistry.getWebviewUpdate();
-        if (webviewUpdate) {
-            await webviewUpdate.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
-        }
+        await this._handlerRegistry.getWebviewUpdate()?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
@@ -526,357 +443,158 @@ export class KanbanWebviewPanel {
         this._restoreStateFromFileService();
     }
 
-    /**
-     * Initialize board from document - delegates to BoardInitializationHandler
-     */
     private async _initializeBoardFromDocument(document: vscode.TextDocument): Promise<void> {
         const boardInit = this._handlerRegistry.getBoardInit();
-        if (!boardInit) {
-            console.error('[KanbanWebviewPanel] BoardInitializationHandler not initialized');
-            return;
-        }
-
-        const result = await boardInit.initializeFromDocument(
-            document,
-            this._mediaTracker
-        );
-
-        // Store the returned MediaTracker
+        if (!boardInit) return;
+        const result = await boardInit.initializeFromDocument(document, this._mediaTracker);
         this._mediaTracker = result.mediaTracker;
     }
 
-    /**
-     * Set editing in progress flag to block board regenerations
-     */
-    public setEditingInProgress(isEditing: boolean): void {
-        this._context.setEditingInProgress(isEditing);
-    }
+    public setEditingInProgress(isEditing: boolean): void { this._context.setEditingInProgress(isEditing); }
+    public markColumnDirty(columnId: string): void { this._boardStore.markColumnDirty(columnId); }
+    public markTaskDirty(taskId: string): void { this._boardStore.markTaskDirty(taskId); }
+    public clearColumnDirty(columnId: string): void { this._boardStore.clearColumnDirty(columnId); }
+    public clearTaskDirty(taskId: string): void { this._boardStore.clearTaskDirty(taskId); }
 
-    /**
-     * Mark a column as having unrendered changes (cache updated, DOM not synced)
-     */
-    public markColumnDirty(columnId: string): void {
-        this._boardStore.markColumnDirty(columnId);
-    }
+    public syncDirtyItems(): void { this._handlerRegistry.getWebviewUpdate()?.syncDirtyItems(); }
 
-    /**
-     * Mark a task as having unrendered changes (cache updated, DOM not synced)
-     */
-    public markTaskDirty(taskId: string): void {
-        this._boardStore.markTaskDirty(taskId);
-    }
-
-    /**
-     * Clear dirty flag for a column (render completed successfully)
-     */
-    public clearColumnDirty(columnId: string): void {
-        this._boardStore.clearColumnDirty(columnId);
-    }
-
-    /**
-     * Clear dirty flag for a task (render completed successfully)
-     */
-    public clearTaskDirty(taskId: string): void {
-        this._boardStore.clearTaskDirty(taskId);
-    }
-
-    /**
-     * Sync dirty items to frontend - delegates to WebviewUpdateService
-     */
-    public syncDirtyItems(): void {
-        const webviewUpdate = this._handlerRegistry.getWebviewUpdate();
-        if (webviewUpdate) {
-            webviewUpdate.syncDirtyItems();
-        }
-    }
-
-    /**
-     * Handle include file switch triggered by user edit (column/task title)
-     * Delegates to IncludeFileCoordinator
-     */
     public async handleIncludeSwitch(params: {
-        columnId?: string;
-        taskId?: string;
-        oldFiles: string[];
-        newFiles: string[];
-        newTitle?: string;
-        preloadedContent?: Map<string, string>;
+        columnId?: string; taskId?: string; oldFiles: string[]; newFiles: string[];
+        newTitle?: string; preloadedContent?: Map<string, string>;
     }): Promise<void> {
         return this._includeCoordinator.handleIncludeSwitch(params);
     }
 
-    /**
-     * Refresh configuration - delegates to WebviewUpdateService
-     */
     public async refreshConfiguration(): Promise<void> {
-        const webviewUpdate = this._handlerRegistry.getWebviewUpdate();
-        if (webviewUpdate) {
-            await webviewUpdate.refreshAllConfiguration();
-        }
+        await this._handlerRegistry.getWebviewUpdate()?.refreshAllConfiguration();
     }
 
-    /**
-     * Get board (single source of truth)
-     *
-     * Returns cached board if valid, otherwise generates fresh board from registry.
-     *
-     * @returns KanbanBoard with all include content, or undefined if not ready
-     */
+    /** Get board - returns cached or generates fresh from registry */
     public getBoard(): KanbanBoard | undefined {
         if (this._boardStore.isCacheValid()) {
             const cachedBoard = this._boardStore.getBoard();
-            if (cachedBoard) {
-                return cachedBoard;
-            }
+            if (cachedBoard) return cachedBoard;
         }
 
-        // Generate fresh board from registry
-        // CRITICAL FIX: Pass existing cached board to preserve column/task IDs
-        // This prevents "Column not found" errors when cache is invalidated
+        // Generate fresh board, preserving existing IDs to prevent "Column not found" errors
         const existingBoard = this._boardStore.getBoard();
         const board = this._fileRegistry.generateBoard(existingBoard || undefined);
-
-        // Cache the result
-        if (board) {
-            this._boardStore.setBoard(board, false); // Don't emit event here - we're just caching
-        }
-
+        if (board) this._boardStore.setBoard(board, false);
         return board;
     }
 
-    /**
-     * Emit board:changed event to sync board state
-     *
-     * Emits an event that BoardSyncHandler handles.
-     * This handles: board store update, include file sync, markdown generation,
-     * media tracking, and backup creation.
-     *
-     * @param board - The board state that changed
-     * @param trigger - What caused the change (edit, undo, redo, template, etc.)
-     */
+    /** Emit board:changed event - triggers BoardSyncHandler for sync/save/backup */
     public emitBoardChanged(board: KanbanBoard, trigger: BoardChangeTrigger = 'edit'): void {
-        eventBus.emitSync(createEvent('board:changed', 'KanbanWebviewPanel', {
-            board,
-            trigger
-        }));
+        eventBus.emitSync(createEvent('board:changed', 'KanbanWebviewPanel', { board, trigger }));
     }
 
-    /**
-     * Emit board:loaded event after initial board load completes
-     * This triggers media tracking updates for include files
-     */
+    /** Emit board:loaded event - triggers media tracking for include files */
     public emitBoardLoaded(board: KanbanBoard): void {
-        eventBus.emitSync(createEvent('board:loaded', 'KanbanWebviewPanel', {
-            board
-        }));
+        eventBus.emitSync(createEvent('board:loaded', 'KanbanWebviewPanel', { board }));
     }
 
-    /**
-     * STATE-2: Invalidate board cache
-     *
-     * Call this whenever registry files change to force fresh board generation on next access.
-     * Examples: file reload, content change, include switch, etc.
-     *
-     * CRITICAL: Blocked during include switches to prevent ID regeneration
-     */
+    /** Invalidate board cache (blocked during include switches to prevent ID regeneration) */
     public invalidateBoardCache(): void {
-        // CRITICAL FIX: Block invalidation during include switches
-        // This prevents column/task IDs from regenerating mid-switch
-        if (this._context.includeSwitchInProgress) {
-            return;
-        }
-
-        this._boardStore.invalidateCache();
+        if (!this._context.includeSwitchInProgress) this._boardStore.invalidateCache();
     }
 
-    /**
-     * Set include switch in-progress flag
-     *
-     * When true, blocks cache invalidation to prevent ID regeneration during include switches.
-     * State machine sets this to true at start of LOAD state, false at COMPLETE.
-     */
+    /** Set include switch in-progress flag - blocks cache invalidation when true */
     public setIncludeSwitchInProgress(inProgress: boolean): void {
         this._context.setIncludeSwitchInProgress(inProgress);
     }
 
     private async _handlePanelClose() {
-        // CRITICAL: Remove from panels map IMMEDIATELY to prevent reuse during disposal
+        // Remove from panels map immediately to prevent reuse during disposal
+        this._removeFromPanelsMap();
+
+        const unsavedChanges = this._handlerRegistry.getUnsavedChanges();
+        if (!unsavedChanges) return this.dispose();
+
+        const unsavedInfo = unsavedChanges.checkForUnsavedChanges();
+        if (!unsavedInfo.hasMainFileChanges && !unsavedInfo.hasIncludeFileChanges) return this.dispose();
+
+        const choice = await unsavedChanges.showUnsavedChangesDialog(unsavedInfo);
+        if (choice === 'save') {
+            try { await this.saveToMarkdown(true, true); }
+            catch (error) { vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`); }
+        } else {
+            unsavedChanges.discardAllChanges();
+        }
+        this.dispose();
+    }
+
+    private _removeFromPanelsMap(): void {
         const trackedUri = this._context.trackedDocumentUri;
         if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
             KanbanWebviewPanel.panels.delete(trackedUri);
         }
         for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
-            if (panel === this) {
-                KanbanWebviewPanel.panels.delete(uri);
-            }
-        }
-
-        const unsavedChanges = this._handlerRegistry.getUnsavedChanges();
-        if (!unsavedChanges) {
-            this.dispose();
-            return;
-        }
-
-        const unsavedInfo = unsavedChanges.checkForUnsavedChanges();
-        if (!unsavedInfo.hasMainFileChanges && !unsavedInfo.hasIncludeFileChanges) {
-            this.dispose();
-            return;
-        }
-
-        const choice = await unsavedChanges.showUnsavedChangesDialog(unsavedInfo);
-
-        switch (choice) {
-            case 'save':
-                try {
-                    await this.saveToMarkdown(true, true);
-                } catch (error) {
-                    console.error('[PanelClose] Save failed:', error);
-                    vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`);
-                }
-                this.dispose();
-                break;
-
-            case 'discard':
-                unsavedChanges.discardAllChanges();
-                this.dispose();
-                break;
-
-            case 'cancel':
-            default:
-                console.warn('[PanelClose] User cancelled, but panel already disposed');
-                unsavedChanges.discardAllChanges();
-                this.dispose();
-                break;
+            if (panel === this) KanbanWebviewPanel.panels.delete(uri);
         }
     }
 
     private tryAutoLoadActiveMarkdown() {
-        // Only auto-load the currently active markdown document in the editor
-        // Don't auto-load random open markdown files (caused wrong files to load on revival)
         const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document.languageId === 'markdown') {
+        if (activeEditor?.document.languageId === 'markdown') {
             this.loadMarkdownFile(activeEditor.document);
         }
-        // If no active markdown editor, panel remains empty - user can manually select a file
     }
 
-    /**
-     * Check if this panel has unsaved changes
-     * Used by extension deactivate() to prompt before VSCode closes
-     */
+    /** Check if this panel has unsaved changes */
     public async checkUnsavedChanges(): Promise<boolean> {
         return this._fileRegistry.hasAnyUnsavedChanges();
     }
 
-    /**
-     * Save unsaved changes to backup files
-     */
+    /** Save unsaved changes to backup files */
     public async saveUnsavedChangesBackup(): Promise<void> {
-        const unsavedChanges = this._handlerRegistry.getUnsavedChanges();
-        if (unsavedChanges) {
-            await unsavedChanges.saveBackups(this.getCurrentDocumentUri());
-        }
+        await this._handlerRegistry.getUnsavedChanges()?.saveBackups(this.getCurrentDocumentUri());
     }
 
     public async dispose() {
-        // Prevent double disposal
-        if (this._context.disposed) {
-            return;
-        }
+        if (this._context.disposed) return;
         this._context.setDisposed(true);
 
-        // Remove from panels map
-        const trackedUri = this._context.trackedDocumentUri;
-        if (trackedUri && KanbanWebviewPanel.panels.get(trackedUri) === this) {
-            KanbanWebviewPanel.panels.delete(trackedUri);
-        }
-        for (const [uri, panel] of KanbanWebviewPanel.panels.entries()) {
-            if (panel === this) {
-                KanbanWebviewPanel.panels.delete(uri);
-            }
-        }
+        this._removeFromPanelsMap();
 
-        // Clear unsaved changes flag
-        const mainFile = this._fileRegistry.getMainFile();
-        if (mainFile) {
-            mainFile.discardChanges();
-        }
+        this._fileRegistry.getMainFile()?.discardChanges();
         this._context.setClosingPrevented(false);
 
-        // Dispose core components
         this._webviewBridge.dispose();
         KanbanWebviewPanel.panelStates.delete(this._context.panelId);
         this._concurrency.dispose();
 
-        // Unregister from SaveEventDispatcher
         const document = this._fileManager.getDocument();
-        if (document) {
-            SaveEventDispatcher.getInstance().unregisterHandler(`panel-${document.uri.fsPath}`);
-        }
+        if (document) SaveEventDispatcher.getInstance().unregisterHandler(`panel-${document.uri.fsPath}`);
 
-        // Dispose managers
         this._backupManager.dispose();
-        if (this._mediaTracker) {
-            this._mediaTracker.dispose();
-            this._mediaTracker = null;
-        }
+        this._mediaTracker?.dispose();
+        this._mediaTracker = null;
 
-        // Dispose all handlers via registry
         this._handlerRegistry.dispose();
-
-        // Dispose remaining resources
         this._fileRegistry.dispose();
         this._boardStore.dispose();
         this._panel.dispose();
 
-        while (this._disposables.length) {
-            this._disposables.pop()?.dispose();
-        }
+        while (this._disposables.length) this._disposables.pop()?.dispose();
     }
 
-    public get backupManager(): BackupManager {
-        return this._backupManager;
-    }
+    public get backupManager(): BackupManager { return this._backupManager; }
+    public get fileRegistry(): MarkdownFileRegistry { return this._fileRegistry; }
+    public get fileFactory(): FileFactory { return this._fileFactory; }
 
-    public get fileRegistry(): MarkdownFileRegistry {
-        return this._fileRegistry;
-    }
-
-    public get fileFactory(): FileFactory {
-        return this._fileFactory;
-    }
-
-    /**
-     * Setup document change listener to track external modifications
-     */
     private setupDocumentChangeListener(): void {
         this._fileService.setupDocumentChangeListener(this._disposables);
     }
 
-    /**
-     * Ensure an include file is registered in the unified system for conflict resolution
-     */
     public ensureIncludeFileRegistered(relativePath: string, type: 'regular' | 'column' | 'task'): void {
         this._fileRegistry.ensureIncludeFileRegistered(relativePath, type, this._fileFactory);
     }
 
-    /**
-     * Show conflict dialog to user
-     */
     public async showConflictDialog(context: ConflictContext): Promise<ConflictResolution> {
-        // Use ConflictResolver to handle the dialog
-        return await this._conflictResolver.resolveConflict(context);
+        return this._conflictResolver.resolveConflict(context);
     }
 
-    /**
-     * Trigger snippet insertion in the webview
-     */
     public triggerSnippetInsertion(): void {
-        if (this._panel) {
-            const snippetMessage: TriggerSnippetMessage = {
-                type: 'triggerSnippet'
-            };
-            this._webviewBridge.send(snippetMessage);
-        }
+        if (this._panel) this._webviewBridge.send({ type: 'triggerSnippet' } as TriggerSnippetMessage);
     }
 }
