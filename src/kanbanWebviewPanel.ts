@@ -9,11 +9,9 @@ import { LinkHandler } from './services/LinkHandler';
 import { MessageHandler } from './messageHandler';
 import { BackupManager } from './services/BackupManager';
 import { ConflictResolver, ConflictContext, ConflictResolution } from './services/ConflictResolver';
-import { configService } from './services/ConfigurationService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 import { KanbanFileService, KanbanFileServiceCallbacks } from './kanbanFileService';
-import { MediaTracker, ChangedMediaFile } from './services/MediaTracker';
-import { LinkOperations } from './utils/linkOperations';
+import { MediaTracker } from './services/MediaTracker';
 import { getErrorMessage } from './utils/stringUtils';
 import {
     MarkdownFileRegistry,
@@ -25,18 +23,9 @@ import { BoardStore, UndoCapture } from './core/stores';
 import { WebviewBridge } from './core/bridge';
 import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, eventBus, createEvent, BoardChangeTrigger } from './core/events';
 import { UnsavedChangesService } from './services/UnsavedChangesService';
-import {
-    BoardUpdateMessage,
-    UpdateIncludeContentMessage,
-    SyncDirtyItemsMessage,
-    SyncDirtyColumnInfo,
-    SyncDirtyTaskInfo,
-    UpdateShortcutsMessage,
-    ConfigurationUpdateMessage,
-    TriggerSnippetMessage
-} from './core/bridge/MessageTypes';
+import { WebviewUpdateService } from './services/WebviewUpdateService';
+import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
-import { KeybindingService } from './services/KeybindingService';
 import {
     REVIVAL_TRACKING_CLEAR_DELAY_MS,
     MAX_UNDO_STACK_SIZE,
@@ -97,9 +86,10 @@ export class KanbanWebviewPanel {
     private _webviewBridge: WebviewBridge;
     private _boardSyncHandler: BoardSyncHandler | null = null;
     private _fileSyncHandler: FileSyncHandler | null = null;
-    // NEW: Event-driven handlers
+    // NEW: Event-driven handlers and services
     private _linkReplacementHandler: LinkReplacementHandler | null = null;
     private _unsavedChangesService: UnsavedChangesService | null = null;
+    private _webviewUpdateService: WebviewUpdateService | null = null;
 
     // Public getter for webview to allow proper access from messageHandler
     public get webview(): vscode.Webview {
@@ -473,6 +463,17 @@ export class KanbanWebviewPanel {
         // Initialize UnsavedChangesService (extracted unsaved changes logic)
         this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
 
+        // Initialize WebviewUpdateService (extracted webview update logic)
+        this._webviewUpdateService = new WebviewUpdateService({
+            boardStore: this._boardStore,
+            webviewBridge: this._webviewBridge,
+            fileRegistry: this._fileRegistry,
+            webviewManager: this._webviewManager,
+            panelContext: this._context,
+            getBoard: () => this.getBoard(),
+            hasPanel: () => !!this._panel
+        });
+
         // Document will be loaded via loadMarkdownFile call from createOrShow
     }
 
@@ -569,7 +570,7 @@ export class KanbanWebviewPanel {
 
                     // ⚠️ REFRESH ALL CONFIGURATION when view gains focus
                     // This ensures settings (shortcuts, tag colors, layout, etc.) are always up-to-date
-                    await this._refreshAllViewConfiguration();
+                    await this.refreshConfiguration();
 
                     // Emit focus:gained event - FileSyncHandler handles both include and media file checks
                     // This is the unified code path for external change detection
@@ -674,59 +675,11 @@ export class KanbanWebviewPanel {
         });
     }
 
+    // Delegate to WebviewUpdateService
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        if (!this._panel.webview) { return; }
-
-        // Queue update if webview not ready yet
-        if (!this._context.webviewReady) {
-            this._context.setPendingBoardUpdate({ applyDefaultFolding, isFullRefresh });
-            return;
+        if (this._webviewUpdateService) {
+            await this._webviewUpdateService.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
         }
-
-        let board = this.getBoard() || {
-            valid: false,
-            title: 'Please open a Markdown Kanban file',
-            columns: [],
-            yamlHeader: null,
-            kanbanFooter: null
-        };
-
-        // Update webview permissions to include asset directories
-        // This ensures the webview can access images from include file directories
-        this._webviewManager.updatePermissionsForAssets();
-
-        // Get version from package.json
-        const packageJson = require('../package.json');
-        const version = packageJson.version || 'Unknown';
-
-        // Send boardUpdate with includeContext for dynamic image path resolution
-        // The board now contains includeContext in tasks from include files,
-        // which the frontend will use to dynamically resolve relative image paths
-        this._sendBoardUpdate(board, {
-            isFullRefresh,
-            applyDefaultFolding,
-            version
-        });
-
-        // REFRESH ALL CONFIGURATION after sending board
-        // This loads shortcuts, tag settings, layout settings, etc.
-        // Must happen AFTER boardUpdate to prevent premature renders with empty mappings
-        await this._refreshAllViewConfiguration();
-
-        // Send include file contents immediately after board update
-        // WebviewBridge batching handles message ordering
-        const includeFiles = this._fileRegistry.getIncludeFiles();
-        if (includeFiles.length > 0) {
-            for (const file of includeFiles) {
-                const message: UpdateIncludeContentMessage = {
-                    type: 'updateIncludeContent',
-                    filePath: file.getRelativePath(),
-                    content: file.getContent()
-                };
-                this._webviewBridge.sendBatched(message);
-            }
-        }
-
     }
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
@@ -903,63 +856,11 @@ export class KanbanWebviewPanel {
      * Called when view becomes visible to apply any pending DOM updates.
      * Also called after editing stops to ensure skipped updates are applied.
      */
+    // Delegate to WebviewUpdateService
     public syncDirtyItems(): void {
-        // CRITICAL FIX: Don't sync during include switches - state machine sends correct updates
-        // During include switch, board might be regenerated with empty descriptions (before async load completes)
-        // This would send stale/empty data and cause content flapping
-        if (this._context.includeSwitchInProgress) {
-            return;
+        if (this._webviewUpdateService) {
+            this._webviewUpdateService.syncDirtyItems();
         }
-
-        const board = this.getBoard();
-        if (!board || !this._panel) return;
-
-        if (!this._boardStore.hasDirtyItems()) {
-            return; // Nothing to sync
-        }
-
-        // Get dirty items from BoardStore
-        const dirtyColumnIds = this._boardStore.getDirtyColumns();
-        const dirtyTaskIds = this._boardStore.getDirtyTasks();
-
-        // Collect dirty columns
-        const dirtyColumns: SyncDirtyColumnInfo[] = [];
-        for (const columnId of dirtyColumnIds) {
-            const column = BoardCrudOperations.findColumnById(board, columnId);
-            if (column) {
-                dirtyColumns.push({
-                    columnId: column.id,
-                    title: column.title,
-                    displayTitle: column.displayTitle,
-                    includeMode: column.includeMode,
-                    includeFiles: column.includeFiles
-                });
-            }
-        }
-
-        // Collect dirty tasks
-        const dirtyTasks: SyncDirtyTaskInfo[] = [];
-        for (const taskId of dirtyTaskIds) {
-            const result = BoardCrudOperations.findTaskById(board, taskId);
-            if (result) {
-                dirtyTasks.push({
-                    columnId: result.column.id,
-                    taskId: result.task.id,
-                    displayTitle: result.task.displayTitle,
-                    description: result.task.description
-                });
-            }
-        }
-
-        // Send single batched message
-        const syncMessage: SyncDirtyItemsMessage = {
-            type: 'syncDirtyItems',
-            columns: dirtyColumns,
-            tasks: dirtyTasks
-        };
-        this._webviewBridge.send(syncMessage);
-
-        this._boardStore.clearAllDirty();
     }
 
     /**
@@ -1074,105 +975,16 @@ export class KanbanWebviewPanel {
     }
 
     /**
-     * Send full board update to frontend with all configuration
-     * Helper to consolidate board update message logic
-     */
-    private async _sendShortcutsToWebview(): Promise<void> {
-        if (!this._panel) return;
-
-        try {
-            const shortcuts = await KeybindingService.getInstance().getAllShortcuts();
-            const shortcutsMessage: UpdateShortcutsMessage = {
-                type: 'updateShortcuts',
-                shortcuts: shortcuts
-            };
-            this._webviewBridge.send(shortcutsMessage);
-        } catch (error) {
-            console.error('[KanbanWebviewPanel] Failed to send shortcuts to webview:', error);
-        }
-    }
-
-    /**
-     * ⚠️ CENTRAL CONFIGURATION REFRESH POINT ⚠️
-     *
-     * This method is THE SINGLE SOURCE OF TRUTH for refreshing all view configuration.
-     * It should be called ONLY in these scenarios:
-     *
-     * 1. When the webview panel gains focus (user switches to Kanban view)
-     * 2. When the webview panel is first created/initialized
-     * 3. When VSCode workspace configuration changes (via onDidChangeConfiguration)
-     *
-     * DO NOT call this method from anywhere else! If you think you need to refresh
-     * configuration, you probably want to trigger one of the above events instead.
-     *
-     * What this method does:
-     * - Loads keyboard shortcuts from VSCode
-     * - Loads ALL workspace settings (layout, tags, rendering, etc.)
-     * - Sends everything to the webview in a single "configurationUpdate" message
-     *
-     * Why this matters:
-     * - Ensures configuration is always fresh when user focuses the view
-     * - Avoids stale configuration (e.g., changing tag colors and not seeing updates)
-     * - Centralizes configuration loading logic in ONE place
-     * - Makes it obvious what gets loaded and when
+     * Refresh configuration - delegates to WebviewUpdateService
+     * See WebviewUpdateService.refreshAllConfiguration() for implementation details
      */
     public async refreshConfiguration(): Promise<void> {
-        await this._refreshAllViewConfiguration();
-    }
-
-    private async _refreshAllViewConfiguration(): Promise<void> {
-        if (!this._panel) {
-            console.warn('[KanbanWebviewPanel] Cannot refresh configuration - panel is null');
-            return;
-        }
-
-        try {
-            // 1. Load keyboard shortcuts
-            await this._sendShortcutsToWebview();
-
-            // 2. Load all workspace settings and send to webview
-            // Uses centralized getBoardViewConfig() - single source of truth
-            const layoutPresets = this._webviewManager.getLayoutPresetsConfiguration();
-            const config = configService.getBoardViewConfig(layoutPresets);
-
-            // Send configuration to webview
-            const configMessage: ConfigurationUpdateMessage = {
-                type: 'configurationUpdate',
-                config: config
-            };
-            this._webviewBridge.send(configMessage);
-
-        } catch (error) {
-            console.error('[KanbanWebviewPanel] ❌ Failed to refresh view configuration:', error);
+        if (this._webviewUpdateService) {
+            await this._webviewUpdateService.refreshAllConfiguration();
         }
     }
 
-    private _sendBoardUpdate(board: KanbanBoard, options: {
-        isFullRefresh?: boolean;
-        applyDefaultFolding?: boolean;
-        version?: string;
-    } = {}): void {
-        if (!this._panel) return;
-
-        // Use centralized getBoardViewConfig() - single source of truth
-        const layoutPresets = this._webviewManager.getLayoutPresetsConfiguration();
-        const viewConfig = configService.getBoardViewConfig(layoutPresets);
-
-        // BoardUpdateMessage type matches getBoardViewConfig() output
-        const message = {
-            type: 'boardUpdate' as const,
-            board: board,
-            ...(viewConfig as Partial<BoardUpdateMessage>),
-            // Optional fields for full board loads
-            ...(options.isFullRefresh !== undefined && { isFullRefresh: options.isFullRefresh }),
-            ...(options.applyDefaultFolding !== undefined && { applyDefaultFolding: options.applyDefaultFolding }),
-            ...(options.version && { version: options.version })
-        } as BoardUpdateMessage;
-
-        this._webviewBridge.send(message);
-    }
-
-    // NOTE: The following functions have been migrated to event handlers:
+    // NOTE: The following functions have been migrated to event handlers/services:
     // - _updateMediaTrackingFromIncludes() → BoardSyncHandler (handles 'board:loaded')
     // - _checkMediaFilesForChanges() → FileSyncHandler (handles 'focus:gained')
     // - _checkIncludeFilesForExternalChanges() → FileSyncHandler (handles 'focus:gained')
@@ -1422,6 +1234,12 @@ export class KanbanWebviewPanel {
         if (this._linkReplacementHandler) {
             this._linkReplacementHandler.dispose();
             this._linkReplacementHandler = null;
+        }
+
+        // Dispose webview update service
+        if (this._webviewUpdateService) {
+            this._webviewUpdateService.dispose();
+            this._webviewUpdateService = null;
         }
 
         // UnsavedChangesService doesn't need disposal (no subscriptions)
