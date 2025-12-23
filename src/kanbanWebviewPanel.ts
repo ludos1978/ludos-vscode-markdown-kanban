@@ -255,7 +255,7 @@ export class KanbanWebviewPanel {
             this._context, KanbanWebviewPanel.panelStates, KanbanWebviewPanel.panels
         );
 
-        this._linkHandler = new LinkHandler(this._fileManager, this._panel.webview);
+        this._linkHandler = new LinkHandler(this._fileManager);
         this.setupDocumentChangeListener();
 
         this._messageHandler = new MessageHandler(this._fileManager, this._boardStore, this._boardOperations, this._linkHandler, {

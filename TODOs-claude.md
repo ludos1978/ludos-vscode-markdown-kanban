@@ -1,6 +1,6 @@
 # Open Cleanup Tasks
 
-Last updated: 2025-12-22
+Last updated: 2025-12-23
 
 ---
 
@@ -50,6 +50,22 @@ The migration is more complex than initially thought:
    - Ensuring undo/redo still works correctly
 
 **Decision:** Defer until a larger refactoring sprint or when row-tag logic needs changes anyway.
+
+---
+
+## COMPLETED (2025-12-23)
+
+### ✅ 9. Excessive MediaTracker Logging
+- Removed 20+ debug console.log statements from `src/services/MediaTracker.ts`
+- Kept console.warn and console.error for actual issues
+
+### ✅ 10. Unused `_webview` Parameter in LinkHandler
+- Removed unused `_webview` parameter from constructor in `src/services/LinkHandler.ts`
+- Updated call site in `src/kanbanWebviewPanel.ts`
+
+### ✅ 11. UnsavedChangesService Informational Logs
+- Removed 2 informational console.log statements from `src/services/UnsavedChangesService.ts`
+- Kept console.error for actual errors
 
 ---
 

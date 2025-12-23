@@ -17,10 +17,7 @@ export class LinkHandler {
      * Previously: received onRequestLinkReplacement callback
      * Now: emits 'link:replace-requested' events via EventBus
      */
-    constructor(
-        fileManager: FileManager,
-        _webview: vscode.Webview
-    ) {
+    constructor(fileManager: FileManager) {
         this._fileManager = fileManager;
         // Provide extension root so FileSearchService can load icon assets
         this._fileSearchService = new FileSearchService(this._fileManager.getExtensionUri());

@@ -140,10 +140,9 @@ export class MediaTracker {
         try {
             this._cache.lastUpdated = new Date().toISOString();
             const cacheContent = JSON.stringify(this._cache, null, 2);
-            console.log(`[MediaTracker] Saving cache to ${this._cachePath} with ${Object.keys(this._cache.files).length} files`);
             fs.writeFileSync(this._cachePath, cacheContent, 'utf8');
         } catch (error) {
-            console.error(`[MediaTracker] Failed to save cache to ${this._cachePath}:`, error);
+            console.error(`[MediaTracker] Failed to save cache:`, error);
         }
     }
 
@@ -220,7 +219,6 @@ export class MediaTracker {
         while ((match = imageRegex.exec(content)) !== null) {
             const filePath = match[1];
             const mediaType = this._getMediaType(filePath);
-            console.log(`[MediaTracker] extractMediaReferences: found image ref "${filePath}", mediaType=${mediaType}`);
             if (mediaType) {
                 mediaFiles.add(filePath);
             }
@@ -276,9 +274,7 @@ export class MediaTracker {
      * Returns list of all tracked files
      */
     public updateTrackedFiles(content: string): string[] {
-        console.log(`[MediaTracker] updateTrackedFiles called with content length: ${content?.length || 0}`);
         const mediaRefs = this.extractMediaReferences(content);
-        console.log(`[MediaTracker] Found ${mediaRefs.length} media reference(s) in content:`, mediaRefs);
 
         // Track which files are no longer referenced (for watcher cleanup)
         const oldFiles = new Set(Object.keys(this._cache.files));
@@ -290,16 +286,12 @@ export class MediaTracker {
             const absolutePath = this._resolveMediaPath(relativePath);
             const mediaType = this._getMediaType(relativePath);
 
-            console.log(`[MediaTracker] Processing: "${relativePath}" -> type=${mediaType}, absolutePath="${absolutePath}"`);
-
             if (!mediaType) {
-                console.log(`[MediaTracker] Skipping "${relativePath}" - unsupported media type`);
                 continue;
             }
 
             const mtime = this._getFileMtime(absolutePath);
             if (mtime !== null) {
-                console.log(`[MediaTracker] Tracking "${relativePath}" - mtime=${mtime}`);
                 const entry: MediaFileEntry = {
                     mtime: mtime,
                     type: mediaType
@@ -316,8 +308,6 @@ export class MediaTracker {
                         this._watchFile(relativePath, entry);
                     }
                 }
-            } else {
-                console.log(`[MediaTracker] File not found: "${absolutePath}"`);
             }
         }
 
@@ -329,7 +319,6 @@ export class MediaTracker {
         this._cache.files = newCache;
         this._saveCache();
 
-        console.log(`[MediaTracker] Updated tracking for ${trackedFiles.length} media file(s)`);
         return trackedFiles;
     }
 
@@ -348,11 +337,8 @@ export class MediaTracker {
             const absolutePath = this._resolveMediaPath(relativePath);
             const currentMtime = this._getFileMtime(absolutePath);
 
-            console.log(`[MediaTracker] Checking ${relativePath}: cached=${entry.mtime}, current=${currentMtime}, path=${absolutePath}`);
-
             if (currentMtime === null) {
                 // File no longer exists - skip
-                console.log(`[MediaTracker] File not found: ${absolutePath}`);
                 continue;
             }
 
@@ -372,8 +358,6 @@ export class MediaTracker {
 
         if (changedFiles.length > 0) {
             this._saveCache();
-            console.log(`[MediaTracker] Detected ${changedFiles.length} changed media file(s):`,
-                changedFiles.map(f => f.path));
 
             // UNIFIED: Notify through single callback (same path as file watchers)
             if (triggerCallback && this._onMediaChanged) {
@@ -417,7 +401,6 @@ export class MediaTracker {
                 if (mediaType === 'diagram') {
                     const isDrawIO = this._isDrawIOFile(relativePath);
                     const isExcalidraw = this._isExcalidrawFile(relativePath);
-                    console.log(`[MediaTracker] addTrackedFiles: diagram "${relativePath}" isDrawIO=${isDrawIO}, isExcalidraw=${isExcalidraw}`);
                     if (isDrawIO || isExcalidraw) {
                         this._watchFile(relativePath, entry);
                     }
@@ -427,7 +410,6 @@ export class MediaTracker {
 
         if (addedFiles.length > 0) {
             this._saveCache();
-            console.log(`[MediaTracker] Added ${addedFiles.length} media file(s) from include content`);
         }
 
         return addedFiles;
@@ -463,8 +445,6 @@ export class MediaTracker {
      * This enables real-time detection of changes when editing diagram files
      */
     public setupFileWatchers(): void {
-        console.log(`[MediaTracker] Setting up file watchers. Cache has ${Object.keys(this._cache.files).length} files`);
-
         for (const [relativePath, entry] of Object.entries(this._cache.files)) {
             // Only watch diagram files (drawio, excalidraw)
             if (entry.type !== 'diagram') {
@@ -474,18 +454,13 @@ export class MediaTracker {
             const isDrawIO = this._isDrawIOFile(relativePath);
             const isExcalidraw = this._isExcalidrawFile(relativePath);
 
-            console.log(`[MediaTracker] Checking diagram: ${relativePath}, isDrawIO=${isDrawIO}, isExcalidraw=${isExcalidraw}`);
-
             // Check if it's a drawio or excalidraw file using proper detection
             if (!isDrawIO && !isExcalidraw) {
-                console.log(`[MediaTracker] Skipping non-diagram file: ${relativePath}`);
                 continue;
             }
 
             this._watchFile(relativePath, entry);
         }
-
-        console.log(`[MediaTracker] Setup file watchers for ${this._fileWatchers.size} diagram file(s)`);
     }
 
     /**
@@ -494,23 +469,19 @@ export class MediaTracker {
     private _watchFile(relativePath: string, entry: MediaFileEntry): void {
         // Skip if already watching
         if (this._fileWatchers.has(relativePath)) {
-            console.log(`[MediaTracker] Already watching: ${relativePath}`);
             return;
         }
 
         const absolutePath = this._resolveMediaPath(relativePath);
-        console.log(`[MediaTracker] Creating watcher for: ${absolutePath}`);
 
         try {
             const watcher = vscode.workspace.createFileSystemWatcher(absolutePath);
 
             watcher.onDidChange(async () => {
-                console.log(`[MediaTracker] File changed: ${relativePath}`);
                 await this._handleFileChange(relativePath, entry);
             });
 
             watcher.onDidDelete(() => {
-                console.log(`[MediaTracker] File deleted: ${relativePath}`);
                 // Remove from cache
                 delete this._cache.files[relativePath];
                 this._saveCache();
@@ -519,7 +490,6 @@ export class MediaTracker {
             });
 
             this._fileWatchers.set(relativePath, watcher);
-            console.log(`[MediaTracker] Watcher created successfully for: ${relativePath}`);
         } catch (error) {
             console.warn(`[MediaTracker] Failed to watch file ${relativePath}:`, error);
         }

@@ -130,7 +130,6 @@ export class UnsavedChangesService {
                 // Create backup filename: "file.md" -> ".file-unsavedchanges.md" (hidden)
                 const backupPath = this._createBackupPath(filePath);
                 fs.writeFileSync(backupPath, content, 'utf8');
-                console.log(`[UnsavedChangesService] Created backup: ${backupPath}`);
             }
 
             // Save include files backups
@@ -144,7 +143,6 @@ export class UnsavedChangesService {
                             const content = includeFile.getContent();
                             const backupPath = this._createBackupPath(filePath);
                             fs.writeFileSync(backupPath, content, 'utf8');
-                            console.log(`[UnsavedChangesService] Created include backup: ${backupPath}`);
                         }
                     }
                 }
