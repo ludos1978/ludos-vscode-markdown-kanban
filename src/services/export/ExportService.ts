@@ -13,6 +13,7 @@ import { getMermaidExportService } from './MermaidExportService';
 import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
+import { MarkdownPatterns, HtmlPatterns, isUrl } from '../../shared/regexPatterns';
 import { AssetHandler } from '../assets/AssetHandler';
 import { escapeRegExp, getErrorMessage, toForwardSlashes } from '../../utils/stringUtils';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../../board/KanbanTypes';
@@ -535,33 +536,21 @@ export class ExportService {
     private static findAssets(content: string, sourceDir: string): ExportAssetInfo[] {
         const assets: ExportAssetInfo[] = [];
 
-        // Match markdown images: ![alt](path) and ![alt](path "title")
-        const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
-
-        // Match markdown links: [text](path) and [text](path "title")
-        const linkRegex = /(?<!!)\[[^\]]*\]\(([^)]+)\)/g;
-
-        // Match HTML img tags: <img src="path">
-        const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-
-        // Match HTML video/audio tags: <video src="path">, <audio src="path">
-        const htmlMediaRegex = /<(?:video|audio)[^>]+src=["']([^"']+)["'][^>]*>/gi;
-
-        // Process all matches
+        // Use shared patterns (properly handle titles in regex)
         const patterns = [
-            imageRegex,
-            linkRegex,
-            htmlImgRegex,
-            htmlMediaRegex
+            MarkdownPatterns.image(),
+            MarkdownPatterns.link(),
+            HtmlPatterns.img(),
+            HtmlPatterns.media()
         ];
 
         patterns.forEach((regex) => {
             let match;
             while ((match = regex.exec(content)) !== null) {
-                const rawPath = match[1].split(' ')[0].replace(/["']/g, ''); // Remove quotes and titles
+                const rawPath = match[1];
 
                 // Skip URLs
-                if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+                if (isUrl(rawPath)) {
                     continue;
                 }
 

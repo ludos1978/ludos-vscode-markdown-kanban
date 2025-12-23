@@ -13,3 +13,14 @@ export {
 
 // Shared interfaces
 export { ValidationResult } from './interfaces';
+
+// Regex patterns for content matching
+export {
+    MarkdownPatterns,
+    HtmlPatterns,
+    DiagramPatterns,
+    PathPatterns,
+    getAssetPatterns,
+    isUrl,
+    isWindowsAbsolute
+} from './regexPatterns';

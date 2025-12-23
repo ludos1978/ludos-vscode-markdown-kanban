@@ -2,6 +2,7 @@ import { PlantUMLService } from './PlantUMLService';
 import { getMermaidExportService, MermaidExportService } from './MermaidExportService';
 import { DrawIOService } from './DrawIOService';
 import { ExcalidrawService } from './ExcalidrawService';
+import { DiagramPatterns } from '../../shared/regexPatterns';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
@@ -101,7 +102,7 @@ export class DiagramPreprocessor {
         let excalidrawCounter = 0;
 
         // Extract PlantUML diagrams
-        const plantUMLRegex = /```plantuml\s*\n([\s\S]*?)\n```/g;
+        const plantUMLRegex = DiagramPatterns.plantuml();
         let match;
 
         while ((match = plantUMLRegex.exec(markdown)) !== null) {
@@ -115,7 +116,7 @@ export class DiagramPreprocessor {
         }
 
         // Extract Mermaid diagrams
-        const mermaidRegex = /```mermaid\s*\n([\s\S]*?)\n```/g;
+        const mermaidRegex = DiagramPatterns.mermaid();
 
         while ((match = mermaidRegex.exec(markdown)) !== null) {
             mermaidCounter++;
@@ -129,7 +130,7 @@ export class DiagramPreprocessor {
 
         // Extract draw.io diagram file references
         // Pattern: ![alt](path/to/file.drawio) or ![alt](file.dio)
-        const drawioRegex = /!\[[^\]]*\]\(([^\)]+\.(?:drawio|dio))\)/g;
+        const drawioRegex = DiagramPatterns.drawio();
 
         while ((match = drawioRegex.exec(markdown)) !== null) {
             drawioCounter++;
@@ -144,7 +145,7 @@ export class DiagramPreprocessor {
 
         // Extract excalidraw diagram file references
         // Pattern: ![alt](path/to/file.excalidraw) or ![alt](file.excalidraw.json) or ![alt](file.excalidraw.svg)
-        const excalidrawRegex = /!\[[^\]]*\]\(([^\)]+\.excalidraw(?:\.json|\.svg)?)\)/g;
+        const excalidrawRegex = DiagramPatterns.excalidraw();
 
         while ((match = excalidrawRegex.exec(markdown)) !== null) {
             excalidrawCounter++;

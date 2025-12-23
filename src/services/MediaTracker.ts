@@ -16,6 +16,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { MarkdownPatterns, HtmlPatterns } from '../shared/regexPatterns';
 
 interface MediaFileEntry {
     mtime: number;
@@ -212,45 +213,21 @@ export class MediaTracker {
     public extractMediaReferences(content: string): string[] {
         const mediaFiles: Set<string> = new Set();
 
-        // Match markdown images: ![alt](path)
-        const imageRegex = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-        let match;
+        // Use shared patterns for consistency
+        const patterns = [
+            MarkdownPatterns.image(),
+            MarkdownPatterns.link(),
+            HtmlPatterns.img(),
+            HtmlPatterns.media()
+        ];
 
-        while ((match = imageRegex.exec(content)) !== null) {
-            const filePath = match[1];
-            const mediaType = this._getMediaType(filePath);
-            if (mediaType) {
-                mediaFiles.add(filePath);
-            }
-        }
-
-        // Match markdown links that point to media: [text](path)
-        const linkRegex = /\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-
-        while ((match = linkRegex.exec(content)) !== null) {
-            const filePath = match[1];
-            if (this._getMediaType(filePath)) {
-                mediaFiles.add(filePath);
-            }
-        }
-
-        // Match HTML img tags: <img src="path">
-        const htmlImgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
-
-        while ((match = htmlImgRegex.exec(content)) !== null) {
-            const filePath = match[1];
-            if (this._getMediaType(filePath)) {
-                mediaFiles.add(filePath);
-            }
-        }
-
-        // Match HTML audio/video tags
-        const htmlMediaRegex = /<(?:audio|video)[^>]+src=["']([^"']+)["']/gi;
-
-        while ((match = htmlMediaRegex.exec(content)) !== null) {
-            const filePath = match[1];
-            if (this._getMediaType(filePath)) {
-                mediaFiles.add(filePath);
+        for (const regex of patterns) {
+            let match;
+            while ((match = regex.exec(content)) !== null) {
+                const filePath = match[1];
+                if (this._getMediaType(filePath)) {
+                    mediaFiles.add(filePath);
+                }
             }
         }
 

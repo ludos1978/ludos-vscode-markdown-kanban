@@ -1,6 +1,14 @@
-# Cleanup Tasks - Rounds 2 & 3
+# Cleanup Tasks - Rounds 1-4
 
 ## Completed
+
+### Round 4 - Regex Pattern Unification
+- [x] Created `src/shared/regexPatterns.ts` with centralized patterns as factory functions
+- [x] Added `MarkdownPatterns` (image, link, include), `HtmlPatterns` (img, media), `DiagramPatterns` (plantuml, mermaid, drawio, excalidraw), `PathPatterns` (url, windowsDrive)
+- [x] Updated `ExportService.ts` to use shared `MarkdownPatterns`, `HtmlPatterns`, `isUrl()`
+- [x] Updated `MediaTracker.ts` to use shared `MarkdownPatterns`, `HtmlPatterns`
+- [x] Updated `DiagramPreprocessor.ts` to use shared `DiagramPatterns`
+- [x] Exported patterns from `src/shared/index.ts`
 
 ### Round 3 - Files Directory
 - [x] Fixed IncludeFile to use base class `isDocumentDirtyInVSCode()` (was duplicating 4 lines)
@@ -50,16 +58,10 @@ The ExportService has >12 distinct responsibilities:
 - `LinkRewriter` (all link rewriting logic)
 - `PresentationConverter` (board ↔ presentation conversion)
 
-### HIGH: Duplicate Regex Patterns Across 4 Services
-**Problem:** Image/link regex patterns are defined independently in:
-- ExportService.ts (lines 539-548)
-- MediaTracker.ts (lines 216-248)
-- PathConversionService.ts (lines 61-84) - already centralized
-- DiagramPreprocessor.ts (lines 104-158)
-
-**Issue:** Inconsistent pattern variations (title attribute handling differs, causing bugs)
-
-**Recommendation:** Consolidate all patterns into `src/shared/regexPatterns.ts` or extend PathConversionService.PATTERNS
+### ~~HIGH: Duplicate Regex Patterns Across 4 Services~~ ✅ RESOLVED
+**Status:** Fixed in Round 4 - patterns consolidated into `src/shared/regexPatterns.ts`
+- ExportService, MediaTracker, DiagramPreprocessor now use shared patterns
+- PathConversionService has its own specialized patterns (different capture groups for path conversion)
 
 ### MEDIUM: Path Extraction Logic Duplicated in 3 Services
 Three independent implementations:
