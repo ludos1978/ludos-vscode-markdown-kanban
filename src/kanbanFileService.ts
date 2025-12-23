@@ -34,6 +34,8 @@ export interface KanbanFileServiceCallbacks {
     updateWebviewPermissions: () => void;
     clearUndoRedo: () => void;
     getPanelInstance: () => any;
+    /** Save original task order for 'unsorted' sort restoration */
+    setOriginalTaskOrder: (board: KanbanBoard) => void;
 }
 
 /**
@@ -139,7 +141,7 @@ export class KanbanFileService {
 
                 const currentBoard = this.board();
                 if (currentBoard) {
-                    this.boardOperations.setOriginalTaskOrder(currentBoard);
+                    this.callbacks.setOriginalTaskOrder(currentBoard);
                 }
             } catch (error) {
                 this.setBoard({
@@ -266,7 +268,7 @@ export class KanbanFileService {
             const currentBoard = this.board();
             if (currentBoard) {
                 this.boardOperations.cleanupRowTags(currentBoard);
-                this.boardOperations.setOriginalTaskOrder(currentBoard);
+                this.callbacks.setOriginalTaskOrder(currentBoard);
             }
 
             // Clear unsaved changes flag after successful reload

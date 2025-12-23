@@ -26,27 +26,18 @@ export {
 /**
  * BoardOperations - Unified board operations class
  *
- * Handles state management and specialized operations.
+ * Handles specialized board operations.
  * Most CRUD operations are now handled via Actions (src/actions/).
+ * Original task order tracking is now in BoardStore.
  *
  * Remaining responsibilities:
- * - Original task order tracking (for 'unsorted' sort)
  * - Row tag cleanup
+ * - Sorting (delegates to BoardCrudOperations)
  * - Automatic sorting (via GatherQueryEngine)
  */
 export class BoardOperations {
     private _crudOperations = new BoardCrudOperations();
     private _gatherEngine = new GatherQueryEngine();
-
-    // ============= STATE MANAGEMENT =============
-
-    /**
-     * Save the original task order for each column.
-     * Used by 'unsorted' sort to restore original order.
-     */
-    public setOriginalTaskOrder(board: KanbanBoard): void {
-        this._crudOperations.setOriginalTaskOrder(board);
-    }
 
     // ============= ROW TAG OPERATIONS =============
 
@@ -62,10 +53,15 @@ export class BoardOperations {
 
     /**
      * Sort tasks in a column.
-     * 'unsorted' requires access to _originalTaskOrder state, so this must go through BoardCrudOperations.
+     * For 'unsorted', pass originalOrder from BoardStore.getOriginalTaskOrder(columnId).
      */
-    public sortColumn(board: KanbanBoard, columnId: string, sortType: 'unsorted' | 'title' | 'numericTag'): boolean {
-        return this._crudOperations.sortColumn(board, columnId, sortType);
+    public sortColumn(
+        board: KanbanBoard,
+        columnId: string,
+        sortType: 'unsorted' | 'title' | 'numericTag',
+        originalOrder?: string[]
+    ): boolean {
+        return this._crudOperations.sortColumn(board, columnId, sortType, originalOrder);
     }
 
     // ============= GATHER & SORT OPERATIONS =============

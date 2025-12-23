@@ -37,6 +37,8 @@ export interface BoardState {
     undoStack: UndoEntry[];
     /** Redo history stack with target metadata */
     redoStack: UndoEntry[];
+    /** Original task order per column (for 'unsorted' sort restoration) */
+    originalTaskOrder: Map<string, string[]>;
 }
 
 export interface BoardStoreOptions {
@@ -73,7 +75,8 @@ export class BoardStore implements vscode.Disposable {
             dirtyColumns: new Set(),
             dirtyTasks: new Set(),
             undoStack: [],
-            redoStack: []
+            redoStack: [],
+            originalTaskOrder: new Map()
         };
     }
 
@@ -166,6 +169,40 @@ export class BoardStore implements vscode.Disposable {
     clearAllDirty(): void {
         this._state.dirtyColumns.clear();
         this._state.dirtyTasks.clear();
+    }
+
+    // ============= ORIGINAL TASK ORDER (for 'unsorted' sort) =============
+
+    /**
+     * Save the original task order for each column.
+     * Used by 'unsorted' sort to restore original order.
+     */
+    setOriginalTaskOrder(board: KanbanBoard): void {
+        this._state.originalTaskOrder.clear();
+        board.columns.forEach(column => {
+            this._state.originalTaskOrder.set(column.id, column.tasks.map(t => t.id));
+        });
+    }
+
+    /**
+     * Get original task order for a column
+     */
+    getOriginalTaskOrder(columnId: string): string[] | undefined {
+        return this._state.originalTaskOrder.get(columnId);
+    }
+
+    /**
+     * Initialize task order for a new column (empty order)
+     */
+    initColumnTaskOrder(columnId: string): void {
+        this._state.originalTaskOrder.set(columnId, []);
+    }
+
+    /**
+     * Remove task order tracking for a deleted column
+     */
+    deleteColumnTaskOrder(columnId: string): void {
+        this._state.originalTaskOrder.delete(columnId);
     }
 
     // ============= UNDO/REDO =============

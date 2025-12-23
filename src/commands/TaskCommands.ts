@@ -31,7 +31,7 @@ import {
 } from '../core/bridge/MessageTypes';
 import { INCLUDE_SYNTAX, extractIncludeFiles } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { findColumn, findColumnContainingTask } from '../actions/helpers';
 import { TaskActions } from '../actions';
 import { UndoCapture } from '../core/stores/UndoCapture';
 
@@ -138,7 +138,7 @@ export class TaskCommands extends BaseMessageCommand {
 
         // Capture undo state BEFORE include switch (include switches bypass action system)
         const board = context.getCurrentBoard();
-        const column = board ? BoardCrudOperations.findColumnContainingTask(board, taskId) : null;
+        const column = board ? findColumnContainingTask(board, taskId) : null;
         if (board && column) {
             context.boardStore.saveUndoEntry(
                 UndoCapture.forTask(board, taskId, column.id, 'includeSwitch')
@@ -171,7 +171,7 @@ export class TaskCommands extends BaseMessageCommand {
         if (message.taskData?.title !== undefined) {
             const newTitle = message.taskData.title;
             const board = context.getCurrentBoard();
-            const column = board ? BoardCrudOperations.findColumnById(board, message.columnId) : undefined;
+            const column = board ? findColumn(board, message.columnId) : undefined;
             const task = column?.tasks.find(t => t.id === message.taskId);
 
             if (task) {
@@ -207,7 +207,7 @@ export class TaskCommands extends BaseMessageCommand {
         // If this is a task include and description was updated, update the file instance
         if (message.taskData.description !== undefined) {
             const board = context.getCurrentBoard();
-            const column = board ? BoardCrudOperations.findColumnById(board, message.columnId) : undefined;
+            const column = board ? findColumn(board, message.columnId) : undefined;
             const task = column?.tasks.find(t => t.id === message.taskId);
 
             const columnHasInclude = column?.includeMode === true;
@@ -368,7 +368,7 @@ export class TaskCommands extends BaseMessageCommand {
      */
     private async handleEditTaskTitle(message: EditTaskTitleMessage, context: CommandContext): Promise<CommandResult> {
         const currentBoard = context.getCurrentBoard();
-        const targetColumn = currentBoard ? BoardCrudOperations.findColumnById(currentBoard, message.columnId) : undefined;
+        const targetColumn = currentBoard ? findColumn(currentBoard, message.columnId) : undefined;
         const task = targetColumn?.tasks.find(t => t.id === message.taskId);
 
         // Skip include detection for column-generated tasks

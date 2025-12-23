@@ -112,3 +112,21 @@ export function findTaskById(
 export function findColumnContainingTask(board: KanbanBoard, taskId: string): KanbanColumn | undefined {
     return board.columns.find(c => c.tasks.some(t => t.id === taskId));
 }
+
+/**
+ * Find a task by ID within a specific column
+ * Returns object with task, column, and index, or undefined if not found
+ */
+export function findTaskInColumn(
+    board: KanbanBoard,
+    columnId: string,
+    taskId: string
+): { task: KanbanTask; column: KanbanColumn; index: number } | undefined {
+    const column = findColumn(board, columnId);
+    if (!column) return undefined;
+
+    const index = column.tasks.findIndex(t => t.id === taskId);
+    if (index === -1) return undefined;
+
+    return { task: column.tasks[index], column, index };
+}

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { MarkdownFile } from './MarkdownFile';
 import { IMarkdownFileRegistry, CapturedEdit } from './FileInterfaces';
 import { KanbanBoard, KanbanTask } from '../board/KanbanTypes';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { findColumn, findTaskById, findTaskInColumn } from '../actions/helpers';
 import { MarkdownKanbanParser } from '../markdownParser';
 import { ConflictResolver, ConflictContext, ConflictResolution } from '../services/ConflictResolver';
 import { BackupManager } from '../services/BackupManager';
@@ -150,7 +150,7 @@ export class MainKanbanFile extends MarkdownFile {
                 task.description = capturedEdit.value;
             }
         } else if (capturedEdit.type === 'column-title' && capturedEdit.columnId) {
-            const column = BoardCrudOperations.findColumnById(board, capturedEdit.columnId);
+            const column = findColumn(board, capturedEdit.columnId);
             if (column) {
                 column.title = capturedEdit.value;
             }
@@ -173,12 +173,12 @@ export class MainKanbanFile extends MarkdownFile {
     private _findTaskInBoard(board: KanbanBoard, taskId: string, columnId?: string): KanbanTask | null {
         // If columnId provided, search only that column first
         if (columnId) {
-            const result = BoardCrudOperations.findTaskInColumn(board, columnId, taskId);
+            const result = findTaskInColumn(board, columnId, taskId);
             if (result) return result.task;
         }
 
         // Search all columns
-        const result = BoardCrudOperations.findTaskById(board, taskId);
+        const result = findTaskById(board, taskId);
         return result?.task ?? null;
     }
 

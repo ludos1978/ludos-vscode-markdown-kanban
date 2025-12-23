@@ -12,7 +12,7 @@ import * as path from 'path';
 import { INCLUDE_SYNTAX, createDisplayTitleWithPlaceholders } from '../constants/IncludeConstants';
 import { ChangeContext, IncludeSwitchEvent, UserEditEvent } from './ChangeTypes';
 import { KanbanBoard, KanbanColumn, KanbanTask } from '../board/KanbanTypes';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { findColumn, findColumnContainingTask } from '../actions/helpers';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
 import { FileFactory } from '../files/FileFactory';
 import { MarkdownFile } from '../files/MarkdownFile';
@@ -69,18 +69,18 @@ export class IncludeLoadingProcessor {
 
         if (event.type === 'include_switch') {
             if (event.target === 'column') {
-                targetColumn = BoardCrudOperations.findColumnById(board, event.targetId) || null;
+                targetColumn = findColumn(board, event.targetId) || null;
                 isColumnSwitch = true;
             } else if (event.target === 'task') {
-                targetColumn = (event.columnIdForTask ? BoardCrudOperations.findColumnById(board, event.columnIdForTask) : null) ?? null;
+                targetColumn = (event.columnIdForTask ? findColumn(board, event.columnIdForTask) : null) ?? null;
                 targetTask = targetColumn?.tasks.find(t => t.id === event.targetId) || null;
             }
         } else if (event.type === 'user_edit' && event.params.includeSwitch) {
             if (event.editType === 'column_title') {
-                targetColumn = (event.params.columnId ? BoardCrudOperations.findColumnById(board, event.params.columnId) : null) ?? null;
+                targetColumn = (event.params.columnId ? findColumn(board, event.params.columnId) : null) ?? null;
                 isColumnSwitch = true;
             } else if (event.editType === 'task_title') {
-                targetColumn = (event.params.taskId ? BoardCrudOperations.findColumnContainingTask(board, event.params.taskId) : null) ?? null;
+                targetColumn = (event.params.taskId ? findColumnContainingTask(board, event.params.taskId) : null) ?? null;
                 targetTask = event.params.taskId ? (targetColumn?.tasks.find(t => t.id === event.params.taskId) || null) : null;
             }
         }

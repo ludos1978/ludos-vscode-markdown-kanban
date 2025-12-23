@@ -24,6 +24,10 @@ export interface NewTaskInput {
  * Core CRUD operations for Kanban board tasks and columns
  */
 export class BoardCrudOperations {
+    /**
+     * @deprecated Original task order is now stored in BoardStore.
+     * Kept for test compatibility only.
+     */
     private _originalTaskOrder: Map<string, string[]> = new Map();
 
     private generateId(type: 'column' | 'task'): string {
@@ -34,6 +38,10 @@ export class BoardCrudOperations {
         }
     }
 
+    /**
+     * @deprecated Use BoardStore.setOriginalTaskOrder() instead.
+     * Kept for test compatibility only.
+     */
     public setOriginalTaskOrder(board: KanbanBoard): void {
         this._originalTaskOrder.clear();
         board.columns.forEach(column => {
@@ -411,7 +419,20 @@ export class BoardCrudOperations {
 
     // ============= SORTING OPERATIONS =============
 
-    public sortColumn(board: KanbanBoard, columnId: string, sortType: 'unsorted' | 'title' | 'numericTag'): boolean {
+    /**
+     * Sort tasks in a column.
+     * @param board The board containing the column
+     * @param columnId The column to sort
+     * @param sortType The sort type: 'title', 'numericTag', or 'unsorted'
+     * @param originalOrder Optional original task order for 'unsorted' (from BoardStore.getOriginalTaskOrder).
+     *                      If not provided, falls back to internal _originalTaskOrder (for test compatibility).
+     */
+    public sortColumn(
+        board: KanbanBoard,
+        columnId: string,
+        sortType: 'unsorted' | 'title' | 'numericTag',
+        originalOrder?: string[]
+    ): boolean {
         const column = this.findColumn(board, columnId);
         if (!column) { return false; }
 
@@ -433,12 +454,13 @@ export class BoardCrudOperations {
                 return numA - numB;
             });
         } else if (sortType === 'unsorted') {
-            const originalOrder = this._originalTaskOrder.get(columnId);
-            if (originalOrder) {
+            // Use provided original order, fall back to internal (for test compatibility)
+            const order = originalOrder ?? this._originalTaskOrder.get(columnId);
+            if (order) {
                 const taskMap = new Map(column.tasks.map(t => [t.id, t]));
                 column.tasks = [];
 
-                originalOrder.forEach(taskId => {
+                order.forEach(taskId => {
                     const task = taskMap.get(taskId);
                     if (task) {
                         column.tasks.push(task);

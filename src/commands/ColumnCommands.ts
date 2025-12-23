@@ -364,17 +364,17 @@ ${tasksContent}`;
 
     /**
      * Handle sortColumn message
-     * Note: Sorting requires access to _originalTaskOrder state for 'unsorted' mode,
-     * so we route through boardOperations.sortColumn instead of using an Action.
+     * For 'unsorted' mode, gets original order from BoardStore.
      */
     private async handleSortColumn(message: SortColumnMessage, context: CommandContext): Promise<CommandResult> {
-        // Use boardOperations.sortColumn because 'unsorted' requires _originalTaskOrder state
         const success = await this.performBoardAction(
             context,
             () => {
                 const board = context.getCurrentBoard();
                 if (!board) return false;
-                return context.boardOperations.sortColumn(board, message.columnId, message.sortType);
+                // Get original order from BoardStore for 'unsorted' mode
+                const originalOrder = context.boardStore.getOriginalTaskOrder(message.columnId);
+                return context.boardOperations.sortColumn(board, message.columnId, message.sortType, originalOrder);
             }
         );
         return success ? this.success() : this.failure('Failed to sort column');

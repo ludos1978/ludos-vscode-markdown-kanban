@@ -26,7 +26,8 @@ export {
     cleanRowTag,
     extractNumericTag,
     findTaskById,
-    findColumnContainingTask
+    findColumnContainingTask,
+    findTaskInColumn
 } from './helpers';
 
 // Action factories (namespaced)

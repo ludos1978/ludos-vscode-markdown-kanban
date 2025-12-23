@@ -16,7 +16,7 @@ import { KanbanBoard } from '../../markdownParser';
 import { BoardStore, UndoCapture } from '../stores';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { WebviewBridge } from '../bridge';
-import { BoardCrudOperations } from '../../board';
+import { findColumn } from '../../actions/helpers';
 import { LinkOperations } from '../../utils/linkOperations';
 
 /**
@@ -116,7 +116,7 @@ export class LinkReplacementHandler {
         encodedNewPath: string,
         linkIndex?: number
     ): boolean {
-        const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
+        const targetColumn = findColumn(board, columnId);
         if (!targetColumn) {
             console.warn(`[LinkReplacementHandler] Column ${columnId} not found for link replacement`);
             return false;
@@ -158,7 +158,7 @@ export class LinkReplacementHandler {
         encodedNewPath: string,
         linkIndex?: number
     ): boolean {
-        const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
+        const targetColumn = findColumn(board, columnId);
         if (!targetColumn) {
             console.warn(`[LinkReplacementHandler] Column ${columnId} not found for link replacement`);
             return false;
@@ -222,7 +222,7 @@ export class LinkReplacementHandler {
     private _sendUpdate(board: KanbanBoard, taskId?: string, columnId?: string): void {
         // OPTIMIZATION: Send targeted update instead of full board redraw
         if (taskId && columnId) {
-            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
+            const targetColumn = findColumn(board, columnId);
             const targetTask = targetColumn?.tasks.find(task => task.id === taskId);
             if (targetTask) {
                 this._deps.webviewBridge.sendBatched({
@@ -235,7 +235,7 @@ export class LinkReplacementHandler {
                 return;
             }
         } else if (columnId && !taskId) {
-            const targetColumn = BoardCrudOperations.findColumnById(board, columnId);
+            const targetColumn = findColumn(board, columnId);
             if (targetColumn) {
                 this._deps.webviewBridge.sendBatched({
                     type: 'updateColumnContent',

@@ -20,7 +20,7 @@ import { PanelContext } from '../panel/PanelContext';
 import { WebviewManager } from '../panel/WebviewManager';
 import { configService } from './ConfigurationService';
 import { KeybindingService } from './KeybindingService';
-import { BoardCrudOperations } from '../board';
+import { findColumn, findTaskById } from '../actions/helpers';
 import { eventBus, createEvent, WebviewUpdateRequestedEvent } from '../core/events';
 import {
     BoardUpdateMessage,
@@ -232,7 +232,7 @@ export class WebviewUpdateService {
         // Collect dirty columns
         const dirtyColumns: SyncDirtyColumnInfo[] = [];
         for (const columnId of dirtyColumnIds) {
-            const column = BoardCrudOperations.findColumnById(board, columnId);
+            const column = findColumn(board, columnId);
             if (column) {
                 dirtyColumns.push({
                     columnId: column.id,
@@ -247,7 +247,7 @@ export class WebviewUpdateService {
         // Collect dirty tasks
         const dirtyTasks: SyncDirtyTaskInfo[] = [];
         for (const taskId of dirtyTaskIds) {
-            const result = BoardCrudOperations.findTaskById(board, taskId);
+            const result = findTaskById(board, taskId);
             if (result) {
                 dirtyTasks.push({
                     columnId: result.column.id,

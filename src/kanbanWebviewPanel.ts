@@ -250,7 +250,8 @@ export class KanbanWebviewPanel {
                 showConflictDialog: (ctx) => this.showConflictDialog(ctx),
                 updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
                 clearUndoRedo: () => this._boardStore.clearHistory(),
-                getPanelInstance: () => this
+                getPanelInstance: () => this,
+                setOriginalTaskOrder: (board) => this._boardStore.setOriginalTaskOrder(board)
             },
             this._context, KanbanWebviewPanel.panelStates, KanbanWebviewPanel.panels
         );

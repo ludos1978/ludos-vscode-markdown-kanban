@@ -21,7 +21,7 @@ import {
 } from '../core/bridge/MessageTypes';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelContext } from './PanelContext';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { findColumn, findColumnContainingTask } from '../actions/helpers';
 
 /**
  * Dependencies required by IncludeFileCoordinator
@@ -136,8 +136,8 @@ export class IncludeFileCoordinator {
     }): Promise<void> {
         const board = this._deps.getBoard();
         const column = board ? (params.columnId
-            ? BoardCrudOperations.findColumnById(board, params.columnId)
-            : BoardCrudOperations.findColumnContainingTask(board, params.taskId!)) : undefined;
+            ? findColumn(board, params.columnId)
+            : findColumnContainingTask(board, params.taskId!)) : undefined;
 
         const result = await this._deps.stateMachine.processChange({
             type: 'include_switch',
