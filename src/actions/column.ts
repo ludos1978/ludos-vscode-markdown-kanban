@@ -6,7 +6,7 @@
 
 import { BoardAction } from './types';
 import { KanbanColumn } from '../markdownParser';
-import { findColumn, findColumnIndex } from './helpers';
+import { findColumn, findColumnIndex, cleanRowTag } from './helpers';
 import { IdGenerator } from '../utils/idGenerator';
 
 // ============= CONTENT UPDATES (target: column) =============
@@ -186,47 +186,10 @@ export const insertAfter = (
     }
 });
 
-/**
- * Sort tasks in a column by type
- */
-export const sortTasks = (
-    columnId: string,
-    sortType: 'unsorted' | 'title' | 'numericTag'
-): BoardAction => ({
-    type: 'column:sortTasks',
-    targets: [{ type: 'column', id: columnId }],
-    execute: (board) => {
-        const column = findColumn(board, columnId);
-        if (!column) return false;
-
-        if (sortType === 'title') {
-            column.tasks.sort((a, b) => {
-                const titleA = a.title || '';
-                const titleB = b.title || '';
-                return titleA.localeCompare(titleB);
-            });
-        } else if (sortType === 'numericTag') {
-            column.tasks.sort((a, b) => {
-                const numA = ColumnActions.extractNumericTag(a.title || '');
-                const numB = ColumnActions.extractNumericTag(b.title || '');
-                if (numA === null && numB === null) return 0;
-                if (numA === null) return 1;
-                if (numB === null) return -1;
-                return numA - numB;
-            });
-        }
-        // 'unsorted' - do nothing
-        return true;
-    }
-});
-
-// Helper for extracting numeric tags
-const ColumnActions = {
-    extractNumericTag(title: string): number | null {
-        const match = title.match(/#(\d+)/);
-        return match ? parseInt(match[1], 10) : null;
-    }
-};
+// NOTE: sortTasks action was removed because:
+// 1. 'unsorted' requires _originalTaskOrder state (only in BoardCrudOperations)
+// 2. All sorting now routes through boardOperations.sortColumn()
+// See ColumnCommands.handleSortColumn for the implementation.
 
 /**
  * Duplicate a column
@@ -273,3 +236,100 @@ export const clearTasks = (
         return true;
     }
 });
+
+// ============= ROW-TAG OPERATIONS =============
+
+/**
+ * Move a column to a new position and update its row tag
+ */
+export const moveWithRowUpdate = (
+    columnId: string,
+    newPosition: number,
+    newRow: number
+): BoardAction => ({
+    type: 'column:moveWithRowUpdate',
+    targets: [], // Full board refresh needed
+    execute: (board) => {
+        const column = findColumn(board, columnId);
+        if (!column) return false;
+
+        // Update the row tag in the title
+        const cleanTitle = cleanRowTag(column.title);
+        if (newRow > 1) {
+            column.title = cleanTitle + ` #row${newRow}`;
+        } else {
+            column.title = cleanTitle;
+        }
+
+        const currentIndex = findColumnIndex(board, columnId);
+        if (currentIndex === -1) return false;
+
+        // Build new order
+        const targetOrder: string[] = [];
+        board.columns.forEach((col, idx) => {
+            if (idx !== currentIndex) {
+                targetOrder.push(col.id);
+            }
+        });
+        targetOrder.splice(newPosition, 0, columnId);
+
+        // Reorder columns
+        const reorderedColumns: KanbanColumn[] = [];
+        targetOrder.forEach(id => {
+            const col = board.columns.find(c => c.id === id);
+            if (col) {
+                reorderedColumns.push(col);
+            }
+        });
+
+        board.columns.length = 0;
+        board.columns.push(...reorderedColumns);
+
+        return true;
+    }
+});
+
+/**
+ * Reorder columns with row tag update for the moved column
+ */
+export const reorderWithRowTags = (
+    newOrder: string[],
+    movedColumnId: string,
+    targetRow: number
+): BoardAction => ({
+    type: 'column:reorderWithRowTags',
+    targets: [], // Full board refresh needed
+    execute: (board) => {
+        const movedColumn = findColumn(board, movedColumnId);
+        if (!movedColumn) return false;
+
+        // Update row tag for the moved column
+        const cleanTitle = cleanRowTag(movedColumn.title);
+        if (targetRow > 1) {
+            movedColumn.title = cleanTitle + ` #row${targetRow}`;
+        } else {
+            movedColumn.title = cleanTitle;
+        }
+
+        // Rebuild columns array in the new order
+        const columnMap = new Map<string, KanbanColumn>();
+        board.columns.forEach(col => columnMap.set(col.id, col));
+
+        const reorderedColumns: KanbanColumn[] = [];
+        newOrder.forEach(id => {
+            const col = columnMap.get(id);
+            if (col) {
+                reorderedColumns.push(col);
+            }
+        });
+
+        board.columns = reorderedColumns;
+        return true;
+    }
+});
+
+// NOTE: cleanupRowTags action was removed because:
+// 1. It's called from kanbanFileService during file operations, not from commands
+// 2. The implementation lives in BoardCrudOperations.cleanupRowTags()
+// 3. It's accessed via boardOperations.cleanupRowTags() facade
+// If needed as an action in the future, re-implement here.

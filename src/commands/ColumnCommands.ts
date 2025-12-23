@@ -27,7 +27,7 @@ import {
 } from '../core/bridge/MessageTypes';
 import { getErrorMessage } from '../utils/stringUtils';
 import { INCLUDE_SYNTAX, extractIncludeFiles } from '../constants/IncludeConstants';
-import { BoardCrudOperations } from '../board/BoardCrudOperations';
+import { findColumn } from '../actions/helpers';
 import { KanbanColumn } from '../board/KanbanTypes';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeFileUri } from '../utils/uriUtils';
@@ -165,7 +165,7 @@ ${tasksContent}`;
             return;
         }
 
-        const column = BoardCrudOperations.findColumnById(currentBoard, columnId);
+        const column = findColumn(currentBoard, columnId);
         if (!column) {
             return;
         }
@@ -313,33 +313,31 @@ ${tasksContent}`;
      * Handle moveColumnWithRowUpdate message
      */
     private async handleMoveColumnWithRowUpdate(message: MoveColumnWithRowUpdateMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.moveColumnWithRowUpdate(
-                context.getCurrentBoard()!,
+            ColumnActions.moveWithRowUpdate(
                 message.columnId,
                 message.newPosition,
                 message.newRow
             ),
-            { sendUpdate: false }
+            { sendUpdates: false }
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to move column');
     }
 
     /**
      * Handle reorderColumns message
      */
     private async handleReorderColumns(message: ReorderColumnsMessage, context: CommandContext): Promise<CommandResult> {
-        await this.performBoardAction(
+        const result = await this.executeAction(
             context,
-            () => context.boardOperations.reorderColumns(
-                context.getCurrentBoard()!,
+            ColumnActions.reorderWithRowTags(
                 message.newOrder,
                 message.movedColumnId,
                 message.targetRow
             )
         );
-        return this.success();
+        return result.success ? this.success() : this.failure(result.error || 'Failed to reorder columns');
     }
 
     /**
@@ -366,13 +364,20 @@ ${tasksContent}`;
 
     /**
      * Handle sortColumn message
+     * Note: Sorting requires access to _originalTaskOrder state for 'unsorted' mode,
+     * so we route through boardOperations.sortColumn instead of using an Action.
      */
     private async handleSortColumn(message: SortColumnMessage, context: CommandContext): Promise<CommandResult> {
-        const result = await this.executeAction(
+        // Use boardOperations.sortColumn because 'unsorted' requires _originalTaskOrder state
+        const success = await this.performBoardAction(
             context,
-            ColumnActions.sortTasks(message.columnId, message.sortType)
+            () => {
+                const board = context.getCurrentBoard();
+                if (!board) return false;
+                return context.boardOperations.sortColumn(board, message.columnId, message.sortType);
+            }
         );
-        return result.success ? this.success() : this.failure(result.error || 'Failed to sort column');
+        return success ? this.success() : this.failure('Failed to sort column');
     }
 
     /**

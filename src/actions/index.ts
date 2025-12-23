@@ -16,7 +16,18 @@ export { BoardAction, ActionTarget, ActionResult } from './types';
 export { ActionExecutor, ExecutorDependencies, ExecuteOptions } from './executor';
 
 // Helpers
-export { findTask, findTaskWithColumn, findColumn, findTaskIndex, findColumnIndex } from './helpers';
+export {
+    findTask,
+    findTaskWithColumn,
+    findColumn,
+    findTaskIndex,
+    findColumnIndex,
+    getColumnRow,
+    cleanRowTag,
+    extractNumericTag,
+    findTaskById,
+    findColumnContainingTask
+} from './helpers';
 
 // Action factories (namespaced)
 import * as TaskActions from './task';

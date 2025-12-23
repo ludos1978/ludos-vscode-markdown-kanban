@@ -4,56 +4,61 @@ Last updated: 2025-12-23
 
 ---
 
-## HIGH PRIORITY (Deferred - Needs Further Analysis)
+## COMPLETED (2025-12-23)
 
-### 1. Duplicate Board Operations (Two Systems)
-**Status:** Analyzed - Partial migration possible, full migration complex
-**Effort:** 4-8 hours | **Impact:** Medium - some duplication is intentional
+### ✅ 1. Duplicate Board Operations - Unified to Actions
 
-**Analysis Results:**
+**Migration completed (Plan 2 - Moderate approach):**
 
-Two systems exist with overlapping functionality:
-- `src/board/BoardCrudOperations.ts` - Instance methods
-- `src/actions/task.ts`, `src/actions/column.ts` - Action factories
+**New Actions created:**
+- `ColumnActions.moveWithRowUpdate(columnId, newPosition, newRow)` - Move column with row tag update
+- `ColumnActions.reorderWithRowTags(newOrder, movedColumnId, targetRow)` - Reorder columns with row tags
 
-**Methods that have direct Action equivalents (could migrate):**
-| BoardCrudOperations | Action Equivalent |
-|---------------------|-------------------|
-| `moveTask()` | `TaskActions.move()` |
-| `addTask()` | `TaskActions.add()` |
-| `deleteTask()` | `TaskActions.remove()` |
-| `duplicateTask()` | `TaskActions.duplicate()` |
-| `insertTaskBefore/After()` | `TaskActions.insertBefore/After()` |
-| `moveTaskToTop/Up/Down/Bottom()` | `TaskActions.moveToTop/Up/Down/Bottom()` |
-| `moveColumn()` | `ColumnActions.move()` |
-| `deleteColumn()` | `ColumnActions.remove()` |
-| `insertColumnBefore/After()` | `ColumnActions.insertBefore/After()` |
+**Actions removed (dead code cleanup):**
+- `ColumnActions.sortTasks()` - Removed because 'unsorted' requires `_originalTaskOrder` state
+- `ColumnActions.cleanupRowTags()` - Removed because it's called from kanbanFileService, not commands
 
-**Specialized methods (NO Action equivalent - must keep):**
-- `setOriginalTaskOrder()` - State tracking helper
-- `moveColumnWithRowUpdate()` - Move with row tag update
-- `reorderColumns()` - Reorder with row tag update
-- `getColumnRow()` - Row tag extraction helper
-- `cleanupRowTags()` - Row tag cleanup helper
-- `performAutomaticSort()` - Automatic sorting
+**Helpers consolidated to `src/actions/helpers.ts`:**
+- `getColumnRow(column)` - Extract row number from column title
+- `cleanRowTag(title)` - Remove row tag from title
+- `extractNumericTag(title)` - Extract numeric tag from task title
+- `findTaskById(board, taskId)` - Find task by ID with column/index
+- `findColumnContainingTask(board, taskId)` - Find column containing task
 
-**Static helper methods (keep):**
-- `findColumnById()`, `findTaskById()`, `findColumnContainingTask()`
+**Call sites updated:**
+- `ColumnCommands.ts` - Now uses `executeAction()` with new Actions
+- Removed import of `BoardCrudOperations`, uses `findColumn` from helpers
 
-**Recommendation:**
-The migration is more complex than initially thought:
-1. Specialized row-tag methods have no Action equivalent
-2. Some instance methods are used by `performBoardAction()` which needs the callback pattern
-3. Full migration would require:
-   - Creating new Actions for row-tag operations
-   - Updating all callers of `performBoardAction()` to use `executeAction()`
-   - Ensuring undo/redo still works correctly
+**BoardOperations facade slimmed down:**
+- Removed all delegated CRUD methods (now handled by Actions)
+- Kept only: `setOriginalTaskOrder()`, `cleanupRowTags()`, `sortColumn()`, `performAutomaticSort()`
 
-**Decision:** Defer until a larger refactoring sprint or when row-tag logic needs changes anyway.
+**BoardCrudOperations updated:**
+- Static helpers now delegate to `actions/helpers.ts`
+- Task/Column instance methods marked `@deprecated` with guidance to use Actions
+- Kept for: test compatibility, state management (`_originalTaskOrder`), and `sortColumn('unsorted')`
+
+**Bug fix: 'Unsorted' sorting now works:**
+- `ColumnCommands.handleSortColumn` now uses `boardOperations.sortColumn()` for all sort types
+- This ensures 'unsorted' has access to `_originalTaskOrder` state
+- Added `sortColumn()` back to BoardOperations facade
 
 ---
 
-## COMPLETED (2025-12-23)
+## REMAINING TECHNICAL DEBT (Lower Priority)
+
+### P2: Add tests for new row-tag actions
+- `moveWithRowUpdate`, `reorderWithRowTags` have no unit tests
+
+### P3: Move `_originalTaskOrder` to BoardStore
+- State currently lives in BoardCrudOperations
+- Should be in BoardStore for proper state management
+
+### P4: Remove static method indirection
+- 15+ files still use `BoardCrudOperations.findColumnById()` etc.
+- Should update to use `findColumn` from `actions/helpers.ts` directly
+
+---
 
 ### ✅ 9. Excessive MediaTracker Logging
 - Removed 20+ debug console.log statements from `src/services/MediaTracker.ts`
