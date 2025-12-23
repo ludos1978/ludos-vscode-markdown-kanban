@@ -1,19 +1,10 @@
-- [ ] the marp presentation that can be exported should have it's video playback system modified. It should automatically stop videos when the slide is changed (it can allways stop all videos). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
+- [ ] add a table editor that allows sorting of content by each category.
 
-- [ ] move the delete button from the "image not found hover" to the burger menu on the image.
-
-- [ ] gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
-- add an option to open the file or the path in the file explorer (finder) where the file is in!
-
-- [x] when i delete the top column in a stack, the stack below it should have it's #stack tag removed. in all other cases there is no need to change anything
-
-- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
-
-- [x] add a feature to convert individual or multiple images-paths or referenced document-paths in any of the documents (main or included kanban baords) that allows converting from absolute to relative paths and from relative to absolute paths. each document should get a button on the top-right (an individual breadcrumbs menu), with the option to convert the path type. detect the path type and give the option to convert it to the other tyep. also add the feature to the "File States Overview" system where each (kanban or markdown) file can be individually modified from relative to absolute paths, have both options (convert all to relative paths and convert all to absolute paths). and add one button to convert the main file and all included files.
+- [ ] in the marp presentation expost the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
 
 - [ ] on windows drag & dropping files into the columns doesnt create paths as it does with osx. does it handle c: and other paths equally as / paths?
 
-- [x] when initializing a file it still does not reload the file immediately after adding the required header.
+- [ ] can this be integrated ? https://github.com/Skarlso/adventure-voter 
 
 - [ ] would it be possible to take a screenshot of a webpage if a link is added to the board?
 
@@ -60,6 +51,17 @@ A column can have multiple query tags:
 Collects all cards that didn't match any gather rule:
 
 
+
+- [x] add a feature to convert individual or multiple images-paths or referenced document-paths in any of the documents (main or included kanban baords) that allows converting from absolute to relative paths and from relative to absolute paths. each document should get a button on the top-right (an individual breadcrumbs menu), with the option to convert the path type. detect the path type and give the option to convert it to the other tyep. also add the feature to the "File States Overview" system where each (kanban or markdown) file can be individually modified from relative to absolute paths, have both options (convert all to relative paths and convert all to absolute paths). and add one button to convert the main file and all included files.
+
+- [x] move the delete button from the "image not found hover" to the burger menu on the image.
+
+- [x] gray out the option which is not applicable. a relatvie path should not be chageable to relative again.
+- add an option to open the file or the path in the file explorer (finder) where the file is in!
+
+- [x] when i delete the top column in a stack, the stack below it should have it's #stack tag removed. in all other cases there is no need to change anything
+
+- [x] when initializing a file it still does not reload the file immediately after adding the required header.
 
 - [x] found problems:
 - when i modify a column that has tasks and i add a columninclude. it should be able to add the existing tasks into the included board (as these othervise get lost when the include is added). this was working before, but isnt anymore.
