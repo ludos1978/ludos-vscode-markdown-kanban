@@ -50,10 +50,6 @@ export interface BoardStoreOptions {
 
 // ============= HELPER FUNCTIONS =============
 
-function deepCloneBoard(board: KanbanBoard): KanbanBoard {
-    return JSON.parse(JSON.stringify(board));
-}
-
 function createLegacyUndoEntry(board: KanbanBoard): UndoEntry {
     return UndoCapture.inferred(board, 'legacy');
 }
@@ -99,7 +95,7 @@ export class BoardStore implements vscode.Disposable {
     /**
      * Set the board (marks cache as valid)
      */
-    setBoard(board: KanbanBoard | null, _emitEvent: boolean = true): void {
+    setBoard(board: KanbanBoard | null): void {
         this._state.board = board;
         this._state.cacheValid = board !== null;
     }

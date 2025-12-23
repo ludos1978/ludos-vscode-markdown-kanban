@@ -243,7 +243,7 @@ export class KanbanWebviewPanel {
             this._fileManager, this._fileRegistry, this._fileFactory, this._backupManager, this._boardOperations,
             {
                 getBoard: () => this.getBoard(),
-                setBoard: (board) => this._boardStore.setBoard(board, false),
+                setBoard: (board) => this._boardStore.setBoard(board),
                 sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
                 getPanel: () => this._panel,
                 getContext: () => this._extensionContext,
@@ -264,7 +264,7 @@ export class KanbanWebviewPanel {
             onSaveToMarkdown: this.saveToMarkdown.bind(this),
             onInitializeFile: this.initializeFile.bind(this),
             getCurrentBoard: () => this.getBoard(),
-            setBoard: (board: KanbanBoard) => this._boardStore.setBoard(board, true),
+            setBoard: (board: KanbanBoard) => this._boardStore.setBoard(board),
             setUndoRedoOperation: (isOperation: boolean) => this._context.setUndoRedoOperation(isOperation),
             getWebviewPanel: () => this,
             getWebviewBridge: () => this._webviewBridge,
@@ -338,7 +338,7 @@ export class KanbanWebviewPanel {
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
         if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview, false);
+            this._boardStore.setBoard(state.cachedBoardFromWebview);
         }
     }
 
@@ -454,7 +454,7 @@ export class KanbanWebviewPanel {
         // Generate fresh board, preserving existing IDs to prevent "Column not found" errors
         const existingBoard = this._boardStore.getBoard();
         const board = this._fileRegistry.generateBoard(existingBoard || undefined);
-        if (board) this._boardStore.setBoard(board, false);
+        if (board) this._boardStore.setBoard(board);
         return board;
     }
 

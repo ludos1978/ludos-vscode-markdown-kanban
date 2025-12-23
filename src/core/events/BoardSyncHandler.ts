@@ -88,8 +88,8 @@ export class BoardSyncHandler {
             columns: sortColumnsByRow(board.columns)
         };
 
-        // 2. Update BoardStore (without emitting event - we're syncing, not changing)
-        this._deps.boardStore.setBoard(normalizedBoard, false);
+        // 2. Update BoardStore
+        this._deps.boardStore.setBoard(normalizedBoard);
 
         // 3. Update MainKanbanFile's cached board for conflict detection
         const mainFile = this._deps.fileRegistry.getMainFile();
