@@ -1,36 +1,98 @@
-# Cleanup Tasks - Round 2
+# Cleanup Tasks - Rounds 2 & 3
 
 ## Completed
 
-### Frontend JavaScript
-- [x] Remove duplicate `toggleFileBarMenu` and `positionFileBarDropdown` from menuOperations.js (dead code - webview.js loads after)
-- [x] Improved `positionFileBarDropdown` in webview.js to use dynamic measurement (was using hardcoded dimensions)
-- [x] Consolidated task movement functions (4x: moveTaskToTop/Up/Down/Bottom) into single `moveTaskInDirection()` with wrapper functions
+### Round 3 - Files Directory
+- [x] Fixed IncludeFile to use base class `isDocumentDirtyInVSCode()` (was duplicating 4 lines)
+- [x] Extracted `_setupWatcherSubscriptions()` helper in MarkdownFile.ts (eliminated ~15 lines duplication)
+- [x] Added `_toRelativePath()` and `_normalizedLookup()` helpers in MarkdownFileRegistry.ts
+- [x] Simplified `getByRelativePath()`, `hasByRelativePath()`, `ensureIncludeFileRegistered()` using new helpers
 
-### Commands (TypeScript)
+### Round 2 - Frontend JavaScript
+- [x] Removed duplicate `toggleFileBarMenu` and `positionFileBarDropdown` from menuOperations.js (dead code)
+- [x] Improved `positionFileBarDropdown` in webview.js to use dynamic measurement
+- [x] Consolidated task movement functions into single `moveTaskInDirection()` with wrapper functions
+
+### Round 2 - Commands (TypeScript)
 - [x] Extracted `_extractBase64Data()` helper in ClipboardCommands.ts (replaced 3 duplicates)
 - [x] Consolidated path replacement logic in PathCommands.ts into `_replacePathInFiles()` helper (~80 lines saved)
 
-### Backend (TypeScript) - Round 1
+### Round 1 - Backend (TypeScript)
 - [x] Removed unused `deepCloneBoard` from BoardStore.ts
 - [x] Removed unused `_emitEvent` parameter from BoardStore.setBoard()
+
+---
+
+## Future Refactoring (Critical Issues Identified)
+
+### CRITICAL: ExportService God Object (1,795 lines)
+**Location:** `src/services/export/ExportService.ts`
+
+The ExportService has >12 distinct responsibilities:
+1. Export coordination (extractContent, transformContent, outputContent)
+2. Content transformations (speaker notes, HTML comments)
+3. Include file processing (processIncludedFiles - 203 lines)
+4. Asset detection and packing
+5. Path rewriting (rewriteLinksForExport - 53 lines)
+6. Diagram preprocessing coordination
+7. Marp conversion pipeline (runMarpConversion - 169 lines)
+8. Tag filtering
+9. Presentation conversion (convertPresentationToKanban - 69 lines)
+10. Board filtering (filterBoard - 67 lines)
+11. Marp class extraction (extractMarpClassesFromMarkdown - 59 lines)
+12. Column extraction (extractColumnContent - 51 lines)
+
+**Recommendation:** Split into:
+- `ExportCoordinator` (orchestration)
+- `ContentTransformer` (speech notes, HTML transforms, tag filtering)
+- `IncludeProcessor` (include file handling)
+- `AssetPacker` (asset detection, filtering, packing)
+- `LinkRewriter` (all link rewriting logic)
+- `PresentationConverter` (board ↔ presentation conversion)
+
+### HIGH: Duplicate Regex Patterns Across 4 Services
+**Problem:** Image/link regex patterns are defined independently in:
+- ExportService.ts (lines 539-548)
+- MediaTracker.ts (lines 216-248)
+- PathConversionService.ts (lines 61-84) - already centralized
+- DiagramPreprocessor.ts (lines 104-158)
+
+**Issue:** Inconsistent pattern variations (title attribute handling differs, causing bugs)
+
+**Recommendation:** Consolidate all patterns into `src/shared/regexPatterns.ts` or extend PathConversionService.PATTERNS
+
+### MEDIUM: Path Extraction Logic Duplicated in 3 Services
+Three independent implementations:
+- ExportService.findAssets() (52 lines)
+- MediaTracker.extractMediaReferences() (46 lines)
+- PathConversionService.extractPaths() (108 lines)
+
+**Recommendation:** Create unified `ContentPathExtractor` interface
+
+### MEDIUM: MainKanbanFile Dual Board Caching
+**Location:** `src/files/MainKanbanFile.ts`
+
+Two board caching mechanisms:
+- `_board` field (persistent cache)
+- `_cachedBoardFromWebview` field (temporary for pending edits)
+
+Creates potential sync issues. Consider single source of truth with event-based updates.
+
+---
 
 ## Skipped (with rationale)
 
 ### Include mode column/task operations
-- Skipped: Functions already use shared utilities (`window.menuUtils`), differences are meaningful (column vs task types, different message types). Consolidating would add type-checking complexity without benefit.
+Already uses shared utilities (`window.menuUtils`), differences are meaningful.
 
 ### Move createDiagramFile to DiagramCommands
-- Skipped: Function shares helper methods (`_getCurrentFilePaths`, `_getMediaFolderPath`) with other ClipboardCommands. Moving would require duplicating helpers or extracting to shared module.
+Would require duplicating helper methods or extracting to shared module.
 
 ### Remove scrollToElementIfNeeded
-- Skipped: Analysis was incorrect - function IS used in multiple places (menuOperations.js, dragDrop.js)
+Analysis was incorrect - function IS used in multiple places.
 
 ### Merge filename generation methods
-- Skipped: Methods use fundamentally different algorithms (hash-based vs counter-based). Merging would make code less clear.
+Methods use fundamentally different algorithms (hash-based vs counter-based).
 
-### Clean up folding state functions in boardRenderer.js
-- Deferred: Would require deeper analysis to understand relationships between functions
-
-### Clean up diagnostic logging in dragDrop.js
-- Deferred: Low priority, would need verification of which logs are still needed
+### ensureIncludeRegistered absolute path handling
+Uses `mainFile` parameter directly (not `this.getMainFile()`), intentionally different pattern.

@@ -41,6 +41,34 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         this._fileSaveService = FileSaveService.getInstance();
     }
 
+    // ============= PATH HELPERS =============
+
+    /**
+     * Convert an absolute path to relative path from main file's directory
+     * Returns the original path if already relative or no main file available
+     */
+    private _toRelativePath(inputPath: string): string {
+        if (!path.isAbsolute(inputPath)) {
+            return inputPath;
+        }
+        const mainFile = this.getMainFile();
+        if (!mainFile) {
+            return inputPath;
+        }
+        const baseDir = path.dirname(mainFile.getPath());
+        return path.relative(baseDir, inputPath);
+    }
+
+    /**
+     * Lookup a file by path (handles both absolute and relative paths)
+     * Normalizes the path and returns the file from the registry
+     */
+    private _normalizedLookup(inputPath: string): MarkdownFile | undefined {
+        const relativePath = this._toRelativePath(inputPath);
+        const normalized = MarkdownFile.normalizeRelativePath(relativePath);
+        return this._filesByRelativePath.get(normalized);
+    }
+
     // ============= MESSAGE HANDLER ACCESS =============
 
     /**
@@ -168,18 +196,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * registry.getByRelativePath("FOLDER/FILE.MD")
      */
     public getByRelativePath(relativePath: string): MarkdownFile | undefined {
-        // Handle absolute paths by converting to relative first
-        let pathToLookup = relativePath;
-        if (path.isAbsolute(relativePath)) {
-            const mainFile = this.getMainFile();
-            if (mainFile) {
-                const baseDir = path.dirname(mainFile.getPath());
-                pathToLookup = path.relative(baseDir, relativePath);
-            }
-        }
-
-        const normalized = MarkdownFile.normalizeRelativePath(pathToLookup);
-        return this._filesByRelativePath.get(normalized);
+        return this._normalizedLookup(relativePath);
     }
 
     /**
@@ -205,18 +222,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
      * @returns true if file exists in registry
      */
     public hasByRelativePath(relativePath: string): boolean {
-        // Handle absolute paths by converting to relative first
-        let pathToLookup = relativePath;
-        if (path.isAbsolute(relativePath)) {
-            const mainFile = this.getMainFile();
-            if (mainFile) {
-                const baseDir = path.dirname(mainFile.getPath());
-                pathToLookup = path.relative(baseDir, relativePath);
-            }
-        }
-
-        const normalized = MarkdownFile.normalizeRelativePath(pathToLookup);
-        return this._filesByRelativePath.has(normalized);
+        return this._normalizedLookup(relativePath) !== undefined;
     }
 
     // ============= TYPE-SPECIFIC QUERIES =============
@@ -507,21 +513,12 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         type: 'regular' | 'column' | 'task',
         fileFactory: IFileFactory
     ): void {
-        // Convert absolute path to relative if needed
-        if (path.isAbsolute(relativePath)) {
-            const mainFile = this.getMainFile();
-            if (!mainFile) {
-                console.error(`[MarkdownFileRegistry] Cannot convert absolute to relative - no main file`);
-                return;
-            }
-            const baseDir = path.dirname(mainFile.getPath());
-            relativePath = path.relative(baseDir, relativePath);
+        // Convert absolute path to relative and normalize ./ prefix
+        let normalizedPath = this._toRelativePath(relativePath);
+        if (normalizedPath.startsWith('./')) {
+            normalizedPath = normalizedPath.substring(2);
         }
-
-        // Normalize ./ prefix
-        if (relativePath.startsWith('./')) {
-            relativePath = relativePath.substring(2);
-        }
+        relativePath = normalizedPath;
 
         // Fast check using registration cache
         if (this.isBeingRegistered(relativePath)) {

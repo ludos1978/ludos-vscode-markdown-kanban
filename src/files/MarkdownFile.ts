@@ -694,27 +694,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
         if (existingWatcher) {
             existingWatcher.refCount++;
             this._fileWatcher = existingWatcher.watcher;
-
-            // CRITICAL: Each instance needs its own event subscriptions even when sharing a watcher
-            const changeSubscription = this._fileWatcher.onDidChange(async (_uri) => {
-                await this._onFileSystemChange('modified');
-            });
-            this._watcherSubscriptions.push(changeSubscription);
-
-            const deleteSubscription = this._fileWatcher.onDidDelete(async (_uri) => {
-                await this._onFileSystemChange('deleted');
-            });
-            this._watcherSubscriptions.push(deleteSubscription);
-
-            const createSubscription = this._fileWatcher.onDidCreate(async (_uri) => {
-                await this._onFileSystemChange('created');
-            });
-            this._watcherSubscriptions.push(createSubscription);
-
+            this._setupWatcherSubscriptions();
             this._isWatching = true;
             return;
         }
-
 
         const pattern = new vscode.RelativePattern(
             path.dirname(this._path),
@@ -722,30 +705,33 @@ export abstract class MarkdownFile implements vscode.Disposable {
         );
 
         this._fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-        // Watch for modifications - CRITICAL: Store disposables to prevent memory leak
-        const changeSubscription = this._fileWatcher.onDidChange(async (_uri) => {
-            await this._onFileSystemChange('modified');
-        });
-        this._watcherSubscriptions.push(changeSubscription);
-
-        // Watch for deletion
-        const deleteSubscription = this._fileWatcher.onDidDelete(async (_uri) => {
-            await this._onFileSystemChange('deleted');
-        });
-        this._watcherSubscriptions.push(deleteSubscription);
-
-        // Watch for creation
-        const createSubscription = this._fileWatcher.onDidCreate(async (_uri) => {
-            await this._onFileSystemChange('created');
-        });
-        this._watcherSubscriptions.push(createSubscription);
+        this._setupWatcherSubscriptions();
 
         // PERFORMANCE: Register in shared watcher registry
         MarkdownFile._activeWatchers.set(watchPath, { watcher: this._fileWatcher, refCount: 1, lastActivity: new Date() });
 
         this._disposables.push(this._fileWatcher);
         this._isWatching = true;
+    }
+
+    /**
+     * Setup event subscriptions for the file watcher
+     * CRITICAL: Each instance needs its own subscriptions even when sharing a watcher
+     */
+    private _setupWatcherSubscriptions(): void {
+        if (!this._fileWatcher) return;
+
+        this._watcherSubscriptions.push(
+            this._fileWatcher.onDidChange(async () => {
+                await this._onFileSystemChange('modified');
+            }),
+            this._fileWatcher.onDidDelete(async () => {
+                await this._onFileSystemChange('deleted');
+            }),
+            this._fileWatcher.onDidCreate(async () => {
+                await this._onFileSystemChange('created');
+            })
+        );
     }
 
     /**

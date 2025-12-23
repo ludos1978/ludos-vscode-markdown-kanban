@@ -260,16 +260,10 @@ export class IncludeFile extends MarkdownFile {
     // ============= CONFLICT CONTEXT =============
 
     protected getConflictContext(): ConflictContext {
-        // Check if VSCode document is dirty (text editor unsaved changes)
-        const openDocuments = vscode.workspace.textDocuments;
-        const documentIsDirty = openDocuments.some(doc =>
-            doc.uri.fsPath === this._path && doc.isDirty
-        );
-
         // Include has unsaved changes if either:
         // - Internal state flag is true (from kanban UI edits) - computed from content comparison
         // - OR VSCode document is dirty (from text editor edits)
-        const hasIncludeUnsavedChanges = this.hasUnsavedChanges() || documentIsDirty;
+        const hasIncludeUnsavedChanges = this.hasUnsavedChanges() || this.isDocumentDirtyInVSCode();
 
         return {
             type: 'external_include',
