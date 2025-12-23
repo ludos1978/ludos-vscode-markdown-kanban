@@ -28,13 +28,36 @@ export function toForwardSlashes(filePath: string): string {
 
 /**
  * Normalizes a file path for case-insensitive lookup.
- * Converts to lowercase and normalizes path separators.
+ * Converts to lowercase, normalizes path separators, and trims whitespace.
+ *
+ * Use for:
+ * - Registry operations
+ * - Path comparisons
+ * - Map keys
  *
  * @param filePath - The file path to normalize
  * @returns Normalized path for use as lookup key
  */
 export function normalizePathForLookup(filePath: string): string {
-    return toForwardSlashes(filePath.toLowerCase());
+    if (!filePath) return '';
+    return toForwardSlashes(filePath.trim().toLowerCase());
+}
+
+/**
+ * Compares two paths for equality using normalized comparison.
+ * Case-insensitive and platform-independent (handles both / and \).
+ *
+ * @param path1 - First path to compare
+ * @param path2 - Second path to compare
+ * @returns true if paths are equivalent after normalization
+ *
+ * @example
+ * isSamePath("Folder/File.md", "folder/file.md")   // true
+ * isSamePath("Folder\\File.md", "folder/file.md")  // true
+ * isSamePath("Folder/File.md", "Other/File.md")    // false
+ */
+export function isSamePath(path1: string, path2: string): boolean {
+    return normalizePathForLookup(path1) === normalizePathForLookup(path2);
 }
 
 /**

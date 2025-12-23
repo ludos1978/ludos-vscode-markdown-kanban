@@ -10,14 +10,11 @@
 // Unified State (replaces PanelStateModel + DocumentStateModel)
 export { PanelContext, PendingBoardUpdate } from './PanelContext';
 
-// Foundation (Phase 1)
+// Foundation
 export { ConcurrencyManager } from './ConcurrencyManager';
 
-// Core Operations (Phase 2)
+// Core Operations
 export { IncludeFileCoordinator, IncludeCoordinatorDependencies } from './IncludeFileCoordinator';
 
-// Webview Management (Phase 3)
+// Webview Management
 export { WebviewManager, WebviewManagerDependencies } from './WebviewManager';
-
-// Handler Lifecycle (Phase 4)
-export { HandlerRegistry, RegisteredHandlers } from './HandlerRegistry';

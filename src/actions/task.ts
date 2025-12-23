@@ -5,9 +5,9 @@
  * Actions know their targets for proper undo/redo handling.
  */
 
-import { BoardAction, ActionTarget } from './types';
+import { BoardAction } from './types';
 import { KanbanTask } from '../markdownParser';
-import { findColumn, findTaskIndex, findTaskWithColumn } from './helpers';
+import { findColumn, findTaskIndex } from './helpers';
 import { IdGenerator } from '../utils/idGenerator';
 
 // ============= CONTENT UPDATES (target: task) =============

@@ -16,7 +16,7 @@ import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } fr
 import { PathConversionService, ConversionResult } from '../services/PathConversionService';
 import { getErrorMessage, encodeFilePath } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
-import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage, IncomingMessage } from '../core/bridge/MessageTypes';
+import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
 import { safeFileUri } from '../utils/uriUtils';
 import { FileSearchService } from '../fileSearchService';
 import { LinkOperations } from '../utils/linkOperations';
@@ -348,7 +348,7 @@ export class PathCommands extends BaseMessageCommand {
      */
     private async handleOpenPath(
         message: OpenPathMessage,
-        context: CommandContext
+        _context: CommandContext
     ): Promise<CommandResult> {
         const filePath = message.filePath;
 
@@ -422,7 +422,7 @@ export class PathCommands extends BaseMessageCommand {
      */
     private async handleRevealPathInExplorer(
         message: RevealPathInExplorerMessage,
-        context: CommandContext
+        _context: CommandContext
     ): Promise<CommandResult> {
         const filePath = message.filePath;
 

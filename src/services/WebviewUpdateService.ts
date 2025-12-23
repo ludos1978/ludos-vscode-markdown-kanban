@@ -21,7 +21,7 @@ import { WebviewManager } from '../panel/WebviewManager';
 import { configService } from './ConfigurationService';
 import { KeybindingService } from './KeybindingService';
 import { findColumn, findTaskById } from '../actions/helpers';
-import { eventBus, createEvent, WebviewUpdateRequestedEvent } from '../core/events';
+import { eventBus, WebviewUpdateRequestedEvent } from '../core/events';
 import {
     BoardUpdateMessage,
     UpdateIncludeContentMessage,

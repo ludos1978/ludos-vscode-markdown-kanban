@@ -74,7 +74,7 @@ export class BoardSyncHandler {
      * This is the logic previously in syncBoardToBackend()
      */
     private async _handleBoardChanged(event: BoardChangedEvent): Promise<void> {
-        const { board, trigger } = event.data;
+        const { board } = event.data;
 
         if (!this._deps.fileRegistry.isReady()) {
             return;

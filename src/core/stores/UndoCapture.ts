@@ -235,7 +235,7 @@ export class UndoCapture {
     /**
      * Resolve targets from an IncludeSwitchEvent
      */
-    private static resolveIncludeSwitchTargets(event: IncludeSwitchEvent, board: KanbanBoard): ResolvedTarget[] {
+    private static resolveIncludeSwitchTargets(event: IncludeSwitchEvent, _board: KanbanBoard): ResolvedTarget[] {
         const targets: ResolvedTarget[] = [];
 
         if (event.target === 'task') {

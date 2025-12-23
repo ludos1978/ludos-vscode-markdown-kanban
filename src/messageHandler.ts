@@ -3,7 +3,7 @@ import { BoardStore } from './core/stores';
 import { BoardOperations } from './board';
 import { LinkHandler } from './services/LinkHandler';
 import { MarkdownFile } from './files/MarkdownFile'; // FOUNDATION-1: For path comparison
-import { KanbanBoard } from './markdownParser';
+import { KanbanBoard, KanbanTask } from './markdownParser';
 import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
@@ -15,6 +15,18 @@ import { EditingStoppedMessage, BoardUpdateFromFrontendMessage, IncomingMessage 
 import { CapturedEdit } from './files/FileInterfaces';
 import { STOP_EDITING_TIMEOUT_MS } from './constants/TimeoutConstants';
 
+/**
+ * Simplified dependencies for MessageHandler
+ */
+export interface MessageHandlerDeps {
+    onBoardUpdate: () => Promise<void>;
+    onSaveToMarkdown: () => Promise<void>;
+    onInitializeFile: () => Promise<void>;
+    getWebviewPanel: () => any;
+    getWebviewBridge?: () => any;
+    emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
+}
+
 export class MessageHandler {
     private _fileManager: FileManager;
     private _boardStore: BoardStore;
@@ -22,15 +34,7 @@ export class MessageHandler {
     private _linkHandler: LinkHandler;
     private _plantUMLService: PlantUMLService;
     private _fileSaveService: FileSaveService;
-    private _onBoardUpdate: () => Promise<void>;
-    private _onSaveToMarkdown: () => Promise<void>;
-    private _onInitializeFile: () => Promise<void>;
-    private _getCurrentBoard: () => KanbanBoard | undefined;
-    private _setBoard: (board: KanbanBoard) => void;
-    private _setUndoRedoOperation: (isOperation: boolean) => void;
-    private _getWebviewPanel: () => any;
-    private _getWebviewBridge: (() => any) | undefined;
-    private _emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
+    private _deps: MessageHandlerDeps;
     private _autoExportSettings: NewExportOptions | null = null;
 
     // Command Pattern: Registry for message handlers
@@ -46,17 +50,7 @@ export class MessageHandler {
         boardStore: BoardStore,
         boardOperations: BoardOperations,
         linkHandler: LinkHandler,
-        callbacks: {
-            onBoardUpdate: () => Promise<void>;
-            onSaveToMarkdown: () => Promise<void>;
-            onInitializeFile: () => Promise<void>;
-            getCurrentBoard: () => KanbanBoard | undefined;
-            setBoard: (board: KanbanBoard) => void;
-            setUndoRedoOperation: (isOperation: boolean) => void;
-            getWebviewPanel: () => any;
-            getWebviewBridge?: () => any;
-            emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => void;
-        }
+        deps: MessageHandlerDeps
     ) {
         this._fileManager = fileManager;
         this._boardStore = boardStore;
@@ -64,15 +58,7 @@ export class MessageHandler {
         this._linkHandler = linkHandler;
         this._plantUMLService = new PlantUMLService();
         this._fileSaveService = FileSaveService.getInstance();
-        this._onBoardUpdate = callbacks.onBoardUpdate;
-        this._onSaveToMarkdown = callbacks.onSaveToMarkdown;
-        this._onInitializeFile = callbacks.onInitializeFile;
-        this._getCurrentBoard = callbacks.getCurrentBoard;
-        this._setBoard = callbacks.setBoard;
-        this._setUndoRedoOperation = callbacks.setUndoRedoOperation;
-        this._getWebviewPanel = callbacks.getWebviewPanel;
-        this._getWebviewBridge = callbacks.getWebviewBridge;
-        this._emitBoardChanged = callbacks.emitBoardChanged;
+        this._deps = deps;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
         this._commandRegistry = new CommandRegistry();
@@ -84,6 +70,7 @@ export class MessageHandler {
      */
     private _initializeCommandRegistry(): void {
         // Create the command context with all dependencies
+        // Note: Uses simplified deps + direct references to reduce callback indirection
         this._commandContext = {
             fileManager: this._fileManager,
             boardStore: this._boardStore,
@@ -91,34 +78,34 @@ export class MessageHandler {
             linkHandler: this._linkHandler,
             plantUMLService: this._plantUMLService,
             fileSaveService: this._fileSaveService,
-            getFileRegistry: () => this._getWebviewPanel()?._fileRegistry,
-            onBoardUpdate: this._onBoardUpdate,
-            onSaveToMarkdown: this._onSaveToMarkdown,
-            onInitializeFile: this._onInitializeFile,
-            getCurrentBoard: this._getCurrentBoard,
-            setBoard: this._setBoard,
-            setUndoRedoOperation: this._setUndoRedoOperation,
-            getWebviewPanel: this._getWebviewPanel,
-            getWebviewBridge: () => this._getWebviewBridge?.() ?? this._getWebviewPanel()?._webviewBridge,
-            emitBoardChanged: this._emitBoardChanged,
+            getFileRegistry: () => this._deps.getWebviewPanel()?._fileRegistry,
+            onBoardUpdate: this._deps.onBoardUpdate,
+            onSaveToMarkdown: this._deps.onSaveToMarkdown,
+            onInitializeFile: this._deps.onInitializeFile,
+            getCurrentBoard: () => this._boardStore.getBoard() ?? undefined,
+            setBoard: (board: KanbanBoard) => this._boardStore.setBoard(board),
+            setUndoRedoOperation: (isOperation: boolean) => this._deps.getWebviewPanel()?._context?.setUndoRedoOperation(isOperation),
+            getWebviewPanel: this._deps.getWebviewPanel,
+            getWebviewBridge: () => this._deps.getWebviewBridge?.() ?? this._deps.getWebviewPanel()?._webviewBridge,
+            emitBoardChanged: this._deps.emitBoardChanged,
             getAutoExportSettings: () => this._autoExportSettings,
             setAutoExportSettings: (settings: NewExportOptions | null) => { this._autoExportSettings = settings; },
 
             // Editing state management
-            setEditingInProgress: (value: boolean) => this._getWebviewPanel()?.setEditingInProgress(value),
+            setEditingInProgress: (value: boolean) => this._deps.getWebviewPanel()?.setEditingInProgress(value),
 
             // Dirty tracking
-            markTaskDirty: (taskId: string) => this._getWebviewPanel()?.markTaskDirty?.(taskId),
-            clearTaskDirty: (taskId: string) => this._getWebviewPanel()?.clearTaskDirty?.(taskId),
-            markColumnDirty: (columnId: string) => this._getWebviewPanel()?.markColumnDirty?.(columnId),
-            clearColumnDirty: (columnId: string) => this._getWebviewPanel()?.clearColumnDirty?.(columnId),
+            markTaskDirty: (taskId: string) => this._deps.getWebviewPanel()?.markTaskDirty?.(taskId),
+            clearTaskDirty: (taskId: string) => this._deps.getWebviewPanel()?.clearTaskDirty?.(taskId),
+            markColumnDirty: (columnId: string) => this._deps.getWebviewPanel()?.markColumnDirty?.(columnId),
+            clearColumnDirty: (columnId: string) => this._deps.getWebviewPanel()?.clearColumnDirty?.(columnId),
 
             // Include file operations
-            handleIncludeSwitch: (params) => this._getWebviewPanel()?.handleIncludeSwitch(params),
+            handleIncludeSwitch: (params) => this._deps.getWebviewPanel()?.handleIncludeSwitch(params),
             requestStopEditing: () => this.requestStopEditing(),
 
             // Configuration
-            refreshConfiguration: () => this._getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve()
+            refreshConfiguration: () => this._deps.getWebviewPanel()?.refreshConfiguration?.() || Promise.resolve()
         };
 
         // Register command handlers
@@ -136,7 +123,9 @@ export class MessageHandler {
         this._commandRegistry.register(new PathCommands());
 
         // Initialize the registry with context
-        this._commandRegistry.initialize(this._commandContext);
+        if (this._commandContext) {
+            this._commandRegistry.initialize(this._commandContext);
+        }
     }
 
     /**
@@ -146,7 +135,7 @@ export class MessageHandler {
      */
     public async requestStopEditing(): Promise<any> {
         const requestId = `stop-edit-${++this._stopEditingRequestCounter}`;
-        const panel = this._getWebviewPanel();
+        const panel = this._deps.getWebviewPanel();
 
         if (!panel || !panel.webview) {
             console.warn('[requestStopEditing] No panel or webview available');
@@ -165,7 +154,7 @@ export class MessageHandler {
             this._pendingStopEditingRequests.set(requestId, { resolve, reject, timeout });
 
             // Send request to frontend to capture edit value via bridge
-            const bridge = this._getWebviewBridge?.();
+            const bridge = this._deps.getWebviewBridge?.();
             if (bridge) {
                 bridge.send({
                     type: 'stopEditing',
@@ -237,8 +226,8 @@ export class MessageHandler {
             }
 
             // CRITICAL: Check for unsaved changes in include files BEFORE updating the board
-            const panel = this._getWebviewPanel();
-            const oldBoard = this._getCurrentBoard();
+            const panel = this._deps.getWebviewPanel();
+            const oldBoard = this._boardStore.getBoard();
 
             if (oldBoard && panel) {
 
@@ -279,7 +268,7 @@ export class MessageHandler {
 
                     // Check task includes within this column
                     for (const newTask of newCol.tasks) {
-                        const oldTask = oldCol.tasks.find(t => t.id === newTask.id);
+                        const oldTask = oldCol.tasks.find((t: KanbanTask) => t.id === newTask.id);
                         if (oldTask) {
                             const oldTaskIncludes = oldTask.includeFiles || [];
                             const newTaskIncludes = newTask.includeFiles || [];
@@ -315,10 +304,10 @@ export class MessageHandler {
             }
 
             // Set the updated board (now that we've handled unsaved changes)
-            this._setBoard(board);
+            this._boardStore.setBoard(board);
 
             // Emit board:changed event (updates _content for unsaved detection)
-            this._emitBoardChanged(board, 'edit');
+            this._deps.emitBoardChanged(board, 'edit');
 
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);

@@ -16,8 +16,7 @@ import { WebviewBridge } from '../core/bridge';
 import {
     UpdateColumnContentExtendedMessage,
     UpdateTaskContentExtendedMessage,
-    UpdateIncludeContentMessage,
-    IncludesUpdatedMessage
+    UpdateIncludeContentMessage
 } from '../core/bridge/MessageTypes';
 import { ChangeStateMachine } from '../core/ChangeStateMachine';
 import { PanelContext } from './PanelContext';

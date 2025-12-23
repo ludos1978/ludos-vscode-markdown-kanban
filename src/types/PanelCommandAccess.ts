@@ -9,7 +9,6 @@
  */
 
 import * as vscode from 'vscode';
-import { KanbanBoard } from '../markdownParser';
 import { ConflictResolver } from '../services/ConflictResolver';
 import { MessageHandler } from '../messageHandler';
 import { EditingStoppedMessage, BoardUpdateFromFrontendMessage } from '../core/bridge/MessageTypes';

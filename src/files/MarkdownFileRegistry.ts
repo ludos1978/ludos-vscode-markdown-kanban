@@ -460,7 +460,7 @@ export class MarkdownFileRegistry implements vscode.Disposable {
         fileType: IncludeFileType,
         fileFactory: { createIncludeDirect: (path: string, mainFile: MainKanbanFile, type: IncludeFileType) => IncludeFile },
         mainFile: MainKanbanFile,
-        context: {
+        _context: {
             columnId?: string;
             columnTitle?: string;
             taskId?: string;

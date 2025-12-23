@@ -5,11 +5,11 @@ import { FileManager } from './fileManager';
 import { MarkdownFileRegistry, FileFactory } from './files';
 import { BackupManager } from './services/BackupManager';
 import { SaveEventDispatcher, SaveEventHandler } from './SaveEventDispatcher';
-import { ConflictContext, ConflictResolution } from './services/ConflictResolver';
 import { BoardOperations } from './board';
 import { FileSaveService } from './core/FileSaveService';
 import { getErrorMessage } from './utils/stringUtils';
-import { PanelContext } from './panel';
+import { PanelContext, WebviewManager } from './panel';
+import { BoardStore } from './core/stores';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -22,20 +22,16 @@ enum SaveState {
 }
 
 /**
- * Panel callbacks interface - groups all callbacks from panel to reduce constructor parameters
+ * Simplified dependencies for KanbanFileService
+ * Direct references instead of callback indirection
  */
-export interface KanbanFileServiceCallbacks {
-    getBoard: () => KanbanBoard | undefined;
-    setBoard: (board: KanbanBoard) => void;
-    sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>;
-    getPanel: () => vscode.WebviewPanel | undefined;
-    getContext: () => vscode.ExtensionContext;
-    showConflictDialog: (context: ConflictContext) => Promise<ConflictResolution | null>;
-    updateWebviewPermissions: () => void;
-    clearUndoRedo: () => void;
+export interface KanbanFileServiceDeps {
+    boardStore: BoardStore;
+    extensionContext: vscode.ExtensionContext;
+    getPanel: () => vscode.WebviewPanel;
     getPanelInstance: () => any;
-    /** Save original task order for 'unsorted' sort restoration */
-    setOriginalTaskOrder: (board: KanbanBoard) => void;
+    getWebviewManager: () => WebviewManager | null;
+    sendBoardUpdate: (applyDefaultFolding?: boolean, isFullRefresh?: boolean) => Promise<void>;
 }
 
 /**
@@ -60,6 +56,9 @@ export class KanbanFileService {
     // Shared panel context (single source of truth with panel)
     private _context: PanelContext;
 
+    // Dependencies (simplified from callbacks)
+    private _deps: KanbanFileServiceDeps;
+
     // Debounce timer for document change reparse (prevents rapid reparses during undo/redo)
     private _documentChangeDebounceTimer: NodeJS.Timeout | null = null;
     private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 150;
@@ -70,27 +69,28 @@ export class KanbanFileService {
         _fileFactory: FileFactory,  // Reserved for future use
         private backupManager: BackupManager,
         private boardOperations: BoardOperations,
-        private callbacks: KanbanFileServiceCallbacks,
+        deps: KanbanFileServiceDeps,
         context: PanelContext,  // Shared panel context
         private panelStates: Map<string, any>,
         private panels: Map<string, any>
     ) {
         this._context = context;
+        this._deps = deps;
 
         // Initialize new architecture components
         this._fileSaveService = FileSaveService.getInstance();
     }
 
-    // Convenience accessors for callbacks (maintains backwards compatibility internally)
-    private get board() { return this.callbacks.getBoard; }
-    private get setBoard() { return this.callbacks.setBoard; }
-    private get sendBoardUpdate() { return this.callbacks.sendBoardUpdate; }
-    private get panel() { return this.callbacks.getPanel; }
-    private get context() { return this.callbacks.getContext; }
-    // showConflictDialog available via this.callbacks.showConflictDialog if needed
-    private get updateWebviewPermissions() { return this.callbacks.updateWebviewPermissions; }
-    private get undoRedoManagerClear() { return this.callbacks.clearUndoRedo; }
-    private get getPanelInstance() { return this.callbacks.getPanelInstance; }
+    // Convenience accessors for dependencies
+    private get board() { return () => this._deps.boardStore.getBoard(); }
+    private get setBoard() { return (board: KanbanBoard) => this._deps.boardStore.setBoard(board); }
+    private get sendBoardUpdate() { return this._deps.sendBoardUpdate; }
+    private get panel() { return this._deps.getPanel; }
+    private get extensionContext() { return this._deps.extensionContext; }
+    private get updateWebviewPermissions() { return () => this._deps.getWebviewManager()?.updatePermissions(); }
+    private get undoRedoManagerClear() { return () => this._deps.boardStore.clearHistory(); }
+    private get getPanelInstance() { return this._deps.getPanelInstance; }
+    private get setOriginalTaskOrder() { return (board: KanbanBoard) => this._deps.boardStore.setOriginalTaskOrder(board); }
 
     /**
      * Get current state values for syncing back to panel
@@ -129,7 +129,7 @@ export class KanbanFileService {
 
                 const currentBoard = this.board();
                 if (currentBoard) {
-                    this.callbacks.setOriginalTaskOrder(currentBoard);
+                    this.setOriginalTaskOrder(currentBoard);
                 }
             } catch (error) {
                 this.setBoard({
@@ -168,7 +168,7 @@ export class KanbanFileService {
         // Also store in VSCode's global state for persistence across restarts
         // Use documentUri hash as stable key so panels can find their state after restart
         const stableKey = `kanban_doc_${Buffer.from(document.uri.toString()).toString('base64').replace(/[^a-zA-Z0-9]/g, '_')}`;
-        this.context().globalState.update(stableKey, {
+        this.extensionContext.globalState.update(stableKey, {
             documentUri: document.uri.toString(),
             lastAccessed: Date.now(),
             panelId: panelId  // Store for cleanup but don't use for lookup
@@ -256,7 +256,7 @@ export class KanbanFileService {
             const currentBoard = this.board();
             if (currentBoard) {
                 this.boardOperations.cleanupRowTags(currentBoard);
-                this.callbacks.setOriginalTaskOrder(currentBoard);
+                this.setOriginalTaskOrder(currentBoard);
             }
 
             // Clear unsaved changes flag after successful reload

@@ -6,7 +6,7 @@ import { BackupManager } from '../services/BackupManager';
 import { SaveOptions } from './SaveOptions';
 import { SaveTransactionManager } from './SaveTransactionManager';
 import { WatcherCoordinator } from './WatcherCoordinator';
-import { toForwardSlashes } from '../utils/stringUtils';
+import { normalizePathForLookup, isSamePath } from '../utils/stringUtils';
 import { CapturedEdit, IMarkdownFileRegistry } from './FileInterfaces';
 
 /**
@@ -143,54 +143,30 @@ export abstract class MarkdownFile implements vscode.Disposable {
     public abstract getFileRegistry(): IMarkdownFileRegistry | undefined;
 
     // ============= PATH NORMALIZATION (FOUNDATION-1) =============
+    // Note: Core path functions are in utils/stringUtils.ts
+    // These static methods delegate to the centralized functions for backwards compatibility
 
     /**
-     * Centralized normalization function for relative paths
-     *
-     * Rules:
-     * 1. Trim whitespace
-     * 2. Convert to lowercase (case-insensitive comparison)
-     * 3. Convert backslashes to forward slashes (Windows compatibility)
-     *
-     * IMPORTANT:
-     * - Does NOT resolve relative paths (./file stays ./file)
-     * - Does NOT handle absolute paths (not intended for absolute paths)
-     * - Use this for all path normalization throughout the codebase
+     * Centralized normalization function for relative paths.
+     * Delegates to normalizePathForLookup from stringUtils.
      *
      * @param relativePath The relative path to normalize
      * @returns Normalized path (lowercase, forward slashes, trimmed)
-     *
-     * @example
-     * normalizeRelativePath("Folder/File.md")     // "folder/file.md"
-     * normalizeRelativePath("Folder\\File.md")    // "folder/file.md"
-     * normalizeRelativePath("  folder/file.md  ") // "folder/file.md"
      */
     public static normalizeRelativePath(relativePath: string): string {
-        if (!relativePath) {
-            return '';
-        }
-
-        return toForwardSlashes(relativePath.trim().toLowerCase());
+        return normalizePathForLookup(relativePath);
     }
 
     /**
-     * Compare two paths for equality (normalized comparison)
-     *
-     * Use this instead of === when comparing paths to ensure case-insensitive
-     * and platform-independent comparison.
+     * Compare two paths for equality (normalized comparison).
+     * Delegates to isSamePath from stringUtils.
      *
      * @param path1 First path to compare
      * @param path2 Second path to compare
      * @returns true if paths are equivalent (after normalization)
-     *
-     * @example
-     * isSameFile("Folder/File.md", "folder/file.md")   // true
-     * isSameFile("Folder\\File.md", "folder/file.md")  // true
-     * isSameFile("Folder/File.md", "Other/File.md")    // false
      */
     public static isSameFile(path1: string, path2: string): boolean {
-        return MarkdownFile.normalizeRelativePath(path1) ===
-               MarkdownFile.normalizeRelativePath(path2);
+        return isSamePath(path1, path2);
     }
 
     // ============= CANCELLATION HELPERS (FOUNDATION-2) =============

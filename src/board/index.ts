@@ -8,7 +8,7 @@
  */
 
 import { KanbanBoard } from './KanbanTypes';
-import { BoardCrudOperations, NewTaskInput } from './BoardCrudOperations';
+import { BoardCrudOperations } from './BoardCrudOperations';
 import { GatherQueryEngine } from './GatherQueryEngine';
 
 // Export core types

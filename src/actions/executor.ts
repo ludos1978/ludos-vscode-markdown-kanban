@@ -19,7 +19,7 @@ import {
     UpdateTaskContentExtendedMessage,
     UpdateColumnContentExtendedMessage
 } from '../core/bridge/MessageTypes';
-import { findTask, findColumn } from './helpers';
+import { findColumn } from './helpers';
 
 /**
  * Dependencies required by the executor

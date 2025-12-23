@@ -15,7 +15,7 @@
  * - Parts of `_initializeBoardFromDocument()` related to include file loading
  */
 
-import { eventBus, FocusGainedEvent, createEvent } from './index';
+import { eventBus, FocusGainedEvent } from './index';
 import { KanbanBoard } from '../../markdownParser';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { MediaTracker } from '../../services/MediaTracker';

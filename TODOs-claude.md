@@ -1,112 +1,188 @@
-# Cleanup Tasks - Rounds 1-5
+# Plan C: Comprehensive Cleanup - Deep Analysis
 
-## Completed
-
-### Round 5 - Dead Code Removal (Board Caching)
-- [x] Removed `KanbanFileService._cachedBoardFromWebview` field (was never set, always null)
-- [x] Simplified `KanbanFileService.getState()` return type (removed dead field)
-- [x] Removed dead if-branch in `KanbanFileService.ensureBoardAndSendUpdate()`
-- [x] Removed `_cachedBoardFromWebview` from `PanelCommandAccess` interface (orphaned type)
-- [x] Removed no-op assignment in `DebugCommands.ts:334`
-- [x] Simplified `KanbanWebviewPanel._restoreStateFromFileService()`
-
-### Round 4 - Regex Pattern Unification
-- [x] Created `src/shared/regexPatterns.ts` with centralized patterns as factory functions
-- [x] Added `MarkdownPatterns` (image, link, include), `HtmlPatterns` (img, media), `DiagramPatterns` (plantuml, mermaid, drawio, excalidraw), `PathPatterns` (url, windowsDrive)
-- [x] Updated `ExportService.ts` to use shared `MarkdownPatterns`, `HtmlPatterns`, `isUrl()`
-- [x] Updated `MediaTracker.ts` to use shared `MarkdownPatterns`, `HtmlPatterns`
-- [x] Updated `DiagramPreprocessor.ts` to use shared `DiagramPatterns`
-- [x] Exported patterns from `src/shared/index.ts`
-
-### Round 3 - Files Directory
-- [x] Fixed IncludeFile to use base class `isDocumentDirtyInVSCode()` (was duplicating 4 lines)
-- [x] Extracted `_setupWatcherSubscriptions()` helper in MarkdownFile.ts (eliminated ~15 lines duplication)
-- [x] Added `_toRelativePath()` and `_normalizedLookup()` helpers in MarkdownFileRegistry.ts
-- [x] Simplified `getByRelativePath()`, `hasByRelativePath()`, `ensureIncludeFileRegistered()` using new helpers
-
-### Round 2 - Frontend JavaScript
-- [x] Removed duplicate `toggleFileBarMenu` and `positionFileBarDropdown` from menuOperations.js (dead code)
-- [x] Improved `positionFileBarDropdown` in webview.js to use dynamic measurement
-- [x] Consolidated task movement functions into single `moveTaskInDirection()` with wrapper functions
-
-### Round 2 - Commands (TypeScript)
-- [x] Extracted `_extractBase64Data()` helper in ClipboardCommands.ts (replaced 3 duplicates)
-- [x] Consolidated path replacement logic in PathCommands.ts into `_replacePathInFiles()` helper (~80 lines saved)
-
-### Round 1 - Backend (TypeScript)
-- [x] Removed unused `deepCloneBoard` from BoardStore.ts
-- [x] Removed unused `_emitEvent` parameter from BoardStore.setBoard()
+## Overview
+This plan addresses 8 major architectural issues to create a cleaner, simpler codebase.
+Estimated complexity: High | Risk: Medium-High | Benefit: Very High
 
 ---
 
-## Future Refactoring (Critical Issues Identified)
+## Phase 1: Foundation Cleanup (Low Risk)
 
-### CRITICAL: ExportService God Object (1,795 lines)
-**Location:** `src/services/export/ExportService.ts`
+### 1.1 Remove HandlerRegistry (PRIORITY: HIGH)
+**Files affected:**
+- `src/panel/HandlerRegistry.ts` (DELETE)
+- `src/panel/index.ts` (remove export)
+- `src/kanbanWebviewPanel.ts` (inline handlers)
 
-The ExportService has >12 distinct responsibilities:
-1. Export coordination (extractContent, transformContent, outputContent)
-2. Content transformations (speaker notes, HTML comments)
-3. Include file processing (processIncludedFiles - 203 lines)
-4. Asset detection and packing
-5. Path rewriting (rewriteLinksForExport - 53 lines)
-6. Diagram preprocessing coordination
-7. Marp conversion pipeline (runMarpConversion - 169 lines)
-8. Tag filtering
-9. Presentation conversion (convertPresentationToKanban - 69 lines)
-10. Board filtering (filterBoard - 67 lines)
-11. Marp class extraction (extractMarpClassesFromMarkdown - 59 lines)
-12. Column extraction (extractColumnContent - 51 lines)
+**Problem:** HandlerRegistry is a thin wrapper (~160 lines) that just stores 7 nullable handler references with getters/setters. It adds complexity without meaningful benefit.
 
-**Recommendation:** Split into:
-- `ExportCoordinator` (orchestration)
-- `ContentTransformer` (speech notes, HTML transforms, tag filtering)
-- `IncludeProcessor` (include file handling)
-- `AssetPacker` (asset detection, filtering, packing)
-- `LinkRewriter` (all link rewriting logic)
-- `PresentationConverter` (board ↔ presentation conversion)
+**Solution:** Inline handler fields directly into KanbanWebviewPanel.
 
-### ~~HIGH: Duplicate Regex Patterns Across 4 Services~~ ✅ RESOLVED
-**Status:** Fixed in Round 4 - patterns consolidated into `src/shared/regexPatterns.ts`
-- ExportService, MediaTracker, DiagramPreprocessor now use shared patterns
-- PathConversionService has its own specialized patterns (different capture groups for path conversion)
-
-### ~~MEDIUM: Path Extraction Logic Duplicated in 3 Services~~ ✅ ANALYZED - INTENTIONAL
-**Status:** Analyzed - each serves different purpose, all use shared regex patterns now
-- `ExportService.findAssets()` - returns file existence/size for asset packing
-- `MediaTracker.extractMediaReferences()` - returns paths filtered by media type
-- `PathConversionService.extractPaths()` - returns position info for in-place replacement
-
-All are internal helper methods (6 total calls, all within own class). With shared regex patterns in place, remaining "duplication" is just each adding its specific data.
-
-### ~~MEDIUM: MainKanbanFile Dual Board Caching~~ ✅ RESOLVED
-**Status:** Fixed in Round 5 - removed dead code, documented intentional design
-
-**Finding:** There were actually FOUR board locations, not two:
-1. `BoardStore.board` - undo/redo, rendering (working)
-2. `MainKanbanFile._board` - parsed board cache (working)
-3. `MainKanbanFile._cachedBoardFromWebview` - UI edit buffer (working, intentional)
-4. `KanbanFileService._cachedBoardFromWebview` - **DEAD CODE** (removed)
-
-The MainKanbanFile dual caching is intentional and correct:
-- `_board` = "last parsed from disk" (file truth)
-- `_cachedBoardFromWebview` = "current UI state" (UI truth, set by BoardSyncHandler)
+**Changes:**
+- [ ] Move handler fields to KanbanWebviewPanel as private fields
+- [ ] Move dispose logic to KanbanWebviewPanel.dispose()
+- [ ] Remove HandlerRegistry class and file
+- [ ] Update panel/index.ts exports
 
 ---
 
-## Skipped (with rationale)
+### 1.2 Create PathUtils Module (PRIORITY: HIGH)
+**Files affected:**
+- `src/utils/pathUtils.ts` (CREATE)
+- `src/files/MarkdownFile.ts` (use PathUtils)
+- `src/files/MarkdownFileRegistry.ts` (use PathUtils)
+- `src/files/IncludeFile.ts` (use PathUtils)
 
-### Include mode column/task operations
-Already uses shared utilities (`window.menuUtils`), differences are meaningful.
+**Problem:** Path normalization logic is scattered across multiple files.
 
-### Move createDiagramFile to DiagramCommands
-Would require duplicating helper methods or extracting to shared module.
+**Solution:** Create centralized `PathUtils` module.
 
-### Remove scrollToElementIfNeeded
-Analysis was incorrect - function IS used in multiple places.
+**Changes:**
+- [ ] Create `src/utils/pathUtils.ts` with all path functions
+- [ ] Update MarkdownFile to use PathUtils
+- [ ] Update MarkdownFileRegistry to use PathUtils
+- [ ] Update IncludeFile to use PathUtils
 
-### Merge filename generation methods
-Methods use fundamentally different algorithms (hash-based vs counter-based).
+---
 
-### ensureIncludeRegistered absolute path handling
-Uses `mainFile` parameter directly (not `this.getMainFile()`), intentionally different pattern.
+### 1.3 Simplify PanelContext Flags (PRIORITY: MEDIUM)
+**Files affected:**
+- `src/panel/PanelContext.ts`
+
+**Problem:** 9 boolean flags are hard to reason about.
+
+**Solution:** Group related flags and use operation state enum.
+
+**Changes:**
+- [ ] Create `PanelLifecycle` enum: `INITIALIZING | READY | DISPOSED`
+- [ ] Create `OperationState` enum: `IDLE | LOADING | SAVING | INCLUDE_SWITCH | UNDO_REDO`
+- [ ] Replace boolean flags with enums where appropriate
+
+---
+
+## Phase 2: Callback Pattern Elimination (Medium Risk)
+
+### 2.1 Simplify KanbanFileServiceCallbacks (PRIORITY: HIGH)
+**Files affected:**
+- `src/kanbanFileService.ts`
+- `src/kanbanWebviewPanel.ts`
+
+**Problem:** 9 callbacks create callback hell.
+
+**Solution:** Pass minimal dependencies + panel reference.
+
+**Changes:**
+- [ ] Create simplified deps interface
+- [ ] Replace callback pattern with direct panel access
+- [ ] Update all usages
+
+---
+
+### 2.2 Simplify MessageHandler Callbacks (PRIORITY: HIGH)
+**Files affected:**
+- `src/messageHandler.ts`
+- `src/kanbanWebviewPanel.ts`
+
+**Problem:** 10 callbacks in constructor.
+
+**Solution:** Same pattern - minimal deps + panel reference.
+
+**Changes:**
+- [ ] Create MessageHandlerDeps interface
+- [ ] Replace callback pattern
+- [ ] Update initialization
+
+---
+
+## Phase 3: Service Consolidation (Medium Risk)
+
+### 3.1 Merge WebviewManager + WebviewUpdateService (PRIORITY: MEDIUM)
+**Files affected:**
+- `src/panel/WebviewManager.ts` (DELETE)
+- `src/services/WebviewUpdateService.ts` (DELETE)
+- `src/panel/WebviewService.ts` (CREATE - merged)
+
+**Problem:** Both deal with webview, responsibilities overlap.
+
+**Solution:** Merge into single `WebviewService`.
+
+**Changes:**
+- [ ] Create WebviewService combining both
+- [ ] Delete original files
+- [ ] Update imports
+
+---
+
+### 3.2 Consolidate Board Access (PRIORITY: MEDIUM)
+**Files affected:**
+- `src/kanbanWebviewPanel.ts`
+- `src/files/MarkdownFileRegistry.ts`
+- `src/core/stores/BoardStore.ts`
+
+**Problem:** Multiple ways to get board.
+
+**Solution:** BoardStore as single source of truth.
+
+**Changes:**
+- [ ] Make generateBoard() private
+- [ ] Add BoardStore.regenerateFromRegistry()
+- [ ] Update getBoard() to only use BoardStore
+
+---
+
+## Phase 4: Architecture Cleanup (Higher Risk - DEFER)
+
+### 4.1 Commit to EventBus Pattern (DEFER)
+**Reason:** Lower priority, can be done incrementally later.
+
+### 4.2 Simplify ChangeStateMachine (DEFER)
+**Reason:** High risk, complex. Better as separate focused PR.
+
+---
+
+## Execution Order
+
+1. **Phase 1.1** - Remove HandlerRegistry (safest, biggest impact)
+2. **Phase 1.2** - Create PathUtils (independent, easy)
+3. **Phase 2.1** - Simplify KanbanFileServiceCallbacks
+4. **Phase 2.2** - Simplify MessageHandler callbacks
+5. **Phase 3.2** - Consolidate board access
+6. **Phase 3.1** - Merge WebviewManager + WebviewUpdateService
+7. **Phase 1.3** - Simplify PanelContext flags
+
+---
+
+## Current Status (Completed 2025-12-23)
+
+- [x] Phase 1.1 - Remove HandlerRegistry (~160 lines removed)
+- [x] Phase 1.2 - Create PathUtils Module (isSamePath added to stringUtils)
+- [x] Phase 2.1 - Simplify KanbanFileServiceCallbacks (10 -> 6 callbacks)
+- [x] Phase 2.2 - Simplify MessageHandler Callbacks (9 -> 6 callbacks)
+- [x] Phase 3.1 - SKIPPED: WebviewManager/UpdateService have good separation of concerns
+- [x] Phase 3.2 - SKIPPED: Current layered board access design is reasonable
+- [x] Phase 1.3 - SKIPPED: Current PanelContext flags are flexible and appropriate
+
+---
+
+## Summary of Changes
+
+### Completed Improvements:
+1. **HandlerRegistry Removed**: Inlined 7 handler fields directly into KanbanWebviewPanel, removed ~160 lines of boilerplate wrapper code
+2. **Path Utilities Centralized**: Added `isSamePath()` to stringUtils.ts, updated MarkdownFile to delegate to centralized functions
+3. **KanbanFileService Simplified**: New `KanbanFileServiceDeps` interface with 6 direct dependencies instead of 10 callbacks
+4. **MessageHandler Simplified**: New `MessageHandlerDeps` interface with 6 callbacks instead of 9
+
+### Skipped (After Analysis):
+- **WebviewManager/UpdateService Merge**: These have different responsibilities (setup vs runtime), good separation of concerns
+- **Board Access Consolidation**: Current layered architecture (BoardStore cache + MarkdownFileRegistry generation) is appropriate
+- **PanelContext Flag Enums**: Boolean flags provide flexibility for edge cases where operations might overlap
+
+### Files Modified:
+- `src/kanbanWebviewPanel.ts` - Inlined handlers, updated deps
+- `src/panel/index.ts` - Removed HandlerRegistry export
+- `src/panel/HandlerRegistry.ts` - DELETED
+- `src/kanbanFileService.ts` - Simplified to KanbanFileServiceDeps
+- `src/messageHandler.ts` - Simplified to MessageHandlerDeps
+- `src/utils/stringUtils.ts` - Added isSamePath()
+- `src/utils/index.ts` - Exported isSamePath
+- `src/files/MarkdownFile.ts` - Delegates to stringUtils

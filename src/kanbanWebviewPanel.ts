@@ -23,7 +23,7 @@ import { BoardSyncHandler, FileSyncHandler, LinkReplacementHandler, BoardInitial
 import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
 import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
-import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager, HandlerRegistry } from './panel';
+import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
 import {
     REVIVAL_TRACKING_CLEAR_DELAY_MS,
     MAX_UNDO_STACK_SIZE,
@@ -67,7 +67,15 @@ export class KanbanWebviewPanel {
     private _mediaTracker: MediaTracker | null = null;
     private _boardStore: BoardStore;
     private _webviewBridge: WebviewBridge;
-    private _handlerRegistry: HandlerRegistry;
+
+    // Handlers (inlined from HandlerRegistry for simplicity)
+    private _boardSyncHandler: BoardSyncHandler | null = null;
+    private _fileSyncHandler: FileSyncHandler | null = null;
+    private _linkReplacementHandler: LinkReplacementHandler | null = null;
+    private _boardInitHandler: BoardInitializationHandler | null = null;
+    private _fileRegistryChangeHandler: FileRegistryChangeHandler | null = null;
+    private _unsavedChangesService: UnsavedChangesService | null = null;
+    private _webviewUpdateService: WebviewUpdateService | null = null;
 
     public get _isUpdatingFromPanel(): boolean { return this._context.updatingFromPanel; }
     public set _isUpdatingFromPanel(value: boolean) { this._context.setUpdatingFromPanel(value); }
@@ -227,8 +235,7 @@ export class KanbanWebviewPanel {
             isInitialized: () => this._context.initialized
         });
 
-        this._handlerRegistry = new HandlerRegistry();
-        this._handlerRegistry.registerFileRegistryChange(new FileRegistryChangeHandler({
+        this._fileRegistryChangeHandler = new FileRegistryChangeHandler({
             fileRegistry: this._fileRegistry,
             boardStore: this._boardStore,
             panelContext: this._context,
@@ -237,21 +244,17 @@ export class KanbanWebviewPanel {
             getBoard: () => this.getBoard(),
             invalidateBoardCache: () => this.invalidateBoardCache(),
             sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh)
-        }));
+        });
 
         this._fileService = new KanbanFileService(
             this._fileManager, this._fileRegistry, this._fileFactory, this._backupManager, this._boardOperations,
             {
-                getBoard: () => this.getBoard(),
-                setBoard: (board) => this._boardStore.setBoard(board),
-                sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh),
+                boardStore: this._boardStore,
+                extensionContext: this._extensionContext,
                 getPanel: () => this._panel,
-                getContext: () => this._extensionContext,
-                showConflictDialog: (ctx) => this.showConflictDialog(ctx),
-                updateWebviewPermissions: () => this._webviewManager.updatePermissions(),
-                clearUndoRedo: () => this._boardStore.clearHistory(),
                 getPanelInstance: () => this,
-                setOriginalTaskOrder: (board) => this._boardStore.setOriginalTaskOrder(board)
+                getWebviewManager: () => this._webviewManager,
+                sendBoardUpdate: (applyDefaultFolding, isFullRefresh) => this.sendBoardUpdate(applyDefaultFolding, isFullRefresh)
             },
             this._context, KanbanWebviewPanel.panelStates, KanbanWebviewPanel.panels
         );
@@ -263,9 +266,6 @@ export class KanbanWebviewPanel {
             onBoardUpdate: this.sendBoardUpdate.bind(this),
             onSaveToMarkdown: this.saveToMarkdown.bind(this),
             onInitializeFile: this.initializeFile.bind(this),
-            getCurrentBoard: () => this.getBoard(),
-            setBoard: (board: KanbanBoard) => this._boardStore.setBoard(board),
-            setUndoRedoOperation: (isOperation: boolean) => this._context.setUndoRedoOperation(isOperation),
             getWebviewPanel: () => this,
             getWebviewBridge: () => this._webviewBridge,
             emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
@@ -280,32 +280,32 @@ export class KanbanWebviewPanel {
     }
 
     private _registerHandlers(): void {
-        this._handlerRegistry.registerBoardSync(new BoardSyncHandler({
+        this._boardSyncHandler = new BoardSyncHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, getMediaTracker: () => this._mediaTracker,
             backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument()
-        }));
-        this._handlerRegistry.registerFileSync(new FileSyncHandler({
+        });
+        this._fileSyncHandler = new FileSyncHandler({
             fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,
             getWebviewBridge: () => this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context,
             sendBoardUpdate: (isFullRefresh, applyDefaultFolding) => this.sendBoardUpdate(isFullRefresh, applyDefaultFolding),
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
-        }));
-        this._handlerRegistry.registerLinkReplacement(new LinkReplacementHandler({
+        });
+        this._linkReplacementHandler = new LinkReplacementHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard()
-        }));
-        this._handlerRegistry.registerUnsavedChanges(new UnsavedChangesService(this._fileRegistry));
-        this._handlerRegistry.registerWebviewUpdate(new WebviewUpdateService({
+        });
+        this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
+        this._webviewUpdateService = new WebviewUpdateService({
             boardStore: this._boardStore, webviewBridge: this._webviewBridge, fileRegistry: this._fileRegistry,
             webviewManager: this._webviewManager, panelContext: this._context, getBoard: () => this.getBoard(), hasPanel: () => !!this._panel
-        }));
-        this._handlerRegistry.registerBoardInit(new BoardInitializationHandler({
+        });
+        this._boardInitHandler = new BoardInitializationHandler({
             fileRegistry: this._fileRegistry, fileFactory: this._fileFactory, includeCoordinator: this._includeCoordinator,
-            panelContext: this._context, getFileSyncHandler: () => this._handlerRegistry.getFileSync(),
+            panelContext: this._context, getFileSyncHandler: () => this._fileSyncHandler,
             getBoard: () => this.getBoard(), getPanel: () => this._panel,
             onMediaChanged: (files) => this._panel?.webview.postMessage({
                 type: 'mediaFilesChanged', changedFiles: files.map(f => ({ path: f.path, absolutePath: f.absolutePath, type: f.type }))
             })
-        }));
+        });
     }
 
     private _setupDocumentCloseListener() {
@@ -402,7 +402,7 @@ export class KanbanWebviewPanel {
     }
 
     private async sendBoardUpdate(applyDefaultFolding: boolean = false, isFullRefresh: boolean = false) {
-        await this._handlerRegistry.getWebviewUpdate()?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
+        await this._webviewUpdateService?.sendBoardUpdate({ applyDefaultFolding, isFullRefresh });
     }
 
     public async saveToMarkdown(updateVersionTracking: boolean = true, triggerSave: boolean = true) {
@@ -416,9 +416,8 @@ export class KanbanWebviewPanel {
     }
 
     private async _initializeBoardFromDocument(document: vscode.TextDocument): Promise<void> {
-        const boardInit = this._handlerRegistry.getBoardInit();
-        if (!boardInit) return;
-        const result = await boardInit.initializeFromDocument(document, this._mediaTracker);
+        if (!this._boardInitHandler) return;
+        const result = await this._boardInitHandler.initializeFromDocument(document, this._mediaTracker);
         this._mediaTracker = result.mediaTracker;
     }
 
@@ -428,7 +427,7 @@ export class KanbanWebviewPanel {
     public clearColumnDirty(columnId: string): void { this._boardStore.clearColumnDirty(columnId); }
     public clearTaskDirty(taskId: string): void { this._boardStore.clearTaskDirty(taskId); }
 
-    public syncDirtyItems(): void { this._handlerRegistry.getWebviewUpdate()?.syncDirtyItems(); }
+    public syncDirtyItems(): void { this._webviewUpdateService?.syncDirtyItems(); }
 
     public async handleIncludeSwitch(params: {
         columnId?: string; taskId?: string; oldFiles: string[]; newFiles: string[];
@@ -438,7 +437,7 @@ export class KanbanWebviewPanel {
     }
 
     public async refreshConfiguration(): Promise<void> {
-        await this._handlerRegistry.getWebviewUpdate()?.refreshAllConfiguration();
+        await this._webviewUpdateService?.refreshAllConfiguration();
     }
 
     /** Get board - returns cached or generates fresh from registry */
@@ -479,18 +478,17 @@ export class KanbanWebviewPanel {
         // Remove from panels map immediately to prevent reuse during disposal
         this._removeFromPanelsMap();
 
-        const unsavedChanges = this._handlerRegistry.getUnsavedChanges();
-        if (!unsavedChanges) return this.dispose();
+        if (!this._unsavedChangesService) return this.dispose();
 
-        const unsavedInfo = unsavedChanges.checkForUnsavedChanges();
+        const unsavedInfo = this._unsavedChangesService.checkForUnsavedChanges();
         if (!unsavedInfo.hasMainFileChanges && !unsavedInfo.hasIncludeFileChanges) return this.dispose();
 
-        const choice = await unsavedChanges.showUnsavedChangesDialog(unsavedInfo);
+        const choice = await this._unsavedChangesService.showUnsavedChangesDialog(unsavedInfo);
         if (choice === 'save') {
             try { await this.saveToMarkdown(true, true); }
             catch (error) { vscode.window.showErrorMessage(`Failed to save: ${getErrorMessage(error)}`); }
         } else {
-            unsavedChanges.discardAllChanges();
+            this._unsavedChangesService.discardAllChanges();
         }
         this.dispose();
     }
@@ -519,7 +517,7 @@ export class KanbanWebviewPanel {
 
     /** Save unsaved changes to backup files */
     public async saveUnsavedChangesBackup(): Promise<void> {
-        await this._handlerRegistry.getUnsavedChanges()?.saveBackups(this.getCurrentDocumentUri());
+        await this._unsavedChangesService?.saveBackups(this.getCurrentDocumentUri());
     }
 
     public async dispose() {
@@ -542,7 +540,14 @@ export class KanbanWebviewPanel {
         this._mediaTracker?.dispose();
         this._mediaTracker = null;
 
-        this._handlerRegistry.dispose();
+        // Dispose handlers in reverse registration order
+        this._webviewUpdateService?.dispose();
+        this._fileRegistryChangeHandler?.dispose();
+        this._linkReplacementHandler?.dispose();
+        this._fileSyncHandler?.dispose();
+        this._boardSyncHandler?.dispose();
+        // Note: unsavedChangesService and boardInitHandler don't need disposal
+
         this._fileRegistry.dispose();
         this._boardStore.dispose();
         this._panel.dispose();

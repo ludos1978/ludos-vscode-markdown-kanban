@@ -22,7 +22,7 @@ export { LinkOperations } from './linkOperations';
 export { safeFileUri } from './uriUtils';
 
 // String utilities
-export { escapeRegExp, getErrorMessage, normalizePathForLookup, toForwardSlashes, safeDecodeURIComponent } from './stringUtils';
+export { escapeRegExp, getErrorMessage, normalizePathForLookup, isSamePath, toForwardSlashes, safeDecodeURIComponent } from './stringUtils';
 
 // File dialog utilities
 export { selectMarkdownFile, type SelectMarkdownFileOptions } from './fileDialogUtils';
