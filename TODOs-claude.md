@@ -1,6 +1,14 @@
-# Cleanup Tasks - Rounds 1-4
+# Cleanup Tasks - Rounds 1-5
 
 ## Completed
+
+### Round 5 - Dead Code Removal (Board Caching)
+- [x] Removed `KanbanFileService._cachedBoardFromWebview` field (was never set, always null)
+- [x] Simplified `KanbanFileService.getState()` return type (removed dead field)
+- [x] Removed dead if-branch in `KanbanFileService.ensureBoardAndSendUpdate()`
+- [x] Removed `_cachedBoardFromWebview` from `PanelCommandAccess` interface (orphaned type)
+- [x] Removed no-op assignment in `DebugCommands.ts:334`
+- [x] Simplified `KanbanWebviewPanel._restoreStateFromFileService()`
 
 ### Round 4 - Regex Pattern Unification
 - [x] Created `src/shared/regexPatterns.ts` with centralized patterns as factory functions
@@ -63,22 +71,26 @@ The ExportService has >12 distinct responsibilities:
 - ExportService, MediaTracker, DiagramPreprocessor now use shared patterns
 - PathConversionService has its own specialized patterns (different capture groups for path conversion)
 
-### MEDIUM: Path Extraction Logic Duplicated in 3 Services
-Three independent implementations:
-- ExportService.findAssets() (52 lines)
-- MediaTracker.extractMediaReferences() (46 lines)
-- PathConversionService.extractPaths() (108 lines)
+### ~~MEDIUM: Path Extraction Logic Duplicated in 3 Services~~ ✅ ANALYZED - INTENTIONAL
+**Status:** Analyzed - each serves different purpose, all use shared regex patterns now
+- `ExportService.findAssets()` - returns file existence/size for asset packing
+- `MediaTracker.extractMediaReferences()` - returns paths filtered by media type
+- `PathConversionService.extractPaths()` - returns position info for in-place replacement
 
-**Recommendation:** Create unified `ContentPathExtractor` interface
+All are internal helper methods (6 total calls, all within own class). With shared regex patterns in place, remaining "duplication" is just each adding its specific data.
 
-### MEDIUM: MainKanbanFile Dual Board Caching
-**Location:** `src/files/MainKanbanFile.ts`
+### ~~MEDIUM: MainKanbanFile Dual Board Caching~~ ✅ RESOLVED
+**Status:** Fixed in Round 5 - removed dead code, documented intentional design
 
-Two board caching mechanisms:
-- `_board` field (persistent cache)
-- `_cachedBoardFromWebview` field (temporary for pending edits)
+**Finding:** There were actually FOUR board locations, not two:
+1. `BoardStore.board` - undo/redo, rendering (working)
+2. `MainKanbanFile._board` - parsed board cache (working)
+3. `MainKanbanFile._cachedBoardFromWebview` - UI edit buffer (working, intentional)
+4. `KanbanFileService._cachedBoardFromWebview` - **DEAD CODE** (removed)
 
-Creates potential sync issues. Consider single source of truth with event-based updates.
+The MainKanbanFile dual caching is intentional and correct:
+- `_board` = "last parsed from disk" (file truth)
+- `_cachedBoardFromWebview` = "current UI state" (UI truth, set by BoardSyncHandler)
 
 ---
 

@@ -54,8 +54,6 @@ export class KanbanFileService {
     // State machine for tracking save operations
     private _saveState: SaveState = SaveState.IDLE;
 
-    private _cachedBoardFromWebview: KanbanBoard | null = null;
-
     // NEW ARCHITECTURE COMPONENTS
     private _fileSaveService: FileSaveService;
 
@@ -101,7 +99,6 @@ export class KanbanFileService {
     public getState(): {
         isUpdatingFromPanel: boolean;
         hasUnsavedChanges: boolean;
-        cachedBoardFromWebview: KanbanBoard | null;
     } {
         // Query main file for unsaved changes (single source of truth)
         const mainFile = this.fileRegistry.getMainFile();
@@ -112,8 +109,7 @@ export class KanbanFileService {
 
         return {
             isUpdatingFromPanel,
-            hasUnsavedChanges: hasUnsavedChanges,
-            cachedBoardFromWebview: this._cachedBoardFromWebview
+            hasUnsavedChanges: hasUnsavedChanges
         };
     }
 
@@ -125,19 +121,11 @@ export class KanbanFileService {
             try {
                 const document = this.fileManager.getDocument()!;
 
-                // If we have unsaved changes with a cached board, use that instead of re-parsing
-                // This preserves user's work when switching views
-                const mainFile = this.fileRegistry.getMainFile();
-                if (mainFile?.hasUnsavedChanges() && this._cachedBoardFromWebview) {
-                    this.setBoard(this._cachedBoardFromWebview);
-                    // Keep using the cached board and existing include file states
-                } else {
-                    // Only re-parse from document if no unsaved changes
-                    const basePath = path.dirname(document.uri.fsPath);
-                    const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
-                    this.setBoard(parseResult.board);
-                    // Registry now handles include content automatically via generateBoard()
-                }
+                // Parse board from document
+                // Note: MainKanbanFile._cachedBoardFromWebview handles unsaved UI state for conflict detection
+                const basePath = path.dirname(document.uri.fsPath);
+                const parseResult = MarkdownKanbanParser.parseMarkdown(document.getText(), basePath, undefined, document.uri.fsPath);
+                this.setBoard(parseResult.board);
 
                 const currentBoard = this.board();
                 if (currentBoard) {

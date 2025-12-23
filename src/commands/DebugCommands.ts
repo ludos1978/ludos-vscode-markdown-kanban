@@ -331,8 +331,6 @@ export class DebugCommands extends BaseMessageCommand {
                 includeFileMap.clear();
             }
 
-            panelAccess._cachedBoardFromWebview = null;
-
             const document = context.fileManager.getDocument();
             if (document && panelAccess.loadMarkdownFile) {
                 await panelAccess.loadMarkdownFile(document, false);

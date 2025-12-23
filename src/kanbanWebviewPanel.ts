@@ -337,9 +337,6 @@ export class KanbanWebviewPanel {
     private _restoreStateFromFileService(): void {
         const state = this._fileService.getState();
         this._isUpdatingFromPanel = state.isUpdatingFromPanel;
-        if (state.cachedBoardFromWebview) {
-            this._boardStore.setBoard(state.cachedBoardFromWebview);
-        }
     }
 
     private _setupEventListeners() {

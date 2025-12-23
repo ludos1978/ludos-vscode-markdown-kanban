@@ -86,9 +86,6 @@ export interface PanelCommandAccess {
         createUnifiedBackup(filePath: string, reason: string, includeMetadata: boolean): Promise<string>;
     };
     _messageHandler?: MessageHandlerCommandAccess;
-
-    // Cache management
-    _cachedBoardFromWebview?: KanbanBoard | null;
 }
 
 /**
