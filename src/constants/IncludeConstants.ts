@@ -18,6 +18,25 @@ export const INCLUDE_SYNTAX = {
 } as const;
 
 /**
+ * Extract include file paths from a title string
+ * Returns array of file paths found in !!!include(path)!!! syntax
+ *
+ * @param title - The title string to extract include files from
+ * @returns Array of file paths found in include directives
+ */
+export function extractIncludeFiles(title: string): string[] {
+    const includeFiles: string[] = [];
+    const matches = title.match(INCLUDE_SYNTAX.REGEX);
+    if (matches) {
+        matches.forEach((match: string) => {
+            const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
+            includeFiles.push(filePath);
+        });
+    }
+    return includeFiles;
+}
+
+/**
  * Creates a display title by replacing !!!include()!!! directives with badge placeholders
  *
  * SINGLE SOURCE OF TRUTH for include badge placeholder format.

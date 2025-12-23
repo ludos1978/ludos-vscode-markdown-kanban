@@ -26,7 +26,7 @@ import {
     UpdateColumnTitleFromStrikethroughDeletionMessage
 } from '../core/bridge/MessageTypes';
 import { getErrorMessage } from '../utils/stringUtils';
-import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { INCLUDE_SYNTAX, extractIncludeFiles } from '../constants/IncludeConstants';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { KanbanColumn } from '../board/KanbanTypes';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
@@ -96,22 +96,6 @@ export class ColumnCommands extends BaseMessageCommand {
     }
 
     // ============= HELPER METHODS =============
-
-    /**
-     * Extract include file paths from a title string
-     * Returns array of file paths found in !!!include(path)!!! syntax
-     */
-    private extractIncludeFiles(title: string): string[] {
-        const includeFiles: string[] = [];
-        const matches = title.match(INCLUDE_SYNTAX.REGEX);
-        if (matches) {
-            matches.forEach((match: string) => {
-                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                includeFiles.push(filePath);
-            });
-        }
-        return includeFiles;
-    }
 
     /**
      * Generate content for appending tasks from a column to an include file.
@@ -193,7 +177,7 @@ ${tasksContent}`;
 
         if (hasIncludeChanges) {
             // Column include switch - route through state machine
-            const newIncludeFiles = this.extractIncludeFiles(newTitle);
+            const newIncludeFiles = extractIncludeFiles(newTitle);
             const oldIncludeFiles = column.includeFiles || [];
 
             // DATA LOSS PREVENTION: Check if column has existing tasks that would be lost
@@ -253,7 +237,7 @@ ${tasksContent}`;
             await context.requestStopEditing();
 
             // Capture undo state BEFORE include switch (include switches bypass action system)
-            const currentBoard = context.getCurrentBoard();
+            // Note: reusing currentBoard from outer scope (already checked for null at function start)
             if (currentBoard) {
                 context.boardStore.saveUndoEntry(
                     UndoCapture.forColumn(currentBoard, columnId, 'includeSwitch')

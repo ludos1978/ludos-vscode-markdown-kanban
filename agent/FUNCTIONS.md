@@ -871,7 +871,7 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
 
 ## src/constants/IncludeConstants.ts
 
-**Centralized Constants** (Added 2025-11-04)
+**Centralized Constants** (Added 2025-11-04, Updated 2025-12-22)
 - **INCLUDE_SYNTAX** - Include directive constants (PREFIX, SUFFIX, REGEX, REGEX_SINGLE)
   - PREFIX: '!!!include('
   - SUFFIX: ')!!!'
@@ -879,7 +879,12 @@ Sidebar TreeView for listing and managing kanban boards in workspace. Supports a
   - REGEX_SINGLE: Non-global regex for single match
 - **FILE_TYPES** - File type constants (MAIN, INCLUDE_COLUMN, INCLUDE_TASK, INCLUDE_REGULAR)
 - **Purpose**: Eliminates 783+ duplicate string instances across the codebase
-- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts
+- **Used by**: markdownParser.ts, messageHandler.ts, boardOperations.ts, ColumnCommands.ts, TaskCommands.ts
+
+**Functions:**
+- **extractIncludeFiles(title: string): string[]** - Extract include file paths from a title string
+  - Returns array of file paths found in !!!include(path)!!! syntax
+  - Added 2025-12-22 to consolidate duplicate implementations from ColumnCommands and TaskCommands
 
 **Note**: All include syntax pattern matching should use INCLUDE_SYNTAX constants instead of hardcoded strings.
 

@@ -114,7 +114,8 @@
       "Bash(if [ ! -f \"/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/$f\" ])",
       "Bash(npm run compile:check:*)",
       "Bash(node -e \"require(''/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/dist/src/html/utils/presentationParser.js'')\")",
-      "Bash(npm run compile:extension:*)"
+      "Bash(npm run compile:extension:*)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log --oneline -n 10)"
     ],
     "deny": [],
     "ask": []

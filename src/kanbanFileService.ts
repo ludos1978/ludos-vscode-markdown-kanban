@@ -18,8 +18,7 @@ import { PanelContext } from './panel';
  */
 enum SaveState {
     IDLE,        // No save operation in progress
-    SAVING,      // Save operation active (applying edits, saving files)
-    RECOVERING   // Error recovery in progress
+    SAVING       // Save operation active (applying edits, saving files)
 }
 
 /**

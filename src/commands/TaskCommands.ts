@@ -29,7 +29,7 @@ import {
     EditTaskTitleMessage,
     UpdateTaskFromStrikethroughDeletionMessage
 } from '../core/bridge/MessageTypes';
-import { INCLUDE_SYNTAX } from '../constants/IncludeConstants';
+import { INCLUDE_SYNTAX, extractIncludeFiles } from '../constants/IncludeConstants';
 import { getErrorMessage } from '../utils/stringUtils';
 import { BoardCrudOperations } from '../board/BoardCrudOperations';
 import { TaskActions } from '../actions';
@@ -111,22 +111,6 @@ export class TaskCommands extends BaseMessageCommand {
     // ============= HELPER METHODS =============
 
     /**
-     * Extract include file paths from a title string
-     * Returns array of file paths found in !!!include(path)!!! syntax
-     */
-    private extractIncludeFiles(title: string): string[] {
-        const includeFiles: string[] = [];
-        const matches = title.match(INCLUDE_SYNTAX.REGEX);
-        if (matches) {
-            matches.forEach((match: string) => {
-                const filePath = match.replace(INCLUDE_SYNTAX.REGEX_SINGLE, '$1').trim();
-                includeFiles.push(filePath);
-            });
-        }
-        return includeFiles;
-    }
-
-    /**
      * Handle include switch for a task title change
      * Performs the include switch if the title contains or contained include syntax
      * @returns true if include switch was performed, false otherwise
@@ -144,7 +128,7 @@ export class TaskCommands extends BaseMessageCommand {
             return false;
         }
 
-        const newIncludeFiles = this.extractIncludeFiles(newTitle);
+        const newIncludeFiles = extractIncludeFiles(newTitle);
 
         // Clear dirty flag before stopping edit
         context.clearTaskDirty(taskId);

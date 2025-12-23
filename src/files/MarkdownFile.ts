@@ -212,14 +212,10 @@ export abstract class MarkdownFile implements vscode.Disposable {
      * FOUNDATION-2: Pattern 2 (Helper Method)
      *
      * @param mySequence - The sequence number of this operation
-     * @param stage - Description of where the check is happening
      * @returns true if cancelled, false if still current
      */
-    private _checkReloadCancelled(mySequence: number, _stage: string): boolean {
-        if (mySequence !== this._currentReloadSequence) {
-            return true;
-        }
-        return false;
+    private _checkReloadCancelled(mySequence: number): boolean {
+        return mySequence !== this._currentReloadSequence;
     }
 
     /**
@@ -235,12 +231,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             throw new Error('[MarkdownFile] Relative path cannot be empty');
         }
 
-        // Check 2: Absolute path passed as relative (security/correctness issue)
-        // if (path.isAbsolute(relativePath)) {
-        //     throw new Error(`[MarkdownFile] Expected relative path, got absolute: "${relativePath}"`);
-        // }
-
-        // Check 3: Excessive parent directory traversal (potential security concern)
+        // Check 2: Excessive parent directory traversal (potential security concern)
         const normalized = path.normalize(relativePath);
         const parentDirCount = (normalized.match(/\.\.\//g) || []).length;
         if (parentDirCount > 3) {
@@ -435,7 +426,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
             const content = await this._readFromDiskWithVerification();
 
             // FOUNDATION-2: Check if this reload was cancelled during async operation
-            if (this._checkReloadCancelled(mySequence, 'after disk read')) {
+            if (this._checkReloadCancelled(mySequence)) {
                 return;
             }
 
@@ -443,7 +434,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
                 // Check if content actually changed (verification returns baseline if unchanged)
                 if (content !== this._baseline) {
                     // FOUNDATION-2: Final check before applying changes
-                    if (this._checkReloadCancelled(mySequence, 'before applying changes')) {
+                    if (this._checkReloadCancelled(mySequence)) {
                         return;
                     }
 

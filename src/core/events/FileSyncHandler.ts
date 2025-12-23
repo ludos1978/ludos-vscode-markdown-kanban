@@ -101,13 +101,11 @@ export class FileSyncHandler {
 
         // Skip if registry not ready
         if (!this._deps.fileRegistry.isReady()) {
-            console.log('[FileSyncHandler] Registry not ready, skipping sync');
             return result;
         }
 
         // Skip during initial board loading if requested
         if (skipDuringInitialLoad && this._deps.panelContext.initialBoardLoad) {
-            console.log('[FileSyncHandler] Initial loading in progress, skipping sync');
             return result;
         }
 
@@ -148,7 +146,6 @@ export class FileSyncHandler {
                 }
             }
 
-            console.log(`[FileSyncHandler] Sync complete: includeChanges=${result.includeFilesChanged}, mediaChanges=${result.mediaFilesChanged}`);
             return result;
 
         } catch (error) {
@@ -165,15 +162,10 @@ export class FileSyncHandler {
      */
     private async _reloadChangedIncludeFiles(force: boolean): Promise<{ hasChanges: boolean; changedFiles: string[] }> {
         const changedFiles: string[] = [];
-
-        // Log registry contents for debugging
         const allFiles = this._deps.fileRegistry.getAll();
-        console.log(`[FileSyncHandler] Registry contains ${allFiles.length} file(s):`,
-            allFiles.map(f => `${f.getPath()} (${f.getFileType()})`));
 
         if (force) {
             // Force mode: reload all files
-            console.log('[FileSyncHandler] Force mode: reloading all include files');
             for (const file of allFiles) {
                 if (file.getFileType() !== 'main') {
                     await file.reload();
@@ -187,19 +179,15 @@ export class FileSyncHandler {
         const changesMap = await this._deps.fileRegistry.checkAllForExternalChanges();
 
         changesMap.forEach((hasChanged, path) => {
-            console.log(`[FileSyncHandler] File ${path}: hasChanged=${hasChanged}`);
             if (hasChanged) {
                 changedFiles.push(path);
             }
         });
 
         if (changedFiles.length > 0) {
-            console.log(`[FileSyncHandler] Found ${changedFiles.length} changed include file(s):`, changedFiles);
-
             // Force sync baseline for changed files
             for (const file of allFiles) {
                 if (changesMap.get(file.getPath())) {
-                    console.log(`[FileSyncHandler] Syncing baseline for: ${file.getPath()}`);
                     await file.forceSyncBaseline();
                 }
             }
@@ -219,16 +207,10 @@ export class FileSyncHandler {
     private _checkMediaForExternalChanges(): { hasChanges: boolean; changedFiles: string[] } {
         const mediaTracker = this._deps.getMediaTracker();
         if (!mediaTracker) {
-            console.log('[FileSyncHandler] No media tracker initialized');
             return { hasChanges: false, changedFiles: [] };
         }
 
         try {
-            // Log tracked files for debugging
-            const trackedFiles = mediaTracker.getTrackedFiles();
-            console.log(`[FileSyncHandler] Checking ${trackedFiles.length} tracked media file(s):`,
-                trackedFiles.map(f => `${f.path} (${f.type})`));
-
             // checkForChanges() compares mtimes and triggers callback if changes found
             // The callback (set in KanbanWebviewPanel) handles notifying the frontend
             const changedFiles = mediaTracker.checkForChanges();
@@ -250,17 +232,13 @@ export class FileSyncHandler {
     private _sendIncludeContentOnly(): void {
         const webviewBridge = this._deps.getWebviewBridge();
         if (!webviewBridge) {
-            console.warn('[FileSyncHandler] No webview bridge available for sending include content');
             return;
         }
 
         const includeFiles = this._deps.fileRegistry.getIncludeFiles();
         if (includeFiles.length === 0) {
-            console.log('[FileSyncHandler] No include files to send');
             return;
         }
-
-        console.log(`[FileSyncHandler] Sending ${includeFiles.length} include file(s) content (without board update)`);
 
         for (const file of includeFiles) {
             const message = {

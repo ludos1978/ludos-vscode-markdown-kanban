@@ -99,7 +99,7 @@ export class ChangeStateMachine {
             return {
                 success: false,
                 error: new Error(`Event queued - state machine busy (currentState: ${currentState}, processing: ${currentEventType}, queued: ${event.type})`),
-                context: this._createEmptyContext(event),
+                context: this._createInitialContext(event),
                 duration: 0
             };
         }
@@ -137,7 +137,7 @@ export class ChangeStateMachine {
             return {
                 success: false,
                 error: error instanceof Error ? error : new Error(String(error)),
-                context: this._currentContext || this._createEmptyContext(event),
+                context: this._currentContext || this._createInitialContext(event),
                 duration: Date.now() - (this._currentContext?.startTime || Date.now())
             };
 
@@ -702,9 +702,5 @@ export class ChangeStateMachine {
             currentState: ChangeState.IDLE,
             stateHistory: []
         };
-    }
-
-    private _createEmptyContext(event: ChangeEvent): ChangeContext {
-        return this._createInitialContext(event);
     }
 }
