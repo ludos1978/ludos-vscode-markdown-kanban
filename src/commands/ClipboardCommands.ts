@@ -230,7 +230,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             const imagePath = path.join(mediaFolderPath, imageFileName);
             const mediaFolderName = `${baseFileName}-MEDIA`;
 
-            const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+            const base64Only = this._extractBase64Data(imageData);
             const buffer = Buffer.from(base64Only, 'base64');
             fs.writeFileSync(imagePath, buffer);
 
@@ -267,7 +267,7 @@ export class ClipboardCommands extends BaseMessageCommand {
             const imagePath = path.join(mediaFolderPath, imageFileName);
             const mediaFolderName = `${baseFileName}-MEDIA`;
 
-            const base64Only = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+            const base64Only = this._extractBase64Data(imageData);
             const buffer = Buffer.from(base64Only, 'base64');
             fs.writeFileSync(imagePath, buffer);
 
@@ -587,6 +587,14 @@ export class ClipboardCommands extends BaseMessageCommand {
         return mediaFolderPath;
     }
 
+    /**
+     * Extract raw base64 data from a data URL or plain base64 string
+     * Handles both "data:image/png;base64,xxxxx" and plain "xxxxx" formats
+     */
+    private _extractBase64Data(data: string): string {
+        return data.includes(',') ? data.split(',')[1] : data;
+    }
+
     private _isFileInWorkspace(filePath: string): boolean {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
@@ -846,7 +854,8 @@ export class ClipboardCommands extends BaseMessageCommand {
 
         let buffer: Buffer;
         if (fileData) {
-            const base64Only = isImage && fileData.includes(',') ? fileData.split(',')[1] : fileData;
+            // For images, extract base64 from data URL format; for other files, use raw data
+            const base64Only = isImage ? this._extractBase64Data(fileData) : fileData;
             buffer = Buffer.from(base64Only, 'base64');
         } else if (sourcePath) {
             buffer = fs.readFileSync(sourcePath);

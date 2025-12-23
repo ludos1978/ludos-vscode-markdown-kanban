@@ -1,143 +1,36 @@
-# Open Cleanup Tasks
+# Cleanup Tasks - Round 2
 
-Last updated: 2025-12-23
+## Completed
 
----
+### Frontend JavaScript
+- [x] Remove duplicate `toggleFileBarMenu` and `positionFileBarDropdown` from menuOperations.js (dead code - webview.js loads after)
+- [x] Improved `positionFileBarDropdown` in webview.js to use dynamic measurement (was using hardcoded dimensions)
+- [x] Consolidated task movement functions (4x: moveTaskToTop/Up/Down/Bottom) into single `moveTaskInDirection()` with wrapper functions
 
-## COMPLETED (2025-12-23) - Part 2
+### Commands (TypeScript)
+- [x] Extracted `_extractBase64Data()` helper in ClipboardCommands.ts (replaced 3 duplicates)
+- [x] Consolidated path replacement logic in PathCommands.ts into `_replacePathInFiles()` helper (~80 lines saved)
 
-### ✅ P2: Tests for row-tag actions
-- Created `src/test/unit/ColumnActions.test.ts` with tests for:
-  - `moveWithRowUpdate` - 5 test cases
-  - `reorderWithRowTags` - 5 test cases
-- Fixed missing `KanbanBoard` properties in test files (`valid`, `yamlHeader`, `kanbanFooter`)
+### Backend (TypeScript) - Round 1
+- [x] Removed unused `deepCloneBoard` from BoardStore.ts
+- [x] Removed unused `_emitEvent` parameter from BoardStore.setBoard()
 
-### ✅ P3: Move `_originalTaskOrder` to BoardStore
-- Added state to `BoardStore`:
-  - `originalTaskOrder: Map<string, string[]>` in BoardState
-  - `setOriginalTaskOrder(board)` - captures original order
-  - `getOriginalTaskOrder(columnId)` - retrieves order for a column
-  - `initColumnTaskOrder(columnId)` - for new columns
-  - `deleteColumnTaskOrder(columnId)` - for deleted columns
-- Added `setOriginalTaskOrder` callback to `KanbanFileServiceCallbacks`
-- Wired callback in `kanbanWebviewPanel.ts`
-- Updated `kanbanFileService.ts` to use callback
-- Updated `BoardCrudOperations.sortColumn()` to accept optional `originalOrder` parameter
-- Updated `BoardOperations.sortColumn()` to pass through `originalOrder`
-- Updated `ColumnCommands.handleSortColumn()` to get order from `context.boardStore`
-- Removed `setOriginalTaskOrder` from `BoardOperations` facade
-- Added tracking update in `ActionExecutor.execute()` for `column:add` actions
+## Skipped (with rationale)
 
-### ✅ P4: Remove static method indirection
-- Updated 6 files to use helpers directly from `actions/helpers.ts`:
-  - `IncludeLoadingProcessor.ts`
-  - `LinkReplacementHandler.ts`
-  - `IncludeFileCoordinator.ts`
-  - `MainKanbanFile.ts`
-  - `TaskCommands.ts`
-  - `WebviewUpdateService.ts`
-- Added new helper `findTaskInColumn` to `actions/helpers.ts`
-- Static methods in `BoardCrudOperations` still delegate to helpers (for test compatibility)
+### Include mode column/task operations
+- Skipped: Functions already use shared utilities (`window.menuUtils`), differences are meaningful (column vs task types, different message types). Consolidating would add type-checking complexity without benefit.
 
----
+### Move createDiagramFile to DiagramCommands
+- Skipped: Function shares helper methods (`_getCurrentFilePaths`, `_getMediaFolderPath`) with other ClipboardCommands. Moving would require duplicating helpers or extracting to shared module.
 
-## COMPLETED (2025-12-23) - Part 1
+### Remove scrollToElementIfNeeded
+- Skipped: Analysis was incorrect - function IS used in multiple places (menuOperations.js, dragDrop.js)
 
-### ✅ 1. Duplicate Board Operations - Unified to Actions
+### Merge filename generation methods
+- Skipped: Methods use fundamentally different algorithms (hash-based vs counter-based). Merging would make code less clear.
 
-**Migration completed (Plan 2 - Moderate approach):**
+### Clean up folding state functions in boardRenderer.js
+- Deferred: Would require deeper analysis to understand relationships between functions
 
-**New Actions created:**
-- `ColumnActions.moveWithRowUpdate(columnId, newPosition, newRow)` - Move column with row tag update
-- `ColumnActions.reorderWithRowTags(newOrder, movedColumnId, targetRow)` - Reorder columns with row tags
-
-**Actions removed (dead code cleanup):**
-- `ColumnActions.sortTasks()` - Removed because 'unsorted' requires `_originalTaskOrder` state
-- `ColumnActions.cleanupRowTags()` - Removed because it's called from kanbanFileService, not commands
-
-**Helpers consolidated to `src/actions/helpers.ts`:**
-- `getColumnRow(column)` - Extract row number from column title
-- `cleanRowTag(title)` - Remove row tag from title
-- `extractNumericTag(title)` - Extract numeric tag from task title
-- `findTaskById(board, taskId)` - Find task by ID with column/index
-- `findColumnContainingTask(board, taskId)` - Find column containing task
-- `findTaskInColumn(board, columnId, taskId)` - Find task in specific column
-
-**Call sites updated:**
-- `ColumnCommands.ts` - Now uses `executeAction()` with new Actions
-- Removed import of `BoardCrudOperations`, uses helpers directly
-
-**BoardOperations facade slimmed down:**
-- Removed `setOriginalTaskOrder()` (now in BoardStore)
-- Kept only: `cleanupRowTags()`, `sortColumn()`, `performAutomaticSort()`
-
-**BoardCrudOperations updated:**
-- Static helpers delegate to `actions/helpers.ts`
-- Task/Column instance methods marked `@deprecated`
-- Internal `_originalTaskOrder` kept for test compatibility
-- `sortColumn()` accepts optional `originalOrder` parameter
-
-**Bug fix: 'Unsorted' sorting works correctly:**
-- Production code gets order from `BoardStore.getOriginalTaskOrder()`
-- Tests use internal `_originalTaskOrder` in BoardCrudOperations
-- `ActionExecutor` initializes tracking for new columns
-
----
-
-## REMAINING TECHNICAL DEBT (Very Low Priority)
-
-### Optional: Slim down BoardCrudOperations further
-- Could remove deprecated methods and update tests to use Actions directly
-- Current approach works fine - deprecated methods are self-documenting
-- Tests serve as integration tests for the legacy CRUD operations
-
----
-
-### ✅ 9. Excessive MediaTracker Logging
-- Removed 20+ debug console.log statements from `src/services/MediaTracker.ts`
-- Kept console.warn and console.error for actual issues
-
-### ✅ 10. Unused `_webview` Parameter in LinkHandler
-- Removed unused `_webview` parameter from constructor in `src/services/LinkHandler.ts`
-- Updated call site in `src/kanbanWebviewPanel.ts`
-
-### ✅ 11. UnsavedChangesService Informational Logs
-- Removed 2 informational console.log statements from `src/services/UnsavedChangesService.ts`
-- Kept console.error for actual errors
-
----
-
-## COMPLETED (2025-12-22)
-
-### ✅ 2. Duplicate `extractIncludeFiles` Method
-- Moved to `src/constants/IncludeConstants.ts`
-- Both `ColumnCommands.ts` and `TaskCommands.ts` now import from shared utility
-
-### ✅ 3. Excessive Console Logging
-- Removed debug logging from `src/core/events/FileSyncHandler.ts`
-- Kept only error logging (`console.error`)
-
-### ✅ 4. Unused `_stage` Parameter
-- Removed from `_checkReloadCancelled()` in `src/files/MarkdownFile.ts`
-- Updated call sites to remove string parameter
-
-### ✅ 5. Duplicate `_createEmptyContext` Method
-- Removed from `src/core/ChangeStateMachine.ts`
-- Replaced calls with `_createInitialContext()`
-
-### ✅ 6. Variable Shadowing
-- Fixed in `src/commands/ColumnCommands.ts` - removed `currentBoard` redeclaration
-
-### ✅ 7. Unused `SaveState.RECOVERING`
-- Removed from `src/kanbanFileService.ts`
-
-### ✅ 8. Commented-out Validation Code
-- Removed from `src/files/MarkdownFile.ts`
-
----
-
-## Post-Cleanup
-
-- [x] Update `agent/FUNCTIONS.md` after cleanup (2025-12-22)
-  - Added `extractIncludeFiles()` function documentation
-  - Updated IncludeConstants.ts section with new function and usage
+### Clean up diagnostic logging in dragDrop.js
+- Deferred: Low priority, would need verification of which logs are still needed

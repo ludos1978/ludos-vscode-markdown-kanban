@@ -965,71 +965,8 @@ function positionDropdown(triggerButton, dropdown) {
     dropdown.style.display = originalDisplay;
 }
 
-// File bar menu toggle (similar pattern)
-function toggleFileBarMenu(event, button) {
-    event.stopPropagation();
-    const menu = button.parentElement;
-    const wasActive = menu.classList.contains('active');
-    
-    document.querySelectorAll('.file-bar-menu, .donut-menu').forEach(m => {
-        m.classList.remove('active');
-    });
-    
-    if (!wasActive) {
-        menu.classList.add('active');
-        const dropdown = menu.querySelector('.file-bar-menu-dropdown');
-        if (dropdown) {
-            positionFileBarDropdown(button, dropdown);
-        }
-    }
-}
-
-function positionFileBarDropdown(triggerButton, dropdown) {
-    const rect = triggerButton.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Get actual dropdown dimensions by temporarily showing it
-    const originalDisplay = dropdown.style.display;
-    const originalVisibility = dropdown.style.visibility;
-    dropdown.style.visibility = 'hidden';
-    dropdown.style.display = 'block';
-    
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const dropdownWidth = dropdownRect.width || 200;
-    const dropdownHeight = dropdownRect.height || 150;
-    
-    // Calculate horizontal position (prefer aligned with right edge of trigger)
-    let left = rect.right - dropdownWidth;
-    
-    // Check horizontal boundaries
-    if (left < 10) {left = 10;}
-    if (left + dropdownWidth > viewportWidth - 10) {
-        left = viewportWidth - dropdownWidth - 10;
-    }
-    
-    // Calculate vertical position (prefer below trigger)
-    let top = rect.bottom + 4;
-    
-    // If dropdown goes off bottom, position above trigger
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = rect.top - dropdownHeight - 4;
-    }
-    
-    // Final vertical boundary check
-    if (top < 10) {top = 10;}
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = viewportHeight - dropdownHeight - 10;
-    }
-    
-    // Apply positioning
-    dropdown.style.left = left + 'px';
-    dropdown.style.top = top + 'px';
-    
-    // Restore original visibility
-    dropdown.style.visibility = originalVisibility;
-    dropdown.style.display = originalDisplay;
-}
+// NOTE: toggleFileBarMenu and positionFileBarDropdown are defined in webview.js
+// (webview.js version has essential submenu/Marp handling that loads after this file)
 
 // Column operations - keep existing functions
 function insertColumnBefore(columnId) {
@@ -2130,95 +2067,71 @@ function insertTaskAfter(taskId, columnId) {
     // No VS Code message - cache-first system requires explicit save via Cmd+S
 }
 
-function moveTaskToTop(taskId, columnId) {
+/**
+ * Move a task within its column in a specified direction
+ * @param {string} taskId - Task to move
+ * @param {string} columnId - Column containing the task
+ * @param {'top'|'up'|'down'|'bottom'} direction - Direction to move
+ */
+function moveTaskInDirection(taskId, columnId, direction) {
     closeAllMenus();
 
-    if (window.cachedBoard) {
-        const found = findTaskInBoard(taskId, columnId);
-        if (found) {
-            const { column } = found;
-            const taskIndex = column.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex > 0) {
-                // Update cache
-                const task = column.tasks.splice(taskIndex, 1)[0];
-                column.tasks.unshift(task);
+    if (!window.cachedBoard) return;
 
-                // Update DOM directly instead of full re-render
-                moveTaskInDOM(taskId, column.id, 0);
+    const found = findTaskInBoard(taskId, columnId);
+    if (!found) return;
 
-                markUnsavedChanges();
-            }
-        }
+    const { column } = found;
+    const taskIndex = column.tasks.findIndex(t => t.id === taskId);
+    if (taskIndex < 0) return;
+
+    let newIndex;
+    const lastIndex = column.tasks.length - 1;
+
+    switch (direction) {
+        case 'top':
+            if (taskIndex === 0) return; // Already at top
+            column.tasks.splice(taskIndex, 1);
+            column.tasks.unshift(found.task);
+            newIndex = 0;
+            break;
+
+        case 'up':
+            if (taskIndex === 0) return; // Can't go up
+            // Swap with previous
+            [column.tasks[taskIndex], column.tasks[taskIndex - 1]] =
+                [column.tasks[taskIndex - 1], column.tasks[taskIndex]];
+            newIndex = taskIndex - 1;
+            break;
+
+        case 'down':
+            if (taskIndex === lastIndex) return; // Can't go down
+            // Swap with next
+            [column.tasks[taskIndex], column.tasks[taskIndex + 1]] =
+                [column.tasks[taskIndex + 1], column.tasks[taskIndex]];
+            newIndex = taskIndex + 1;
+            break;
+
+        case 'bottom':
+            if (taskIndex === lastIndex) return; // Already at bottom
+            column.tasks.splice(taskIndex, 1);
+            column.tasks.push(found.task);
+            newIndex = column.tasks.length - 1;
+            break;
+
+        default:
+            return;
     }
+
+    moveTaskInDOM(taskId, column.id, newIndex);
+    markUnsavedChanges();
 }
 
-function moveTaskUp(taskId, columnId) {
-    closeAllMenus();
-
-    if (window.cachedBoard) {
-        const found = findTaskInBoard(taskId, columnId);
-        if (found) {
-            const { column } = found;
-            const taskIndex = column.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex > 0) {
-                // Update cache - swap with previous
-                const task = column.tasks[taskIndex];
-                column.tasks[taskIndex] = column.tasks[taskIndex - 1];
-                column.tasks[taskIndex - 1] = task;
-
-                // Update DOM directly instead of full re-render
-                moveTaskInDOM(taskId, column.id, taskIndex - 1);
-
-                markUnsavedChanges();
-            }
-        }
-    }
-}
-
-function moveTaskDown(taskId, columnId) {
-    closeAllMenus();
-
-    if (window.cachedBoard) {
-        const found = findTaskInBoard(taskId, columnId);
-        if (found) {
-            const { column } = found;
-            const taskIndex = column.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex >= 0 && taskIndex < column.tasks.length - 1) {
-                // Update cache - swap with next
-                const task = column.tasks[taskIndex];
-                column.tasks[taskIndex] = column.tasks[taskIndex + 1];
-                column.tasks[taskIndex + 1] = task;
-
-                // Update DOM directly instead of full re-render
-                moveTaskInDOM(taskId, column.id, taskIndex + 1);
-
-                markUnsavedChanges();
-            }
-        }
-    }
-}
-
-function moveTaskToBottom(taskId, columnId) {
-    closeAllMenus();
-
-    if (window.cachedBoard) {
-        const found = findTaskInBoard(taskId, columnId);
-        if (found) {
-            const { column } = found;
-            const taskIndex = column.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex >= 0 && taskIndex < column.tasks.length - 1) {
-                // Update cache
-                const task = column.tasks.splice(taskIndex, 1)[0];
-                column.tasks.push(task);
-
-                // Update DOM directly - move to end (last index)
-                moveTaskInDOM(taskId, column.id, column.tasks.length - 1);
-
-                markUnsavedChanges();
-            }
-        }
-    }
-}
+// Wrapper functions for backwards compatibility
+function moveTaskToTop(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'top'); }
+function moveTaskUp(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'up'); }
+function moveTaskDown(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'down'); }
+function moveTaskToBottom(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'bottom'); }
 
 /**
  * Moves a task to a different column
@@ -3646,7 +3559,7 @@ function updateTagCategoryCounts(id, type, columnId = null) {
 
 // Make functions globally available
 window.toggleDonutMenu = toggleDonutMenu;
-window.toggleFileBarMenu = toggleFileBarMenu;
+// NOTE: toggleFileBarMenu is defined in webview.js (has essential submenu/Marp handling)
 window.closeAllMenus = closeAllMenus;
 window.handleColumnTagClick = (columnId, tagName, event) => {
     // CRITICAL: Clear any pending hover timeouts to prevent menu from closing

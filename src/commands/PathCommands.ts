@@ -407,88 +407,9 @@ export class PathCommands extends BaseMessageCommand {
             }
 
             const selectedFile = replacement.fsPath;
+            const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
 
-            // Determine if the old path was relative or absolute
-            const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-
-            // Convert the new path to the same format as the old path
-            let newPath: string;
-            if (wasRelative) {
-                // Convert to relative path from the main file's directory
-                newPath = path.relative(basePath, selectedFile);
-                // Normalize to forward slashes
-                newPath = newPath.replace(/\\/g, '/');
-                // Add ./ prefix if it doesn't start with . or /
-                if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                    newPath = './' + newPath;
-                }
-            } else {
-                newPath = selectedFile;
-            }
-
-            // URL-encode the path for markdown (same encoding as when dropping images)
-            newPath = encodeFilePath(newPath);
-
-            // Collect all files to search
-            const allFiles: MarkdownFile[] = [];
-            allFiles.push(mainFile);
-            allFiles.push(...fileRegistry.getIncludeFiles());
-
-            // Find the file containing the old path
-            let foundFile: MarkdownFile | null = null;
-            let foundContent: string = '';
-
-            const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(escapedOldPath, 'g');
-
-            for (const file of allFiles) {
-                const content = file.getContent();
-                if (regex.test(content)) {
-                    foundFile = file;
-                    foundContent = content;
-                    break;
-                }
-                regex.lastIndex = 0;
-            }
-
-            if (!foundFile) {
-                return this.failure('Old path not found in any file');
-            }
-
-            // Use LinkOperations to replace with strikethrough pattern
-            // This produces: ~~![alt](old-path)~~ ![alt](new-path)
-            const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
-
-            if (newContent === foundContent) {
-                // Fallback to direct replacement if LinkOperations doesn't find a match
-                regex.lastIndex = 0;
-                const directContent = foundContent.replace(regex, newPath);
-                foundFile.setContent(directContent, false);
-            } else {
-                // Update file content with strikethrough version
-                foundFile.setContent(newContent, false);
-            }
-
-            // Refresh the board to show the new image
-            context.boardStore.invalidateCache();
-            await context.onBoardUpdate();
-
-            // Notify frontend
-            this.postMessage({
-                type: 'imagePathReplaced',
-                oldPath: oldPath,
-                newPath: newPath,
-                filePath: foundFile.getRelativePath()
-            });
-
-            vscode.window.showInformationMessage(`Path updated: ${path.basename(oldPath)} → ${path.basename(newPath)}`);
-
-            return this.success({
-                replaced: true,
-                oldPath: oldPath,
-                newPath: newPath,
-                filePath: foundFile.getRelativePath()
-            });
+            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error searching for file:`, error);
@@ -573,89 +494,7 @@ export class PathCommands extends BaseMessageCommand {
         }
 
         const selectedFile = result[0].fsPath;
-
-        // Determine if the old path was relative or absolute
-        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-
-        // Convert the new path to the same format as the old path
-        let newPath: string;
-        if (wasRelative) {
-            // Convert to relative path from the main file's directory
-            newPath = path.relative(basePath, selectedFile);
-            // Normalize to forward slashes
-            newPath = newPath.replace(/\\/g, '/');
-            // Add ./ prefix if it doesn't start with . or /
-            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                newPath = './' + newPath;
-            }
-        } else {
-            newPath = selectedFile;
-        }
-
-        // URL-encode the path for markdown (same encoding as when dropping images)
-        newPath = encodeFilePath(newPath);
-
-        // Collect all files to search
-        const allFiles: MarkdownFile[] = [];
-        allFiles.push(mainFile);
-        allFiles.push(...fileRegistry.getIncludeFiles());
-
-        // Find the file containing the old path
-        let foundFile: MarkdownFile | null = null;
-        let foundContent: string = '';
-
-        // Create regex to find the old path in markdown image syntax
-        const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedOldPath, 'g');
-
-        for (const file of allFiles) {
-            const content = file.getContent();
-            if (regex.test(content)) {
-                foundFile = file;
-                foundContent = content;
-                break;
-            }
-            regex.lastIndex = 0;
-        }
-
-        if (!foundFile) {
-            return this.failure('Old path not found in any file');
-        }
-
-        // Use LinkOperations to replace with strikethrough pattern
-        // This produces: ~~![alt](old-path)~~ ![alt](new-path)
-        const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
-
-        if (newContent === foundContent) {
-            // Fallback to direct replacement if LinkOperations doesn't find a match
-            regex.lastIndex = 0;
-            const directContent = foundContent.replace(regex, newPath);
-            foundFile.setContent(directContent, false);
-        } else {
-            // Update file content with strikethrough version
-            foundFile.setContent(newContent, false);
-        }
-
-        // Refresh the board to show the new image
-        context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
-
-        // Notify frontend
-        this.postMessage({
-            type: 'imagePathReplaced',
-            oldPath: oldPath,
-            newPath: newPath,
-            filePath: foundFile.getRelativePath()
-        });
-
-        vscode.window.showInformationMessage(`Image path updated successfully`);
-
-        return this.success({
-            replaced: true,
-            oldPath: oldPath,
-            newPath: newPath,
-            filePath: foundFile.getRelativePath()
-        });
+        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully');
     }
 
     /**
@@ -774,6 +613,103 @@ export class PathCommands extends BaseMessageCommand {
         return this.success({
             deleted: true,
             path: pathToDelete,
+            filePath: foundFile.getRelativePath()
+        });
+    }
+
+    // ============= HELPER METHODS =============
+
+    /**
+     * Replace a path in markdown files and refresh the board
+     * Common logic used by handleSearchForFile and handleBrowseForImage
+     */
+    private async _replacePathInFiles(
+        oldPath: string,
+        selectedFilePath: string,
+        basePath: string,
+        context: CommandContext,
+        successMessage: string
+    ): Promise<CommandResult> {
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) {
+            return this.failure('File registry not available');
+        }
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            return this.failure('No main file found');
+        }
+
+        // Determine if the old path was relative or absolute
+        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+
+        // Convert the new path to match the old path's format
+        let newPath: string;
+        if (wasRelative) {
+            newPath = path.relative(basePath, selectedFilePath);
+            newPath = newPath.replace(/\\/g, '/'); // Normalize to forward slashes
+            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                newPath = './' + newPath;
+            }
+        } else {
+            newPath = selectedFilePath;
+        }
+
+        // URL-encode the path for markdown
+        newPath = encodeFilePath(newPath);
+
+        // Collect all files to search
+        const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
+
+        // Find the file containing the old path
+        let foundFile: MarkdownFile | null = null;
+        let foundContent: string = '';
+
+        const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedOldPath, 'g');
+
+        for (const file of allFiles) {
+            const content = file.getContent();
+            if (regex.test(content)) {
+                foundFile = file;
+                foundContent = content;
+                break;
+            }
+            regex.lastIndex = 0;
+        }
+
+        if (!foundFile) {
+            return this.failure('Old path not found in any file');
+        }
+
+        // Use LinkOperations to replace with strikethrough pattern
+        const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
+
+        if (newContent === foundContent) {
+            // Fallback to direct replacement
+            regex.lastIndex = 0;
+            foundFile.setContent(foundContent.replace(regex, newPath), false);
+        } else {
+            foundFile.setContent(newContent, false);
+        }
+
+        // Refresh the board
+        context.boardStore.invalidateCache();
+        await context.onBoardUpdate();
+
+        // Notify frontend
+        this.postMessage({
+            type: 'imagePathReplaced',
+            oldPath: oldPath,
+            newPath: newPath,
+            filePath: foundFile.getRelativePath()
+        });
+
+        vscode.window.showInformationMessage(successMessage);
+
+        return this.success({
+            replaced: true,
+            oldPath: oldPath,
+            newPath: newPath,
             filePath: foundFile.getRelativePath()
         });
     }
