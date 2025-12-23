@@ -78,7 +78,6 @@ export class DiagramCommands extends BaseMessageCommand {
                     return this.success();
 
                 case 'requestExcalidrawRender':
-                    console.log('[DiagramCommands] *** requestExcalidrawRender received ***');
                     await this.handleRenderExcalidraw(message, context);
                     return this.success();
 
@@ -443,7 +442,6 @@ export class DiagramCommands extends BaseMessageCommand {
      */
     private async handleRenderExcalidraw(message: RequestExcalidrawRenderMessage, context: CommandContext): Promise<void> {
         const { requestId, filePath } = message;
-        console.log('[Excalidraw Backend] Received render request for:', filePath);
         const panel = context.getWebviewPanel();
 
         if (!panel || !panel.webview) {
@@ -453,10 +451,8 @@ export class DiagramCommands extends BaseMessageCommand {
 
         try {
             // Import excalidraw service
-            console.log('[Excalidraw Backend] Importing ExcalidrawService...');
             const { ExcalidrawService } = await import('../services/export/ExcalidrawService');
             const service = new ExcalidrawService();
-            console.log('[Excalidraw Backend] Service created');
 
             // Resolve file path (handles both document-relative and workspace-relative paths)
             const resolution = await context.fileManager.resolveFilePath(filePath);
@@ -491,10 +487,7 @@ export class DiagramCommands extends BaseMessageCommand {
             });
 
         } catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            const errStack = error instanceof Error ? error.stack : '';
-            console.error('[Excalidraw Backend] Render error:', errMsg);
-            console.error('[Excalidraw Backend] Stack:', errStack);
+            console.error('[Excalidraw Backend] Render error:', error);
 
             // Send error response to webview
             this.postMessage({

@@ -121,8 +121,6 @@ export class ExcalidrawService {
      * Uses a separate Node process to avoid jsdom bundling issues
      */
     private async convertToSVG(excalidrawData: ExcalidrawData): Promise<string> {
-        console.log('[ExcalidrawService] Converting to SVG via child process, elements:', excalidrawData.elements?.length);
-
         const elements = excalidrawData.elements || [];
         const appState = excalidrawData.appState || {};
         const files = excalidrawData.files || {};
@@ -149,7 +147,6 @@ export class ExcalidrawService {
 
             child.on('close', (code) => {
                 if (code === 0 && stdout) {
-                    console.log('[ExcalidrawService] Child process SUCCESS, SVG length:', stdout.length);
                     resolve(stdout);
                 } else {
                     let errorMsg = 'Excalidraw conversion failed';
@@ -159,13 +156,11 @@ export class ExcalidrawService {
                     } catch {
                         errorMsg = stderr || `Process exited with code ${code}`;
                     }
-                    console.error('[ExcalidrawService] Child process FAILED:', errorMsg);
                     reject(new Error(errorMsg));
                 }
             });
 
             child.on('error', (err) => {
-                console.error('[ExcalidrawService] Child process spawn error:', err);
                 reject(err);
             });
 
