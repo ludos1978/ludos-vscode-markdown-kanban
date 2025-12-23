@@ -57,6 +57,7 @@
 
 - dont refactor names by just modifying adding underscores or from one style to another. When changing names, think about the function of a variable or class and then rename it properly!
 
+- when analyzing code for refactoring allways check the function calls as well as the code before and after as well!
 
 - Never keep any obsolete code! Rewrite code to make it use new data styles completely or remove it completely. Do not create any compatiblity layers or conversions from old data styles!
 - Keep reports short and concise or leave them out if it's already mentioned in the answer.

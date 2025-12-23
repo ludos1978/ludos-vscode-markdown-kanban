@@ -52,6 +52,14 @@ console.log('Marp watch script placeholder');
 				console.log('Created watch.js placeholder for Marp CLI');
 			}
 
+			// Copy Excalidraw worker script (runs in child process with real node_modules)
+			const excalidrawWorkerSrc = 'src/services/export/excalidraw-worker.js';
+			const excalidrawWorkerDist = 'dist/excalidraw-worker.js';
+			if (fs.existsSync(excalidrawWorkerSrc)) {
+				fs.copyFileSync(excalidrawWorkerSrc, excalidrawWorkerDist);
+				console.log('Copied excalidraw-worker.js to dist/');
+			}
+
 			const srcHtmlDir = 'src/html';
 			const distHtmlDir = 'dist/src/html';
 
@@ -242,7 +250,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/extension.js',
-		external: ['vscode', 'tslib', 'emitter', 'jsdom', 'canvas'],
+		external: ['vscode', 'tslib', 'emitter', 'canvas', 'jsdom'],
 		logLevel: 'silent',
 		plugins: [
 			copyStaticFilesPlugin,

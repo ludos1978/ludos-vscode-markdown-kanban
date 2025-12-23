@@ -1,3 +1,5 @@
+- [ ] the excalidraw converter doesnt show embedded images and manually drawn strokes. i need them to work!
+
 - [ ] add a table editor that allows sorting of content by each category.
 
 - [ ] in the marp presentation expost the video playback plugin must be modified. It should automatically stop videos when the slide is changed (it can allways stop all videos in the presentation). Also it would be nice if we could have a start time and optional end time ./filename.mp4&start=40&end=60s
