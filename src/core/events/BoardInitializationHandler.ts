@@ -111,26 +111,20 @@ export class BoardInitializationHandler {
     ): MediaTracker {
         // Dispose old tracker before creating new one to cleanup file watchers
         if (existingTracker) {
-            console.log('[BoardInitializationHandler] Disposing old MediaTracker before creating new one');
             existingTracker.dispose();
         }
 
-        console.log(`[BoardInitializationHandler] Creating new MediaTracker for: ${filePath}`);
         const mediaTracker = new MediaTracker(filePath);
 
         // Set up callback for real-time media file change detection
         mediaTracker.setOnMediaChanged((changedFiles) => {
-            console.log(`[BoardInitializationHandler] Real-time change detected for ${changedFiles.length} file(s):`,
-                changedFiles.map(f => f.path));
             this._deps.onMediaChanged(changedFiles);
         });
 
         // Update tracked media files from current content
         const content = mainFile.getContent();
-        console.log(`[BoardInitializationHandler] Main file content length: ${content?.length || 0}`);
         if (content) {
-            const trackedFiles = mediaTracker.updateTrackedFiles(content);
-            console.log(`[BoardInitializationHandler] Tracking ${trackedFiles.length} media files from main file`);
+            mediaTracker.updateTrackedFiles(content);
         } else {
             console.warn(`[BoardInitializationHandler] No content from main file - skipping media tracking`);
         }
@@ -161,7 +155,6 @@ export class BoardInitializationHandler {
         if (fileSyncHandler) {
             try {
                 await fileSyncHandler.reloadExternallyModifiedFiles({ force: true, skipBoardUpdate: true });
-                console.log('[BoardInitializationHandler] Include files loaded via FileSyncHandler (unified path)');
             } catch (error) {
                 console.error('[BoardInitializationHandler] Error loading include content:', error);
             } finally {

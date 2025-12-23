@@ -9,7 +9,10 @@ import { KanbanBoard, KanbanColumn, KanbanTask } from '../../markdownParser';
 // Helper to create a test board
 function createTestBoard(): KanbanBoard {
     return {
+        valid: true,
         title: 'Test Board',
+        yamlHeader: null,
+        kanbanFooter: null,
         columns: [
             {
                 id: 'col-1',
@@ -432,7 +435,10 @@ describe('BoardCrudOperations', () => {
         describe('sortColumn', () => {
             it('should sort by title alphabetically', () => {
                 const board: KanbanBoard = {
+                    valid: true,
                     title: 'Test',
+                    yamlHeader: null,
+                    kanbanFooter: null,
                     columns: [{
                         id: 'col-1',
                         title: 'Sort Test',
@@ -454,7 +460,10 @@ describe('BoardCrudOperations', () => {
 
             it('should sort by numeric tag', () => {
                 const board: KanbanBoard = {
+                    valid: true,
                     title: 'Test',
+                    yamlHeader: null,
+                    kanbanFooter: null,
                     columns: [{
                         id: 'col-1',
                         title: 'Sort Test',

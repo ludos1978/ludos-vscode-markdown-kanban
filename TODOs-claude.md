@@ -4,7 +4,44 @@ Last updated: 2025-12-23
 
 ---
 
-## COMPLETED (2025-12-23)
+## COMPLETED (2025-12-23) - Part 2
+
+### ✅ P2: Tests for row-tag actions
+- Created `src/test/unit/ColumnActions.test.ts` with tests for:
+  - `moveWithRowUpdate` - 5 test cases
+  - `reorderWithRowTags` - 5 test cases
+- Fixed missing `KanbanBoard` properties in test files (`valid`, `yamlHeader`, `kanbanFooter`)
+
+### ✅ P3: Move `_originalTaskOrder` to BoardStore
+- Added state to `BoardStore`:
+  - `originalTaskOrder: Map<string, string[]>` in BoardState
+  - `setOriginalTaskOrder(board)` - captures original order
+  - `getOriginalTaskOrder(columnId)` - retrieves order for a column
+  - `initColumnTaskOrder(columnId)` - for new columns
+  - `deleteColumnTaskOrder(columnId)` - for deleted columns
+- Added `setOriginalTaskOrder` callback to `KanbanFileServiceCallbacks`
+- Wired callback in `kanbanWebviewPanel.ts`
+- Updated `kanbanFileService.ts` to use callback
+- Updated `BoardCrudOperations.sortColumn()` to accept optional `originalOrder` parameter
+- Updated `BoardOperations.sortColumn()` to pass through `originalOrder`
+- Updated `ColumnCommands.handleSortColumn()` to get order from `context.boardStore`
+- Removed `setOriginalTaskOrder` from `BoardOperations` facade
+- Added tracking update in `ActionExecutor.execute()` for `column:add` actions
+
+### ✅ P4: Remove static method indirection
+- Updated 6 files to use helpers directly from `actions/helpers.ts`:
+  - `IncludeLoadingProcessor.ts`
+  - `LinkReplacementHandler.ts`
+  - `IncludeFileCoordinator.ts`
+  - `MainKanbanFile.ts`
+  - `TaskCommands.ts`
+  - `WebviewUpdateService.ts`
+- Added new helper `findTaskInColumn` to `actions/helpers.ts`
+- Static methods in `BoardCrudOperations` still delegate to helpers (for test compatibility)
+
+---
+
+## COMPLETED (2025-12-23) - Part 1
 
 ### ✅ 1. Duplicate Board Operations - Unified to Actions
 
@@ -24,39 +61,35 @@ Last updated: 2025-12-23
 - `extractNumericTag(title)` - Extract numeric tag from task title
 - `findTaskById(board, taskId)` - Find task by ID with column/index
 - `findColumnContainingTask(board, taskId)` - Find column containing task
+- `findTaskInColumn(board, columnId, taskId)` - Find task in specific column
 
 **Call sites updated:**
 - `ColumnCommands.ts` - Now uses `executeAction()` with new Actions
-- Removed import of `BoardCrudOperations`, uses `findColumn` from helpers
+- Removed import of `BoardCrudOperations`, uses helpers directly
 
 **BoardOperations facade slimmed down:**
-- Removed all delegated CRUD methods (now handled by Actions)
-- Kept only: `setOriginalTaskOrder()`, `cleanupRowTags()`, `sortColumn()`, `performAutomaticSort()`
+- Removed `setOriginalTaskOrder()` (now in BoardStore)
+- Kept only: `cleanupRowTags()`, `sortColumn()`, `performAutomaticSort()`
 
 **BoardCrudOperations updated:**
-- Static helpers now delegate to `actions/helpers.ts`
-- Task/Column instance methods marked `@deprecated` with guidance to use Actions
-- Kept for: test compatibility, state management (`_originalTaskOrder`), and `sortColumn('unsorted')`
+- Static helpers delegate to `actions/helpers.ts`
+- Task/Column instance methods marked `@deprecated`
+- Internal `_originalTaskOrder` kept for test compatibility
+- `sortColumn()` accepts optional `originalOrder` parameter
 
-**Bug fix: 'Unsorted' sorting now works:**
-- `ColumnCommands.handleSortColumn` now uses `boardOperations.sortColumn()` for all sort types
-- This ensures 'unsorted' has access to `_originalTaskOrder` state
-- Added `sortColumn()` back to BoardOperations facade
+**Bug fix: 'Unsorted' sorting works correctly:**
+- Production code gets order from `BoardStore.getOriginalTaskOrder()`
+- Tests use internal `_originalTaskOrder` in BoardCrudOperations
+- `ActionExecutor` initializes tracking for new columns
 
 ---
 
-## REMAINING TECHNICAL DEBT (Lower Priority)
+## REMAINING TECHNICAL DEBT (Very Low Priority)
 
-### P2: Add tests for new row-tag actions
-- `moveWithRowUpdate`, `reorderWithRowTags` have no unit tests
-
-### P3: Move `_originalTaskOrder` to BoardStore
-- State currently lives in BoardCrudOperations
-- Should be in BoardStore for proper state management
-
-### P4: Remove static method indirection
-- 15+ files still use `BoardCrudOperations.findColumnById()` etc.
-- Should update to use `findColumn` from `actions/helpers.ts` directly
+### Optional: Slim down BoardCrudOperations further
+- Could remove deprecated methods and update tests to use Actions directly
+- Current approach works fine - deprecated methods are self-documenting
+- Tests serve as integration tests for the legacy CRUD operations
 
 ---
 

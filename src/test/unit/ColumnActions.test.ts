@@ -9,7 +9,10 @@ import * as ColumnActions from '../../actions/column';
 // Helper to create a test board with row tags
 function createTestBoardWithRows(): KanbanBoard {
     return {
+        valid: true,
         title: 'Test Board',
+        yamlHeader: null,
+        kanbanFooter: null,
         columns: [
             {
                 id: 'col-1',

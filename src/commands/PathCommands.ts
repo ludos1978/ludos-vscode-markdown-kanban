@@ -253,8 +253,6 @@ export class PathCommands extends BaseMessageCommand {
         const conversionService = PathConversionService.getInstance();
         const imagePath = message.imagePath;
 
-        console.log(`[PathCommands] convertSinglePath called with path: "${imagePath}", direction: ${message.direction}, skipRefresh: ${message.skipRefresh}`);
-
         // Collect all files to search
         const allFiles: MarkdownFile[] = [];
         const mainFile = fileRegistry.getMainFile();
@@ -262,8 +260,6 @@ export class PathCommands extends BaseMessageCommand {
             allFiles.push(mainFile);
         }
         allFiles.push(...fileRegistry.getIncludeFiles());
-
-        console.log(`[PathCommands] Searching in ${allFiles.length} files`);
 
         // Search for the path in all files
         let foundFile: MarkdownFile | null = null;
@@ -278,14 +274,12 @@ export class PathCommands extends BaseMessageCommand {
 
         for (const file of allFiles) {
             const content = file.getContent();
-            console.log(`[PathCommands] Checking file: ${file.getRelativePath()}, content length: ${content.length}`);
 
             for (const pathVariation of pathVariations) {
                 if (content.includes(pathVariation)) {
                     foundFile = file;
                     foundContent = content;
                     actualPathInContent = pathVariation;
-                    console.log(`[PathCommands] Found path "${pathVariation}" in file: ${file.getRelativePath()}`);
                     break;
                 }
             }
@@ -293,12 +287,6 @@ export class PathCommands extends BaseMessageCommand {
         }
 
         if (!foundFile) {
-            console.log(`[PathCommands] Path not found in any file: ${imagePath}`);
-            // Log first 200 chars of each file for debugging
-            for (const file of allFiles) {
-                const content = file.getContent();
-                console.log(`[PathCommands] File ${file.getRelativePath()} content preview: ${content.substring(0, 200)}`);
-            }
             return this.failure('Path not found in any file');
         }
 
@@ -328,20 +316,13 @@ export class PathCommands extends BaseMessageCommand {
         // Replace the actual path in content (use string replace, not regex)
         const newContent = foundContent.split(actualPathInContent).join(newPath);
 
-        console.log(`[PathCommands] Replacing "${actualPathInContent}" with "${newPath}"`);
-        console.log(`[PathCommands] Old content length: ${foundContent.length}, New content length: ${newContent.length}`);
-        console.log(`[PathCommands] Content changed: ${foundContent !== newContent}`);
-
         // Update file content in cache (marks as unsaved, does NOT save to disk)
         foundFile.setContent(newContent, false);
-        console.log(`[PathCommands] File content updated in cache for: ${foundFile.getRelativePath()}`);
 
         // Always invalidate board cache and refresh webview to show updated paths
         // This is needed for includes to update their displayed path
         context.boardStore.invalidateCache();
-        console.log(`[PathCommands] Board cache invalidated, calling onBoardUpdate...`);
         await context.onBoardUpdate();
-        console.log(`[PathCommands] onBoardUpdate completed`);
 
         // Notify frontend
         this.postMessage({
@@ -370,7 +351,6 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const filePath = message.filePath;
-        console.log(`[PathCommands] openPath called with path: "${filePath}"`);
 
         // If the path is relative, resolve it against the main file's directory
         let resolvedPath = filePath;
@@ -384,8 +364,6 @@ export class PathCommands extends BaseMessageCommand {
                 return this.failure('Cannot resolve relative path: main file not found');
             }
         }
-
-        console.log(`[PathCommands] Opening path with system default app: "${resolvedPath}"`);
 
         try {
             const fileUri = safeFileUri(resolvedPath, 'PathCommands-openPath');
@@ -407,7 +385,6 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const oldPath = message.filePath;
-        console.log(`[PathCommands] searchForFile called with path: "${oldPath}"`);
 
         // Get the main file's directory for the search
         const fileRegistry = this.getFileRegistry();
@@ -426,12 +403,10 @@ export class PathCommands extends BaseMessageCommand {
             const replacement = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
 
             if (!replacement) {
-                console.log(`[PathCommands] User cancelled file selection`);
                 return this.success({ cancelled: true });
             }
 
             const selectedFile = replacement.fsPath;
-            console.log(`[PathCommands] User selected file: "${selectedFile}"`);
 
             // Determine if the old path was relative or absolute
             const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
@@ -453,8 +428,6 @@ export class PathCommands extends BaseMessageCommand {
 
             // URL-encode the path for markdown (same encoding as when dropping images)
             newPath = encodeFilePath(newPath);
-
-            console.log(`[PathCommands] Replacing "${oldPath}" with "${newPath}"`);
 
             // Collect all files to search
             const allFiles: MarkdownFile[] = [];
@@ -479,7 +452,6 @@ export class PathCommands extends BaseMessageCommand {
             }
 
             if (!foundFile) {
-                console.log(`[PathCommands] Old path not found in any file: ${oldPath}`);
                 return this.failure('Old path not found in any file');
             }
 
@@ -488,7 +460,6 @@ export class PathCommands extends BaseMessageCommand {
             const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
 
             if (newContent === foundContent) {
-                console.log(`[PathCommands] LinkOperations did not find a match, trying direct replacement`);
                 // Fallback to direct replacement if LinkOperations doesn't find a match
                 regex.lastIndex = 0;
                 const directContent = foundContent.replace(regex, newPath);
@@ -497,7 +468,6 @@ export class PathCommands extends BaseMessageCommand {
                 // Update file content with strikethrough version
                 foundFile.setContent(newContent, false);
             }
-            console.log(`[PathCommands] File content updated: ${foundFile.getRelativePath()}`);
 
             // Refresh the board to show the new image
             context.boardStore.invalidateCache();
@@ -534,7 +504,6 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const filePath = message.filePath;
-        console.log(`[PathCommands] revealPathInExplorer called with path: "${filePath}"`);
 
         // If the path is relative, resolve it against the main file's directory
         let resolvedPath = filePath;
@@ -549,11 +518,8 @@ export class PathCommands extends BaseMessageCommand {
             }
         }
 
-        console.log(`[PathCommands] Revealing path in explorer: "${resolvedPath}"`);
-
         // Check if the path exists
         if (!fs.existsSync(resolvedPath)) {
-            console.log(`[PathCommands] Path does not exist: "${resolvedPath}"`);
             vscode.window.showWarningMessage(`File not found: ${resolvedPath}`);
             return this.failure(`Path does not exist: ${resolvedPath}`);
         }
@@ -577,7 +543,6 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const oldPath = message.oldPath;
-        console.log(`[PathCommands] browseForImage called with oldPath: "${oldPath}"`);
 
         // Get the main file's directory as the starting point for the file dialog
         const fileRegistry = this.getFileRegistry();
@@ -604,12 +569,10 @@ export class PathCommands extends BaseMessageCommand {
         });
 
         if (!result || result.length === 0) {
-            console.log(`[PathCommands] User cancelled file selection`);
             return this.success({ cancelled: true });
         }
 
         const selectedFile = result[0].fsPath;
-        console.log(`[PathCommands] User selected file: "${selectedFile}"`);
 
         // Determine if the old path was relative or absolute
         const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
@@ -631,8 +594,6 @@ export class PathCommands extends BaseMessageCommand {
 
         // URL-encode the path for markdown (same encoding as when dropping images)
         newPath = encodeFilePath(newPath);
-
-        console.log(`[PathCommands] Replacing "${oldPath}" with "${newPath}"`);
 
         // Collect all files to search
         const allFiles: MarkdownFile[] = [];
@@ -658,7 +619,6 @@ export class PathCommands extends BaseMessageCommand {
         }
 
         if (!foundFile) {
-            console.log(`[PathCommands] Old path not found in any file: ${oldPath}`);
             return this.failure('Old path not found in any file');
         }
 
@@ -667,7 +627,6 @@ export class PathCommands extends BaseMessageCommand {
         const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
 
         if (newContent === foundContent) {
-            console.log(`[PathCommands] LinkOperations did not find a match, trying direct replacement`);
             // Fallback to direct replacement if LinkOperations doesn't find a match
             regex.lastIndex = 0;
             const directContent = foundContent.replace(regex, newPath);
@@ -676,7 +635,6 @@ export class PathCommands extends BaseMessageCommand {
             // Update file content with strikethrough version
             foundFile.setContent(newContent, false);
         }
-        console.log(`[PathCommands] File content updated: ${foundFile.getRelativePath()}`);
 
         // Refresh the board to show the new image
         context.boardStore.invalidateCache();
@@ -710,7 +668,6 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext
     ): Promise<CommandResult> {
         const pathToDelete = message.path;
-        console.log(`[PathCommands] deleteFromMarkdown called with path: "${pathToDelete}"`);
 
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
@@ -737,13 +694,11 @@ export class PathCommands extends BaseMessageCommand {
             if (content.includes(pathToDelete)) {
                 foundFile = file;
                 foundContent = content;
-                console.log(`[PathCommands] Found path in file: ${file.getRelativePath()}`);
                 break;
             }
         }
 
         if (!foundFile) {
-            console.log(`[PathCommands] Path not found in any file: ${pathToDelete}`);
             return this.failure('Path not found in any file');
         }
 
@@ -766,17 +721,13 @@ export class PathCommands extends BaseMessageCommand {
 
         const matches = foundContent.match(regex);
         if (!matches || matches.length === 0) {
-            console.log(`[PathCommands] Could not find matching element for path: ${pathToDelete}`);
             return this.failure('Could not find element containing this path');
         }
-
-        console.log(`[PathCommands] Found ${matches.length} matching element(s): ${matches.join(', ')}`);
 
         // Remove each matching element completely
         let newContent = foundContent;
         for (const match of matches) {
             newContent = newContent.replace(match, '');
-            console.log(`[PathCommands] Removed element: ${match}`);
         }
 
         // Clean up any double newlines created by removal
@@ -801,8 +752,6 @@ export class PathCommands extends BaseMessageCommand {
 
             // Also update the in-memory cache so the board refresh shows correct content
             foundFile.setContent(newContent, false);
-
-            console.log(`[PathCommands] File content updated via WorkspaceEdit: ${foundFile.getRelativePath()}`);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error applying edit:`, error);

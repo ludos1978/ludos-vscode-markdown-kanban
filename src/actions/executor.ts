@@ -106,6 +106,9 @@ export class ActionExecutor {
             this.deps.boardStore.saveUndoEntry(undoEntry);
         }
 
+        // Update BoardStore's originalTaskOrder for column add/delete
+        this.updateOriginalTaskOrderTracking(action.type, result);
+
         // Emit board changed event
         if (emitChange) {
             this.deps.emitBoardChanged(board, trigger);
@@ -140,6 +143,22 @@ export class ActionExecutor {
         if (typeof result === 'boolean') return result;
         if (result === null || result === undefined) return false;
         return true; // Non-null values (like IDs) indicate success
+    }
+
+    /**
+     * Update BoardStore's originalTaskOrder tracking for column add/delete
+     * This ensures 'unsorted' sort works for newly created columns
+     */
+    private updateOriginalTaskOrderTracking(actionType: string, result: unknown): void {
+        if (actionType === 'column:add' && typeof result === 'string') {
+            // Result is the new column ID
+            this.deps.boardStore.initColumnTaskOrder(result);
+        } else if (actionType === 'column:delete') {
+            // For delete, we need to extract columnId from the action
+            // But we don't have it here - the tracking will be cleaned up
+            // when setOriginalTaskOrder is called on next board load
+            // This is acceptable because deleted columns don't need tracking
+        }
     }
 
     /**
