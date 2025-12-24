@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { DrawIOService } from './DrawIOService';
 
 /**
  * Excalidraw element structure (subset of properties used)
@@ -170,47 +169,6 @@ export class ExcalidrawService {
             child.stdin.write(JSON.stringify({ elements, appState, files }));
             child.stdin.end();
         });
-    }
-
-    /**
-     * Render excalidraw diagram file to PNG
-     * Converts to SVG first, then uses draw.io CLI to convert SVG→PNG
-     * @param filePath Absolute path to excalidraw file
-     * @returns PNG data as Buffer
-     */
-    async renderPNG(filePath: string): Promise<Buffer> {
-        try {
-            // First render to SVG
-            const svg = await this.renderSVG(filePath);
-
-            // Create temp SVG file for draw.io CLI conversion
-            const tempDir = path.join(__dirname, '../../../tmp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
-            const tempSvgPath = path.join(tempDir, `excalidraw-${Date.now()}.svg`);
-
-            // Write SVG to temp file
-            await fs.promises.writeFile(tempSvgPath, svg, 'utf8');
-
-            try {
-                // Use draw.io CLI to convert SVG → PNG
-                const drawioService = new DrawIOService();
-                const pngBuffer = await drawioService.renderPNG(tempSvgPath);
-
-                // Cleanup temp SVG file
-                await fs.promises.unlink(tempSvgPath);
-
-                return pngBuffer;
-            } catch (error) {
-                // Cleanup temp file on error
-                await fs.promises.unlink(tempSvgPath).catch(() => {});
-                throw error;
-            }
-        } catch (error) {
-            console.error(`[ExcalidrawService] PNG conversion failed for ${filePath}:`, error);
-            throw error;
-        }
     }
 
 }

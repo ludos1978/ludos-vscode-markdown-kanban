@@ -43,7 +43,7 @@ process.stdin.on('end', async () => {
                             const appState = ${JSON.stringify({
                                 ...appState,
                                 exportWithDarkMode: false,
-                                exportBackground: true,
+                                exportBackground: false,
                             })};
                             const files = ${JSON.stringify(files)};
 

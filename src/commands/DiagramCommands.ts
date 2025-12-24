@@ -467,16 +467,9 @@ export class DiagramCommands extends BaseMessageCommand {
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
 
-            // Try PNG conversion first (better rendering), fallback to SVG if it fails
-            let dataUrl: string;
-            try {
-                const pngBuffer = await service.renderPNG(absolutePath);
-                dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
-            } catch (pngError) {
-                // Fallback to SVG if PNG conversion fails
-                const svg = await service.renderSVG(absolutePath);
-                dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-            }
+            // Render as SVG
+            const svg = await service.renderSVG(absolutePath);
+            const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
             // Send success response to webview with mtime for cache invalidation
             this.postMessage({
