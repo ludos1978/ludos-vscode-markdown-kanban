@@ -3867,6 +3867,12 @@ function toggleImagePathMenu(container, imagePath) {
     const isAbsolutePath = imagePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(imagePath);
     const escapedPath = imagePath.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
+    // Find task/column context for targeted updates
+    const taskElement = container.closest('.task-item');
+    const columnElement = container.closest('.kanban-column');
+    const taskId = taskElement?.dataset?.taskId || '';
+    const columnId = columnElement?.dataset?.columnId || '';
+
     // Check if the image is broken (has the image-broken class)
     const isBroken = container.classList.contains('image-broken');
 
@@ -3885,8 +3891,8 @@ function toggleImagePathMenu(container, imagePath) {
         menu.innerHTML = `
             <button class="image-path-menu-item disabled" disabled>📄 Open</button>
             <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}')">🔎 Search for File</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}')">📂 Browse for File</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}')">🔎 Search for File</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}')">📂 Browse for File</button>
             <div class="image-path-menu-divider"></div>
             <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
             <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
@@ -4059,6 +4065,43 @@ function revealPathInExplorer(filePath) {
 }
 
 /**
+ * Get a shortened display name for a file path
+ * Shows filename + limited parent folder for context
+ * @param {string} filePath - The full file path
+ * @param {number} maxFolderChars - Maximum characters for folder portion (default 20)
+ * @returns {string} Shortened display name like "…/folder/image.png"
+ */
+function getShortDisplayPath(filePath, maxFolderChars = 20) {
+    if (!filePath) return 'unknown';
+
+    // Normalize path separators
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const parts = normalizedPath.split('/').filter(p => p);
+
+    if (parts.length === 0) return 'unknown';
+
+    const filename = parts[parts.length - 1];
+
+    if (parts.length === 1) {
+        return filename;
+    }
+
+    // Get parent folder
+    const parentFolder = parts[parts.length - 2];
+
+    // Truncate parent folder if too long
+    let displayFolder = parentFolder;
+    if (parentFolder.length > maxFolderChars) {
+        displayFolder = parentFolder.substring(0, maxFolderChars - 1) + '…';
+    }
+
+    // Add ellipsis prefix if there are more parent folders
+    const prefix = parts.length > 2 ? '…/' : '';
+
+    return `${prefix}${displayFolder}/${filename}`;
+}
+
+/**
  * Handle image not found - replace broken image with a placeholder that has a burger menu
  * Called from image onerror handlers
  * Uses data attributes instead of inline onclick to safely handle paths with special characters
@@ -4089,7 +4132,8 @@ function handleImageNotFound(imgElement, originalSrc) {
         placeholder.className = 'image-not-found';
         placeholder.dataset.originalSrc = originalSrc;
         placeholder.title = `Image not found: ${originalSrc}`;
-        placeholder.innerHTML = `<span class="image-not-found-text">📷 Image not found</span>`;
+        const shortPath = getShortDisplayPath(originalSrc);
+        placeholder.innerHTML = `<span class="image-not-found-text">📷 ${shortPath}</span>`;
 
         // Insert placeholder before the image and hide the image
         imgElement.parentElement.insertBefore(placeholder, imgElement);
@@ -4104,6 +4148,8 @@ function handleImageNotFound(imgElement, originalSrc) {
     console.log('[handleImageNotFound] Standalone image, creating full container');
 
     const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const shortPath = getShortDisplayPath(originalSrc);
+    const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
 
     // Create container with burger menu
@@ -4113,7 +4159,7 @@ function handleImageNotFound(imgElement, originalSrc) {
 
     container.innerHTML = `
         <span class="image-not-found" data-original-src="${htmlEscapedPath}" title="Image not found: ${htmlEscapedPath}">
-            <span class="image-not-found-text">📷 Image not found</span>
+            <span class="image-not-found-text">📷 ${htmlEscapedShortPath}</span>
             <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
         </span>
         <div class="image-not-found-menu" data-is-absolute="${isAbsolutePath}">
@@ -4165,9 +4211,12 @@ function toggleImageNotFoundMenu(container) {
 
 /**
  * Search for a file by name
+ * @param {string} filePath - The file path to search for
+ * @param {string} [taskId] - Optional task ID for targeted update
+ * @param {string} [columnId] - Optional column ID for targeted update
  */
-function searchForFile(filePath) {
-    console.log(`[searchForFile] Called with path: "${filePath}"`);
+function searchForFile(filePath, taskId, columnId) {
+    console.log(`[searchForFile] Called with path: "${filePath}", taskId: ${taskId}, columnId: ${columnId}`);
 
     // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
@@ -4176,18 +4225,25 @@ function searchForFile(filePath) {
     document.getElementById('floating-image-path-menu')?.remove();
     document.getElementById('floating-include-path-menu')?.remove();
 
-    vscode.postMessage({
+    const message = {
         type: 'searchForFile',
         filePath: filePath
-    });
+    };
+    if (taskId) message.taskId = taskId;
+    if (columnId) message.columnId = columnId;
+
+    vscode.postMessage(message);
 }
 
 /**
  * Browse for an image file to replace a broken image path
  * Opens a file dialog and replaces the old path with the selected file
+ * @param {string} oldPath - The old file path to replace
+ * @param {string} [taskId] - Optional task ID for targeted update
+ * @param {string} [columnId] - Optional column ID for targeted update
  */
-function browseForImage(oldPath) {
-    console.log(`[browseForImage] Called with oldPath: "${oldPath}"`);
+function browseForImage(oldPath, taskId, columnId) {
+    console.log(`[browseForImage] Called with oldPath: "${oldPath}", taskId: ${taskId}, columnId: ${columnId}`);
 
     // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
@@ -4196,10 +4252,14 @@ function browseForImage(oldPath) {
     document.getElementById('floating-image-path-menu')?.remove();
     document.getElementById('floating-include-path-menu')?.remove();
 
-    vscode.postMessage({
+    const message = {
         type: 'browseForImage',
         oldPath: oldPath
-    });
+    };
+    if (taskId) message.taskId = taskId;
+    if (columnId) message.columnId = columnId;
+
+    vscode.postMessage(message);
 }
 
 /**
@@ -4262,6 +4322,12 @@ if (!webviewEventListenersInitialized) {
             return;
         }
 
+        // Find task/column context for targeted updates
+        const taskElement = container.closest('.task-item');
+        const columnElement = container.closest('.kanban-column');
+        const taskId = taskElement?.dataset?.taskId;
+        const columnId = columnElement?.dataset?.columnId;
+
         e.stopPropagation();
 
         switch (action) {
@@ -4279,7 +4345,7 @@ if (!webviewEventListenersInitialized) {
                 // Close the menu first
                 const searchMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
                 if (searchMenu) searchMenu.classList.remove('visible');
-                searchForFile(imagePath);
+                searchForFile(imagePath, taskId, columnId);
                 break;
             case 'browse':
             case 'browse-overlay':
@@ -4287,7 +4353,7 @@ if (!webviewEventListenersInitialized) {
                 // Close the menu first
                 const browseMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
                 if (browseMenu) browseMenu.classList.remove('visible');
-                browseForImage(imagePath);
+                browseForImage(imagePath, taskId, columnId);
                 break;
             case 'to-relative':
                 if (!target.disabled) {
@@ -4348,6 +4414,8 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
 
     // Standalone placeholder - create full container
     const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const shortPath = getShortDisplayPath(originalSrc);
+    const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
 
     // Create the full container
@@ -4357,7 +4425,7 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
 
     container.innerHTML = `
         <span class="image-not-found" data-original-src="${htmlEscapedPath}" title="Image not found: ${htmlEscapedPath}">
-            <span class="image-not-found-text">📷 Image not found</span>
+            <span class="image-not-found-text">📷 ${htmlEscapedShortPath}</span>
             <button class="image-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
         </span>
         <div class="image-not-found-menu" data-is-absolute="${isAbsolutePath}">
@@ -4389,13 +4457,20 @@ function upgradeSimpleImageNotFoundPlaceholder(simpleSpan) {
  * 4. Store the path for event delegation
  */
 function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) {
-    // Add the "Image not found" text to the simple span
-    simpleSpan.innerHTML = `<span class="image-not-found-text">📷 Image not found</span>`;
+    // Add the "Image not found" text with filename to the simple span
+    const shortPath = getShortDisplayPath(originalSrc);
+    simpleSpan.innerHTML = `<span class="image-not-found-text">📷 ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
     simpleSpan.title = `Image not found: ${originalSrc}`;
 
     // Store the path on the overlay container for event delegation
     overlayContainer.dataset.imagePath = originalSrc;
     overlayContainer.classList.add('image-broken');
+
+    // Find task/column context for targeted updates
+    const taskElement = overlayContainer.closest('.task-item');
+    const columnElement = overlayContainer.closest('.kanban-column');
+    const taskId = taskElement?.dataset?.taskId;
+    const columnId = columnElement?.dataset?.columnId;
 
     // Find and update the existing menu
     const existingMenu = overlayContainer.querySelector('.image-path-menu');
@@ -4416,10 +4491,10 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
         if (searchBtn) {
             searchBtn.classList.remove('disabled');
             searchBtn.disabled = false;
-            // Use onclick closure - captures path safely, no escaping issues
+            // Use onclick closure - captures path and context safely
             searchBtn.onclick = function(e) {
                 e.stopPropagation();
-                searchForFile(originalSrc);
+                searchForFile(originalSrc, taskId, columnId);
             };
         }
 
@@ -4430,10 +4505,10 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
         if (browseBtn) {
             browseBtn.classList.remove('disabled');
             browseBtn.disabled = false;
-            // Use onclick closure - captures path safely, no escaping issues
+            // Use onclick closure - captures path and context safely
             browseBtn.onclick = function(e) {
                 e.stopPropagation();
-                browseForImage(originalSrc);
+                browseForImage(originalSrc, taskId, columnId);
             };
         }
     }

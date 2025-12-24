@@ -1938,7 +1938,8 @@ function renderMarkdown(text, includeContext) {
             let onerrorHandler = '';
             if (!isDataUrl) {
                 const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
-                onerrorHandler = ` onerror="if(typeof handleImageNotFound==='function'){handleImageNotFound(this,'${escapedOriginalSrc}');}else{var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';}"`;
+                // Extract filename for display (inline since getShortDisplayPath may not be available in fallback)
+                onerrorHandler = ` onerror="if(typeof handleImageNotFound==='function'){handleImageNotFound(this,'${escapedOriginalSrc}');}else{var p=document.createElement('span');p.className='image-not-found';p.setAttribute('data-original-src','${escapedOriginalSrc}');p.title='Image not found: ${escapedOriginalSrc}';var fn=(typeof getShortDisplayPath==='function')?getShortDisplayPath('${escapedOriginalSrc}'):'${escapedOriginalSrc}'.split('/').pop()||'unknown';p.innerHTML='<span class=image-not-found-text>📷 '+fn+'</span>';if(this.parentElement){this.parentElement.insertBefore(p,this);}this.style.display='none';}"`;
             }
 
             // Build the img tag

@@ -409,7 +409,7 @@ export class PathCommands extends BaseMessageCommand {
             const selectedFile = replacement.fsPath;
             const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
 
-            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage);
+            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error searching for file:`, error);
@@ -509,7 +509,7 @@ export class PathCommands extends BaseMessageCommand {
         }
 
         const selectedFile = result[0].fsPath;
-        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully');
+        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully', message.taskId, message.columnId);
     }
 
     /**
@@ -637,13 +637,16 @@ export class PathCommands extends BaseMessageCommand {
     /**
      * Replace a path in markdown files and refresh the board
      * Common logic used by handleSearchForFile and handleBrowseForImage
+     * If taskId and columnId are provided, sends targeted update instead of full refresh
      */
     private async _replacePathInFiles(
         oldPath: string,
         selectedFilePath: string,
         basePath: string,
         context: CommandContext,
-        successMessage: string
+        successMessage: string,
+        taskId?: string,
+        columnId?: string
     ): Promise<CommandResult> {
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
@@ -707,11 +710,38 @@ export class PathCommands extends BaseMessageCommand {
             foundFile.setContent(newContent, false);
         }
 
-        // Refresh the board
+        // Invalidate cache so board is reparsed
         context.boardStore.invalidateCache();
-        await context.onBoardUpdate();
 
-        // Notify frontend
+        // Send targeted update if we have task context, otherwise full refresh
+        if (taskId && columnId) {
+            // Get the updated board and find the specific task
+            const board = context.boardStore.getBoard();
+            if (board) {
+                const column = board.columns.find(c => c.id === columnId);
+                const task = column?.tasks.find(t => t.id === taskId);
+                if (task && column) {
+                    // Send targeted task update
+                    this.postMessage({
+                        type: 'updateTaskContent',
+                        taskId: taskId,
+                        columnId: columnId,
+                        task: task,
+                        imageMappings: {}
+                    });
+                } else {
+                    // Task/column not found, fall back to full update
+                    await context.onBoardUpdate();
+                }
+            } else {
+                await context.onBoardUpdate();
+            }
+        } else {
+            // No context, do full board refresh
+            await context.onBoardUpdate();
+        }
+
+        // Notify frontend about the replacement
         this.postMessage({
             type: 'imagePathReplaced',
             oldPath: oldPath,

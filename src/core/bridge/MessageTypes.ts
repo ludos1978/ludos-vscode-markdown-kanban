@@ -1474,6 +1474,8 @@ export interface OpenPathMessage extends BaseMessage {
 export interface SearchForFileMessage extends BaseMessage {
     type: 'searchForFile';
     filePath: string;
+    taskId?: string;
+    columnId?: string;
 }
 
 /**
@@ -1490,6 +1492,8 @@ export interface RevealPathInExplorerMessage extends BaseMessage {
 export interface BrowseForImageMessage extends BaseMessage {
     type: 'browseForImage';
     oldPath: string;
+    taskId?: string;
+    columnId?: string;
 }
 
 /**
