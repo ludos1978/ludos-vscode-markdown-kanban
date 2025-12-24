@@ -441,8 +441,23 @@ export class PathCommands extends BaseMessageCommand {
 
         // Check if the path exists
         if (!fs.existsSync(resolvedPath)) {
-            vscode.window.showWarningMessage(`File not found: ${resolvedPath}`);
-            return this.failure(`Path does not exist: ${resolvedPath}`);
+            // File doesn't exist - try to open the parent folder instead
+            const parentDir = path.dirname(resolvedPath);
+            if (fs.existsSync(parentDir)) {
+                try {
+                    await vscode.commands.executeCommand('revealFileInOS', safeFileUri(parentDir, 'PathCommands-revealParentFolder'));
+                    vscode.window.showInformationMessage(`File not found. Opened parent folder: ${path.basename(parentDir)}`);
+                    return this.success({ revealed: true, path: parentDir, fallbackToParent: true });
+                } catch (error) {
+                    const errorMessage = getErrorMessage(error);
+                    console.error(`[PathCommands] Error revealing parent folder:`, error);
+                    vscode.window.showWarningMessage(`File not found and failed to open parent folder: ${errorMessage}`);
+                    return this.failure(`File not found and failed to open parent folder: ${errorMessage}`);
+                }
+            } else {
+                vscode.window.showWarningMessage(`File not found: ${resolvedPath}`);
+                return this.failure(`Path does not exist: ${resolvedPath}`);
+            }
         }
 
         try {

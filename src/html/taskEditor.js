@@ -913,10 +913,13 @@ class TaskEditor {
                                 this.currentEditor.element.style.display = 'none';
                             }
 
-                            // STEP 3: Update badges (matching task pattern line 1043-1047)
-                            if (columnElement && window.updateAllVisualTagElements) {
+                            // STEP 3: Update visual tag state (borders, backgrounds, badges)
+                            if (columnElement) {
                                 const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
-                                window.updateAllVisualTagElements(columnElement, allTags, 'column');
+                                const isCollapsed = columnElement.classList.contains('collapsed');
+                                if (window.updateVisualTagState) {
+                                    window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
+                                }
                             }
 
                             // STEP 4: Check layout changes even for include columns (they can have #stack too!)
@@ -1155,11 +1158,14 @@ class TaskEditor {
                                 this.currentEditor.displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
                             }
 
-                            // Update all visual tag elements (badges, bars, backgrounds, borders)
+                            // Update visual tag state (borders, backgrounds, badges)
                             const taskElement = element.closest('.task-item');
-                            if (taskElement && window.updateAllVisualTagElements) {
+                            if (taskElement) {
                                 const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(value) : [];
-                                window.updateAllVisualTagElements(taskElement, allTags, 'task');
+                                const isCollapsed = taskElement.classList.contains('collapsed');
+                                if (window.updateVisualTagState) {
+                                    window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
+                                }
                             }
 
                             return; // Skip local updates, let backend handle
