@@ -117,7 +117,12 @@
       "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log --oneline -n 10)",
       "Bash(npm run check-types:vscode:*)",
       "Bash(npx jest:*)",
-      "Bash(npx ts-prune)"
+      "Bash(npx ts-prune)",
+      "Bash(npx @vscode/vsce package:*)",
+      "Bash(npm exec:*)",
+      "Bash(for dep in jsdom/@acemir/cssom/@asamuzakjp/dom-selector/cssstyle/data-urls/decimal.js/html-encoding-sniffer/http-proxy-agent/https-proxy-agent/is-potential-custom-element-name/parse5/saxes/symbol-tree/tough-cookie/w3c-xmlserializer/webidl-conversions/whatwg-encoding/whatwg-mimetype/whatwg-url/ws/xml-name-validator/tldts/tldts-core/agent-base/debug/ms/iconv-lite/safer-buffer/tr46/punycode/entities/xmlchars/nwsapi/rrweb-cssom)",
+      "Bash(if [ -d \"$dep\" ])",
+      "Bash(then echo \"$dep\")"
     ],
     "deny": [],
     "ask": []

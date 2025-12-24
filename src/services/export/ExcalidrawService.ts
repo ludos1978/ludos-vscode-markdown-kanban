@@ -129,9 +129,11 @@ export class ExcalidrawService {
         const workerPath = path.join(__dirname, 'excalidraw-worker.js');
 
         return new Promise<string>((resolve, reject) => {
+            // cwd should be extension root (one level up from dist/)
+            const extensionRoot = path.join(__dirname, '..');
             const child = spawn('node', [workerPath], {
                 stdio: ['pipe', 'pipe', 'pipe'],
-                cwd: path.join(__dirname, '../../..'),
+                cwd: extensionRoot,
             });
 
             let stdout = '';
