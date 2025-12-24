@@ -2641,6 +2641,11 @@ function updateColumnDisplayImmediate(columnId, newTitle, isActive, tagName) {
     // Update temporal attributes using shared utility
     window.menuUtils.updateTemporalAttributes(columnElement, newTitle, 'column');
 
+    // Update border/background tag attributes and stackable bars
+    if (window.injectStackableBars) {
+        window.injectStackableBars(columnElement);
+    }
+
     // Update visual tag state
     if (window.updateVisualTagState) {
         const isCollapsed = columnElement.classList.contains('collapsed');
@@ -2684,6 +2689,11 @@ function updateTaskDisplayImmediate(taskId, newTitle, isActive, tagName) {
         taskDescription: found.task.description || ''
     } : {};
     window.menuUtils.updateTemporalAttributes(taskElement, newTitle, 'task', context);
+
+    // Update border/background tag attributes and stackable bars
+    if (window.injectStackableBars) {
+        window.injectStackableBars(taskElement);
+    }
 
     // Update visual tag state
     if (window.updateVisualTagState) {
