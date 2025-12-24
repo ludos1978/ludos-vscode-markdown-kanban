@@ -631,10 +631,11 @@ export abstract class MarkdownFile implements vscode.Disposable {
     /**
      * Show notification with link to open backup file
      */
-    protected _showBackupNotification(backupPath: string): void {
+    protected _showBackupNotification(backupPath: string, message?: string): void {
         const fileName = path.basename(backupPath);
+        const displayMessage = message || `Your changes have been saved to backup: ${fileName}`;
         vscode.window.showInformationMessage(
-            `Your changes have been saved to backup: ${fileName}`,
+            displayMessage,
             'Open Backup'
         ).then(choice => {
             if (choice === 'Open Backup') {

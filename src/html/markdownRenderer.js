@@ -1179,10 +1179,21 @@ async function processDiagramQueue() {
             // Add current version (with size limit)
             setCacheWithLimit(diagramRenderCache, cacheKey, imageDataUrl);
 
-            // Replace placeholder with rendered image
+            // Replace placeholder with rendered image wrapped in overlay container with menu
             // Include data-original-src for alt-click to open in editor
             // Height recalculation is handled automatically by the column ResizeObserver
-            element.innerHTML = `<img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${item.filePath}" />`;
+            // Decode URL-encoded paths (e.g., %20 -> space) before escaping for JS string
+            let decodedPath = item.filePath;
+            try {
+                decodedPath = decodeURIComponent(item.filePath);
+            } catch (e) {
+                // If decoding fails, use original path
+            }
+            const escapedPath = decodedPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            element.innerHTML = `<div class="image-path-overlay-container">
+                <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath}" />
+                <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+            </div>`;
 
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);

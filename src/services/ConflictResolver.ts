@@ -24,9 +24,10 @@ export interface ConflictContext {
 }
 
 export interface ConflictResolution {
-    action: 'save' | 'discard_local' | 'discard_external' | 'ignore' | 'cancel' | 'backup_and_reload';
+    action: 'save' | 'discard_local' | 'discard_external' | 'ignore' | 'cancel' | 'backup_and_reload' | 'backup_external_and_save';
     shouldProceed: boolean;
     shouldCreateBackup: boolean;
+    shouldBackupExternal?: boolean;  // Optional: backup external file before saving
     shouldSave: boolean;
     shouldReload: boolean;
     shouldIgnore: boolean;
@@ -129,6 +130,7 @@ export class ConflictResolver {
                 action: 'ignore',
                 shouldProceed: true,
                 shouldCreateBackup: false,
+                shouldBackupExternal: false,
                 shouldSave: false,
                 shouldReload: false,
                 shouldIgnore: true
@@ -238,25 +240,27 @@ export class ConflictResolver {
             message += ` Your current column include file changes may be lost if you reload.${includeFilesList}`;
         }
 
-        const discardMyChanges = 'Discard my changes and reload';
-        const saveAsBackup = 'Save my changes as backup and reload';
-        const saveAndIgnoreExternal = 'Save my changes and ignore external';
-        const ignoreExternal = 'Ignore external changes (Esc)';
+        const saveAndOverwrite       = 'Save my changes (discard external changes)';
+        const backupExternalAndSave  = 'Save my changes (backup external changes)';
+        const saveAsBackupAndReload  = 'Load external changes (backup current board)';
+        const discardMyChanges       = 'Load external changes (discard current board)';
 
         const choice = await vscode.window.showWarningMessage(
             message,
             { modal: true },
-            discardMyChanges,
-            saveAsBackup,
-            saveAndIgnoreExternal,
-            ignoreExternal
+            saveAndOverwrite,
+            backupExternalAndSave,
+            saveAsBackupAndReload,
+            discardMyChanges
         );
 
-        if (!choice || choice === ignoreExternal) {
+        if (!choice) {
+            // Esc pressed - ignore external changes and continue
             return {
                 action: 'ignore',
                 shouldProceed: true,
                 shouldCreateBackup: false,
+                shouldBackupExternal: false,
                 shouldSave: false,
                 shouldReload: false,
                 shouldIgnore: true
@@ -264,31 +268,44 @@ export class ConflictResolver {
         }
 
         switch (choice) {
+            case saveAndOverwrite:
+                return {
+                    action: 'discard_external',
+                    shouldProceed: true,
+                    shouldCreateBackup: false,
+                    shouldBackupExternal: false,
+                    shouldSave: true,
+                    shouldReload: false,
+                    shouldIgnore: false
+                };
+            case backupExternalAndSave:
+                return {
+                    action: 'backup_external_and_save',
+                    shouldProceed: true,
+                    shouldCreateBackup: false,
+                    shouldBackupExternal: true,
+                    shouldSave: true,
+                    shouldReload: false,
+                    shouldIgnore: false
+                };
+            case saveAsBackupAndReload:
+                return {
+                    action: 'backup_and_reload',
+                    shouldProceed: true,
+                    shouldCreateBackup: true,
+                    shouldBackupExternal: false,
+                    shouldSave: false,
+                    shouldReload: true,
+                    shouldIgnore: false
+                };
             case discardMyChanges:
                 return {
                     action: 'discard_local',
                     shouldProceed: true,
                     shouldCreateBackup: false,
+                    shouldBackupExternal: false,
                     shouldSave: false,
                     shouldReload: true,
-                    shouldIgnore: false
-                };
-            case saveAsBackup:
-                return {
-                    action: 'backup_and_reload',
-                    shouldProceed: true,
-                    shouldCreateBackup: true,
-                    shouldSave: false,
-                    shouldReload: true,
-                    shouldIgnore: false
-                };
-            case saveAndIgnoreExternal:
-                return {
-                    action: 'discard_external',
-                    shouldProceed: true,
-                    shouldCreateBackup: false,
-                    shouldSave: true,
-                    shouldReload: false,
                     shouldIgnore: false
                 };
             default:
@@ -296,6 +313,7 @@ export class ConflictResolver {
                     action: 'ignore',
                     shouldProceed: true,
                     shouldCreateBackup: false,
+                    shouldBackupExternal: false,
                     shouldSave: false,
                     shouldReload: false,
                     shouldIgnore: true

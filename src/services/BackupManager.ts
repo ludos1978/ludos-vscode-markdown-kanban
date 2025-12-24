@@ -87,6 +87,62 @@ export class BackupManager {
     }
 
     /**
+     * Create a backup from raw content (without needing a TextDocument)
+     * Used for backing up external file content before overwriting
+     * @returns The backup file path if successful, null if failed
+     */
+    public async createBackupFromContent(filePath: string, content: string, options: BackupOptions = {}): Promise<string | null> {
+        try {
+            const enableBackups = configService.getConfig('enableBackups');
+
+            if (!enableBackups && !options.forceCreate) {
+                return null;
+            }
+
+            const backupPath = this.generateBackupPathFromFilePath(filePath, options.label || 'backup');
+
+            // Ensure backup directory exists
+            const backupDir = path.dirname(backupPath);
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
+            }
+
+            // Write backup file
+            fs.writeFileSync(backupPath, content, 'utf8');
+
+            // Set hidden attribute on Windows
+            await this.setFileHidden(backupPath);
+
+            return backupPath;
+        } catch (error) {
+            console.error('[BackupManager] Failed to create backup from content:', error);
+            vscode.window.showWarningMessage(`Failed to create backup: ${error}`);
+            return null;
+        }
+    }
+
+    /**
+     * Generate backup file path from file path (without TextDocument)
+     */
+    private generateBackupPathFromFilePath(filePath: string, label: string = 'backup'): string {
+        const dir = path.dirname(filePath);
+        const basename = path.basename(filePath, '.md');
+
+        const backupLocation = configService.getConfig('backupLocation');
+
+        let backupDir = dir;
+        if (backupLocation === 'subfolder') {
+            backupDir = path.join(dir, '.kanban-backups');
+        }
+
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const backupFileName = `${basename}.${label}.${timestamp}.md`;
+
+        return path.join(backupDir, backupFileName);
+    }
+
+    /**
      * Generate backup file path
      */
     private generateBackupPath(document: vscode.TextDocument, label: string = 'backup'): string {

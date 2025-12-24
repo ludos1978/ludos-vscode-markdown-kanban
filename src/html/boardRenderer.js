@@ -3980,22 +3980,29 @@ function getTagConfig(tagName) {
     // Skip default configuration
     if (tagName === 'default') {return null;}
 
+    // Normalize tag name to lowercase for case-insensitive matching
+    const normalizedTagName = tagName.toLowerCase();
+
     // Check all keys in tagColors dynamically (supports any group name)
     for (const key of Object.keys(window.tagColors)) {
         const value = window.tagColors[key];
         // Check if this is a group (object containing tag configs)
         if (value && typeof value === 'object' && !value.light && !value.dark &&
             !value.headerBar && !value.footerBar && !value.border && !value.cornerBadge) {
-            // This looks like a group - check if it contains the tag
-            if (value[tagName]) {
-                return value[tagName];
+            // This looks like a group - check if it contains the tag (case-insensitive)
+            for (const tagKey of Object.keys(value)) {
+                if (tagKey.toLowerCase() === normalizedTagName) {
+                    return value[tagKey];
+                }
             }
         }
     }
 
-    // Check flat structure (direct tag config at root level)
-    if (window.tagColors[tagName]) {
-        return window.tagColors[tagName];
+    // Check flat structure (direct tag config at root level) - case-insensitive
+    for (const key of Object.keys(window.tagColors)) {
+        if (key.toLowerCase() === normalizedTagName) {
+            return window.tagColors[key];
+        }
     }
 
     return null;

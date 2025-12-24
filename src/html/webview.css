@@ -1455,7 +1455,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-item:hover {
-  border-color: var(--task-hover-color);
+  border: var(--button-border);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -4104,9 +4104,9 @@ blockquote {
   height: auto;
   border-radius: 4px;
   margin: 4px 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  border: 1px solid var(--vscode-panel-border);
-  background-color: white;
+  /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */
+  /* border: 1px solid var(--vscode-panel-border); */
+  /* background-color: white; */
   display: inline-block;
   vertical-align: middle;
 }

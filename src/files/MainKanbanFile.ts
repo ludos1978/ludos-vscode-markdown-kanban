@@ -423,6 +423,13 @@ export class MainKanbanFile extends MarkdownFile {
                 if (backupPath) {
                     this._showBackupNotification(backupPath);
                 }
+            } else if (resolution.shouldBackupExternal && resolution.shouldSave) {
+                // Backup the external file first (the current file on disk), then save kanban
+                const externalBackupPath = await this.createExternalBackup('external-conflict');
+                await this.save();  // save() already clears cached board
+                if (externalBackupPath) {
+                    this._showBackupNotification(externalBackupPath, 'External changes backed up');
+                }
             } else if (resolution.shouldSave) {
                 // save() method marks itself as legitimate automatically
                 await this.save();  // save() already clears cached board
@@ -463,6 +470,38 @@ export class MainKanbanFile extends MarkdownFile {
     }
 
     // ============= PRIVATE HELPERS =============
+
+    /**
+     * Create a backup of the external file (current file on disk).
+     * Used when user wants to save their kanban changes but preserve external changes as backup.
+     */
+    public async createExternalBackup(label: string = 'external'): Promise<string | null> {
+        try {
+            // Read current content from disk (the external version)
+            const diskContent = await this.readFromDisk();
+            if (diskContent === null) {
+                console.warn(`[MainKanbanFile] Cannot create external backup - file not found: ${this._relativePath}`);
+                return null;
+            }
+
+            // Create backup using BackupManager with the disk content
+            const backupManager = new BackupManager();
+            const backupPath = await backupManager.createBackupFromContent(
+                this._path,
+                diskContent,
+                { label: label, forceCreate: true }
+            );
+
+            if (!backupPath) {
+                console.warn(`[MainKanbanFile] External backup creation returned null: ${this._relativePath}`);
+            }
+
+            return backupPath;
+        } catch (error) {
+            console.error(`[MainKanbanFile] Failed to create external backup:`, error);
+            return null;
+        }
+    }
 
     /**
      * Generate markdown from board structure using the shared parser logic

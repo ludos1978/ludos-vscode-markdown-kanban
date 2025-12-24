@@ -40,11 +40,13 @@ process.stdin.on('end', async () => {
                     (async function() {
                         try {
                             const elements = ${JSON.stringify(elements)};
+                            const hasContent = elements.length > 0;
                             const appState = ${JSON.stringify({
                                 ...appState,
                                 exportWithDarkMode: false,
                                 exportBackground: false,
                             })};
+                            appState.exportPadding = hasContent ? 0 : 20;
                             const files = ${JSON.stringify(files)};
 
                             const svg = await ExcalidrawUtils.exportToSvg({
