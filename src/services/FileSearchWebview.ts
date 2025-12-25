@@ -37,6 +37,15 @@ export interface FileSearchResult {
     pathFormat: PathFormat;
 }
 
+/**
+ * Tracked file data for scanning (from MarkdownFileRegistry)
+ */
+export interface TrackedFileData {
+    path: string;           // Absolute path
+    relativePath: string;   // Relative path from main file
+    content: string;        // Cached content
+}
+
 export class FileSearchWebview {
     private _webview: vscode.Webview | undefined;
     private _resolveSelection: ((result: FileSearchResult | undefined) => void) | undefined;
@@ -48,6 +57,9 @@ export class FileSearchWebview {
     private _originalPath: string = '';
     private _messageDisposable: vscode.Disposable | undefined;
 
+    // Tracked files from registry (main + includes)
+    private _trackedFiles: TrackedFileData[] = [];
+
     // Search options
     private _caseSensitive = false;
     private _wholeWord = false;
@@ -55,6 +67,13 @@ export class FileSearchWebview {
 
     constructor() {
         // No extensionUri needed - we use the existing kanban webview
+    }
+
+    /**
+     * Set the tracked files to search within (from MarkdownFileRegistry)
+     */
+    setTrackedFiles(files: TrackedFileData[]): void {
+        this._trackedFiles = files;
     }
 
     /**
@@ -410,10 +429,10 @@ export class FileSearchWebview {
     }
 
     private async _handleScanBrokenPath(): Promise<void> {
-        // Scan workspace for files that have the same directory as the broken path
+        // Scan tracked files (main + includes) for paths matching the broken directory
         const brokenDir = path.dirname(this._originalPath);
 
-        // Find all markdown files and count paths with the broken directory
+        // Pattern to find markdown image/link paths
         const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
         let brokenCount = 0;
         const foundFiles: string[] = [];
@@ -430,55 +449,47 @@ export class FileSearchWebview {
             });
         };
 
-        try {
-            // Search for markdown files in workspace
-            const mdFiles = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', 100);
+        console.log('[FileSearchWebview] Scanning', this._trackedFiles.length, 'tracked files for brokenDir:', brokenDir);
 
-            for (const fileUri of mdFiles) {
+        // Search within tracked files (already loaded in memory)
+        for (const trackedFile of this._trackedFiles) {
+            const content = trackedFile.content;
+            if (!content) continue;
+
+            let match;
+            pathPattern.lastIndex = 0;
+
+            while ((match = pathPattern.exec(content)) !== null) {
+                const foundPath = match[2] || match[4];
+                if (!foundPath) continue;
+
+                let decodedPath: string;
                 try {
-                    // Use fs.readFile for faster reading (no document model overhead)
-                    const content = Buffer.from(
-                        await vscode.workspace.fs.readFile(fileUri)
-                    ).toString('utf8');
+                    decodedPath = decodeURIComponent(foundPath);
+                } catch {
+                    decodedPath = foundPath;
+                }
 
-                    let match;
-                    pathPattern.lastIndex = 0;
-
-                    while ((match = pathPattern.exec(content)) !== null) {
-                        const foundPath = match[2] || match[4];
-                        if (!foundPath) continue;
-
-                        let decodedPath: string;
-                        try {
-                            decodedPath = decodeURIComponent(foundPath);
-                        } catch {
-                            decodedPath = foundPath;
-                        }
-
-                        const foundDir = path.dirname(decodedPath);
-                        if (foundDir === brokenDir) {
-                            brokenCount++;
-                            const filename = path.basename(decodedPath);
-                            if (!foundFiles.includes(filename)) {
-                                foundFiles.push(filename);
-                                // Send incremental update (throttled to every 100ms)
-                                const now = Date.now();
-                                if (now - lastUpdateTime > 100) {
-                                    lastUpdateTime = now;
-                                    sendUpdate(true);
-                                }
-                            }
+                const foundDir = path.dirname(decodedPath);
+                if (foundDir === brokenDir) {
+                    brokenCount++;
+                    console.log('[FileSearchWebview] MATCH in', trackedFile.relativePath, ':', decodedPath);
+                    const filename = path.basename(decodedPath);
+                    if (!foundFiles.includes(filename)) {
+                        foundFiles.push(filename);
+                        // Send incremental update (throttled to every 100ms)
+                        const now = Date.now();
+                        if (now - lastUpdateTime > 100) {
+                            lastUpdateTime = now;
+                            sendUpdate(true);
                         }
                     }
-                } catch {
-                    // Skip files that can't be read
                 }
             }
-        } catch (error) {
-            console.warn('[FileSearchWebview] Error scanning for broken paths:', error);
         }
 
         // Send final update
+        console.log('[FileSearchWebview] Scan complete: found', brokenCount, 'paths in', foundFiles.length, 'unique files');
         sendUpdate(false);
     }
 
@@ -505,57 +516,46 @@ export class FileSearchWebview {
             });
         };
 
-        try {
-            const mdFiles = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', 100);
+        // Search within tracked files (already loaded in memory)
+        for (const trackedFile of this._trackedFiles) {
+            const content = trackedFile.content;
+            if (!content) continue;
 
-            for (const fileUri of mdFiles) {
+            let match;
+            pathPattern.lastIndex = 0;
+
+            while ((match = pathPattern.exec(content)) !== null) {
+                const foundPath = match[2] || match[4];
+                if (!foundPath) continue;
+
+                let decodedPath: string;
                 try {
-                    // Use fs.readFile for faster reading
-                    const content = Buffer.from(
-                        await vscode.workspace.fs.readFile(fileUri)
-                    ).toString('utf8');
+                    decodedPath = decodeURIComponent(foundPath);
+                } catch {
+                    decodedPath = foundPath;
+                }
 
-                    let match;
-                    pathPattern.lastIndex = 0;
-
-                    while ((match = pathPattern.exec(content)) !== null) {
-                        const foundPath = match[2] || match[4];
-                        if (!foundPath) continue;
-
-                        let decodedPath: string;
+                const foundDir = path.dirname(decodedPath);
+                if (foundDir === brokenDir) {
+                    const filename = path.basename(decodedPath);
+                    if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {
+                        // Check if file exists in new directory
+                        const newPath = path.join(newDir, filename);
                         try {
-                            decodedPath = decodeURIComponent(foundPath);
+                            await vscode.workspace.fs.stat(vscode.Uri.file(newPath));
+                            filesToReplace.push(filename);
                         } catch {
-                            decodedPath = foundPath;
+                            filesMissing.push(filename);
                         }
-
-                        const foundDir = path.dirname(decodedPath);
-                        if (foundDir === brokenDir) {
-                            const filename = path.basename(decodedPath);
-                            if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {
-                                // Check if file exists in new directory
-                                const newPath = path.join(newDir, filename);
-                                try {
-                                    await vscode.workspace.fs.stat(vscode.Uri.file(newPath));
-                                    filesToReplace.push(filename);
-                                } catch {
-                                    filesMissing.push(filename);
-                                }
-                                // Send incremental update (throttled)
-                                const now = Date.now();
-                                if (now - lastUpdateTime > 100) {
-                                    lastUpdateTime = now;
-                                    sendUpdate(true);
-                                }
-                            }
+                        // Send incremental update (throttled)
+                        const now = Date.now();
+                        if (now - lastUpdateTime > 100) {
+                            lastUpdateTime = now;
+                            sendUpdate(true);
                         }
                     }
-                } catch {
-                    // Skip files that can't be read
                 }
             }
-        } catch (error) {
-            console.warn('[FileSearchWebview] Error analyzing batch:', error);
         }
 
         // Send final update

@@ -18,7 +18,7 @@ import { getErrorMessage, encodeFilePath } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
 import { safeFileUri } from '../utils/uriUtils';
-import { FileSearchService } from '../fileSearchService';
+import { FileSearchService, TrackedFileData } from '../fileSearchService';
 import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
@@ -406,6 +406,17 @@ export class PathCommands extends BaseMessageCommand {
             const webview = context.fileManager.getWebview();
             console.log('[PathCommands] handleSearchForFile: Got webview:', webview ? 'defined' : 'undefined');
             fileSearchService.setWebview(webview);
+
+            // Get tracked files from registry (main + includes) for scanning
+            const allFiles = fileRegistry.getAll();
+            const trackedFiles: TrackedFileData[] = allFiles.map(file => ({
+                path: file.getPath(),
+                relativePath: file.getRelativePath(),
+                content: file.getContent()
+            }));
+            console.log('[PathCommands] handleSearchForFile: Passing', trackedFiles.length, 'tracked files to FileSearchService');
+            fileSearchService.setTrackedFiles(trackedFiles);
+
             const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
 
             if (!result) {

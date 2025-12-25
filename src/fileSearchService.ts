@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { FileSearchWebview, FileSearchResult } from './services/FileSearchWebview';
+import { FileSearchWebview, FileSearchResult, TrackedFileData } from './services/FileSearchWebview';
 
-export { FileSearchResult } from './services/FileSearchWebview';
+export { FileSearchResult, TrackedFileData } from './services/FileSearchWebview';
 
 export class FileSearchService {
     private _fileSearchWebview: FileSearchWebview;
@@ -18,6 +18,13 @@ export class FileSearchService {
         console.log('[FileSearchService] setWebview called, webview:', webview ? 'defined' : 'undefined');
         this._webview = webview;
         this._fileSearchWebview.setWebview(webview);
+    }
+
+    /**
+     * Set the tracked files to search within (from MarkdownFileRegistry)
+     */
+    setTrackedFiles(files: TrackedFileData[]): void {
+        this._fileSearchWebview.setTrackedFiles(files);
     }
 
     /**
