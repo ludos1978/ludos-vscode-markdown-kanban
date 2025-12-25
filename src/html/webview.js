@@ -3000,8 +3000,11 @@ if (!webviewEventListenersInitialized) {
                     }
 
                     if (!isEditing) {
-                        // Re-render just this column to reflect the task update
-                        if (typeof renderSingleColumn === 'function') {
+                        // Re-render just this task to reflect the update (not the entire column)
+                        if (typeof window.renderSingleTask === 'function') {
+                            window.renderSingleTask(message.taskId, foundTask, foundColumn.id);
+                        } else if (typeof renderSingleColumn === 'function') {
+                            // Fallback to column render if task render not available
                             renderSingleColumn(foundColumn.id, foundColumn);
                         } else {
                             if (typeof window.renderBoard === 'function') {
@@ -3009,14 +3012,7 @@ if (!webviewEventListenersInitialized) {
                             }
                         }
 
-                        // Inject header/footer bars after rendering
-                        if (typeof window.injectStackableBars === 'function') {
-                            requestAnimationFrame(() => {
-                                window.injectStackableBars();
-                            });
-                        }
-
-                        // Recalculate stacked column heights after task include content update (only this stack)
+                        // Recalculate stacked column heights after task content update (only this stack)
                         if (typeof window.applyStackedColumnStyles === 'function') {
                             requestAnimationFrame(() => {
                                 window.applyStackedColumnStyles(foundColumn.id);
@@ -3870,8 +3866,11 @@ function toggleImagePathMenu(container, imagePath) {
     // Find task/column context for targeted updates
     const taskElement = container.closest('.task-item');
     const columnElement = container.closest('.kanban-column');
+    const columnTitleElement = container.closest('.column-title');
     const taskId = taskElement?.dataset?.taskId || '';
     const columnId = columnElement?.dataset?.columnId || '';
+    // Detect if image is in column title (not in a task)
+    const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
 
     // Check if the image is broken (has the image-broken class)
     const isBroken = container.classList.contains('image-broken');
@@ -3891,8 +3890,8 @@ function toggleImagePathMenu(container, imagePath) {
         menu.innerHTML = `
             <button class="image-path-menu-item disabled" disabled>📄 Open</button>
             <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}')">🔎 Search for File</button>
-            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}')">📂 Browse for File</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
             <div class="image-path-menu-divider"></div>
             <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
             <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
@@ -4214,9 +4213,10 @@ function toggleImageNotFoundMenu(container) {
  * @param {string} filePath - The file path to search for
  * @param {string} [taskId] - Optional task ID for targeted update
  * @param {string} [columnId] - Optional column ID for targeted update
+ * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
-function searchForFile(filePath, taskId, columnId) {
-    console.log(`[searchForFile] Called with path: "${filePath}", taskId: ${taskId}, columnId: ${columnId}`);
+function searchForFile(filePath, taskId, columnId, isColumnTitle) {
+    console.log(`[searchForFile] Called with path: "${filePath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
 
     // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
@@ -4231,6 +4231,7 @@ function searchForFile(filePath, taskId, columnId) {
     };
     if (taskId) message.taskId = taskId;
     if (columnId) message.columnId = columnId;
+    if (isColumnTitle === 'true') message.isColumnTitle = true;
 
     vscode.postMessage(message);
 }
@@ -4241,9 +4242,10 @@ function searchForFile(filePath, taskId, columnId) {
  * @param {string} oldPath - The old file path to replace
  * @param {string} [taskId] - Optional task ID for targeted update
  * @param {string} [columnId] - Optional column ID for targeted update
+ * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
-function browseForImage(oldPath, taskId, columnId) {
-    console.log(`[browseForImage] Called with oldPath: "${oldPath}", taskId: ${taskId}, columnId: ${columnId}`);
+function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
+    console.log(`[browseForImage] Called with oldPath: "${oldPath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
 
     // Close all menus - including floating menus
     document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
@@ -4258,6 +4260,7 @@ function browseForImage(oldPath, taskId, columnId) {
     };
     if (taskId) message.taskId = taskId;
     if (columnId) message.columnId = columnId;
+    if (isColumnTitle === 'true') message.isColumnTitle = true;
 
     vscode.postMessage(message);
 }

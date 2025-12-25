@@ -398,8 +398,9 @@ export class PathCommands extends BaseMessageCommand {
         const basePath = path.dirname(mainFile.getPath());
 
         try {
-            // Use FileSearchService to show QuickPick with smart search
-            const fileSearchService = new FileSearchService();
+            // Use FileSearchService to show custom webview search dialog
+            const extensionUri = context.fileManager.getExtensionUri();
+            const fileSearchService = new FileSearchService(extensionUri);
             const replacement = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
 
             if (!replacement) {
@@ -409,7 +410,7 @@ export class PathCommands extends BaseMessageCommand {
             const selectedFile = replacement.fsPath;
             const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
 
-            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId);
+            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId, message.isColumnTitle);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error searching for file:`, error);
@@ -509,7 +510,7 @@ export class PathCommands extends BaseMessageCommand {
         }
 
         const selectedFile = result[0].fsPath;
-        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully', message.taskId, message.columnId);
+        return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, 'Image path updated successfully', message.taskId, message.columnId, message.isColumnTitle);
     }
 
     /**
@@ -638,6 +639,7 @@ export class PathCommands extends BaseMessageCommand {
      * Replace a path in markdown files and refresh the board
      * Common logic used by handleSearchForFile and handleBrowseForImage
      * If taskId and columnId are provided, sends targeted update instead of full refresh
+     * If isColumnTitle is true, updates column title instead of task
      */
     private async _replacePathInFiles(
         oldPath: string,
@@ -646,7 +648,8 @@ export class PathCommands extends BaseMessageCommand {
         context: CommandContext,
         successMessage: string,
         taskId?: string,
-        columnId?: string
+        columnId?: string,
+        isColumnTitle?: boolean
     ): Promise<CommandResult> {
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
@@ -710,18 +713,47 @@ export class PathCommands extends BaseMessageCommand {
             foundFile.setContent(newContent, false);
         }
 
-        // Invalidate cache so board is reparsed
-        context.boardStore.invalidateCache();
+        // Send targeted update based on context
+        if (isColumnTitle && columnId) {
+            // Image is in column title - update column only
+            const board = context.boardStore.getBoard();
+            if (board) {
+                const column = board.columns.find(c => c.id === columnId);
+                if (column) {
+                    // Manually update the column title with the new path
+                    column.title = LinkOperations.replaceSingleLink(column.title, oldPath, newPath, 0);
 
-        // Send targeted update if we have task context, otherwise full refresh
-        if (taskId && columnId) {
-            // Get the updated board and find the specific task
+                    // Send targeted column update
+                    this.postMessage({
+                        type: 'updateColumnContent',
+                        columnId: columnId,
+                        column: column,
+                        imageMappings: {}
+                    });
+                } else {
+                    // Column not found, fall back to full update
+                    context.boardStore.invalidateCache();
+                    await context.onBoardUpdate();
+                }
+            } else {
+                context.boardStore.invalidateCache();
+                await context.onBoardUpdate();
+            }
+        } else if (taskId && columnId) {
+            // Image is in task - update task only
             const board = context.boardStore.getBoard();
             if (board) {
                 const column = board.columns.find(c => c.id === columnId);
                 const task = column?.tasks.find(t => t.id === taskId);
                 if (task && column) {
-                    // Send targeted task update
+                    // Manually update the task object with the new path
+                    // This avoids full board reparsing
+                    task.title = LinkOperations.replaceSingleLink(task.title, oldPath, newPath, 0);
+                    if (task.description) {
+                        task.description = LinkOperations.replaceSingleLink(task.description, oldPath, newPath, 0);
+                    }
+
+                    // Send targeted task update with the modified task
                     this.postMessage({
                         type: 'updateTaskContent',
                         taskId: taskId,
@@ -731,13 +763,16 @@ export class PathCommands extends BaseMessageCommand {
                     });
                 } else {
                     // Task/column not found, fall back to full update
+                    context.boardStore.invalidateCache();
                     await context.onBoardUpdate();
                 }
             } else {
+                context.boardStore.invalidateCache();
                 await context.onBoardUpdate();
             }
         } else {
             // No context, do full board refresh
+            context.boardStore.invalidateCache();
             await context.onBoardUpdate();
         }
 

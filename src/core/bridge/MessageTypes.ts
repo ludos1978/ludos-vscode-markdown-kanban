@@ -1476,6 +1476,7 @@ export interface SearchForFileMessage extends BaseMessage {
     filePath: string;
     taskId?: string;
     columnId?: string;
+    isColumnTitle?: boolean;
 }
 
 /**
@@ -1494,6 +1495,7 @@ export interface BrowseForImageMessage extends BaseMessage {
     oldPath: string;
     taskId?: string;
     columnId?: string;
+    isColumnTitle?: boolean;
 }
 
 /**

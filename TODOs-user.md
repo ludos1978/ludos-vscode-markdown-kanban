@@ -1,3 +1,5 @@
+- [ ] when using the search for file, could we add a checkbox to the dialogue searching for the alternative files, which would allow replacing all paths that have the same error. so it searches for the filename, the user selects the file. the path element is taken from the broken file (broken-path) and the newly found file (new-path). and all occurances of the broken-path are replaced by the new- path (if the filename exists under the new path).
+
 - [ ] the excalidraw converter doesnt show embedded images and manually drawn strokes. i need them to work!
 
 - [ ] add a table editor that allows sorting of content by each category.

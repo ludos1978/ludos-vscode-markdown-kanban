@@ -1482,6 +1482,73 @@ function renderSingleColumn(columnId, columnData) {
 
 }
 
+/**
+ * Render a single task - used for targeted updates of individual tasks
+ * Purpose: Updates just one task without re-rendering the entire column
+ * Used by: Path replacement for broken images, single task content updates
+ * @param {string} taskId - ID of the task to render
+ * @param {Object} taskData - Task data object
+ * @param {string} columnId - Parent column ID
+ * @returns {boolean} True if successful, false otherwise
+ */
+function renderSingleTask(taskId, taskData, columnId) {
+    // Find the existing task element
+    const existingTaskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!existingTaskElement) {
+        return false;
+    }
+
+    // Get the task index from the existing element
+    const taskIndex = parseInt(existingTaskElement.getAttribute('data-task-index') || '0', 10);
+
+    // Clean up old tag handlers for this task to prevent memory leaks
+    if (window.tagHandlers) {
+        const taskHandlerPrefix = `tag-chip-task-${taskId}-`;
+        Object.keys(window.tagHandlers).forEach(key => {
+            if (key.startsWith(taskHandlerPrefix)) {
+                delete window.tagHandlers[key];
+            }
+        });
+    }
+
+    // Create new task element HTML
+    const newTaskHtml = createTaskElement(taskData, columnId, taskIndex);
+    if (!newTaskHtml) {
+        return false;
+    }
+
+    // Create a temporary container to parse the HTML
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = newTaskHtml;
+    const newTaskElement = tempContainer.firstElementChild;
+
+    if (!newTaskElement) {
+        return false;
+    }
+
+    // Replace the old element with the new one
+    existingTaskElement.parentNode.replaceChild(newTaskElement, existingTaskElement);
+
+    // Initialize the new task element (drag handle, etc.)
+    if (typeof initializeTaskElement === 'function') {
+        initializeTaskElement(newTaskElement);
+    }
+
+    // Update image sources for the new content
+    if (typeof updateImageSources === 'function') {
+        updateImageSources();
+    }
+
+    // Apply stackable bars to this task if needed
+    if (typeof window.injectStackableBars === 'function') {
+        requestAnimationFrame(() => {
+            window.injectStackableBars();
+        });
+    }
+
+    return true;
+}
+
 // ============================================================================
 // TEMPLATE HANDLING
 // ============================================================================
@@ -5184,3 +5251,4 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
 // Expose incremental rendering functions
 window.addSingleTaskToDOM = addSingleTaskToDOM;
 window.addSingleColumnToDOM = addSingleColumnToDOM;
+window.renderSingleTask = renderSingleTask;

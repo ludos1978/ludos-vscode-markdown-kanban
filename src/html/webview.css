@@ -1262,7 +1262,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 /* Style for images that failed to load (file not found) */
 .image-not-found {
   /* Show subtle placeholder for missing images with search capability */
-  display: inline-flex;
+  display: contents;
   align-items: center;
   gap: 6px;
   min-width: 60px;
@@ -1274,6 +1274,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   font-size: 10px;
   color: var(--vscode-descriptionForeground, #888);
   cursor: pointer;
+  max-width: 100%;
 }
 
 .image-not-found:hover {
@@ -1631,10 +1632,14 @@ body.small-card-fonts .task-title-container .markdown-content img {
   flex: 1 1 auto;
 }
 
+.image-not-found-text {
+  font-size: 0.8em;
+}
+
 .task-description-display {
   color: var(--vscode-foreground);
-  font-size: 13px;
-  line-height: 1.5;
+  /* font-size: 1em; */
+  /* line-height: 1.5; */
   border-radius: 3px;
   cursor: pointer;
 	padding-left: 8px;
@@ -4133,6 +4138,10 @@ blockquote {
 .image-path-overlay-container {
   position: relative;
   display: inline-block;
+  max-width: 100%;
+  width: 100%;
+  overflow-wrap: anywhere;
+  word-wrap: normal;
 }
 
 .image-path-overlay-container .image-menu-btn {
