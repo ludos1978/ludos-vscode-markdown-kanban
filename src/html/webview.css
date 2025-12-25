@@ -8005,14 +8005,16 @@ body.font-size-5x .task-description-edit {
 }
 
 .file-search-title {
-    font-size: 14px;
+    font-size: var(--vscode-font-size, 14px);
     font-weight: 600;
+    font-family: var(--vscode-font-family);
     margin-bottom: 8px;
     color: var(--vscode-titleBar-activeForeground, #ffffff);
 }
 
 .file-search-subtitle {
     font-size: 12px;
+    font-family: var(--vscode-editor-font-family, monospace);
     color: var(--vscode-descriptionForeground, #969696);
     word-break: break-all;
 }
@@ -8050,7 +8052,8 @@ body.font-size-5x .task-description-edit {
 .file-search-input {
     flex: 1;
     padding: 8px 12px;
-    font-size: 14px;
+    font-size: var(--vscode-font-size, 14px);
+    font-family: var(--vscode-font-family);
     border: 1px solid var(--vscode-input-border, #3c3c3c);
     background: var(--vscode-input-background, #3c3c3c);
     color: var(--vscode-input-foreground, #cccccc);
@@ -8065,6 +8068,7 @@ body.font-size-5x .task-description-edit {
 .file-search-toggle-btn {
     padding: 6px 10px;
     font-size: 12px;
+    font-family: var(--vscode-font-family);
     border: 1px solid var(--vscode-button-border, transparent);
     background: var(--vscode-button-secondaryBackground, #3c3c3c);
     color: var(--vscode-button-secondaryForeground, #cccccc);
@@ -8144,6 +8148,7 @@ body.font-size-5x .task-description-edit {
     text-align: left;
     font-size: 11px;
     font-weight: 600;
+    font-family: var(--vscode-font-family);
     text-transform: uppercase;
     color: var(--vscode-descriptionForeground, #969696);
     border-bottom: 1px solid var(--vscode-widget-border, #454545);
@@ -8171,6 +8176,7 @@ body.font-size-5x .task-description-edit {
 .file-search-result-label {
     font-size: 13px;
     font-weight: 500;
+    font-family: var(--vscode-font-family);
     color: var(--vscode-foreground, #cccccc);
     word-break: break-word;
 }
@@ -8320,6 +8326,7 @@ body.font-size-5x .task-description-edit {
 .file-search-format-btn {
     padding: 4px 10px;
     font-size: 11px;
+    font-family: var(--vscode-font-family);
     border: 1px solid var(--vscode-button-secondaryBorder, #454545);
     background: var(--vscode-button-secondaryBackground, #3a3d41);
     color: var(--vscode-button-secondaryForeground, #cccccc);
@@ -8358,6 +8365,7 @@ body.font-size-5x .task-description-edit {
 
 .file-search-path-preview-label {
     font-size: 12px;
+    font-family: var(--vscode-font-family);
     color: var(--vscode-descriptionForeground, #969696);
     flex-shrink: 0;
 }
@@ -8406,6 +8414,7 @@ body.font-size-5x .task-description-edit {
 .file-search-btn {
     padding: 8px 16px;
     font-size: 13px;
+    font-family: var(--vscode-font-family);
     border: none;
     border-radius: 4px;
     cursor: pointer;
@@ -8442,6 +8451,7 @@ body.font-size-5x .task-description-edit {
     gap: 4px;
     padding: 6px 12px;
     font-size: 12px;
+    font-family: var(--vscode-font-family);
     border: 1px solid var(--vscode-button-secondaryBorder, #454545);
     background: var(--vscode-button-secondaryBackground, #3a3d41);
     color: var(--vscode-descriptionForeground, #969696);

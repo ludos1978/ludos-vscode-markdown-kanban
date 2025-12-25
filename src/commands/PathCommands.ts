@@ -401,8 +401,11 @@ export class PathCommands extends BaseMessageCommand {
 
         try {
             // Use FileSearchService to show custom webview search dialog
+            console.log('[PathCommands] handleSearchForFile: Creating FileSearchService for path:', oldPath);
             const fileSearchService = new FileSearchService();
-            fileSearchService.setWebview(context.fileManager.getWebview());
+            const webview = context.fileManager.getWebview();
+            console.log('[PathCommands] handleSearchForFile: Got webview:', webview ? 'defined' : 'undefined');
+            fileSearchService.setWebview(webview);
             const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
 
             if (!result) {

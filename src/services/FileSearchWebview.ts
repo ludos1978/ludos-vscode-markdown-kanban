@@ -61,6 +61,7 @@ export class FileSearchWebview {
      * Set the webview to use for displaying the file search modal
      */
     setWebview(webview: vscode.Webview): void {
+        console.log('[FileSearchWebview] setWebview called, webview:', webview ? 'defined' : 'undefined');
         this._webview = webview;
     }
 
@@ -69,8 +70,11 @@ export class FileSearchWebview {
      */
     async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<FileSearchResult | undefined> {
         if (!this._webview) {
+            console.error('[FileSearchWebview] pickReplacementForBrokenLink: webview not set');
             throw new Error('Webview not set. Call setWebview() first.');
         }
+
+        console.log('[FileSearchWebview] pickReplacementForBrokenLink called for:', originalPath);
 
         const decodedPath = safeDecodeURIComponent(originalPath);
         const nameRoot = path.parse(path.basename(decodedPath)).name;
@@ -109,34 +113,50 @@ export class FileSearchWebview {
             this._messageDisposable.dispose();
         }
 
-        if (!this._webview) return;
+        if (!this._webview) {
+            console.error('[FileSearchWebview] Cannot setup listener: webview is undefined');
+            return;
+        }
+
+        console.log('[FileSearchWebview] Setting up message listener');
 
         this._messageDisposable = this._webview.onDidReceiveMessage(async (message) => {
-            switch (message.type) {
-                case 'fileSearchQuery':
-                    this._handleSearch(message.term);
-                    break;
-                case 'fileSearchSelected':
-                    this._handleSelect(message.path, message.batchReplace || false, message.pathFormat || 'auto');
-                    break;
-                case 'fileSearchPreview':
-                    this._handlePreview(message.path);
-                    break;
-                case 'fileSearchCancelled':
-                    this._handleCancel();
-                    break;
-                case 'fileSearchToggleOption':
-                    this._handleToggleOption(message.option);
-                    break;
-                case 'fileSearchAnalyzeBatch':
-                    this._handleAnalyzeBatch(message.selectedPath);
-                    break;
-                case 'fileSearchScanBrokenPath':
-                    this._handleScanBrokenPath();
-                    break;
-                case 'fileSearchClosePreview':
-                    this._closePreview();
-                    break;
+            // Only handle file search messages
+            if (!message.type?.startsWith('fileSearch')) {
+                return; // Let other handlers process non-fileSearch messages
+            }
+
+            console.log('[FileSearchWebview] Received message:', message.type);
+
+            try {
+                switch (message.type) {
+                    case 'fileSearchQuery':
+                        this._handleSearch(message.term);
+                        break;
+                    case 'fileSearchSelected':
+                        this._handleSelect(message.path, message.batchReplace || false, message.pathFormat || 'auto');
+                        break;
+                    case 'fileSearchPreview':
+                        this._handlePreview(message.path);
+                        break;
+                    case 'fileSearchCancelled':
+                        this._handleCancel();
+                        break;
+                    case 'fileSearchToggleOption':
+                        this._handleToggleOption(message.option);
+                        break;
+                    case 'fileSearchAnalyzeBatch':
+                        await this._handleAnalyzeBatch(message.selectedPath);
+                        break;
+                    case 'fileSearchScanBrokenPath':
+                        await this._handleScanBrokenPath();
+                        break;
+                    case 'fileSearchClosePreview':
+                        await this._closePreview();
+                        break;
+                }
+            } catch (error) {
+                console.error('[FileSearchWebview] Error handling message:', message.type, error);
             }
         });
     }
@@ -151,12 +171,14 @@ export class FileSearchWebview {
     }
 
     private async _performSearch(term: string): Promise<void> {
+        console.log('[FileSearchWebview] _performSearch called with term:', term);
         this._searchSeq += 1;
         const seq = this._searchSeq;
         const rawTerm = term.trim();
         const normalized = this._caseSensitive ? rawTerm : rawTerm.toLowerCase();
 
         // Send loading state
+        console.log('[FileSearchWebview] Sending fileSearchSearching message');
         this._webview?.postMessage({ type: 'fileSearchSearching' });
 
         const results: SearchResult[] = [];
@@ -270,6 +292,7 @@ export class FileSearchWebview {
         if (seq !== this._searchSeq) return;
 
         // Send results to webview
+        console.log('[FileSearchWebview] Sending fileSearchResults with', results.length, 'results');
         this._webview?.postMessage({
             type: 'fileSearchResults',
             results: results,

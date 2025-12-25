@@ -207,6 +207,11 @@ export class MessageHandler {
             }
         }
 
+        // File search messages are handled by FileSearchWebview's own listener
+        if (message.type?.startsWith('fileSearch')) {
+            return; // Silently ignore - these are handled elsewhere
+        }
+
         // Fallback for unregistered message types (should not happen in normal operation)
         console.error(`[MessageHandler] Unknown message type: ${message.type}`);
     }
