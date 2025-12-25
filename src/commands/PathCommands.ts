@@ -20,6 +20,7 @@ import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, 
 import { safeFileUri } from '../utils/uriUtils';
 import { FileSearchService } from '../fileSearchService';
 import { LinkOperations } from '../utils/linkOperations';
+import { UndoCapture } from '../core/stores/UndoCapture';
 
 type PathCommandMessage = ConvertPathsMessage | ConvertAllPathsMessage | ConvertSinglePathMessage | OpenPathMessage | SearchForFileMessage | RevealPathInExplorerMessage | BrowseForImageMessage | DeleteFromMarkdownMessage;
 
@@ -666,6 +667,21 @@ export class PathCommands extends BaseMessageCommand {
             return this.failure('No main file found');
         }
 
+        // Save undo entry before making changes
+        const currentBoard = context.boardStore.getBoard();
+        if (currentBoard) {
+            if (taskId && columnId) {
+                const undoEntry = UndoCapture.forTask(currentBoard, taskId, columnId, 'path-replace');
+                context.boardStore.saveUndoEntry(undoEntry);
+            } else if (columnId) {
+                const undoEntry = UndoCapture.forColumn(currentBoard, columnId, 'path-replace');
+                context.boardStore.saveUndoEntry(undoEntry);
+            } else {
+                const undoEntry = UndoCapture.forFullBoard(currentBoard, 'path-replace');
+                context.boardStore.saveUndoEntry(undoEntry);
+            }
+        }
+
         // Determine if the old path was relative or absolute
         const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
 
@@ -815,6 +831,13 @@ export class PathCommands extends BaseMessageCommand {
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
             return this.failure('File registry not available');
+        }
+
+        // Save undo entry before making changes
+        const currentBoard = context.boardStore.getBoard();
+        if (currentBoard) {
+            const undoEntry = UndoCapture.forFullBoard(currentBoard, 'batch-path-replace');
+            context.boardStore.saveUndoEntry(undoEntry);
         }
 
         // Extract directories from paths
