@@ -841,12 +841,27 @@
                 <div class="file-search-batch-list" id="file-search-batch-list"></div>
             </div>
 
-            <div class="file-search-batch-option">
-                <label>
-                    <input type="checkbox" id="file-search-batch-checkbox">
-                    Replace all paths with same directory
-                </label>
-                <span class="file-search-batch-info" id="file-search-batch-info"></span>
+            <div class="file-search-options-row">
+                <div class="file-search-batch-option">
+                    <label>
+                        <input type="checkbox" id="file-search-batch-checkbox">
+                        Replace all paths with same directory
+                    </label>
+                    <span class="file-search-batch-info" id="file-search-batch-info"></span>
+                </div>
+                <div class="file-search-path-format">
+                    <span class="file-search-path-format-label">Path format:</span>
+                    <div class="file-search-path-format-btns">
+                        <button type="button" class="file-search-format-btn active" id="file-search-format-auto" title="Keep original format">Auto</button>
+                        <button type="button" class="file-search-format-btn" id="file-search-format-relative" title="Use relative path">Relative</button>
+                        <button type="button" class="file-search-format-btn" id="file-search-format-absolute" title="Use absolute path">Absolute</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="file-search-path-preview" id="file-search-path-preview">
+                <span class="file-search-path-preview-label">New path:</span>
+                <span class="file-search-path-preview-value" id="file-search-path-preview-value">Select a file to preview</span>
             </div>
 
             <div class="file-search-footer">
@@ -855,6 +870,10 @@
                     <span><kbd>Enter</kbd> Select</span>
                     <span><kbd>Esc</kbd> Cancel</span>
                 </div>
+                <button type="button" class="file-search-preview-toggle" id="file-search-preview-toggle" title="Toggle file preview (opens selected file in editor)">
+                    <span class="preview-icon">👁</span>
+                    <span class="preview-label">Preview</span>
+                </button>
                 <button class="file-search-btn file-search-btn-secondary" id="file-search-cancel-btn">Cancel</button>
                 <button class="file-search-btn file-search-btn-primary" id="file-search-select-btn" disabled>Select</button>
             </div>
@@ -906,7 +925,10 @@
         'use strict';
         let overlay, originalPathEl, brokenBadgeEl, searchInputEl, caseBtnEl, wordBtnEl, regexBtnEl;
         let resultsEl, batchPanelEl, batchCountEl, batchListEl, batchCheckboxEl, batchInfoEl, cancelBtnEl, selectBtnEl;
+        let formatAutoBtnEl, formatRelativeBtnEl, formatAbsoluteBtnEl, pathPreviewEl, pathPreviewValueEl, previewToggleEl;
         let results = [], selectedIndex = -1, originalPath = '', brokenPathData = null, batchAnalysisData = null, batchAnalysisCache = {}, isVisible = false;
+        let pathFormat = 'auto'; // 'auto', 'relative', 'absolute'
+        let filePreviewEnabled = false; // File preview toggle state
 
         function init() {
             overlay = document.getElementById('file-search-overlay');
@@ -924,6 +946,12 @@
             batchInfoEl = document.getElementById('file-search-batch-info');
             cancelBtnEl = document.getElementById('file-search-cancel-btn');
             selectBtnEl = document.getElementById('file-search-select-btn');
+            formatAutoBtnEl = document.getElementById('file-search-format-auto');
+            formatRelativeBtnEl = document.getElementById('file-search-format-relative');
+            formatAbsoluteBtnEl = document.getElementById('file-search-format-absolute');
+            pathPreviewEl = document.getElementById('file-search-path-preview');
+            pathPreviewValueEl = document.getElementById('file-search-path-preview-value');
+            previewToggleEl = document.getElementById('file-search-preview-toggle');
             if (!overlay) return;
             searchInputEl.addEventListener('input', () => vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }));
             caseBtnEl.addEventListener('click', () => vscode.postMessage({ type: 'fileSearchToggleOption', option: 'caseSensitive' }));
@@ -932,8 +960,87 @@
             batchCheckboxEl.addEventListener('change', () => { updateBatchPanel(); if (batchCheckboxEl.checked) requestAllBatchAnalysis(); });
             cancelBtnEl.addEventListener('click', close);
             selectBtnEl.addEventListener('click', selectCurrentItem);
-            overlay.addEventListener('keydown', handleKeydown);
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+            // Prevent all events from propagating through to the kanban board
+            overlay.addEventListener('click', (e) => { e.stopPropagation(); if (e.target === overlay) close(); });
+            overlay.addEventListener('mousedown', (e) => e.stopPropagation());
+            overlay.addEventListener('mouseup', (e) => e.stopPropagation());
+            overlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+            overlay.addEventListener('pointerup', (e) => e.stopPropagation());
+            overlay.addEventListener('focusin', (e) => e.stopPropagation());
+            overlay.addEventListener('focusout', (e) => e.stopPropagation());
+            // Capture keyboard events at the document level when modal is visible
+            // Use capture phase to intercept before other handlers (like kanban navigation)
+            document.addEventListener('keydown', (e) => {
+                if (isVisible) {
+                    e.stopImmediatePropagation();
+                    handleKeydown(e);
+                }
+            }, true);
+            formatAutoBtnEl.addEventListener('click', () => setPathFormat('auto'));
+            formatRelativeBtnEl.addEventListener('click', () => setPathFormat('relative'));
+            formatAbsoluteBtnEl.addEventListener('click', () => setPathFormat('absolute'));
+            previewToggleEl.addEventListener('click', toggleFilePreview);
+        }
+
+        function toggleFilePreview() {
+            filePreviewEnabled = !filePreviewEnabled;
+            previewToggleEl.classList.toggle('active', filePreviewEnabled);
+            if (filePreviewEnabled) {
+                // If enabling preview and we have a selection, trigger preview immediately
+                if (selectedIndex >= 0 && results[selectedIndex]) {
+                    vscode.postMessage({ type: 'fileSearchPreview', path: results[selectedIndex].fullPath });
+                }
+            } else {
+                // If disabling preview, close any open preview
+                vscode.postMessage({ type: 'fileSearchClosePreview' });
+            }
+        }
+
+        function setPathFormat(format) {
+            pathFormat = format;
+            formatAutoBtnEl.classList.toggle('active', format === 'auto');
+            formatRelativeBtnEl.classList.toggle('active', format === 'relative');
+            formatAbsoluteBtnEl.classList.toggle('active', format === 'absolute');
+            updatePathPreview();
+        }
+
+        function isRelativePath(p) {
+            // Check if path is relative (not absolute and not starting with drive letter)
+            if (!p) return true;
+            if (p.startsWith('/') || p.startsWith('\\')) return false;
+            if (/^[a-zA-Z]:[\\\/]/.test(p)) return false;
+            return true;
+        }
+
+        function updatePathPreview() {
+            if (selectedIndex < 0 || !results[selectedIndex]) {
+                pathPreviewValueEl.textContent = 'Select a file to preview';
+                pathPreviewEl.classList.remove('has-value');
+                return;
+            }
+            const selected = results[selectedIndex];
+            let previewPath;
+            if (pathFormat === 'absolute') {
+                previewPath = selected.fullPath;
+            } else if (pathFormat === 'relative') {
+                previewPath = selected.relativePath;
+                // Ensure it starts with ./ for clarity
+                if (!previewPath.startsWith('.') && !previewPath.startsWith('/') && !previewPath.startsWith('\\')) {
+                    previewPath = './' + previewPath;
+                }
+            } else {
+                // Auto: use original format
+                if (isRelativePath(originalPath)) {
+                    previewPath = selected.relativePath;
+                    if (!previewPath.startsWith('.') && !previewPath.startsWith('/') && !previewPath.startsWith('\\')) {
+                        previewPath = './' + previewPath;
+                    }
+                } else {
+                    previewPath = selected.fullPath;
+                }
+            }
+            pathPreviewValueEl.textContent = previewPath;
+            pathPreviewEl.classList.add('has-value');
         }
 
         function handleKeydown(e) {
@@ -955,6 +1062,7 @@
             batchInfoEl.textContent = '';
             selectBtnEl.disabled = true;
             resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+            setPathFormat('auto'); // Reset path format to auto
             isVisible = true;
             overlay.classList.add('visible');
             setTimeout(() => { searchInputEl.focus(); searchInputEl.select(); }, 50);
@@ -967,7 +1075,7 @@
         function selectCurrentItem() {
             if (selectedIndex >= 0 && results[selectedIndex]) {
                 isVisible = false; overlay.classList.remove('visible');
-                vscode.postMessage({ type: 'fileSearchSelected', path: results[selectedIndex].fullPath, batchReplace: batchCheckboxEl.checked });
+                vscode.postMessage({ type: 'fileSearchSelected', path: results[selectedIndex].fullPath, batchReplace: batchCheckboxEl.checked, pathFormat: pathFormat });
             }
         }
 
@@ -976,8 +1084,8 @@
             if (index < 0) index = 0;
             if (index >= results.length) index = results.length - 1;
             selectedIndex = index;
-            renderResults(); updateBatchInfo();
-            if (results[index]) vscode.postMessage({ type: 'fileSearchPreview', path: results[index].fullPath });
+            renderResults(); updateBatchInfo(); updatePathPreview();
+            if (filePreviewEnabled && results[index]) vscode.postMessage({ type: 'fileSearchPreview', path: results[index].fullPath });
             const rows = resultsEl.querySelectorAll('tr[data-index]');
             if (rows[index]) rows[index].scrollIntoView({ block: 'nearest' });
             selectBtnEl.disabled = selectedIndex < 0;
@@ -1053,10 +1161,19 @@
             batchListEl.innerHTML = html;
         }
 
+        // Column widths state (persisted during session)
+        let columnWidths = { filename: 140, path: null, filesFound: 100 }; // null = flex
+
         function renderResults() {
             if (results.length === 0) { resultsEl.innerHTML = '<div class="file-search-status">No results found</div>'; selectBtnEl.disabled = true; return; }
             const showBatch = batchCheckboxEl.checked;
-            let html = '<table class="file-search-table"><thead><tr><th>Filename</th><th>Path</th>' + (showBatch ? '<th style="width:120px">Files Found</th>' : '') + '</tr></thead><tbody>';
+            let html = '<table class="file-search-table" id="file-search-table"><thead><tr>';
+            html += '<th style="width:' + columnWidths.filename + 'px" data-col="filename">Filename<div class="col-resize-handle"></div></th>';
+            html += '<th data-col="path">Path' + (showBatch ? '<div class="col-resize-handle"></div>' : '') + '</th>';
+            if (showBatch) {
+                html += '<th style="width:' + columnWidths.filesFound + 'px" data-col="filesFound">Files Found</th>';
+            }
+            html += '</tr></thead><tbody>';
             results.forEach((r, i) => {
                 html += '<tr class="' + (i === selectedIndex ? 'selected' : '') + '" data-index="' + i + '">';
                 html += '<td><div class="file-search-result-label">' + escapeHtml(r.label) + '</div></td>';
@@ -1079,6 +1196,54 @@
                 row.addEventListener('click', () => selectItem(idx));
                 row.addEventListener('dblclick', () => { selectedIndex = idx; selectCurrentItem(); });
             });
+            // Attach resize handlers
+            initColumnResizers();
+        }
+
+        function initColumnResizers() {
+            const table = document.getElementById('file-search-table');
+            if (!table) return;
+            const handles = table.querySelectorAll('.col-resize-handle');
+            handles.forEach(handle => {
+                handle.addEventListener('mousedown', startColumnResize);
+            });
+        }
+
+        let resizeState = null;
+        function startColumnResize(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const th = e.target.parentElement;
+            const col = th.dataset.col;
+            const startX = e.clientX;
+            const startWidth = th.offsetWidth;
+            resizeState = { col, th, startX, startWidth };
+            // Use capture phase to ensure we get the events before the overlay blocks them
+            document.addEventListener('mousemove', doColumnResize, true);
+            document.addEventListener('mouseup', stopColumnResize, true);
+            overlay.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+        }
+
+        function doColumnResize(e) {
+            if (!resizeState) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const diff = e.clientX - resizeState.startX;
+            const newWidth = Math.max(50, resizeState.startWidth + diff);
+            resizeState.th.style.width = newWidth + 'px';
+            columnWidths[resizeState.col] = newWidth;
+        }
+
+        function stopColumnResize(e) {
+            if (!resizeState) return;
+            e.preventDefault();
+            e.stopPropagation();
+            resizeState = null;
+            document.removeEventListener('mousemove', doColumnResize, true);
+            document.removeEventListener('mouseup', stopColumnResize, true);
+            overlay.classList.remove('resizing');
+            document.body.style.cursor = '';
         }
 
         function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -1087,7 +1252,7 @@
             switch (msg.type) {
                 case 'fileSearchShow': show(msg.originalPath, msg.initialSearch); break;
                 case 'fileSearchSearching': resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>'; selectBtnEl.disabled = true; break;
-                case 'fileSearchResults': results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; renderResults(); if (selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
+                case 'fileSearchResults': results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; renderResults(); updatePathPreview(); if (filePreviewEnabled && selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
                 case 'fileSearchOptionsUpdated': caseBtnEl.classList.toggle('active', msg.caseSensitive); wordBtnEl.classList.toggle('active', msg.wholeWord); regexBtnEl.classList.toggle('active', msg.regex); vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }); break;
                 case 'fileSearchBrokenPathCount': brokenPathData = msg; updateBrokenCountDisplay(); if (batchCheckboxEl.checked) updateBatchPanel(); break;
                 case 'fileSearchBatchAnalysis': batchAnalysisData = msg; if (msg.newDir && !msg.scanning) batchAnalysisCache[msg.newDir] = msg; renderBatchFilesList(); renderResults(); updateBatchInfo(); break;

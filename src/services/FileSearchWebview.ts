@@ -28,10 +28,13 @@ interface SearchResult {
     relativePath: string;
 }
 
+export type PathFormat = 'auto' | 'relative' | 'absolute';
+
 export interface FileSearchResult {
     uri: vscode.Uri;
     batchReplace: boolean;
     originalPath: string;
+    pathFormat: PathFormat;
 }
 
 export class FileSearchWebview {
@@ -41,6 +44,7 @@ export class FileSearchWebview {
     private _debounceTimer: NodeJS.Timeout | undefined;
     private _baseDir: string | undefined;
     private _previewEditor: vscode.TextEditor | undefined;
+    private _previewUri: vscode.Uri | undefined;
     private _originalPath: string = '';
     private _messageDisposable: vscode.Disposable | undefined;
 
@@ -113,7 +117,7 @@ export class FileSearchWebview {
                     this._handleSearch(message.term);
                     break;
                 case 'fileSearchSelected':
-                    this._handleSelect(message.path, message.batchReplace || false);
+                    this._handleSelect(message.path, message.batchReplace || false, message.pathFormat || 'auto');
                     break;
                 case 'fileSearchPreview':
                     this._handlePreview(message.path);
@@ -129,6 +133,9 @@ export class FileSearchWebview {
                     break;
                 case 'fileSearchScanBrokenPath':
                     this._handleScanBrokenPath();
+                    break;
+                case 'fileSearchClosePreview':
+                    this._closePreview();
                     break;
             }
         });
@@ -270,12 +277,13 @@ export class FileSearchWebview {
         });
     }
 
-    private _handleSelect(filePath: string, batchReplace: boolean = false): void {
+    private _handleSelect(filePath: string, batchReplace: boolean = false, pathFormat: PathFormat = 'auto'): void {
         if (this._resolveSelection) {
             this._resolveSelection({
                 uri: vscode.Uri.file(filePath),
                 batchReplace: batchReplace,
-                originalPath: this._originalPath
+                originalPath: this._originalPath,
+                pathFormat: pathFormat
             });
             this._resolveSelection = undefined;
         }
@@ -284,15 +292,69 @@ export class FileSearchWebview {
 
     private async _handlePreview(filePath: string): Promise<void> {
         try {
-            const doc = await vscode.workspace.openTextDocument(filePath);
-            this._previewEditor = await vscode.window.showTextDocument(doc, {
-                preview: true,
-                preserveFocus: true,
-                viewColumn: vscode.ViewColumn.Beside
-            });
+            // Close previous preview first
+            await this._closePreview();
+
+            const uri = vscode.Uri.file(filePath);
+            const ext = path.extname(filePath).toLowerCase();
+            this._previewUri = uri;
+
+            // Binary/image files that need vscode.open command
+            const binaryExtensions = [
+                '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.svg',
+                '.pdf', '.zip', '.tar', '.gz', '.7z', '.rar',
+                '.mp3', '.wav', '.ogg', '.mp4', '.webm', '.avi', '.mov',
+                '.ttf', '.otf', '.woff', '.woff2',
+                '.exe', '.dll', '.so', '.dylib'
+            ];
+
+            if (binaryExtensions.includes(ext)) {
+                // Use vscode.open for binary files - this lets VS Code/extensions handle them
+                await vscode.commands.executeCommand('vscode.open', uri, {
+                    preview: true,
+                    viewColumn: vscode.ViewColumn.Beside,
+                    preserveFocus: true
+                });
+                this._previewEditor = undefined;
+            } else {
+                // Use openTextDocument for text files
+                const doc = await vscode.workspace.openTextDocument(filePath);
+                this._previewEditor = await vscode.window.showTextDocument(doc, {
+                    preview: true,
+                    preserveFocus: true,
+                    viewColumn: vscode.ViewColumn.Beside
+                });
+            }
         } catch (error) {
             console.warn('[FileSearchWebview] Cannot preview file:', error);
         }
+    }
+
+    private async _closePreview(): Promise<void> {
+        if (!this._previewUri) return;
+
+        try {
+            const targetUri = this._previewUri.toString();
+            const tabsToClose: vscode.Tab[] = [];
+
+            for (const group of vscode.window.tabGroups.all) {
+                for (const tab of group.tabs) {
+                    // Check both text and custom tab inputs
+                    const tabInput = tab.input as { uri?: vscode.Uri } | undefined;
+                    const tabUri = tabInput?.uri?.toString();
+                    if (tabUri === targetUri && tab.isPreview) {
+                        tabsToClose.push(tab);
+                    }
+                }
+            }
+
+            if (tabsToClose.length > 0) {
+                await vscode.window.tabGroups.close(tabsToClose);
+            }
+        } catch { /* ignore */ }
+
+        this._previewUri = undefined;
+        this._previewEditor = undefined;
     }
 
     private _handleCancel(): void {
@@ -489,23 +551,6 @@ export class FileSearchWebview {
         }
 
         // Close preview editor
-        if (this._previewEditor) {
-            try {
-                const targetUri = this._previewEditor.document.uri.toString();
-                const tabsToClose: vscode.Tab[] = [];
-                for (const group of vscode.window.tabGroups.all) {
-                    for (const tab of group.tabs) {
-                        const tabInput = tab.input as vscode.TabInputText | undefined;
-                        const tabUri = tabInput?.uri?.toString();
-                        if (tabUri === targetUri && tab.isPreview) {
-                            tabsToClose.push(tab);
-                        }
-                    }
-                }
-                if (tabsToClose.length > 0) {
-                    await vscode.window.tabGroups.close(tabsToClose);
-                }
-            } catch { /* ignore */ }
-        }
+        await this._closePreview();
     }
 }

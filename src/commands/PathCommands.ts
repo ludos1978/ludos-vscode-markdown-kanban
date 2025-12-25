@@ -19,6 +19,7 @@ import { MarkdownFile } from '../files/MarkdownFile';
 import { ConvertPathsMessage, ConvertAllPathsMessage, ConvertSinglePathMessage, OpenPathMessage, SearchForFileMessage, RevealPathInExplorerMessage, BrowseForImageMessage, DeleteFromMarkdownMessage } from '../core/bridge/MessageTypes';
 import { safeFileUri } from '../utils/uriUtils';
 import { FileSearchService } from '../fileSearchService';
+import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 
@@ -409,15 +410,16 @@ export class PathCommands extends BaseMessageCommand {
             }
 
             const selectedFile = result.uri.fsPath;
+            const pathFormat = result.pathFormat;
 
             // Handle batch replacement if enabled
             if (result.batchReplace) {
-                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context);
+                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context, pathFormat);
             }
 
             // Single file replacement
             const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
-            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId, message.isColumnTitle);
+            return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId, message.isColumnTitle, pathFormat);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error searching for file:`, error);
@@ -656,7 +658,8 @@ export class PathCommands extends BaseMessageCommand {
         successMessage: string,
         taskId?: string,
         columnId?: string,
-        isColumnTitle?: boolean
+        isColumnTitle?: boolean,
+        pathFormat: PathFormat = 'auto'
     ): Promise<CommandResult> {
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
@@ -682,12 +685,13 @@ export class PathCommands extends BaseMessageCommand {
             }
         }
 
-        // Determine if the old path was relative or absolute
+        // Determine path format based on user choice or original format
         const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
 
-        // Convert the new path to match the old path's format
+        // Convert the new path to the desired format
         let newPath: string;
-        if (wasRelative) {
+        if (useRelative) {
             newPath = path.relative(basePath, selectedFilePath);
             newPath = newPath.replace(/\\/g, '/'); // Normalize to forward slashes
             if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
@@ -826,7 +830,8 @@ export class PathCommands extends BaseMessageCommand {
         brokenPath: string,
         selectedPath: string,
         basePath: string,
-        context: CommandContext
+        context: CommandContext,
+        pathFormat: PathFormat = 'auto'
     ): Promise<CommandResult> {
         const fileRegistry = this.getFileRegistry();
         if (!fileRegistry) {
@@ -879,17 +884,31 @@ export class PathCommands extends BaseMessageCommand {
                 if (foundDir === brokenDir || decodedPath.startsWith(brokenDir + '/') || decodedPath.startsWith(brokenDir + '\\')) {
                     // Calculate the new path
                     const filename = path.basename(decodedPath);
-                    const newPath = path.join(newDir, filename);
+                    const absoluteNewPath = path.join(newDir, filename);
 
-                    // Check if the new file exists
-                    let newPathResolved = newPath;
-                    if (!path.isAbsolute(newPath)) {
-                        newPathResolved = path.resolve(basePath, newPath);
+                    // Resolve to absolute path for file existence check
+                    let newPathResolved = absoluteNewPath;
+                    if (!path.isAbsolute(absoluteNewPath)) {
+                        newPathResolved = path.resolve(basePath, absoluteNewPath);
                     }
 
                     try {
                         await fs.promises.access(newPathResolved);
-                        // File exists, add to replacement map
+                        // File exists, calculate the path in desired format
+                        const wasRelative = !path.isAbsolute(decodedPath) && !decodedPath.match(/^[a-zA-Z]:[\\\/]/);
+                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
+
+                        let newPath: string;
+                        if (useRelative) {
+                            newPath = path.relative(basePath, newPathResolved);
+                            newPath = newPath.replace(/\\/g, '/');
+                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                                newPath = './' + newPath;
+                            }
+                        } else {
+                            newPath = newPathResolved;
+                        }
+
                         if (!pathsToReplace.has(decodedPath)) {
                             pathsToReplace.set(decodedPath, newPath);
                         }

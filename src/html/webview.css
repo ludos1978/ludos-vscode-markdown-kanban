@@ -1633,7 +1633,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .image-not-found-text {
-  font-size: 0.8em;
+  font-size: 1.0em;
 }
 
 .task-description-display {
@@ -4142,6 +4142,10 @@ blockquote {
   width: 100%;
   overflow-wrap: anywhere;
   word-wrap: normal;
+  min-height: 28px;
+}
+
+.image-path-overlay-container .image-broken {
 }
 
 .image-path-overlay-container .image-menu-btn {
@@ -7963,12 +7967,14 @@ body.font-size-5x .task-description-edit {
     z-index: 10000;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transition: opacity 0.15s, visibility 0.15s;
 }
 
 .file-search-overlay.visible {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
 }
 
 .file-search-dialog {
@@ -8085,6 +8091,49 @@ body.font-size-5x .task-description-edit {
 .file-search-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.file-search-table th {
+    position: relative;
+}
+
+/* Column resize handle */
+.col-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: col-resize;
+    background: transparent;
+    border-right: 2px solid var(--vscode-widget-border, #454545);
+    transition: border-color 0.15s;
+}
+
+.col-resize-handle:hover {
+    border-right-color: var(--vscode-button-background, #007acc);
+}
+
+/* Disable pointer events on overlay background during resize */
+.file-search-overlay.resizing {
+    pointer-events: none;
+}
+
+.file-search-overlay.resizing .file-search-dialog {
+    pointer-events: auto;
+}
+
+/* Filename column - compact with word wrap */
+.file-search-table th:first-child,
+.file-search-table td:first-child {
+    word-break: break-word;
+}
+
+/* Path column - takes remaining space */
+.file-search-table th:nth-child(2),
+.file-search-table td:nth-child(2) {
+    width: auto;
 }
 
 .file-search-table th {
@@ -8123,6 +8172,7 @@ body.font-size-5x .task-description-edit {
     font-size: 13px;
     font-weight: 500;
     color: var(--vscode-foreground, #cccccc);
+    word-break: break-word;
 }
 
 .file-search-result-path {
@@ -8213,10 +8263,17 @@ body.font-size-5x .task-description-edit {
     to { transform: rotate(360deg); }
 }
 
-.file-search-batch-option {
+.file-search-options-row {
     padding: 10px 20px;
     background: var(--vscode-editor-background, #1e1e1e);
     border-top: 1px solid var(--vscode-widget-border, #454545);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.file-search-batch-option {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -8242,6 +8299,81 @@ body.font-size-5x .task-description-edit {
     color: var(--vscode-descriptionForeground, #969696);
     margin-left: auto;
     font-style: italic;
+}
+
+.file-search-path-format {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-search-path-format-label {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground, #969696);
+}
+
+.file-search-path-format-btns {
+    display: flex;
+    gap: 2px;
+}
+
+.file-search-format-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid var(--vscode-button-secondaryBorder, #454545);
+    background: var(--vscode-button-secondaryBackground, #3a3d41);
+    color: var(--vscode-button-secondaryForeground, #cccccc);
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.file-search-format-btn:first-child {
+    border-radius: 3px 0 0 3px;
+}
+
+.file-search-format-btn:last-child {
+    border-radius: 0 3px 3px 0;
+}
+
+.file-search-format-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.file-search-format-btn.active {
+    background: var(--vscode-button-background, #007acc);
+    color: var(--vscode-button-foreground, #ffffff);
+    border-color: var(--vscode-button-background, #007acc);
+}
+
+/* Path Preview */
+.file-search-path-preview {
+    padding: 10px 20px;
+    background: var(--vscode-editor-background, #1e1e1e);
+    border-top: 1px solid var(--vscode-widget-border, #454545);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+}
+
+.file-search-path-preview-label {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground, #969696);
+    flex-shrink: 0;
+}
+
+.file-search-path-preview-value {
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    color: var(--vscode-textPreformat-foreground, #d7ba7d);
+    word-break: break-all;
+    flex: 1;
+}
+
+.file-search-path-preview:not(.has-value) .file-search-path-preview-value {
+    color: var(--vscode-descriptionForeground, #969696);
+    font-style: italic;
+    font-family: inherit;
 }
 
 .file-search-footer {
@@ -8301,4 +8433,40 @@ body.font-size-5x .task-description-edit {
 
 .file-search-btn-secondary:hover {
     background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
+}
+
+/* Preview Toggle Button */
+.file-search-preview-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    border: 1px solid var(--vscode-button-secondaryBorder, #454545);
+    background: var(--vscode-button-secondaryBackground, #3a3d41);
+    color: var(--vscode-descriptionForeground, #969696);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-right: auto;
+    margin-left: 16px;
+}
+
+.file-search-preview-toggle:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #45494e);
+    color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.file-search-preview-toggle.active {
+    background: var(--vscode-button-background, #007acc);
+    color: var(--vscode-button-foreground, #ffffff);
+    border-color: var(--vscode-button-background, #007acc);
+}
+
+.file-search-preview-toggle .preview-icon {
+    font-size: 14px;
+}
+
+.file-search-preview-toggle .preview-label {
+    font-size: 11px;
 }
