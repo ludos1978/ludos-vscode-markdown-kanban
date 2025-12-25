@@ -5,6 +5,7 @@
  */
 
 export { EventBus, eventBus } from './EventBus';
+export { ScopedEventBus } from './ScopedEventBus';
 export {
     EventType,
     BoardChangeTrigger,

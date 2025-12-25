@@ -69,11 +69,14 @@ export class FileSyncHandler {
     }
 
     /**
-     * Subscribe to events
+     * Subscribe to events on the panel's scoped event bus.
+     * This ensures focus events from other panels don't trigger this handler.
      */
     private _subscribe(): void {
+        const scopedBus = this._deps.panelContext.scopedEventBus;
+
         // Subscribe to focus:gained for external change detection
-        this._unsubscribeFocus = eventBus.on('focus:gained', async (_event: FocusGainedEvent) => {
+        this._unsubscribeFocus = scopedBus.on<Record<string, never>>('focus:gained', async () => {
             await this.reloadExternallyModifiedFiles({ force: false, skipDuringInitialLoad: true });
         });
     }

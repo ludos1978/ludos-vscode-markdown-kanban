@@ -6,19 +6,22 @@ import { FileSearchService } from '../fileSearchService';
 import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { eventBus, createEvent, LinkReplaceRequestedEvent } from '../core/events';
+import { PanelContext } from '../panel/PanelContext';
 
 export class LinkHandler {
     private _fileManager: FileManager;
     private _fileSearchService: FileSearchService;
+    private _panelContext: PanelContext;
 
     /**
      * Constructor - now uses event-driven approach instead of callbacks
      *
      * Previously: received onRequestLinkReplacement callback
-     * Now: emits 'link:replace-requested' events via EventBus
+     * Now: emits 'link:replace-requested' events via scoped EventBus
      */
-    constructor(fileManager: FileManager) {
+    constructor(fileManager: FileManager, panelContext: PanelContext) {
         this._fileManager = fileManager;
+        this._panelContext = panelContext;
         // Create FileSearchService and set the webview for modal display
         this._fileSearchService = new FileSearchService();
         this._fileSearchService.setWebview(this._fileManager.getWebview());
@@ -286,15 +289,15 @@ export class LinkHandler {
                        originalPath.includes('.svg') || originalPath.includes('.bmp') ||
                        originalPath.includes('.webp');
 
-        // Emit event for link replacement (handled by LinkReplacementHandler)
-        eventBus.emitSync(createEvent<LinkReplaceRequestedEvent>('link:replace-requested', 'LinkHandler', {
+        // Emit event for link replacement on scoped bus (handled by LinkReplacementHandler)
+        this._panelContext.scopedEventBus.emit('link:replace-requested', {
             originalPath,
             newPath: configuredPath,
             isImage,
             taskId,
             columnId,
             linkIndex
-        }));
+        });
 
         vscode.window.showInformationMessage(`Link updated: ${originalPath} → ${configuredPath}`);
     }

@@ -63,11 +63,13 @@ export class WebviewUpdateService {
     }
 
     /**
-     * Subscribe to webview update events
+     * Subscribe to webview update events on the panel's scoped event bus.
+     * This ensures update events from other panels don't trigger this handler.
      */
     private _subscribe(): void {
-        this._unsubscribe = eventBus.on('webview:update-requested', async (event: WebviewUpdateRequestedEvent) => {
-            await this.sendBoardUpdate(event.data);
+        const scopedBus = this._deps.panelContext.scopedEventBus;
+        this._unsubscribe = scopedBus.on<BoardUpdateOptions>('webview:update-requested', async (data) => {
+            await this.sendBoardUpdate(data);
         });
     }
 

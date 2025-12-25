@@ -4,8 +4,12 @@
  * Consolidates PanelStateModel and DocumentStateModel into a single
  * source of truth for all panel-related state.
  *
+ * Also holds the panel's ScopedEventBus for panel-isolated events.
+ *
  * @module panel/PanelContext
  */
+
+import { ScopedEventBus } from '../core/events/ScopedEventBus';
 
 /**
  * Pending board update structure
@@ -46,10 +50,22 @@ export class PanelContext {
     // ============= CONFIG =============
     private _debugMode: boolean;
 
+    // ============= SCOPED EVENT BUS =============
+    private _scopedEventBus: ScopedEventBus;
+
     constructor(panelId?: string, debugMode: boolean = false) {
         this._panelId = panelId || Math.random().toString(36).substr(2, 9);
         this._debugMode = debugMode;
+        this._scopedEventBus = new ScopedEventBus(this._panelId);
     }
+
+    // ============= SCOPED EVENT BUS GETTER =============
+
+    /**
+     * Get the panel's scoped event bus for panel-isolated events.
+     * Events emitted on this bus only trigger handlers subscribed to THIS panel's bus.
+     */
+    get scopedEventBus(): ScopedEventBus { return this._scopedEventBus; }
 
     // ============= PANEL FLAG GETTERS =============
 
@@ -106,6 +122,8 @@ export class PanelContext {
             this._initialBoardLoad = false;
             this._includeSwitchInProgress = false;
             this._webviewReady = false;
+            // Dispose the scoped event bus
+            this._scopedEventBus.dispose();
         }
     }
 

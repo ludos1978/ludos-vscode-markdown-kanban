@@ -18,6 +18,7 @@ import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { WebviewBridge } from '../bridge';
 import { findColumn } from '../../actions/helpers';
 import { LinkOperations } from '../../utils/linkOperations';
+import { PanelContext } from '../../panel/PanelContext';
 
 /**
  * Dependencies required by LinkReplacementHandler
@@ -27,6 +28,7 @@ export interface LinkReplacementDependencies {
     fileRegistry: MarkdownFileRegistry;
     webviewBridge: WebviewBridge;
     getBoard: () => KanbanBoard | undefined;
+    panelContext: PanelContext;
 }
 
 export class LinkReplacementHandler {
@@ -39,11 +41,13 @@ export class LinkReplacementHandler {
     }
 
     /**
-     * Subscribe to link replacement events
+     * Subscribe to link replacement events on the panel's scoped event bus.
+     * This ensures replacement events from other panels don't trigger this handler.
      */
     private _subscribe(): void {
-        this._unsubscribe = eventBus.on('link:replace-requested', async (event: LinkReplaceRequestedEvent) => {
-            await this._handleLinkReplacement(event);
+        const scopedBus = this._deps.panelContext.scopedEventBus;
+        this._unsubscribe = scopedBus.on<LinkReplaceRequestedEvent['data']>('link:replace-requested', async (data) => {
+            await this._handleLinkReplacement({ data } as LinkReplaceRequestedEvent);
         });
     }
 
@@ -247,11 +251,11 @@ export class LinkReplacementHandler {
             }
         }
 
-        // Fallback: emit event for full board update
-        eventBus.emitSync(createEvent('webview:update-requested', 'LinkReplacementHandler', {
+        // Fallback: emit event for full board update on panel's scoped bus
+        this._deps.panelContext.scopedEventBus.emit('webview:update-requested', {
             applyDefaultFolding: false,
             isFullRefresh: false
-        }));
+        });
     }
 
     /**

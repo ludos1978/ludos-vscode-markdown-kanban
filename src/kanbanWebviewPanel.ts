@@ -259,7 +259,7 @@ export class KanbanWebviewPanel {
             this._context, KanbanWebviewPanel.panelStates, KanbanWebviewPanel.panels
         );
 
-        this._linkHandler = new LinkHandler(this._fileManager);
+        this._linkHandler = new LinkHandler(this._fileManager, this._context);
         this.setupDocumentChangeListener();
 
         this._messageHandler = new MessageHandler(this._fileManager, this._boardStore, this._boardOperations, this._linkHandler, {
@@ -282,7 +282,7 @@ export class KanbanWebviewPanel {
     private _registerHandlers(): void {
         this._boardSyncHandler = new BoardSyncHandler({
             boardStore: this._boardStore, fileRegistry: this._fileRegistry, getMediaTracker: () => this._mediaTracker,
-            backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument()
+            backupManager: this._backupManager, getDocument: () => this._fileManager.getDocument(), panelContext: this._context
         });
         this._fileSyncHandler = new FileSyncHandler({
             fileRegistry: this._fileRegistry, boardStore: this._boardStore, getMediaTracker: () => this._mediaTracker,
@@ -291,7 +291,7 @@ export class KanbanWebviewPanel {
             emitBoardLoaded: (board) => this.emitBoardLoaded(board)
         });
         this._linkReplacementHandler = new LinkReplacementHandler({
-            boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard()
+            boardStore: this._boardStore, fileRegistry: this._fileRegistry, webviewBridge: this._webviewBridge, getBoard: () => this.getBoard(), panelContext: this._context
         });
         this._unsavedChangesService = new UnsavedChangesService(this._fileRegistry);
         this._webviewUpdateService = new WebviewUpdateService({
@@ -347,7 +347,7 @@ export class KanbanWebviewPanel {
                 this._fileManager.sendFileInfo();
                 this.syncDirtyItems();
                 await this.refreshConfiguration();
-                eventBus.emitSync(createEvent('focus:gained', 'KanbanWebviewPanel'));
+                this._context.scopedEventBus.emit('focus:gained', {});
 
                 if (this._fileManager.getDocument() && (!this.getBoard() || !this._context.initialized)) {
                     this._ensureBoardAndSendUpdate();
@@ -456,12 +456,12 @@ export class KanbanWebviewPanel {
 
     /** Emit board:changed event - triggers BoardSyncHandler for sync/save/backup */
     public emitBoardChanged(board: KanbanBoard, trigger: BoardChangeTrigger = 'edit'): void {
-        eventBus.emitSync(createEvent('board:changed', 'KanbanWebviewPanel', { board, trigger }));
+        this._context.scopedEventBus.emit('board:changed', { board, trigger });
     }
 
     /** Emit board:loaded event - triggers media tracking for include files */
     public emitBoardLoaded(board: KanbanBoard): void {
-        eventBus.emitSync(createEvent('board:loaded', 'KanbanWebviewPanel', { board }));
+        this._context.scopedEventBus.emit('board:loaded', { board });
     }
 
     /** Invalidate board cache (blocked during include switches to prevent ID regeneration) */

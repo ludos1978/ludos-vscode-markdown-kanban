@@ -23,6 +23,7 @@ import { IncludeFile } from '../../files/IncludeFile';
 import { MediaTracker } from '../../services/MediaTracker';
 import { BackupManager } from '../../services/BackupManager';
 import { sortColumnsByRow } from '../../utils/columnUtils';
+import { PanelContext } from '../../panel/PanelContext';
 
 /**
  * Dependencies required by BoardSyncHandler
@@ -33,6 +34,7 @@ export interface BoardSyncDependencies {
     getMediaTracker: () => MediaTracker | null;  // Getter because MediaTracker is created lazily
     backupManager: BackupManager;
     getDocument: () => vscode.TextDocument | undefined;
+    panelContext: PanelContext;  // Panel context for scoped event bus
 }
 
 export class BoardSyncHandler {
@@ -46,17 +48,20 @@ export class BoardSyncHandler {
     }
 
     /**
-     * Subscribe to board events
+     * Subscribe to board events on the panel's scoped event bus.
+     * This ensures events from other panels don't trigger this handler.
      */
     private _subscribe(): void {
+        const scopedBus = this._deps.panelContext.scopedEventBus;
+
         // Subscribe to board:changed for sync operations
-        this._unsubscribeChanged = eventBus.on('board:changed', async (event: BoardChangedEvent) => {
-            await this._handleBoardChanged(event);
+        this._unsubscribeChanged = scopedBus.on<{ board: KanbanBoard }>('board:changed', async (data) => {
+            await this._handleBoardChanged({ data } as BoardChangedEvent);
         });
 
         // Subscribe to board:loaded for post-initialization media tracking
-        this._unsubscribeLoaded = eventBus.on('board:loaded', (event: BoardLoadedEvent) => {
-            this._handleBoardLoaded(event);
+        this._unsubscribeLoaded = scopedBus.on<{ board: KanbanBoard }>('board:loaded', (data) => {
+            this._handleBoardLoaded({ data } as BoardLoadedEvent);
         });
     }
 
