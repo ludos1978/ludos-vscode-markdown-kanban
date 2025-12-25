@@ -3881,7 +3881,7 @@ function toggleImagePathMenu(container, imagePath) {
 
     // Find task/column context for targeted updates
     const taskElement = container.closest('.task-item');
-    const columnElement = container.closest('.kanban-column');
+    const columnElement = container.closest('.kanban-full-height-column') || container.closest('[data-column-id]');
     const columnTitleElement = container.closest('.column-title');
     const taskId = taskElement?.dataset?.taskId || '';
     const columnId = columnElement?.dataset?.columnId || '';
@@ -4343,7 +4343,7 @@ if (!webviewEventListenersInitialized) {
 
         // Find task/column context for targeted updates
         const taskElement = container.closest('.task-item');
-        const columnElement = container.closest('.kanban-column');
+        const columnElement = container.closest('.kanban-full-height-column') || container.closest('[data-column-id]');
         const taskId = taskElement?.dataset?.taskId;
         const columnId = columnElement?.dataset?.columnId;
 
@@ -4487,7 +4487,7 @@ function upgradeImageOverlayToBroken(overlayContainer, simpleSpan, originalSrc) 
 
     // Find task/column context for targeted updates
     const taskElement = overlayContainer.closest('.task-item');
-    const columnElement = overlayContainer.closest('.kanban-column');
+    const columnElement = overlayContainer.closest('.kanban-full-height-column') || overlayContainer.closest('[data-column-id]');
     const taskId = taskElement?.dataset?.taskId;
     const columnId = columnElement?.dataset?.columnId;
 
