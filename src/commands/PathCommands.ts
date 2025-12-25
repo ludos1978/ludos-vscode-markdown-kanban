@@ -399,17 +399,23 @@ export class PathCommands extends BaseMessageCommand {
 
         try {
             // Use FileSearchService to show custom webview search dialog
-            const extensionUri = context.fileManager.getExtensionUri();
-            const fileSearchService = new FileSearchService(extensionUri);
-            const replacement = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
+            const fileSearchService = new FileSearchService();
+            fileSearchService.setWebview(context.fileManager.getWebview());
+            const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
 
-            if (!replacement) {
+            if (!result) {
                 return this.success({ cancelled: true });
             }
 
-            const selectedFile = replacement.fsPath;
-            const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
+            const selectedFile = result.uri.fsPath;
 
+            // Handle batch replacement if enabled
+            if (result.batchReplace) {
+                return await this._batchReplacePaths(oldPath, selectedFile, basePath, context);
+            }
+
+            // Single file replacement
+            const successMessage = `Path updated: ${path.basename(oldPath)} → ${path.basename(selectedFile)}`;
             return await this._replacePathInFiles(oldPath, selectedFile, basePath, context, successMessage, message.taskId, message.columnId, message.isColumnTitle);
         } catch (error) {
             const errorMessage = getErrorMessage(error);
@@ -791,6 +797,148 @@ export class PathCommands extends BaseMessageCommand {
             oldPath: oldPath,
             newPath: newPath,
             filePath: foundFile.getRelativePath()
+        });
+    }
+
+    /**
+     * Batch replace paths with the same directory prefix.
+     * Finds all paths in the board that have the same directory as the broken path,
+     * checks if the corresponding file exists in the new directory,
+     * and replaces all matching paths.
+     */
+    private async _batchReplacePaths(
+        brokenPath: string,
+        selectedPath: string,
+        basePath: string,
+        context: CommandContext
+    ): Promise<CommandResult> {
+        const fileRegistry = this.getFileRegistry();
+        if (!fileRegistry) {
+            return this.failure('File registry not available');
+        }
+
+        // Extract directories from paths
+        const brokenDir = path.dirname(brokenPath);
+        const newDir = path.dirname(selectedPath);
+
+        // Collect all files to search
+        const mainFile = fileRegistry.getMainFile();
+        if (!mainFile) {
+            return this.failure('No main file found');
+        }
+        const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
+
+        // Find all image/file paths in the content that start with brokenDir
+        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        const pathsToReplace: Map<string, string> = new Map(); // oldPath -> newPath
+        const skippedPaths: string[] = []; // Paths where new file doesn't exist
+
+        for (const file of allFiles) {
+            const content = file.getContent();
+            let match;
+            pathPattern.lastIndex = 0;
+
+            while ((match = pathPattern.exec(content)) !== null) {
+                // Get the path from either image or link syntax
+                const foundPath = match[2] || match[4];
+                if (!foundPath) continue;
+
+                // Decode the path for comparison
+                let decodedPath: string;
+                try {
+                    decodedPath = decodeURIComponent(foundPath);
+                } catch {
+                    decodedPath = foundPath;
+                }
+
+                // Check if this path is in the broken directory
+                const foundDir = path.dirname(decodedPath);
+                if (foundDir === brokenDir || decodedPath.startsWith(brokenDir + '/') || decodedPath.startsWith(brokenDir + '\\')) {
+                    // Calculate the new path
+                    const filename = path.basename(decodedPath);
+                    const newPath = path.join(newDir, filename);
+
+                    // Check if the new file exists
+                    let newPathResolved = newPath;
+                    if (!path.isAbsolute(newPath)) {
+                        newPathResolved = path.resolve(basePath, newPath);
+                    }
+
+                    try {
+                        await fs.promises.access(newPathResolved);
+                        // File exists, add to replacement map
+                        if (!pathsToReplace.has(decodedPath)) {
+                            pathsToReplace.set(decodedPath, newPath);
+                        }
+                    } catch {
+                        // File doesn't exist in new location
+                        if (!skippedPaths.includes(filename)) {
+                            skippedPaths.push(filename);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (pathsToReplace.size === 0) {
+            vscode.window.showWarningMessage('No matching paths found to replace.');
+            return this.success({ replaced: false, count: 0 });
+        }
+
+        // Perform all replacements
+        let replacedCount = 0;
+        for (const file of allFiles) {
+            let content = file.getContent();
+            let modified = false;
+
+            for (const [oldPath, newPath] of pathsToReplace) {
+                // Encode paths for replacement in markdown
+                const encodedOldPath = encodeFilePath(oldPath);
+                const encodedNewPath = encodeFilePath(newPath);
+
+                // Also try the original (possibly already encoded) path
+                const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedEncodedOldPath = encodedOldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                const regex1 = new RegExp(escapedOldPath, 'g');
+                const regex2 = new RegExp(escapedEncodedOldPath, 'g');
+
+                const newContent1 = content.replace(regex1, encodedNewPath);
+                if (newContent1 !== content) {
+                    content = newContent1;
+                    modified = true;
+                    replacedCount++;
+                }
+
+                const newContent2 = content.replace(regex2, encodedNewPath);
+                if (newContent2 !== content) {
+                    content = newContent2;
+                    modified = true;
+                    // Don't double count if both matched
+                }
+            }
+
+            if (modified) {
+                file.setContent(content, false);
+            }
+        }
+
+        // Refresh the board
+        context.boardStore.invalidateCache();
+        await context.onBoardUpdate();
+
+        // Show result notification
+        const skippedMsg = skippedPaths.length > 0
+            ? ` (${skippedPaths.length} skipped - file not found)`
+            : '';
+        vscode.window.showInformationMessage(
+            `Replaced ${pathsToReplace.size} paths${skippedMsg}`
+        );
+
+        return this.success({
+            replaced: true,
+            count: pathsToReplace.size,
+            skipped: skippedPaths.length
         });
     }
 }

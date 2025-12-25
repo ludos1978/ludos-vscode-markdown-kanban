@@ -62,6 +62,10 @@ export class FileManager {
         return this._extensionUri;
     }
 
+    public getWebview(): vscode.Webview {
+        return this._webview;
+    }
+
     public setDocument(document: vscode.TextDocument | undefined) {
         this._document = document;
         // Remember the file path even when document is cleared

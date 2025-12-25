@@ -1,10 +1,14 @@
 /**
- * FileSearchWebview - Custom webview-based file search dialog
+ * FileSearchWebview - File search dialog using kanban webview overlay
  *
- * Provides a customizable file search dialog with:
- * - 80% screen width
+ * Provides a customizable file search dialog rendered as a modal overlay
+ * inside the kanban webview, allowing the board to remain visible behind.
+ *
+ * Features:
+ * - 80% screen width/height with transparent background
  * - Full path display without truncation
  * - Search toggles (case sensitive, whole word, regex)
+ * - Batch path replacement
  * - File preview on selection
  */
 
@@ -24,79 +28,110 @@ interface SearchResult {
     relativePath: string;
 }
 
+export interface FileSearchResult {
+    uri: vscode.Uri;
+    batchReplace: boolean;
+    originalPath: string;
+}
+
 export class FileSearchWebview {
-    private _panel: vscode.WebviewPanel | undefined;
-    private _extensionUri: vscode.Uri;
-    private _resolveSelection: ((uri: vscode.Uri | undefined) => void) | undefined;
+    private _webview: vscode.Webview | undefined;
+    private _resolveSelection: ((result: FileSearchResult | undefined) => void) | undefined;
     private _searchSeq = 0;
     private _debounceTimer: NodeJS.Timeout | undefined;
     private _baseDir: string | undefined;
     private _previewEditor: vscode.TextEditor | undefined;
+    private _originalPath: string = '';
+    private _messageDisposable: vscode.Disposable | undefined;
 
     // Search options
     private _caseSensitive = false;
     private _wholeWord = false;
     private _useRegex = false;
 
-    constructor(extensionUri: vscode.Uri) {
-        this._extensionUri = extensionUri;
+    constructor() {
+        // No extensionUri needed - we use the existing kanban webview
     }
 
-    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<vscode.Uri | undefined> {
+    /**
+     * Set the webview to use for displaying the file search modal
+     */
+    setWebview(webview: vscode.Webview): void {
+        this._webview = webview;
+    }
+
+    /**
+     * Open the file search modal in the kanban webview
+     */
+    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<FileSearchResult | undefined> {
+        if (!this._webview) {
+            throw new Error('Webview not set. Call setWebview() first.');
+        }
+
         const decodedPath = safeDecodeURIComponent(originalPath);
         const nameRoot = path.parse(path.basename(decodedPath)).name;
         this._baseDir = baseDir;
+        this._originalPath = decodedPath;
+
+        // Reset search options
+        this._caseSensitive = false;
+        this._wholeWord = false;
+        this._useRegex = false;
 
         return new Promise((resolve) => {
             this._resolveSelection = resolve;
-            this._createPanel(decodedPath, nameRoot);
+
+            // Set up message listener
+            this._setupMessageListener();
+
+            // Send message to show the modal
+            this._webview?.postMessage({
+                type: 'fileSearchShow',
+                originalPath: decodedPath,
+                initialSearch: nameRoot
+            });
+
+            // Start initial search after a short delay
+            setTimeout(() => this._handleSearch(nameRoot), 100);
         });
     }
 
-    private _createPanel(originalPath: string, initialSearch: string): void {
-        this._panel = vscode.window.createWebviewPanel(
-            'fileSearch',
-            'Search for File',
-            { viewColumn: vscode.ViewColumn.Active, preserveFocus: false },
-            {
-                enableScripts: true,
-                retainContextWhenHidden: false,
-                localResourceRoots: [this._extensionUri]
-            }
-        );
+    /**
+     * Set up listener for messages from the webview
+     */
+    private _setupMessageListener(): void {
+        // Dispose previous listener if any
+        if (this._messageDisposable) {
+            this._messageDisposable.dispose();
+        }
 
-        this._panel.webview.html = this._getWebviewContent(originalPath, initialSearch);
+        if (!this._webview) return;
 
-        this._panel.webview.onDidReceiveMessage(async (message) => {
+        this._messageDisposable = this._webview.onDidReceiveMessage(async (message) => {
             switch (message.type) {
-                case 'search':
+                case 'fileSearchQuery':
                     this._handleSearch(message.term);
                     break;
-                case 'select':
-                    this._handleSelect(message.path);
+                case 'fileSearchSelected':
+                    this._handleSelect(message.path, message.batchReplace || false);
                     break;
-                case 'preview':
+                case 'fileSearchPreview':
                     this._handlePreview(message.path);
                     break;
-                case 'cancel':
+                case 'fileSearchCancelled':
                     this._handleCancel();
                     break;
-                case 'toggleOption':
+                case 'fileSearchToggleOption':
                     this._handleToggleOption(message.option);
+                    break;
+                case 'fileSearchAnalyzeBatch':
+                    this._handleAnalyzeBatch(message.selectedPath);
+                    break;
+                case 'fileSearchScanBrokenPath':
+                    this._handleScanBrokenPath();
                     break;
             }
         });
-
-        this._panel.onDidDispose(() => {
-            this._cleanup();
-            if (this._resolveSelection) {
-                this._resolveSelection(undefined);
-                this._resolveSelection = undefined;
-            }
-        });
-
-        // Start initial search
-        setTimeout(() => this._handleSearch(initialSearch), 100);
     }
 
     private _handleSearch(term: string): void {
@@ -115,7 +150,7 @@ export class FileSearchWebview {
         const normalized = this._caseSensitive ? rawTerm : rawTerm.toLowerCase();
 
         // Send loading state
-        this._panel?.webview.postMessage({ type: 'searching' });
+        this._webview?.postMessage({ type: 'fileSearchSearching' });
 
         const results: SearchResult[] = [];
         const seen = new Set<string>();
@@ -228,20 +263,23 @@ export class FileSearchWebview {
         if (seq !== this._searchSeq) return;
 
         // Send results to webview
-        this._panel?.webview.postMessage({
-            type: 'results',
+        this._webview?.postMessage({
+            type: 'fileSearchResults',
             results: results,
             term: rawTerm
         });
     }
 
-    private _handleSelect(filePath: string): void {
+    private _handleSelect(filePath: string, batchReplace: boolean = false): void {
         if (this._resolveSelection) {
-            this._resolveSelection(vscode.Uri.file(filePath));
+            this._resolveSelection({
+                uri: vscode.Uri.file(filePath),
+                batchReplace: batchReplace,
+                originalPath: this._originalPath
+            });
             this._resolveSelection = undefined;
         }
         this._cleanup();
-        this._panel?.dispose();
     }
 
     private async _handlePreview(filePath: string): Promise<void> {
@@ -263,7 +301,6 @@ export class FileSearchWebview {
             this._resolveSelection = undefined;
         }
         this._cleanup();
-        this._panel?.dispose();
     }
 
     private _handleToggleOption(option: string): void {
@@ -279,18 +316,178 @@ export class FileSearchWebview {
                 break;
         }
         // Send updated state
-        this._panel?.webview.postMessage({
-            type: 'optionsUpdated',
+        this._webview?.postMessage({
+            type: 'fileSearchOptionsUpdated',
             caseSensitive: this._caseSensitive,
             wholeWord: this._wholeWord,
             regex: this._useRegex
         });
     }
 
+    private async _handleScanBrokenPath(): Promise<void> {
+        // Scan workspace for files that have the same directory as the broken path
+        const brokenDir = path.dirname(this._originalPath);
+
+        // Find all markdown files and count paths with the broken directory
+        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        let brokenCount = 0;
+        const foundFiles: string[] = [];
+        let lastUpdateTime = 0;
+
+        const sendUpdate = (scanning: boolean = true) => {
+            this._webview?.postMessage({
+                type: 'fileSearchBrokenPathCount',
+                count: brokenCount,
+                uniqueFiles: foundFiles.length,
+                files: [...foundFiles],
+                brokenDir: brokenDir,
+                scanning: scanning
+            });
+        };
+
+        try {
+            // Search for markdown files in workspace
+            const mdFiles = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', 100);
+
+            for (const fileUri of mdFiles) {
+                try {
+                    // Use fs.readFile for faster reading (no document model overhead)
+                    const content = Buffer.from(
+                        await vscode.workspace.fs.readFile(fileUri)
+                    ).toString('utf8');
+
+                    let match;
+                    pathPattern.lastIndex = 0;
+
+                    while ((match = pathPattern.exec(content)) !== null) {
+                        const foundPath = match[2] || match[4];
+                        if (!foundPath) continue;
+
+                        let decodedPath: string;
+                        try {
+                            decodedPath = decodeURIComponent(foundPath);
+                        } catch {
+                            decodedPath = foundPath;
+                        }
+
+                        const foundDir = path.dirname(decodedPath);
+                        if (foundDir === brokenDir) {
+                            brokenCount++;
+                            const filename = path.basename(decodedPath);
+                            if (!foundFiles.includes(filename)) {
+                                foundFiles.push(filename);
+                                // Send incremental update (throttled to every 100ms)
+                                const now = Date.now();
+                                if (now - lastUpdateTime > 100) {
+                                    lastUpdateTime = now;
+                                    sendUpdate(true);
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    // Skip files that can't be read
+                }
+            }
+        } catch (error) {
+            console.warn('[FileSearchWebview] Error scanning for broken paths:', error);
+        }
+
+        // Send final update
+        sendUpdate(false);
+    }
+
+    private async _handleAnalyzeBatch(selectedPath: string): Promise<void> {
+        const brokenDir = path.dirname(this._originalPath);
+        const newDir = path.dirname(selectedPath);
+
+        // Find all paths with broken directory and check if they exist in new directory
+        const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
+        const filesToReplace: string[] = [];
+        const filesMissing: string[] = [];
+        let lastUpdateTime = 0;
+
+        const sendUpdate = (scanning: boolean = true) => {
+            this._webview?.postMessage({
+                type: 'fileSearchBatchAnalysis',
+                canReplace: filesToReplace.length,
+                missing: filesMissing.length,
+                filesCanReplace: [...filesToReplace],
+                filesMissing: [...filesMissing],
+                brokenDir: brokenDir,
+                newDir: newDir,
+                scanning: scanning
+            });
+        };
+
+        try {
+            const mdFiles = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', 100);
+
+            for (const fileUri of mdFiles) {
+                try {
+                    // Use fs.readFile for faster reading
+                    const content = Buffer.from(
+                        await vscode.workspace.fs.readFile(fileUri)
+                    ).toString('utf8');
+
+                    let match;
+                    pathPattern.lastIndex = 0;
+
+                    while ((match = pathPattern.exec(content)) !== null) {
+                        const foundPath = match[2] || match[4];
+                        if (!foundPath) continue;
+
+                        let decodedPath: string;
+                        try {
+                            decodedPath = decodeURIComponent(foundPath);
+                        } catch {
+                            decodedPath = foundPath;
+                        }
+
+                        const foundDir = path.dirname(decodedPath);
+                        if (foundDir === brokenDir) {
+                            const filename = path.basename(decodedPath);
+                            if (!filesToReplace.includes(filename) && !filesMissing.includes(filename)) {
+                                // Check if file exists in new directory
+                                const newPath = path.join(newDir, filename);
+                                try {
+                                    await vscode.workspace.fs.stat(vscode.Uri.file(newPath));
+                                    filesToReplace.push(filename);
+                                } catch {
+                                    filesMissing.push(filename);
+                                }
+                                // Send incremental update (throttled)
+                                const now = Date.now();
+                                if (now - lastUpdateTime > 100) {
+                                    lastUpdateTime = now;
+                                    sendUpdate(true);
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    // Skip files that can't be read
+                }
+            }
+        } catch (error) {
+            console.warn('[FileSearchWebview] Error analyzing batch:', error);
+        }
+
+        // Send final update
+        sendUpdate(false);
+    }
+
     private async _cleanup(): Promise<void> {
         if (this._debounceTimer) {
             clearTimeout(this._debounceTimer);
         }
+
+        // Dispose message listener
+        if (this._messageDisposable) {
+            this._messageDisposable.dispose();
+            this._messageDisposable = undefined;
+        }
+
         // Close preview editor
         if (this._previewEditor) {
             try {
@@ -310,433 +507,5 @@ export class FileSearchWebview {
                 }
             } catch { /* ignore */ }
         }
-    }
-
-    private _getWebviewContent(originalPath: string, initialSearch: string): string {
-        const escapedPath = this._escapeHtml(originalPath);
-        const escapedSearch = this._escapeHtml(initialSearch);
-
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search for File</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-            font-size: var(--vscode-font-size, 13px);
-            color: var(--vscode-foreground, #cccccc);
-            background: var(--vscode-editor-background, #1e1e1e);
-            padding: 0;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            padding: 16px 20px;
-            background: var(--vscode-titleBar-activeBackground, #3c3c3c);
-            border-bottom: 1px solid var(--vscode-widget-border, #454545);
-        }
-
-        .title {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--vscode-titleBar-activeForeground, #ffffff);
-        }
-
-        .subtitle {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground, #969696);
-            word-break: break-all;
-        }
-
-        .search-container {
-            padding: 12px 20px;
-            background: var(--vscode-input-background, #3c3c3c);
-            border-bottom: 1px solid var(--vscode-widget-border, #454545);
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .search-input {
-            flex: 1;
-            padding: 8px 12px;
-            font-size: 14px;
-            border: 1px solid var(--vscode-input-border, #3c3c3c);
-            background: var(--vscode-input-background, #3c3c3c);
-            color: var(--vscode-input-foreground, #cccccc);
-            border-radius: 4px;
-            outline: none;
-        }
-
-        .search-input:focus {
-            border-color: var(--vscode-focusBorder, #007acc);
-        }
-
-        .toggle-btn {
-            padding: 6px 10px;
-            font-size: 12px;
-            border: 1px solid var(--vscode-button-border, transparent);
-            background: var(--vscode-button-secondaryBackground, #3c3c3c);
-            color: var(--vscode-button-secondaryForeground, #cccccc);
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .toggle-btn:hover {
-            background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
-        }
-
-        .toggle-btn.active {
-            background: var(--vscode-button-background, #007acc);
-            color: var(--vscode-button-foreground, #ffffff);
-        }
-
-        .results-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 0;
-        }
-
-        .result-item {
-            padding: 10px 20px;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-            transition: all 0.1s;
-        }
-
-        .result-item:hover {
-            background: var(--vscode-list-hoverBackground, #2a2d2e);
-        }
-
-        .result-item.selected {
-            background: var(--vscode-list-activeSelectionBackground, #094771);
-            border-left-color: var(--vscode-focusBorder, #007acc);
-        }
-
-        .result-label {
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 4px;
-            color: var(--vscode-list-activeSelectionForeground, #ffffff);
-        }
-
-        .result-path {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground, #969696);
-            word-break: break-all;
-            font-family: var(--vscode-editor-font-family, monospace);
-        }
-
-        .result-relative {
-            font-size: 11px;
-            color: var(--vscode-textLink-foreground, #3794ff);
-            margin-top: 2px;
-        }
-
-        .status {
-            padding: 20px;
-            text-align: center;
-            color: var(--vscode-descriptionForeground, #969696);
-        }
-
-        .status.searching::after {
-            content: '';
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid var(--vscode-progressBar-background, #007acc);
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .footer {
-            padding: 12px 20px;
-            background: var(--vscode-titleBar-activeBackground, #3c3c3c);
-            border-top: 1px solid var(--vscode-widget-border, #454545);
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            font-size: 13px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn-primary {
-            background: var(--vscode-button-background, #007acc);
-            color: var(--vscode-button-foreground, #ffffff);
-        }
-
-        .btn-primary:hover {
-            background: var(--vscode-button-hoverBackground, #0062a3);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: var(--vscode-button-secondaryBackground, #3c3c3c);
-            color: var(--vscode-button-secondaryForeground, #cccccc);
-        }
-
-        .btn-secondary:hover {
-            background: var(--vscode-button-secondaryHoverBackground, #4c4c4c);
-        }
-
-        .keyboard-hint {
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground, #969696);
-            margin-right: auto;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        kbd {
-            background: var(--vscode-keybindingLabel-background, #333);
-            border: 1px solid var(--vscode-keybindingLabel-border, #444);
-            border-radius: 3px;
-            padding: 2px 6px;
-            font-family: inherit;
-            font-size: 11px;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div class="title">File not found</div>
-        <div class="subtitle">${escapedPath}</div>
-    </div>
-
-    <div class="search-container">
-        <input type="text"
-               class="search-input"
-               id="searchInput"
-               placeholder="Search for file..."
-               value="${escapedSearch}"
-               autofocus>
-        <button class="toggle-btn" id="caseBtn" title="Match Case (Alt+C)">Aa</button>
-        <button class="toggle-btn" id="wordBtn" title="Whole Word (Alt+W)">Ab</button>
-        <button class="toggle-btn" id="regexBtn" title="Regular Expression (Alt+R)">.*</button>
-    </div>
-
-    <div class="results-container" id="resultsContainer">
-        <div class="status searching" id="status">Searching...</div>
-    </div>
-
-    <div class="footer">
-        <div class="keyboard-hint">
-            <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
-            <span><kbd>Enter</kbd> Select</span>
-            <span><kbd>Esc</kbd> Cancel</span>
-        </div>
-        <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
-        <button class="btn btn-primary" id="selectBtn" disabled>Select</button>
-    </div>
-
-    <script>
-        const vscode = acquireVsCodeApi();
-
-        let results = [];
-        let selectedIndex = -1;
-
-        const searchInput = document.getElementById('searchInput');
-        const resultsContainer = document.getElementById('resultsContainer');
-        const statusEl = document.getElementById('status');
-        const selectBtn = document.getElementById('selectBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
-        const caseBtn = document.getElementById('caseBtn');
-        const wordBtn = document.getElementById('wordBtn');
-        const regexBtn = document.getElementById('regexBtn');
-
-        // Search input handler
-        searchInput.addEventListener('input', () => {
-            vscode.postMessage({ type: 'search', term: searchInput.value });
-        });
-
-        // Keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                vscode.postMessage({ type: 'cancel' });
-            } else if (e.key === 'Enter') {
-                if (selectedIndex >= 0 && results[selectedIndex]) {
-                    vscode.postMessage({ type: 'select', path: results[selectedIndex].fullPath });
-                }
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                selectItem(selectedIndex + 1);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                selectItem(selectedIndex - 1);
-            } else if (e.altKey && e.key === 'c') {
-                e.preventDefault();
-                vscode.postMessage({ type: 'toggleOption', option: 'caseSensitive' });
-            } else if (e.altKey && e.key === 'w') {
-                e.preventDefault();
-                vscode.postMessage({ type: 'toggleOption', option: 'wholeWord' });
-            } else if (e.altKey && e.key === 'r') {
-                e.preventDefault();
-                vscode.postMessage({ type: 'toggleOption', option: 'regex' });
-            }
-        });
-
-        // Button handlers
-        cancelBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'cancel' });
-        });
-
-        selectBtn.addEventListener('click', () => {
-            if (selectedIndex >= 0 && results[selectedIndex]) {
-                vscode.postMessage({ type: 'select', path: results[selectedIndex].fullPath });
-            }
-        });
-
-        caseBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'toggleOption', option: 'caseSensitive' });
-        });
-
-        wordBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'toggleOption', option: 'wholeWord' });
-        });
-
-        regexBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'toggleOption', option: 'regex' });
-        });
-
-        // Select item by index
-        function selectItem(index) {
-            if (results.length === 0) return;
-
-            // Clamp index
-            if (index < 0) index = 0;
-            if (index >= results.length) index = results.length - 1;
-
-            selectedIndex = index;
-            renderResults();
-
-            // Preview file
-            if (results[index]) {
-                vscode.postMessage({ type: 'preview', path: results[index].fullPath });
-            }
-
-            // Scroll into view
-            const items = resultsContainer.querySelectorAll('.result-item');
-            if (items[index]) {
-                items[index].scrollIntoView({ block: 'nearest' });
-            }
-
-            selectBtn.disabled = selectedIndex < 0;
-        }
-
-        // Render results
-        function renderResults() {
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<div class="status">No results found</div>';
-                selectBtn.disabled = true;
-                return;
-            }
-
-            resultsContainer.innerHTML = results.map((r, i) => \`
-                <div class="result-item \${i === selectedIndex ? 'selected' : ''}"
-                     data-index="\${i}"
-                     onclick="handleClick(\${i})"
-                     ondblclick="handleDblClick(\${i})">
-                    <div class="result-label">\${escapeHtml(r.label)}</div>
-                    <div class="result-path">\${escapeHtml(r.fullPath)}</div>
-                    <div class="result-relative">Workspace: \${escapeHtml(r.relativePath)}</div>
-                </div>
-            \`).join('');
-        }
-
-        // Click handlers
-        window.handleClick = function(index) {
-            selectItem(index);
-        };
-
-        window.handleDblClick = function(index) {
-            if (results[index]) {
-                vscode.postMessage({ type: 'select', path: results[index].fullPath });
-            }
-        };
-
-        // Escape HTML
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        // Handle messages from extension
-        window.addEventListener('message', (event) => {
-            const message = event.data;
-
-            switch (message.type) {
-                case 'searching':
-                    resultsContainer.innerHTML = '<div class="status searching">Searching...</div>';
-                    selectBtn.disabled = true;
-                    break;
-
-                case 'results':
-                    results = message.results;
-                    selectedIndex = results.length > 0 ? 0 : -1;
-                    renderResults();
-                    if (selectedIndex >= 0) {
-                        vscode.postMessage({ type: 'preview', path: results[0].fullPath });
-                    }
-                    selectBtn.disabled = selectedIndex < 0;
-                    break;
-
-                case 'optionsUpdated':
-                    caseBtn.classList.toggle('active', message.caseSensitive);
-                    wordBtn.classList.toggle('active', message.wholeWord);
-                    regexBtn.classList.toggle('active', message.regex);
-                    // Re-trigger search
-                    vscode.postMessage({ type: 'search', term: searchInput.value });
-                    break;
-            }
-        });
-
-        // Focus search input on load
-        searchInput.focus();
-        searchInput.select();
-    </script>
-</body>
-</html>`;
-    }
-
-    private _escapeHtml(str: string): string {
-        return str
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
     }
 }

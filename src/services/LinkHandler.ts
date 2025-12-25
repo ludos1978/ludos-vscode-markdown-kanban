@@ -19,8 +19,9 @@ export class LinkHandler {
      */
     constructor(fileManager: FileManager) {
         this._fileManager = fileManager;
-        // Provide extension root so FileSearchService can load icon assets
-        this._fileSearchService = new FileSearchService(this._fileManager.getExtensionUri());
+        // Create FileSearchService and set the webview for modal display
+        this._fileSearchService = new FileSearchService();
+        this._fileSearchService.setWebview(this._fileManager.getWebview());
     }
     /**
      * Enhanced file link handler with workspace-relative path support
@@ -49,9 +50,9 @@ export class LinkHandler {
                 const baseDir = this._fileManager.getDocument()
                     ? path.dirname(this._fileManager.getDocument()!.uri.fsPath)
                     : undefined;
-                const replacement = await this._fileSearchService.pickReplacementForBrokenLink(href, baseDir);
-                if (replacement) {
-                    await this.applyLinkReplacement(href, replacement, taskId, columnId, linkIndex);
+                const result = await this._fileSearchService.pickReplacementForBrokenLink(href, baseDir);
+                if (result) {
+                    await this.applyLinkReplacement(href, result.uri, taskId, columnId, linkIndex);
                     return;
                 }
 
@@ -402,9 +403,9 @@ export class LinkHandler {
             const baseDir = this._fileManager.getDocument()
                 ? path.dirname(this._fileManager.getDocument()!.uri.fsPath)
                 : undefined;
-            const replacement = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
-            if (replacement) {
-                await this.applyLinkReplacement(documentName, replacement);
+            const result = await this._fileSearchService.pickReplacementForBrokenLink(documentName, baseDir);
+            if (result) {
+                await this.applyLinkReplacement(documentName, result.uri);
                 return;
             }
         } catch (e) {

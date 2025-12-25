@@ -1,24 +1,34 @@
 import * as vscode from 'vscode';
-import { FileSearchWebview } from './services/FileSearchWebview';
+import { FileSearchWebview, FileSearchResult } from './services/FileSearchWebview';
+
+export { FileSearchResult } from './services/FileSearchWebview';
 
 export class FileSearchService {
-    private _extensionUri?: vscode.Uri;
-    private _webview: FileSearchWebview | undefined;
+    private _fileSearchWebview: FileSearchWebview;
+    private _webview: vscode.Webview | undefined;
 
-    constructor(extensionUri?: vscode.Uri) {
-        this._extensionUri = extensionUri;
+    constructor() {
+        this._fileSearchWebview = new FileSearchWebview();
+    }
+
+    /**
+     * Set the webview to use for the file search modal
+     */
+    setWebview(webview: vscode.Webview): void {
+        this._webview = webview;
+        this._fileSearchWebview.setWebview(webview);
     }
 
     /**
      * Open a custom webview dialog to search for a replacement file.
      * Provides full control over UI: 80% width, full path display, custom styling.
+     * Returns selection with optional batch replace flag.
      */
-    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<vscode.Uri | undefined> {
-        if (!this._extensionUri) {
-            throw new Error('Extension URI is required for FileSearchWebview');
+    async pickReplacementForBrokenLink(originalPath: string, baseDir?: string): Promise<FileSearchResult | undefined> {
+        if (!this._webview) {
+            throw new Error('Webview not set. Call setWebview() first.');
         }
 
-        this._webview = new FileSearchWebview(this._extensionUri);
-        return this._webview.pickReplacementForBrokenLink(originalPath, baseDir);
+        return this._fileSearchWebview.pickReplacementForBrokenLink(originalPath, baseDir);
     }
 }

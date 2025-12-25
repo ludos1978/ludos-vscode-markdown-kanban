@@ -3346,6 +3346,18 @@ if (!webviewEventListenersInitialized) {
                     });
                 });
             break;
+
+        // File Search Modal messages
+        case 'fileSearchShow':
+        case 'fileSearchSearching':
+        case 'fileSearchResults':
+        case 'fileSearchOptionsUpdated':
+        case 'fileSearchBrokenPathCount':
+        case 'fileSearchBatchAnalysis':
+            if (typeof fileSearchModal !== 'undefined' && fileSearchModal.handleMessage) {
+                fileSearchModal.handleMessage(message);
+            }
+            break;
     }
 });
 } // End of webviewEventListenersInitialized guard

@@ -810,6 +810,57 @@
         </div>
     </div>
 
+    <!-- File Search Modal -->
+    <div id="file-search-overlay" class="file-search-overlay">
+        <div class="file-search-dialog">
+            <div class="file-search-header">
+                <div class="file-search-title">File not found</div>
+                <div class="file-search-subtitle" id="file-search-original-path"></div>
+                <div class="file-search-broken-info">
+                    <span class="file-search-badge warning" id="file-search-broken-badge">Scanning...</span>
+                </div>
+            </div>
+
+            <div class="file-search-input-container">
+                <input type="text"
+                       class="file-search-input"
+                       id="file-search-input"
+                       placeholder="Search for file..."
+                       autofocus>
+                <button class="file-search-toggle-btn" id="file-search-case-btn" title="Match Case (Alt+C)">Aa</button>
+                <button class="file-search-toggle-btn" id="file-search-word-btn" title="Whole Word (Alt+W)">Ab</button>
+                <button class="file-search-toggle-btn" id="file-search-regex-btn" title="Regular Expression (Alt+R)">.*</button>
+            </div>
+
+            <div class="file-search-results" id="file-search-results">
+                <div class="file-search-status searching">Searching...</div>
+            </div>
+
+            <div class="file-search-batch-panel" id="file-search-batch-panel" style="display: none;">
+                <div class="file-search-batch-title">Files in broken path: <span id="file-search-batch-count"></span></div>
+                <div class="file-search-batch-list" id="file-search-batch-list"></div>
+            </div>
+
+            <div class="file-search-batch-option">
+                <label>
+                    <input type="checkbox" id="file-search-batch-checkbox">
+                    Replace all paths with same directory
+                </label>
+                <span class="file-search-batch-info" id="file-search-batch-info"></span>
+            </div>
+
+            <div class="file-search-footer">
+                <div class="file-search-keyboard-hint">
+                    <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+                    <span><kbd>Enter</kbd> Select</span>
+                    <span><kbd>Esc</kbd> Cancel</span>
+                </div>
+                <button class="file-search-btn file-search-btn-secondary" id="file-search-cancel-btn">Cancel</button>
+                <button class="file-search-btn file-search-btn-primary" id="file-search-select-btn" disabled>Select</button>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript modules -->
     <!-- Initialize vscode API first -->
     <script>
@@ -848,6 +899,206 @@
     <script src="foldingStateManager.js"></script>
     <script src="templateDialog.js"></script>
     <script src="exportMarpUI.js"></script>
+
+    <!-- File Search Modal - inline to avoid CSP issues -->
+    <script>
+    const fileSearchModal = (function() {
+        'use strict';
+        let overlay, originalPathEl, brokenBadgeEl, searchInputEl, caseBtnEl, wordBtnEl, regexBtnEl;
+        let resultsEl, batchPanelEl, batchCountEl, batchListEl, batchCheckboxEl, batchInfoEl, cancelBtnEl, selectBtnEl;
+        let results = [], selectedIndex = -1, originalPath = '', brokenPathData = null, batchAnalysisData = null, batchAnalysisCache = {}, isVisible = false;
+
+        function init() {
+            overlay = document.getElementById('file-search-overlay');
+            originalPathEl = document.getElementById('file-search-original-path');
+            brokenBadgeEl = document.getElementById('file-search-broken-badge');
+            searchInputEl = document.getElementById('file-search-input');
+            caseBtnEl = document.getElementById('file-search-case-btn');
+            wordBtnEl = document.getElementById('file-search-word-btn');
+            regexBtnEl = document.getElementById('file-search-regex-btn');
+            resultsEl = document.getElementById('file-search-results');
+            batchPanelEl = document.getElementById('file-search-batch-panel');
+            batchCountEl = document.getElementById('file-search-batch-count');
+            batchListEl = document.getElementById('file-search-batch-list');
+            batchCheckboxEl = document.getElementById('file-search-batch-checkbox');
+            batchInfoEl = document.getElementById('file-search-batch-info');
+            cancelBtnEl = document.getElementById('file-search-cancel-btn');
+            selectBtnEl = document.getElementById('file-search-select-btn');
+            if (!overlay) return;
+            searchInputEl.addEventListener('input', () => vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }));
+            caseBtnEl.addEventListener('click', () => vscode.postMessage({ type: 'fileSearchToggleOption', option: 'caseSensitive' }));
+            wordBtnEl.addEventListener('click', () => vscode.postMessage({ type: 'fileSearchToggleOption', option: 'wholeWord' }));
+            regexBtnEl.addEventListener('click', () => vscode.postMessage({ type: 'fileSearchToggleOption', option: 'regex' }));
+            batchCheckboxEl.addEventListener('change', () => { updateBatchPanel(); if (batchCheckboxEl.checked) requestAllBatchAnalysis(); });
+            cancelBtnEl.addEventListener('click', close);
+            selectBtnEl.addEventListener('click', selectCurrentItem);
+            overlay.addEventListener('keydown', handleKeydown);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        }
+
+        function handleKeydown(e) {
+            if (!isVisible) return;
+            if (e.key === 'Escape') { e.preventDefault(); close(); }
+            else if (e.key === 'Enter') { e.preventDefault(); selectCurrentItem(); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); selectItem(selectedIndex + 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); selectItem(selectedIndex - 1); }
+        }
+
+        function show(path, initialSearch) {
+            if (!overlay) init();
+            originalPath = path; results = []; selectedIndex = -1; brokenPathData = null; batchAnalysisData = null; batchAnalysisCache = {};
+            originalPathEl.textContent = path;
+            searchInputEl.value = initialSearch || '';
+            brokenBadgeEl.textContent = 'Scanning...';
+            batchCheckboxEl.checked = false;
+            batchPanelEl.style.display = 'none';
+            batchInfoEl.textContent = '';
+            selectBtnEl.disabled = true;
+            resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>';
+            isVisible = true;
+            overlay.classList.add('visible');
+            setTimeout(() => { searchInputEl.focus(); searchInputEl.select(); }, 50);
+            vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value });
+            vscode.postMessage({ type: 'fileSearchScanBrokenPath' });
+        }
+
+        function close() { isVisible = false; overlay.classList.remove('visible'); vscode.postMessage({ type: 'fileSearchCancelled' }); }
+
+        function selectCurrentItem() {
+            if (selectedIndex >= 0 && results[selectedIndex]) {
+                isVisible = false; overlay.classList.remove('visible');
+                vscode.postMessage({ type: 'fileSearchSelected', path: results[selectedIndex].fullPath, batchReplace: batchCheckboxEl.checked });
+            }
+        }
+
+        function selectItem(index) {
+            if (results.length === 0) return;
+            if (index < 0) index = 0;
+            if (index >= results.length) index = results.length - 1;
+            selectedIndex = index;
+            renderResults(); updateBatchInfo();
+            if (results[index]) vscode.postMessage({ type: 'fileSearchPreview', path: results[index].fullPath });
+            const rows = resultsEl.querySelectorAll('tr[data-index]');
+            if (rows[index]) rows[index].scrollIntoView({ block: 'nearest' });
+            selectBtnEl.disabled = selectedIndex < 0;
+            if (batchCheckboxEl.checked) requestBatchAnalysis();
+        }
+
+        function requestBatchAnalysis() {
+            if (selectedIndex >= 0 && results[selectedIndex] && batchCheckboxEl.checked) {
+                const selectedPath = results[selectedIndex].fullPath;
+                const newDir = getDir(selectedPath);
+                if (batchAnalysisCache[newDir]) { batchAnalysisData = batchAnalysisCache[newDir]; renderBatchFilesList(); renderResults(); updateBatchInfo(); return; }
+                vscode.postMessage({ type: 'fileSearchAnalyzeBatch', selectedPath: selectedPath });
+            }
+        }
+
+        function getDir(fullPath) {
+            const sep = fullPath.includes('/') ? '/' : '\\';
+            const lastSep = fullPath.lastIndexOf(sep);
+            return lastSep >= 0 ? fullPath.substring(0, lastSep) : fullPath;
+        }
+
+        function requestAllBatchAnalysis() {
+            if (!batchCheckboxEl.checked || results.length === 0) return;
+            const dirs = new Set();
+            results.forEach(r => {
+                const dir = getDir(r.fullPath);
+                if (!batchAnalysisCache[dir]) dirs.add(dir);
+            });
+            dirs.forEach(dir => {
+                const file = results.find(r => getDir(r.fullPath) === dir);
+                if (file) vscode.postMessage({ type: 'fileSearchAnalyzeBatch', selectedPath: file.fullPath });
+            });
+        }
+
+        function updateBatchPanel() {
+            if (batchCheckboxEl.checked && brokenPathData && brokenPathData.files) {
+                batchPanelEl.style.display = 'block';
+                batchCountEl.textContent = brokenPathData.files.length + ' unique files';
+                renderBatchFilesList();
+            } else { batchPanelEl.style.display = 'none'; }
+            renderResults();
+        }
+
+        function updateBatchInfo() {
+            if (!batchCheckboxEl.checked) { batchInfoEl.textContent = ''; return; }
+            if (selectedIndex >= 0 && results[selectedIndex]) {
+                const selectedPath = results[selectedIndex].fullPath;
+                const newDir = getDir(selectedPath);
+                if (batchAnalysisCache[newDir] && !batchAnalysisCache[newDir].scanning) {
+                    const a = batchAnalysisCache[newDir];
+                    batchInfoEl.textContent = a.canReplace + ' files can be replaced' + (a.missing > 0 ? ', ' + a.missing + ' missing' : '');
+                } else if (batchAnalysisData && batchAnalysisData.newDir === newDir) {
+                    batchInfoEl.textContent = batchAnalysisData.canReplace + ' files can be replaced' + (batchAnalysisData.missing > 0 ? ', ' + batchAnalysisData.missing + ' missing' : '') + (batchAnalysisData.scanning ? ' ⏳' : '');
+                } else { batchInfoEl.textContent = 'Analyzing...'; }
+            } else { batchInfoEl.textContent = 'Select a file to see batch info'; }
+        }
+
+        function updateBrokenCountDisplay() {
+            if (brokenPathData) brokenBadgeEl.textContent = brokenPathData.uniqueFiles + ' files with this path' + (brokenPathData.scanning ? ' ⏳' : '');
+        }
+
+        function renderBatchFilesList() {
+            if (!brokenPathData || !brokenPathData.files) return;
+            let html = '';
+            brokenPathData.files.forEach(fn => {
+                let cn = 'file-search-batch-item';
+                if (batchAnalysisData) {
+                    if (batchAnalysisData.filesCanReplace && batchAnalysisData.filesCanReplace.includes(fn)) cn += ' can-replace';
+                    else if (batchAnalysisData.filesMissing && batchAnalysisData.filesMissing.includes(fn)) cn += ' cannot-replace';
+                }
+                html += '<span class="' + cn + '">' + escapeHtml(fn) + '</span>';
+            });
+            batchListEl.innerHTML = html;
+        }
+
+        function renderResults() {
+            if (results.length === 0) { resultsEl.innerHTML = '<div class="file-search-status">No results found</div>'; selectBtnEl.disabled = true; return; }
+            const showBatch = batchCheckboxEl.checked;
+            let html = '<table class="file-search-table"><thead><tr><th>Filename</th><th>Path</th>' + (showBatch ? '<th style="width:120px">Files Found</th>' : '') + '</tr></thead><tbody>';
+            results.forEach((r, i) => {
+                html += '<tr class="' + (i === selectedIndex ? 'selected' : '') + '" data-index="' + i + '">';
+                html += '<td><div class="file-search-result-label">' + escapeHtml(r.label) + '</div></td>';
+                html += '<td><div class="file-search-result-path">' + escapeHtml(r.fullPath) + '</div></td>';
+                if (showBatch) {
+                    const dir = getDir(r.fullPath);
+                    if (batchAnalysisCache[dir] && !batchAnalysisCache[dir].scanning) {
+                        const a = batchAnalysisCache[dir];
+                        html += '<td class="file-search-batch-count"><span class="found">' + a.canReplace + ' ✓</span>' + (a.missing > 0 ? ' <span class="missing">' + a.missing + ' ✗</span>' : '') + '</td>';
+                    } else if (i === selectedIndex && batchAnalysisData) {
+                        html += '<td class="file-search-batch-count"><span class="found">' + batchAnalysisData.canReplace + ' ✓</span>' + (batchAnalysisData.missing > 0 ? ' <span class="missing">' + batchAnalysisData.missing + ' ✗</span>' : '') + '</td>';
+                    } else { html += '<td class="file-search-batch-count"><span class="scanning">—</span></td>'; }
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            resultsEl.innerHTML = html;
+            resultsEl.querySelectorAll('tr[data-index]').forEach(row => {
+                const idx = parseInt(row.getAttribute('data-index'), 10);
+                row.addEventListener('click', () => selectItem(idx));
+                row.addEventListener('dblclick', () => { selectedIndex = idx; selectCurrentItem(); });
+            });
+        }
+
+        function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'fileSearchShow': show(msg.originalPath, msg.initialSearch); break;
+                case 'fileSearchSearching': resultsEl.innerHTML = '<div class="file-search-status searching">Searching...</div>'; selectBtnEl.disabled = true; break;
+                case 'fileSearchResults': results = msg.results; selectedIndex = results.length > 0 ? 0 : -1; renderResults(); if (selectedIndex >= 0) vscode.postMessage({ type: 'fileSearchPreview', path: results[0].fullPath }); selectBtnEl.disabled = selectedIndex < 0; if (batchCheckboxEl.checked) requestAllBatchAnalysis(); break;
+                case 'fileSearchOptionsUpdated': caseBtnEl.classList.toggle('active', msg.caseSensitive); wordBtnEl.classList.toggle('active', msg.wholeWord); regexBtnEl.classList.toggle('active', msg.regex); vscode.postMessage({ type: 'fileSearchQuery', term: searchInputEl.value }); break;
+                case 'fileSearchBrokenPathCount': brokenPathData = msg; updateBrokenCountDisplay(); if (batchCheckboxEl.checked) updateBatchPanel(); break;
+                case 'fileSearchBatchAnalysis': batchAnalysisData = msg; if (msg.newDir && !msg.scanning) batchAnalysisCache[msg.newDir] = msg; renderBatchFilesList(); renderResults(); updateBatchInfo(); break;
+            }
+        }
+
+        return { init: init, show: show, close: close, handleMessage: handleMessage, isVisible: function() { return isVisible; } };
+    })();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => fileSearchModal.init());
+    else fileSearchModal.init();
+    </script>
 
     <!-- Main webview entry point (must be last) -->
     <script src="webview.js"></script>
