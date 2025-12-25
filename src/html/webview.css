@@ -8373,7 +8373,7 @@ body.font-size-5x .task-description-edit {
 .file-search-path-preview-value {
     font-size: 12px;
     font-family: var(--vscode-editor-font-family, monospace);
-    color: var(--vscode-textPreformat-foreground, #d7ba7d);
+    /* color: var(--vscode-textPreformat-foreground, #d7ba7d); */
     word-break: break-all;
     flex: 1;
 }

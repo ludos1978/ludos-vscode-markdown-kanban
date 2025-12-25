@@ -3354,8 +3354,12 @@ if (!webviewEventListenersInitialized) {
         case 'fileSearchOptionsUpdated':
         case 'fileSearchBrokenPathCount':
         case 'fileSearchBatchAnalysis':
+            console.log('[webview.js] Received fileSearch message:', message.type);
             if (typeof fileSearchModal !== 'undefined' && fileSearchModal.handleMessage) {
+                console.log('[webview.js] Forwarding to fileSearchModal.handleMessage');
                 fileSearchModal.handleMessage(message);
+            } else {
+                console.error('[webview.js] fileSearchModal not available! typeof:', typeof fileSearchModal);
             }
             break;
     }

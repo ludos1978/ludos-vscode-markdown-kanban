@@ -688,29 +688,10 @@ export class PathCommands extends BaseMessageCommand {
             }
         }
 
-        // Determine path format based on user choice or original format
-        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
-        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-
-        // Convert the new path to the desired format
-        let newPath: string;
-        if (useRelative) {
-            newPath = path.relative(basePath, selectedFilePath);
-            newPath = newPath.replace(/\\/g, '/'); // Normalize to forward slashes
-            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                newPath = './' + newPath;
-            }
-        } else {
-            newPath = selectedFilePath;
-        }
-
-        // URL-encode the path for markdown
-        newPath = encodeFilePath(newPath);
-
         // Collect all files to search
         const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
 
-        // Find the file containing the old path
+        // Find the file containing the old path FIRST
         let foundFile: MarkdownFile | null = null;
         let foundContent: string = '';
 
@@ -730,6 +711,29 @@ export class PathCommands extends BaseMessageCommand {
         if (!foundFile) {
             return this.failure('Old path not found in any file');
         }
+
+        // Use the FOUND FILE's directory as base for relative path calculation
+        // This is critical for include files in different directories
+        const fileBasePath = path.dirname(foundFile.getPath());
+
+        // Determine path format based on user choice or original format
+        const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
+
+        // Convert the new path to the desired format relative to the file containing it
+        let newPath: string;
+        if (useRelative) {
+            newPath = path.relative(fileBasePath, selectedFilePath);
+            newPath = newPath.replace(/\\/g, '/'); // Normalize to forward slashes
+            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                newPath = './' + newPath;
+            }
+        } else {
+            newPath = selectedFilePath;
+        }
+
+        // URL-encode the path for markdown
+        newPath = encodeFilePath(newPath);
 
         // Use LinkOperations to replace with strikethrough pattern
         const newContent = LinkOperations.replaceSingleLink(foundContent, oldPath, newPath, 0);
@@ -860,12 +864,15 @@ export class PathCommands extends BaseMessageCommand {
         const allFiles: MarkdownFile[] = [mainFile, ...fileRegistry.getIncludeFiles()];
 
         // Find all image/file paths in the content that start with brokenDir
+        // First pass: identify which paths need replacement and verify new files exist
         const pathPattern = /!\[([^\]]*)\]\(([^)]+)\)|(?<!!)\[([^\]]*)\]\(([^)]+)\)/g;
-        const pathsToReplace: Map<string, string> = new Map(); // oldPath -> newPath
+        // Map: oldPath -> absolute new file path (we'll calculate relative per-file later)
+        const pathsToReplace: Map<string, string> = new Map();
         const skippedPaths: string[] = []; // Paths where new file doesn't exist
 
         for (const file of allFiles) {
             const content = file.getContent();
+            const fileBasePath = path.dirname(file.getPath());
             let match;
             pathPattern.lastIndex = 0;
 
@@ -885,35 +892,22 @@ export class PathCommands extends BaseMessageCommand {
                 // Check if this path is in the broken directory
                 const foundDir = path.dirname(decodedPath);
                 if (foundDir === brokenDir || decodedPath.startsWith(brokenDir + '/') || decodedPath.startsWith(brokenDir + '\\')) {
-                    // Calculate the new path
+                    // Calculate the new absolute path
                     const filename = path.basename(decodedPath);
                     const absoluteNewPath = path.join(newDir, filename);
 
                     // Resolve to absolute path for file existence check
                     let newPathResolved = absoluteNewPath;
                     if (!path.isAbsolute(absoluteNewPath)) {
-                        newPathResolved = path.resolve(basePath, absoluteNewPath);
+                        // Use THIS file's directory as base for resolution
+                        newPathResolved = path.resolve(fileBasePath, absoluteNewPath);
                     }
 
                     try {
                         await fs.promises.access(newPathResolved);
-                        // File exists, calculate the path in desired format
-                        const wasRelative = !path.isAbsolute(decodedPath) && !decodedPath.match(/^[a-zA-Z]:[\\\/]/);
-                        const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
-
-                        let newPath: string;
-                        if (useRelative) {
-                            newPath = path.relative(basePath, newPathResolved);
-                            newPath = newPath.replace(/\\/g, '/');
-                            if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
-                                newPath = './' + newPath;
-                            }
-                        } else {
-                            newPath = newPathResolved;
-                        }
-
+                        // File exists - store the absolute path (we'll make it relative per-file)
                         if (!pathsToReplace.has(decodedPath)) {
-                            pathsToReplace.set(decodedPath, newPath);
+                            pathsToReplace.set(decodedPath, newPathResolved);
                         }
                     } catch {
                         // File doesn't exist in new location
@@ -930,13 +924,30 @@ export class PathCommands extends BaseMessageCommand {
             return this.success({ replaced: false, count: 0 });
         }
 
-        // Perform all replacements
+        // Second pass: Perform replacements, calculating relative paths per-file
         let replacedCount = 0;
         for (const file of allFiles) {
             let content = file.getContent();
             let modified = false;
+            const fileBasePath = path.dirname(file.getPath());
 
-            for (const [oldPath, newPath] of pathsToReplace) {
+            for (const [oldPath, absoluteNewPath] of pathsToReplace) {
+                // Calculate the correct path format for THIS file's location
+                const wasRelative = !path.isAbsolute(oldPath) && !oldPath.match(/^[a-zA-Z]:[\\\/]/);
+                const useRelative = pathFormat === 'relative' || (pathFormat === 'auto' && wasRelative);
+
+                let newPath: string;
+                if (useRelative) {
+                    // Calculate relative to THIS file's directory
+                    newPath = path.relative(fileBasePath, absoluteNewPath);
+                    newPath = newPath.replace(/\\/g, '/');
+                    if (!newPath.startsWith('.') && !newPath.startsWith('/')) {
+                        newPath = './' + newPath;
+                    }
+                } else {
+                    newPath = absoluteNewPath;
+                }
+
                 // Encode paths for replacement in markdown
                 const encodedOldPath = encodeFilePath(oldPath);
                 const encodedNewPath = encodeFilePath(newPath);
