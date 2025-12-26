@@ -2243,8 +2243,8 @@ if (!webviewEventListenersInitialized) {
                 window.tagColors = message.tagColors;
 
                 // Only apply styles if not skipping render (prevents style spam during tag operations)
-                if (!shouldSkipRender && typeof applyTagStyles === 'function') {
-                    applyTagStyles();
+                if (!shouldSkipRender && typeof window.applyTagStyles === 'function') {
+                    window.applyTagStyles();
                 }
             } else if (!window.tagColors) {
                 // Fallback: initialize to empty object only if backend didn't send it
@@ -2386,8 +2386,8 @@ if (!webviewEventListenersInitialized) {
             if (configData.tagColors && Object.keys(configData.tagColors).length > 0) {
                 window.tagColors = window.tagColors || {};
                 Object.assign(window.tagColors, configData.tagColors);
-                if (typeof applyTagStyles === 'function') {
-                    applyTagStyles();
+                if (typeof window.applyTagStyles === 'function') {
+                    window.applyTagStyles();
                 }
             }
 
@@ -3407,7 +3407,7 @@ if (typeof MutationObserver !== 'undefined') {
         mutations.forEach((mutation) => {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                 // Check if the body class actually changed (theme change)
-                updateTagStylesForTheme();
+                window.updateTagStylesForTheme();
             }
         });
     });
