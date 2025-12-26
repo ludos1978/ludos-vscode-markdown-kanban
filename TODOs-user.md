@@ -1,3 +1,5 @@
+- [ ] do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems . ultrathink . check the ts, js, html and css!
+
 - [ ] when using the search for file, could we add a checkbox to the dialogue searching for the alternative files, which would allow replacing all paths that have the same error. so it searches for the filename, the user selects the file. the path element is taken from the broken file (broken-path) and the newly found file (new-path). and all occurances of the broken-path are replaced by the new- path (if the filename exists under the new path). if we check the checkbox, then search trough the kanban board for the same (broken-path) and show the number of files that have this path. also search for the filenames in the new-path, which contain the same filename as the files in the kanban board with the broken-path. 
 
 - [ ] the excalidraw converter doesnt show embedded images and manually drawn strokes. i need them to work!
@@ -90,7 +92,7 @@ Collects all cards that didn't match any gather rule:
 - [x] when switching from one columninclude to another, it doesnt load the content if it's not already in the cache. alwayss immediately remove the old content after asking to save changed content. then emtpy the columns tasks, then fill up as soon as the data is available. verify the current order, make 3 suggestions how to fix the problem with quality rating. do not add new functions, fix the existing flow
 
 
-- [x] did this about 30 times: do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems
+- [x] did this about 30 times: do another round of cleanup analysis. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . repeat this until you find no major problems . ultrathink . check the ts, js, html and css!
 
 - [x] The default layout presets are defined in _getLayoutPresetsConfiguration in KanbanWebviewPanel. i want all default configs in the configuration so the user can change them. nothing in the code. check for other default configuration values as well. there is the config and no values that replace the config if it's missing or overrides etc. never use "value = configvalue || someotherdefault;" print a warning or error, make sure the config is defined!
 
