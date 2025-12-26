@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { MarkdownFile } from '../files/MarkdownFile';
 import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 import { FileSaveService } from './FileSaveService';
+import { PanelContext } from '../panel/PanelContext';
 
 // Re-export types from ChangeTypes for backwards compatibility
 export {
@@ -70,10 +71,10 @@ export class ChangeStateMachine {
      * Create a new ChangeStateMachine for a specific panel.
      * Each panel must have its own instance to prevent cross-panel contamination.
      */
-    constructor(fileRegistry: IFileRegistryForStateMachine, webviewPanel: IWebviewPanelForStateMachine) {
+    constructor(fileRegistry: IFileRegistryForStateMachine, webviewPanel: IWebviewPanelForStateMachine, panelContext: PanelContext) {
         this._fileRegistry = fileRegistry;
         this._webviewPanel = webviewPanel;
-        this._fileSaveService = FileSaveService.getInstance();
+        this._fileSaveService = panelContext.fileSaveService;
         // Cast to concrete types for IncludeLoadingProcessor which needs full implementations
         this._includeProcessor = new IncludeLoadingProcessor({
             fileRegistry: fileRegistry as unknown as import('../files/MarkdownFileRegistry').MarkdownFileRegistry,

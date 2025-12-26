@@ -77,8 +77,8 @@ export class KanbanFileService {
         this._context = context;
         this._deps = deps;
 
-        // Initialize new architecture components
-        this._fileSaveService = FileSaveService.getInstance();
+        // Initialize new architecture components - use panel's file save service
+        this._fileSaveService = context.fileSaveService;
     }
 
     // Convenience accessors for dependencies

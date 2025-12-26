@@ -16,20 +16,21 @@ import { SaveOptions } from '../files/SaveOptions';
  *
  * NOTE: This handles actual FILE SAVE OPERATIONS.
  * For VS Code save events (onDidSaveTextDocument), see SaveEventDispatcher.
+ *
+ * PANEL ISOLATION:
+ * Each panel gets its own FileSaveService instance via PanelContext.
+ * This ensures save operations from one panel don't interfere with another.
  */
 export class FileSaveService {
-    private static instance: FileSaveService | undefined;
+    private readonly _panelId: string;
     private activeSaves = new Map<string, Promise<void>>();
 
-    private constructor() {
-        // Singleton - use getInstance()
+    constructor(panelId: string) {
+        this._panelId = panelId;
     }
 
-    public static getInstance(): FileSaveService {
-        if (!FileSaveService.instance) {
-            FileSaveService.instance = new FileSaveService();
-        }
-        return FileSaveService.instance;
+    get panelId(): string {
+        return this._panelId;
     }
 
     /**

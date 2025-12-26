@@ -10,6 +10,8 @@
  */
 
 import { ScopedEventBus } from '../core/events/ScopedEventBus';
+import { FileSaveService } from '../core/FileSaveService';
+import { ConflictResolver } from '../services/ConflictResolver';
 
 /**
  * Pending board update structure
@@ -53,10 +55,18 @@ export class PanelContext {
     // ============= SCOPED EVENT BUS =============
     private _scopedEventBus: ScopedEventBus;
 
+    // ============= FILE SAVE SERVICE =============
+    private _fileSaveService: FileSaveService;
+
+    // ============= CONFLICT RESOLVER =============
+    private _conflictResolver: ConflictResolver;
+
     constructor(panelId?: string, debugMode: boolean = false) {
         this._panelId = panelId || Math.random().toString(36).substr(2, 9);
         this._debugMode = debugMode;
         this._scopedEventBus = new ScopedEventBus(this._panelId);
+        this._fileSaveService = new FileSaveService(this._panelId);
+        this._conflictResolver = new ConflictResolver(this._panelId);
     }
 
     // ============= SCOPED EVENT BUS GETTER =============
@@ -66,6 +76,22 @@ export class PanelContext {
      * Events emitted on this bus only trigger handlers subscribed to THIS panel's bus.
      */
     get scopedEventBus(): ScopedEventBus { return this._scopedEventBus; }
+
+    // ============= FILE SAVE SERVICE GETTER =============
+
+    /**
+     * Get the panel's file save service for panel-isolated save operations.
+     * Each panel has its own save tracking to prevent cross-panel interference.
+     */
+    get fileSaveService(): FileSaveService { return this._fileSaveService; }
+
+    // ============= CONFLICT RESOLVER GETTER =============
+
+    /**
+     * Get the panel's conflict resolver for panel-isolated conflict dialogs.
+     * Each panel has its own dialog tracking to prevent cross-panel interference.
+     */
+    get conflictResolver(): ConflictResolver { return this._conflictResolver; }
 
     // ============= PANEL FLAG GETTERS =============
 

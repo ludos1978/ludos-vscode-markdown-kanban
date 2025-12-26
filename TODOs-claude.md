@@ -18,6 +18,34 @@ Changes made:
   - `LinkHandler.ts` (link:replace-requested)
 - Global EventBus kept for truly global events (file:externally-changed)
 
+### Issue 2: FileSaveService Singleton - ✅ COMPLETED
+**Implemented: Per-Panel FileSaveService via PanelContext**
+
+Changes made:
+- Removed singleton pattern from `src/core/FileSaveService.ts`
+- Added `fileSaveService` to `src/panel/PanelContext.ts`
+- Updated all users to get FileSaveService from PanelContext:
+  - `ChangeStateMachine.ts`
+  - `MarkdownFileRegistry.ts`
+  - `MessageHandler.ts`
+  - `KanbanFileService.ts`
+
+### Issue 3: ConflictResolver Singleton - ✅ COMPLETED
+**Implemented: Per-Panel ConflictResolver via PanelContext**
+
+Changes made:
+- Removed singleton pattern from `src/services/ConflictResolver.ts`
+- Added `conflictResolver` to `src/panel/PanelContext.ts`
+- Updated `KanbanWebviewPanel.ts` to use `panelContext.conflictResolver`
+
+### Issue 4: SaveEventDispatcher Singleton - ✅ NO CHANGES NEEDED
+**Analysis: Already panel-safe by design**
+
+SaveEventDispatcher correctly remains a global singleton because:
+1. VS Code `onDidSaveTextDocument` is a global event
+2. Each panel registers its own handler with unique ID
+3. Handlers already filter by their panel's files (main doc + include files)
+
 ---
 
 # Issue 1: Global EventBus Singleton - 3 Implementation Options

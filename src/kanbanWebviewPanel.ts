@@ -209,11 +209,11 @@ export class KanbanWebviewPanel {
         this._fileManager = new FileManager(this._panel.webview, extensionUri);
         this._boardOperations = new BoardOperations();
         this._backupManager = new BackupManager();
-        this._conflictResolver = ConflictResolver.getInstance();
+        this._conflictResolver = this._context.conflictResolver;
 
-        this._fileRegistry = new MarkdownFileRegistry();
+        this._fileRegistry = new MarkdownFileRegistry(this._context);
         this._fileFactory = new FileFactory(this._fileManager, this._conflictResolver, this._backupManager, this._fileRegistry);
-        this._stateMachine = new ChangeStateMachine(this._fileRegistry, this);
+        this._stateMachine = new ChangeStateMachine(this._fileRegistry, this, this._context);
 
         this._includeCoordinator = new IncludeFileCoordinator({
             fileRegistry: this._fileRegistry,
@@ -269,7 +269,7 @@ export class KanbanWebviewPanel {
             getWebviewPanel: () => this,
             getWebviewBridge: () => this._webviewBridge,
             emitBoardChanged: (board: KanbanBoard, trigger?: BoardChangeTrigger) => this.emitBoardChanged(board, trigger)
-        });
+        }, this._context);
 
         this._fileRegistry.setMessageHandler(this._messageHandler);
         this._initialize();

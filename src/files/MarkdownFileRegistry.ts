@@ -6,6 +6,7 @@ import { IncludeFile, IncludeFileType } from './IncludeFile';
 import { FileSaveService } from '../core/FileSaveService';
 import type { KanbanBoard } from '../markdownParser'; // STATE-2: For generateBoard()
 import type { IMessageHandler, IFileFactory, CapturedEdit } from './FileInterfaces';
+import type { PanelContext } from '../panel/PanelContext';
 
 /**
  * Central registry for all markdown files (main and includes).
@@ -36,9 +37,9 @@ export class MarkdownFileRegistry implements vscode.Disposable {
     // ============= LIFECYCLE =============
     private _disposables: vscode.Disposable[] = [];
 
-    constructor() {
+    constructor(panelContext: PanelContext) {
         this._disposables.push(this._onDidChange);
-        this._fileSaveService = FileSaveService.getInstance();
+        this._fileSaveService = panelContext.fileSaveService;
     }
 
     // ============= PATH HELPERS =============

@@ -37,19 +37,22 @@ export interface ConflictResolution {
 /**
  * Centralized conflict resolution system that handles all file change protection scenarios
  * with consistent dialogs and unified logic to prevent multiple dialog appearances.
+ *
+ * PANEL ISOLATION:
+ * Each panel gets its own ConflictResolver instance via PanelContext.
+ * This ensures conflict dialogs from one panel don't interfere with another.
  */
 export class ConflictResolver {
-    private static instance: ConflictResolver | undefined;
+    private readonly _panelId: string;
     private activeDialogs = new Set<string>();
     private pendingResolutions = new Map<string, Promise<ConflictResolution>>();
 
-    protected constructor() {}
+    constructor(panelId: string) {
+        this._panelId = panelId;
+    }
 
-    public static getInstance(): ConflictResolver {
-        if (!ConflictResolver.instance) {
-            ConflictResolver.instance = new ConflictResolver();
-        }
-        return ConflictResolver.instance;
+    get panelId(): string {
+        return this._panelId;
     }
 
     /**

@@ -8,6 +8,7 @@ import { PlantUMLService } from './services/export/PlantUMLService';
 import { FileSaveService } from './core/FileSaveService';
 import { NewExportOptions } from './services/export/ExportService';
 import { BoardChangeTrigger } from './core/events';
+import { PanelContext } from './panel/PanelContext';
 // Command Pattern: Registry and commands for message handling
 import { CommandRegistry, CommandContext, TaskCommands, ColumnCommands, UICommands, FileCommands, ClipboardCommands, ExportCommands, DiagramCommands, IncludeCommands, EditModeCommands, TemplateCommands, DebugCommands, PathCommands } from './commands';
 import * as vscode from 'vscode';
@@ -50,14 +51,15 @@ export class MessageHandler {
         boardStore: BoardStore,
         boardOperations: BoardOperations,
         linkHandler: LinkHandler,
-        deps: MessageHandlerDeps
+        deps: MessageHandlerDeps,
+        panelContext: PanelContext
     ) {
         this._fileManager = fileManager;
         this._boardStore = boardStore;
         this._boardOperations = boardOperations;
         this._linkHandler = linkHandler;
         this._plantUMLService = new PlantUMLService();
-        this._fileSaveService = FileSaveService.getInstance();
+        this._fileSaveService = panelContext.fileSaveService;
         this._deps = deps;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
