@@ -35,6 +35,7 @@ export class MessageHandler {
     private _linkHandler: LinkHandler;
     private _plantUMLService: PlantUMLService;
     private _fileSaveService: FileSaveService;
+    private _panelContext: PanelContext;
     private _deps: MessageHandlerDeps;
     private _autoExportSettings: NewExportOptions | null = null;
 
@@ -60,6 +61,7 @@ export class MessageHandler {
         this._linkHandler = linkHandler;
         this._plantUMLService = new PlantUMLService();
         this._fileSaveService = panelContext.fileSaveService;
+        this._panelContext = panelContext;
         this._deps = deps;
 
         // Initialize Command Pattern registry (per-instance, not singleton)
@@ -79,6 +81,7 @@ export class MessageHandler {
             boardOperations: this._boardOperations,
             linkHandler: this._linkHandler,
             plantUMLService: this._plantUMLService,
+            getMermaidExportService: () => this._panelContext.mermaidExportService,
             fileSaveService: this._fileSaveService,
             getFileRegistry: () => this._deps.getWebviewPanel()?._fileRegistry,
             onBoardUpdate: this._deps.onBoardUpdate,

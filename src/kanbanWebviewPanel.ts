@@ -24,6 +24,7 @@ import { UnsavedChangesService } from './services/UnsavedChangesService';
 import { WebviewUpdateService } from './services/WebviewUpdateService';
 import { TriggerSnippetMessage } from './core/bridge/MessageTypes';
 import { PanelContext, ConcurrencyManager, IncludeFileCoordinator, WebviewManager } from './panel';
+import { cleanupAutoExportSubscription } from './commands';
 import {
     REVIVAL_TRACKING_CLEAR_DELAY_MS,
     MAX_UNDO_STACK_SIZE,
@@ -534,7 +535,11 @@ export class KanbanWebviewPanel {
         this._concurrency.dispose();
 
         const document = this._fileManager.getDocument();
-        if (document) SaveEventDispatcher.getInstance().unregisterHandler(`panel-${document.uri.fsPath}`);
+        if (document) {
+            SaveEventDispatcher.getInstance().unregisterHandler(`panel-${document.uri.fsPath}`);
+            // Cleanup auto-export subscription to prevent memory leak
+            cleanupAutoExportSubscription(document.uri.fsPath);
+        }
 
         this._backupManager.dispose();
         this._mediaTracker?.dispose();

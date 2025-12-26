@@ -24,7 +24,7 @@ export { ColumnCommands } from './ColumnCommands';
 export { UICommands } from './UICommands';
 export { FileCommands } from './FileCommands';
 export { ClipboardCommands } from './ClipboardCommands';
-export { ExportCommands } from './ExportCommands';
+export { ExportCommands, cleanupAutoExportSubscription } from './ExportCommands';
 export { DiagramCommands } from './DiagramCommands';
 export { IncludeCommands } from './IncludeCommands';
 export { EditModeCommands } from './EditModeCommands';

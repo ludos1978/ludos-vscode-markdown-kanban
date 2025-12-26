@@ -463,7 +463,9 @@ export class IncludeCommands extends BaseMessageCommand {
 
                     if (document) {
                         try {
-                            await ExportService.export(document, autoExportSettings, board);
+                            const webviewPanel = context.getWebviewPanel();
+                            const mermaidService = context.getMermaidExportService();
+                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
                         } catch (error) {
                             console.error('[IncludeCommands] MarpWatch export failed:', error);
                         }
@@ -514,7 +516,9 @@ export class IncludeCommands extends BaseMessageCommand {
                         const board = fileService?.board();
 
                         try {
-                            await ExportService.export(document, autoExportSettings, board);
+                            const webviewPanel = context.getWebviewPanel();
+                            const mermaidService = context.getMermaidExportService();
+                            await ExportService.export(document, autoExportSettings, board, webviewPanel, mermaidService);
                         } catch (error) {
                             console.error('[IncludeCommands] MarpWatch export failed:', error);
                         }

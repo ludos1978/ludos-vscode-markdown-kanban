@@ -1,5 +1,5 @@
 import { PlantUMLService } from './PlantUMLService';
-import { getMermaidExportService, MermaidExportService } from './MermaidExportService';
+import { MermaidExportService } from './MermaidExportService';
 import { DrawIOService } from './DrawIOService';
 import { ExcalidrawService } from './ExcalidrawService';
 import { DiagramPatterns } from '../../shared/regexPatterns';
@@ -40,13 +40,14 @@ export class DiagramPreprocessor {
     private drawioService: DrawIOService;
     private excalidrawService: ExcalidrawService;
 
-    constructor(webviewPanel?: vscode.WebviewPanel) {
+    constructor(mermaidService?: MermaidExportService, webviewPanel?: vscode.WebviewPanel) {
         this.plantUMLService = new PlantUMLService();
-        this.mermaidService = getMermaidExportService();
+        // Create a dummy service if not provided (Mermaid diagrams won't render but won't crash)
+        this.mermaidService = mermaidService || new MermaidExportService();
         this.drawioService = new DrawIOService();
         this.excalidrawService = new ExcalidrawService();
 
-        if (webviewPanel) {
+        if (webviewPanel && mermaidService) {
             this.mermaidService.setWebviewPanel(webviewPanel);
         }
     }

@@ -30,6 +30,18 @@ const log = DEBUG ? console.log.bind(console, '[ExportCommands]') : () => {};
 const autoExportSubscriptions = new Map<string, vscode.Disposable>();
 
 /**
+ * Cleanup auto-export subscription for a document path.
+ * Should be called when a panel is disposed to prevent memory leaks.
+ */
+export function cleanupAutoExportSubscription(docPath: string): void {
+    const subscription = autoExportSubscriptions.get(docPath);
+    if (subscription) {
+        subscription.dispose();
+        autoExportSubscriptions.delete(docPath);
+    }
+}
+
+/**
  * Export Commands Handler
  *
  * Processes export-related messages from the webview.
@@ -192,12 +204,13 @@ export class ExportCommands extends BaseMessageCommand {
             // Get board for ANY conversion exports (use in-memory board data)
             const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
-            // Get webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+            // Get webview panel and mermaid service for diagram rendering (injected to avoid circular dependency)
             const webviewPanel = context.getWebviewPanel();
+            const mermaidService = context.getMermaidExportService();
 
             // Handle COPY mode (no progress bar)
             if (options.mode === 'copy') {
-                const result = await ExportService.export(document, options, board, webviewPanel);
+                const result = await ExportService.export(document, options, board, webviewPanel, mermaidService);
 
                 this.postMessage({
                     type: 'copyContentResult',
@@ -221,7 +234,7 @@ export class ExportCommands extends BaseMessageCommand {
                 }
                 progress.report({ increment: 20, message: 'Processing content...' });
 
-                const result = await ExportService.export(document!, options, board, webviewPanel);
+                const result = await ExportService.export(document!, options, board, webviewPanel, mermaidService);
 
                 if (operationId) {
                     await this.updateOperationProgress(operationId, 90, context, 'Finalizing...');
@@ -262,11 +275,12 @@ export class ExportCommands extends BaseMessageCommand {
         // Get board for conversion exports
         const board = (options.format !== 'kanban' && !options.packAssets) ? context.getCurrentBoard() : undefined;
 
-        // Get webview panel for Mermaid diagram rendering (injected to avoid circular dependency)
+        // Get webview panel and mermaid service for diagram rendering (injected to avoid circular dependency)
         const webviewPanel = context.getWebviewPanel();
+        const mermaidService = context.getMermaidExportService();
 
         // Do initial export FIRST (to start Marp if needed)
-        const initialResult = await ExportService.export(document, options, board, webviewPanel);
+        const initialResult = await ExportService.export(document, options, board, webviewPanel, mermaidService);
 
         // NOW stop existing handlers/processes for other files
         // Use marpWatchPath (the file Marp is watching) for protection, fallback to exportedPath
@@ -306,9 +320,10 @@ export class ExportCommands extends BaseMessageCommand {
             try {
                 // Re-read the document to get fresh content
                 const freshDoc = await vscode.workspace.openTextDocument(document.uri);
-                // Get current webview panel (may have changed since initial setup)
+                // Get current webview panel and mermaid service (may have changed since initial setup)
                 const currentWebviewPanel = context.getWebviewPanel();
-                const result = await ExportService.export(freshDoc, options, undefined, currentWebviewPanel);
+                const currentMermaidService = context.getMermaidExportService();
+                const result = await ExportService.export(freshDoc, options, undefined, currentWebviewPanel, currentMermaidService);
 
                 if (result.success && options.openAfterExport && result.exportedPath && !options.marpWatch) {
                     const uri = safeFileUri(result.exportedPath, 'ExportCommands-openExportedFile');

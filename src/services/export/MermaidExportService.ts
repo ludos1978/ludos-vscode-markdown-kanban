@@ -189,16 +189,3 @@ export class MermaidExportService {
     }
 
 }
-
-// Singleton instance for easy access across the application
-let mermaidExportServiceInstance: MermaidExportService | undefined;
-
-/**
- * Get the singleton MermaidExportService instance
- */
-export function getMermaidExportService(): MermaidExportService {
-    if (!mermaidExportServiceInstance) {
-        mermaidExportServiceInstance = new MermaidExportService();
-    }
-    return mermaidExportServiceInstance;
-}

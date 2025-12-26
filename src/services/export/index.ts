@@ -18,7 +18,7 @@ export { PresentationParser, PresentationSlide } from './PresentationParser';
 export { DiagramPreprocessor, PreprocessResult } from './DiagramPreprocessor';
 export { DrawIOService } from './DrawIOService';
 export { ExcalidrawService } from './ExcalidrawService';
-export { MermaidExportService, getMermaidExportService } from './MermaidExportService';
+export { MermaidExportService } from './MermaidExportService';
 export { PlantUMLService } from './PlantUMLService';
 
 // PDF service

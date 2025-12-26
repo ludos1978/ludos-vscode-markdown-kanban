@@ -20,7 +20,6 @@ import {
     RequestPDFPageRenderMessage,
     RequestPDFInfoMessage
 } from '../core/bridge/MessageTypes';
-import { getMermaidExportService } from '../services/export/MermaidExportService';
 import { replaceCodeBlockWithSVG } from '../services/diagram/SvgReplacementService';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as path from 'path';
@@ -66,11 +65,11 @@ export class DiagramCommands extends BaseMessageCommand {
                     return this.success();
 
                 case 'mermaidExportSuccess':
-                    getMermaidExportService().handleRenderSuccess(message.requestId, message.svg);
+                    context.getMermaidExportService().handleRenderSuccess(message.requestId, message.svg);
                     return this.success();
 
                 case 'mermaidExportError':
-                    getMermaidExportService().handleRenderError(message.requestId, message.error);
+                    context.getMermaidExportService().handleRenderError(message.requestId, message.error);
                     return this.success();
 
                 case 'requestDrawIORender':

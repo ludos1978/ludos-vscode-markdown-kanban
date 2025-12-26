@@ -46,6 +46,40 @@ SaveEventDispatcher correctly remains a global singleton because:
 2. Each panel registers its own handler with unique ID
 3. Handlers already filter by their panel's files (main doc + include files)
 
+### Phase 3: Panel Tracking Map - ✅ NO CHANGES NEEDED
+**Analysis: Already prevents duplicate panels**
+
+Line 95 checks if panel exists for document URI before creating:
+```typescript
+const existingPanel = KanbanWebviewPanel.panels.get(document.uri.toString());
+if (existingPanel) { existingPanel.reveal(); return; }
+```
+Same file cannot be opened in two panels - the second just reveals the first.
+
+### Phase 4: Cleanup on Panel Close - ✅ VERIFIED
+**Analysis: All handlers properly disposed**
+
+`dispose()` method (lines 523-556) properly cleans up:
+- `this._context.setDisposed(true)` triggers ScopedEventBus.dispose()
+- All handlers disposed in reverse order
+- SaveEventDispatcher handler unregistered
+
+### Phase 5: CommandContext - ✅ NO CHANGES NEEDED
+**Analysis: Commands use callbacks that emit on scopedEventBus**
+
+Commands don't emit events directly. They use:
+- `emitBoardChanged()` callback → KanbanWebviewPanel → scopedEventBus
+- `fileSaveService` → already per-panel via PanelContext
+
+---
+
+## ✅ ALL ISSUES RESOLVED
+
+The cross-kanban content contamination should now be fixed. Each panel has:
+1. Its own `ScopedEventBus` - events only trigger handlers on same panel
+2. Its own `FileSaveService` - save operations isolated
+3. Its own `ConflictResolver` - conflict dialogs isolated
+
 ---
 
 # Issue 1: Global EventBus Singleton - 3 Implementation Options

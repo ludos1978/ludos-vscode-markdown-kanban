@@ -13,6 +13,7 @@ import { BoardOperations } from '../../board';
 import { LinkHandler } from '../../services/LinkHandler';
 import { KanbanBoard } from '../../markdownParser';
 import { PlantUMLService } from '../../services/export/PlantUMLService';
+import { MermaidExportService } from '../../services/export/MermaidExportService';
 import { MarkdownFileRegistry } from '../../files/MarkdownFileRegistry';
 import { FileSaveService } from '../../core/FileSaveService';
 import { IncomingMessage } from '../../core/bridge/MessageTypes';
@@ -107,6 +108,8 @@ export interface ExportContext {
 export interface ServiceContext {
     linkHandler: LinkHandler;
     plantUMLService: PlantUMLService;
+    /** Get the panel's MermaidExportService for panel-isolated Mermaid rendering */
+    getMermaidExportService: () => MermaidExportService;
 }
 
 // =============================================================================
