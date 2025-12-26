@@ -1214,12 +1214,12 @@ function setupGlobalDragAndDrop() {
         // Recalculate only affected stacks (not entire board)
         const sourceStack = originalColumnElement?.closest('.kanban-column-stack');
         const targetStack = finalColumnElement?.closest('.kanban-column-stack');
-        if (typeof window.recalculateStackHeightsDebounced === 'function') {
+        if (typeof window.updateStackLayoutDebounced === 'function') {
             if (sourceStack) {
-                window.recalculateStackHeightsDebounced(sourceStack);
+                window.updateStackLayoutDebounced(sourceStack);
             }
             if (targetStack && targetStack !== sourceStack) {
-                window.recalculateStackHeightsDebounced(targetStack);
+                window.updateStackLayoutDebounced(targetStack);
             }
         }
     }
@@ -1310,11 +1310,11 @@ function setupGlobalDragAndDrop() {
                     cleanupAndRecreateDropZones(rowOrBoard);
 
                     // Recalculate heights for both source and new target stack
-                    if (typeof window.recalculateStackHeightsImmediate === 'function') {
+                    if (typeof window.updateStackLayoutImmediate === 'function') {
                         if (currentStack && document.body.contains(currentStack)) {
-                            window.recalculateStackHeightsImmediate(currentStack);
+                            window.updateStackLayoutImmediate(currentStack);
                         }
-                        window.recalculateStackHeightsImmediate(dropZoneStack);
+                        window.updateStackLayoutImmediate(dropZoneStack);
                     }
                 }
             }
@@ -1992,8 +1992,8 @@ function setupGlobalDragAndDrop() {
 
                     // Recalculate affected stack after restoration (no cache invalidation - just position restore)
                     const restoredStack = droppedColumn?.closest('.kanban-column-stack');
-                    if (restoredStack && typeof window.recalculateStackHeightsDebounced === 'function') {
-                        window.recalculateStackHeightsDebounced(restoredStack);
+                    if (restoredStack && typeof window.updateStackLayoutDebounced === 'function') {
+                        window.updateStackLayoutDebounced(restoredStack);
                         // dragLogger.always('Applied stacked column styles after restoration');
                     }
 
@@ -2632,8 +2632,8 @@ function createTasksWithContent(tasksData, dropPosition, explicitColumnId = null
         // Recalculate affected stack after adding tasks (cache already invalidated by addSingleTaskToDOM)
         const targetColumnElement = document.querySelector(`[data-column-id="${targetColumnId}"]`);
         const targetStack = targetColumnElement?.closest('.kanban-column-stack');
-        if (targetStack && typeof window.recalculateStackHeightsDebounced === 'function') {
-            window.recalculateStackHeightsDebounced(targetStack);
+        if (targetStack && typeof window.updateStackLayoutDebounced === 'function') {
+            window.updateStackLayoutDebounced(targetStack);
         }
     } else {
         vscode.postMessage({
@@ -3132,7 +3132,7 @@ function updateStackBottomDropZones() {
         dropZone.className = 'stack-bottom-drop-zone';
 
         // Calculate top position by summing up heights of all columns' elements
-        // This matches the calculation in recalculateStackHeights()
+        // This matches the calculation in updateStackLayout()
         let cumulativeTop = 0;
         columns.forEach(col => {
             const isVerticallyFolded = col.classList.contains('collapsed-vertical');
