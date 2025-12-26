@@ -6,6 +6,13 @@
  */
 
 // =============================================================================
+// CONSTANTS (must match src/constants/FileNaming.ts)
+// =============================================================================
+
+/** Default export folder name - source of truth: FileNaming.DEFAULT_EXPORT_FOLDER */
+const DEFAULT_EXPORT_FOLDER = '_Export';
+
+// =============================================================================
 // STATE VARIABLES
 // =============================================================================
 
@@ -483,7 +490,7 @@ function getWorkspacePath() {
         const directoryPath = '/' + pathParts.slice(0, -1).join('/');
         return directoryPath;
     }
-    return '_Export';
+    return DEFAULT_EXPORT_FOLDER;
 }
 
 // =============================================================================
@@ -679,7 +686,7 @@ function applyPresetMarpPresentation(currentFilename) {
     document.getElementById('marp-pptx-editable').checked = false;
 
     const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_Export`;
+    const exportFolder = `${workspacePath}/${DEFAULT_EXPORT_FOLDER}`;
     document.getElementById('export-folder').value = exportFolder;
 
     document.getElementById('link-handling-mode').value = 'rewrite-only';
@@ -702,7 +709,7 @@ function applyPresetMarpPdf(currentFilename) {
     document.getElementById('marp-pptx-editable').checked = false;
 
     const workspacePath = getWorkspacePath();
-    const exportFolder = `${workspacePath}/_Export`;
+    const exportFolder = `${workspacePath}/${DEFAULT_EXPORT_FOLDER}`;
     document.getElementById('export-folder').value = exportFolder;
 
     document.getElementById('link-handling-mode').value = 'rewrite-only';

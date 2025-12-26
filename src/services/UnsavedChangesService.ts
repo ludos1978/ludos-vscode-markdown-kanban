@@ -11,10 +11,9 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fs from 'fs';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
-import { UNSAVED_CHANGES_SUFFIX } from '../constants/FileNaming';
+import { getUnsavedChangesPath } from '../constants/FileNaming';
 
 /**
  * Result of showing the unsaved changes dialog
@@ -159,9 +158,6 @@ export class UnsavedChangesService {
      * "file.md" -> ".file-unsavedchanges.md" (hidden file)
      */
     private _createBackupPath(filePath: string): string {
-        const ext = path.extname(filePath);
-        const baseName = path.basename(filePath, ext);
-        const dirName = path.dirname(filePath);
-        return path.join(dirName, `.${baseName}${UNSAVED_CHANGES_SUFFIX}${ext}`);
+        return getUnsavedChangesPath(filePath);
     }
 }

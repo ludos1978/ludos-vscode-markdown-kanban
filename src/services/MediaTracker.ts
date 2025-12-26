@@ -24,6 +24,7 @@ import {
     isExcalidrawFile,
     DOTTED_EXTENSIONS
 } from '../constants/FileExtensions';
+import { getMediaCachePath } from '../constants/FileNaming';
 
 interface MediaFileEntry {
     mtime: number;
@@ -89,9 +90,7 @@ export class MediaTracker {
      * e.g., /path/to/myboard.kanban.md -> /path/to/.myboard.kanban.md.mediacache.json
      */
     private _getCachePath(kanbanPath: string): string {
-        const dir = path.dirname(kanbanPath);
-        const basename = path.basename(kanbanPath);
-        return path.join(dir, `.${basename}.mediacache.json`);
+        return getMediaCachePath(kanbanPath);
     }
 
     /**

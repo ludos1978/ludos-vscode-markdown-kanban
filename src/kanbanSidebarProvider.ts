@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { UNSAVED_CHANGES_SUFFIX, isUnsavedChangesFile } from './constants/FileNaming';
+import {
+	isUnsavedChangesFile,
+	isAutosaveFile,
+	isBackupFile,
+	isConflictFile
+} from './constants/FileNaming';
 
 /**
  * File type categories for filtering
@@ -26,17 +31,17 @@ class FileTypeDetector {
 		const fileName = path.basename(filePath);
 
 		// Check for autosave: .{basename}-autosave.md
-		if (/^\..*-autosave\.md$/.test(fileName)) {
+		if (isAutosaveFile(fileName)) {
 			return FileCategory.Autosaves;
 		}
 
 		// Check for backup: .{basename}-backup-{timestamp}.md
-		if (/^\..*-backup-\d{8}T\d{6}\.md$/.test(fileName)) {
+		if (isBackupFile(fileName)) {
 			return FileCategory.Backups;
 		}
 
 		// Check for conflict: .{basename}-conflict-{timestamp}.md or {basename}-conflict-{timestamp}.md
-		if (/-conflict-\d{8}T\d{6}\.md$/.test(fileName)) {
+		if (isConflictFile(fileName)) {
 			return FileCategory.Conflicts;
 		}
 

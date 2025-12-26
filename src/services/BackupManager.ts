@@ -2,7 +2,13 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { configService } from './ConfigurationService';
-import { escapeRegExp } from '../utils/stringUtils';
+import {
+    getBackupFolderPath,
+    getWorkspaceBackupFolderPath,
+    getAutosavePath,
+    getLabeledBackupPath,
+    createBackupPattern
+} from '../constants/FileNaming';
 
 export interface BackupOptions {
     label?: string;           // 'backup', 'conflict', etc.
@@ -126,20 +132,14 @@ export class BackupManager {
      */
     private generateBackupPathFromFilePath(filePath: string, label: string = 'backup'): string {
         const dir = path.dirname(filePath);
-        const basename = path.basename(filePath, '.md');
-
         const backupLocation = configService.getConfig('backupLocation');
 
         let backupDir = dir;
         if (backupLocation === 'subfolder') {
-            backupDir = path.join(dir, '.kanban-backups');
+            backupDir = getBackupFolderPath(dir);
         }
 
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const backupFileName = `${basename}.${label}.${timestamp}.md`;
-
-        return path.join(backupDir, backupFileName);
+        return getLabeledBackupPath(filePath, label, backupDir);
     }
 
     /**
@@ -148,8 +148,6 @@ export class BackupManager {
     private generateBackupPath(document: vscode.TextDocument, label: string = 'backup'): string {
         const originalPath = document.uri.fsPath;
         const dir = path.dirname(originalPath);
-        const basename = path.basename(originalPath, '.md');
-
         const backupLocation = configService.getConfig('backupLocation');
 
         let backupDir = dir;
@@ -157,25 +155,17 @@ export class BackupManager {
         if (backupLocation === 'workspace-folder') {
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
             if (workspaceFolder) {
-                backupDir = path.join(workspaceFolder.uri.fsPath, '.kanban-backups');
+                backupDir = getWorkspaceBackupFolderPath(workspaceFolder.uri.fsPath);
             }
         }
 
-        // All automatically generated files should be hidden
-        const prefix = '.';
-
         // For autosave, use a fixed filename (only one autosave file)
         if (label === 'auto') {
-            const backupFileName = `${prefix}${basename}-autosave.md`;
-            return path.join(backupDir, backupFileName);
+            return getAutosavePath(originalPath, backupDir);
         }
 
         // For backup and conflict files, use timestamp
-        const now = new Date();
-        const timestamp = this.formatTimestamp(now);
-        const backupFileName = `${prefix}${basename}-${label}-${timestamp}.md`;
-
-        return path.join(backupDir, backupFileName);
+        return getLabeledBackupPath(originalPath, label, backupDir);
     }
 
     /**
@@ -233,9 +223,6 @@ export class BackupManager {
      */
     private generateFileBackupPath(filePath: string, label: string = 'backup'): string {
         const dir = path.dirname(filePath);
-        const ext = path.extname(filePath);
-        const basename = path.basename(filePath, ext);
-
         const backupLocation = configService.getConfig('backupLocation');
 
         let backupDir = dir;
@@ -244,39 +231,17 @@ export class BackupManager {
             // Try to find workspace folder for this file
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
             if (workspaceFolder) {
-                backupDir = path.join(workspaceFolder.uri.fsPath, '.kanban-backups');
+                backupDir = getWorkspaceBackupFolderPath(workspaceFolder.uri.fsPath);
             }
         }
 
-        // All automatically generated files should be hidden
-        const prefix = '.';
-
         // For autosave, use a fixed filename (only one autosave file)
         if (label === 'auto') {
-            const backupFileName = `${prefix}${basename}-autosave${ext}`;
-            return path.join(backupDir, backupFileName);
+            return getAutosavePath(filePath, backupDir);
         }
 
         // For backup and conflict files, use timestamp
-        const now = new Date();
-        const timestamp = this.formatTimestamp(now);
-        const backupFileName = `${prefix}${basename}-${label}-${timestamp}${ext}`;
-
-        return path.join(backupDir, backupFileName);
-    }
-
-    /**
-     * Format timestamp as YYYYMMDDTHHmmss
-     */
-    private formatTimestamp(date: Date): string {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-
-        return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+        return getLabeledBackupPath(filePath, label, backupDir);
     }
 
     /**
@@ -309,7 +274,7 @@ export class BackupManager {
             if (backupLocation === 'workspace-folder') {
                 const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
                 if (workspaceFolder) {
-                    backupDir = path.join(workspaceFolder.uri.fsPath, '.kanban-backups');
+                    backupDir = getWorkspaceBackupFolderPath(workspaceFolder.uri.fsPath);
                 }
             }
 
@@ -321,7 +286,7 @@ export class BackupManager {
             // Only clean up backup files with timestamps, NOT autosave or conflict files
             // Pattern matches: .basename-backup-YYYYMMDDTHHmmss.md
             // This EXCLUDES: autosave (single file) and conflict files (user-created)
-            const backupPattern = new RegExp(`^\\.${escapeRegExp(basename)}-backup-\\d{8}T\\d{6}\\.md$`);
+            const backupPattern = createBackupPattern(basename);
 
             const files = fs.readdirSync(backupDir);
             const backupFiles = files

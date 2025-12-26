@@ -10,6 +10,7 @@ import { ConflictResolver, ConflictContext, ConflictResolution } from '../servic
 import { BackupManager } from '../services/BackupManager';
 import { FileManager } from '../fileManager';
 import { UnifiedChangeHandler } from '../core/UnifiedChangeHandler';
+import { getFileNamingConfig } from '../constants/FileNaming';
 
 /**
  * Represents the main kanban markdown file.
@@ -425,7 +426,7 @@ export class MainKanbanFile extends MarkdownFile {
                 }
             } else if (resolution.shouldBackupExternal && resolution.shouldSave) {
                 // Backup the external file first (the current file on disk), then save kanban
-                const externalBackupPath = await this.createExternalBackup('external-conflict');
+                const externalBackupPath = await this.createExternalBackup(getFileNamingConfig().externalConflictLabel);
                 await this.save();  // save() already clears cached board
                 if (externalBackupPath) {
                     this._showBackupNotification(externalBackupPath, 'External changes backed up');
