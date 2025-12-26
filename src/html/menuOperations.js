@@ -2127,7 +2127,7 @@ function moveTaskInDirection(taskId, columnId, direction) {
     markUnsavedChanges();
 }
 
-// Wrapper functions for backwards compatibility
+// Shorthand functions for menu onclick handlers
 function moveTaskToTop(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'top'); }
 function moveTaskUp(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'up'); }
 function moveTaskDown(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'down'); }
@@ -2962,7 +2962,7 @@ function saveCachedBoard() {
     
 }
 
-// Legacy function - redirect to new system
+// Alias for saveCachedBoard
 function flushPendingTagChanges() {
     saveCachedBoard();
 }
@@ -3601,7 +3601,7 @@ window.updateTagButtonAppearance = updateTagButtonAppearance;
 window.saveCachedBoard = saveCachedBoard;
 window.markUnsavedChanges = markUnsavedChanges;
 window.hasUnsavedChanges = hasUnsavedChanges;
-window.flushPendingTagChanges = flushPendingTagChanges; // Legacy redirect
+window.flushPendingTagChanges = flushPendingTagChanges;
 window.updateRefreshButtonState = updateRefreshButtonState;
 window.handleSaveError = handleSaveError;
 

@@ -115,17 +115,57 @@ export const TIMESTAMP_PATTERN = '\\d{8}T\\d{6}';
 // =============================================================================
 
 /**
- * Generate a timestamp string for backup/conflict files
- * Format: YYYYMMDDTHHmmss
+ * Extract date/time components from a Date object (local time)
+ */
+function getDateComponents(date: Date = new Date()) {
+    return {
+        year: date.getFullYear(),
+        month: String(date.getMonth() + 1).padStart(2, '0'),
+        day: String(date.getDate()).padStart(2, '0'),
+        hours: String(date.getHours()).padStart(2, '0'),
+        minutes: String(date.getMinutes()).padStart(2, '0'),
+        seconds: String(date.getSeconds()).padStart(2, '0')
+    };
+}
+
+/**
+ * Generate a compact timestamp for backup/conflict files
+ * Format: YYYYMMDDTHHmmss (e.g., 20231215T143022)
+ * Used for: backup files, conflict files
  */
 export function generateTimestamp(date: Date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const { year, month, day, hours, minutes, seconds } = getDateComponents(date);
     return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+}
+
+/**
+ * Generate a timestamp for export folders (without seconds)
+ * Format: YYYYMMDD-HHmm (e.g., 20231215-1430)
+ * Used for: export folder names
+ */
+export function generateTimestampExport(date: Date = new Date()): string {
+    const { year, month, day, hours, minutes } = getDateComponents(date);
+    return `${year}${month}${day}-${hours}${minutes}`;
+}
+
+/**
+ * Generate a filename-safe ISO-like timestamp
+ * Format: YYYY-MM-DDTHH-mm-ss (e.g., 2023-12-15T14-30-22)
+ * Used for: image files, clipboard pastes
+ */
+export function generateTimestampFilenameSafe(date: Date = new Date()): string {
+    const { year, month, day, hours, minutes, seconds } = getDateComponents(date);
+    return `${year}-${month}-${day}T${hours}-${minutes}-${seconds}`;
+}
+
+/**
+ * Generate date-only string
+ * Format: YYYY-MM-DD (e.g., 2023-12-15)
+ * Used for: share content presets, date-only naming
+ */
+export function generateDateOnly(date: Date = new Date()): string {
+    const { year, month, day } = getDateComponents(date);
+    return `${year}-${month}-${day}`;
 }
 
 // =============================================================================

@@ -1393,7 +1393,7 @@ function loadMermaidLibrary() {
             return;
         }
 
-        // Check if already loaded via script tag (backwards compatibility)
+        // Check if already loaded via script tag
         if (typeof mermaid !== 'undefined') {
             initializeMermaid();
             resolve();

@@ -154,7 +154,7 @@ export class EditModeCommands extends BaseMessageCommand {
 
                 // Board state operations - sync board from frontend to backend
                 case 'markUnsavedChanges':
-                    // Legacy message type from frontend - sync board if provided
+                    // Sync board from frontend if provided
                     if (message.cachedBoard) {
                         context.emitBoardChanged(message.cachedBoard, 'edit');
                     }

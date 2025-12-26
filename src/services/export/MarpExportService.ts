@@ -283,7 +283,7 @@ export class MarpExportService {
                 args.push('--pptx-editable');
             }
         } else {
-            // Default to HTML (covers 'html' and any legacy 'markdown' from old saved settings)
+            // Default to HTML (covers 'html' and old 'markdown' format setting)
             args.push('--html');
         }
 

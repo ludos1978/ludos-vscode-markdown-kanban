@@ -56,9 +56,9 @@ export class GatherQueryEngine {
         board.columns.forEach(column => {
             if (!column.title) { return; }
 
-            // Extract legacy gather and ungathered tags (#gather_...)
-            const legacyMatches = column.title.match(/#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g) || [];
-            legacyMatches.forEach(match => {
+            // Extract classic gather and ungathered tags (#gather_...)
+            const classicMatches = column.title.match(/#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g) || [];
+            classicMatches.forEach(match => {
                 const tag = match.substring(1);
                 if (tag === 'ungathered') {
                     ungatheredRules.push({ column: column });

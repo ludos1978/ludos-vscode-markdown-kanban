@@ -14,7 +14,7 @@ import { IncomingMessage } from '../core/bridge/MessageTypes';
 import { ValidationResult } from '../shared/interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 
-// Re-export for backwards compatibility
+// Re-export for external access
 export { ValidationResult };
 
 /**

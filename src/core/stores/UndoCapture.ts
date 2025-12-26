@@ -167,7 +167,7 @@ export class UndoCapture {
     }
 
     /**
-     * Create an UndoEntry with inferred targets (legacy support)
+     * Create an UndoEntry with inferred targets
      * Used when call site doesn't provide target info
      */
     static inferred(board: KanbanBoard, operation: string): UndoEntry {

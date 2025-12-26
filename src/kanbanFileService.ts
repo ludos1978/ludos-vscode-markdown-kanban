@@ -105,7 +105,7 @@ export class KanbanFileService {
         const mainFile = this.fileRegistry.getMainFile();
         const hasUnsavedChanges = mainFile?.hasUnsavedChanges() || false;
 
-        // STATE MACHINE: Convert to boolean for backwards compatibility
+        // STATE MACHINE: Convert to boolean
         const isUpdatingFromPanel = this._saveState !== SaveState.IDLE;
 
         return {

@@ -8,7 +8,7 @@ import { PluginRegistry, IncludeContextLocation } from './plugins';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Re-export types from KanbanTypes for backwards compatibility
+// Re-export types from KanbanTypes
 export { KanbanTask, KanbanColumn, KanbanBoard } from './board/KanbanTypes';
 
 // Import types for internal use

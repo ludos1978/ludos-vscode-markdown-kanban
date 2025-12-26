@@ -1572,14 +1572,14 @@ window.updateTemplates = function(templates, showBar = true) {
     window.availableTemplates = templates || [];
     window.showTemplateBar = showBar;
 
-    // Get the template source container and select element (legacy, kept hidden)
+    // Get the template source container and select element (hidden)
     const templateSource = document.getElementById('template-source');
     const templateSelect = document.getElementById('template-select');
 
     // Get the new columns menu dropdown
     const columnsMenuDropdown = document.getElementById('columns-menu-dropdown');
 
-    // Update legacy template select (hidden, for backwards compatibility)
+    // Update template select (hidden)
     if (templateSelect) {
         // Clear existing options (keep first placeholder)
         while (templateSelect.options.length > 1) {
@@ -5187,7 +5187,7 @@ function addSingleColumnToDOM(column, insertIndex = -1, referenceColumnId = null
             }
         }
     } else {
-        // Legacy single-row mode: insert directly into boardElement
+        // Single-row mode: insert directly into boardElement
         const directChildren = Array.from(boardElement.children).filter(child =>
             child.classList.contains('kanban-full-height-column') ||
             child.classList.contains('kanban-column-stack') ||

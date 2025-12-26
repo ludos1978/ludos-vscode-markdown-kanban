@@ -12,6 +12,7 @@ import { DiagramPreprocessor } from './DiagramPreprocessor';
 import { MermaidExportService } from './MermaidExportService';
 import { ConfigurationService } from '../ConfigurationService';
 import { INCLUDE_SYNTAX } from '../../constants/IncludeConstants';
+import { generateTimestampExport } from '../../constants/FileNaming';
 import { DOTTED_EXTENSIONS } from '../../shared/fileTypeDefinitions';
 import { MarkdownPatterns, HtmlPatterns, isUrl } from '../../shared/regexPatterns';
 import { AssetHandler } from '../assets/AssetHandler';
@@ -947,15 +948,7 @@ export class ExportService {
         const absoluteSourcePath = path.resolve(sourceDocumentPath);
         const sourceDir = path.dirname(absoluteSourcePath);
         const sourceBasename = path.basename(absoluteSourcePath, '.md');
-        const now = new Date();
-
-        // Use local time instead of UTC (toISOString uses UTC/GMT)
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const timestamp = `${year}${month}${day}-${hours}${minutes}`;  // YYYYMMDD-HHmm
+        const timestamp = generateTimestampExport();
 
         const exportFolder = path.join(sourceDir, `${sourceBasename}-${timestamp}`);
         return exportFolder;

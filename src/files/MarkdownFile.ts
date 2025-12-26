@@ -144,7 +144,7 @@ export abstract class MarkdownFile implements vscode.Disposable {
 
     // ============= PATH NORMALIZATION (FOUNDATION-1) =============
     // Note: Core path functions are in utils/stringUtils.ts
-    // These static methods delegate to the centralized functions for backwards compatibility
+    // These static methods delegate to the centralized functions
 
     /**
      * Centralized normalization function for relative paths.

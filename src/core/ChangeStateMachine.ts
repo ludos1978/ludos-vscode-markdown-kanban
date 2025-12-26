@@ -4,7 +4,7 @@ import { IncludeLoadingProcessor } from './IncludeLoadingProcessor';
 import { FileSaveService } from './FileSaveService';
 import { PanelContext } from '../panel/PanelContext';
 
-// Re-export types from ChangeTypes for backwards compatibility
+// Re-export types from ChangeTypes
 export {
     ChangeState,
     FileSystemChangeEvent,

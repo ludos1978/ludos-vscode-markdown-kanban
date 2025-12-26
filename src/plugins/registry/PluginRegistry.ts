@@ -17,7 +17,7 @@ import {
 } from '../interfaces';
 import { ValidationResult } from '../../shared/interfaces';
 
-// Re-export for backwards compatibility
+// Re-export for external access
 export { ValidationResult };
 
 /**

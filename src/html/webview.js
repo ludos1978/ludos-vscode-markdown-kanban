@@ -133,15 +133,6 @@ async function handleDiagramConvert(button, diagramType) {
     }
 }
 
-// Legacy wrapper functions for backwards compatibility
-function handlePlantUMLConvert(button) {
-    return handleDiagramConvert(button, 'plantuml');
-}
-
-function handleMermaidConvert(button) {
-    return handleDiagramConvert(button, 'mermaid');
-}
-
 // Event delegation for convert buttons (wrapped in guard to prevent duplicates on webview revival)
 if (!webviewEventListenersInitialized) {
     document.addEventListener('click', (e) => {
@@ -292,7 +283,7 @@ function getCSS(optionType, value) {
     return option ? option.css : value;
 }
 
-// Helper function to convert CSS value back to option value (for legacy support)
+// Helper function to convert CSS value back to option value
 function getValue(optionType, css) {
     if (!baseOptions[optionType]) {
         return css;
@@ -1217,7 +1208,7 @@ function applyRowHeightSetting(height) {
 
     styleManager.applyRowHeight(cssValue === 'auto' ? 'auto' : cssValue);
 
-    // Call legacy applyRowHeight if it exists
+    // Also call applyRowHeight if defined elsewhere
     if (typeof applyRowHeight === 'function') {
         applyRowHeight(height);
     }
@@ -1363,7 +1354,7 @@ function applyWhitespace(spacing) {
     // Use styleManager to apply CSS variable
     styleManager.applyWhitespace(spacing);
 
-    // Call legacy updateWhitespace if it exists for compatibility
+    // Also call updateWhitespace if defined elsewhere
     if (typeof updateWhitespace === 'function') {
         updateWhitespace(spacing);
     }
@@ -1386,7 +1377,7 @@ function applyTaskMinHeight(height) {
     // Use styleManager to apply card height
     styleManager.applyCardHeight(height);
 
-    // Call legacy updateTaskMinHeight if it exists for compatibility
+    // Also call updateTaskMinHeight if defined elsewhere
     if (typeof updateTaskMinHeight === 'function') {
         updateTaskMinHeight(height);
     }
@@ -2048,7 +2039,7 @@ if (!webviewEventListenersInitialized) {
                 window.currentColumnWidth = currentColumnWidth;
                 // Update whitespace with the value from configuration
                 if (message.whitespace) {
-                    // Handle legacy whitespace values
+                    // Normalize old whitespace values to current options
                     let whitespace = message.whitespace;
                     if (whitespace === '2px') {
                         whitespace = '4px'; // Convert old compact to new compact
@@ -2068,7 +2059,7 @@ if (!webviewEventListenersInitialized) {
 
                 // Update task min height with the value from configuration
                 if (message.taskMinHeight) {
-                    // Handle legacy card height values - convert CSS back to value
+                    // Convert CSS value to option value
                     const taskMinHeight = getValue('cardHeight', message.taskMinHeight);
                     applyTaskMinHeight(taskMinHeight);
                 } else {
@@ -2091,12 +2082,12 @@ if (!webviewEventListenersInitialized) {
 
                 // Update font size with the value from configuration
                 if (message.fontSize) {
-                    // Handle legacy font size values
+                    // Normalize old font size values to current options
                     let fontSize = message.fontSize;
                     if (fontSize === 'small') {
-                        fontSize = '0_75x'; // Convert legacy 'small' to 0.75x
+                        fontSize = '0_75x';
                     } else if (fontSize === 'normal') {
-                        fontSize = '1x'; // Convert legacy 'normal' to 1x
+                        fontSize = '1x';
                     }
                     applyFontSize(fontSize);
                 } else {
@@ -2136,7 +2127,7 @@ if (!webviewEventListenersInitialized) {
 
                 // Update column width with the value from configuration
                 if (message.columnWidth) {
-                    // Handle legacy column width values
+                    // Normalize old column width values to current options
                     let columnWidth = message.columnWidth;
                     if (columnWidth === 'small') {
                         columnWidth = '250px';
@@ -2163,9 +2154,9 @@ if (!webviewEventListenersInitialized) {
             if (isInitialLoad) {
                 // Update row height with the value from configuration
                 if (message.rowHeight) {
-                    // Handle legacy row height values - convert CSS back to value
+                    // Normalize old row height values to current options
                     let rowHeight = message.rowHeight;
-                    // Map legacy em values
+                    // Map old em values to px
                     if (rowHeight === '19em') {
                         rowHeight = '300px';
                     } else if (rowHeight === '31em') {
@@ -2190,7 +2181,7 @@ if (!webviewEventListenersInitialized) {
 
                 // Update tag visibility with the value from configuration
                 if (message.tagVisibility) {
-                    // Handle legacy tag visibility values
+                    // Normalize old tag visibility values to current options
                     let tagVisibility = message.tagVisibility;
                     if (tagVisibility === 'standard') {
                         tagVisibility = 'allexcludinglayout';
@@ -2449,7 +2440,7 @@ if (!webviewEventListenersInitialized) {
             // NOTE: Full re-render is no longer needed here.
             // updateIncludeFileCache now handles targeted re-rendering of only
             // the task descriptions containing pending include placeholders.
-            // Keeping this case for backwards compatibility but not triggering renderBoard.
+            // This case is kept but no longer triggers renderBoard.
             break;
         case 'enableTaskIncludeMode':
             // Call the enableTaskIncludeMode function with the provided parameters
@@ -2854,7 +2845,7 @@ if (!webviewEventListenersInitialized) {
                     // Update column title and displayTitle from backend
                     // Backend is source of truth after processing
                     if (colData.title !== undefined) column.title = colData.title;
-                    // Also support legacy columnTitle property
+                    // Also support columnTitle property from message
                     if (message.columnTitle !== undefined) column.title = message.columnTitle;
                     if (colData.displayTitle !== undefined) column.displayTitle = colData.displayTitle;
 
@@ -2966,7 +2957,7 @@ if (!webviewEventListenersInitialized) {
                     // Empty string "" is falsy and would fall back to old value with ||
                     if (taskData.description !== undefined) foundTask.description = taskData.description;
                     if (taskData.title !== undefined) foundTask.title = taskData.title;
-                    // Also support legacy taskTitle property
+                    // Also support taskTitle property from message
                     if (message.taskTitle !== undefined) foundTask.title = message.taskTitle;
                     if (taskData.displayTitle !== undefined) foundTask.displayTitle = taskData.displayTitle;
                     if (taskData.originalTitle !== undefined) foundTask.originalTitle = taskData.originalTitle;
@@ -3117,7 +3108,7 @@ if (!webviewEventListenersInitialized) {
                         originalValue: editor.originalValue
                     };
                 } else {
-                    // SAVE mode: Normal save (for backwards compatibility)
+                    // SAVE mode: Normal save
                     if (typeof window.taskEditor.saveCurrentField === 'function') {
                         window.taskEditor.saveCurrentField();
                     }
@@ -3585,7 +3576,7 @@ document.addEventListener('keydown', (e) => {
                                 });
                             }
 
-                            // Clear old pending changes (legacy cleanup)
+                            // Clear pending changes
                             if (window.pendingColumnChanges) {window.pendingColumnChanges.clear();}
                             if (window.pendingTaskChanges) {window.pendingTaskChanges.clear();}
 
@@ -4892,12 +4883,6 @@ function setFontFamily(family) {
     applyAndSaveSetting('fontFamily', family, applyFontFamily);
 }
 
-// Legacy function for backward compatibility
-function toggleCardFontSize() {
-    const nextSize = currentFontSize === 'small' ? 'normal' : 'small';
-    setFontSize(nextSize);
-}
-
 // Open include file function
 function openIncludeFile(filePath) {
     if (typeof vscode !== 'undefined') {
@@ -4910,7 +4895,6 @@ function openIncludeFile(filePath) {
 
 // Make functions globally available
 window.setFontSize = setFontSize;
-window.toggleCardFontSize = toggleCardFontSize;
 window.openIncludeFile = openIncludeFile;
 
 /**

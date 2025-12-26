@@ -58,7 +58,7 @@ class TagUtils {
             // Captures: type prefix and the query content
             queryTags: new RegExp(`${P.Q}([${P.H}${P.P}${P.T}])([^\\s]+)`, 'g'),
 
-            // Legacy gather tags (for backward compatibility)
+            // Classic gather tags (#gather_...)
             gatherTags: new RegExp(`${P.H}(gather_[^\\s]+|ungathered)(?=\\s|$)`, 'g'),
 
             // TEMPORAL TAGS - all start with . and capture everything until whitespace
@@ -817,9 +817,9 @@ class TagUtils {
     }
 
     /**
-     * Check if a tag is a legacy gather tag (#gather_...)
+     * Check if a tag is a classic gather tag (#gather_...)
      * @param {string} tag - Tag to check
-     * @returns {boolean} True if legacy gather tag
+     * @returns {boolean} True if classic gather tag
      */
     isGatherTag(tag) {
         if (!tag) return false;
@@ -990,7 +990,7 @@ class TagUtils {
             person: [],     // @ tags
             query: [],      // ? tags (queries/gathers)
             layout: [],
-            gather: [],     // legacy #gather_ tags
+            gather: [],     // classic #gather_ tags
             regular: []     // # tags
         };
 

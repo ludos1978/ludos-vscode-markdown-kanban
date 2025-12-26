@@ -19,9 +19,7 @@ const CLIPBOARD_CHECK_THROTTLE = 1000; // Only check clipboard once per second
 // =============================================================================
 
 /**
- * Legacy clipboard mousedown handler (deprecated)
- * Purpose: Previously handled clipboard interactions
- * Used by: Clipboard card source (now unused)
+ * Clipboard mousedown handler
  * @param {MouseEvent} e - Mouse event
  */
 window.handleClipboardMouseDown = async function(e) {

@@ -50,8 +50,8 @@ export interface BoardStoreOptions {
 
 // ============= HELPER FUNCTIONS =============
 
-function createLegacyUndoEntry(board: KanbanBoard): UndoEntry {
-    return UndoCapture.inferred(board, 'legacy');
+function createInferredUndoEntry(board: KanbanBoard): UndoEntry {
+    return UndoCapture.inferred(board, 'inferred');
 }
 
 // ============= MAIN CLASS =============
@@ -219,15 +219,15 @@ export class BoardStore implements vscode.Disposable {
     }
 
     /**
-     * Save current board state for undo (legacy method for compatibility)
+     * Save current board state for undo
      * Creates an inferred UndoEntry without target metadata
-     * @deprecated Use saveUndoEntry with proper UndoCapture instead
+     * Note: Prefer saveUndoEntry with proper UndoCapture for better performance
      */
     saveStateForUndo(board?: KanbanBoard): void {
         const boardToSave = board ?? this._state.board;
         if (!boardToSave || !boardToSave.valid) { return; }
 
-        const entry = createLegacyUndoEntry(boardToSave);
+        const entry = createInferredUndoEntry(boardToSave);
         this.saveUndoEntry(entry);
     }
 
@@ -246,7 +246,7 @@ export class BoardStore implements vscode.Disposable {
         if (currentBoard && currentBoard.valid) {
             // Create a redo entry from current state
             // We don't have target info for redo, so use inferred
-            this._state.redoStack.push(createLegacyUndoEntry(currentBoard));
+            this._state.redoStack.push(createInferredUndoEntry(currentBoard));
         }
 
         const restoredEntry = this._state.undoStack.pop()!;
@@ -274,7 +274,7 @@ export class BoardStore implements vscode.Disposable {
         const currentBoard = this._state.board;
         if (currentBoard && currentBoard.valid) {
             // Create an undo entry from current state
-            this._state.undoStack.push(createLegacyUndoEntry(currentBoard));
+            this._state.undoStack.push(createInferredUndoEntry(currentBoard));
         }
 
         const restoredEntry = this._state.redoStack.pop()!;

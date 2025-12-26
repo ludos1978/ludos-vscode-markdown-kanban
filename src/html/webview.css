@@ -1355,7 +1355,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   flex-shrink: 0;
 }
 
-/* Column controls - keep for backwards compatibility */
+/* Column controls */
 .column-controls {
   display: flex;
   gap: var(--whitespace-div2);
@@ -3903,7 +3903,7 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   display: block;
 }
 
-/* LEGACY: Internal drop indicator (now unified, kept for backwards compat) */
+/* Internal drop indicator (unified) */
 .internal-drop-indicator {
   position: fixed;
   height: 3px;

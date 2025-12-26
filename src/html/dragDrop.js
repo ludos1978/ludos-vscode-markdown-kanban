@@ -2235,8 +2235,7 @@ function processImageSave(e, base64Data, imageType, md5Hash) {
         const directory = pathParts.join('/'); // Always use forward slash for consistency
 
         // Generate unique filename for the image
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + 'T' +
-                         new Date().toISOString().replace(/[:.]/g, '-').split('T')[1].split('-')[0];
+        const timestamp = window.DateUtils.generateTimestampFilenameSafe();
         const extension = imageType.split('/')[1] || 'png';
         const imageFileName = `clipboard-image-${timestamp}.${extension}`;
 

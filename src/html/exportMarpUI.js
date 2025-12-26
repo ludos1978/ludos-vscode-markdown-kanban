@@ -163,13 +163,6 @@ function setSelectedExportFolder(folderPath) {
 }
 
 /**
- * Execute the export operation (LEGACY - kept for backward compatibility)
- */
-function executeExport() {
-    executeUnifiedExport();
-}
-
-/**
  * Initialize export tree when modal opens
  * @param {string} preSelectNodeId - Optional node ID to pre-select instead of full kanban
  */
@@ -721,8 +714,7 @@ function applyPresetMarpPdf(currentFilename) {
  * Apply Share Content preset
  */
 function applyPresetShareContent(currentFilename) {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
+    const dateStr = window.DateUtils.generateDateOnly();
 
     document.getElementById('export-format').value = 'keep';
     document.getElementById('merge-includes').checked = false;

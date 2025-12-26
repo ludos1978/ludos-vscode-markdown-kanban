@@ -7,7 +7,7 @@ import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
 
-// Re-export for backwards compatibility
+// Re-export for external access
 export { getOutputChannel } from './services/OutputChannelService';
 
 export function activate(context: vscode.ExtensionContext) {

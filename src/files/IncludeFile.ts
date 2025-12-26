@@ -9,6 +9,7 @@ import { KanbanTask } from '../board/KanbanTypes';
 import { PresentationParser } from '../services/export/PresentationParser';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeDecodeURIComponent } from '../utils/stringUtils';
+import { generateTimestampFilenameSafe } from '../constants/FileNaming';
 
 /**
  * Include file types supported by the plugin system
@@ -213,7 +214,7 @@ export class IncludeFile extends MarkdownFile {
     public async createBackup(label: string = 'manual'): Promise<string | null> {
 
         try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const timestamp = generateTimestampFilenameSafe();
             const backupDir = path.join(path.dirname(this._absolutePath), '.backups');
             const filename = path.basename(this._absolutePath);
             const backupPath = path.join(backupDir, `${timestamp}_${label}_${filename}`);
