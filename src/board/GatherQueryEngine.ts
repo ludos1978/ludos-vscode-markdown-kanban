@@ -56,34 +56,25 @@ export class GatherQueryEngine {
         board.columns.forEach(column => {
             if (!column.title) { return; }
 
-            // Extract classic gather and ungathered tags (#gather_...)
-            const classicMatches = column.title.match(/#(gather_[a-zA-Z0-9_&|=><!\-]+|ungathered)/g) || [];
-            classicMatches.forEach(match => {
-                const tag = match.substring(1);
-                if (tag === 'ungathered') {
-                    ungatheredRules.push({ column: column });
-                } else if (tag.startsWith('gather_')) {
-                    gatherRules.push({
-                        column: column,
-                        expression: tag.substring(7)
-                    });
-                }
-            });
+            // Extract #ungathered tags (special case - collects unmatched tasks)
+            if (column.title.includes('#ungathered')) {
+                ungatheredRules.push({ column: column });
+            }
 
-            // Extract new query tags (?. for temporal, ?@ for person, ?# for hash)
+            // Extract query tags: ?. (temporal), ?@ (person), ?# (hash tag)
             const queryMatches = column.title.match(/\?([.@#])([^\s]+)/g) || [];
             queryMatches.forEach(match => {
                 const typePrefix = match[1]; // . @ or #
                 const queryContent = match.substring(2);
 
                 if (typePrefix === '.') {
-                    // Temporal query
+                    // Temporal query (?.)
                     this._processTemporalQuery(queryContent, column, gatherRules);
                 } else if (typePrefix === '@') {
-                    // Person query
+                    // Person query (?@)
                     gatherRules.push({ column, expression: queryContent });
                 } else if (typePrefix === '#') {
-                    // Hash tag query
+                    // Hash tag query (?#)
                     gatherRules.push({ column, expression: `tag_${queryContent}` });
                 }
             });

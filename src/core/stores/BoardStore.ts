@@ -219,19 +219,6 @@ export class BoardStore implements vscode.Disposable {
     }
 
     /**
-     * Save current board state for undo
-     * Creates an inferred UndoEntry without target metadata
-     * Note: Prefer saveUndoEntry with proper UndoCapture for better performance
-     */
-    saveStateForUndo(board?: KanbanBoard): void {
-        const boardToSave = board ?? this._state.board;
-        if (!boardToSave || !boardToSave.valid) { return; }
-
-        const entry = createInferredUndoEntry(boardToSave);
-        this.saveUndoEntry(entry);
-    }
-
-    /**
      * Undo to previous state
      * @returns Object containing restored board and targets for targeted update
      */

@@ -10,7 +10,7 @@ const TAG_PREFIXES = {
     HASH: '#',      // Regular tags: #todo, #urgent, #row2
     PERSON: '@',    // Person/mention tags: @john, @team-alpha
     TEMPORAL: '!',  // Temporal tags: !2025.01.28, !w15, !mon, !15:30
-    QUERY: '$'      // Query/gather tags: $#tag, $@person, $!today (gathers cards with matching tags)
+    QUERY: '$'      // Query tags: $#tag, $@person, $!today (queries cards with matching tags)
 };
 
 // Helper to escape special regex characters in prefixes
@@ -33,7 +33,7 @@ class TagUtils {
         // All tags capture everything after their prefix until whitespace (space, tab, newline)
         this.patterns = {
             // HASH TAGS - regular tags, everything until whitespace
-            // Supports: #tag, #1, #1.5, #++, #gather_reto|anita, #gather_bruno&karl, etc.
+            // Supports: #tag, #1, #1.5, #++, etc.
             basicTags: new RegExp(`${P.H}([^\\s]+)`, 'g'),
 
             // PERSON/MENTION TAGS - everything until whitespace
@@ -53,13 +53,10 @@ class TagUtils {
             stickyTag: new RegExp(`${P.H}sticky(?=\\s|$)`, 'gi'),
             includeTag: new RegExp(`${P.H}include:([^\\s]+)`, 'i'),
 
-            // QUERY/GATHER TAGS - start with ? followed by tag type prefix (#, @, !)
+            // QUERY TAGS - start with ? followed by tag type prefix (#, @, !)
             // Examples: ?#tag, ?@person, ?!today, ?#tag1&tag2, ?@reto|bruno
             // Captures: type prefix and the query content
             queryTags: new RegExp(`${P.Q}([${P.H}${P.P}${P.T}])([^\\s]+)`, 'g'),
-
-            // Classic gather tags (#gather_...)
-            gatherTags: new RegExp(`${P.H}(gather_[^\\s]+|ungathered)(?=\\s|$)`, 'g'),
 
             // TEMPORAL TAGS - all start with . and capture everything until whitespace
             // Date patterns (.2025.01.28, .2025-01-05, .2025/01/05)
@@ -100,7 +97,7 @@ class TagUtils {
         this.layoutTags = ['row', 'span', 'stack', 'sticky', 'fold', 'archive', 'hidden', 'include'];
 
         // Tags that should be excluded from menus
-        this.excludedTags = ['gather_', 'ungathered', 'fold', 'archive', 'hidden'];
+        this.excludedTags = ['ungathered', 'fold', 'archive', 'hidden'];
     }
 
     /**
@@ -114,7 +111,7 @@ class TagUtils {
             includeHash = false,      // # tags (regular tags)
             includePerson = false,    // @ tags (person/mention tags)
             includeTemporal = false,  // . tags (temporal tags)
-            includeQuery = false,     // ? tags (query/gather tags)
+            includeQuery = false,     // ? tags (query tags)
             excludeLayout = true,
             unique = true
         } = options;
@@ -199,9 +196,6 @@ class TagUtils {
             const raw = m[1];
             const baseMatch = raw.match(/^([a-zA-Z0-9_.-]+)/);
             const base = (baseMatch ? baseMatch[1] : raw).toLowerCase();
-
-            // Skip gather tags for styling
-            if (base.startsWith('gather_')) continue;
 
             // Skip numeric tags for styling (they're for indexing, not styling)
             // Check if the tag is purely numeric (with optional decimal point)
@@ -807,24 +801,13 @@ class TagUtils {
     }
 
     /**
-     * Check if a tag is a query/gather tag
+     * Check if a tag is a query tag
      * @param {string} tag - Tag to check
-     * @returns {boolean} True if query/gather tag
+     * @returns {boolean} True if query tag
      */
     isQueryTag(tag) {
         if (!tag) return false;
         return tag.startsWith(this.prefixes.QUERY);
-    }
-
-    /**
-     * Check if a tag is a classic gather tag (#gather_...)
-     * @param {string} tag - Tag to check
-     * @returns {boolean} True if classic gather tag
-     */
-    isGatherTag(tag) {
-        if (!tag) return false;
-        const cleanTag = tag.replace(this.prefixStripRegex, '');
-        return cleanTag.startsWith('gather_') || cleanTag === 'ungathered';
     }
 
     /**
@@ -964,9 +947,6 @@ class TagUtils {
             // Skip layout tags
             if (this.isLayoutTag(cleanTag)) return false;
 
-            // Skip gather tags
-            if (this.isGatherTag(cleanTag)) return false;
-
             // Skip excluded tags
             if (this.excludedTags.some(excluded => cleanTag.startsWith(excluded))) {
                 return false;
@@ -988,9 +968,8 @@ class TagUtils {
             state: [],
             temporal: [],   // . tags (dates, times, weeks, weekdays)
             person: [],     // @ tags
-            query: [],      // ? tags (queries/gathers)
+            query: [],      // ? tags (queries)
             layout: [],
-            gather: [],     // classic #gather_ tags
             regular: []     // # tags
         };
 
@@ -1009,8 +988,6 @@ class TagUtils {
                 groups.person.push(tag);
             } else if (this.isLayoutTag(cleanTag)) {
                 groups.layout.push(tag);
-            } else if (this.isGatherTag(cleanTag)) {
-                groups.gather.push(tag);
             } else {
                 groups.regular.push(tag);
             }
@@ -1044,47 +1021,6 @@ class TagUtils {
                 return `tag-${cleanTag}`;
             })
             .join(' ');
-    }
-
-    /**
-     * Parse gather tag conditions
-     * @param {string} gatherTag - Gather tag to parse
-     * @returns {Object} Parsed conditions
-     */
-    parseGatherConditions(gatherTag) {
-        if (!gatherTag || !gatherTag.startsWith('gather_')) {
-            return null;
-        }
-
-        const conditionString = gatherTag.substring(7); // Remove 'gather_'
-        const conditions = {
-            include: [],
-            exclude: [],
-            operator: 'AND'
-        };
-
-        // Parse OR conditions
-        if (conditionString.includes('|')) {
-            conditions.operator = 'OR';
-            conditions.include = conditionString.split('|').map(t => t.trim());
-        }
-        // Parse AND conditions
-        else if (conditionString.includes('&')) {
-            conditions.operator = 'AND';
-            conditions.include = conditionString.split('&').map(t => t.trim());
-        }
-        // Parse NOT conditions
-        else if (conditionString.includes('!')) {
-            const parts = conditionString.split('!');
-            conditions.include = parts[0] ? [parts[0].trim()] : [];
-            conditions.exclude = parts.slice(1).map(t => t.trim());
-        }
-        // Single condition
-        else {
-            conditions.include = [conditionString.trim()];
-        }
-
-        return conditions;
     }
 
     /**
