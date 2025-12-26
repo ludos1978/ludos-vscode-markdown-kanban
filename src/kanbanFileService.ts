@@ -10,6 +10,7 @@ import { FileSaveService } from './core/FileSaveService';
 import { getErrorMessage } from './utils/stringUtils';
 import { PanelContext, WebviewManager } from './panel';
 import { BoardStore } from './core/stores';
+import { DOCUMENT_CHANGE_DEBOUNCE_MS } from './constants/TimeoutConstants';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -61,7 +62,7 @@ export class KanbanFileService {
 
     // Debounce timer for document change reparse (prevents rapid reparses during undo/redo)
     private _documentChangeDebounceTimer: NodeJS.Timeout | null = null;
-    private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 150;
+    // Note: Uses centralized DOCUMENT_CHANGE_DEBOUNCE_MS from TimeoutConstants
 
     constructor(
         private fileManager: FileManager,
@@ -453,7 +454,7 @@ export class KanbanFileService {
                                 // Trigger full board refresh
                                 await this.sendBoardUpdate(false, true);
                             }
-                        }, KanbanFileService.DOCUMENT_CHANGE_DEBOUNCE_MS);
+                        }, DOCUMENT_CHANGE_DEBOUNCE_MS);
                     }
                 }
             }

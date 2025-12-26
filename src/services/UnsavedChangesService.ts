@@ -14,6 +14,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { MarkdownFileRegistry } from '../files/MarkdownFileRegistry';
+import { UNSAVED_CHANGES_SUFFIX } from '../constants/FileNaming';
 
 /**
  * Result of showing the unsaved changes dialog
@@ -161,6 +162,6 @@ export class UnsavedChangesService {
         const ext = path.extname(filePath);
         const baseName = path.basename(filePath, ext);
         const dirName = path.dirname(filePath);
-        return path.join(dirName, `.${baseName}-unsavedchanges${ext}`);
+        return path.join(dirName, `.${baseName}${UNSAVED_CHANGES_SUFFIX}${ext}`);
     }
 }

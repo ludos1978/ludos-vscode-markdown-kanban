@@ -8,6 +8,7 @@
  */
 
 import { normalizePathForLookup } from '../utils/stringUtils';
+import { WATCHER_TIMEOUT_MS } from '../constants/TimeoutConstants';
 
 /**
  * Active operation data
@@ -32,7 +33,7 @@ interface QueuedOperation {
  */
 export class WatcherCoordinator {
     private static instance: WatcherCoordinator | undefined;
-    private readonly DEFAULT_TIMEOUT_MS = 5000;
+    // Note: Uses centralized WATCHER_TIMEOUT_MS from TimeoutConstants
 
     // Track active operations per file
     private activeOperations = new Map<string, ActiveOperation>();
@@ -54,7 +55,7 @@ export class WatcherCoordinator {
      * If another operation is active, queues this one.
      */
     async startOperation(filePath: string, operation: string, timeoutMs?: number): Promise<void> {
-        const timeout = timeoutMs ?? this.DEFAULT_TIMEOUT_MS;
+        const timeout = timeoutMs ?? WATCHER_TIMEOUT_MS;
         const normalizedPath = normalizePathForLookup(filePath);
         const existing = this.activeOperations.get(normalizedPath);
 

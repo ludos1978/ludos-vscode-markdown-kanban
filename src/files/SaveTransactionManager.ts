@@ -8,6 +8,7 @@
  */
 
 import { normalizePathForLookup } from '../utils/stringUtils';
+import { TRANSACTION_TIMEOUT_MS } from '../constants/TimeoutConstants';
 
 /**
  * State captured at the start of a save transaction
@@ -35,7 +36,7 @@ interface ActiveTransaction {
  */
 export class SaveTransactionManager {
     private static instance: SaveTransactionManager | undefined;
-    private readonly TRANSACTION_TIMEOUT_MS = 30000;
+    // Note: Uses centralized TRANSACTION_TIMEOUT_MS from TimeoutConstants
 
     // Track active save transactions
     private activeTransactions = new Map<string, ActiveTransaction>();
@@ -61,7 +62,7 @@ export class SaveTransactionManager {
         const timeout = setTimeout(() => {
             console.error(`[SaveTransaction] Transaction ${transactionId} timed out for ${normalizedPath}`);
             this.rollbackTransaction(filePath, transactionId);
-        }, this.TRANSACTION_TIMEOUT_MS);
+        }, TRANSACTION_TIMEOUT_MS);
 
         this.activeTransactions.set(normalizedPath, {
             transactionId,

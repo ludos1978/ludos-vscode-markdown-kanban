@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { UNSAVED_CHANGES_SUFFIX, isUnsavedChangesFile } from './constants/FileNaming';
 
 /**
  * File type categories for filtering
@@ -40,7 +41,7 @@ class FileTypeDetector {
 		}
 
 		// Check for unsaved changes: .{basename}-unsavedchanges.md (hidden files with dot prefix)
-		if (/^\..+-unsavedchanges\.md$/.test(fileName)) {
+		if (isUnsavedChangesFile(fileName)) {
 			return FileCategory.UnsavedChanges;
 		}
 

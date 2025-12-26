@@ -17,6 +17,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { MarkdownPatterns, HtmlPatterns } from '../shared/regexPatterns';
+import {
+    DRAWIO_EXTENSIONS,
+    EXCALIDRAW_EXTENSIONS,
+    isDrawioFile,
+    isExcalidrawFile,
+    DOTTED_EXTENSIONS
+} from '../constants/FileExtensions';
 
 interface MediaFileEntry {
     mtime: number;
@@ -41,36 +48,17 @@ export interface ChangedMediaFile {
 export class MediaTracker {
     private static readonly CACHE_VERSION = 1;
 
-    // Media file extensions by type
+    // Build MEDIA_EXTENSIONS from centralized constants
     private static readonly MEDIA_EXTENSIONS: Record<string, 'diagram' | 'image' | 'audio' | 'video' | 'document'> = {
-        // Diagrams
-        '.drawio': 'diagram',
-        '.dio': 'diagram',
-        '.excalidraw': 'diagram',
-        // Images
-        '.png': 'image',
-        '.jpg': 'image',
-        '.jpeg': 'image',
-        '.gif': 'image',
-        '.svg': 'image',
-        '.webp': 'image',
-        '.avif': 'image',
-        '.bmp': 'image',
-        '.ico': 'image',
-        // Audio
-        '.mp3': 'audio',
-        '.wav': 'audio',
-        '.ogg': 'audio',
-        '.m4a': 'audio',
-        '.flac': 'audio',
-        '.aac': 'audio',
-        // Video
-        '.mp4': 'video',
-        '.webm': 'video',
-        '.mov': 'video',
-        '.avi': 'video',
-        '.mkv': 'video',
-        // Documents
+        // Diagrams (from centralized extensions)
+        ...Object.fromEntries([...DRAWIO_EXTENSIONS, ...EXCALIDRAW_EXTENSIONS].map(ext => [ext, 'diagram' as const])),
+        // Images (from centralized DOTTED_EXTENSIONS)
+        ...Object.fromEntries(DOTTED_EXTENSIONS.image.map(ext => [ext, 'image' as const])),
+        // Audio (from centralized DOTTED_EXTENSIONS)
+        ...Object.fromEntries(DOTTED_EXTENSIONS.audio.map(ext => [ext, 'audio' as const])),
+        // Video (from centralized DOTTED_EXTENSIONS)
+        ...Object.fromEntries(DOTTED_EXTENSIONS.video.map(ext => [ext, 'video' as const])),
+        // Documents - only PDF for media tracking
         '.pdf': 'document'
     };
 
@@ -165,23 +153,7 @@ export class MediaTracker {
         return MediaTracker.MEDIA_EXTENSIONS[ext] || null;
     }
 
-    /**
-     * Check if a file is an excalidraw file (handles compound extensions)
-     */
-    private _isExcalidrawFile(filePath: string): boolean {
-        const lowerPath = filePath.toLowerCase();
-        return lowerPath.endsWith('.excalidraw') ||
-               lowerPath.endsWith('.excalidraw.json') ||
-               lowerPath.endsWith('.excalidraw.svg');
-    }
-
-    /**
-     * Check if a file is a drawio file
-     */
-    private _isDrawIOFile(filePath: string): boolean {
-        const lowerPath = filePath.toLowerCase();
-        return lowerPath.endsWith('.drawio') || lowerPath.endsWith('.dio');
-    }
+    // Note: Using imported isExcalidrawFile and isDrawioFile from FileExtensions
 
     /**
      * Resolve a relative path to absolute path
@@ -279,8 +251,8 @@ export class MediaTracker {
 
                 // Set up file watcher for diagram files (if not already watching)
                 if (mediaType === 'diagram') {
-                    const isDrawIO = this._isDrawIOFile(relativePath);
-                    const isExcalidraw = this._isExcalidrawFile(relativePath);
+                    const isDrawIO = isDrawioFile(relativePath);
+                    const isExcalidraw = isExcalidrawFile(relativePath);
                     if (isDrawIO || isExcalidraw) {
                         this._watchFile(relativePath, entry);
                     }
@@ -376,8 +348,8 @@ export class MediaTracker {
 
                 // Set up file watcher for newly added diagram files (real-time change detection)
                 if (mediaType === 'diagram') {
-                    const isDrawIO = this._isDrawIOFile(relativePath);
-                    const isExcalidraw = this._isExcalidrawFile(relativePath);
+                    const isDrawIO = isDrawioFile(relativePath);
+                    const isExcalidraw = isExcalidrawFile(relativePath);
                     if (isDrawIO || isExcalidraw) {
                         this._watchFile(relativePath, entry);
                     }
@@ -428,8 +400,8 @@ export class MediaTracker {
                 continue;
             }
 
-            const isDrawIO = this._isDrawIOFile(relativePath);
-            const isExcalidraw = this._isExcalidrawFile(relativePath);
+            const isDrawIO = isDrawioFile(relativePath);
+            const isExcalidraw = isExcalidrawFile(relativePath);
 
             // Check if it's a drawio or excalidraw file using proper detection
             if (!isDrawIO && !isExcalidraw) {

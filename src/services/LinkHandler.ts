@@ -7,6 +7,15 @@ import { configService } from './ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { eventBus, createEvent, LinkReplaceRequestedEvent } from '../core/events';
 import { PanelContext } from '../panel/PanelContext';
+import {
+    DRAWIO_EXTENSIONS,
+    EXCALIDRAW_EXTENSIONS,
+    TEXT_FILE_EXTENSIONS,
+    isDrawioFile,
+    isExcalidrawFile,
+    hasExtension,
+    DOTTED_EXTENSIONS
+} from '../constants/FileExtensions';
 
 export class LinkHandler {
     private _fileManager: FileManager;
@@ -113,11 +122,7 @@ export class LinkHandler {
 
             // Special handling for diagram files (draw.io, excalidraw)
             // Try to open in VS Code (will use appropriate extension if installed)
-            const diagramExtensions = ['.drawio', '.dio'];
-            const excalidrawExtensions = ['.excalidraw', '.excalidraw.json', '.excalidraw.svg'];
-
-            const isDiagramFile = diagramExtensions.includes(ext) ||
-                                  excalidrawExtensions.some(e => resolvedPath.toLowerCase().endsWith(e));
+            const isDiagramFile = isDrawioFile(resolvedPath) || isExcalidrawFile(resolvedPath);
 
             if (isDiagramFile) {
                 try {
@@ -127,7 +132,7 @@ export class LinkHandler {
                     const fileUri = safeFileUri(resolvedPath, 'linkHandler');
                     await vscode.commands.executeCommand('vscode.open', fileUri);
 
-                    const diagramType = diagramExtensions.includes(ext) ? 'draw.io' : 'Excalidraw';
+                    const diagramType = isDrawioFile(resolvedPath) ? 'draw.io' : 'Excalidraw';
                     vscode.window.showInformationMessage(
                         `Opened ${diagramType} diagram: ${path.basename(resolvedPath)}`
                     );
@@ -148,31 +153,11 @@ export class LinkHandler {
                 }
             }
 
-            const textExtensions = [
-                '.md', '.markdown', '.txt', '.rtf', '.log', '.csv', '.tsv',
-                '.html', '.htm', '.css', '.scss', '.sass', '.less',
-                '.js', '.jsx', '.ts', '.tsx', '.json', '.xml', '.svg',
-                '.py', '.java', '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.cs',
-                '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.r',
-                '.m', '.mm', '.pl', '.pm', '.lua', '.dart', '.elm', '.clj',
-                '.ex', '.exs', '.erl', '.hrl', '.fs', '.fsx', '.ml', '.mli',
-                '.pas', '.pp', '.asm', '.s', '.bas', '.cob', '.for', '.f90',
-                '.jl', '.nim', '.cr', '.zig', '.v', '.vh', '.vhd', '.vhdl',
-                '.sh', '.bash', '.zsh', '.fish', '.ps1', '.psm1', '.psd1', '.bat', '.cmd',
-                '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf', '.config',
-                '.env', '.properties', '.gitignore', '.dockerignore', '.editorconfig',
-                '.prettierrc', '.eslintrc', '.babelrc', '.webpack',
-                '.rst', '.tex', '.latex', '.bib',
-                '.sql', '.graphql', '.proto',
-                'makefile', 'Makefile', 'GNUmakefile', '.mk',
-                'dockerfile', 'Dockerfile', '.dockerfile',
-                '.diff', '.patch', '.vue', '.svelte'
-            ];
-
-            const isTextFile = textExtensions.includes(ext) ||
+            // Use centralized text file extensions
+            const isTextFile = hasExtension(resolvedPath, TEXT_FILE_EXTENSIONS) ||
                             basename === 'makefile' ||
                             basename === 'dockerfile' ||
-                            basename.startsWith('.') && !ext;
+                            (basename.startsWith('.') && !ext);
 
             if (isTextFile) {
                 const openInNewTab = configService.getConfig('openLinksInNewTab');
@@ -284,10 +269,8 @@ export class LinkHandler {
         // Generate path based on user configuration (relative or absolute)
         const configuredPath = this._fileManager.generateConfiguredPath(replacementUri.fsPath);
 
-        const isImage = originalPath.includes('.png') || originalPath.includes('.jpg') ||
-                       originalPath.includes('.jpeg') || originalPath.includes('.gif') ||
-                       originalPath.includes('.svg') || originalPath.includes('.bmp') ||
-                       originalPath.includes('.webp');
+        // Check if the path is an image file using centralized extensions
+        const isImage = hasExtension(originalPath, DOTTED_EXTENSIONS.image);
 
         // Emit event for link replacement on scoped bus (handled by LinkReplacementHandler)
         this._panelContext.scopedEventBus.emit('link:replace-requested', {
@@ -310,11 +293,11 @@ export class LinkHandler {
         let triedFilenames: string[] = [];
 
         // Check if the document name already has a file extension
-        const hasExtension = /\.[a-zA-Z0-9]+$/.test(documentName);
+        const documentHasExtension = /\.[a-zA-Z0-9]+$/.test(documentName);
 
         let filesToTry: string[] = [];
 
-        if (hasExtension) {
+        if (documentHasExtension) {
             // If it already has an extension, try it as-is first
             filesToTry = [documentName];
             // Then try with markdown extensions as fallback (in case it's something like "document.v1" that should be "document.v1.md")
@@ -334,10 +317,9 @@ export class LinkHandler {
                 if (resolution.exists) {
                     try {
                         // For text files, try to open in VS Code
-                        const textExtensions = ['.md', '.markdown', '.txt', '.rtf', '.json', '.xml', '.html', '.css', '.js', '.ts', '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.php', '.rb', '.go', '.rs', '.sh', '.bat', '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf'];
                         const ext = path.extname(filename).toLowerCase();
 
-                        if (!ext || textExtensions.includes(ext)) {
+                        if (!ext || hasExtension(filename, TEXT_FILE_EXTENSIONS)) {
                             // Normalize the path for comparison (resolve symlinks, normalize separators)
                             const normalizedPath = path.resolve(resolution.resolvedPath);
 
@@ -421,7 +403,7 @@ export class LinkHandler {
 
         if (workspaceFolders && workspaceFolders.length > 0) {
             const folderNames = workspaceFolders.map(f => path.basename(f.uri.fsPath));
-            if (hasExtension) {
+            if (documentHasExtension) {
                 contextInfo = `\n\nTip: For files in specific workspace folders, try: [[${folderNames[0]}/${documentName}]]`;
             } else {
                 contextInfo = `\n\nTip: For files in specific workspace folders, try: [[${folderNames[0]}/${documentName}]] or [[${folderNames[0]}/${documentName}.ext]]`;
@@ -431,7 +413,7 @@ export class LinkHandler {
         const pathsList = allAttemptedPaths.map((p, i) => `  ${i + 1}. ${p}`).join('\n');
         const extensionsList = triedFilenames.join(', ');
 
-        const hasExtensionNote = hasExtension
+        const hasExtensionNote = documentHasExtension
             ? `\n\nNote: "${documentName}" already has an extension, so it was tried as-is first.`
             : `\n\nNote: "${documentName}" has no extension, so markdown extensions (.md, .markdown, .txt) were tried first.`;
 

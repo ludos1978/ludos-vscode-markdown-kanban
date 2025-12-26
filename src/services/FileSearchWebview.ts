@@ -21,6 +21,7 @@ import {
     MAX_RESULTS_PER_PATTERN,
     MAX_REGEX_RESULTS
 } from '../constants/TimeoutConstants';
+import { BINARY_FILE_EXTENSIONS, hasExtension } from '../constants/FileExtensions';
 
 interface SearchResult {
     label: string;
@@ -342,15 +343,12 @@ export class FileSearchWebview {
             this._previewUri = uri;
 
             // Binary/image files that need vscode.open command
-            const binaryExtensions = [
-                '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.svg',
-                '.pdf', '.zip', '.tar', '.gz', '.7z', '.rar',
-                '.mp3', '.wav', '.ogg', '.mp4', '.webm', '.avi', '.mov',
-                '.ttf', '.otf', '.woff', '.woff2',
-                '.exe', '.dll', '.so', '.dylib'
-            ];
+            // Additional extensions not in BINARY_FILE_EXTENSIONS
+            const additionalBinaryExtensions = ['.ttf', '.otf', '.woff', '.woff2', '.exe', '.dll', '.so', '.dylib'];
+            const isBinaryFile = hasExtension(filePath, BINARY_FILE_EXTENSIONS) ||
+                                 additionalBinaryExtensions.includes(ext);
 
-            if (binaryExtensions.includes(ext)) {
+            if (isBinaryFile) {
                 // Use vscode.open for binary files - this lets VS Code/extensions handle them
                 await vscode.commands.executeCommand('vscode.open', uri, {
                     preview: true,
