@@ -1333,7 +1333,7 @@ function showVerificationResults(results) {
             <div class="verification-dialog ${resultClass}">
                 <div class="verification-header">
                     <h3>🔍 Content Synchronization Verification</h3>
-                    <button onclick="closeVerificationResults()" class="close-btn">✕</button>
+                    <button onclick="closeVerificationResults()" class="verification-close-btn">✕</button>
                 </div>
                 <div class="verification-content">
                     <div class="verification-summary">

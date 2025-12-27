@@ -182,8 +182,6 @@ body {
    ============================================================================ */
 
 /* Text elements that can be hidden - base styles */
-.empty-card-text,
-.clipboard-text,
 .global-fold-text,
 .sort-text,
 .refresh-text,
@@ -195,8 +193,6 @@ body {
 
 /* Container query: Hide text when file-info-bar is narrow (below 1000px) */
 @container file-info-bar (max-width: 1000px) {
-  .empty-card-text,
-  .clipboard-text,
   .global-fold-text,
   .sort-text,
   .refresh-text,
@@ -272,8 +268,6 @@ body {
 /* Media query fallback for browsers without container query support */
 @supports not (container-type: inline-size) {
   @media (max-width: 1000px) {
-    .empty-card-text,
-    .clipboard-text,
     .global-fold-text,
     .sort-text,
     .refresh-text,
@@ -517,22 +511,6 @@ body {
   border-radius: 3px;
 }
 
-.file-info-center .clipboard-card-source,
-.file-info-center .empty-card-source {
-  border: var(--button-border);
-  padding: 4px 4px;
-  margin: 0;
-  height: 22px;
-  min-height: 22px;
-  /* width: 22px; */
-  min-width: 22px;
-  justify-content: center;
-  gap: 4px;
-  box-sizing: border-box;
-  font-size: 12px;
-  border-radius: 3px;
-}
-
 .file-info-right .file-bar-menu-btn {
   padding: 4px 4px;
 }
@@ -559,10 +537,6 @@ body {
   font-size: 14px;
 }
 
-.font-size-icon {
-  font-size: 14px;
-  font-weight: bold;
-}
 
 /* ============================================================================
    TOOLBAR BUTTONS - Consolidated primary button styles
@@ -734,28 +708,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: none !important;
 }
 
-/* Clipboard card source */
-.clipboard-card-source {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  background: var(--button-alternative-background);
-  color: var(--button-alternative-foreground);
-  border: var(--button-alternative-border);
-  border-radius: 4px;
-  cursor: grab;
-  font-size: 12px;
-  transition: all 0.2s ease;
-  user-select: none;
-  position: relative;
-}
-
-.clipboard-card-source:hover {
-  background: var(--button-alternative-background-hover);
-  color: var(--button-alternative-foreground-hover);
-}
-
 /* Clipboard hover preview */
 .clipboard-preview {
   position: absolute;
@@ -807,84 +759,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   overflow-y: auto;
 }
 
-/* Empty card drop source */
-.empty-card-source {
-  display: flex;
-  align-items: center;
-  gap: var(--whitespace-div2);
-  padding: 3px 6px;
-  background: var(--button-alternative-background);
-  color: var(--button-alternative-foreground);
-  border: var(--button-alternative-border);
-  border-radius: 4px;
-  cursor: grab;
-  font-size: 12px;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.empty-card-source:hover {
-  background: var(--button-alternative-background-hover);
-  color: var(--button-alternative-foreground-hover);
-}
-
-.empty-card-source:active,
-.empty-card-source.dragging {
-  cursor: grabbing;
-  opacity: 0.7;
-}
-
-.empty-card-source .empty-card-icon {
-  font-size: 14px;
-}
-
-.empty-card-source .empty-card-text {
-  font-weight: 500;
-}
-
-.clipboard-card-source:active,
-.clipboard-card-source.dragging {
-  cursor: grabbing;
-  opacity: 0.7;
-}
-
-.clipboard-card-source .clipboard-icon {
-  font-size: 14px;
-}
-
-.clipboard-card-source .clipboard-text {
-  font-weight: 500;
-}
-
-/* Responsive behavior: hide text when space is limited */
-@media (max-width: 600px) {
-  .clipboard-card-source .clipboard-text,
-  .empty-card-source .empty-card-text {
-    display: none;
-  }
-  
-  .clipboard-card-source,
-  .empty-card-source {
-    padding: 3px;
-    min-width: 20px;
-  }
-}
-
-/* Additional breakpoint for very small screens */
+/* Small screen layout adjustments */
 @media (max-width: 480px) {
   .file-info-center {
     gap: 4px;
-  }
-  
-  .clipboard-card-source,
-  .empty-card-source {
-    padding: 2px;
-    font-size: 11px;
-  }
-  
-  .clipboard-card-source .clipboard-icon,
-  .empty-card-source .empty-card-icon {
-    font-size: 12px;
   }
 }
 
@@ -963,17 +841,7 @@ body.small-card-fonts .task-title-container .markdown-content img {
   background-color: transparent;
 }
 
-.column-footer {
-	padding-top: var(--whitespace-div4);
-	position: sticky;
-	/* top: 28px; */
-	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	/* border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border)); */
-	border-radius: 0px 0px 4px 4px;
-}
-
-/* .column-inner :not(has) */
+/* Note: .column-footer is defined later in the file with complete styling */
 
 .column-content {
   /* This contains the actual visual column with border and background */
@@ -1178,39 +1046,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   background-color: rgba(var(--vscode-textLink-activeForeground-rgb, 0, 122, 204), 0.1);
 }
 
-/* Strikethrough delete button styling */
+/* Strikethrough styling */
 .strikethrough-container {
   position: relative;
   display: inline;
-}
-
-.strikethrough-container:hover .delete-strike-btn {
-  opacity: 1;
-  visibility: visible;
-}
-
-.delete-strike-btn {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  margin-left: 4px;
-  padding: 0;
-  border: none;
-  border-radius: 2px;
-  background-color: var(--vscode-errorBackground, #f48771);
-  color: var(--vscode-errorForeground, #ffffff);
-  font-size: 12px;
-  line-height: 14px;
-  cursor: pointer;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
-  vertical-align: baseline;
-}
-
-.delete-strike-btn:hover {
-  background-color: var(--vscode-errorHoverBackground, #e74c3c);
-  transform: scale(1.1);
 }
 
 /* Strikethrough visual effects for broken images and links */
@@ -1315,30 +1154,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .image-not-found-menu .image-path-menu-item:not(.disabled):not(:disabled) {
   cursor: pointer;
-}
-
-/* Left side controls (drag handle, collapse toggle) */
-.column-left-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* Right side controls (count, add button, menu) */
-.column-right-controls {
-  display: flex;
-  gap: var(--whitespace-div2);
-  align-items: center;
-  flex-shrink: 0;
-}
-
-/* Column controls */
-.column-controls {
-  display: flex;
-  gap: var(--whitespace-div2);
-  align-items: center;
-  flex-shrink: 0;
 }
 
 
@@ -2732,40 +2547,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 
 /* END style with only lines not with borders */
 
-/* BEGIN style with borders */
-
-/*
-
-.task-item {
-  border: var(--task-border, 1px solid var(--vscode-panel-border));
-}
-
-.column-header {
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-top: var(--column-border, 0.5px solid var(--vscode-panel-border));
-}
-
-.column-title {
-  border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-  border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-}
-
-.column-inner {
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-}
-
-.column-footer {
-	border-left: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-right: var(--column-border, 0.5px solid var(--vscode-panel-border));
-	border-bottom: var(--column-border, 0.5px solid var(--vscode-panel-border));
-} 
-
-*/
-/* END style with borders */
-
-
 
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
@@ -4119,9 +3900,6 @@ blockquote {
   min-height: 28px;
 }
 
-.image-path-overlay-container .image-broken {
-}
-
 .image-path-overlay-container .image-menu-btn {
   position: absolute;
   top: 4px;
@@ -4605,39 +4383,6 @@ h6 .kanban-tag {
   z-index: 102;
 }
 
-/* Numeric badges for index tags (#1, #1.1, etc.) */
-.numeric-badge {
-  position: absolute;
-  top: -12px;
-  left: -12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  background-color: var(--vscode-badge-background, #4d4d4d);
-  color: var(--vscode-badge-foreground, #ffffff);
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 12px;
-  z-index: 150;
-  pointer-events: none;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  transition: all 0.2s ease;
-}
-
-/* Numeric badge in tasks */
-.task-item .numeric-badge {
-  top: -12px;
-  left: -12px;
-}
-
-/* Numeric badge in columns */
-.kanban-full-height-column .numeric-badge {
-  top: -12px;
-  left: -12px;
-}
 
 /* REMOVED: CSS positioning creates initial wrong position, then JavaScript corrects it later causing delay
  * ONLY JavaScript dynamic positioning should be used (menuOperations.js)
@@ -4786,24 +4531,7 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
 }
 
 
-/* Collapsed column bars - padding set dynamically by JavaScript */
-
-/* .kanban-full-height-column.collapsed-horizontal.has-footer-bar .column-controls  */
-.kanban-full-height-column.collapsed-vertical.has-footer-bar .column-controls {
-  margin-bottom: 4px;
-}
-
-/* .kanban-full-height-column.collapsed-horizontal.has-footer-label,
-.kanban-full-height-column.collapsed-horizontal.has-header-label, */
-
-/* .kanban-full-height-column.collapsed-vertical.has-header-label,
-.kanban-full-height-column.collapsed-vertical.has-footer-label {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
-} */
-
-/* .kanban-full-height-column.collapsed-horizontal.has-header-label.has-footer-label, */
+/* Collapsed column label sizing */
 .kanban-full-height-column.collapsed-vertical.has-header-label,
 .kanban-full-height-column.collapsed-vertical.has-footer-label,
 .kanban-full-height-column.collapsed-vertical.has-header-label.has-footer-label {
@@ -6307,36 +6035,7 @@ figcaption {
     font-size: 11px;
 }
 
-.file-actions {
-    display: flex;
-    gap: 4px;
-}
-
-.action-btn {
-    background: var(--button-background);
-    color: var(--button-foreground);
-    border: none;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    cursor: pointer;
-    white-space: nowrap;
-    font-weight: 500;
-}
-
-.action-btn:hover {
-    background: var(--button-background-hover);
-}
-
-.save-btn {
-    background: var(--vscode-gitDecoration-addedResourceForeground);
-    color: white;
-}
-
-.reload-btn {
-    background: var(--vscode-gitDecoration-modifiedResourceForeground);
-    color: white;
-}
+/* Note: .action-btn, .save-btn, .reload-btn are defined in the Files Table section below */
 
 .file-states {
     display: grid;
@@ -6504,14 +6203,6 @@ figcaption {
 }
 .col-image {
     width: 8%;
-}
-
-
-.col-sync-backend, .col-sync-saved {
-    width: 8%;
-    text-align: center;
-    font-size: 10px;
-    font-weight: 600;
 }
 
 .sync-status-icon.sync-good {
@@ -6713,17 +6404,6 @@ figcaption {
 }
 
 /* Force Write & Verification Styles */
-.debug-verify-btn {
-    background: var(--button-background);
-    color: var(--button-foreground);
-}
-
-.debug-force-write-btn {
-    background: var(--vscode-gitDecoration-modifiedResourceForeground);
-    color: white;
-    font-weight: bold;
-}
-
 .force-write-confirmation-overlay,
 .verification-results-overlay {
     position: fixed;
@@ -6838,7 +6518,8 @@ figcaption {
     opacity: 0.9;
 }
 
-.close-btn {
+/* Verification dialog close button - different style from modal .close-btn */
+.verification-close-btn {
     background: transparent;
     border: none;
     color: var(--vscode-titleBar-activeForeground);
@@ -6847,7 +6528,7 @@ figcaption {
     padding: 4px 8px;
 }
 
-.close-btn:hover {
+.verification-close-btn:hover {
     opacity: 0.7;
 }
 
