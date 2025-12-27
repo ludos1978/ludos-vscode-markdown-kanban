@@ -805,546 +805,560 @@ class TaskEditor {
         this.closeEditor();
     }
 
+    /**
+     * Main entry point for saving the current field
+     * Dispatches to specialized methods based on field type
+     */
     saveCurrentField() {
-        if (!this.currentEditor) {return;}
+        if (!this.currentEditor) { return; }
+        if (!window.cachedBoard || !window.cachedBoard.columns) { return; }
 
-        const { element, type, taskId } = this.currentEditor;
-        let columnId = this.currentEditor.columnId; // Don't destructure - we may need to update this
+        const { type } = this.currentEditor;
+
+        switch (type) {
+            case 'column-title':
+                this._saveColumnTitle();
+                break;
+            case 'task-title':
+            case 'task-description':
+                this._saveTaskField();
+                break;
+        }
+    }
+
+    /**
+     * Save column title changes
+     * Handles: include syntax, layout tags, display updates, visual state
+     */
+    _saveColumnTitle() {
+        const { element } = this.currentEditor;
+        const columnId = this.currentEditor.columnId;
         const value = element.value;
 
-        // Update local state for immediate feedback
-        if (window.cachedBoard && window.cachedBoard.columns) {
-            if (type === 'column-title') {
-                const column = window.cachedBoard.columns.find(c => c.id === columnId);
-                if (column) {
-                    // Check if user is setting up includes - if so, use their input exactly
-                    // Include syntax bypasses reconstruction (no hidden layout tag preservation)
-                    let newTitle;
-                    const hasIncludes = /!!!include\([^)]+\)!!!/.test(value);
+        const column = window.cachedBoard.columns.find(c => c.id === columnId);
+        if (!column) { return; }
 
-                    if (hasIncludes) {
-                        // Includes: Use exactly what user typed (predictable, no hidden tags)
-                        newTitle = value.trim();
-                    } else {
-                        // No includes: Reconstruct to merge user input with preserved hidden tags
-                        try {
-                            newTitle = this.reconstructColumnTitle(value.trim(), element.getAttribute('data-original-title') || column.title);
-                        } catch (error) {
-                            console.error('[TaskEditor] Error in reconstructColumnTitle:', error);
-                            // Fallback to simple value if reconstruction fails
-                            newTitle = value.trim();
-                        }
-                    }
+        // Determine the new title (with or without reconstruction)
+        const newTitle = this._computeNewColumnTitle(value, element, column);
 
-                    // Check if the title actually changed
-                    if (column.title !== newTitle) {
-                        // Create context for this edit
-                        const editContext = `column-title-${columnId}`;
-                        this.lastEditContext = editContext;
+        // Check if the title actually changed
+        if (column.title === newTitle) {
+            // No change - just update display and exit
+            this._updateColumnDisplay(column, columnId);
+            return;
+        }
 
-                        // Check for include syntax in column header (location-based column include)
-                        const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
-                        const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
+        // Create context for this edit
+        this.lastEditContext = `column-title-${columnId}`;
 
-                        const hasIncludeChanges =
-                            oldIncludeMatches.length !== newIncludeMatches.length ||
-                            oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
+        // Check for include syntax changes
+        const oldIncludeMatches = (column.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
+        const newIncludeMatches = newTitle.match(/!!!include\(([^)]+)\)!!!/g) || [];
+        const hasOrHadIncludes = newIncludeMatches.length > 0 || oldIncludeMatches.length > 0;
 
-                        // CRITICAL: Check if column HAS includes OR HAD includes (to handle removal!)
-                        const hasIncludes = newIncludeMatches.length > 0;
-                        const hadIncludes = oldIncludeMatches.length > 0;
-                        const hasOrHadIncludes = hasIncludes || hadIncludes;
+        if (hasOrHadIncludes) {
+            // Handle column with includes (add/change/remove)
+            this._saveColumnTitleWithIncludes(column, columnId, newTitle, newIncludeMatches.length > 0, element);
+            return;
+        }
 
-                        // If column has/had includes, send to backend (add/change/remove)
-                        // Backend handles undo via action system - don't save undo here
-                        if (hasOrHadIncludes) {
-                            column.title = newTitle;
-                            // Get column element first
-                            const columnElement = element.closest('.kanban-full-height-column');
+        // Regular column title edit (no includes)
+        this._saveRegularColumnTitle(column, columnId, newTitle, element);
+    }
 
-                            // CRITICAL: Get current column ID by POSITION
-                            let currentColumnId = columnId;
-                            if (columnElement) {
-                                const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-                                const columnIndex = allColumns.indexOf(columnElement);
-                                if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
-                                    currentColumnId = window.currentBoard.columns[columnIndex].id;
-                                }
-                            }
+    /**
+     * Compute the new column title, handling reconstruction of hidden layout tags
+     */
+    _computeNewColumnTitle(value, element, column) {
+        const hasIncludes = /!!!include\([^)]+\)!!!/.test(value);
 
-                            // STEP 1: Send message with FULL include syntax for backend to process
-                            vscode.postMessage({
-                                type: 'editColumnTitle',
-                                columnId: currentColumnId,
-                                title: newTitle
-                            });
+        if (hasIncludes) {
+            // Includes bypass reconstruction (no hidden layout tag preservation)
+            return value.trim();
+        }
 
-                            // STEP 2: Update display immediately
-                            if (this.currentEditor && this.currentEditor.displayElement) {
-                                let displayTitle = newTitle;
+        // No includes: Reconstruct to merge user input with preserved hidden tags
+        try {
+            return this.reconstructColumnTitle(value.trim(), element.getAttribute('data-original-title') || column.title);
+        } catch (error) {
+            console.error('[TaskEditor] Error in reconstructColumnTitle:', error);
+            return value.trim();
+        }
+    }
 
-                                // If has includes, replace !!!include(file)!!! with HTML badge
-                                if (hasIncludes) {
-                                    displayTitle = displayTitle.replace(/!!!include\(([^)]+)\)!!!/g, function(match, filepath) {
-                                        // Extract just filename from path
-                                        const parts = filepath.split('/').length > 1 ? filepath.split('/') : filepath.split('\\');
-                                        const filename = parts[parts.length - 1];
-                                        // Create HTML badge (matching tagUtils.js line 816 format)
-                                        const escapeHtml = function(text) {
-                                            return text.replace(/[&<>"']/g, function(char) {
-                                                const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
-                                                return map[char];
-                                            });
-                                        };
-                                        const escapedPath = escapeHtml(filepath);
-                                        const escapedFilename = escapeHtml(filename);
-                                        return '<span class="columninclude-link" data-file-path="' + escapedPath + '" title="Include: ' + escapedPath + '">!(' + escapedFilename + ')!</span>';
-                                    });
-                                }
-                                // If removed includes, displayTitle is just newTitle (no include syntax)
+    /**
+     * Save column title that has include syntax (add/change/remove)
+     */
+    _saveColumnTitleWithIncludes(column, columnId, newTitle, hasIncludes, element) {
+        column.title = newTitle;
 
-                                // Render the display title (with HTML badge already inserted)
-                                const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
-                                const renderedTitle = renderFn ? renderFn(displayTitle) : displayTitle;
-                                this.currentEditor.displayElement.innerHTML = renderedTitle;
+        // Get column element and current column ID by position
+        const columnElement = element.closest('.kanban-full-height-column');
+        let currentColumnId = columnId;
+        if (columnElement) {
+            const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
+            const columnIndex = allColumns.indexOf(columnElement);
+            if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
+                currentColumnId = window.currentBoard.columns[columnIndex].id;
+            }
+        }
 
-                                // Show display and hide editor
-                                this.currentEditor.displayElement.style.removeProperty('display');
-                                this.currentEditor.element.style.display = 'none';
-                            }
+        // Send to backend
+        vscode.postMessage({
+            type: 'editColumnTitle',
+            columnId: currentColumnId,
+            title: newTitle
+        });
 
-                            // STEP 3: Update visual tag state (borders, backgrounds, badges)
-                            if (columnElement) {
-                                const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
-                                const isCollapsed = columnElement.classList.contains('collapsed');
-                                if (window.updateVisualTagState) {
-                                    window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
-                                }
-                            }
+        // Update display with include badges
+        if (this.currentEditor && this.currentEditor.displayElement) {
+            let displayTitle = newTitle;
+            if (hasIncludes) {
+                displayTitle = this._renderIncludeBadges(displayTitle);
+            }
+            const renderFn = window.renderMarkdown || (typeof renderMarkdown !== 'undefined' ? renderMarkdown : null);
+            this.currentEditor.displayElement.innerHTML = renderFn ? renderFn(displayTitle) : displayTitle;
+            this.currentEditor.displayElement.style.removeProperty('display');
+            this.currentEditor.element.style.display = 'none';
+        }
 
-                            // STEP 4: Check layout changes even for include columns (they can have #stack too!)
-                            const originalTitleForLayout = element.getAttribute('data-original-title') || '';
-                            const layoutChangedForInclude = this.hasLayoutChanged(originalTitleForLayout, newTitle);
+        // Update visual tag state
+        if (columnElement) {
+            const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
+            const isCollapsed = columnElement.classList.contains('collapsed');
+            if (window.updateVisualTagState) {
+                window.updateVisualTagState(columnElement, allTags, 'column', isCollapsed);
+            }
+        }
 
-                            if (layoutChangedForInclude) {
-                                // Layout tags changed - reorganize stacks (optimized, no full re-render)
-                                const stackChangedForInclude = this.hasStackTagChanged(originalTitleForLayout, newTitle);
+        // Handle layout changes
+        const originalTitleForLayout = element.getAttribute('data-original-title') || '';
+        this._handleLayoutChanges(originalTitleForLayout, newTitle, columnId);
 
-                                if (stackChangedForInclude && typeof window.reorganizeStacksForColumn === 'function') {
-                                    // Use optimized stack reorganization
-                                    window.reorganizeStacksForColumn(columnId);
-                                } else {
-                                    // Other layout changes need full re-render
-                                    const savedEditorForInclude = this.currentEditor;
-                                    this.currentEditor = null;
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+    }
 
-                                    if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                        window.renderBoard();
-                                    }
-                                    if (typeof window.applyStackedColumnStyles === 'function') {
-                                        requestAnimationFrame(() => {
-                                            window.applyStackedColumnStyles();
-                                        });
-                                    }
+    /**
+     * Replace !!!include(path)!!! with HTML badges
+     */
+    _renderIncludeBadges(title) {
+        return title.replace(/!!!include\(([^)]+)\)!!!/g, function(match, filepath) {
+            const parts = filepath.split('/').length > 1 ? filepath.split('/') : filepath.split('\\');
+            const filename = parts[parts.length - 1];
+            const escapeHtml = function(text) {
+                return text.replace(/[&<>"']/g, function(char) {
+                    const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+                    return map[char];
+                });
+            };
+            const escapedPath = escapeHtml(filepath);
+            const escapedFilename = escapeHtml(filename);
+            return '<span class="columninclude-link" data-file-path="' + escapedPath + '" title="Include: ' + escapedPath + '">!(' + escapedFilename + ')!</span>';
+        });
+    }
 
-                                    this.currentEditor = savedEditorForInclude;
-                                }
-                            }
+    /**
+     * Save regular column title (no includes)
+     */
+    _saveRegularColumnTitle(column, columnId, newTitle, element) {
+        column.title = newTitle;
 
-                            // Mark as unsaved
-                            if (typeof markUnsavedChanges === 'function') {
-                                markUnsavedChanges();
-                            }
+        // Send to backend - action system handles undo capture
+        vscode.postMessage({
+            type: 'editColumnTitle',
+            columnId: columnId,
+            title: newTitle
+        });
 
-                            return;
-                        }
+        // Handle layout changes
+        const originalTitle = element.getAttribute('data-original-title') || '';
+        this._handleLayoutChanges(originalTitle, newTitle, columnId);
 
-                        // Non-include column title edit - send to backend action system for proper undo handling
-                        // NOTE: We intentionally do NOT call saveUndoStateImmediately() here.
-                        // The editColumnTitle message goes through the action system, which properly
-                        // handles undo state capture BEFORE applying changes via ColumnActions.updateTitle.
-                        // Calling saveUndoStateImmediately() would create a duplicate undo entry with
-                        // potentially stale board state due to timing issues.
-                        // See: ColumnCommands.ts handleEditColumnTitleUnified() for backend handling.
+        // Update display and styling
+        this._updateColumnDisplay(column, columnId);
+        this._updateColumnSpanClasses(column, columnId);
+        this._updateColumnTagStyling(column, columnId);
+        this._trackPendingColumnChange(columnId, newTitle);
+    }
 
-                        // Update local state for immediate visual feedback
-                        column.title = newTitle;
+    /**
+     * Handle layout tag changes (#stack, #row, #span)
+     */
+    _handleLayoutChanges(originalTitle, newTitle, columnId) {
+        if (!this.hasLayoutChanged(originalTitle, newTitle)) { return; }
 
-                        // Send to backend - action system handles undo capture and board sync
-                        vscode.postMessage({
-                            type: 'editColumnTitle',
-                            columnId: columnId,
-                            title: newTitle
-                        });
+        const stackChanged = this.hasStackTagChanged(originalTitle, newTitle);
 
-                        // Check if this edit affects layout and trigger board refresh if needed
-                        const originalTitle = element.getAttribute('data-original-title') || '';
-                        const layoutChanged = this.hasLayoutChanged(originalTitle, newTitle);
+        if (stackChanged && typeof window.reorganizeStacksForColumn === 'function') {
+            window.reorganizeStacksForColumn(columnId);
+        } else {
+            // Other layout changes need full re-render
+            const savedEditor = this.currentEditor;
+            this.currentEditor = null;
 
-                        if (layoutChanged) {
-                            // Layout tags changed - reorganize stacks (optimized, no full re-render)
-                            // Check if only #stack changed (not #row or #span)
-                            const stackChanged = this.hasStackTagChanged(originalTitle, newTitle);
+            if (typeof window.renderBoard === 'function' && window.cachedBoard) {
+                window.renderBoard();
+            }
+            if (typeof window.applyStackedColumnStyles === 'function') {
+                requestAnimationFrame(() => {
+                    window.applyStackedColumnStyles();
+                });
+            }
 
-                            if (stackChanged && typeof window.reorganizeStacksForColumn === 'function') {
-                                // Use optimized stack reorganization (only affects nearby stacks)
-                                window.reorganizeStacksForColumn(columnId);
-                            } else {
-                                // Other layout changes need full re-render
-                                const savedEditor = this.currentEditor;
-                                this.currentEditor = null;
+            this.currentEditor = savedEditor;
+        }
+    }
 
-                                if (typeof window.renderBoard === 'function' && window.cachedBoard) {
-                                    window.renderBoard();
-                                }
+    /**
+     * Update column display element
+     */
+    _updateColumnDisplay(column, columnId) {
+        if (!this.currentEditor || !this.currentEditor.displayElement) { return; }
 
-                                if (typeof window.applyStackedColumnStyles === 'function') {
-                                    requestAnimationFrame(() => {
-                                        window.applyStackedColumnStyles();
-                                    });
-                                }
+        if (window.tagUtils) {
+            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
+            this.currentEditor.displayElement.innerHTML = renderedTitle;
+        } else {
+            this.currentEditor.displayElement.innerHTML = column.title || '';
+        }
 
-                                this.currentEditor = savedEditor;
-                            }
-                        }
+        this.currentEditor.displayElement.style.removeProperty('display');
+        this.currentEditor.element.style.display = 'none';
+    }
 
-                        // NOTE: We intentionally do NOT call markUnsavedChanges() here.
-                        // The editColumnTitle message triggers emitBoardChanged() in the backend,
-                        // which handles board sync. Calling markUnsavedChanges() would sync the
-                        // already-modified local board BEFORE the action executes, causing undo
-                        // to capture the wrong "before" state.
-                    }
+    /**
+     * Update column span CSS classes
+     */
+    _updateColumnSpanClasses(column, columnId) {
+        const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+        if (!columnElement) { return; }
 
-                    // Update display IMMEDIATELY while editor is still open (matching task edit pattern lines 1149-1178)
-                    if (this.currentEditor && this.currentEditor.displayElement) {
-                        if (window.tagUtils) {
-                            const renderedTitle = window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText);
-                            this.currentEditor.displayElement.innerHTML = renderedTitle;
-                        } else {
-                            this.currentEditor.displayElement.innerHTML = column.title || '';
-                        }
+        columnElement.classList.remove('column-span-2', 'column-span-3', 'column-span-4');
 
-                        // Make display visible AND hide editor immediately
-                        this.currentEditor.displayElement.style.removeProperty('display');
-                        this.currentEditor.element.style.display = 'none';
-                    }
+        const spanMatch = column.title.match(/#span(\d+)\b/i);
+        const hasViewportWidth = window.currentColumnWidth && (window.currentColumnWidth === '50percent' || window.currentColumnWidth === '100percent');
+        if (spanMatch && !hasViewportWidth) {
+            const spanCount = parseInt(spanMatch[1]);
+            if (spanCount >= 2 && spanCount <= 4) {
+                columnElement.classList.add(`column-span-${spanCount}`);
+            }
+        }
+    }
 
-                    // Update column CSS classes for span tags
-                    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
-                    if (columnElement) {
-                        // Remove old span classes
-                        columnElement.classList.remove('column-span-2', 'column-span-3', 'column-span-4');
+    /**
+     * Update column tag-based styling (primary tag, temporal attributes, visual state)
+     */
+    _updateColumnTagStyling(column, columnId) {
+        const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
+        if (!columnElement) { return; }
 
-                        // Check for new span tag (only blocked by viewport-based widths, not pixel widths)
-                        const spanMatch = column.title.match(/#span(\d+)\b/i);
-                        const hasViewportWidth = window.currentColumnWidth && (window.currentColumnWidth === '50percent' || window.currentColumnWidth === '100percent');
-                        if (spanMatch && !hasViewportWidth) {
-                            const spanCount = parseInt(spanMatch[1]);
-                            if (spanCount >= 2 && spanCount <= 4) {
-                                columnElement.classList.add(`column-span-${spanCount}`);
-                            }
-                        }
-                    }
+        const titleTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(column.title || '') : [];
 
-                    // Update tag-based styling for columns (following task pattern)
-                    const columnElement2 = document.querySelector(`[data-column-id="${columnId}"]`);
-                    if (columnElement2) {
-                        // Only use column title tags for card-level styling (headers/footers)
-                        // Column description tags should remain inline-only
-                        const titleTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(column.title || '') : [];
-                        const allTags = titleTags; // Only title tags get card-level styling
+        // Update primary tag
+        const primaryTag = window.extractFirstTag ? window.extractFirstTag(column.title) : null;
+        if (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span')) {
+            columnElement.setAttribute('data-column-tag', primaryTag);
+        } else {
+            columnElement.removeAttribute('data-column-tag');
+        }
 
-                        // Update primary tag (first non-special tag from title)
-                        const primaryTag = window.extractFirstTag ? window.extractFirstTag(column.title) : null;
-                        if (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span')) {
-                            columnElement2.setAttribute('data-column-tag', primaryTag);
-                        } else {
-                            columnElement2.removeAttribute('data-column-tag');
-                        }
+        // Update temporal attributes
+        this._updateColumnTemporalAttributes(columnElement, column.title || '');
 
-                        // Update temporal attributes - set the CORRECT attribute for each type
-                        if (window.tagUtils) {
-                            const colText = column.title || '';
+        // Update visual tag state
+        const isCollapsed = columnElement.classList.contains('collapsed');
+        if (window.updateVisualTagState) {
+            window.updateVisualTagState(columnElement, titleTags, 'column', isCollapsed);
+        }
+    }
 
-                            // Remove all temporal attributes first
-                            columnElement2.removeAttribute('data-current-day');
-                            columnElement2.removeAttribute('data-current-week');
-                            columnElement2.removeAttribute('data-current-weekday');
-                            columnElement2.removeAttribute('data-current-hour');
-                            columnElement2.removeAttribute('data-current-time');
+    /**
+     * Update column temporal attributes (current day/week/weekday/hour/time)
+     */
+    _updateColumnTemporalAttributes(columnElement, colText) {
+        if (!window.tagUtils) { return; }
 
-                            // Set only the ones that are active
-                            if (window.tagUtils.isCurrentDate(colText)) columnElement2.setAttribute('data-current-day', 'true');
-                            if (window.tagUtils.isCurrentWeek(colText)) columnElement2.setAttribute('data-current-week', 'true');
-                            if (window.tagUtils.isCurrentWeekday(colText)) columnElement2.setAttribute('data-current-weekday', 'true');
-                            if (window.tagUtils.isCurrentTime(colText)) columnElement2.setAttribute('data-current-hour', 'true');
-                            if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement2.setAttribute('data-current-time', 'true');
-                        }
+        // Remove all temporal attributes first
+        columnElement.removeAttribute('data-current-day');
+        columnElement.removeAttribute('data-current-week');
+        columnElement.removeAttribute('data-current-weekday');
+        columnElement.removeAttribute('data-current-hour');
+        columnElement.removeAttribute('data-current-time');
 
-                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
-                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
-                        const isCollapsed = columnElement2.classList.contains('collapsed');
-                        if (window.updateVisualTagState) {
-                            window.updateVisualTagState(columnElement2, allTags, 'column', isCollapsed);
-                        }
-                    }
-                    
-                    // Store pending change locally instead of sending immediately
-                    if (!window.pendingColumnChanges) {
-                        window.pendingColumnChanges = new Map();
-                    }
-                    window.pendingColumnChanges.set(columnId, { columnId, title: newTitle });
-                    
-                    // Update refresh button state
-                    const totalPending = (window.pendingColumnChanges?.size || 0) + (window.pendingTaskChanges?.size || 0);
-                    if (window.updateRefreshButtonState) {
-                        window.updateRefreshButtonState('pending', totalPending);
-                    }
-                    
-                }
-            } else if (type === 'task-title' || type === 'task-description') {
-                let column = window.cachedBoard.columns.find(c => c.id === columnId);
-                let task = column?.tasks.find(t => t.id === taskId);
+        // Set only the active ones
+        if (window.tagUtils.isCurrentDate(colText)) columnElement.setAttribute('data-current-day', 'true');
+        if (window.tagUtils.isCurrentWeek(colText)) columnElement.setAttribute('data-current-week', 'true');
+        if (window.tagUtils.isCurrentWeekday(colText)) columnElement.setAttribute('data-current-weekday', 'true');
+        if (window.tagUtils.isCurrentTime(colText)) columnElement.setAttribute('data-current-hour', 'true');
+        if (window.tagUtils.isCurrentTimeSlot(colText)) columnElement.setAttribute('data-current-time', 'true');
+    }
 
-                // If task not found in expected column, search all columns (task may have been moved)
-                if (!task) {
-                    for (const col of window.cachedBoard.columns) {
-                        task = col.tasks.find(t => t.id === taskId);
-                        if (task) {
-                            column = col;
-                            // Update BOTH the editor's reference AND the local variable
-                            this.currentEditor.columnId = column.id;
-                            columnId = column.id; // CRITICAL: Update local variable too!
-                            break;
-                        }
-                    }
-                }
+    /**
+     * Track pending column change for refresh button state
+     */
+    _trackPendingColumnChange(columnId, newTitle) {
+        if (!window.pendingColumnChanges) {
+            window.pendingColumnChanges = new Map();
+        }
+        window.pendingColumnChanges.set(columnId, { columnId, title: newTitle });
 
+        const totalPending = (window.pendingColumnChanges?.size || 0) + (window.pendingTaskChanges?.size || 0);
+        if (window.updateRefreshButtonState) {
+            window.updateRefreshButtonState('pending', totalPending);
+        }
+    }
+
+    /**
+     * Save task field (title or description)
+     * Handles: include syntax, display updates, tag styling, temporal attributes
+     */
+    _saveTaskField() {
+        const { element, type, taskId } = this.currentEditor;
+        let columnId = this.currentEditor.columnId;
+        const value = element.value;
+
+        // Find task (may have been moved to different column)
+        let { column, task } = this._findTask(taskId, columnId);
+        if (!task) { return; }
+
+        // Update columnId if task was found in different column
+        if (column.id !== columnId) {
+            this.currentEditor.columnId = column.id;
+            columnId = column.id;
+        }
+
+        // Capture original values
+        const originalTitle = task.title || '';
+        const originalDisplayTitle = task.displayTitle || '';
+        const originalDescription = task.description || '';
+
+        // Handle based on field type
+        if (type === 'task-title') {
+            const handled = this._saveTaskTitle(task, value, taskId, columnId, element);
+            if (handled) { return; } // Early return for include handling
+        } else if (type === 'task-description') {
+            this._saveTaskDescription(task, value, taskId, columnId);
+        }
+
+        // Update display
+        this._updateTaskDisplay(task, type, value, taskId);
+
+        // Update tag styling
+        this._updateTaskTagStyling(task, taskId, columnId);
+
+        // Send to backend
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: taskId,
+            columnId: columnId,
+            taskData: task
+        });
+
+        // Update refresh button state
+        if (window.updateRefreshButtonState) {
+            const totalPending = (window.pendingColumnChanges?.size || 0);
+            window.updateRefreshButtonState(totalPending > 0 ? 'pending' : 'default', totalPending);
+        }
+    }
+
+    /**
+     * Find task by ID, searching all columns if not in expected column
+     */
+    _findTask(taskId, expectedColumnId) {
+        let column = window.cachedBoard.columns.find(c => c.id === expectedColumnId);
+        let task = column?.tasks.find(t => t.id === taskId);
+
+        if (!task) {
+            for (const col of window.cachedBoard.columns) {
+                task = col.tasks.find(t => t.id === taskId);
                 if (task) {
-                    // Capture original values before making changes
-                    const originalTitle = task.title || '';
-                    const originalDisplayTitle = task.displayTitle || '';
-                    const originalDescription = task.description || '';
-
-                    if (type === 'task-title') {
-                        // Handle task title - check for include syntax (location-based task include)
-                        const newIncludeMatches = value.match(/!!!include\(([^)]+)\)!!!/g) || [];
-                        const oldIncludeMatches = (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
-
-                        const hasIncludeChanges =
-                            oldIncludeMatches.length !== newIncludeMatches.length ||
-                            oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
-
-                        if (newIncludeMatches.length > 0 || hasIncludeChanges) {
-                            // This involves include syntax (new include, changed include, or removing include)
-                            // Backend handles undo via action system - don't save undo here
-                            const editContext = `${type}-${taskId}-${columnId}`;
-                            this.lastEditContext = editContext;
-
-                            task.title = value;
-
-                            // Use editTask message type for title changes
-
-                            vscode.postMessage({
-                                type: 'editTask',
-                                taskId: taskId,
-                                columnId: columnId,
-                                taskData: { title: value }
-                            });
-
-                            // Update display immediately before backend processes
-                            if (this.currentEditor.displayElement && window.renderMarkdownWithTags) {
-                                const renderedHtml = window.renderMarkdownWithTags(value);
-                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
-                            }
-
-                            // Update visual tag state (borders, backgrounds, badges)
-                            const taskElement = element.closest('.task-item');
-                            if (taskElement) {
-                                const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(value) : [];
-                                const isCollapsed = taskElement.classList.contains('collapsed');
-                                if (window.updateVisualTagState) {
-                                    window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
-                                }
-                            }
-
-                            return; // Skip local updates, let backend handle
-                        } else if (task.includeMode && oldIncludeMatches.length > 0) {
-                            // FIX BUG #2: Don't update displayTitle for task includes
-                            // If we reach here, the include syntax hasn't changed (caught by line 971)
-                            // displayTitle should stay as "# include in path" (UI indicator only, read-only)
-                            // Nothing to do - include syntax is unchanged
-                            return;
-                        } else {
-                            // Regular task title editing
-                            // Note: Backend handles undo via editTask message sent at end of edit
-                            if (task.title !== value) {
-                                const editContext = `${type}-${taskId}-${columnId}`;
-                                this.lastEditContext = editContext;
-                                task.title = value;
-                            }
-                        }
-                    } else if (type === 'task-description') {
-                        // Handle task description
-                        // Note: Backend handles undo via editTask message sent at end of edit
-                        if (task.includeMode) {
-                            // FIX BUG #1: No-parsing approach
-                            // The description field contains the COMPLETE file content - don't parse it!
-                            // displayTitle stays as "# include in path" (UI indicator only)
-                            const editContext = `${type}-${taskId}-${columnId}`;
-                            this.lastEditContext = editContext;
-                            task.description = value;  // Complete file content
-                        } else {
-                            // Regular task description handling
-                            const currentRawValue = task.description || '';
-                            if (currentRawValue !== value) {
-                                const editContext = `${type}-${taskId}-${columnId}`;
-                                this.lastEditContext = editContext;
-                                task.description = value;
-                            }
-                        }
-                    }
-
-                    // Mark as unsaved and send the specific change to backend if any change was made
-                    let wasChanged = false;
-                    if (type === 'task-title') {
-                        if (task.includeMode) {
-                            // For include tasks, check if displayTitle changed
-                            wasChanged = (task.displayTitle || '') !== originalDisplayTitle;
-                        } else {
-                            // For regular tasks, check if title changed
-                            wasChanged = (task.title || '') !== originalTitle;
-                        }
-                    } else if (type === 'task-description') {
-                        wasChanged = (task.description || '') !== originalDescription;
-                    }
-
-
-                    // NOTE: We intentionally do NOT call markUnsavedChanges() here for task edits.
-                    // The editTask message (sent below at end of edit) goes through the action system,
-                    // which properly handles undo state capture BEFORE applying changes.
-                    // Calling markUnsavedChanges() would sync the already-modified board to backend
-                    // BEFORE editTask is processed, causing undo to capture the wrong "before" state.
-                    // See: editTask is sent at lines 1314-1320 and handles board sync via emitBoardChanged.
-
-                    if (this.currentEditor.displayElement) {
-                        if (value.trim()) {
-                            // For task includes, determine the correct display value
-                            let displayValue = value;
-                            if (type === 'task-description' && task.includeMode) {
-                                // For task include descriptions, show only the description part (not the title)
-                                displayValue = task.description || '';
-                            } else if (type === 'task-title' && task.includeMode) {
-                                // For task include titles, show the display title
-                                displayValue = task.displayTitle || '';
-                            }
-
-                            // Set parent time slot context for minute slot inheritance (description only)
-                            if (type === 'task-description' && window.tagUtils && window.tagUtils.extractTimeSlotTag) {
-                                window.currentRenderingTimeSlot = window.tagUtils.extractTimeSlotTag(task.title || '');
-                            }
-
-                            let renderedHtml = renderMarkdown(displayValue, task.includeContext);
-
-                            // Clear context after rendering
-                            window.currentRenderingTimeSlot = null;
-
-                            // Wrap in sections for keyboard navigation if this is a task description
-                            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
-                                renderedHtml = window.wrapTaskSections(renderedHtml);
-                            }
-                            this.currentEditor.displayElement.innerHTML = renderedHtml;
-                        } else {
-                            // Handle empty values
-                            // For task descriptions, always wrap in sections for keyboard navigation
-                            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
-                                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections('');
-                            } else {
-                                // For other types, must be truly empty for CSS :empty selector
-                                this.currentEditor.displayElement.innerHTML = '';
-                            }
-                        }
-                        // Ensure display element is visible
-                        this.currentEditor.displayElement.style.removeProperty('display');
-
-                        // For task includes, also update the title display when description is edited
-                        if (type === 'task-description' && task.includeMode) {
-                            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-                            if (taskElement) {
-                                const titleDisplayElement = taskElement.querySelector('.task-title-display');
-                                if (titleDisplayElement) {
-                                    // Use getTaskDisplayTitle to maintain link format
-                                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '', task.includeContext);
-                                    titleDisplayElement.innerHTML = displayHtml;
-                                }
-                            }
-                        }
-                    }
-
-                    // Update tag-based styling (only title tags for card-level styling)
-                    const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-                    if (taskElement) {
-                        // Only use title tags for card-level styling (headers/footers)
-                        // Description tags should remain inline-only
-                        const titleTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(task.title || '') : [];
-                        const allTags = titleTags; // Only title tags get card-level styling
-
-                        // Update primary tag (first non-special tag from title)
-                        const primaryTag = window.extractFirstTag ? window.extractFirstTag(task.title) : null;
-                        if (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span')) {
-                            taskElement.setAttribute('data-task-tag', primaryTag);
-                        } else {
-                            taskElement.removeAttribute('data-task-tag');
-                        }
-
-                        // Update temporal attributes with hierarchical gating
-                        if (window.tagUtils && window.getActiveTemporalAttributes) {
-                            // Get column title for hierarchical gating
-                            const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
-                            const columnTitle = column?.title || '';
-
-                            // Remove all temporal attributes first
-                            taskElement.removeAttribute('data-current-day');
-                            taskElement.removeAttribute('data-current-week');
-                            taskElement.removeAttribute('data-current-weekday');
-                            taskElement.removeAttribute('data-current-hour');
-                            taskElement.removeAttribute('data-current-time');
-
-                            // Get active temporal attributes with hierarchical gating
-                            const activeAttrs = window.getActiveTemporalAttributes(columnTitle, task.title || '', task.description || '');
-
-                            // Set only the ones that are active
-                            for (const [attr, isActive] of Object.entries(activeAttrs)) {
-                                if (isActive) {
-                                    taskElement.setAttribute(attr, 'true');
-                                }
-                            }
-                        }
-
-                        // Update all visual tag state (attributes, backgrounds, borders, visual elements)
-                        // This includes badges, so no need to call updateCornerBadgesImmediate separately
-                        const isCollapsed = taskElement.classList.contains('collapsed');
-                        if (window.updateVisualTagState) {
-                            window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
-                        }
-                    }
-                    
-                    // Send editTask message immediately when edit ends (not on window blur)
-                    vscode.postMessage({
-                        type: 'editTask',
-                        taskId: taskId,
-                        columnId: columnId,
-                        taskData: task
-                    });
-
-                    // Note: No longer storing in pendingTaskChanges since we send immediately
-                    // Update refresh button state (no pending changes since we sent immediately)
-                    if (window.updateRefreshButtonState) {
-                        const totalPending = (window.pendingColumnChanges?.size || 0);
-                        window.updateRefreshButtonState(totalPending > 0 ? 'pending' : 'default', totalPending);
-                    }
-                    
+                    column = col;
+                    break;
                 }
+            }
+        }
+
+        return { column, task };
+    }
+
+    /**
+     * Save task title
+     * Returns true if handled (include case with early return), false otherwise
+     */
+    _saveTaskTitle(task, value, taskId, columnId, element) {
+        const newIncludeMatches = value.match(/!!!include\(([^)]+)\)!!!/g) || [];
+        const oldIncludeMatches = (task.title || '').match(/!!!include\(([^)]+)\)!!!/g) || [];
+
+        const hasIncludeChanges =
+            oldIncludeMatches.length !== newIncludeMatches.length ||
+            oldIncludeMatches.some((match, index) => match !== newIncludeMatches[index]);
+
+        if (newIncludeMatches.length > 0 || hasIncludeChanges) {
+            // Handle include syntax (new, changed, or removed)
+            this._saveTaskTitleWithIncludes(task, value, taskId, columnId, element);
+            return true;
+        }
+
+        if (task.includeMode && oldIncludeMatches.length > 0) {
+            // Include task with unchanged include syntax - don't update
+            return true;
+        }
+
+        // Regular task title editing
+        if (task.title !== value) {
+            this.lastEditContext = `task-title-${taskId}-${columnId}`;
+            task.title = value;
+        }
+
+        return false;
+    }
+
+    /**
+     * Save task title with include syntax
+     */
+    _saveTaskTitleWithIncludes(task, value, taskId, columnId, element) {
+        this.lastEditContext = `task-title-${taskId}-${columnId}`;
+        task.title = value;
+
+        vscode.postMessage({
+            type: 'editTask',
+            taskId: taskId,
+            columnId: columnId,
+            taskData: { title: value }
+        });
+
+        // Update display
+        if (this.currentEditor.displayElement && window.renderMarkdownWithTags) {
+            const renderedHtml = window.renderMarkdownWithTags(value);
+            this.currentEditor.displayElement.innerHTML = window.wrapTaskSections ? window.wrapTaskSections(renderedHtml) : renderedHtml;
+        }
+
+        // Update visual tag state
+        const taskElement = element.closest('.task-item');
+        if (taskElement) {
+            const allTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(value) : [];
+            const isCollapsed = taskElement.classList.contains('collapsed');
+            if (window.updateVisualTagState) {
+                window.updateVisualTagState(taskElement, allTags, 'task', isCollapsed);
+            }
+        }
+    }
+
+    /**
+     * Save task description
+     */
+    _saveTaskDescription(task, value, taskId, columnId) {
+        const currentRawValue = task.description || '';
+        if (currentRawValue === value && !task.includeMode) { return; }
+
+        this.lastEditContext = `task-description-${taskId}-${columnId}`;
+        task.description = value;
+    }
+
+    /**
+     * Update task display element
+     */
+    _updateTaskDisplay(task, type, value, taskId) {
+        if (!this.currentEditor.displayElement) { return; }
+
+        if (value.trim()) {
+            // Determine correct display value for includes
+            let displayValue = value;
+            if (type === 'task-description' && task.includeMode) {
+                displayValue = task.description || '';
+            } else if (type === 'task-title' && task.includeMode) {
+                displayValue = task.displayTitle || '';
+            }
+
+            // Set time slot context for description rendering
+            if (type === 'task-description' && window.tagUtils && window.tagUtils.extractTimeSlotTag) {
+                window.currentRenderingTimeSlot = window.tagUtils.extractTimeSlotTag(task.title || '');
+            }
+
+            let renderedHtml = renderMarkdown(displayValue, task.includeContext);
+            window.currentRenderingTimeSlot = null;
+
+            // Wrap in sections for keyboard navigation
+            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
+                renderedHtml = window.wrapTaskSections(renderedHtml);
+            }
+            this.currentEditor.displayElement.innerHTML = renderedHtml;
+        } else {
+            // Handle empty values
+            if (type === 'task-description' && typeof window.wrapTaskSections === 'function') {
+                this.currentEditor.displayElement.innerHTML = window.wrapTaskSections('');
+            } else {
+                this.currentEditor.displayElement.innerHTML = '';
+            }
+        }
+
+        this.currentEditor.displayElement.style.removeProperty('display');
+
+        // For task includes, also update title display when description is edited
+        if (type === 'task-description' && task.includeMode) {
+            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (taskElement) {
+                const titleDisplayElement = taskElement.querySelector('.task-title-display');
+                if (titleDisplayElement) {
+                    const displayHtml = window.tagUtils ? window.tagUtils.getTaskDisplayTitle(task) : renderMarkdown(task.displayTitle || '', task.includeContext);
+                    titleDisplayElement.innerHTML = displayHtml;
+                }
+            }
+        }
+    }
+
+    /**
+     * Update task tag-based styling (primary tag, temporal attributes, visual state)
+     */
+    _updateTaskTagStyling(task, taskId, columnId) {
+        const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (!taskElement) { return; }
+
+        const titleTags = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(task.title || '') : [];
+
+        // Update primary tag
+        const primaryTag = window.extractFirstTag ? window.extractFirstTag(task.title) : null;
+        if (primaryTag && !primaryTag.startsWith('row') && !primaryTag.startsWith('gather_') && !primaryTag.startsWith('span')) {
+            taskElement.setAttribute('data-task-tag', primaryTag);
+        } else {
+            taskElement.removeAttribute('data-task-tag');
+        }
+
+        // Update temporal attributes with hierarchical gating
+        this._updateTaskTemporalAttributes(taskElement, task, columnId);
+
+        // Update visual tag state
+        const isCollapsed = taskElement.classList.contains('collapsed');
+        if (window.updateVisualTagState) {
+            window.updateVisualTagState(taskElement, titleTags, 'task', isCollapsed);
+        }
+    }
+
+    /**
+     * Update task temporal attributes with hierarchical gating
+     */
+    _updateTaskTemporalAttributes(taskElement, task, columnId) {
+        if (!window.tagUtils || !window.getActiveTemporalAttributes) { return; }
+
+        const column = window.cachedBoard?.columns?.find(c => c.id === columnId);
+        const columnTitle = column?.title || '';
+
+        // Remove all temporal attributes first
+        taskElement.removeAttribute('data-current-day');
+        taskElement.removeAttribute('data-current-week');
+        taskElement.removeAttribute('data-current-weekday');
+        taskElement.removeAttribute('data-current-hour');
+        taskElement.removeAttribute('data-current-time');
+
+        // Get active temporal attributes with hierarchical gating
+        const activeAttrs = window.getActiveTemporalAttributes(columnTitle, task.title || '', task.description || '');
+
+        // Set only the active ones
+        for (const [attr, isActive] of Object.entries(activeAttrs)) {
+            if (isActive) {
+                taskElement.setAttribute(attr, 'true');
             }
         }
     }

@@ -129,8 +129,8 @@ function generateTagStyles() {
                 const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                 // Calculate text color from the ACTUAL interpolated background
-                const defaultColumnTextColor = colorUtils ? colorUtils.getContrastText(columnBg) : '#000000';
-                const defaultColumnTextShadow = colorUtils ? colorUtils.getContrastShadow(defaultColumnTextColor, columnBg) : '';
+                const { textColor: defaultColumnTextColor, textShadow: defaultColumnTextShadow } =
+                    colorUtils ? colorUtils.getTextColorsForBackground(columnBg) : { textColor: '#000000', textShadow: '' };
 
                 // Default column header background
                 styles += `.kanban-full-height-column:not([data-column-tag]) .column-header {
@@ -165,8 +165,8 @@ function generateTagStyles() {
                 const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                 // Calculate text color from the ACTUAL collapsed background
-                const defaultCollapsedTextColor = colorUtils ? colorUtils.getContrastText(columnCollapsedBg) : '#000000';
-                const defaultCollapsedTextShadow = colorUtils ? colorUtils.getContrastShadow(defaultCollapsedTextColor, columnCollapsedBg) : '';
+                const { textColor: defaultCollapsedTextColor, textShadow: defaultCollapsedTextShadow } =
+                    colorUtils ? colorUtils.getTextColorsForBackground(columnCollapsedBg) : { textColor: '#000000', textShadow: '' };
 
                 // Default collapsed column header background
                 styles += `.kanban-full-height-column.collapsed:not([data-column-tag]) .column-header {
@@ -249,8 +249,8 @@ function generateTagStyles() {
                     const opaqueBackground = themeColors.background.length === 9 ? themeColors.background.substring(0, 7) : themeColors.background;
 
                     // Calculate automatic text color based on background luminance
-                    const tagTextColor = colorUtils ? colorUtils.getContrastText(opaqueBackground) : '#000000';
-                    const tagTextShadow = colorUtils ? colorUtils.getContrastShadow(tagTextColor, opaqueBackground) : '';
+                    const { textColor: tagTextColor, textShadow: tagTextShadow } =
+                        colorUtils ? colorUtils.getTextColorsForBackground(opaqueBackground) : { textColor: '#000000', textShadow: '' };
 
                     styles += `.kanban-tag[data-tag="${attrTagName}"] {
                         color: ${tagTextColor} !important;
@@ -279,8 +279,8 @@ function generateTagStyles() {
                     const columnBg = colorUtils.interpolateColor(editorBg, bgDark, 0.15);
 
                     // Calculate text color from the ACTUAL interpolated background, not the original color
-                    const columnTextColor = colorUtils ? colorUtils.getContrastText(columnBg) : '#000000';
-                    const columnTextShadow = colorUtils ? colorUtils.getContrastShadow(columnTextColor, columnBg) : '';
+                    const { textColor: columnTextColor, textShadow: columnTextShadow } =
+                        colorUtils ? colorUtils.getTextColorsForBackground(columnBg) : { textColor: '#000000', textShadow: '' };
 
                     // Column header background
                     styles += `.kanban-full-height-column[data-column-bg-tag="${attrTagName}"] .column-header {
@@ -316,8 +316,8 @@ function generateTagStyles() {
                     const columnCollapsedBg = colorUtils.interpolateColor(editorBg, bgDark, 0.2);
 
                     // Calculate text color from the ACTUAL collapsed background
-                    const collapsedTextColor = colorUtils ? colorUtils.getContrastText(columnCollapsedBg) : '#000000';
-                    const collapsedTextShadow = colorUtils ? colorUtils.getContrastShadow(collapsedTextColor, columnCollapsedBg) : '';
+                    const { textColor: collapsedTextColor, textShadow: collapsedTextShadow } =
+                        colorUtils ? colorUtils.getTextColorsForBackground(columnCollapsedBg) : { textColor: '#000000', textShadow: '' };
 
                     // Collapsed column header background
                     styles += `.kanban-full-height-column.collapsed[data-column-bg-tag="${attrTagName}"] .column-header {
@@ -418,8 +418,8 @@ function generateTagStyles() {
                         // Calculate automatic text color from header bar background
                         // ALWAYS use automatic calculation, ignore configured labelColor
                         const opaqueHeaderColor = headerColor.length === 9 ? headerColor.substring(0, 7) : headerColor;
-                        const headerTextColor = colorUtils ? colorUtils.getContrastText(opaqueHeaderColor) : '#ffffff';
-                        const headerTextShadow = colorUtils ? colorUtils.getContrastShadow(headerTextColor, opaqueHeaderColor) : '';
+                        const { textColor: headerTextColor, textShadow: headerTextShadow } =
+                            colorUtils ? colorUtils.getTextColorsForBackground(opaqueHeaderColor) : { textColor: '#ffffff', textShadow: '' };
 
                         // Create a unique class for this header bar - always solid color
                         styles += `.header-bar-${lowerTagName} {
@@ -466,8 +466,8 @@ function generateTagStyles() {
                         // Calculate automatic text color from footer bar background
                         // ALWAYS use automatic calculation, ignore configured labelColor
                         const opaqueFooterColor = footerColor.length === 9 ? footerColor.substring(0, 7) : footerColor;
-                        const footerTextColor = colorUtils ? colorUtils.getContrastText(opaqueFooterColor) : '#ffffff';
-                        const footerTextShadow = colorUtils ? colorUtils.getContrastShadow(footerTextColor, opaqueFooterColor) : '';
+                        const { textColor: footerTextColor, textShadow: footerTextShadow } =
+                            colorUtils ? colorUtils.getTextColorsForBackground(opaqueFooterColor) : { textColor: '#ffffff', textShadow: '' };
 
                         // Create a unique class for this footer bar
                         styles += `.footer-bar-${lowerTagName} {

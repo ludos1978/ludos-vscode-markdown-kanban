@@ -193,6 +193,19 @@ class ColorUtils {
         // Smoother and less obstucting
         return `0 0 4px #888`;
     }
+
+    /**
+     * Get both text color and text shadow for a background color
+     * Combines getContrastText() and getContrastShadow() in a single call
+     * to avoid duplicate luminance/contrast calculations
+     * @param {string} backgroundColor - Background color
+     * @returns {Object} Object with textColor and textShadow properties
+     */
+    getTextColorsForBackground(backgroundColor) {
+        const textColor = this.getContrastText(backgroundColor);
+        const textShadow = this.getContrastShadow(textColor, backgroundColor);
+        return { textColor, textShadow };
+    }
 }
 
 // Create singleton instance
