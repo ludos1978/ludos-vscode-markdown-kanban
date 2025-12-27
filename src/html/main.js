@@ -12,7 +12,7 @@ import './utils/fileTypeUtils.js';
 import './utils/tagUtils.js';
 import './utils/configManager.js';
 import './utils/styleManager.js';
-import './utils/menuManager.js';
+// menuManager.js removed - was dead code (overwritten by SimpleMenuManager in menuOperations.js)
 import './utils/dragStateManager.js';
 import './utils/validationUtils.js';
 import './utils/modalUtils.js';
