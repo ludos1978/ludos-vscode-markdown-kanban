@@ -39,6 +39,12 @@ kanban-plugin: board
 - [ ] drawio
   ![](./kanban-presentation-1-MEDIA/drawio.drawio)
 
-## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!!
+## first
+- [ ] test
+
+## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!! #stack
+
+## second
+- [ ] test
 
 
