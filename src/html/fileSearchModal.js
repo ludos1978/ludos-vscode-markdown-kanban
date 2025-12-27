@@ -39,10 +39,8 @@ const fileSearchModal = (function() {
      * Initialize the modal (called once on page load)
      */
     function init() {
-        console.log('[FileSearchModal] Initializing...');
         // Get DOM elements
         overlay = document.getElementById('file-search-overlay');
-        console.log('[FileSearchModal] overlay element:', overlay);
         originalPathEl = document.getElementById('file-search-original-path');
         brokenBadgeEl = document.getElementById('file-search-broken-badge');
         searchInputEl = document.getElementById('file-search-input');
@@ -144,12 +142,9 @@ const fileSearchModal = (function() {
      * Show the modal with the given parameters
      */
     function show(path, initialSearch) {
-        console.log('[FileSearchModal] show() called with path:', path);
         if (!overlay) {
-            console.log('[FileSearchModal] overlay not found, calling init()');
             init();
         }
-        console.log('[FileSearchModal] overlay after init:', overlay);
 
         // Reset state
         originalPath = path;
@@ -460,10 +455,8 @@ const fileSearchModal = (function() {
      * Handle messages from the extension
      */
     function handleMessage(message) {
-        console.log('[FileSearchModal] handleMessage:', message.type);
         switch (message.type) {
             case 'fileSearchShow':
-                console.log('[FileSearchModal] Showing modal for:', message.originalPath);
                 show(message.originalPath, message.initialSearch);
                 break;
 

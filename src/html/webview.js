@@ -2005,11 +2005,9 @@ if (!webviewEventListenersInitialized) {
                             window.invalidateDiagramCache(filePath, 'excalidraw');
                         }
                     });
-                    console.log(`[Frontend] Cleared diagram cache for ${message.paths.length} file(s)`);
                 } else {
                     // Clear entire cache
                     window.clearDiagramCache();
-                    console.log('[Frontend] Cleared all diagram cache');
                 }
             }
             break;
@@ -2020,16 +2018,11 @@ if (!webviewEventListenersInitialized) {
             // Backend sends "changedFiles", support both for compatibility
             const changedMediaFiles = message.changedFiles || message.files;
             if (changedMediaFiles && changedMediaFiles.length > 0) {
-                console.log(`[Frontend] Media files changed:`, changedMediaFiles.map(f => f.path));
-
                 // Process each changed file
                 changedMediaFiles.forEach(file => {
-                    console.log(`[Frontend] Processing changed file: ${file.path} (type: ${file.type})`);
-
                     if (file.type === 'diagram') {
                         // Clear diagram cache for this specific file
                         if (typeof window.invalidateDiagramCache === 'function') {
-                            console.log(`[Frontend] Clearing diagram cache for: ${file.path}`);
                             window.invalidateDiagramCache(file.path, 'drawio');
                             window.invalidateDiagramCache(file.path, 'excalidraw');
                         }
@@ -2046,8 +2039,6 @@ if (!webviewEventListenersInitialized) {
                         const src = img.getAttribute('src') || '';
                         return src.includes(fileName);
                     });
-                    console.log(`[Frontend] Looking for images containing: ${fileName}`);
-                    console.log(`[Frontend] Found ${matchingImages.length} matching images`);
 
                     matchingImages.forEach(img => {
                         // Force reload by appending cache-busting timestamp
@@ -2058,7 +2049,6 @@ if (!webviewEventListenersInitialized) {
                             // Add new cache buster
                             const separator = cleanSrc.includes('?') ? '&' : '?';
                             const newSrc = `${cleanSrc}${separator}_cb=${Date.now()}`;
-                            console.log(`[Frontend] Updating img src: ${originalSrc} -> ${newSrc}`);
                             img.setAttribute('src', newSrc);
                         }
                     });
@@ -2072,8 +2062,6 @@ if (!webviewEventListenersInitialized) {
                             const originalSrc = img.getAttribute('data-original-src') || '';
                             return originalSrc.includes(fileName);
                         });
-                        console.log(`[Frontend] Looking for diagram images with data-original-src containing: ${fileName}`);
-                        console.log(`[Frontend] Found ${matchingImages.length} matching diagram images`);
 
                         matchingImages.forEach(img => {
                             const originalSrc = img.getAttribute('data-original-src');
@@ -2086,8 +2074,6 @@ if (!webviewEventListenersInitialized) {
                                 originalSrc.endsWith('.excalidraw.svg')) {
                                 diagramType = 'excalidraw';
                             }
-
-                            console.log(`[Frontend] Re-rendering diagram: type=${diagramType}, path=${originalSrc}`);
 
                             // Get the parent container (diagram-placeholder div)
                             const container = img.parentElement;
@@ -2109,8 +2095,6 @@ if (!webviewEventListenersInitialized) {
                         });
                     }
                 });
-
-                console.log(`[Frontend] Processed ${changedMediaFiles.length} changed media file(s)`);
             }
             break;
 
@@ -2733,14 +2717,10 @@ if (!webviewEventListenersInitialized) {
             {
                 const convertedFileName = message.filePath?.split('/').pop() || 'file';
                 if (message.converted > 0) {
-                    console.log(`[Paths] Converted ${message.converted} paths in ${convertedFileName}`);
                     // Refresh debug overlay to show updated state
                     if (typeof window.refreshDebugOverlay === 'function') {
                         setTimeout(() => window.refreshDebugOverlay(), 500);
                     }
-                }
-                if (message.warnings && message.warnings.length > 0) {
-                    console.warn('[Paths] Conversion warnings:', message.warnings);
                 }
             }
             break;
@@ -2748,22 +2728,16 @@ if (!webviewEventListenersInitialized) {
         case 'allPathsConverted':
             // Handle bulk path conversion result
             if (message.converted > 0) {
-                console.log(`[Paths] Converted ${message.converted} paths in ${message.filesModified} file(s)`);
                 // Refresh debug overlay to show updated state
                 if (typeof window.refreshDebugOverlay === 'function') {
                     setTimeout(() => window.refreshDebugOverlay(), 500);
                 }
-            }
-            if (message.warnings && message.warnings.length > 0) {
-                console.warn('[Paths] Conversion warnings:', message.warnings);
             }
             break;
 
         case 'singlePathConverted':
             // Handle single path conversion result
             if (message.converted) {
-                console.log(`[Paths] Converted: ${message.originalPath} -> ${message.newPath}`);
-
                 // Update DOM elements that reference the old path
                 updatePathInDOM(message.originalPath, message.newPath, message.direction);
 
@@ -2771,8 +2745,6 @@ if (!webviewEventListenersInitialized) {
                 if (typeof window.refreshDebugOverlay === 'function') {
                     setTimeout(() => window.refreshDebugOverlay(), 500);
                 }
-            } else {
-                console.log(`[Paths] ${message.message}`);
             }
             break;
 
@@ -2846,12 +2818,8 @@ if (!webviewEventListenersInitialized) {
         case 'fileSearchOptionsUpdated':
         case 'fileSearchBrokenPathCount':
         case 'fileSearchBatchAnalysis':
-            console.log('[webview.js] Received fileSearch message:', message.type);
             if (typeof fileSearchModal !== 'undefined' && fileSearchModal.handleMessage) {
-                console.log('[webview.js] Forwarding to fileSearchModal.handleMessage');
                 fileSearchModal.handleMessage(message);
-            } else {
-                console.error('[webview.js] fileSearchModal not available! typeof:', typeof fileSearchModal);
             }
             break;
     }

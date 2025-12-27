@@ -330,16 +330,6 @@ function setupGlobalDragAndDrop() {
     function handleExternalDrop(e) {
         // Handle external drop event
 
-        // DIAGNOSTIC: Log drop event details
-        console.log('[DragDrop] handleExternalDrop called', {
-            hasFiles: e.dataTransfer?.files?.length > 0,
-            filesCount: e.dataTransfer?.files?.length,
-            types: Array.from(e.dataTransfer?.types || []),
-            isDragging: dragState.isDragging,
-            hasTask: !!dragState.draggedTask,
-            hasColumn: !!dragState.draggedColumn
-        });
-
         // Prevent default browser behavior
         e.preventDefault();
 
@@ -350,7 +340,6 @@ function setupGlobalDragAndDrop() {
             !dragState.draggedEmptyCard;
 
         if (isInternalDrag) {
-            console.log('[DragDrop] handleExternalDrop - skipping (isInternalDrag)');
             return;
         }
 
@@ -425,10 +414,6 @@ function setupGlobalDragAndDrop() {
 
         // Priority 2: Check for files
         if (dt.files && dt.files.length > 0) {
-            console.log('[DragDrop] handleExternalDrop - handling as FILES', {
-                filesCount: dt.files.length,
-                firstFileName: dt.files[0]?.name
-            });
             handleVSCodeFileDrop(e, dt.files);
             return;
         }
@@ -467,18 +452,9 @@ function setupGlobalDragAndDrop() {
         // Priority 4: Check for URI list
         const uriList = dt.getData('text/uri-list');
         if (uriList) {
-            console.log('[DragDrop] handleExternalDrop - handling as URI-LIST', {
-                uriList: uriList.substring(0, 200)
-            });
             handleVSCodeUriDrop(e, uriList);
             return;
         }
-
-        console.log('[DragDrop] handleExternalDrop - NO HANDLER MATCHED', {
-            textData2: textData2?.substring(0, 100),
-            types: Array.from(dt.types || [])
-        });
-        
     }
     
     // Board container dragover for external file drag indicators
@@ -500,10 +476,6 @@ function setupGlobalDragAndDrop() {
         // DIAGNOSTIC: Log external file drag handling (once per session)
         if (!window._externalDragLogged) {
             window._externalDragLogged = true;
-            console.log('[DragDrop] EXTERNAL FILE DRAG detected - showing position indicator', {
-                hasFiles: e.dataTransfer?.types?.includes('Files'),
-                types: Array.from(e.dataTransfer?.types || [])
-            });
         }
 
         // Show drop indicators for external drags using hierarchical lookup
@@ -1163,13 +1135,6 @@ function setupGlobalDragAndDrop() {
         const beforeColumnId = dragState.dropTargetBeforeColumn?.dataset?.columnId || null;
         const isDropZone = dragState.dropTargetStack.classList.contains('column-drop-zone-stack');
 
-        console.log('[insertColumnAtPosition] Target info:', {
-            isDropZone,
-            targetStackFirstColId,
-            beforeColumnId,
-            dropTargetStackClasses: dragState.dropTargetStack.className
-        });
-
         // Get row number for #row tag
         const targetRowElement = dragState.dropTargetStack.closest('.kanban-row');
         const targetRow = targetRowElement ? parseInt(targetRowElement.getAttribute('data-row-number') || '1') : 1;
@@ -1388,11 +1353,6 @@ function setupGlobalDragAndDrop() {
      * Uses the SAME position tracking as processColumnDrop (dragState.dropTargetStack/dropTargetBeforeColumn)
      */
     function processTemplateColumnDrop() {
-        console.log('[processTemplateColumnDrop] Called!', {
-            dropTargetStack: !!dragState.dropTargetStack,
-            dropTargetBeforeColumn: dragState.dropTargetBeforeColumn?.dataset?.columnId || 'null'
-        });
-
         // Check drop target directly (same as processColumnDrop)
         if (!dragState.dropTargetStack) {
             console.warn('[processTemplateColumnDrop] No drop target stack');
@@ -1548,10 +1508,6 @@ function setupGlobalDragAndDrop() {
         window._indicatorShownLogged = false;
         window._externalDragLogged = false;
         window._externalInWrongHandlerLogged = false;
-        console.log('[DragDrop] Dragend fired', {
-            hasTask: !!dragState.draggedTask,
-            isDragging: dragState.isDragging
-        });
 
         // 1. CAPTURE STATE BEFORE ANY CLEANUP
         const wasTask = !!dragState.draggedTask;
@@ -1564,16 +1520,6 @@ function setupGlobalDragAndDrop() {
             (templateDragState.isEmptyColumn || templateDragState.isClipboardColumn || templateDragState.templatePath);
         const droppedOutside = e.dataTransfer?.dropEffect === 'none';
 
-        // DEBUG: Log template drag state
-        console.log('[dragend] Template drag check:', {
-            wasTemplateColumnDrag,
-            templateDragStateIsDragging: typeof templateDragState !== 'undefined' ? templateDragState.isDragging : 'undefined',
-            isEmptyColumn: typeof templateDragState !== 'undefined' ? templateDragState.isEmptyColumn : 'undefined',
-            isClipboardColumn: typeof templateDragState !== 'undefined' ? templateDragState.isClipboardColumn : 'undefined',
-            templatePath: typeof templateDragState !== 'undefined' ? templateDragState.templatePath : 'undefined',
-            dropTargetStack: !!dragState.dropTargetStack,
-            dropTargetBeforeColumn: dragState.dropTargetBeforeColumn
-        });
         const leftView = dragState.leftView;
 
         // Get current position for debugging
@@ -1631,16 +1577,8 @@ function setupGlobalDragAndDrop() {
                 processColumnDrop();
             }
             // Handle template column drags (empty column, clipboard column, or template)
-            console.log('[dragend] About to check template column drop:', {
-                wasTemplateColumnDrag,
-                hasDropTargetStack: !!dragState.dropTargetStack,
-                willCallProcessTemplateColumnDrop: wasTemplateColumnDrag && dragState.dropTargetStack
-            });
             if (wasTemplateColumnDrag && dragState.dropTargetStack) {
-                console.log('[dragend] Calling processTemplateColumnDrop()');
                 processTemplateColumnDrop();
-            } else if (wasTemplateColumnDrag && !dragState.dropTargetStack) {
-                console.warn('[dragend] Template drag but NO dropTargetStack!');
             }
         }
 
@@ -2471,14 +2409,10 @@ function setupTaskDragHandle(handle) {
     handle.draggable = true;
 
     handle.addEventListener('dragstart', e => {
-        // DIAGNOSTIC: Trace dragstart events
-        console.log('[DragDrop] Task dragstart fired', { target: e.target?.className });
-
         const taskItem = e.target && e.target.closest ? e.target.closest('.task-item') : null;
 
         if (taskItem) {
             e.stopPropagation();
-            console.log('[DragDrop] Task dragstart - taskItem found', { taskId: taskItem.dataset.taskId });
 
             // CRITICAL FIX: Clear any text selection to prevent it from being dragged instead of the task
             // This prevents the bug where selecting text and then dragging creates unintended tasks
@@ -3075,13 +3009,6 @@ function setupColumnDragAndDrop() {
             });
         }
 
-        // DIAGNOSTIC: Log first dragover of each drag (use counter to avoid spam)
-        if (!window._dragoverLogCount) window._dragoverLogCount = 0;
-        if (window._dragoverLogCount < 3) {
-            console.log('[DragDrop] Dragover processing', { isTaskDrag, draggedTask: !!dragState.draggedTask });
-            window._dragoverLogCount++;
-        }
-
         e.preventDefault();
 
         // Update Alt key state during drag (for task-like drags)
@@ -3209,11 +3136,6 @@ function setupColumnDragAndDrop() {
                 // DIAGNOSTIC: Log once per drag session (not every frame)
                 if (!window._currentDragSessionLogged) {
                     window._currentDragSessionLogged = true;
-                    const indicator = window.dropIndicatorManager.getDropIndicator();
-                    console.log('[DragDrop] NEW DRAG SESSION - Task drag start', {
-                        draggedTaskId: dragState.draggedTask?.dataset?.taskId,
-                        indicatorInDOM: indicator ? document.body.contains(indicator) : false
-                    });
                 }
 
                 let targetColumn = null;
@@ -3267,16 +3189,6 @@ function setupColumnDragAndDrop() {
 
                 // If over column-title or folded column, highlight title and drop at end
                 if (dropAtEnd) {
-                    // DIAGNOSTIC: Log ONCE when dropAtEnd path is taken
-                    if (!window._dropAtEndLogged) {
-                        window._dropAtEndLogged = true;
-                        console.log('[DragDrop] dropAtEnd=true - NOT showing indicator line', {
-                            isFolded,
-                            mouseY,
-                            columnId: targetColumn?.dataset?.columnId,
-                            reason: isFolded ? 'Column is folded' : 'Mouse over column-title (RULE 1)'
-                        });
-                    }
                     const columnTitle = targetColumn.querySelector('.column-title');
                     if (columnTitle) {
                         addHighlight(columnTitle, 'task-drop-target');
@@ -3310,13 +3222,6 @@ function setupColumnDragAndDrop() {
                 }
 
                 // If no task found, afterElement stays null (drop at end)
-                if (!window._indicatorShownLogged) {
-                    window._indicatorShownLogged = true;
-                    console.log('[DragDrop] SUCCESS - Showing position indicator', {
-                        afterElementId: afterElement?.dataset?.taskId,
-                        columnId: targetColumn?.dataset?.columnId
-                    });
-                }
                 showTaskDropIndicatorWithState(tasksContainer, { afterElement });
                 return;
             }
@@ -3363,10 +3268,6 @@ function setupColumnDragAndDrop() {
             // Update drop target state
             dragState.dropTargetStack = foundStack;
             dragState.dropTargetBeforeColumn = beforeColumn;
-            console.log('[DragOver] Template/Column drop target set:', {
-                stackId: foundStack?.firstElementChild?.dataset?.columnId,
-                beforeColumnId: beforeColumn?.dataset?.columnId || 'end of stack'
-            });
 
             // Only show line indicator for template drags, not column drags
             if (!stillColumnDrag) {

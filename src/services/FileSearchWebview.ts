@@ -81,7 +81,6 @@ export class FileSearchWebview {
      * Set the webview to use for displaying the file search modal
      */
     setWebview(webview: vscode.Webview): void {
-        console.log('[FileSearchWebview] setWebview called, webview:', webview ? 'defined' : 'undefined');
         this._webview = webview;
     }
 
@@ -93,8 +92,6 @@ export class FileSearchWebview {
             console.error('[FileSearchWebview] pickReplacementForBrokenLink: webview not set');
             throw new Error('Webview not set. Call setWebview() first.');
         }
-
-        console.log('[FileSearchWebview] pickReplacementForBrokenLink called for:', originalPath);
 
         const decodedPath = safeDecodeURIComponent(originalPath);
         const nameRoot = path.parse(path.basename(decodedPath)).name;
@@ -138,15 +135,11 @@ export class FileSearchWebview {
             return;
         }
 
-        console.log('[FileSearchWebview] Setting up message listener');
-
         this._messageDisposable = this._webview.onDidReceiveMessage(async (message) => {
             // Only handle file search messages
             if (!message.type?.startsWith('fileSearch')) {
                 return; // Let other handlers process non-fileSearch messages
             }
-
-            console.log('[FileSearchWebview] Received message:', message.type);
 
             try {
                 switch (message.type) {
@@ -191,14 +184,12 @@ export class FileSearchWebview {
     }
 
     private async _performSearch(term: string): Promise<void> {
-        console.log('[FileSearchWebview] _performSearch called with term:', term);
         this._searchSeq += 1;
         const seq = this._searchSeq;
         const rawTerm = term.trim();
         const normalized = this._caseSensitive ? rawTerm : rawTerm.toLowerCase();
 
         // Send loading state
-        console.log('[FileSearchWebview] Sending fileSearchSearching message');
         this._webview?.postMessage({ type: 'fileSearchSearching' });
 
         const results: SearchResult[] = [];
@@ -312,7 +303,6 @@ export class FileSearchWebview {
         if (seq !== this._searchSeq) return;
 
         // Send results to webview
-        console.log('[FileSearchWebview] Sending fileSearchResults with', results.length, 'results');
         this._webview?.postMessage({
             type: 'fileSearchResults',
             results: results,
@@ -447,8 +437,6 @@ export class FileSearchWebview {
             });
         };
 
-        console.log('[FileSearchWebview] Scanning', this._trackedFiles.length, 'tracked files for brokenDir:', brokenDir);
-
         // Search within tracked files (already loaded in memory)
         for (const trackedFile of this._trackedFiles) {
             const content = trackedFile.content;
@@ -471,7 +459,6 @@ export class FileSearchWebview {
                 const foundDir = path.dirname(decodedPath);
                 if (foundDir === brokenDir) {
                     brokenCount++;
-                    console.log('[FileSearchWebview] MATCH in', trackedFile.relativePath, ':', decodedPath);
                     const filename = path.basename(decodedPath);
                     if (!foundFiles.includes(filename)) {
                         foundFiles.push(filename);
@@ -487,7 +474,6 @@ export class FileSearchWebview {
         }
 
         // Send final update
-        console.log('[FileSearchWebview] Scan complete: found', brokenCount, 'paths in', foundFiles.length, 'unique files');
         sendUpdate(false);
     }
 

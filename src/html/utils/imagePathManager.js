@@ -53,7 +53,6 @@ function convertPathsToAbsolute() {
  * Called from inline onclick handlers in rendered markdown
  */
 function convertSinglePath(imagePath, direction, skipRefresh = false) {
-    console.log(`[convertSinglePath] Called with path: "${imagePath}", direction: ${direction}, skipRefresh: ${skipRefresh}`);
     closeAllPathMenus();
 
     vscode.postMessage({
@@ -73,7 +72,6 @@ function convertSinglePath(imagePath, direction, skipRefresh = false) {
  * Called from inline onclick handlers in rendered markdown
  */
 function openPath(filePath) {
-    console.log(`[openPath] Called with path: "${filePath}"`);
     closeAllPathMenus();
 
     vscode.postMessage({
@@ -87,7 +85,6 @@ function openPath(filePath) {
  * Called from inline onclick handlers in rendered markdown
  */
 function revealPathInExplorer(filePath) {
-    console.log(`[revealPathInExplorer] Called with path: "${filePath}"`);
     closeAllPathMenus();
 
     vscode.postMessage({
@@ -141,7 +138,6 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
  * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
 function searchForFile(filePath, taskId, columnId, isColumnTitle) {
-    console.log(`[searchForFile] Called with path: "${filePath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
     closeAllPathMenus();
 
     const message = {
@@ -164,7 +160,6 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
  * @param {string} [isColumnTitle] - 'true' if image is in column title (not a task)
  */
 function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
-    console.log(`[browseForImage] Called with oldPath: "${oldPath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
     closeAllPathMenus();
 
     const message = {
@@ -183,7 +178,6 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
  * This will remove the entire markdown element (image, link, include, etc.) from the document
  */
 function deleteFromMarkdown(path) {
-    console.log(`[deleteFromMarkdown] Called with path: "${path}"`);
     closeAllPathMenus();
 
     vscode.postMessage({
@@ -377,8 +371,6 @@ function toggleImageNotFoundMenu(container) {
  * Uses data attributes instead of inline onclick to safely handle paths with special characters
  */
 function handleImageNotFound(imgElement, originalSrc) {
-    console.log(`[handleImageNotFound] Called with path: "${originalSrc}"`);
-
     if (!imgElement || !imgElement.parentElement) {
         console.warn('[handleImageNotFound] No imgElement or parent');
         return;
@@ -386,7 +378,6 @@ function handleImageNotFound(imgElement, originalSrc) {
 
     // Check if already handled (prevent double processing)
     if (imgElement.dataset.handled === 'true') {
-        console.log('[handleImageNotFound] Already handled, skipping');
         return;
     }
     imgElement.dataset.handled = 'true';
@@ -395,8 +386,6 @@ function handleImageNotFound(imgElement, originalSrc) {
     // If so, we need to upgrade the existing container, not create a nested one
     const existingOverlay = imgElement.closest('.image-path-overlay-container');
     if (existingOverlay) {
-        console.log('[handleImageNotFound] Image is inside overlay container, upgrading existing menu');
-
         // Create a simple placeholder span for the image
         const placeholder = document.createElement('span');
         placeholder.className = 'image-not-found';
@@ -415,8 +404,6 @@ function handleImageNotFound(imgElement, originalSrc) {
     }
 
     // Standalone image - create full container with menu
-    console.log('[handleImageNotFound] Standalone image, creating full container');
-
     const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const shortPath = getShortDisplayPath(originalSrc);
     const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -597,9 +584,6 @@ function upgradeAllSimpleImageNotFoundPlaceholders() {
         }
     });
 
-    if (upgradedCount > 0) {
-        console.log(`[upgradeAllSimpleImageNotFoundPlaceholders] Upgraded ${upgradedCount} placeholder(s)`);
-    }
 }
 
 // ============================================================================
@@ -611,8 +595,6 @@ function upgradeAllSimpleImageNotFoundPlaceholders() {
  * This allows updating the UI without a full board refresh
  */
 function updatePathInDOM(oldPath, newPath, direction) {
-    console.log(`[updatePathInDOM] Updating path from "${oldPath}" to "${newPath}"`);
-
     // Update the cached board data (used for editing)
     if (window.cachedBoard) {
         let boardUpdated = false;
@@ -649,13 +631,10 @@ function updatePathInDOM(oldPath, newPath, direction) {
         });
 
         if (boardUpdated) {
-            console.log(`[updatePathInDOM] Updated cached board data`);
             // Mark as having unsaved changes
             window.hasUnsavedChanges = true;
         }
     }
-
-    console.log(`[updatePathInDOM] Path updated in cached board`);
 }
 
 // ============================================================================
@@ -671,36 +650,19 @@ function setupImagePathEventDelegation() {
         const target = e.target;
         const action = target.dataset?.action;
 
-        // Debug: Log all clicks on menu items
-        if (target.classList?.contains('image-path-menu-item')) {
-            console.log('[EventDelegation] Click on menu item:', {
-                target: target,
-                action: action,
-                text: target.textContent,
-                disabled: target.disabled,
-                classList: Array.from(target.classList)
-            });
-        }
-
         if (!action) return;
-
-        console.log('[EventDelegation] Action detected:', action);
 
         // Find the container to get the image path
         // Check both container types: standalone broken images and broken images in overlay
         const container = target.closest('.image-not-found-container') || target.closest('.image-path-overlay-container');
-        console.log('[EventDelegation] Container found:', container);
 
         if (!container) {
-            console.log('[EventDelegation] No container found, returning');
             return;
         }
 
         const imagePath = container.dataset.imagePath;
-        console.log('[EventDelegation] imagePath:', imagePath);
 
         if (!imagePath && action !== 'toggle-menu') {
-            console.log('[EventDelegation] No imagePath and action is not toggle-menu, returning');
             return;
         }
 
@@ -714,16 +676,13 @@ function setupImagePathEventDelegation() {
 
         switch (action) {
             case 'toggle-menu':
-                console.log('[EventDelegation] Toggling menu');
                 toggleImageNotFoundMenu(container);
                 break;
             case 'reveal':
-                console.log('[EventDelegation] Revealing path');
                 revealPathInExplorer(imagePath);
                 break;
             case 'search':
             case 'search-overlay':
-                console.log('[EventDelegation] Searching for replacement:', imagePath);
                 // Close the menu first
                 const searchMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
                 if (searchMenu) searchMenu.classList.remove('visible');
@@ -731,7 +690,6 @@ function setupImagePathEventDelegation() {
                 break;
             case 'browse':
             case 'browse-overlay':
-                console.log('[EventDelegation] Browsing for replacement:', imagePath);
                 // Close the menu first
                 const browseMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
                 if (browseMenu) browseMenu.classList.remove('visible');
@@ -739,18 +697,15 @@ function setupImagePathEventDelegation() {
                 break;
             case 'to-relative':
                 if (!target.disabled) {
-                    console.log('[EventDelegation] Converting to relative');
                     convertSinglePath(imagePath, 'relative', true);
                 }
                 break;
             case 'to-absolute':
                 if (!target.disabled) {
-                    console.log('[EventDelegation] Converting to absolute');
                     convertSinglePath(imagePath, 'absolute', true);
                 }
                 break;
             case 'delete':
-                console.log('[EventDelegation] Deleting element:', imagePath);
                 // Close the menu first
                 const deleteMenu = container.querySelector('.image-path-menu.visible, .image-not-found-menu.visible');
                 if (deleteMenu) deleteMenu.classList.remove('visible');

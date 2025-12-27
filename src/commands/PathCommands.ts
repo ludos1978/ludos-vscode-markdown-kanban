@@ -382,10 +382,8 @@ export class PathCommands extends SwitchBasedCommand {
 
         try {
             // Use FileSearchService to show custom webview search dialog
-            console.log('[PathCommands] handleSearchForFile: Creating FileSearchService for path:', oldPath);
             const fileSearchService = new FileSearchService();
             const webview = context.fileManager.getWebview();
-            console.log('[PathCommands] handleSearchForFile: Got webview:', webview ? 'defined' : 'undefined');
             fileSearchService.setWebview(webview);
 
             // Get tracked files from registry (main + includes) for scanning
@@ -395,7 +393,6 @@ export class PathCommands extends SwitchBasedCommand {
                 relativePath: file.getRelativePath(),
                 content: file.getContent()
             }));
-            console.log('[PathCommands] handleSearchForFile: Passing', trackedFiles.length, 'tracked files to FileSearchService');
             fileSearchService.setTrackedFiles(trackedFiles);
 
             const result = await fileSearchService.pickReplacementForBrokenLink(oldPath, basePath);
@@ -739,9 +736,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         // Send targeted update based on context
-        console.log('[PathCommands] _replacePathInFiles: taskId =', taskId, 'columnId =', columnId, 'isColumnTitle =', isColumnTitle);
         if (isColumnTitle && columnId) {
-            console.log('[PathCommands] -> Taking COLUMN TITLE path');
             // Image is in column title - update column only
             const board = context.boardStore.getBoard();
             if (board) {
@@ -767,13 +762,11 @@ export class PathCommands extends SwitchBasedCommand {
                 await context.onBoardUpdate();
             }
         } else if (taskId && columnId) {
-            console.log('[PathCommands] -> Taking TASK path');
             // Image is in task - update task only
             const board = context.boardStore.getBoard();
             if (board) {
                 const column = board.columns.find(c => c.id === columnId);
                 const task = column?.tasks.find(t => t.id === taskId);
-                console.log('[PathCommands] -> Found column:', !!column, 'task:', !!task);
                 if (task && column) {
                     // Manually update the task object with the new path
                     // This avoids full board reparsing
@@ -783,7 +776,6 @@ export class PathCommands extends SwitchBasedCommand {
                     }
 
                     // Send targeted task update with the modified task
-                    console.log('[PathCommands] -> Sending updateTaskContent for task:', taskId);
                     this.postMessage({
                         type: 'updateTaskContent',
                         taskId: taskId,
@@ -793,18 +785,15 @@ export class PathCommands extends SwitchBasedCommand {
                     });
                 } else {
                     // Task/column not found, fall back to full update
-                    console.log('[PathCommands] -> Task/column not found, doing FULL REFRESH');
                     context.boardStore.invalidateCache();
                     await context.onBoardUpdate();
                 }
             } else {
-                console.log('[PathCommands] -> No board, doing FULL REFRESH');
                 context.boardStore.invalidateCache();
                 await context.onBoardUpdate();
             }
         } else {
             // No context, do full board refresh
-            console.log('[PathCommands] -> No taskId/columnId, doing FULL REFRESH');
             context.boardStore.invalidateCache();
             await context.onBoardUpdate();
         }
@@ -870,10 +859,6 @@ export class PathCommands extends SwitchBasedCommand {
         const pathsToReplace: Map<string, string> = new Map();
         const skippedPaths: string[] = []; // Paths where new file doesn't exist
 
-        console.log('[PathCommands] _batchReplacePaths: brokenDir =', brokenDir);
-        console.log('[PathCommands] _batchReplacePaths: newDir =', newDir);
-        console.log('[PathCommands] _batchReplacePaths: searching', allFiles.length, 'files');
-
         for (const file of allFiles) {
             const content = file.getContent();
             const fileBasePath = path.dirname(file.getPath());
@@ -895,15 +880,6 @@ export class PathCommands extends SwitchBasedCommand {
 
                 // Check if this path is in the broken directory
                 const foundDir = path.dirname(decodedPath);
-
-                // Debug: log paths that might be related (contain same folder name)
-                const brokenBasename = path.basename(brokenDir);
-                if (decodedPath.includes(brokenBasename)) {
-                    console.log('[PathCommands] Potential match in', file.getRelativePath(), ':', decodedPath);
-                    console.log('[PathCommands]   foundDir =', foundDir);
-                    console.log('[PathCommands]   brokenDir =', brokenDir);
-                    console.log('[PathCommands]   match?', foundDir === brokenDir);
-                }
 
                 if (foundDir === brokenDir || decodedPath.startsWith(brokenDir + '/') || decodedPath.startsWith(brokenDir + '\\')) {
                     // Calculate the new absolute path

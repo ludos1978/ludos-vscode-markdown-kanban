@@ -40,7 +40,7 @@ kanban-plugin: board
   ![](./kanban-presentation-1-MEDIA/drawio.drawio)
 
 ## first
-- [ ] test
+- [ ] A
 
 ## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!! #stack
 

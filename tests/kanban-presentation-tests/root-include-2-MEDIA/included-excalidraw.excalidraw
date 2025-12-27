@@ -4,6 +4,36 @@
   "source": "https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor",
   "elements": [
     {
+      "id": "CEeFwHS2OZadOSB0zJ-Fy",
+      "type": "rectangle",
+      "x": 252.9359388732911,
+      "y": -15.270329580307418,
+      "width": 332.54534912109375,
+      "height": 407.63438415527344,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#ffffff",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "Zz",
+      "roundness": {
+        "type": 3
+      },
+      "seed": 1295603147,
+      "version": 162,
+      "versionNonce": 622811589,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1766875419641,
+      "link": null,
+      "locked": false
+    },
+    {
       "roughness": 1,
       "version": 19,
       "versionNonce": 1671397445,
@@ -56,7 +86,7 @@
       "version": 112,
       "versionNonce": 331850984,
       "isDeleted": false,
-      "boundElements": null,
+      "boundElements": [],
       "updated": 1766850103579,
       "link": null,
       "locked": false,
@@ -508,10 +538,7 @@
       ],
       "pressures": [],
       "simulatePressure": true,
-      "lastCommittedPoint": [
-        -10.082763671875,
-        119.55938720703125
-      ]
+      "lastCommittedPoint": null
     }
   ],
   "appState": {
