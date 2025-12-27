@@ -10,7 +10,7 @@
  * @module commands/FileCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
 import { getErrorMessage } from '../utils/stringUtils';
 import * as vscode from 'vscode';
@@ -27,28 +27,11 @@ import {
 } from '../core/bridge/MessageTypes';
 
 /**
- * Union type for all file command messages
- */
-type FileCommandMessage =
-    | OpenFileLinkMessage
-    | OpenWikiLinkMessage
-    | OpenExternalLinkMessage
-    | OpenFileMessage
-    | OpenIncludeFileMessage
-    | HandleFileDropMessage
-    | HandleUriDropMessage
-    | ResolveAndCopyPathMessage
-    | { type: 'toggleFileLock' }
-    | { type: 'selectFile' }
-    | { type: 'requestFileInfo' }
-    | { type: 'initializeFile' };
-
-/**
  * File Commands Handler
  *
  * Processes file-related messages from the webview.
  */
-export class FileCommands extends BaseMessageCommand {
+export class FileCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'file-commands',
         name: 'File Commands',
@@ -70,42 +53,20 @@ export class FileCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: FileCommandMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'openFileLink':
-                    return await this.handleOpenFileLink(message, context);
-                case 'openWikiLink':
-                    return await this.handleOpenWikiLink(message, context);
-                case 'openExternalLink':
-                    return await this.handleOpenExternalLink(message, context);
-                case 'openFile':
-                    return await this.handleOpenFile(message, context);
-                case 'openIncludeFile':
-                    return await this.handleOpenIncludeFile(message, context);
-                case 'handleFileDrop':
-                    return await this.handleFileDrop(message, context);
-                case 'handleUriDrop':
-                    return await this.handleUriDrop(message, context);
-                case 'toggleFileLock':
-                    return this.handleToggleFileLock(context);
-                case 'selectFile':
-                    return await this.handleSelectFile(context);
-                case 'requestFileInfo':
-                    return this.handleRequestFileInfo(context);
-                case 'initializeFile':
-                    return await this.handleInitializeFile(context);
-                case 'resolveAndCopyPath':
-                    return await this.handleResolveAndCopyPath(message, context);
-                default:
-                    return this.failure(`Unknown file command: ${(message as { type: string }).type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[FileCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'openFileLink': (msg, ctx) => this.handleOpenFileLink(msg as OpenFileLinkMessage, ctx),
+        'openWikiLink': (msg, ctx) => this.handleOpenWikiLink(msg as OpenWikiLinkMessage, ctx),
+        'openExternalLink': (msg, ctx) => this.handleOpenExternalLink(msg as OpenExternalLinkMessage, ctx),
+        'openFile': (msg, ctx) => this.handleOpenFile(msg as OpenFileMessage, ctx),
+        'openIncludeFile': (msg, ctx) => this.handleOpenIncludeFile(msg as OpenIncludeFileMessage, ctx),
+        'handleFileDrop': (msg, ctx) => this.handleFileDrop(msg as HandleFileDropMessage, ctx),
+        'handleUriDrop': (msg, ctx) => this.handleUriDrop(msg as HandleUriDropMessage, ctx),
+        'toggleFileLock': (_msg, ctx) => Promise.resolve(this.handleToggleFileLock(ctx)),
+        'selectFile': (_msg, ctx) => this.handleSelectFile(ctx),
+        'requestFileInfo': (_msg, ctx) => Promise.resolve(this.handleRequestFileInfo(ctx)),
+        'initializeFile': (_msg, ctx) => this.handleInitializeFile(ctx),
+        'resolveAndCopyPath': (msg, ctx) => this.handleResolveAndCopyPath(msg as ResolveAndCopyPathMessage, ctx)
+    };
 
     // ============= FILE LINK HANDLERS =============
 

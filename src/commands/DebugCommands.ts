@@ -13,7 +13,7 @@
  * @module commands/DebugCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { PanelCommandAccess, hasConflictService } from '../types/PanelCommandAccess';
 import { MarkdownKanbanParser } from '../markdownParser';
@@ -106,7 +106,7 @@ interface TrackedFilesDebugInfo {
  *
  * Processes debug-related messages from the webview.
  */
-export class DebugCommands extends BaseMessageCommand {
+export class DebugCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'debug-commands',
         name: 'Debug Commands',
@@ -120,30 +120,12 @@ export class DebugCommands extends BaseMessageCommand {
         priority: 50
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'forceWriteAllContent':
-                    return await this.handleForceWriteAllContent(context);
-
-                case 'verifyContentSync':
-                    return await this.handleVerifyContentSync(message.frontendBoard, context);
-
-                case 'getTrackedFilesDebugInfo':
-                    return await this.handleGetTrackedFilesDebugInfo(context);
-
-                case 'clearTrackedFilesCache':
-                    return await this.handleClearTrackedFilesCache(context);
-
-                default:
-                    return this.failure(`Unknown debug command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[DebugCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'forceWriteAllContent': (_msg, ctx) => this.handleForceWriteAllContent(ctx),
+        'verifyContentSync': (msg, ctx) => this.handleVerifyContentSync((msg as any).frontendBoard, ctx),
+        'getTrackedFilesDebugInfo': (_msg, ctx) => this.handleGetTrackedFilesDebugInfo(ctx),
+        'clearTrackedFilesCache': (_msg, ctx) => this.handleClearTrackedFilesCache(ctx)
+    };
 
     // ============= FORCE WRITE / VERIFICATION HANDLERS =============
 

@@ -15,7 +15,7 @@
  * @module commands/IncludeCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import {
     ConfirmDisableIncludeModeMessage,
     RequestIncludeFileNameMessage,
@@ -37,7 +37,7 @@ import * as fsPromises from 'fs/promises';
  *
  * Processes include file-related messages from the webview.
  */
-export class IncludeCommands extends BaseMessageCommand {
+export class IncludeCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'include-commands',
         name: 'Include Commands',
@@ -57,57 +57,18 @@ export class IncludeCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'confirmDisableIncludeMode':
-                    return await this.handleConfirmDisableIncludeMode(message, context);
-
-                case 'requestIncludeFile':
-                    return await this.handleRequestIncludeFile(message.filePath ?? '', context);
-
-                case 'registerInlineInclude':
-                    return await this.handleRegisterInlineInclude(message.filePath, message.content, context);
-
-                case 'requestIncludeFileName':
-                    return await this.handleRequestIncludeFileName(message, context);
-
-                case 'requestEditIncludeFileName':
-                    return await this.handleRequestEditIncludeFileName(message, context);
-
-                case 'requestEditTaskIncludeFileName':
-                    return await this.handleRequestEditTaskIncludeFileName(message, context);
-
-                case 'requestTaskIncludeFileName':
-                    return await this.handleRequestTaskIncludeFileName(message.taskId, message.columnId, context);
-
-                case 'reloadAllIncludedFiles':
-                    return await this.handleReloadAllIncludedFiles(context);
-
-                case 'saveIndividualFile':
-                    return await this.handleSaveIndividualFile(
-                        message.filePath,
-                        message.isMainFile,
-                        message.forceSave,
-                        context
-                    );
-
-                case 'reloadIndividualFile':
-                    return await this.handleReloadIndividualFile(
-                        message.filePath,
-                        message.isMainFile,
-                        context
-                    );
-
-                default:
-                    return this.failure(`Unknown include command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[IncludeCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'confirmDisableIncludeMode': (msg, ctx) => this.handleConfirmDisableIncludeMode(msg as ConfirmDisableIncludeModeMessage, ctx),
+        'requestIncludeFile': (msg, ctx) => this.handleRequestIncludeFile((msg as any).filePath ?? '', ctx),
+        'registerInlineInclude': (msg, ctx) => this.handleRegisterInlineInclude((msg as any).filePath, (msg as any).content, ctx),
+        'requestIncludeFileName': (msg, ctx) => this.handleRequestIncludeFileName(msg as RequestIncludeFileNameMessage, ctx),
+        'requestEditIncludeFileName': (msg, ctx) => this.handleRequestEditIncludeFileName(msg as RequestEditIncludeFileNameMessage, ctx),
+        'requestEditTaskIncludeFileName': (msg, ctx) => this.handleRequestEditTaskIncludeFileName(msg as RequestEditTaskIncludeFileNameMessage, ctx),
+        'requestTaskIncludeFileName': (msg, ctx) => this.handleRequestTaskIncludeFileName((msg as any).taskId, (msg as any).columnId, ctx),
+        'reloadAllIncludedFiles': (_msg, ctx) => this.handleReloadAllIncludedFiles(ctx),
+        'saveIndividualFile': (msg, ctx) => this.handleSaveIndividualFile((msg as any).filePath, (msg as any).isMainFile, (msg as any).forceSave, ctx),
+        'reloadIndividualFile': (msg, ctx) => this.handleReloadIndividualFile((msg as any).filePath, (msg as any).isMainFile, ctx)
+    };
 
     // ============= INCLUDE MODE HANDLERS =============
 

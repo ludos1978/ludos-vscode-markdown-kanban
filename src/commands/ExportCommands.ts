@@ -11,7 +11,7 @@
  * @module commands/ExportCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler, IncomingMessage } from './interfaces';
 import { ExportService, NewExportOptions } from '../services/export/ExportService';
 import { MarpExportService } from '../services/export/MarpExportService';
 import { MarpExtensionService } from '../services/export/MarpExtensionService';
@@ -46,7 +46,7 @@ export function cleanupAutoExportSubscription(docPath: string): void {
  *
  * Processes export-related messages from the webview.
  */
-export class ExportCommands extends BaseMessageCommand {
+export class ExportCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'export-commands',
         name: 'Export Commands',
@@ -69,65 +69,33 @@ export class ExportCommands extends BaseMessageCommand {
     // Track active operations for progress reporting
     private _activeOperations = new Map<string, { type: string, startTime: number }>();
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+    protected handlers: Record<string, MessageHandler> = {
+        'export': (msg, ctx) => this.handleExportWithTracking(msg, ctx),
+        'stopAutoExport': async (_msg, ctx) => { await this.handleStopAutoExport(ctx); return this.success(); },
+        'getExportDefaultFolder': async (_msg, ctx) => { await this.handleGetExportDefaultFolder(ctx); return this.success(); },
+        'selectExportFolder': async (msg, ctx) => { await this.handleSelectExportFolder(ctx, (msg as any).defaultPath); return this.success(); },
+        'getMarpThemes': async (_msg, ctx) => { await this.handleGetMarpThemes(ctx); return this.success(); },
+        'pollMarpThemes': async (_msg, ctx) => { await this.handlePollMarpThemes(ctx); return this.success(); },
+        'openInMarpPreview': async (msg, ctx) => { await this.handleOpenInMarpPreview((msg as any).filePath); return this.success(); },
+        'checkMarpStatus': async (_msg, ctx) => { await this.handleCheckMarpStatus(ctx); return this.success(); },
+        'getMarpAvailableClasses': async (_msg, ctx) => { await this.handleGetMarpAvailableClasses(ctx); return this.success(); },
+        'askOpenExportFolder': async (msg, _ctx) => { await this.handleAskOpenExportFolder((msg as any).path); return this.success(); }
+    };
+
+    /**
+     * Handle export with operation tracking
+     */
+    private async handleExportWithTracking(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const exportId = `export_${Date.now()}`;
+        await this.startOperation(exportId, 'export', 'Exporting...', context);
         try {
-            switch (message.type) {
-                case 'export':
-                    const exportId = `export_${Date.now()}`;
-                    await this.startOperation(exportId, 'export', 'Exporting...', context);
-                    try {
-                        await this.handleExport(message.options as unknown as NewExportOptions, context, exportId);
-                        await this.endOperation(exportId, context);
-                    } catch (error) {
-                        await this.endOperation(exportId, context);
-                        throw error;
-                    }
-                    return this.success();
-
-                case 'stopAutoExport':
-                    await this.handleStopAutoExport(context);
-                    return this.success();
-
-                case 'getExportDefaultFolder':
-                    await this.handleGetExportDefaultFolder(context);
-                    return this.success();
-
-                case 'selectExportFolder':
-                    await this.handleSelectExportFolder(context, message.defaultPath);
-                    return this.success();
-
-                case 'getMarpThemes':
-                    await this.handleGetMarpThemes(context);
-                    return this.success();
-
-                case 'pollMarpThemes':
-                    await this.handlePollMarpThemes(context);
-                    return this.success();
-
-                case 'openInMarpPreview':
-                    await this.handleOpenInMarpPreview(message.filePath);
-                    return this.success();
-
-                case 'checkMarpStatus':
-                    await this.handleCheckMarpStatus(context);
-                    return this.success();
-
-                case 'getMarpAvailableClasses':
-                    await this.handleGetMarpAvailableClasses(context);
-                    return this.success();
-
-                case 'askOpenExportFolder':
-                    await this.handleAskOpenExportFolder(message.path);
-                    return this.success();
-
-                default:
-                    return this.failure(`Unknown export command: ${message.type}`);
-            }
+            await this.handleExport((message as any).options as NewExportOptions, context, exportId);
+            await this.endOperation(exportId, context);
         } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[ExportCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
+            await this.endOperation(exportId, context);
+            throw error;
         }
+        return this.success();
     }
 
     // ============= OPERATION TRACKING =============

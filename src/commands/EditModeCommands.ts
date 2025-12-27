@@ -17,7 +17,7 @@
  * @module commands/EditModeCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler, IncomingMessage } from './interfaces';
 import { getErrorMessage } from '../utils/stringUtils';
 import { hasMessageHandler } from '../types/PanelCommandAccess';
 import { UndoCapture } from '../core/stores/UndoCapture';
@@ -27,7 +27,7 @@ import { UndoCapture } from '../core/stores/UndoCapture';
  *
  * Processes edit mode, rendering, and miscellaneous messages from the webview.
  */
-export class EditModeCommands extends BaseMessageCommand {
+export class EditModeCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'edit-mode-commands',
         name: 'Edit Mode Commands',
@@ -57,199 +57,241 @@ export class EditModeCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            const panel = context.getWebviewPanel();
-            if (!panel || !hasMessageHandler(panel)) {
-                return this.failure('No message handler available');
-            }
-            const messageHandler = panel._messageHandler;
+    protected handlers: Record<string, MessageHandler> = {
+        'editModeStart': (msg, ctx) => this._handleEditModeStart(msg, ctx),
+        'editModeEnd': (msg, ctx) => this._handleEditModeEnd(msg, ctx),
+        'editingStarted': (msg, ctx) => this._handleEditingStarted(msg, ctx),
+        'editingStopped': (msg, ctx) => this._handleEditingStopped(msg, ctx),
+        'editingStoppedNormal': (_msg, ctx) => this._handleEditingStoppedNormal(ctx),
+        'renderSkipped': (msg, ctx) => this._handleRenderSkipped(msg, ctx),
+        'renderCompleted': (msg, ctx) => this._handleRenderCompleted(msg, ctx),
+        'columnsUnfolded': (msg, ctx) => this._handleColumnsUnfolded(msg, ctx),
+        'markUnsavedChanges': (msg, ctx) => this._handleMarkUnsavedChanges(msg, ctx),
+        'saveUndoState': (msg, ctx) => this._handleSaveUndoState(msg, ctx),
+        'boardUpdate': (msg, ctx) => this._handleBoardUpdate(msg, ctx),
+        'pageHiddenWithUnsavedChanges': (_msg, ctx) => this._handlePageHiddenWithUnsavedChanges(ctx),
+        'updateMarpGlobalSetting': (msg, ctx) => this._handleUpdateMarpGlobalSetting(msg, ctx),
+        'triggerVSCodeSnippet': (msg, ctx) => this._handleTriggerVSCodeSnippet(msg, ctx),
+        'handleEditorShortcut': (msg, ctx) => this._handleEditorShortcut(msg, ctx),
+        'performSort': (_msg, ctx) => this._handlePerformSort(ctx),
+        'runtimeTrackingReport': () => Promise.resolve(this.success()),
+        'getTemplates': (_msg, ctx) => this._handleGetTemplates(ctx),
+        'applyTemplate': (msg, ctx) => this._handleApplyTemplate(msg, ctx),
+        'submitTemplateVariables': (msg, ctx) => this._handleSubmitTemplateVariables(msg, ctx)
+    };
 
-            switch (message.type) {
-                // Edit mode lifecycle
-                case 'editModeStart':
-                    if (messageHandler.handleEditModeStart) {
-                        await messageHandler.handleEditModeStart(message);
-                    }
-                    return this.success();
+    // ============= HELPER: Get message handler =============
 
-                case 'editModeEnd':
-                    if (messageHandler.handleEditModeEnd) {
-                        await messageHandler.handleEditModeEnd(message);
-                    }
-                    return this.success();
-
-                case 'editingStarted':
-                    // User started editing - block board regenerations
-                    context.setEditingInProgress(true);
-                    // Set edit mode flag on main file for conflict detection
-                    {
-                        const fileRegistry = context.getFileRegistry();
-                        const mainFile = fileRegistry?.getMainFile();
-                        if (mainFile) {
-                            mainFile.setEditMode(true);
-                        }
-                        // Also set edit mode on include files if editing within an include
-                        const board = context.getCurrentBoard();
-                        if (board && (message.taskId || message.columnId)) {
-                            const allFiles = fileRegistry?.getAll() || [];
-                            for (const file of allFiles) {
-                                if (file.getFileType?.() !== 'main') {
-                                    file.setEditMode(true);
-                                }
-                            }
-                        }
-                    }
-                    return this.success();
-
-                case 'editingStopped':
-                    await messageHandler.handleEditingStopped(message);
-                    return this.success();
-
-                case 'editingStoppedNormal':
-                    // User finished editing normally (not via backend request)
-                    context.setEditingInProgress(false);
-                    // Clear edit mode flag on ALL files (main + includes)
-                    {
-                        const fileRegistry = context.getFileRegistry();
-                        const mainFile = fileRegistry?.getMainFile();
-                        if (mainFile) {
-                            mainFile.setEditMode(false);
-                        }
-                        // Also clear edit mode on all include files
-                        const allFiles = fileRegistry?.getAll() || [];
-                        for (const file of allFiles) {
-                            if (file.getFileType?.() !== 'main') {
-                                file.setEditMode(false);
-                            }
-                        }
-                    }
-                    return this.success();
-
-                // Render lifecycle
-                case 'renderSkipped':
-                    // Frontend reports it skipped a render - mark as dirty
-                    if (message.itemType === 'column' && message.itemId) {
-                        context.markColumnDirty(message.itemId);
-                    } else if (message.itemType === 'task' && message.itemId) {
-                        context.markTaskDirty(message.itemId);
-                    }
-                    return this.success();
-
-                case 'renderCompleted':
-                    // Frontend successfully rendered - clear dirty flag
-                    if (message.itemType === 'column' && message.itemId) {
-                        context.clearColumnDirty(message.itemId);
-                    } else if (message.itemType === 'task' && message.itemId) {
-                        context.clearTaskDirty(message.itemId);
-                    }
-                    return this.success();
-
-                case 'columnsUnfolded':
-                    // Frontend confirms columns have been unfolded - call private handler
-                    if (message.requestId && messageHandler._handleColumnsUnfolded) {
-                        messageHandler._handleColumnsUnfolded(message.requestId);
-                    }
-                    return this.success();
-
-                // Board state operations - sync board from frontend to backend
-                case 'markUnsavedChanges':
-                    // Sync board from frontend if provided
-                    if (message.cachedBoard) {
-                        context.emitBoardChanged(message.cachedBoard, 'edit');
-                    }
-                    return this.success();
-
-                case 'saveUndoState':
-                    // NOTE: This message type should rarely be used - most operations save their own undo state.
-                    // Only use when explicitly needed for operations that don't have built-in undo handling.
-                    const boardToSave = message.currentBoard || context.getCurrentBoard();
-                    if (boardToSave) {
-                        context.boardStore.saveUndoEntry(
-                            UndoCapture.forFullBoard(boardToSave, 'saveUndoState')
-                        );
-                    }
-                    return this.success();
-
-                case 'boardUpdate':
-                    await messageHandler.handleBoardUpdate(message);
-                    return this.success();
-
-                case 'pageHiddenWithUnsavedChanges':
-                    if (messageHandler.handlePageHiddenWithUnsavedChanges) {
-                        await messageHandler.handlePageHiddenWithUnsavedChanges();
-                    }
-                    return this.success();
-
-                // Marp settings
-                case 'updateMarpGlobalSetting':
-                    if (messageHandler.handleUpdateMarpGlobalSetting) {
-                        await messageHandler.handleUpdateMarpGlobalSetting(message.key, message.value);
-                    }
-                    return this.success();
-
-                // Editor shortcuts and snippets
-                case 'triggerVSCodeSnippet':
-                    if (messageHandler.handleVSCodeSnippet) {
-                        await messageHandler.handleVSCodeSnippet(message);
-                    }
-                    return this.success();
-
-                case 'handleEditorShortcut':
-                    if (messageHandler.handleEditorShortcut) {
-                        await messageHandler.handleEditorShortcut(message);
-                    }
-                    return this.success();
-
-                // Sorting
-                case 'performSort':
-                    // Perform automatic sort on board
-                    const board = context.getCurrentBoard();
-                    if (board) {
-                        // Capture undo state BEFORE modification (but don't save yet)
-                        const undoEntry = UndoCapture.forFullBoard(board, 'performSort');
-                        const sortMadeChanges = context.boardOperations.performAutomaticSort(board);
-
-                        // Only save undo entry and emit changes if sort actually changed something
-                        if (sortMadeChanges) {
-                            context.boardStore.saveUndoEntry(undoEntry);
-                            context.emitBoardChanged(board, 'sort');
-                            await context.onBoardUpdate();
-                        }
-                    }
-                    return this.success();
-
-                // Runtime tracking
-                case 'runtimeTrackingReport':
-                    // Currently just logs, no action needed
-                    return this.success();
-
-                // Template operations
-                case 'getTemplates':
-                    if (messageHandler.handleGetTemplates) {
-                        await messageHandler.handleGetTemplates();
-                    }
-                    return this.success();
-
-                case 'applyTemplate':
-                    if (messageHandler.handleApplyTemplate) {
-                        await messageHandler.handleApplyTemplate(message);
-                    }
-                    return this.success();
-
-                case 'submitTemplateVariables':
-                    if (messageHandler.handleSubmitTemplateVariables) {
-                        await messageHandler.handleSubmitTemplateVariables(message);
-                    }
-                    return this.success();
-
-                default:
-                    return this.failure(`Unknown edit mode command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[EditModeCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
+    private _getMessageHandler(context: CommandContext): any {
+        const panel = context.getWebviewPanel();
+        if (!panel || !hasMessageHandler(panel)) {
+            return null;
         }
+        return panel._messageHandler;
+    }
+
+    // ============= EDIT MODE LIFECYCLE =============
+
+    private async _handleEditModeStart(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleEditModeStart) {
+            await messageHandler.handleEditModeStart(message);
+        }
+        return this.success();
+    }
+
+    private async _handleEditModeEnd(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleEditModeEnd) {
+            await messageHandler.handleEditModeEnd(message);
+        }
+        return this.success();
+    }
+
+    private async _handleEditingStarted(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        // User started editing - block board regenerations
+        context.setEditingInProgress(true);
+        // Set edit mode flag on main file for conflict detection
+        const fileRegistry = context.getFileRegistry();
+        const mainFile = fileRegistry?.getMainFile();
+        if (mainFile) {
+            mainFile.setEditMode(true);
+        }
+        // Also set edit mode on include files if editing within an include
+        const board = context.getCurrentBoard();
+        const msg = message as any;
+        if (board && (msg.taskId || msg.columnId)) {
+            const allFiles = fileRegistry?.getAll() || [];
+            for (const file of allFiles) {
+                if (file.getFileType?.() !== 'main') {
+                    file.setEditMode(true);
+                }
+            }
+        }
+        return this.success();
+    }
+
+    private async _handleEditingStopped(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler) {
+            await messageHandler.handleEditingStopped(message);
+        }
+        return this.success();
+    }
+
+    private async _handleEditingStoppedNormal(context: CommandContext): Promise<CommandResult> {
+        // User finished editing normally (not via backend request)
+        context.setEditingInProgress(false);
+        // Clear edit mode flag on ALL files (main + includes)
+        const fileRegistry = context.getFileRegistry();
+        const mainFile = fileRegistry?.getMainFile();
+        if (mainFile) {
+            mainFile.setEditMode(false);
+        }
+        // Also clear edit mode on all include files
+        const allFiles = fileRegistry?.getAll() || [];
+        for (const file of allFiles) {
+            if (file.getFileType?.() !== 'main') {
+                file.setEditMode(false);
+            }
+        }
+        return this.success();
+    }
+
+    // ============= RENDER LIFECYCLE =============
+
+    private async _handleRenderSkipped(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        if (msg.itemType === 'column' && msg.itemId) {
+            context.markColumnDirty(msg.itemId);
+        } else if (msg.itemType === 'task' && msg.itemId) {
+            context.markTaskDirty(msg.itemId);
+        }
+        return this.success();
+    }
+
+    private async _handleRenderCompleted(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        if (msg.itemType === 'column' && msg.itemId) {
+            context.clearColumnDirty(msg.itemId);
+        } else if (msg.itemType === 'task' && msg.itemId) {
+            context.clearTaskDirty(msg.itemId);
+        }
+        return this.success();
+    }
+
+    private async _handleColumnsUnfolded(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        const messageHandler = this._getMessageHandler(context);
+        if (msg.requestId && messageHandler?._handleColumnsUnfolded) {
+            messageHandler._handleColumnsUnfolded(msg.requestId);
+        }
+        return this.success();
+    }
+
+    // ============= BOARD STATE OPERATIONS =============
+
+    private async _handleMarkUnsavedChanges(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        if (msg.cachedBoard) {
+            context.emitBoardChanged(msg.cachedBoard, 'edit');
+        }
+        return this.success();
+    }
+
+    private async _handleSaveUndoState(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        const boardToSave = msg.currentBoard || context.getCurrentBoard();
+        if (boardToSave) {
+            context.boardStore.saveUndoEntry(
+                UndoCapture.forFullBoard(boardToSave, 'saveUndoState')
+            );
+        }
+        return this.success();
+    }
+
+    private async _handleBoardUpdate(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler) {
+            await messageHandler.handleBoardUpdate(message);
+        }
+        return this.success();
+    }
+
+    private async _handlePageHiddenWithUnsavedChanges(context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handlePageHiddenWithUnsavedChanges) {
+            await messageHandler.handlePageHiddenWithUnsavedChanges();
+        }
+        return this.success();
+    }
+
+    // ============= MARP & EDITOR =============
+
+    private async _handleUpdateMarpGlobalSetting(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const msg = message as any;
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleUpdateMarpGlobalSetting) {
+            await messageHandler.handleUpdateMarpGlobalSetting(msg.key, msg.value);
+        }
+        return this.success();
+    }
+
+    private async _handleTriggerVSCodeSnippet(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleVSCodeSnippet) {
+            await messageHandler.handleVSCodeSnippet(message);
+        }
+        return this.success();
+    }
+
+    private async _handleEditorShortcut(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleEditorShortcut) {
+            await messageHandler.handleEditorShortcut(message);
+        }
+        return this.success();
+    }
+
+    // ============= SORTING =============
+
+    private async _handlePerformSort(context: CommandContext): Promise<CommandResult> {
+        const board = context.getCurrentBoard();
+        if (board) {
+            const undoEntry = UndoCapture.forFullBoard(board, 'performSort');
+            const sortMadeChanges = context.boardOperations.performAutomaticSort(board);
+            if (sortMadeChanges) {
+                context.boardStore.saveUndoEntry(undoEntry);
+                context.emitBoardChanged(board, 'sort');
+                await context.onBoardUpdate();
+            }
+        }
+        return this.success();
+    }
+
+    // ============= TEMPLATES =============
+
+    private async _handleGetTemplates(context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleGetTemplates) {
+            await messageHandler.handleGetTemplates();
+        }
+        return this.success();
+    }
+
+    private async _handleApplyTemplate(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleApplyTemplate) {
+            await messageHandler.handleApplyTemplate(message);
+        }
+        return this.success();
+    }
+
+    private async _handleSubmitTemplateVariables(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        const messageHandler = this._getMessageHandler(context);
+        if (messageHandler?.handleSubmitTemplateVariables) {
+            await messageHandler.handleSubmitTemplateVariables(message);
+        }
+        return this.success();
     }
 }

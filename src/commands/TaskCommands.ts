@@ -11,7 +11,7 @@
  * @module commands/TaskCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage, MessageHandler } from './interfaces';
 import {
     EditTaskMessage,
     AddTaskMessage,
@@ -40,7 +40,7 @@ import { UndoCapture } from '../core/stores/UndoCapture';
  *
  * Processes all task-related messages from the webview.
  */
-export class TaskCommands extends BaseMessageCommand {
+export class TaskCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'task-commands',
         name: 'Task Commands',
@@ -65,48 +65,23 @@ export class TaskCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'editTask':
-                    return await this.handleEditTask(message, context);
-                case 'addTask':
-                    return await this.handleAddTask(message, context);
-                case 'addTaskAtPosition':
-                    return await this.handleAddTaskAtPosition(message, context);
-                case 'deleteTask':
-                    return await this.handleDeleteTask(message, context);
-                case 'duplicateTask':
-                    return await this.handleDuplicateTask(message, context);
-                case 'insertTaskBefore':
-                    return await this.handleInsertTaskBefore(message, context);
-                case 'insertTaskAfter':
-                    return await this.handleInsertTaskAfter(message, context);
-                case 'moveTask':
-                    return await this.handleMoveTask(message, context);
-                case 'moveTaskToColumn':
-                    return await this.handleMoveTaskToColumn(message, context);
-                case 'moveTaskToTop':
-                    return await this.handleMoveTaskToTop(message, context);
-                case 'moveTaskUp':
-                    return await this.handleMoveTaskUp(message, context);
-                case 'moveTaskDown':
-                    return await this.handleMoveTaskDown(message, context);
-                case 'moveTaskToBottom':
-                    return await this.handleMoveTaskToBottom(message, context);
-                case 'editTaskTitle':
-                    return await this.handleEditTaskTitle(message, context);
-                case 'updateTaskFromStrikethroughDeletion':
-                    return await this.handleUpdateTaskFromStrikethroughDeletion(message, context);
-                default:
-                    return this.failure(`Unknown task command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[TaskCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'editTask': (msg, ctx) => this.handleEditTask(msg as EditTaskMessage, ctx),
+        'addTask': (msg, ctx) => this.handleAddTask(msg as AddTaskMessage, ctx),
+        'addTaskAtPosition': (msg, ctx) => this.handleAddTaskAtPosition(msg as AddTaskAtPositionMessage, ctx),
+        'deleteTask': (msg, ctx) => this.handleDeleteTask(msg as DeleteTaskMessage, ctx),
+        'duplicateTask': (msg, ctx) => this.handleDuplicateTask(msg as DuplicateTaskMessage, ctx),
+        'insertTaskBefore': (msg, ctx) => this.handleInsertTaskBefore(msg as InsertTaskBeforeMessage, ctx),
+        'insertTaskAfter': (msg, ctx) => this.handleInsertTaskAfter(msg as InsertTaskAfterMessage, ctx),
+        'moveTask': (msg, ctx) => this.handleMoveTask(msg as MoveTaskMessage, ctx),
+        'moveTaskToColumn': (msg, ctx) => this.handleMoveTaskToColumn(msg as MoveTaskToColumnMessage, ctx),
+        'moveTaskToTop': (msg, ctx) => this.handleMoveTaskToTop(msg as MoveTaskToTopMessage, ctx),
+        'moveTaskUp': (msg, ctx) => this.handleMoveTaskUp(msg as MoveTaskUpMessage, ctx),
+        'moveTaskDown': (msg, ctx) => this.handleMoveTaskDown(msg as MoveTaskDownMessage, ctx),
+        'moveTaskToBottom': (msg, ctx) => this.handleMoveTaskToBottom(msg as MoveTaskToBottomMessage, ctx),
+        'editTaskTitle': (msg, ctx) => this.handleEditTaskTitle(msg as EditTaskTitleMessage, ctx),
+        'updateTaskFromStrikethroughDeletion': (msg, ctx) => this.handleUpdateTaskFromStrikethroughDeletion(msg as UpdateTaskFromStrikethroughDeletionMessage, ctx)
+    };
 
     // ============= HELPER METHODS =============
 

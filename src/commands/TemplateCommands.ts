@@ -9,7 +9,7 @@
  * @module commands/TemplateCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import {
     ApplyTemplateMessage,
     SubmitTemplateVariablesMessage
@@ -34,7 +34,7 @@ const log = DEBUG ? console.log.bind(console, '[TemplateCommands]') : () => {};
  *
  * Processes template-related messages from the webview.
  */
-export class TemplateCommands extends BaseMessageCommand {
+export class TemplateCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'template-commands',
         name: 'Template Commands',
@@ -49,24 +49,11 @@ export class TemplateCommands extends BaseMessageCommand {
 
     private _templateService: TemplateService = new TemplateService();
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'getTemplates':
-                    return await this.handleGetTemplates(context);
-                case 'applyTemplate':
-                    return await this.handleApplyTemplate(message, context);
-                case 'submitTemplateVariables':
-                    return await this.handleSubmitTemplateVariables(message, context);
-                default:
-                    return this.failure(`Unknown template command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[TemplateCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'getTemplates': (_msg, ctx) => this.handleGetTemplates(ctx),
+        'applyTemplate': (msg, ctx) => this.handleApplyTemplate(msg as ApplyTemplateMessage, ctx),
+        'submitTemplateVariables': (msg, ctx) => this.handleSubmitTemplateVariables(msg as SubmitTemplateVariablesMessage, ctx)
+    };
 
     // ============= TEMPLATE HANDLERS =============
 

@@ -21,6 +21,15 @@ This document consolidates code quality analysis across HTML, CSS, JavaScript, a
 | 2025-12-27 | CSS utility classes (flex, gap, text, transitions) | ✅ DONE | ~50 (when fully adopted) |
 | 2025-12-27 | Decomposed handleBoardUpdate in messageHandler.ts | ✅ DONE | ~30 (better structure) |
 | 2025-12-27 | Menu item template factory in menuUtils.js | ✅ DONE | ~50 (when fully adopted) |
+| 2025-12-27 | Migrated TaskCommands.ts to SwitchBasedCommand | ✅ DONE | ~25 |
+| 2025-12-27 | Migrated ColumnCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated FileCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated ExportCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated TemplateCommands.ts to SwitchBasedCommand | ✅ DONE | ~15 |
+| 2025-12-27 | Migrated DebugCommands.ts to SwitchBasedCommand | ✅ DONE | ~15 |
+| 2025-12-27 | Migrated PathCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated IncludeCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated EditModeCommands.ts to SwitchBasedCommand | ✅ DONE | ~25 (+ extracted 18 methods) |
 
 ---
 

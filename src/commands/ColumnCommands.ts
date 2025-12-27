@@ -12,7 +12,7 @@
  * @module commands/ColumnCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import {
     AddColumnMessage,
     DeleteColumnMessage,
@@ -42,7 +42,7 @@ import { UndoCapture } from '../core/stores/UndoCapture';
  *
  * Processes all column-related messages from the webview.
  */
-export class ColumnCommands extends BaseMessageCommand {
+export class ColumnCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'column-commands',
         name: 'Column Commands',
@@ -62,38 +62,18 @@ export class ColumnCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'addColumn':
-                    return await this.handleAddColumn(message, context);
-                case 'deleteColumn':
-                    return await this.handleDeleteColumn(message, context);
-                case 'moveColumn':
-                    return await this.handleMoveColumn(message, context);
-                case 'moveColumnWithRowUpdate':
-                    return await this.handleMoveColumnWithRowUpdate(message, context);
-                case 'reorderColumns':
-                    return await this.handleReorderColumns(message, context);
-                case 'insertColumnBefore':
-                    return await this.handleInsertColumnBefore(message, context);
-                case 'insertColumnAfter':
-                    return await this.handleInsertColumnAfter(message, context);
-                case 'sortColumn':
-                    return await this.handleSortColumn(message, context);
-                case 'editColumnTitle':
-                    return await this.handleEditColumnTitle(message, context);
-                case 'updateColumnTitleFromStrikethroughDeletion':
-                    return await this.handleUpdateColumnTitleFromStrikethroughDeletion(message, context);
-                default:
-                    return this.failure(`Unknown column command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[ColumnCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'addColumn': (msg, ctx) => this.handleAddColumn(msg as AddColumnMessage, ctx),
+        'deleteColumn': (msg, ctx) => this.handleDeleteColumn(msg as DeleteColumnMessage, ctx),
+        'moveColumn': (msg, ctx) => this.handleMoveColumn(msg as MoveColumnMessage, ctx),
+        'moveColumnWithRowUpdate': (msg, ctx) => this.handleMoveColumnWithRowUpdate(msg as MoveColumnWithRowUpdateMessage, ctx),
+        'reorderColumns': (msg, ctx) => this.handleReorderColumns(msg as ReorderColumnsMessage, ctx),
+        'insertColumnBefore': (msg, ctx) => this.handleInsertColumnBefore(msg as InsertColumnBeforeMessage, ctx),
+        'insertColumnAfter': (msg, ctx) => this.handleInsertColumnAfter(msg as InsertColumnAfterMessage, ctx),
+        'sortColumn': (msg, ctx) => this.handleSortColumn(msg as SortColumnMessage, ctx),
+        'editColumnTitle': (msg, ctx) => this.handleEditColumnTitle(msg as EditColumnTitleMessage, ctx),
+        'updateColumnTitleFromStrikethroughDeletion': (msg, ctx) => this.handleUpdateColumnTitleFromStrikethroughDeletion(msg as UpdateColumnTitleFromStrikethroughDeletionMessage, ctx)
+    };
 
     // ============= HELPER METHODS =============
 

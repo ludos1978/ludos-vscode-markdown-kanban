@@ -12,7 +12,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { PathConversionService, ConversionResult } from '../services/PathConversionService';
 import { getErrorMessage, encodeFilePath } from '../utils/stringUtils';
 import { MarkdownFile } from '../files/MarkdownFile';
@@ -23,14 +23,12 @@ import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
 
-type PathCommandMessage = ConvertPathsMessage | ConvertAllPathsMessage | ConvertSinglePathMessage | OpenPathMessage | SearchForFileMessage | RevealPathInExplorerMessage | BrowseForImageMessage | DeleteFromMarkdownMessage;
-
 /**
  * Path Commands Handler
  *
  * Processes path conversion messages from the webview.
  */
-export class PathCommands extends BaseMessageCommand {
+export class PathCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'path-commands',
         name: 'Path Commands',
@@ -39,34 +37,16 @@ export class PathCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: PathCommandMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'convertPaths':
-                    return await this.handleConvertPaths(message, context);
-                case 'convertAllPaths':
-                    return await this.handleConvertAllPaths(message, context);
-                case 'convertSinglePath':
-                    return await this.handleConvertSinglePath(message, context);
-                case 'openPath':
-                    return await this.handleOpenPath(message, context);
-                case 'searchForFile':
-                    return await this.handleSearchForFile(message, context);
-                case 'revealPathInExplorer':
-                    return await this.handleRevealPathInExplorer(message, context);
-                case 'browseForImage':
-                    return await this.handleBrowseForImage(message, context);
-                case 'deleteFromMarkdown':
-                    return await this.handleDeleteFromMarkdown(message, context);
-                default:
-                    return this.failure(`Unknown path command: ${(message as { type: string }).type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[PathCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    protected handlers: Record<string, MessageHandler> = {
+        'convertPaths': (msg, ctx) => this.handleConvertPaths(msg as ConvertPathsMessage, ctx),
+        'convertAllPaths': (msg, ctx) => this.handleConvertAllPaths(msg as ConvertAllPathsMessage, ctx),
+        'convertSinglePath': (msg, ctx) => this.handleConvertSinglePath(msg as ConvertSinglePathMessage, ctx),
+        'openPath': (msg, ctx) => this.handleOpenPath(msg as OpenPathMessage, ctx),
+        'searchForFile': (msg, ctx) => this.handleSearchForFile(msg as SearchForFileMessage, ctx),
+        'revealPathInExplorer': (msg, ctx) => this.handleRevealPathInExplorer(msg as RevealPathInExplorerMessage, ctx),
+        'browseForImage': (msg, ctx) => this.handleBrowseForImage(msg as BrowseForImageMessage, ctx),
+        'deleteFromMarkdown': (msg, ctx) => this.handleDeleteFromMarkdown(msg as DeleteFromMarkdownMessage, ctx)
+    };
 
     /**
      * Convert paths in a single file
