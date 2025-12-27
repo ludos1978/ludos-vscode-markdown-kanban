@@ -618,6 +618,169 @@ function createSortMenuContent(columnId) {
     ]);
 }
 
+// ============================================================================
+// Menu Manager Class
+// ============================================================================
+
+/**
+ * MenuManager - Centralized menu toggle and state management
+ * Consolidates common patterns from toggleDonutMenu and toggleFileBarMenu
+ */
+class MenuManager {
+    constructor() {
+        this.activeMenu = null;
+        this.hideTimeout = null;
+        this.HIDE_DELAY = 300;
+    }
+
+    /**
+     * Close all open menus of specified types
+     * @param {string[]} menuTypes - CSS selectors for menu types (default: donut and file-bar)
+     */
+    closeAll(menuTypes = ['.donut-menu', '.file-bar-menu']) {
+        menuTypes.forEach(selector => {
+            document.querySelectorAll(selector).forEach(menu => {
+                menu.classList.remove('active');
+            });
+        });
+
+        // Clean up moved dropdowns
+        document.querySelectorAll('.moved-to-body').forEach(dropdown => {
+            this._cleanupDropdown(dropdown);
+        });
+
+        this.activeMenu = null;
+    }
+
+    /**
+     * Toggle a menu open/closed
+     * @param {Event} event - Click event
+     * @param {HTMLElement} button - Menu button element
+     * @param {Object} options - Configuration options
+     * @param {string} options.menuType - 'donut' or 'file-bar'
+     * @param {Function} options.onOpen - Callback when menu opens
+     * @param {Function} options.onClose - Callback when menu closes
+     * @returns {boolean} - true if menu was opened, false if closed
+     */
+    toggle(event, button, options = {}) {
+        event.stopPropagation();
+
+        const menu = button.parentElement;
+        const wasActive = menu.classList.contains('active');
+        const menuType = options.menuType || 'donut';
+        const dropdownClass = menuType === 'file-bar' ? '.file-bar-menu-dropdown' : '.donut-menu-dropdown';
+
+        // Close all menus first
+        this.closeAll();
+
+        if (wasActive) {
+            if (options.onClose) { options.onClose(menu); }
+            return false;
+        }
+
+        // Open this menu
+        menu.classList.add('active');
+        this.activeMenu = menu;
+
+        const dropdown = menu.querySelector(dropdownClass);
+        if (dropdown) {
+            // Position dropdown
+            if (typeof positionDropdownMenu === 'function') {
+                positionDropdownMenu(button, dropdown, options.positionOptions || {});
+            }
+
+            // Setup hover handlers for menu persistence
+            this._setupHoverHandlers(menu, dropdown, menuType);
+        }
+
+        if (options.onOpen) { options.onOpen(menu, dropdown); }
+        return true;
+    }
+
+    /**
+     * Setup hover handlers to keep menu open while user interacts
+     * @private
+     */
+    _setupHoverHandlers(menu, dropdown, menuType) {
+        const buttonClass = menuType === 'file-bar' ? '.file-bar-menu-btn' : '.donut-menu-btn';
+        const menuButton = menu.querySelector(buttonClass);
+
+        if (menuButton) {
+            menuButton.addEventListener('mouseenter', () => {
+                this.clearTimeout();
+                window._inDropdown = true;
+            });
+            menuButton.addEventListener('mouseleave', () => {
+                window._inDropdown = false;
+                this.startHideTimer();
+            });
+        }
+
+        dropdown.addEventListener('mouseenter', () => {
+            this.clearTimeout();
+            window._inDropdown = true;
+        });
+
+        dropdown.addEventListener('mouseleave', () => {
+            window._inDropdown = false;
+            this.startHideTimer();
+        });
+    }
+
+    /**
+     * Clean up a dropdown that was moved to body
+     * @private
+     */
+    _cleanupDropdown(dropdown) {
+        dropdown.classList.remove('moved-to-body');
+        dropdown.style.removeProperty('position');
+        dropdown.style.removeProperty('top');
+        dropdown.style.removeProperty('left');
+        dropdown.style.removeProperty('z-index');
+    }
+
+    /**
+     * Start timer to hide menu after delay
+     */
+    startHideTimer() {
+        this.clearTimeout();
+        this.hideTimeout = setTimeout(() => {
+            if (!window._inDropdown) {
+                this.closeAll();
+            }
+        }, this.HIDE_DELAY);
+    }
+
+    /**
+     * Clear the hide timer
+     */
+    clearTimeout() {
+        if (this.hideTimeout) {
+            clearTimeout(this.hideTimeout);
+            this.hideTimeout = null;
+        }
+    }
+
+    /**
+     * Check if any menu is currently active
+     * @returns {boolean}
+     */
+    isAnyMenuActive() {
+        return this.activeMenu !== null;
+    }
+
+    /**
+     * Get the currently active menu
+     * @returns {HTMLElement|null}
+     */
+    getActiveMenu() {
+        return this.activeMenu;
+    }
+}
+
+// Create singleton instance
+const menuManager = new MenuManager();
+
 // Create menuUtils object
 const menuUtils = {
     shouldExecute,
@@ -649,10 +812,15 @@ const menuUtils = {
     createMenuItems,
     createMoveMenuContent,
     createMoveToColumnMenuContent,
-    createSortMenuContent
+    createSortMenuContent,
+    // Menu Manager
+    MenuManager,
+    menuManager
 };
 
 // Global window exposure
 if (typeof window !== 'undefined') {
     window.menuUtils = menuUtils;
+    window.MenuManager = MenuManager;
+    window.menuManager = menuManager;
 }

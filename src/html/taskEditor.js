@@ -492,34 +492,15 @@ class TaskEditor {
         return text.length;
     }
 
-    /**
-     * Starts editing mode for an element
-     * Purpose: Switch from display to edit mode
-     * Used by: Click handlers on editable elements
-     * @param {HTMLElement} element - Element to edit
-     * @param {string} type - 'task-title', 'task-description', 'column-title'
-     * @param {string} taskId - Task ID if editing task
-     * @param {string} columnId - Column ID
-     * @param {boolean} preserveCursor - Whether to preserve cursor position (default: false, moves to end)
-     */
-    startEdit(element, type, taskId = null, columnId = null, preserveCursor = false) {
-        // If transitioning, don't interfere
-        if (this.isTransitioning) {return;}
+    // ============= startEdit HELPER METHODS =============
 
-        // Notify VS Code that task editing has started (only for task editing, not column editing)
-        if (type === 'task-title' || type === 'task-description') {
-            if (typeof vscode !== 'undefined') {
-                vscode.postMessage({
-                    type: 'setContext',
-                    key: 'kanbanTaskEditing',
-                    value: true
-                });
-            }
-        }
-        
-        // Get the appropriate elements based on type
+    /**
+     * Get display, edit, and container elements based on edit type
+     * @private
+     */
+    _getEditElements(element, type) {
         let displayElement, editElement, containerElement;
-        
+
         if (type === 'task-title') {
             containerElement = element.closest('.task-item') || element;
             displayElement = containerElement.querySelector('.task-title-display');
@@ -534,84 +515,83 @@ class TaskEditor {
             editElement = containerElement.querySelector('.column-title-edit');
         }
 
-        if (!editElement) {return;}
+        return { displayElement, editElement, containerElement };
+    }
 
-        // Check if we're already editing this exact element
-        const isAlreadyEditing = this.currentEditor && 
-                                this.currentEditor.element === editElement &&
-                                editElement.style.display !== 'none';
-
-        // If we're already editing this element, don't interfere - let the user continue
-        if (isAlreadyEditing) {
-            return;
+    /**
+     * Initialize column title value for editing (show full title with tags)
+     * @private
+     */
+    _initializeColumnTitleValue(editElement, columnId) {
+        const column = window.cachedBoard?.columns.find(col => col.id === columnId);
+        if (column && column.title) {
+            editElement.value = column.title;
+            editElement.setAttribute('data-original-title', column.title);
         }
+    }
 
-        // Save any current editor first (different element)
-        if (this.currentEditor && !this.isTransitioning) {
-            this.save();
+    /**
+     * Initialize task description value for editing (preserves leading newlines)
+     * @private
+     */
+    _initializeTaskDescriptionValue(editElement, taskId, columnId) {
+        const column = window.cachedBoard?.columns.find(col => col.id === columnId);
+        const task = column?.tasks.find(t => t.id === taskId);
+        if (task) {
+            editElement.value = task.description || '';
         }
+    }
 
-        // For column title editing, always show full title with tags (regardless of visibility setting)
-        // This prevents tags from being lost when editing
-        if (type === 'column-title' && columnId) {
-            const column = window.cachedBoard?.columns.find(col => col.id === columnId);
-            if (column && column.title) {
-                // Always show full title in editor so users can see and edit tags
-                editElement.value = column.title;
-                // Store the original full title so we can reconstruct it properly when saving
-                editElement.setAttribute('data-original-title', column.title);
-            }
-        }
-
-        // CRITICAL: For task description editing, set value via JavaScript
-        // HTML strips the first newline after opening <textarea> tag, so we MUST set it here
-        // to preserve leading newlines in the description
-        if (type === 'task-description' && taskId) {
-            const column = window.cachedBoard?.columns.find(col => col.id === columnId);
-            const task = column?.tasks.find(t => t.id === taskId);
-            if (task) {
-                // Set raw description value - preserves leading newlines
-                editElement.value = task.description || '';
-            }
-        }
-
-        // Show edit element, hide display
-        if (displayElement) {displayElement.style.display = 'none';}
+    /**
+     * Show edit element and hide display element
+     * @private
+     */
+    _setupEditVisibility(displayElement, editElement) {
+        if (displayElement) { displayElement.style.display = 'none'; }
         editElement.style.display = 'block';
-
-        // Auto-resize if textarea
         this.autoResize(editElement);
+    }
 
-        // For editing in stacked columns, recalculate positions after resize
-        // (column title, task title, or task description changes can affect stack layout)
-        if (typeof window.applyStackedColumnStyles === 'function') {
-            const stack = containerElement.closest('.kanban-column-stack');
-            if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
-                // Only recalc if we're in an actual stack (more than 1 column)
-                // Get columnId to only recalculate THIS stack, not all stacks
-                const column = containerElement.closest('.kanban-full-height-column');
-                const stackColumnId = column ? column.dataset.columnId : null;
-                requestAnimationFrame(() => {
-                    window.applyStackedColumnStyles(stackColumnId);
-                });
-            }
-        }
+    /**
+     * Recalculate stack layout after edit element is shown
+     * @private
+     */
+    _recalculateStackLayout(containerElement) {
+        if (typeof window.applyStackedColumnStyles !== 'function') { return; }
 
-        // Focus and position cursor
+        const stack = containerElement.closest('.kanban-column-stack');
+        if (!stack || stack.querySelectorAll('.kanban-full-height-column').length <= 1) { return; }
+
+        const column = containerElement.closest('.kanban-full-height-column');
+        const stackColumnId = column ? column.dataset.columnId : null;
+        requestAnimationFrame(() => {
+            window.applyStackedColumnStyles(stackColumnId);
+        });
+    }
+
+    /**
+     * Position cursor in edit element
+     * @private
+     */
+    _positionCursor(editElement, type, preserveCursor) {
         editElement.focus();
 
-        // Position cursor based on preserveCursor flag
         if (!preserveCursor) {
             // Default behavior: move cursor to end
             editElement.setSelectionRange(editElement.value.length, editElement.value.length);
         } else if (type === 'task-title' || type === 'column-title') {
-            // For title fields, position cursor before first tag + one space
+            // For title fields, position cursor before first tag
             const cursorPosition = this.findPositionBeforeFirstTag(editElement.value);
             editElement.setSelectionRange(cursorPosition, cursorPosition);
         }
-        // For description fields with preserveCursor=true, don't move cursor - it will stay where the user clicked
+        // For description fields with preserveCursor=true, don't move cursor
+    }
 
-        // Store current editor info
+    /**
+     * Store current editor state
+     * @private
+     */
+    _storeEditorState(editElement, displayElement, type, taskId, columnId) {
         this.currentEditor = {
             element: editElement,
             displayElement: displayElement,
@@ -620,34 +600,45 @@ class TaskEditor {
             columnId: columnId || window.getColumnIdFromElement(editElement),
             originalValue: editElement.value
         };
+    }
 
-        // CRITICAL: Tell backend editing has started to block board regenerations
-        // MUST send for ALL edit types (column-title, task-title, task-description)
+    /**
+     * Notify backend that editing has started
+     * @private
+     */
+    _notifyEditingStarted(type, taskId, columnId) {
+        // Notify VS Code context for task editing
+        if (type === 'task-title' || type === 'task-description') {
+            if (typeof vscode !== 'undefined') {
+                vscode.postMessage({
+                    type: 'setContext',
+                    key: 'kanbanTaskEditing',
+                    value: true
+                });
+            }
+        }
+
+        // Tell backend editing has started to block board regenerations
         vscode.postMessage({
             type: 'editingStarted',
             editType: type,
             taskId: taskId,
             columnId: columnId
         });
+    }
 
-
-        // Reset edit context when starting a new edit session on a different field
-        const newEditContext = type === 'column-title' 
-            ? `column-title-${columnId}` 
-            : `${type}-${taskId || editElement.dataset.taskId}-${columnId}`;
-            
-        
-        // Don't reset context here - let saveCurrentField determine if it's different
-        // This was the bug: resetting to null made every save think it was a new field
-
-        // Set up input handler for auto-resize
+    /**
+     * Set up input handler with auto-resize and throttled stack recalculation
+     * @private
+     */
+    _setupInputHandler(editElement, containerElement) {
         let recalcTimeout = null;
         let lastRecalcTime = 0;
-        const MIN_DELAY_BETWEEN_RECALC = 300; // Minimum 300ms delay between recalculations
+        const MIN_DELAY_BETWEEN_RECALC = 300;
         let autoResizePending = false;
 
         editElement.oninput = () => {
-            // Throttle autoResize to max 60fps for smooth input
+            // Throttle autoResize to max 60fps
             if (!autoResizePending) {
                 autoResizePending = true;
                 requestAnimationFrame(() => {
@@ -655,89 +646,143 @@ class TaskEditor {
                     autoResizePending = false;
                 });
             }
-            // For editing in stacked columns, recalculate positions after resize
-            // Throttle with minimum 300ms delay between recalculations
-            if (typeof window.applyStackedColumnStyles === 'function') {
-                const stack = containerElement.closest('.kanban-column-stack');
-                if (stack && stack.querySelectorAll('.kanban-full-height-column').length > 1) {
-                    // Only recalc if we're in an actual stack (more than 1 column)
-                    // Get columnId to only recalculate THIS stack, not all stacks
-                    const column = containerElement.closest('.kanban-full-height-column');
-                    const columnId = column ? column.dataset.columnId : null;
 
-                    const now = Date.now();
-                    const timeSinceLastRecalc = now - lastRecalcTime;
+            // Throttled stack layout recalculation
+            if (typeof window.applyStackedColumnStyles !== 'function') { return; }
 
-                    if (timeSinceLastRecalc >= MIN_DELAY_BETWEEN_RECALC) {
-                        // Enough time has passed, execute immediately
-                        if (recalcTimeout) {
-                            clearTimeout(recalcTimeout);
-                            recalcTimeout = null;
-                        }
-                        lastRecalcTime = now;
+            const stack = containerElement.closest('.kanban-column-stack');
+            if (!stack || stack.querySelectorAll('.kanban-full-height-column').length <= 1) { return; }
+
+            const column = containerElement.closest('.kanban-full-height-column');
+            const colId = column ? column.dataset.columnId : null;
+            const now = Date.now();
+            const timeSinceLastRecalc = now - lastRecalcTime;
+
+            if (timeSinceLastRecalc >= MIN_DELAY_BETWEEN_RECALC) {
+                if (recalcTimeout) { clearTimeout(recalcTimeout); recalcTimeout = null; }
+                lastRecalcTime = now;
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        void stack.offsetHeight;
+                        window.applyStackedColumnStyles(colId);
+                    });
+                });
+            } else {
+                if (recalcTimeout) { clearTimeout(recalcTimeout); }
+                const delay = MIN_DELAY_BETWEEN_RECALC - timeSinceLastRecalc;
+                recalcTimeout = setTimeout(() => {
+                    lastRecalcTime = Date.now();
+                    requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                void stack.offsetHeight;
-                                window.applyStackedColumnStyles(columnId);
-                            });
+                            void stack.offsetHeight;
+                            window.applyStackedColumnStyles(colId);
                         });
-                    } else {
-                        // Too soon, schedule for later (after minimum delay)
-                        if (recalcTimeout) {
-                            clearTimeout(recalcTimeout);
-                        }
-                        const delay = MIN_DELAY_BETWEEN_RECALC - timeSinceLastRecalc;
-                        recalcTimeout = setTimeout(() => {
-                            lastRecalcTime = Date.now();
-                            requestAnimationFrame(() => {
-                                requestAnimationFrame(() => {
-                                    void stack.offsetHeight;
-                                    window.applyStackedColumnStyles(columnId);
-                                });
-                            });
-                            recalcTimeout = null;
-                        }, delay);
+                    });
+                    recalcTimeout = null;
+                }, delay);
+            }
+        };
+    }
+
+    /**
+     * Set up blur handler to save on focus loss
+     * @private
+     */
+    _setupBlurHandler(editElement) {
+        editElement.onblur = () => {
+            if (this.isTransitioning) { return; }
+
+            setTimeout(() => {
+                if (document.activeElement !== editElement &&
+                    !this.isTransitioning &&
+                    !document.hidden &&
+                    document.hasFocus()) {
+
+                    const activeElement = document.activeElement;
+                    const isEditingElsewhere = activeElement && (
+                        activeElement.classList.contains('task-title-edit') ||
+                        activeElement.classList.contains('task-description-edit') ||
+                        activeElement.classList.contains('column-title-edit')
+                    );
+                    if (!isEditingElsewhere) {
+                        this.save();
                     }
                 }
-            }
+            }, 150);
         };
-        
-        // Set up blur handler (but it won't fire during transitions)
-        editElement.onblur = (e) => {
-            // Don't save on blur if the user is just selecting text or if we're transitioning
-            if (!this.isTransitioning) {
-                // Give a longer delay to handle system shortcuts and focus changes
-                setTimeout(() => {
-                    // Only save if we're still not focused, not transitioning, and the document is visible
-                    if (document.activeElement !== editElement &&
-                        !this.isTransitioning &&
-                        !document.hidden &&
-                        document.hasFocus()) {
+    }
 
-                        // Additional check: don't close if focus moved to another editable element
-                        // or if a modal/picker is open
-                        const activeElement = document.activeElement;
-                        const isEditingElsewhere = activeElement && (
-                            activeElement.classList.contains('task-title-edit') ||
-                            activeElement.classList.contains('task-description-edit') ||
-                            activeElement.classList.contains('column-title-edit')
-                        );
-                        if (!isEditingElsewhere) {
-                            this.save();
-                        }
-                    }
-                }, 150); // Longer delay to handle system shortcuts
-            }
-        };
-
-        // Improved selection handling for better text editing experience
+    /**
+     * Set up mouse event handlers to prevent propagation during editing
+     * @private
+     */
+    _setupMouseHandlers(editElement) {
         editElement.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // Prevent other handlers from interfering
+            e.stopPropagation();
         });
 
         editElement.addEventListener('dblclick', (e) => {
-            e.stopPropagation(); // Prevent other handlers from interfering with double-click selection
+            e.stopPropagation();
         });
+    }
+
+    // ============= MAIN startEdit METHOD =============
+
+    /**
+     * Starts editing mode for an element
+     * Purpose: Switch from display to edit mode
+     * Used by: Click handlers on editable elements
+     * @param {HTMLElement} element - Element to edit
+     * @param {string} type - 'task-title', 'task-description', 'column-title'
+     * @param {string} taskId - Task ID if editing task
+     * @param {string} columnId - Column ID
+     * @param {boolean} preserveCursor - Whether to preserve cursor position (default: false, moves to end)
+     */
+    startEdit(element, type, taskId = null, columnId = null, preserveCursor = false) {
+        // If transitioning, don't interfere
+        if (this.isTransitioning) { return; }
+
+        // Get the appropriate elements based on type
+        const { displayElement, editElement, containerElement } = this._getEditElements(element, type);
+        if (!editElement) { return; }
+
+        // Check if we're already editing this exact element
+        const isAlreadyEditing = this.currentEditor &&
+                                this.currentEditor.element === editElement &&
+                                editElement.style.display !== 'none';
+        if (isAlreadyEditing) { return; }
+
+        // Save any current editor first (different element)
+        if (this.currentEditor && !this.isTransitioning) {
+            this.save();
+        }
+
+        // Initialize value based on type
+        if (type === 'column-title' && columnId) {
+            this._initializeColumnTitleValue(editElement, columnId);
+        } else if (type === 'task-description' && taskId) {
+            this._initializeTaskDescriptionValue(editElement, taskId, columnId);
+        }
+
+        // Show edit element and setup visibility
+        this._setupEditVisibility(displayElement, editElement);
+
+        // Recalculate stack layout if needed
+        this._recalculateStackLayout(containerElement);
+
+        // Position cursor
+        this._positionCursor(editElement, type, preserveCursor);
+
+        // Store editor state
+        this._storeEditorState(editElement, displayElement, type, taskId, columnId);
+
+        // Notify backend
+        this._notifyEditingStarted(type, taskId, columnId);
+
+        // Setup event handlers
+        this._setupInputHandler(editElement, containerElement);
+        this._setupBlurHandler(editElement);
+        this._setupMouseHandlers(editElement);
     }
 
     /**

@@ -30,6 +30,8 @@ This document consolidates code quality analysis across HTML, CSS, JavaScript, a
 | 2025-12-27 | Migrated PathCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
 | 2025-12-27 | Migrated IncludeCommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
 | 2025-12-27 | Migrated EditModeCommands.ts to SwitchBasedCommand | ✅ DONE | ~25 (+ extracted 18 methods) |
+| 2025-12-27 | Decomposed startEdit() in taskEditor.js into 10 helper methods | ✅ DONE | ~40 (better structure) |
+| 2025-12-27 | Created MenuManager class in menuUtils.js | ✅ DONE | ~100 (when fully adopted) |
 
 ---
 
