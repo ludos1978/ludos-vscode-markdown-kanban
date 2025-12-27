@@ -1412,186 +1412,26 @@ function setTaskSectionHeight(height) {
 }
 
 // Function to detect row tags from board
-/**
- * Auto-detects number of rows from column tags
- * Purpose: Determine layout from #row tags in columns
- * Used by: Board initialization and updates
- * @param {Object} board - Board data object
- * @returns {number} Detected number of rows
- */
-function detectRowsFromBoard(board) {
-    if (!board || !board.columns) {return 1;}
-
-    let maxRow = 1;
-    board.columns.forEach(column => {
-        if (column.title) {
-            // Look for #row{number} format only (hashtag required)
-            const rowMatch = column.title.match(/#row(\d+)/i);
-            if (rowMatch) {
-                const rowNum = parseInt(rowMatch[1]);
-                if (rowNum > maxRow) {
-                    maxRow = rowNum;
-                }
-            }
-        }
+// ============================================================================
+// ROW LAYOUT FUNCTIONS (moved to utils/rowLayoutManager.js)
+// ============================================================================
+// Local aliases that use the new manager with current context
+const detectRowsFromBoard = (board) => window.rowLayoutManager.detectRowsFromBoard(board);
+const getColumnRow = (title) => window.rowLayoutManager.getColumnRow(title);
+const sortColumnsByRow = (columns) => window.rowLayoutManager.sortColumnsByRow(columns);
+const updateColumnRowTag = (columnId, newRow) => {
+    window.rowLayoutManager.updateColumnRowTag(columnId, newRow, {
+        currentBoard,
+        cachedBoard: window.cachedBoard,
+        postMessage: vscode.postMessage
     });
-
-    return maxRow; // No cap - support unlimited rows
-}
-
-// Function to get column row from title
-function getColumnRow(title) {
-    if (!title) {return 1;}
-
-    // More comprehensive regex to find row tags
-    const rowMatches = title.match(/#row(\d+)\b/gi);
-    if (rowMatches && rowMatches.length > 0) {
-        // Get the last match in case there are multiple (shouldn't happen, but just in case)
-        const lastMatch = rowMatches[rowMatches.length - 1];
-        const rowNum = parseInt(lastMatch.replace(/#row/i, ''));
-        return Math.max(rowNum, 1); // No upper limit - support unlimited rows
-    }
-    return 1;
-}
-
-/**
- * Sort columns by row number, maintaining original order within each row
- * Mirrors the backend sortColumnsByRow() function from columnUtils.ts
- * @param {Array} columns - Array of columns with title property
- * @returns {Array} Sorted array of columns (row 1 first, then row 2, etc.)
- */
-function sortColumnsByRow(columns) {
-    if (!columns || !Array.isArray(columns)) return columns;
-    return columns
-        .map((column, index) => ({
-            column,
-            index,
-            row: getColumnRow(column.title)
-        }))
-        .sort((a, b) => {
-            // First sort by row number
-            if (a.row !== b.row) {
-                return a.row - b.row;
-            }
-            // Within same row, maintain original order
-            return a.index - b.index;
-        })
-        .map(item => item.column);
-}
-
-// Function to update column row tag
-function updateColumnRowTag(columnId, newRow) {
-    if (!currentBoard || !currentBoard.columns) {return;}
-
-    const column = currentBoard.columns.find(c => c.id === columnId);
-    if (!column) {return;}
-
-    // Also update cachedBoard if it exists and is different
-    let cachedColumn = null;
-    if (window.cachedBoard && window.cachedBoard !== currentBoard) {
-        cachedColumn = window.cachedBoard.columns.find(c => c.id === columnId);
-    }
-    
-    // Remove ALL existing row tags - more comprehensive regex patterns
-    let cleanTitle = column.title
-        .replace(/#row\d+\b/gi, '')  // Remove #row followed by digits
-        .replace(/\s+#row\d+/gi, '')  // Remove with preceding space
-        .replace(/#row\d+\s+/gi, '')  // Remove with following space
-        .replace(/\s+#row\d+\s+/gi, '');  // Remove with following and preceding space
-    
-    // Update the column title
-    if (newRow > 1) {
-        // Add row tag for rows 2, 3, 4
-        // Ensure space before #row tag if title is not empty
-        column.title = cleanTitle ? cleanTitle + ` #row${newRow}` : ` #row${newRow}`;
-        if (cachedColumn) {
-            cachedColumn.title = cleanTitle ? cleanTitle + ` #row${newRow}` : ` #row${newRow}`;
-        }
-    } else {
-        // For row 1, just use the clean title without any row tag
-        column.title = cleanTitle;
-        if (cachedColumn) {
-            cachedColumn.title = cleanTitle;
-        }
-    }
-    
-    // Update the visual element immediately
-    const columnElement = document.querySelector(`[data-column-id="${columnId}"]`)?.closest('.kanban-full-height-column');
-    if (columnElement) {
-        columnElement.setAttribute('data-row', newRow);
-        
-        // Update the displayed title using shared function
-        const titleElement = columnElement.querySelector('.column-title-text');
-        if (titleElement) {
-            const renderedTitle = window.tagUtils ? window.tagUtils.getColumnDisplayTitle(column, window.filterTagsFromText) : (column.title || '');
-            titleElement.innerHTML = renderedTitle;
-        }
-        
-        // Update the edit textarea
-        const editElement = columnElement.querySelector('.column-title-edit');
-        if (editElement) {
-            editElement.value = column.title;
-        }
-    }
-    
-    // CRITICAL: Get current column ID by POSITION from currentBoard (source of truth)
-    // DOM might have stale IDs if a boardUpdate just arrived
-    let currentColumnId = columnId; // Default to what we have
-
-    // Find column's position in DOM to match with current board
-    if (columnElement) {
-        const allColumns = Array.from(document.querySelectorAll('.kanban-full-height-column'));
-        const columnIndex = allColumns.indexOf(columnElement);
-
-        if (columnIndex !== -1 && window.currentBoard?.columns?.[columnIndex]) {
-            // Match by position - use current ID from board at this position
-            currentColumnId = window.currentBoard.columns[columnIndex].id;
-        }
-    }
-
-    // Send update to backend with the full title including row tag
-    vscode.postMessage({
-        type: 'editColumnTitle',
-        columnId: currentColumnId,
-        title: column.title
+};
+const cleanupRowTags = () => {
+    window.rowLayoutManager.cleanupRowTags({
+        currentBoard,
+        renderBoard
     });
-}
-
-// Function to clean up any duplicate or invalid row tags
-function cleanupRowTags() {
-    if (!currentBoard || !currentBoard.columns) {return;}
-    
-    let needsUpdate = false;
-    
-    currentBoard.columns.forEach(column => {
-        const originalTitle = column.title;
-        
-        // Find all row tags
-        const rowTags = column.title.match(/#row\d+\b/gi) || [];
-        
-        if (rowTags.length > 1) {
-            // Remove all row tags first
-            let cleanTitle = column.title;
-            rowTags.forEach(tag => {
-                cleanTitle = cleanTitle.replace(new RegExp(tag, 'gi'), '');
-            });
-            cleanTitle = cleanTitle.replace(/\s{2,}/g, ' ').trim();
-            
-            // Add back only the last tag
-            const lastTag = rowTags[rowTags.length - 1];
-            column.title = cleanTitle + ' ' + lastTag;
-            
-            if (column.title !== originalTitle) {
-                needsUpdate = true;
-            }
-        }
-    });
-    
-    if (needsUpdate) {
-        // Trigger a board update if we made changes
-        renderBoard();
-    }
-}
+};
 
 
 document.addEventListener('DOMContentLoaded', () => {
