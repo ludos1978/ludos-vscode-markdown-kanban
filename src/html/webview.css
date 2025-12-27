@@ -64,9 +64,7 @@
 }
 
 * {
-  box-sizing: border-box;
 }
-
 
 body {
   font-family: var(--vscode-font-family);
@@ -368,7 +366,6 @@ body {
   border-radius: 3px;
   cursor: pointer;
   font-size: 12px;
-  box-sizing: border-box;
   transition: all 0.15s ease;
   user-select: none;
 }
@@ -506,7 +503,6 @@ body {
   min-width: 22px;
   justify-content: center;
   gap: 4px;
-  box-sizing: border-box;
   font-size: 12px;
   border-radius: 3px;
 }
@@ -536,7 +532,6 @@ body {
 .menu-icon {
   font-size: 14px;
 }
-
 
 /* ============================================================================
    TOOLBAR BUTTONS - Consolidated primary button styles
@@ -640,7 +635,6 @@ body {
   color: var(--vscode-dropdown-foreground);
   text-align: left;
   width: 100%;
-  box-sizing: border-box;
 }
 
 .layout-preset-item:hover {
@@ -677,7 +671,6 @@ body.small-card-fonts .task-description-display {
   font-size: 0.85em;
   line-height: 1.3;
 }
-
 
 body.small-card-fonts .task-item {
   padding: 6px;
@@ -788,7 +781,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   align-items: flex-start;
 }
 
-
 /* when it has no child - kanban-row */
 .kanban-board:not(:has(.kanban-row)) {
 	gap: var(--whitespace);
@@ -820,12 +812,10 @@ body.small-card-fonts .task-title-container .markdown-content img {
   padding: 0;
 }
 
-
 .kanban-full-height-column.collapsed-vertical .column-title-section {
 	flex-direction: column !important;
 	align-items: center;
 }
-
 
 .column-inner {
   /* This is the scrollable container for sticky positioning */
@@ -855,7 +845,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   border-top: none;
   margin: 0 var(--whitespace) var(--whitespace) var(--whitespace);
 }
-
 
 .header-bars-container,
 .footer-bars-container {
@@ -995,18 +984,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
   flex-direction: column; */
 }
 
-/* Align control elements (icons/buttons) with the title baseline */
-/* .column-title-section > .drag-handle,
-.column-title-section > .collapse-toggle,
-.column-title-section > .task-count,
-.column-title-section > .collapsed-add-task-btn,
-.column-title-section > .donut-menu {
-  margin-top: 2px; 
-} */
-
 /* Column title text */
 .column-title-text {
-  color: var(--vscode-foreground);
   cursor: pointer;
   border-radius: 3px;
   min-width: 0;
@@ -1016,15 +995,9 @@ body.small-card-fonts .task-title-container .markdown-content img {
   min-height: 16px;
   width: 100%;
   flex: 1;
-  /* Allow text to wrap to multiple lines when too long */
   white-space: normal;
   overflow-wrap: break-word;
   max-height: none;
-}
-
-/* Don't apply block/width styles to tag children - they should be inline */
-.column-title-text *:not(.kanban-tag) {
-  color: inherit;
 }
 
 .column-title-text:hover {
@@ -1156,7 +1129,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   cursor: pointer;
 }
 
-
 /* Tasks container must allow the children to be overflow visible! */
 .tasks-container {
   overflow: visible;
@@ -1239,11 +1211,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   max-height: var(--task-height) !important;
 }
 
-/* .task-item:not(:has(.footer-bars-container)) {
-	padding-top: var(--whitespace-div4);
-	padding-bottom: var(--whitespace-div4);
-} */
-
 .task-item:last-child {
   margin-bottom: 0;
 }
@@ -1322,7 +1289,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
   font-size: 14px;
 }
 
-
 .task-drag-handle:hover {
   background: var(--button-alternative-background-hover);
   color: var(--button-alternative-foreground-hover);
@@ -1358,7 +1324,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 .collapse-toggle.rotated {
   transform: rotate(0deg);
 }
-
 
 .task-collapse-toggle {
   background: var(--button-background);
@@ -1402,11 +1367,8 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .task-title-display {
   font-size: 14px;
-  color: var(--vscode-foreground);
   line-height: 1.4;
-	/* width: var(--task-title-width); */
   word-break: break-word;
-  word-wrap: break-word;
   overflow-wrap: break-word;
   padding: 2px 0;
   border-radius: 3px;
@@ -1430,34 +1392,22 @@ body.small-card-fonts .task-title-container .markdown-content img {
 }
 
 .task-description-display {
-  color: var(--vscode-foreground);
-  /* font-size: 1em; */
-  /* line-height: 1.5; */
   border-radius: 3px;
   cursor: pointer;
-	padding-left: 8px;
-	padding-right: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
   min-height: 20px;
-  word-wrap: break-word;
   overflow-wrap: break-word;
-	max-height: inherit;
+  max-height: inherit;
 }
-
-/* DISABLED: Causes white overlay on videos when hovering */
-/* .task-description-display:hover {
-  background-color: var(--vscode-list-hoverBackground);
-} */
 
 /* Task section styling for content between HRs */
 .task-section {
   max-height: inherit;
   max-width: inherit;
-  /* display: block; */
   display: flex;
   flex-direction: column;
-  outline: none; /* Remove default focus outline */
-  /* border-radius: 4px; */
-  /* transition: background-color 0.15s ease; */
+  outline: none;
 }
 
 /* Focus styling for task sections */
@@ -1511,8 +1461,6 @@ body.section-height-limited .task-section figure img {
   height: 100%;
 }
 
-
-
 /* CSS-based placeholders for empty display elements */
 .column-title-text:empty::before {
   content: "Add title...";
@@ -1538,11 +1486,6 @@ body.section-height-limited .task-section figure img {
   padding: 4px 8px;
   border-radius: 3px;
 }
-
-/* DISABLED: Related to video overlay issue */
-/* .task-description-display:empty:hover::before {
-  background-color: var(--vscode-list-hoverBackground);
-} */
 
 /* Edit fields */
 .column-title-edit,
@@ -1572,7 +1515,6 @@ body.section-height-limited .task-section figure img {
   width: 100%;
   min-width: 0;
 }
-
 
 .task-title-edit {
   font-size: 14px;
@@ -1605,7 +1547,6 @@ body.section-height-limited .task-section figure img {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-
 
 .add-task-btn:hover {
   background: var(--button-secondary-background-hover);
@@ -1698,8 +1639,6 @@ body.vscode-high-contrast-light .task-count {
   color: var(--vscode-foreground);
 }
 
-
-
 /* Fold buttons */
 .fold-all-btn,
 .global-fold-btn {
@@ -1776,32 +1715,7 @@ body.vscode-high-contrast-light .task-count {
 .pin-btn.unpinned:before {
   background: var(--button-background);
   opacity: 0.4;
-
 }
-
-/* .pin-btn:hover {
-  background: var(--button-background-hover);
-  border: 2px solid var(rgba(var(--button-background-hover), 0.4), #007acc66);
-  outline-offset: 1px;
-} */
-
-/* .pin-btn.global-override:before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  border: 2px solid var(--vscode-focusBorder, #007acc);
-  border-radius: 3px;
-  pointer-events: none;
-} */
-
-/* Visual indicator when pin button is overridden by global sticky */
-/* .pin-btn.global-override {
-  outline: 2px solid var(rgba(var(--vscode-focusBorder), 1.0), #007accff);
-  outline-offset: 1px;
-} */
 
 .fold-all-btn:hover,
 .global-fold-btn:hover {
@@ -1830,32 +1744,9 @@ body.vscode-high-contrast-light .task-count {
   padding: 2px;
 }
 
-/* Fold button states */
-/* .fold-all-btn.fold-expanded .fold-icon,
-.global-fold-btn.fold-expanded .global-fold-icon {
-  color: var(--vscode-foreground);
-} */
-
 .fold-all-btn.fold-collapsed .fold-icon,
 .global-fold-btn.fold-collapsed .global-fold-icon {
-  /* background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
-  cursor: pointer;
-  font-size: 10px;
-  transition: all 0.2s;
-  user-select: none;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px; */
   transform: rotate(0deg);
-  /* border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center; */
-
-  /* color: var(--vscode-button);
-  transform: rotate(0deg); */
 }
 
 .fold-all-btn.fold-mixed .fold-icon,
@@ -1863,8 +1754,6 @@ body.vscode-high-contrast-light .task-count {
   color: var(--vscode-charts-orange);
   opacity: 0.8;
 }
-
-
 
 /* File control buttons */
 .file-control-btn {
@@ -1896,7 +1785,6 @@ body.vscode-high-contrast-light .task-count {
 .file-control-btn.primary:hover {
   background: var(--button-background-hover);
 }
-
 
 /* Menus */
 .donut-menu,
@@ -1999,7 +1887,6 @@ body.vscode-high-contrast-light .task-count {
   transition: background-color 0.2s;
   white-space: nowrap;
   display: block;
-  box-sizing: border-box;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
@@ -2104,7 +1991,6 @@ button.file-bar-menu-item {
   max-height: 80vh;
   z-index: 1000;
   pointer-events: all !important;
-  box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
   word-wrap: break-word;
@@ -2136,7 +2022,6 @@ button.file-bar-menu-item {
   gap: 2px;
   padding: 2px;
   width: 100%;
-  box-sizing: border-box;
 }
 
 /* Submenu items prevent overflow */
@@ -2189,12 +2074,6 @@ button.file-bar-menu-item {
   height: 16px;
 }
 
-/* Submenu visibility now controlled by JavaScript only */
-/* .donut-menu-item.has-submenu:hover .donut-menu-submenu,
-.file-bar-menu-item.has-submenu:hover .file-bar-menu-submenu {
-  display: block;
-} */
-
 .donut-menu-submenu button.donut-menu-item,
 .file-bar-menu-submenu button.file-bar-menu-item {
   display: block;
@@ -2204,7 +2083,6 @@ button.file-bar-menu-item {
   background: none;
   padding: 8px 12px;
   margin: 0;
-  box-sizing: border-box;
   white-space: nowrap;
   cursor: pointer !important;
   font-size: 13px;
@@ -2344,7 +2222,6 @@ button.file-bar-menu-item {
   align-self: start;
 }
 
-
 /* Only expanded columns overlay with pointer-events */
 .kanban-column-stack .kanban-full-height-column {
   pointer-events: none;
@@ -2358,47 +2235,36 @@ button.file-bar-menu-item {
   pointer-events: auto;
 }
 
-/* Add background to column-inner to hide content from columns below */
-/* .kanban-column-stack .kanban-full-height-column .column-inner {
-  background-color: var(--column-background);
-} */
-
 /* Sticky headers and titles at bottom with dynamic offsets (set by JavaScript inline styles) */
 .kanban-column-stack .kanban-full-height-column .column-margin,
 .kanban-column-stack .kanban-full-height-column .column-header,
 .kanban-column-stack .kanban-full-height-column .column-title,
 .kanban-column-stack .kanban-full-height-column .column-footer {
   position: sticky;
-  background: var(--column-background); /* required for hiding other content in stacking mode */
+  background: var(--column-background);
   z-index: 100;
-  /* bottom value is set dynamically by applyStackedColumnStyles() */
 }
 
 .kanban-column-stack .kanban-full-height-column .column-inner {
-	/* transform: translateZ(-0.08px) translate(0px,-2.0px); */
   transform: translateZ(-0.08px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-margin {
   height: var(--whitespace-div2);
-  /* transform: translateZ(-0.11px) translate(0px,-2.0px); */
   transform: translateZ(-0.11px);
 }
 
-.kanban-column-stack .kanban-full-height-column .column-header{
-	/* transform: translateZ(-0.133px) translate(0px,-2.66px); */
-  transform: translateZ(-0.133px)
+.kanban-column-stack .kanban-full-height-column .column-header {
+  transform: translateZ(-0.133px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-footer {
-	/* transform: translateZ(-0.133px) translate(0px,-4px); */
   transform: translateZ(-0.133px);
 }
 
 .kanban-column-stack .kanban-full-height-column .column-title {
 	transform: translateZ(0.0px);
 }
-
 
 /* Stack sticky mode: titleonly - only title is sticky (only for columns with #sticky tag) */
 body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column[data-column-sticky="true"] .column-header {
@@ -2471,33 +2337,15 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   white-space: nowrap;
 }
 
-/* .kanban-full-height-column.collapsed-vertical .column-title-text {
-  width: auto;
-  display: inline;
-} */
-
 /* Horizontal fold: keep text horizontal but narrow */
 .kanban-full-height-column.collapsed-horizontal .column-title-text {
   display: flex;
   align-items: center;
   flex: 1;
   width: 100%;
-  /* padding: 0 5px; */
   margin: 0;
   gap: 4px;
-  /* white-space: nowrap; */
 }
-
-/* .kanban-full-height-column.collapsed-horizontal .column-title-text {
-  width: auto;
-  display: inline;
-} */
-
-/* Collapse toggle positioning for collapsed columns */
-/* .kanban-full-height-column.collapsed-vertical .collapse-toggle,
-.kanban-full-height-column.collapsed-horizontal .collapse-toggle {
-  margin: 1px 2px auto;
-} */
 
 /* Hide column-inner when collapsed in stacks */
 .kanban-column-stack .kanban-full-height-column.collapsed-vertical .column-inner,
@@ -2546,7 +2394,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 /* END style with only lines not with borders */
-
 
 /* Visual feedback for drop zones - no scaling */
 .column-drop-zone.drag-over,
@@ -2603,7 +2450,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   flex-wrap: wrap;
   gap: 4px;
   padding: 8px;
-  box-sizing: border-box;
   background: var(--vscode-menu-background);
   border: 1px solid var(--vscode-menu-border);
   border-radius: 4px;
@@ -2628,7 +2474,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   max-width: none;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-sizing: border-box;
   flex-shrink: 0;
   z-index: 999999 !important;
   position: relative !important;
@@ -3306,7 +3151,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   align-items: flex-start;
 	/* padding: var(--whitespace); */
   width: 100%;
-  box-sizing: border-box;
 	
 	height: auto; 
 	min-height: auto; 
@@ -3728,14 +3572,6 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   margin: 0.5em 0;
 }
 
-/* .markdown-content p:first-child {
-  margin-top: 0;
-} */
-
-/* .markdown-content p:last-child {
-  margin-bottom: 0;
-} */
-
 .markdown-content ul,
 .markdown-content ol {
   margin: 0.125em 0;
@@ -3743,16 +3579,12 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
 }
 
 .markdown-content code {
-  /* background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-editor-foreground)	; */
   padding: 0.1em 0.3em;
   border-radius: 3px;
   font-size: 0.9em;
 }
 
 .markdown-content pre {
-  /* background-color: var(--vscode-textCodeBlock-background);
-  color: var(--vscode-textPreformat-foreground); */
   padding: 0.5em;
   border-radius: 3px;
   overflow-x: auto;
@@ -4200,12 +4032,10 @@ blockquote {
 }
 
 .kanban-full-height-column[data-column-tag] {
-  box-sizing: border-box;
   transition: padding 0.2s ease;
 }
 
 .task-item[data-task-tag] {
-  box-sizing: border-box;
   transition: padding 0.2s ease;
 }
 
@@ -4237,7 +4067,6 @@ blockquote {
   display: none !important;
   content: none !important;
 }
-
 
 /* h1 .kanban-tag,
 h2 .kanban-tag {
@@ -4313,12 +4142,6 @@ h6 .kanban-tag {
   flex-direction: column;
 }
 
-/* Task badges have different top position */
-/* .task-item .corner-badges-container.top-left,
-.task-item .corner-badges-container.top-right {
-  top: 18px;
-} */
-
 /* Corner badges */
 .corner-badge {
   position: relative; /* Changed from absolute since container handles positioning */
@@ -4334,17 +4157,6 @@ h6 .kanban-tag {
   background: #666; /* Default background color as fallback */
   color: #fff; /* Default text color as fallback */
 }
-
-/* .corner-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 11px;
-    z-index: 50;
-    pointer-events: none;
-    transition: all 0.2s ease;
-} */
 
 /* Ensure corner badges for specific tags (like corner-badge-feature) appear above borders */
 [class*="corner-badge-"] {
@@ -4382,7 +4194,6 @@ h6 .kanban-tag {
 .corner-badge[data-badge-index="3"] {
   z-index: 102;
 }
-
 
 /* REMOVED: CSS positioning creates initial wrong position, then JavaScript corrects it later causing delay
  * ONLY JavaScript dynamic positioning should be used (menuOperations.js)
@@ -4491,14 +4302,6 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
   transition: all 0.2s ease;
 }
 
-/* .header-bar:first-of-type {
-	border-radius: 4px 4px 0px 0px;
-} */
-
-/* .footer-bar:last-of-type {
-	border-radius: 0px 0px 4px 4px;
-} */
-
 /* Footer bars styling when in column-footer */
 .column-footer > .footer-bars-container {
   position: relative;
@@ -4510,15 +4313,6 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
   position: relative;
 }
 
-/* Collapsed state - bars stay in containers */
-/* .kanban-full-height-column.collapsed-vertical .header-bar,
-
-/* Only bars with labels get the 20px height in collapsed state */
-
-/* Keep original heights for bars without labels - heights set by inline styles from tag configuration */
-
-/* For bars with text content, ensure they have enough height */
-
 .kanban-full-height-column::before,
 .kanban-full-height-column::after,
 .task-item::before,
@@ -4529,7 +4323,6 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
 [data-all-tags] {
   border-width: 0;
 }
-
 
 /* Collapsed column label sizing */
 .kanban-full-height-column.collapsed-vertical.has-header-label,
@@ -4549,16 +4342,6 @@ body.week-highlight-glow .task-item[data-current-week="true"] {
   z-index: 100 !important;
   pointer-events: none;
 }
-
-
-
-
-/* .kanban-full-height-column.collapsed-vertical.has-header-bar,
-.kanban-full-height-column.collapsed-horizontal.has-header-bar {
-  min-height: 200px;
-} */
-
-
 
 /* Custom (user-added) tags styling */
 .donut-menu-tag-chip.custom-tag {
@@ -4764,13 +4547,11 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     border-color: var(--vscode-charts-blue, #007acc);
 }
 
-
 .kanban-temporal-week {
     color: var(--vscode-charts-blue, #007acc);
     background-color: rgba(0, 122, 204, 0.1);
     border-color: var(--vscode-charts-blue, #007acc);
 }
-
 
 .kanban-temporal-weekday {
     color: var(--vscode-charts-purple, #8a2be2);
@@ -4778,20 +4559,17 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
     border-color: var(--vscode-charts-purple, #8a2be2);
 }
 
-
 .kanban-temporal-time {
     color: var(--vscode-charts-blue, #007acc);
     background-color: rgba(0, 122, 204, 0.1);
     border-color: var(--vscode-charts-blue, #007acc);
 }
 
-
 .kanban-temporal-timeSlot {
     color: var(--vscode-charts-blue, #007acc);
     background-color: rgba(0, 122, 204, 0.1);
     border-color: var(--vscode-charts-blue, #007acc);
 }
-
 
 /* Ensure temporal tags stay inline in collapsed columns */
 .collapsed .kanban-temporal-tag {
@@ -4844,10 +4622,6 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
         background-color: transparent;
     }
 }
-
-
-
-
 
 /* ============================================
    MARKDOWN ICON CSS - Compact Width Version
@@ -4978,40 +4752,6 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
 .markdown-content mark::before { margin-right: 2px; }
 .markdown-content mark::after { margin-left: 2px; }
 
-/* Blockquote - only before */
-/* .markdown-content blockquote::before {
-  content: ">"; display: inline-block; float: left;
-  width: 16px; height: 16px; margin-right: 6px; margin-top: 2px;
-  border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
-  font-family: monospace; font-size: 12px !important; font-weight: bold;
-  background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
-  text-align: center; line-height: 16px !important;
-  vertical-align: top; opacity: 0.7;
-} */
-
-/* Lists - only before (UL DISABLED - too common) */
-/*
-.markdown-content ul > li::before {
-  content: "•"; display: inline-block;
-  width: 16px; height: 16px; margin-right: 6px; margin-left: -24px;
-  border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
-  font-size: 12px !important; font-weight: bold;
-  background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
-  text-align: center; line-height: 14px !important;
-  vertical-align: middle; opacity: 0.7;
-}
-*/
-
-/* .markdown-content ol > li::before {
-  content: "#"; display: inline-block;
-  width: 16px; height: 16px; margin-right: 6px; margin-left: -24px;
-  border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
-  font-family: monospace; font-size: 10px !important; font-weight: bold;
-  background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
-  text-align: center; line-height: 16px !important;
-  vertical-align: middle; opacity: 0.7;
-} */
-
 /* Links - before and after with brackets */
 .markdown-content a::before, .markdown-content a::after {
   display: inline; width: 10px; height: 14px;
@@ -5033,16 +4773,6 @@ kanban-full-height-column collapsed-vertical .kanban-person-tag::before {
   background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
   text-align: center; line-height: 16px !important; opacity: 0.7;
 }
-
-/* Horizontal rule - only before */
-/* .markdown-content hr::before {
-  content: "—"; display: block; position: relative;
-  width: 20px; height: 16px; top: -8px; margin: 0 auto;
-  border: 1px solid rgba(102, 102, 102, 0.5); border-radius: 2px;
-  font-family: monospace; font-size: 10px !important; font-weight: bold;
-  background: rgba(240, 240, 240, 0.6); color: rgba(51, 51, 51, 0.7);
-  text-align: center; line-height: 16px !important; opacity: 0.7;
-} */
 
 /* Superscript/Subscript - before and after */
 .markdown-content sup::before, .markdown-content sup::after,
@@ -5525,7 +5255,6 @@ figcaption {
   margin-top: 4px;
   text-align: center;
 }
-
 
 /* =================== LOADING INDICATORS =================== */
 
@@ -6895,7 +6624,6 @@ figcaption {
   font-size: 12px;
   font-family: var(--vscode-font-family);
   width: 100%;
-  box-sizing: border-box;
 }
 
 .marp-setting-item input[type="text"]:focus,
@@ -6946,7 +6674,6 @@ figcaption {
   min-width: 22px;
   justify-content: center;
   gap: 4px;
-  box-sizing: border-box;
   font-size: 12px;
   border-radius: 3px;
   display: flex;
@@ -6993,7 +6720,6 @@ figcaption {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-sizing: border-box;
 }
 
 .marp-global-menu-item:hover {
@@ -7190,7 +6916,6 @@ figcaption {
   cursor: pointer;
   border-radius: 3px;
   font-size: 12px;
-  box-sizing: border-box;
   white-space: nowrap;
 }
 
@@ -7338,7 +7063,6 @@ figcaption {
   color: var(--vscode-input-foreground, #fff);
   border: 1px solid var(--vscode-input-border, #3c3c3c);
   border-radius: 4px;
-  box-sizing: border-box;
   transition: border-color 0.15s;
 }
 
