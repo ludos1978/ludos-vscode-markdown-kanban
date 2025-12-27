@@ -1,3 +1,5 @@
+- [ ] remove the "open file" button, but keep the function if it's still used by the board to open the markdown. othervise remove the function as well.
+
 - [ ] analyze the html structure and make a detailed hierarchy structure in a agent/HTML-STRUCTURE.md with structural documentation. i can provide a html of a typical presentation if you need. we will use it to simplify the css afterwards. so include any relevant data needed for a css analysation.
 
 - [ ] do another round of cleanup analysis and refactoring. what could be improved to make the code simpler and more structured, better readable and mainainable. focus on simplicity over complexity. ultrathink . check the ts, js, html and css! start with the most complex refactorings first and then do the simpler ones. think about renaming functions to match the functionality, 
