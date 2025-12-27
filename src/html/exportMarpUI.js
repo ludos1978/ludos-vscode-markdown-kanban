@@ -23,6 +23,22 @@ let autoExportActive = false;
 let autoExportBrowserMode = false;
 let exportUIListenersInitialized = false; // MEMORY: Prevent duplicate listeners
 
+/**
+ * Set up a select element to persist its value to localStorage on change
+ * @param {string} elementId - The element ID
+ * @param {string} storageKey - The localStorage key
+ * @returns {HTMLElement|null} The element (for chaining)
+ */
+function setupStorageLinkedSelect(elementId, storageKey) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener('change', () => {
+            localStorage.setItem(storageKey, element.value);
+        });
+    }
+    return element;
+}
+
 // =============================================================================
 // EXPORT TAG FILTERING
 // =============================================================================
@@ -196,43 +212,12 @@ function initializeExportTree(preSelectNodeId = null) {
     if (!exportUIListenersInitialized) {
         exportUIListenersInitialized = true;
 
-        // Set up Marp theme change listener
-        const marpThemeSelect = document.getElementById('marp-theme');
-        if (marpThemeSelect) {
-            marpThemeSelect.addEventListener('change', () => {
-                localStorage.setItem('kanban-marp-theme', marpThemeSelect.value);
-            });
-        }
-
-        // Set up Marp browser change listener
-        const marpBrowserSelect = document.getElementById('marp-browser');
-        if (marpBrowserSelect) {
-            marpBrowserSelect.addEventListener('change', () => {
-                localStorage.setItem('kanban-marp-browser', marpBrowserSelect.value);
-            });
-        }
-
-        // Set up content transformation change listeners
-        const speakerNoteSelect = document.getElementById('speaker-note-mode');
-        if (speakerNoteSelect) {
-            speakerNoteSelect.addEventListener('change', () => {
-                localStorage.setItem('kanban-speaker-note-mode', speakerNoteSelect.value);
-            });
-        }
-
-        const htmlCommentSelect = document.getElementById('html-comment-mode');
-        if (htmlCommentSelect) {
-            htmlCommentSelect.addEventListener('change', () => {
-                localStorage.setItem('kanban-html-comment-mode', htmlCommentSelect.value);
-            });
-        }
-
-        const htmlContentSelect = document.getElementById('html-content-mode');
-        if (htmlContentSelect) {
-            htmlContentSelect.addEventListener('change', () => {
-                localStorage.setItem('kanban-html-content-mode', htmlContentSelect.value);
-            });
-        }
+        // Set up storage-linked select elements
+        setupStorageLinkedSelect('marp-theme', 'kanban-marp-theme');
+        setupStorageLinkedSelect('marp-browser', 'kanban-marp-browser');
+        setupStorageLinkedSelect('speaker-note-mode', 'kanban-speaker-note-mode');
+        setupStorageLinkedSelect('html-comment-mode', 'kanban-html-comment-mode');
+        setupStorageLinkedSelect('html-content-mode', 'kanban-html-content-mode');
 
         // Set up link handling mode dropdown
         const linkModeDropdown = document.getElementById('link-handling-mode');

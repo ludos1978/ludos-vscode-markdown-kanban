@@ -1,5 +1,30 @@
 let scrollPositions = new Map();
 
+/**
+ * Insert HTML nodes from a string before or after a reference element
+ * @param {string} htmlString - HTML string to insert
+ * @param {HTMLElement} referenceElement - Element to insert relative to
+ * @param {string} position - 'before' or 'after'
+ */
+function insertHtmlNodes(htmlString, referenceElement, position = 'before') {
+    if (!htmlString || !htmlString.trim() || !referenceElement) return;
+
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = htmlString;
+
+    if (position === 'after') {
+        let insertAfter = referenceElement;
+        while (tempContainer.firstChild) {
+            insertAfter.parentNode.insertBefore(tempContainer.firstChild, insertAfter.nextSibling);
+            insertAfter = insertAfter.nextSibling;
+        }
+    } else {
+        while (tempContainer.firstChild) {
+            referenceElement.parentNode.insertBefore(tempContainer.firstChild, referenceElement);
+        }
+    }
+}
+
 // Make folding state variables global for persistence
 window.collapsedColumns = window.collapsedColumns || new Set();
 window.collapsedTasks = window.collapsedTasks || new Set();
@@ -628,33 +653,16 @@ function regenerateAllBurgerMenus() {
                 if (divider && divider.classList.contains('donut-menu-divider')) {
                     // Create new tag menu HTML and insert after the divider
                     const newTagHtml = generateTagMenuItems(columnId, 'column', null);
-                    if (newTagHtml && newTagHtml.trim()) {
-                        const tempContainer = document.createElement('div');
-                        tempContainer.innerHTML = newTagHtml;
-                        let insertAfter = divider;
-                        while (tempContainer.firstChild) {
-                            insertAfter.parentNode.insertBefore(tempContainer.firstChild, insertAfter.nextSibling);
-                            insertAfter = insertAfter.nextSibling;
-                        }
-                    }
+                    insertHtmlNodes(newTagHtml, divider, 'after');
                 }
             }
         } else {
             // Get insertion point (before first tag item)
             const insertPoint = tagItems[0];
-            const parent = insertPoint.parentNode;
 
-            // Generate new tag menu HTML
+            // Generate new tag menu HTML and insert before first tag item
             const newTagHtml = generateTagMenuItems(columnId, 'column', null);
-
-            // Insert new items first
-            if (newTagHtml && newTagHtml.trim()) {
-                const tempContainer = document.createElement('div');
-                tempContainer.innerHTML = newTagHtml;
-                while (tempContainer.firstChild) {
-                    parent.insertBefore(tempContainer.firstChild, insertPoint);
-                }
-            }
+            insertHtmlNodes(newTagHtml, insertPoint, 'before');
 
             // Remove old items
             tagItems.forEach(item => item.remove());
@@ -675,21 +683,10 @@ function regenerateAllBurgerMenus() {
         const tagItems = Array.from(dropdown.querySelectorAll('[data-group][data-type="task"]'));
         if (tagItems.length === 0) return; // Skip if no tag section exists
 
-        // Get insertion point
+        // Get insertion point and generate new tag menu HTML
         const insertPoint = tagItems[0];
-        const parent = insertPoint.parentNode;
-
-        // Generate new tag menu HTML
         const newTagHtml = generateTagMenuItems(taskId, 'task', columnId);
-
-        // Insert new items first
-        if (newTagHtml && newTagHtml.trim()) {
-            const tempContainer = document.createElement('div');
-            tempContainer.innerHTML = newTagHtml;
-            while (tempContainer.firstChild) {
-                parent.insertBefore(tempContainer.firstChild, insertPoint);
-            }
-        }
+        insertHtmlNodes(newTagHtml, insertPoint, 'before');
 
         // Remove old items
         tagItems.forEach(item => item.remove());

@@ -44,6 +44,16 @@ const FILE_SIZE_LIMIT_BYTES = FILE_SIZE_LIMIT_MB * 1024 * 1024;
 const PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB for partial hash calculation
 
 /**
+ * Get column DOM element by column ID
+ * @param {string} columnId - The column ID
+ * @returns {HTMLElement|null} The column element or null
+ */
+function getColumnElement(columnId) {
+    if (!columnId) return null;
+    return document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+}
+
+/**
  * Read first 1MB of file for hash calculation (safe for large files)
  * @param {File} file - File object to read
  * @returns {Promise<string>} Base64 encoded first 1MB (or entire file if smaller)
@@ -1195,7 +1205,7 @@ function setupGlobalDragAndDrop() {
         }
 
         // Step 4: Find elements after render
-        const newColumnElement = document.querySelector(`.kanban-full-height-column[data-column-id="${newColumnId}"]`);
+        const newColumnElement = getColumnElement(newColumnId);
         if (!newColumnElement) {
             console.warn('[insertColumnAtPosition] Could not find new column element');
             return false;
@@ -1216,14 +1226,14 @@ function setupGlobalDragAndDrop() {
             const parentRow = newColStack?.closest('.kanban-row');
 
             if (parentRow && dropZonePrevColId) {
-                const prevCol = document.querySelector(`.kanban-full-height-column[data-column-id="${dropZonePrevColId}"]`);
+                const prevCol = getColumnElement(dropZonePrevColId);
                 const prevStack = prevCol?.closest('.kanban-column-stack');
                 if (prevStack && newColStack && prevStack.nextElementSibling !== newColStack) {
                     // Move the new column's stack to after the previous stack
                     prevStack.parentNode.insertBefore(newColStack, prevStack.nextElementSibling);
                 }
             } else if (parentRow && dropZoneNextColId) {
-                const nextCol = document.querySelector(`.kanban-full-height-column[data-column-id="${dropZoneNextColId}"]`);
+                const nextCol = getColumnElement(dropZoneNextColId);
                 const nextStack = nextCol?.closest('.kanban-column-stack');
                 if (nextStack && newColStack) {
                     // Move the new column's stack to before the next stack
@@ -1233,11 +1243,11 @@ function setupGlobalDragAndDrop() {
             // For drop zones, column stays in its own stack - no cleanup needed
         } else if (targetStackFirstColId) {
             // Find target stack by its first column
-            const firstCol = document.querySelector(`.kanban-full-height-column[data-column-id="${targetStackFirstColId}"]`);
+            const firstCol = getColumnElement(targetStackFirstColId);
             targetStack = firstCol?.closest('.kanban-column-stack');
 
             if (beforeColumnId) {
-                beforeColumn = document.querySelector(`.kanban-full-height-column[data-column-id="${beforeColumnId}"]`);
+                beforeColumn = getColumnElement(beforeColumnId);
             }
 
             // Step 5: Move column to target position - SAME as processColumnDrop
@@ -1288,12 +1298,12 @@ function setupGlobalDragAndDrop() {
             let lastMovedStack = null;
 
             if (insertAfterColumnId) {
-                const afterCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertAfterColumnId}"]`);
+                const afterCol = getColumnElement(insertAfterColumnId);
                 lastMovedStack = afterCol?.closest('.kanban-column-stack');
 
                 if (lastMovedStack) {
                     for (const colId of newColumnIds) {
-                        const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                        const colElement = getColumnElement(colId);
                         const colStack = colElement?.closest('.kanban-column-stack');
                         if (colStack && colStack !== lastMovedStack) {
                             lastMovedStack.parentNode.insertBefore(colStack, lastMovedStack.nextElementSibling);
@@ -1302,12 +1312,12 @@ function setupGlobalDragAndDrop() {
                     }
                 }
             } else if (insertBeforeColumnId) {
-                const beforeCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertBeforeColumnId}"]`);
+                const beforeCol = getColumnElement(insertBeforeColumnId);
                 const beforeStack = beforeCol?.closest('.kanban-column-stack');
 
                 if (beforeStack) {
                     for (const colId of newColumnIds) {
-                        const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                        const colElement = getColumnElement(colId);
                         const colStack = colElement?.closest('.kanban-column-stack');
                         if (colStack && colStack !== beforeStack) {
                             beforeStack.parentNode.insertBefore(colStack, beforeStack);
@@ -1321,17 +1331,17 @@ function setupGlobalDragAndDrop() {
             let beforeColumn = null;
 
             if (insertAfterColumnId) {
-                const afterCol = document.querySelector(`.kanban-full-height-column[data-column-id="${insertAfterColumnId}"]`);
+                const afterCol = getColumnElement(insertAfterColumnId);
                 targetStack = afterCol?.closest('.kanban-column-stack');
                 beforeColumn = afterCol?.nextElementSibling;
             } else if (insertBeforeColumnId) {
-                beforeColumn = document.querySelector(`.kanban-full-height-column[data-column-id="${insertBeforeColumnId}"]`);
+                beforeColumn = getColumnElement(insertBeforeColumnId);
                 targetStack = beforeColumn?.closest('.kanban-column-stack');
             }
 
             if (targetStack) {
                 for (const colId of newColumnIds) {
-                    const colElement = document.querySelector(`.kanban-full-height-column[data-column-id="${colId}"]`);
+                    const colElement = getColumnElement(colId);
                     if (!colElement) continue;
 
                     const sourceStack = colElement.closest('.kanban-column-stack');
