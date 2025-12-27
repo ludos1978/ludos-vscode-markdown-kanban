@@ -63,9 +63,6 @@
   --button-alternative-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 }
 
-* {
-}
-
 body {
   font-family: var(--vscode-font-family);
   color: var(--vscode-foreground);
@@ -463,11 +460,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0.7;
-}
-
-/* Template items in column menu - same style as other drag menu items */
-.drag-menu-item.template-item {
-  /* No special styling - matches other menu items */
 }
 
 /* Hide label text at narrow widths */
@@ -887,16 +879,13 @@ body.small-card-fonts .task-title-container .markdown-content img {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--whitespace);
-  position: sticky;
   z-index: 10;
   background-color: var(--column-background);
-  /* Keep your original left and right borders */
   border-top: none;
   border-bottom: none;
   margin-bottom: 0;
   flex-direction: column;
-  position: relative; /* Required for pseudo-elements */
+  position: relative;
 }
 
 /* Add dashed top and bottom borders with pseudo-elements */
@@ -1001,7 +990,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 
 .columninclude-link:hover {
   color: var(--vscode-textLink-activeForeground);
-  background-color: var(--vscode-textLink-activeForeground);
   background-color: rgba(var(--vscode-textLink-activeForeground-rgb, 0, 122, 204), 0.1);
 }
 
@@ -1796,7 +1784,6 @@ body.vscode-high-contrast-light .task-count {
   border: var(--button-border);
   cursor: pointer;
   padding: 2px 2px;
-  font-size: 18px;
   line-height: 1;
   transition: all 0.2s;
   border-radius: 3px;
@@ -3611,62 +3598,6 @@ h6 {
 	font-size: 1em;
 }
 
-/* h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-	font-weight:600;
-}
-
-h1 { 
-	font-size: 1em; 
-	font-weight: 800;
-	letter-spacing: -0.02em;
-}
-h2 { 
-	font-size: 1em;
-	font-weight: 700;
-	letter-spacing: -0.03em;
-}
-
-h3 { 
-	font-size: 1em;
-	font-weight: 700;
-}
-
-h4 { 
-	font-size: 1em;
-	font-weight: 600; 
-	color: #333;
-}
-.vscode-dark h4 {
-	color: #ddd;
-}
-
-h5 { 
-	font-size: 0.95em; 
-	letter-spacing: 0.05em;
-	font-weight: 700;
-	text-transform: uppercase;
-	color: #444;
-}
-.vscode-dark h5 { 
-	color: #bbb;
-}
-
-h6 { 
-	font-size: 0.90em; 
-	letter-spacing: 0.05em;
-	font-weight: 800;
-	text-transform: uppercase;
-	color: #666;
-}
-.vscode-dark h6 {
-	color: #999;
-} */
-
 blockquote {
   margin-block-start: 0.5em;
   margin-block-end: 0.5em;
@@ -3895,17 +3826,6 @@ blockquote {
 .markdown-content a[href$=".gif"]::before,
 .markdown-content a[href$=".svg"]::before { content: "🖼️ "; }
 
-/* we dont use width based settings at all
-@media (max-width: 768px) {
-  .task-description-container .markdown-content img {
-    max-height: 150px;
-  }
-  
-  .task-title-container .markdown-content img {
-    max-height: 40px;
-  }
-} */
-
 /* Speaker Notes */
 .speaker-note {
   color: var(--vscode-textCodeBlock-foreground, #888);
@@ -4053,34 +3973,6 @@ blockquote {
   display: none !important;
   content: none !important;
 }
-
-/* h1 .kanban-tag,
-h2 .kanban-tag {
-  position: relative;
-  top: -4px;
-}
-
-h3 .kanban-tag,
-h4 .kanban-tag,
-h5 .kanban-tag,
-h6 .kanban-tag {
-  left: -2px;
-  position: relative;
-}
-
-.collapsed-vertical .column-title h1 .kanban-tag,
-.collapsed-vertical .column-title h2 .kanban-tag {
-  left: -4px;
-  position: relative;
-}
-
-.collapsed-vertical h3 .kanban-tag,
-.collapsed-vertical h4 .kanban-tag,
-.collapsed-vertical h5 .kanban-tag,
-.collapsed-vertical h6 .kanban-tag {
-  left: -2px;
-  position: relative;
-} */
 
 /* Corner badge containers - flexbox based positioning */
 .corner-badges-container {

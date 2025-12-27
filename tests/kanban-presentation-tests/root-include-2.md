@@ -29,18 +29,3 @@ class Admin {
 
 User <|-- Admin
 ```
-
----
-
-andreas-gucklhorn-mawU2PoJWfU-unsplash.jpg #cyan
-
----:
-
-![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/jon-flobrant-rB7-LCa_diU-unsplash.jpg)
-
-
-:--:
-
-![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/yannis-papanastasopoulos-U6dnImauDAE-unsplash.jpg)
-
-:---
