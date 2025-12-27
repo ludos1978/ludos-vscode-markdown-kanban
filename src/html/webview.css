@@ -564,17 +564,41 @@ body {
   font-weight: bold;
 }
 
-/* File States Button (formerly refresh-btn) */
-.refresh-btn {
+/* ============================================================================
+   TOOLBAR BUTTONS - Consolidated primary button styles
+   ============================================================================ */
+
+/* Shared primary button base styles */
+.refresh-btn,
+.auto-export-btn,
+.global-sticky-btn,
+.layout-presets-btn {
   background: var(--button-background);
   color: var(--button-foreground);
   border: var(--button-border);
   cursor: pointer;
 }
 
-.refresh-btn:hover {
+/* Shared hover states */
+.refresh-btn:hover,
+.auto-export-btn:hover,
+.global-sticky-btn:hover,
+.layout-presets-btn:hover {
   background: var(--button-background-hover);
   color: var(--button-foreground-hover);
+}
+
+/* Shared active states */
+.auto-export-btn.active,
+.layout-presets-btn.active {
+  background: var(--button-background-active);
+  color: var(--button-foreground-active);
+  border: var(--button-border-active);
+}
+
+/* Button-specific styles */
+.global-sticky-btn {
+  font-size: 14px;
 }
 
 .refresh-btn.pending {
@@ -589,22 +613,7 @@ body {
   border-color: var(--vscode-inputValidation-infoBorder);
 }
 
-/* Auto Export Button */
-.auto-export-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
-}
-
-.auto-export-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
-}
-
 .auto-export-btn.active {
-  background: var(--button-background-active);
-  color: var(--button-foreground-active);
-  border: var(--button-border-active);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -615,19 +624,6 @@ body {
   50% {
     opacity: 0.7;
   }
-}
-
-/* Global Sticky Button */
-.global-sticky-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border: var(--button-border);
-  font-size: 14px;
-}
-
-.global-sticky-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
 }
 
 .global-sticky-btn.all-sticky {
@@ -642,24 +638,6 @@ body {
 .layout-presets-menu-container {
   position: relative;
   display: inline-block;
-  /* margin-left: 8px; */
-}
-
-.layout-presets-btn {
-  background: var(--button-background);
-  color: var(--button-foreground);
-  border-color: var(--button-border);
-  cursor: pointer;
-}
-
-.layout-presets-btn:hover {
-  background: var(--button-background-hover);
-  color: var(--button-foreground-hover);
-}
-
-.layout-presets-btn.active {
-  background: var(--button-background-active);
-  color: var(--button-foreground-active);
 }
 
 .layout-presets-dropdown {
@@ -3468,21 +3446,28 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   gap: 8px;
 }
 
-.search-toggle-btn {
+/* Shared search button base styles */
+.search-toggle-btn,
+.search-nav-btn {
   padding: 4px 8px;
   border: var(--button-border);
   border-radius: 4px;
   background: var(--button-secondary-background);
   color: var(--button-secondary-foreground);
-  font-size: 11px;
-  font-weight: bold;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 28px;
 }
 
-.search-toggle-btn:hover {
+.search-toggle-btn:hover,
+.search-nav-btn:hover {
   background: var(--button-secondary-background-hover);
+}
+
+/* Button-specific styles */
+.search-toggle-btn {
+  font-size: 11px;
+  font-weight: bold;
+  min-width: 28px;
 }
 
 .search-toggle-btn.active {
@@ -3491,27 +3476,16 @@ body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column
   border-color: var(--vscode-focusBorder);
 }
 
+.search-nav-btn {
+  font-size: 14px;
+}
+
 .search-counter {
   flex: 1;
   text-align: center;
   font-size: 12px;
   color: var(--vscode-descriptionForeground);
   padding: 0 8px;
-}
-
-.search-nav-btn {
-  padding: 4px 8px;
-  border: var(--button-border);
-  border-radius: 4px;
-  background: var(--button-secondary-background);
-  color: var(--button-secondary-foreground);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.search-nav-btn:hover {
-  background: var(--button-secondary-background-hover);
 }
 
 .search-close-btn {
@@ -4176,26 +4150,46 @@ blockquote {
   background: rgba(0, 0, 0, 0.8);
 }
 
-.image-path-menu {
+/* ============================================================================
+   RESOURCE PATH MENUS - Consolidated styles for image/include path menus
+   ============================================================================ */
+
+/* Shared menu container styles */
+.image-path-menu,
+.include-path-menu {
   position: absolute;
-  top: 32px;
-  right: 4px;
+  right: 0;
   background: var(--vscode-menu-background, #252526);
   border: 1px solid var(--vscode-menu-border, #454545);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 1000;
   min-width: 160px;
-  max-width: 220px;
-  width: max-content;
   display: none;
 }
 
-.image-path-menu.visible {
+/* Menu-specific positioning */
+.image-path-menu {
+  top: 32px;
+  right: 4px;
+  max-width: 220px;
+  width: max-content;
+}
+
+.include-path-menu {
+  top: 100%;
+  margin-top: 2px;
+}
+
+/* Visible state */
+.image-path-menu.visible,
+.include-path-menu.visible {
   display: block;
 }
 
-.image-path-menu-item {
+/* Shared menu item styles */
+.image-path-menu-item,
+.include-path-menu-item {
   display: block;
   width: 100%;
   padding: 6px 12px;
@@ -4208,19 +4202,26 @@ blockquote {
   white-space: nowrap;
 }
 
-.image-path-menu-item:hover:not(:disabled) {
+/* Hover states */
+.image-path-menu-item:hover:not(:disabled),
+.include-path-menu-item:hover:not(:disabled) {
   background: var(--vscode-menu-selectionBackground, #094771);
   color: var(--vscode-menu-selectionForeground, #ffffff);
 }
 
+/* Disabled states */
 .image-path-menu-item:disabled,
-.image-path-menu-item.disabled {
+.image-path-menu-item.disabled,
+.include-path-menu-item:disabled,
+.include-path-menu-item.disabled {
   opacity: 0.4;
   cursor: not-allowed;
   color: var(--vscode-disabledForeground, #888888);
 }
 
-.image-path-menu-divider {
+/* Dividers */
+.image-path-menu-divider,
+.include-path-menu-divider {
   height: 1px;
   background: var(--vscode-menu-separatorBackground, #454545);
   margin: 4px 0;
@@ -4257,55 +4258,6 @@ blockquote {
 
 .include-path-overlay-container .include-menu-btn:hover {
   background: rgba(0, 0, 0, 0.7);
-}
-
-.include-path-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 2px;
-  background: var(--vscode-menu-background, #252526);
-  border: 1px solid var(--vscode-menu-border, #454545);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  min-width: 160px;
-  display: none;
-}
-
-.include-path-menu.visible {
-  display: block;
-}
-
-.include-path-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  color: var(--vscode-menu-foreground, #cccccc);
-  text-align: left;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.include-path-menu-item:hover:not(:disabled) {
-  background: var(--vscode-menu-selectionBackground, #094771);
-  color: var(--vscode-menu-selectionForeground, #ffffff);
-}
-
-.include-path-menu-item:disabled,
-.include-path-menu-item.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  color: var(--vscode-disabledForeground, #888888);
-}
-
-.include-path-menu-divider {
-  height: 1px;
-  background: var(--vscode-menu-separatorBackground, #454545);
-  margin: 4px 0;
 }
 
 .markdown-content a[href$=".pdf"],
