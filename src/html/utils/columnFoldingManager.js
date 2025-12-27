@@ -594,7 +594,6 @@ function toggleColumnCollapse(columnId, event) {
 
     // Update global fold button after individual column toggle
     setTimeout(() => {
-        console.log('[STACK-DEBUG] toggleColumnCollapse setTimeout fired for column:', columnId);
         updateGlobalColumnFoldButton();
         // Re-apply user's fixed height setting after column state change (if not auto)
         if (window.currentRowHeight && window.currentRowHeight !== 'auto') {
@@ -602,7 +601,6 @@ function toggleColumnCollapse(columnId, event) {
         }
         // For 'auto' mode, CSS handles the layout naturally
         // Apply stacked column styles after state change (only for this stack)
-        console.log('[STACK-DEBUG] applyStackedColumnStyles available:', typeof window.applyStackedColumnStyles === 'function');
         if (typeof window.applyStackedColumnStyles === 'function') {
             window.applyStackedColumnStyles(columnId);
         }

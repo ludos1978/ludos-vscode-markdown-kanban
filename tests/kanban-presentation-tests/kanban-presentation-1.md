@@ -44,7 +44,7 @@ kanban-plugin: board
 
 ## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!! #stack
 
-## second
+## second #stack
 - [ ] test
 
 

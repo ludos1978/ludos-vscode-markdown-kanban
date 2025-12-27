@@ -747,6 +747,115 @@ Deep selector chains observed:
 
 ---
 
+## Stack Layout System (CRITICAL)
+
+The stack layout is managed by `stackLayoutManager.js` and involves both CSS and JavaScript.
+
+### Column Structure in Stacks
+
+```
+.kanban-column-stack
+│
+├── .kanban-full-height-column[1]
+│   ├── .column-offset          ← margin-top: 0px (first column)
+│   ├── .column-margin          ← top: 0px (sticky)
+│   ├── .column-header          ← top: Xpx (sticky, calculated)
+│   ├── .column-title           ← top: Ypx (sticky, calculated)
+│   ├── .column-inner           ← z-index: calculated, HIDDEN when folded
+│   └── .column-footer          ← bottom: Zpx (sticky from bottom)
+│
+├── .kanban-full-height-column[2]
+│   ├── .column-offset          ← margin-top: (col1.totalHeight + margin)px
+│   ├── .column-margin          ← top: calculated
+│   ├── .column-header          ← top: calculated
+│   ├── .column-title           ← top: calculated
+│   ├── .column-inner           ← HIDDEN when folded
+│   └── .column-footer          ← bottom: calculated
+│
+└── ... more columns
+```
+
+### Height Calculation for Stacking
+
+For each column, `updateStackLayoutCore()` measures:
+
+| Measurement | Source Element | When Folded |
+|-------------|----------------|-------------|
+| `columnHeaderHeight` | `.column-header.offsetHeight` | Measured normally |
+| `headerHeight` | `.column-title.offsetHeight` | Measured normally |
+| `footerHeight` | `.column-footer.offsetHeight` | Measured normally |
+| `contentHeight` | `.column-content.scrollHeight` | **Set to 0** |
+| `marginHeight` | `.column-margin.offsetHeight` | Default: 4px |
+
+```javascript
+totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
+// For folded columns: contentHeight = 0
+// Headers/footers still counted!
+```
+
+### Column Offset Calculation
+
+The `column-offset` element's `margin-top` positions each column below the ones above:
+
+```javascript
+// For column at index N:
+contentPadding = sum of (totalHeight + marginHeight) for columns 0 to N-1
+
+columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
+```
+
+### CSS for Stacked Columns
+
+```css
+/* Base sticky positioning */
+.kanban-column-stack .column-margin,
+.kanban-column-stack .column-header,
+.kanban-column-stack .column-title,
+.kanban-column-stack .column-footer {
+    position: sticky;
+    background: var(--column-background);
+    z-index: 100;
+}
+
+/* Content hidden when folded IN STACKS */
+.kanban-column-stack .collapsed-vertical .column-inner,
+.kanban-column-stack .collapsed-horizontal .column-inner {
+    display: none !important;
+}
+```
+
+### Stack State Classes
+
+| Class | Applied To | Description |
+|-------|------------|-------------|
+| `.all-vertical-folded` | `.kanban-column-stack` | All columns vertically folded → horizontal layout |
+| `.collapsed-vertical` | `.kanban-full-height-column` | Column folded vertically (narrow) |
+| `.collapsed-horizontal` | `.kanban-full-height-column` | Column folded horizontally (header only) |
+
+### JavaScript-Set Inline Styles
+
+These are set by `updateStackLayoutCore()` via `requestAnimationFrame`:
+
+| Element | Property | Purpose |
+|---------|----------|---------|
+| `.column-offset` | `margin-top` | Vertical position in stack |
+| `.column-margin` | `top` | Sticky position for margin |
+| `.column-header` | `top` | Sticky position for header bars |
+| `.column-title` | `top` | Sticky position for title |
+| `.column-footer` | `bottom` | Sticky position from bottom |
+| `.column-inner` | `z-index` | Layer behind sticky elements |
+
+### Function Reference (stackLayoutManager.js)
+
+| Function | Purpose |
+|----------|---------|
+| `updateStackLayoutCore()` | Immediate layout calculation and application |
+| `updateStackLayoutDebounced()` | 150ms debounced version (default) |
+| `applyStackedColumnStyles()` | High-level orchestrator with scroll preservation |
+| `enforceFoldModesForStacks()` | Enforces horizontal folding in multi-column stacks |
+
+---
+
 ## Notes for CSS Simplification
 
 1. **Nested selectors** - Many classes have deep nesting (e.g., `.donut-menu .donut-menu-dropdown .donut-menu-item`)
@@ -757,10 +866,14 @@ Deep selector chains observed:
 
 4. **Responsive considerations** - `container-type: inline-size` on file info bar
 
-5. **Sticky elements** - Complex sticky positioning for column headers/footers
+5. **Sticky elements** - Complex sticky positioning for column headers/footers - **CRITICAL: JS calculates `top` values**
 
 6. **Dynamic class generation** - Marp header/footer classes are generated from tag names
 
 7. **Diagram styles** - PlantUML and Mermaid have nearly identical CSS patterns (potential consolidation)
 
 8. **Tag colors** - 20+ tag colors with identical property patterns, each duplicated for column/task contexts
+
+9. **Stack layout CSS/JS split** - CSS handles `position: sticky`, JS calculates actual `top/bottom` values for layering
+
+10. **Folded column handling** - `.column-inner` is hidden via CSS, but headers/footers remain visible with measured heights

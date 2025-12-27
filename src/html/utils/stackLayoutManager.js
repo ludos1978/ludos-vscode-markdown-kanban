@@ -132,7 +132,6 @@ function enforceFoldModesForStacks(stackElement = null) {
  * @param {string|null} columnId - Column ID to update its stack, or null for all stacks
  */
 function applyStackedColumnStyles(columnId = null) {
-    console.log('[STACK-DEBUG] applyStackedColumnStyles called with columnId:', columnId);
     // Preserve scroll position during layout changes
     const kanbanBoard = document.getElementById('kanban-board');
     const scrollLeft = kanbanBoard ? kanbanBoard.scrollLeft : 0;
@@ -142,10 +141,8 @@ function applyStackedColumnStyles(columnId = null) {
     if (columnId) {
         // Find the specific stack containing this column
         const columnElement = document.querySelector(`[data-column-id="${columnId}"]`);
-        console.log('[STACK-DEBUG] columnElement found:', !!columnElement);
         if (columnElement) {
             targetStack = columnElement.closest('.kanban-column-stack');
-            console.log('[STACK-DEBUG] targetStack found:', !!targetStack);
         }
     }
 
@@ -367,9 +364,7 @@ function updateStackLayoutDebounced(stackElement = null) {
  * @param {HTMLElement} stackElement - Specific stack to update, or null for all stacks
  */
 function updateStackLayoutCore(stackElement = null) {
-    console.log('[STACK-DEBUG] updateStackLayout called, stackElement:', stackElement);
     const stacks = stackElement ? [stackElement] : document.querySelectorAll('.kanban-column-stack');
-    console.log('[STACK-DEBUG] Found stacks:', stacks.length);
 
     stacks.forEach(stack => {
         const columns = Array.from(stack.querySelectorAll('.kanban-full-height-column'));
@@ -418,9 +413,6 @@ function updateStackLayoutCore(stackElement = null) {
                 const marginHeight = columnMargin ? columnMargin.offsetHeight : 4;
 
                 const totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
-
-                // DEBUG - always log to see what's measured
-                console.log(`[STACK-DEBUG] Column ${col.dataset.columnId}: folded=${isVerticallyFolded || isHorizontallyFolded}, columnHeaderH=${columnHeaderHeight}, headerH=${headerHeight}, footerH=${footerHeight}, contentH=${contentHeight}, TOTAL=${totalHeight}`);
 
                 columnData.push({
                     col,
@@ -778,6 +770,7 @@ window.updateStackLayoutDebounced = updateStackLayoutDebounced;
 window.recalculateStackHeights = updateStackLayoutDebounced;
 window.recalculateStackHeightsDebounced = updateStackLayoutDebounced;
 window.recalculateStackHeightsImmediate = updateStackLayoutCore;
+window.recalculateAllStackHeights = () => updateStackLayoutCore(null); // null = all stacks
 
 // Scroll handler
 window.setupStackedColumnScrollHandler = setupStackedColumnScrollHandler;
