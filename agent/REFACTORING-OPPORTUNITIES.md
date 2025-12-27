@@ -15,8 +15,12 @@ This document consolidates code quality analysis across HTML, CSS, JavaScript, a
 | 2025-12-27 | NotificationService.ts for centralized notifications | ✅ DONE | ~200 (when fully adopted) |
 | 2025-12-27 | SwitchBasedCommand base class for command handlers | ✅ DONE | ~220 (when fully adopted) |
 | 2025-12-27 | Migrated UICommands.ts to SwitchBasedCommand | ✅ DONE | ~20 |
+| 2025-12-27 | Migrated DiagramCommands.ts to SwitchBasedCommand | ✅ DONE | ~15 |
+| 2025-12-27 | Migrated ClipboardCommands.ts to SwitchBasedCommand | ✅ DONE | ~15 |
 | 2025-12-27 | CSS button base classes (.btn-base, variants) | ✅ DONE | ~100 (when fully adopted) |
 | 2025-12-27 | CSS utility classes (flex, gap, text, transitions) | ✅ DONE | ~50 (when fully adopted) |
+| 2025-12-27 | Decomposed handleBoardUpdate in messageHandler.ts | ✅ DONE | ~30 (better structure) |
+| 2025-12-27 | Menu item template factory in menuUtils.js | ✅ DONE | ~50 (when fully adopted) |
 
 ---
 

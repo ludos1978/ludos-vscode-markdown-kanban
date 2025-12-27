@@ -11,7 +11,7 @@
  * @module commands/ClipboardCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage, MessageHandler } from './interfaces';
 import {
     RequestFileDropDialogueMessage,
     ExecuteFileDropCopyMessage,
@@ -32,8 +32,9 @@ const configService = ConfigurationService.getInstance();
  * Clipboard Commands Handler
  *
  * Processes clipboard and image-related messages from the webview.
+ * Uses SwitchBasedCommand for automatic dispatch and error handling.
  */
-export class ClipboardCommands extends BaseMessageCommand {
+export class ClipboardCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'clipboard-commands',
         name: 'Clipboard Commands',
@@ -58,125 +59,72 @@ export class ClipboardCommands extends BaseMessageCommand {
 
     private readonly PARTIAL_HASH_SIZE = 1024 * 1024; // 1MB threshold for partial hashing
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'saveClipboardImage':
-                    await this.handleSaveClipboardImage(
-                        message.imageData,
-                        message.imagePath,
-                        message.mediaFolderPath,
-                        message.dropPosition,
-                        message.imageFileName ?? '',
-                        message.mediaFolderName ?? '',
-                        context
-                    );
-                    return this.success();
-
-                case 'saveClipboardImageWithPath':
-                    await this.handleSaveClipboardImageWithPath(
-                        message.imageData,
-                        message.imageType,
-                        message.dropPosition,
-                        context,
-                        message.md5Hash
-                    );
-                    return this.success();
-
-                case 'pasteImageIntoField':
-                    await this.handlePasteImageIntoField(
-                        message.imageData,
-                        message.imageType,
-                        message.md5Hash ?? '',
-                        message.cursorPosition ?? 0,
-                        context
-                    );
-                    return this.success();
-
-                case 'saveDroppedImageFromContents':
-                    await this.handleAnyFileDrop(
-                        null,
-                        message.imageData,
-                        message.originalFileName,
-                        message.dropPosition,
-                        true,
-                        context
-                    );
-                    return this.success();
-
-                case 'copyImageToMedia':
-                    await this.handleAnyFileDrop(
-                        message.sourcePath,
-                        null,
-                        message.originalFileName,
-                        message.dropPosition,
-                        true,
-                        context
-                    );
-                    return this.success();
-
-                case 'handleFileUriDrop':
-                    await this.handleAnyFileDrop(
-                        message.sourcePath,
-                        null,
-                        message.originalFileName,
-                        message.dropPosition,
-                        false,
-                        context
-                    );
-                    return this.success();
-
-                case 'saveDroppedFileFromContents':
-                    await this.handleAnyFileDrop(
-                        null,
-                        message.fileData,
-                        message.originalFileName,
-                        message.dropPosition,
-                        false,
-                        context
-                    );
-                    return this.success();
-
-                case 'requestFileDropDialogue':
-                    await this.handleRequestFileDropDialogue(message, context);
-                    return this.success();
-
-                case 'executeFileDropCopy':
-                    await this.handleExecuteFileDropCopy(message, context);
-                    return this.success();
-
-                case 'executeFileDropLink':
-                    await this.handleExecuteFileDropLink(message, context);
-                    return this.success();
-
-                case 'linkExistingFile':
-                    await this.handleLinkExistingFile(message, context);
-                    return this.success();
-
-                case 'openMediaFolder':
-                    await this.handleOpenMediaFolder(context);
-                    return this.success();
-
-                case 'createDiagramFile':
-                    await this.handleCreateDiagramFile(
-                        message.diagramType,
-                        message.columnId,
-                        message.insertionIndex,
-                        message.dropPosition,
-                        message.sourceFilePath,
-                        context
-                    );
-                    return this.success();
-
-                default:
-                    return this.failure(`Unknown clipboard command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[ClipboardCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
+    /**
+     * Handler mapping for message dispatch
+     * Uses type assertions for message-specific properties
+     */
+    protected handlers: Record<string, MessageHandler> = {
+        'saveClipboardImage': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleSaveClipboardImage(m.imageData, m.imagePath, m.mediaFolderPath, m.dropPosition, m.imageFileName ?? '', m.mediaFolderName ?? '', ctx);
+            return this.success();
+        },
+        'saveClipboardImageWithPath': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleSaveClipboardImageWithPath(m.imageData, m.imageType, m.dropPosition, ctx, m.md5Hash);
+            return this.success();
+        },
+        'pasteImageIntoField': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handlePasteImageIntoField(m.imageData, m.imageType, m.md5Hash ?? '', m.cursorPosition ?? 0, ctx);
+            return this.success();
+        },
+        'saveDroppedImageFromContents': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleAnyFileDrop(null, m.imageData, m.originalFileName, m.dropPosition, true, ctx);
+            return this.success();
+        },
+        'copyImageToMedia': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, true, ctx);
+            return this.success();
+        },
+        'handleFileUriDrop': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleAnyFileDrop(m.sourcePath, null, m.originalFileName, m.dropPosition, false, ctx);
+            return this.success();
+        },
+        'saveDroppedFileFromContents': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleAnyFileDrop(null, m.fileData, m.originalFileName, m.dropPosition, false, ctx);
+            return this.success();
+        },
+        'requestFileDropDialogue': async (msg, ctx) => {
+            await this.handleRequestFileDropDialogue(msg as RequestFileDropDialogueMessage, ctx);
+            return this.success();
+        },
+        'executeFileDropCopy': async (msg, ctx) => {
+            await this.handleExecuteFileDropCopy(msg as ExecuteFileDropCopyMessage, ctx);
+            return this.success();
+        },
+        'executeFileDropLink': async (msg, ctx) => {
+            await this.handleExecuteFileDropLink(msg as ExecuteFileDropLinkMessage, ctx);
+            return this.success();
+        },
+        'linkExistingFile': async (msg, ctx) => {
+            await this.handleLinkExistingFile(msg as LinkExistingFileMessage, ctx);
+            return this.success();
+        },
+        'openMediaFolder': async (_msg, ctx) => {
+            await this.handleOpenMediaFolder(ctx);
+            return this.success();
+        },
+        'createDiagramFile': async (msg, ctx) => {
+            const m = msg as any;
+            await this.handleCreateDiagramFile(m.diagramType, m.columnId, m.insertionIndex, m.dropPosition, m.sourceFilePath, ctx);
+            return this.success();
         }
-    }
+    };
 
     // ============= CLIPBOARD IMAGE HANDLERS =============
 

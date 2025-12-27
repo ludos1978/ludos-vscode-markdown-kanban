@@ -240,76 +240,9 @@ export class MessageHandler {
             const oldBoard = this._boardStore.getBoard();
 
             if (oldBoard && panel) {
-
-                // Check column includes
-                for (let i = 0; i < board.columns.length && i < oldBoard.columns.length; i++) {
-                    const newCol = board.columns[i];
-                    const oldCol = oldBoard.columns[i];
-
-                    const oldIncludeFiles = oldCol.includeFiles || [];
-                    const newIncludeFiles = newCol.includeFiles || [];
-
-                    // FOUNDATION-1: Use normalized comparison
-                    const removedFiles = oldIncludeFiles.filter((oldPath: string) =>
-                        !newIncludeFiles.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
-                    );
-
-                    for (const removedPath of removedFiles) {
-                        const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
-                        if (oldFile && oldFile.hasUnsavedChanges()) {
-
-                            const choice = await vscode.window.showWarningMessage(
-                                `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
-                                { modal: true },
-                                'Save and Continue',
-                                'Discard and Continue',
-                                'Cancel'
-                            );
-
-                            if (choice === 'Save and Continue') {
-                                await this._fileSaveService.saveFile(oldFile);
-                            } else if (choice === 'Discard and Continue') {
-                                oldFile.discardChanges();
-                            } else {
-                                return; // Cancel the entire update
-                            }
-                        }
-                    }
-
-                    // Check task includes within this column
-                    for (const newTask of newCol.tasks) {
-                        const oldTask = oldCol.tasks.find((t: KanbanTask) => t.id === newTask.id);
-                        if (oldTask) {
-                            const oldTaskIncludes = oldTask.includeFiles || [];
-                            const newTaskIncludes = newTask.includeFiles || [];
-                            // FOUNDATION-1: Use normalized comparison
-                            const removedTaskFiles = oldTaskIncludes.filter((oldPath: string) =>
-                                !newTaskIncludes.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
-                            );
-
-                            for (const removedPath of removedTaskFiles) {
-                                const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
-                                if (oldFile && oldFile.hasUnsavedChanges()) {
-
-                                    const choice = await vscode.window.showWarningMessage(
-                                        `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
-                                        { modal: true },
-                                        'Save and Continue',
-                                        'Discard and Continue',
-                                        'Cancel'
-                                    );
-
-                                    if (choice === 'Save and Continue') {
-                                        await this._fileSaveService.saveFile(oldFile);
-                                    } else if (choice === 'Discard and Continue') {
-                                        oldFile.discardChanges();
-                                    } else {
-                                        return; // Cancel the entire update
-                                    }
-                                }
-                            }
-                        }
-                    }
+                const shouldProceed = await this._checkUnsavedIncludeFiles(board, oldBoard, panel);
+                if (!shouldProceed) {
+                    return; // User cancelled
                 }
             }
 
@@ -322,5 +255,99 @@ export class MessageHandler {
         } catch (error) {
             console.error('[boardUpdate] Error handling board update:', error);
         }
+    }
+
+    /**
+     * Check for unsaved changes in include files that are being removed
+     * Prompts user to save/discard/cancel for each file with unsaved changes
+     * @returns true if we should proceed with the update, false if user cancelled
+     */
+    private async _checkUnsavedIncludeFiles(
+        newBoard: KanbanBoard,
+        oldBoard: KanbanBoard,
+        panel: any
+    ): Promise<boolean> {
+        // Check column includes
+        for (let i = 0; i < newBoard.columns.length && i < oldBoard.columns.length; i++) {
+            const newCol = newBoard.columns[i];
+            const oldCol = oldBoard.columns[i];
+
+            // Check column-level include files
+            const shouldProceed = await this._checkRemovedIncludes(
+                oldCol.includeFiles || [],
+                newCol.includeFiles || [],
+                panel
+            );
+            if (!shouldProceed) { return false; }
+
+            // Check task includes within this column
+            for (const newTask of newCol.tasks) {
+                const oldTask = oldCol.tasks.find((t: KanbanTask) => t.id === newTask.id);
+                if (oldTask) {
+                    const taskShouldProceed = await this._checkRemovedIncludes(
+                        oldTask.includeFiles || [],
+                        newTask.includeFiles || [],
+                        panel
+                    );
+                    if (!taskShouldProceed) { return false; }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check for removed include files with unsaved changes
+     * @returns true if we should proceed, false if user cancelled
+     */
+    private async _checkRemovedIncludes(
+        oldIncludes: string[],
+        newIncludes: string[],
+        panel: any
+    ): Promise<boolean> {
+        // FOUNDATION-1: Use normalized comparison
+        const removedFiles = oldIncludes.filter((oldPath: string) =>
+            !newIncludes.some((newPath: string) => MarkdownFile.isSameFile(oldPath, newPath))
+        );
+
+        for (const removedPath of removedFiles) {
+            const result = await this._handleUnsavedIncludeFile(removedPath, panel);
+            if (!result) { return false; }
+        }
+
+        return true;
+    }
+
+    /**
+     * Handle a single include file that's being removed
+     * @returns true if we should proceed, false if user cancelled
+     */
+    private async _handleUnsavedIncludeFile(
+        removedPath: string,
+        panel: any
+    ): Promise<boolean> {
+        const oldFile = panel.fileRegistry?.getByRelativePath(removedPath);
+        if (!oldFile || !oldFile.hasUnsavedChanges()) {
+            return true; // No unsaved changes, proceed
+        }
+
+        const choice = await vscode.window.showWarningMessage(
+            `The include file "${removedPath}" has unsaved changes and will be unloaded. What would you like to do?`,
+            { modal: true },
+            'Save and Continue',
+            'Discard and Continue',
+            'Cancel'
+        );
+
+        if (choice === 'Save and Continue') {
+            await this._fileSaveService.saveFile(oldFile);
+            return true;
+        } else if (choice === 'Discard and Continue') {
+            oldFile.discardChanges();
+            return true;
+        }
+
+        return false; // Cancel
     }
 }

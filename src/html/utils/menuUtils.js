@@ -443,6 +443,181 @@ function restoreDropdownPosition(dropdown) {
     }
 }
 
+// ============================================================================
+// Menu Item Template Factory
+// ============================================================================
+
+/**
+ * Escape HTML special characters for safe embedding in HTML strings
+ * @param {string} text - Text to escape
+ * @returns {string} - Escaped text
+ */
+function escapeHtmlForMenuItem(text) {
+    if (typeof window !== 'undefined' && window.escapeHtml) {
+        return window.escapeHtml(text);
+    }
+    // Fallback escaping
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Create a standard menu item button
+ * @param {Object} options - Menu item configuration
+ * @param {string} options.label - Display text
+ * @param {string} options.onClick - Click handler function call (e.g., "deleteTask('123')")
+ * @param {boolean} [options.danger=false] - Whether this is a danger action (red text)
+ * @param {boolean} [options.disabled=false] - Whether the item is disabled
+ * @param {string} [options.icon] - Optional icon text
+ * @param {string} [options.iconStyle] - Optional icon inline style
+ * @param {string} [options.menuType='donut'] - Menu type: 'donut' or 'file-bar'
+ * @returns {string} - Menu item HTML
+ */
+function createMenuItem(options) {
+    const {
+        label,
+        onClick,
+        danger = false,
+        disabled = false,
+        icon,
+        iconStyle,
+        menuType = 'donut'
+    } = options;
+
+    const baseClass = menuType === 'file-bar' ? 'file-bar-menu-item' : 'donut-menu-item';
+    const classes = [baseClass];
+    if (danger) classes.push('danger');
+
+    const iconHtml = icon
+        ? `<span class="menu-icon"${iconStyle ? ` style="${iconStyle}"` : ''}>${escapeHtmlForMenuItem(icon)}</span> `
+        : '';
+
+    if (disabled) {
+        return `<button class="${classes.join(' ')}" disabled>${iconHtml}${escapeHtmlForMenuItem(label)}</button>`;
+    }
+
+    return `<button class="${classes.join(' ')}" onclick="${onClick}">${iconHtml}${escapeHtmlForMenuItem(label)}</button>`;
+}
+
+/**
+ * Create a menu item with submenu
+ * @param {Object} options - Submenu item configuration
+ * @param {string} options.label - Display text
+ * @param {string} options.submenuType - Type of submenu (e.g., 'move', 'tags', 'sort')
+ * @param {string} [options.id] - Element ID (task or column)
+ * @param {string} [options.type] - Element type ('task' or 'column')
+ * @param {string} [options.columnId] - Column ID for task context
+ * @param {string} [options.group] - Tag group (for tag submenus)
+ * @param {string} [options.scope] - Scope (e.g., 'task', 'column' for marp menus)
+ * @param {string} [options.menuType='donut'] - Menu type: 'donut' or 'file-bar'
+ * @returns {string} - Submenu item HTML
+ */
+function createSubmenuItem(options) {
+    const {
+        label,
+        submenuType,
+        id = '',
+        type = '',
+        columnId = '',
+        group = '',
+        scope = '',
+        menuType = 'donut'
+    } = options;
+
+    const baseClass = menuType === 'file-bar' ? 'file-bar-menu-item' : 'donut-menu-item';
+
+    const dataAttrs = [
+        `data-submenu-type="${submenuType}"`,
+        id && `data-id="${id}"`,
+        type && `data-type="${type}"`,
+        columnId && `data-column-id="${columnId}"`,
+        group && `data-group="${group}"`,
+        scope && `data-scope="${scope}"`
+    ].filter(Boolean).join(' ');
+
+    return `<div class="${baseClass} has-submenu" ${dataAttrs}>${escapeHtmlForMenuItem(label)}</div>`;
+}
+
+/**
+ * Create a menu divider
+ * @param {string} [menuType='donut'] - Menu type: 'donut' or 'file-bar'
+ * @returns {string} - Divider HTML
+ */
+function createMenuDivider(menuType = 'donut') {
+    const dividerClass = menuType === 'file-bar' ? 'file-bar-menu-divider' : 'donut-menu-divider';
+    return `<div class="${dividerClass}"></div>`;
+}
+
+/**
+ * Create multiple menu items from an array of configurations
+ * @param {Array<Object|'divider'>} items - Array of item configs or 'divider' strings
+ * @param {string} [menuType='donut'] - Menu type: 'donut' or 'file-bar'
+ * @returns {string} - Combined HTML for all items
+ */
+function createMenuItems(items, menuType = 'donut') {
+    return items.map(item => {
+        if (item === 'divider') {
+            return createMenuDivider(menuType);
+        }
+        if (item.submenuType) {
+            return createSubmenuItem({ ...item, menuType });
+        }
+        return createMenuItem({ ...item, menuType });
+    }).join('\n');
+}
+
+/**
+ * Create a move position submenu content (Top, Up, Down, Bottom)
+ * @param {string} taskId - Task ID
+ * @param {string} columnId - Column ID
+ * @returns {string} - Move menu HTML
+ */
+function createMoveMenuContent(taskId, columnId) {
+    return createMenuItems([
+        { label: 'Top', onClick: `moveTaskToTop('${taskId}', '${columnId}')` },
+        { label: 'Up', onClick: `moveTaskUp('${taskId}', '${columnId}')` },
+        { label: 'Down', onClick: `moveTaskDown('${taskId}', '${columnId}')` },
+        { label: 'Bottom', onClick: `moveTaskToBottom('${taskId}', '${columnId}')` }
+    ]);
+}
+
+/**
+ * Create a move-to-column submenu content
+ * @param {string} taskId - Task ID
+ * @param {string} currentColumnId - Current column ID (will be excluded)
+ * @returns {string} - Move to column menu HTML
+ */
+function createMoveToColumnMenuContent(taskId, currentColumnId) {
+    const board = (typeof window !== 'undefined') ? window.cachedBoard : null;
+    if (!board?.columns) return '';
+
+    const items = board.columns
+        .filter(col => col.id !== currentColumnId)
+        .map(col => ({
+            label: col.title || 'Untitled',
+            onClick: `moveTaskToColumn('${taskId}', '${currentColumnId}', '${col.id}')`
+        }));
+
+    return createMenuItems(items);
+}
+
+/**
+ * Create sort submenu content
+ * @param {string} columnId - Column ID
+ * @returns {string} - Sort menu HTML
+ */
+function createSortMenuContent(columnId) {
+    return createMenuItems([
+        { label: 'Unsorted', onClick: `sortColumn('${columnId}', 'unsorted')` },
+        { label: 'Sort by title', onClick: `sortColumn('${columnId}', 'title')` },
+        { label: 'Sort by index (#)', onClick: `sortColumn('${columnId}', 'numericTag')` }
+    ]);
+}
+
 // Create menuUtils object
 const menuUtils = {
     shouldExecute,
@@ -465,7 +640,16 @@ const menuUtils = {
     postEditMessage,
     // Dropdown positioning utilities
     positionDropdownMenu,
-    restoreDropdownPosition
+    restoreDropdownPosition,
+    // Menu item template factory
+    escapeHtmlForMenuItem,
+    createMenuItem,
+    createSubmenuItem,
+    createMenuDivider,
+    createMenuItems,
+    createMoveMenuContent,
+    createMoveToColumnMenuContent,
+    createSortMenuContent
 };
 
 // Global window exposure

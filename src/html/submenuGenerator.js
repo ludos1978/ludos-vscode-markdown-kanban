@@ -95,6 +95,11 @@ class SubmenuGenerator {
 
     // Create move content
     createMoveContent(taskId, columnId) {
+        // Use menu item factory from menuUtils
+        if (window.menuUtils?.createMoveMenuContent) {
+            return window.menuUtils.createMoveMenuContent(taskId, columnId);
+        }
+        // Fallback if menuUtils not loaded
         return `
             <button class="donut-menu-item" onclick="moveTaskToTop('${taskId}', '${columnId}')">Top</button>
             <button class="donut-menu-item" onclick="moveTaskUp('${taskId}', '${columnId}')">Up</button>
@@ -105,17 +110,27 @@ class SubmenuGenerator {
 
     // Create move to list content
     createMoveToListContent(taskId, columnId) {
+        // Use menu item factory from menuUtils
+        if (window.menuUtils?.createMoveToColumnMenuContent) {
+            return window.menuUtils.createMoveToColumnMenuContent(taskId, columnId);
+        }
+        // Fallback if menuUtils not loaded
         const currentBoard = window.cachedBoard;
         if (!currentBoard || !currentBoard.columns) {return '';}
-        
-        return currentBoard.columns.map(col => 
-            col.id !== columnId ? 
+
+        return currentBoard.columns.map(col =>
+            col.id !== columnId ?
             `<button class="donut-menu-item" onclick="moveTaskToColumn('${taskId}', '${columnId}', '${col.id}')">${window.escapeHtml ? window.escapeHtml(col.title || 'Untitled') : col.title || 'Untitled'}</button>` : ''
         ).join('');
     }
 
     // Create sort content
     createSortContent(columnId) {
+        // Use menu item factory from menuUtils
+        if (window.menuUtils?.createSortMenuContent) {
+            return window.menuUtils.createSortMenuContent(columnId);
+        }
+        // Fallback if menuUtils not loaded
         return `
             <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'unsorted')">Unsorted</button>
             <button class="donut-menu-item" onclick="sortColumn('${columnId}', 'title')">Sort by title</button>

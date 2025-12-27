@@ -10,7 +10,7 @@
  * @module commands/DiagramCommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage, MessageHandler } from './interfaces';
 import {
     RenderPlantUMLMessage,
     ConvertPlantUMLToSVGMessage,
@@ -29,8 +29,9 @@ import * as fs from 'fs';
  * Diagram Commands Handler
  *
  * Processes diagram rendering messages from the webview.
+ * Uses SwitchBasedCommand for automatic dispatch and error handling.
  */
-export class DiagramCommands extends BaseMessageCommand {
+export class DiagramCommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'diagram-commands',
         name: 'Diagram Commands',
@@ -49,54 +50,49 @@ export class DiagramCommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'renderPlantUML':
-                    await this.handleRenderPlantUML(message, context);
-                    return this.success();
-
-                case 'convertPlantUMLToSVG':
-                    await this.handleConvertPlantUMLToSVG(message, context);
-                    return this.success();
-
-                case 'convertMermaidToSVG':
-                    await this.handleConvertMermaidToSVG(message, context);
-                    return this.success();
-
-                case 'mermaidExportSuccess':
-                    context.getMermaidExportService().handleRenderSuccess(message.requestId, message.svg);
-                    return this.success();
-
-                case 'mermaidExportError':
-                    context.getMermaidExportService().handleRenderError(message.requestId, message.error);
-                    return this.success();
-
-                case 'requestDrawIORender':
-                    await this.handleRenderDrawIO(message, context);
-                    return this.success();
-
-                case 'requestExcalidrawRender':
-                    await this.handleRenderExcalidraw(message, context);
-                    return this.success();
-
-                case 'requestPDFPageRender':
-                    await this.handleRenderPDFPage(message, context);
-                    return this.success();
-
-                case 'requestPDFInfo':
-                    await this.handleGetPDFInfo(message, context);
-                    return this.success();
-
-                default:
-                    return this.failure(`Unknown diagram command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[DiagramCommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
+    /**
+     * Handler mapping for message dispatch
+     */
+    protected handlers: Record<string, MessageHandler> = {
+        'renderPlantUML': async (msg, ctx) => {
+            await this.handleRenderPlantUML(msg as RenderPlantUMLMessage, ctx);
+            return this.success();
+        },
+        'convertPlantUMLToSVG': async (msg, ctx) => {
+            await this.handleConvertPlantUMLToSVG(msg as ConvertPlantUMLToSVGMessage, ctx);
+            return this.success();
+        },
+        'convertMermaidToSVG': async (msg, ctx) => {
+            await this.handleConvertMermaidToSVG(msg as ConvertMermaidToSVGMessage, ctx);
+            return this.success();
+        },
+        'mermaidExportSuccess': (msg, ctx) => {
+            const m = msg as { requestId: string; svg: string };
+            ctx.getMermaidExportService().handleRenderSuccess(m.requestId, m.svg);
+            return Promise.resolve(this.success());
+        },
+        'mermaidExportError': (msg, ctx) => {
+            const m = msg as { requestId: string; error: string };
+            ctx.getMermaidExportService().handleRenderError(m.requestId, m.error);
+            return Promise.resolve(this.success());
+        },
+        'requestDrawIORender': async (msg, ctx) => {
+            await this.handleRenderDrawIO(msg as RequestDrawIORenderMessage, ctx);
+            return this.success();
+        },
+        'requestExcalidrawRender': async (msg, ctx) => {
+            await this.handleRenderExcalidraw(msg as RequestExcalidrawRenderMessage, ctx);
+            return this.success();
+        },
+        'requestPDFPageRender': async (msg, ctx) => {
+            await this.handleRenderPDFPage(msg as RequestPDFPageRenderMessage, ctx);
+            return this.success();
+        },
+        'requestPDFInfo': async (msg, ctx) => {
+            await this.handleGetPDFInfo(msg as RequestPDFInfoMessage, ctx);
+            return this.success();
         }
-    }
+    };
 
     // ============= PLANTUML HANDLERS =============
 
