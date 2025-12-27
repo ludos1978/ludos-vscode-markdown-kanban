@@ -101,6 +101,160 @@ body {
   cursor: not-allowed;
 }
 
+/* ============================================
+   BUTTON BASE CLASSES
+   Composable button utilities to reduce duplication
+   ============================================ */
+
+/* Base button reset and common properties */
+.btn-base {
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Size variants */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  min-height: 24px;
+}
+
+.btn-md {
+  padding: 6px 12px;
+  font-size: 13px;
+  min-height: 28px;
+}
+
+.btn-lg {
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 32px;
+}
+
+/* Icon-only button (square aspect) */
+.btn-icon {
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+/* Color variants - Primary (action) */
+.btn-variant-primary {
+  background: var(--button-background);
+  color: var(--button-foreground);
+  border: var(--button-border);
+}
+
+.btn-variant-primary:hover:not(:disabled) {
+  background: var(--button-background-hover);
+}
+
+/* Color variants - Secondary (cancel, close) */
+.btn-variant-secondary {
+  background: var(--button-secondary-background);
+  color: var(--button-secondary-foreground);
+  border: var(--button-secondary-border);
+}
+
+.btn-variant-secondary:hover:not(:disabled) {
+  background: var(--button-secondary-background-hover);
+}
+
+/* Color variants - Ghost (transparent) */
+.btn-variant-ghost {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+}
+
+.btn-variant-ghost:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+/* Color variants - Danger (destructive actions) */
+.btn-variant-danger {
+  background: var(--vscode-inputValidation-errorBackground);
+  color: var(--vscode-inputValidation-errorForeground, white);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+.btn-variant-danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Color variants - Success (confirm actions) */
+.btn-variant-success {
+  background: var(--vscode-gitDecoration-addedResourceForeground);
+  color: white;
+  border: none;
+}
+
+.btn-variant-success:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   Common reusable patterns
+   ============================================ */
+
+/* Flexbox utilities */
+.flex { display: flex; }
+.flex-inline { display: inline-flex; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+
+/* Gap utilities */
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+
+/* Transition utilities */
+.transition-smooth {
+  transition: all 0.15s ease;
+}
+
+.transition-colors {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Text utilities */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.font-bold { font-weight: bold; }
+.font-medium { font-weight: 500; }
+
+/* Visibility */
+.invisible { visibility: hidden; }
+.pointer-events-none { pointer-events: none; }
+
 .file-info-content {
   display: grid;
   /* Left: flexible but prefers natural size, Center: flexible with min width to prevent sudden collapse, Right: auto (natural size) */

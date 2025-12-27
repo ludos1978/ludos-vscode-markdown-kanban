@@ -11,7 +11,7 @@
  * @module commands/UICommands
  */
 
-import { BaseMessageCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage } from './interfaces';
+import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, IncomingMessage, MessageHandler } from './interfaces';
 import {
     SaveBoardStateMessage,
     ShowMessageRequestMessage,
@@ -22,7 +22,6 @@ import {
     UpdateTaskContentExtendedMessage,
     UpdateColumnContentExtendedMessage
 } from '../core/bridge/MessageTypes';
-import { getErrorMessage } from '../utils/stringUtils';
 import { ResolvedTarget } from '../core/stores/BoardStore';
 import { KanbanBoard } from '../markdownParser';
 import * as vscode from 'vscode';
@@ -31,8 +30,9 @@ import * as vscode from 'vscode';
  * UI Commands Handler
  *
  * Processes UI-related messages from the webview.
+ * Uses SwitchBasedCommand for automatic dispatch and error handling.
  */
-export class UICommands extends BaseMessageCommand {
+export class UICommands extends SwitchBasedCommand {
     readonly metadata: CommandMetadata = {
         id: 'ui-commands',
         name: 'UI Commands',
@@ -52,38 +52,22 @@ export class UICommands extends BaseMessageCommand {
         priority: 100
     };
 
-    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
-        try {
-            switch (message.type) {
-                case 'undo':
-                    return await this.handleUndo(context);
-                case 'redo':
-                    return await this.handleRedo(context);
-                case 'requestBoardUpdate':
-                    return await this.handleRequestBoardUpdate(context);
-                case 'saveBoardState':
-                    return await this.handleSaveBoardState(message, context);
-                case 'showMessage':
-                    return await this.handleShowMessage(message, context);
-                case 'showError':
-                    return await this.handleShowError(message);
-                case 'showInfo':
-                    return await this.handleShowInfo(message);
-                case 'setPreference':
-                    return await this.handleSetPreference(message);
-                case 'setContext':
-                    return await this.handleSetContext(message);
-                case 'requestConfigurationRefresh':
-                    return await this.handleRequestConfigurationRefresh(context);
-                default:
-                    return this.failure(`Unknown UI command: ${message.type}`);
-            }
-        } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            console.error(`[UICommands] Error handling ${message.type}:`, error);
-            return this.failure(errorMessage);
-        }
-    }
+    /**
+     * Handler mapping for message dispatch
+     * Type assertions used for specific message types
+     */
+    protected handlers: Record<string, MessageHandler> = {
+        'undo': (_msg, ctx) => this.handleUndo(ctx),
+        'redo': (_msg, ctx) => this.handleRedo(ctx),
+        'requestBoardUpdate': (_msg, ctx) => this.handleRequestBoardUpdate(ctx),
+        'saveBoardState': (msg, ctx) => this.handleSaveBoardState(msg as SaveBoardStateMessage, ctx),
+        'showMessage': (msg, ctx) => this.handleShowMessage(msg as ShowMessageRequestMessage, ctx),
+        'showError': (msg, _ctx) => this.handleShowError(msg as ShowErrorMessage),
+        'showInfo': (msg, _ctx) => this.handleShowInfo(msg as ShowInfoMessage),
+        'setPreference': (msg, _ctx) => this.handleSetPreference(msg as SetPreferenceMessage),
+        'setContext': (msg, _ctx) => this.handleSetContext(msg as SetContextMessage),
+        'requestConfigurationRefresh': (_msg, ctx) => this.handleRequestConfigurationRefresh(ctx)
+    };
 
     // ============= UI HANDLERS =============
 

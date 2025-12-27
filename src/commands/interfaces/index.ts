@@ -6,6 +6,8 @@
 export {
     MessageCommand,
     BaseMessageCommand,
+    SwitchBasedCommand,
+    MessageHandler,
     // Main context (composed of sub-interfaces)
     CommandContext,
     // Focused sub-interfaces for type narrowing
