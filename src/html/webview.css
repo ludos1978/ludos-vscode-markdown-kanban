@@ -1,8 +1,6 @@
 :root {
   --whitespace: 4px;
-  --whitespate-neg: calc(-1 * var(--whitespace));
   --whitespace-mul2: calc(var(--whitespace) * 2);
-  --whitespace-div3-mul2: calc(var(--whitespace) / 3 * 2);
   --whitespace-div2: calc(var(--whitespace) / 2);
   --whitespace-div4: calc(var(--whitespace) / 4);
   --task-height: auto;
@@ -11,22 +9,18 @@
   --column-width: 350px;
   --collapsed-column-width: 40px;
 
-  /* Task and section highlight colors - easily configurable */
+  /* Task and section highlight colors */
   --task-focus-color: gray;
-  --task-hover-color: var(--vscode-focusBorder);
   --section-focus-color: gray;
 
-  /* Week tag highlighting - configurable */
+  /* Week tag highlighting */
   --current-week-highlight-color: #ff0000;
-  --current-week-highlight-style: border; /* Options: border, background, glow */
   --current-week-border-width: 3px;
   --current-week-border-style: solid;
   --current-week-glow-size: 0 0 10px;
 
-  
-  /* --board-background: var(--vscode-titleBar-activeBackground); */
   --board-background: var(--vscode-editor-background);
-  --column-background: var(--vscode-editor-background); /* must be a color othervise the sticky headers are transparent */
+  --column-background: var(--vscode-editor-background);
   --task-background: var(--vscode-editor-background);
 
   /* Primary Button Styles */
@@ -35,7 +29,6 @@
   --button-border: 1px solid var(--vscode-button-border, transparent);
   --button-background-hover: var(--vscode-button-hoverBackground);
   --button-foreground-hover: var(--vscode-button-foreground);
-  --button-border-hover: 1px solid var(--vscode-button-border, transparent);
   --button-background-active: var(--vscode-button-background);
   --button-foreground-active: var(--vscode-button-foreground);
   --button-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
@@ -45,11 +38,6 @@
   --button-secondary-foreground: var(--vscode-button-secondaryForeground);
   --button-secondary-border: 1px solid var(--vscode-button-border, transparent);
   --button-secondary-background-hover: var(--vscode-button-secondaryHoverBackground);
-  --button-secondary-foreground-hover: var(--vscode-button-secondaryForeground);
-  --button-secondary-border-hover: 1px solid var(--vscode-button-border, transparent);
-  --button-secondary-background-active: var(--vscode-button-secondaryBackground);
-  --button-secondary-foreground-active: var(--vscode-button-secondaryForeground);
-  --button-secondary-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 
   /* Alternative Button Styles (for drag handles and card sources) */
   --button-alternative-background: var(--vscode-button-secondaryBackground);
