@@ -23,11 +23,12 @@
  * Centralized cleanup to avoid code duplication across menu operations
  */
 function closeAllPathMenus() {
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible, .video-not-found-menu.visible').forEach(menu => {
         menu.classList.remove('visible');
     });
     document.getElementById('floating-image-path-menu')?.remove();
     document.getElementById('floating-include-path-menu')?.remove();
+    document.getElementById('floating-video-path-menu')?.remove();
 }
 
 // ============================================================================
@@ -149,6 +150,29 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     if (isColumnTitle === 'true') message.isColumnTitle = true;
 
     vscode.postMessage(message);
+}
+
+/**
+ * Search for an include file (column or task include)
+ * Wrapper that extracts DOM context and calls searchForFile
+ * @param {HTMLElement} buttonElement - The button element that was clicked
+ * @param {string} filePath - The file path to search for
+ * @param {string} isColumnTitle - 'true' if this is a column include, 'false' for task include
+ */
+function searchForIncludeFile(buttonElement, filePath, isColumnTitle) {
+    // Extract columnId from closest column element
+    const columnEl = buttonElement.closest('.kanban-full-height-column') ||
+                     buttonElement.closest('[data-column-id]');
+    const columnId = columnEl?.getAttribute('data-column-id') || columnEl?.id;
+
+    // Extract taskId from closest task element (only for task includes)
+    let taskId = null;
+    if (isColumnTitle !== 'true') {
+        const taskEl = buttonElement.closest('.task-item');
+        taskId = taskEl?.getAttribute('data-task-id');
+    }
+
+    searchForFile(filePath, taskId, columnId, isColumnTitle);
 }
 
 /**
@@ -587,6 +611,191 @@ function upgradeAllSimpleImageNotFoundPlaceholders() {
 }
 
 // ============================================================================
+// BROKEN VIDEO HANDLING
+// ============================================================================
+
+/**
+ * Handle video not found - replace broken video with a placeholder that has a burger menu
+ * Called from video onerror handlers
+ */
+function handleVideoNotFound(videoElement, originalSrc) {
+    if (!videoElement || !videoElement.parentElement) {
+        console.warn('[handleVideoNotFound] No videoElement or parent');
+        return;
+    }
+
+    // Check if already handled (prevent double processing)
+    if (videoElement.dataset.handled === 'true') {
+        return;
+    }
+    videoElement.dataset.handled = 'true';
+
+    // Check if the video is inside an existing video-path-overlay-container
+    const existingOverlay = videoElement.closest('.video-path-overlay-container');
+    if (existingOverlay) {
+        // Mark container as broken so menu is always visible
+        existingOverlay.classList.add('video-broken');
+
+        // Create a placeholder span for the video
+        const shortPath = getShortDisplayPath(originalSrc);
+        const placeholder = document.createElement('span');
+        placeholder.className = 'video-not-found';
+        placeholder.dataset.originalSrc = originalSrc;
+        placeholder.title = `Video not found: ${originalSrc}`;
+        placeholder.innerHTML = `<span class="video-not-found-text">🎬 ${shortPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
+
+        // Insert placeholder before the video and hide the video
+        videoElement.parentElement.insertBefore(placeholder, videoElement);
+        videoElement.style.display = 'none';
+        return;
+    }
+
+    // Standalone video - create full container with menu
+    const htmlEscapedPath = originalSrc.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const shortPath = getShortDisplayPath(originalSrc);
+    const htmlEscapedShortPath = shortPath.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
+
+    // Create container with burger menu
+    const container = document.createElement('div');
+    container.className = 'video-not-found-container video-broken';
+    container.dataset.videoPath = originalSrc;
+
+    container.innerHTML = `
+        <span class="video-not-found" data-original-src="${htmlEscapedPath}" title="Video not found: ${htmlEscapedPath}">
+            <span class="video-not-found-text">🎬 ${htmlEscapedShortPath}</span>
+            <button class="video-menu-btn" data-action="toggle-menu" title="Path options">☰</button>
+        </span>
+        <div class="video-not-found-menu" data-is-absolute="${isAbsolutePath}">
+            <button class="video-path-menu-item disabled" disabled>📄 Open</button>
+            <button class="video-path-menu-item" data-action="reveal">🔍 Reveal in File Explorer</button>
+            <button class="video-path-menu-item" data-action="search">🔎 Search for File</button>
+            <button class="video-path-menu-item" data-action="browse">📂 Browse for File</button>
+            <div class="video-path-menu-divider"></div>
+            <button class="video-path-menu-item${isAbsolutePath ? '' : ' disabled'}" data-action="to-relative" ${isAbsolutePath ? '' : 'disabled'}>📁 Convert to Relative</button>
+            <button class="video-path-menu-item${isAbsolutePath ? ' disabled' : ''}" data-action="to-absolute" ${isAbsolutePath ? 'disabled' : ''}>📂 Convert to Absolute</button>
+            <div class="video-path-menu-divider"></div>
+            <button class="video-path-menu-item" data-action="delete">🗑️ Delete</button>
+        </div>
+    `;
+
+    videoElement.parentElement.insertBefore(container, videoElement);
+    videoElement.style.display = 'none';
+}
+
+/**
+ * Toggle the video path menu visibility
+ * Creates menu dynamically and appends to body to avoid stacking context issues
+ * Mirrors the approach used by toggleImagePathMenu for consistency
+ */
+function toggleVideoPathMenu(container, videoPath) {
+    // Close any existing floating menus and other open menus
+    closeAllPathMenus();
+
+    // Get button position for menu placement
+    const button = container.querySelector('.video-menu-btn');
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    const isAbsolutePath = videoPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(videoPath);
+    const escapedPath = videoPath.replace(/'/g, "\\'").replace(/"/g, '\\"');
+
+    // Find task/column context for targeted updates
+    const taskElement = container.closest('.task-item');
+    const columnElement = container.closest('.kanban-full-height-column') || container.closest('[data-column-id]');
+    const columnTitleElement = container.closest('.column-title');
+    const taskId = taskElement?.dataset?.taskId || '';
+    const columnId = columnElement?.dataset?.columnId || '';
+    // Detect if video is in column title (not in a task)
+    const isColumnTitle = !taskElement && columnTitleElement ? 'true' : '';
+
+    // Check if the video is broken
+    const isBroken = container.classList.contains('video-broken');
+
+    // Create floating menu - use image-path-menu class for consistent styling
+    const menu = document.createElement('div');
+    menu.id = 'floating-video-path-menu';
+    menu.className = 'image-path-menu visible';
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 2) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '999999';
+    menu.dataset.videoPath = videoPath;
+
+    if (isBroken) {
+        // Menu for broken videos - Open disabled, Search/Browse enabled
+        menu.innerHTML = `
+            <button class="image-path-menu-item disabled" disabled>📄 Open</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); searchForFile('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">🔎 Search for File</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); browseForImage('${escapedPath}', '${taskId}', '${columnId}', '${isColumnTitle}')">📂 Browse for File</button>
+            <div class="image-path-menu-divider"></div>
+            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
+            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
+            <div class="image-path-menu-divider"></div>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
+        `;
+    } else {
+        // Menu for valid videos - Open enabled, Search/Browse disabled
+        menu.innerHTML = `
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); openPath('${escapedPath}')">📄 Open</button>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); revealPathInExplorer('${escapedPath}')">🔍 Reveal in File Explorer</button>
+            <button class="image-path-menu-item disabled" disabled>🔎 Search for File</button>
+            <button class="image-path-menu-item disabled" disabled>📂 Browse for File</button>
+            <div class="image-path-menu-divider"></div>
+            <button class="image-path-menu-item${isAbsolutePath ? '' : ' disabled'}" ${isAbsolutePath ? `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'relative', true)"` : 'disabled'}>📁 Convert to Relative</button>
+            <button class="image-path-menu-item${isAbsolutePath ? ' disabled' : ''}" ${isAbsolutePath ? 'disabled' : `onclick="event.stopPropagation(); convertSinglePath('${escapedPath}', 'absolute', true)"`}>📂 Convert to Absolute</button>
+            <div class="image-path-menu-divider"></div>
+            <button class="image-path-menu-item" onclick="event.stopPropagation(); deleteFromMarkdown('${escapedPath}')">🗑️ Delete</button>
+        `;
+    }
+
+    document.body.appendChild(menu);
+
+    // Adjust position if menu goes off screen
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+        menu.style.left = (window.innerWidth - menuRect.width - 10) + 'px';
+    }
+    if (menuRect.bottom > window.innerHeight) {
+        menu.style.top = (rect.top - menuRect.height - 2) + 'px';
+    }
+
+    // Close menu when clicking outside
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !container.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+}
+
+/**
+ * Toggle the video-not-found menu visibility
+ */
+function toggleVideoNotFoundMenu(container) {
+    // Close any other open menus except this container's own menu
+    closeAllPathMenus();
+
+    const menu = container.querySelector('.video-not-found-menu');
+    if (menu) {
+        menu.classList.toggle('visible');
+
+        // Close menu when clicking outside
+        if (menu.classList.contains('visible')) {
+            const closeHandler = (e) => {
+                if (!container.contains(e.target)) {
+                    menu.classList.remove('visible');
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+    }
+}
+
+// ============================================================================
 // DOM PATH UPDATES
 // ============================================================================
 
@@ -800,6 +1009,7 @@ window.openPath = openPath;
 window.revealPathInExplorer = revealPathInExplorer;
 window.getShortDisplayPath = getShortDisplayPath;
 window.searchForFile = searchForFile;
+window.searchForIncludeFile = searchForIncludeFile;
 window.browseForImage = browseForImage;
 window.deleteFromMarkdown = deleteFromMarkdown;
 
@@ -807,9 +1017,14 @@ window.deleteFromMarkdown = deleteFromMarkdown;
 window.toggleImagePathMenu = toggleImagePathMenu;
 window.toggleIncludePathMenu = toggleIncludePathMenu;
 window.toggleImageNotFoundMenu = toggleImageNotFoundMenu;
+window.toggleVideoPathMenu = toggleVideoPathMenu;
+window.toggleVideoNotFoundMenu = toggleVideoNotFoundMenu;
 
 // Broken image handling
 window.handleImageNotFound = handleImageNotFound;
+
+// Broken video handling
+window.handleVideoNotFound = handleVideoNotFound;
 window.upgradeSimpleImageNotFoundPlaceholder = upgradeSimpleImageNotFoundPlaceholder;
 window.upgradeImageOverlayToBroken = upgradeImageOverlayToBroken;
 window.upgradeAllSimpleImageNotFoundPlaceholders = upgradeAllSimpleImageNotFoundPlaceholders;

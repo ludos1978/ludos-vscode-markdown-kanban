@@ -1764,20 +1764,50 @@ function renderMarkdown(text, includeContext) {
         md.renderer.rules.video = function(tokens, idx, options, env, renderer) {
             const token = tokens[idx];
 
-            // Process source children to dynamically resolve paths
+            // Get original source path before processing
+            let originalSrc = '';
             if (token.children) {
                 token.children.forEach(child => {
                     if (child.type === 'source' && child.attrGet) {
-                        const originalSrc = child.attrGet('src');
-                        if (originalSrc) {
-                            const displaySrc = resolveMediaPath(originalSrc);
+                        const src = child.attrGet('src');
+                        if (src && !originalSrc) {
+                            originalSrc = src; // Keep first source as original
+                            const displaySrc = resolveMediaPath(src);
+                            child.attrSet('src', displaySrc);
+                        } else if (src) {
+                            const displaySrc = resolveMediaPath(src);
                             child.attrSet('src', displaySrc);
                         }
                     }
                 });
             }
 
-            return originalVideoRenderer ? originalVideoRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
+            // Generate the base video HTML
+            const videoHtml = originalVideoRenderer ? originalVideoRenderer(tokens, idx, options, env, renderer) : renderer.renderToken(tokens, idx);
+
+            // Skip wrapping for data URLs and blob URLs
+            if (!originalSrc || originalSrc.startsWith('data:') || originalSrc.startsWith('blob:')) {
+                return videoHtml;
+            }
+
+            // Escape the path for use in onclick handlers and error handler
+            const escapedPath = originalSrc.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+            const escapedOriginalSrc = escapeHtml(originalSrc).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/`/g, '\\`');
+
+            // Determine if path is absolute
+            const isAbsolutePath = originalSrc.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(originalSrc);
+
+            // Inject error handler into video element - handles both source errors and video errors
+            const videoWithError = videoHtml.replace(
+                /<video([^>]*)>/,
+                `<video$1 data-original-src="${escapeHtml(originalSrc)}" onerror="if(typeof handleVideoNotFound==='function'){handleVideoNotFound(this,'${escapedOriginalSrc}');}">`
+            );
+
+            // Wrap with overlay container for path conversion menu (similar to images)
+            return `<div class="video-path-overlay-container" data-original-src="${escapeHtml(originalSrc)}">
+                ${videoWithError}
+                <button class="video-menu-btn" onclick="event.stopPropagation(); toggleVideoPathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
+            </div>`;
         };
 
         md.renderer.rules.audio = function(tokens, idx, options, env, renderer) {

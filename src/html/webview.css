@@ -1224,6 +1224,151 @@ body.small-card-fonts .task-title-container .markdown-content img {
   cursor: pointer;
 }
 
+/* ============================================================================
+   VIDEO NOT FOUND STYLES
+   ============================================================================ */
+
+/* Video path overlay container */
+.video-path-overlay-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Video menu button - similar to image menu button */
+.video-path-overlay-container .video-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-path-overlay-container:hover .video-menu-btn {
+  opacity: 1;
+}
+
+.video-path-overlay-container .video-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* BROKEN STATE: Always show menu button on broken videos */
+.video-path-overlay-container.video-broken .video-menu-btn {
+  opacity: 1 !important;
+}
+
+/* Video not found container with burger menu */
+.video-not-found-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Video not found placeholder */
+.video-not-found {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 204, 0, 0.2));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+  border-radius: 4px;
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
+  font-size: 0.9em;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.video-not-found-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* Burger menu button inside the video-not-found box - always visible */
+.video-not-found .video-menu-btn {
+  position: static !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin-left: 6px;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: none !important;
+  border-radius: 3px !important;
+  color: white !important;
+  font-size: 11px !important;
+  cursor: pointer;
+  opacity: 1 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.video-not-found .video-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+.video-not-found-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+  pointer-events: auto;
+}
+
+.video-not-found-menu.visible {
+  display: block;
+}
+
+.video-not-found-menu .video-path-menu-item,
+.video-path-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-menu-foreground, #cccccc);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.video-path-menu-item:hover:not(.disabled):not(:disabled) {
+  background: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.video-path-menu-item.disabled,
+.video-path-menu-item:disabled {
+  color: var(--vscode-disabledForeground, #6e6e6e);
+  cursor: not-allowed;
+}
+
+.video-path-menu-divider {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, #454545);
+  margin: 4px 0;
+}
+
 /* Tasks container must allow the children to be overflow visible! */
 .tasks-container {
   overflow: visible;
@@ -3630,6 +3775,11 @@ blockquote {
   background: rgba(0, 0, 0, 0.8);
 }
 
+/* BROKEN STATE: Always show menu button on broken images */
+.image-path-overlay-container.image-broken .image-menu-btn {
+  opacity: 1 !important;
+}
+
 /* ============================================================================
    RESOURCE PATH MENUS - Consolidated styles for image/include path menus
    ============================================================================ */
@@ -3738,6 +3888,14 @@ blockquote {
 
 .include-path-overlay-container .include-menu-btn:hover {
   background: rgba(0, 0, 0, 0.7);
+}
+
+/* BROKEN STATE: Always show menu button on broken includes */
+/* Handles includes inside error containers and broken include link styling */
+.include-error .include-path-overlay-container .include-menu-btn,
+.include-container.include-error .include-path-overlay-container .include-menu-btn,
+.include-path-overlay-container.include-broken .include-menu-btn {
+  opacity: 1 !important;
 }
 
 .markdown-content a[href$=".pdf"],
