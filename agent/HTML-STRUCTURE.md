@@ -9,6 +9,11 @@ This document provides a comprehensive hierarchy of the HTML structure used in t
 4. [Component Details](#component-details)
 5. [CSS Class Reference](#css-class-reference)
 6. [Data Attributes Reference](#data-attributes-reference)
+7. [CSS Variables Reference](#css-variables-reference)
+8. [Z-Index Hierarchy](#z-index-hierarchy)
+9. [CSS Selector Patterns](#css-selector-patterns)
+10. [Stack Layout System](#stack-layout-system)
+11. [CSS Simplification Opportunities](#css-simplification-opportunities)
 
 ---
 
@@ -33,17 +38,25 @@ This document provides a comprehensive hierarchy of the HTML structure used in t
     └── #path-context-menu (.context-menu)        [CONTEXT MENU]
 ```
 
+### Key Layout Modes
+
+| Mode | Class | Description |
+|------|-------|-------------|
+| Single Row | `.kanban-board` (default) | Horizontal flex, columns side-by-side |
+| Multi Row | `.kanban-board.multi-row` | Vertical flex with `.kanban-row` children |
+| Column Stack | `.kanban-column-stack` | Grid overlay for stacked columns |
+
 ---
 
 ## Static Elements
 
 ### 1. File Info Bar (`#file-info-bar`)
 
-The top navigation bar with file info and controls.
+The top navigation bar with file info and controls. Uses CSS container queries for responsive behavior.
 
 ```
 .file-info-bar
-└── .file-info-content
+└── .file-info-content                          # Grid: 3 columns
     ├── .file-info-left
     │   ├── .file-icon
     │   ├── #file-name (.file-name)
@@ -88,6 +101,19 @@ The top navigation bar with file info and controls.
                 ├── .file-bar-menu-divider
                 └── .file-bar-menu-item.has-submenu
                     └── .file-bar-menu-submenu [data-menu="..."]
+```
+
+#### File Info Bar Responsive Breakpoints
+
+```css
+/* Container Query Support */
+container-type: inline-size;
+container-name: file-info-bar;
+
+@container file-info-bar (max-width: 1000px) { /* Hide text labels */ }
+@container file-info-bar (max-width: 700px)  { /* Compact mode */ }
+@container file-info-bar (max-width: 500px)  { /* Hide marp menu */ }
+@container file-info-bar (max-width: 350px)  { /* Hide center section */ }
 ```
 
 ### 2. Search Panel (`#search-panel`)
@@ -193,37 +219,67 @@ The board content is generated dynamically by `boardRenderer.js`.
     │           ├── .initialize-message
     │           └── .initialise-btn
     │
-    └── [MULTI-ROW LAYOUT - when columns exist]
-        ├── .kanban-row [data-row-number="1"]
-        │   ├── .kanban-column-stack.column-drop-zone-stack (left edge)
-        │   │   └── .column-drop-zone.column-drop-zone-left
-        │   ├── .kanban-column-stack
-        │   │   ├── .kanban-full-height-column [data-column-id="..."]
-        │   │   └── .kanban-full-height-column (stacked columns)
-        │   ├── .kanban-column-stack.column-drop-zone-stack (between)
-        │   │   └── .column-drop-zone.column-drop-zone-right
-        │   ├── .kanban-column-stack
-        │   │   └── .kanban-full-height-column
-        │   ├── .add-column-btn.multi-row-add-btn
-        │   └── .row-drop-zone-spacer
-        │
-        └── .kanban-row [data-row-number="2"]
-            └── ... (same structure)
+    ├── [SINGLE-ROW LAYOUT - default]
+    │   ├── .column-drop-zone-stack
+    │   │   └── .column-drop-zone
+    │   ├── .kanban-column-stack (or .kanban-full-height-column)
+    │   └── ...
+    │
+    └── [MULTI-ROW LAYOUT - with rows]
+        └── .kanban-row [data-row-number="1"]
+            ├── .kanban-row-header              # Sticky left label
+            ├── .column-drop-zone-stack (left edge)
+            │   └── .column-drop-zone.column-drop-zone-left
+            ├── .kanban-column-stack
+            │   ├── .kanban-full-height-column [data-column-id="..."]
+            │   └── .kanban-full-height-column (stacked columns)
+            ├── .column-drop-zone-stack (between)
+            │   └── .column-drop-zone.column-drop-zone-right
+            ├── .add-column-btn.multi-row-add-btn
+            └── .row-drop-zone-spacer
+```
+
+### Board CSS Properties
+
+```css
+.kanban-board {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  align-items: flex-start;
+}
+
+.kanban-board:not(:has(.kanban-row)) {
+  gap: var(--whitespace);
+  padding-left: var(--whitespace);
+  padding-right: var(--whitespace);
+}
+
+.kanban-board.multi-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
 ```
 
 ### Column Structure
 
 ```
 .kanban-full-height-column [data-column-id="..."]
-│   Classes: .collapsed, .has-marp-header-*, .has-marp-footer-*, .span-*
+│   Classes: .collapsed, .collapsed-vertical, .collapsed-horizontal,
+│            .column-span-2/3/4, .has-header-bar, .has-footer-bar, etc.
 │
-├── .column-offset                              [STICKY OFFSET]
-├── .column-margin                              [STICKY MARGIN TOP]
-├── .column-header                              [STICKY HEADER]
+├── .column-offset                              [STICKY OFFSET - margin-top set by JS]
+├── .column-margin                              [STICKY MARGIN TOP - drop zone in stacks]
+├── .column-header                              [STICKY HEADER - header bars container]
+│   └── [header bars - dynamic]                 .header-bar-{tagname}
 ├── .column-title                               [STICKY TITLE]
+│   ├── [corner badges - dynamic]               .corner-badge-{position}
 │   └── .column-title-section
-│       ├── .drag-handle.column-drag-handle
-│       ├── .collapse-toggle [data-column-id]
+│       ├── .drag-handle.column-drag-handle    # ⋮⋮ grip
+│       ├── .collapse-toggle [data-column-id]   # ▶ expand/collapse
 │       ├── .pin-btn (.pinned | .unpinned)
 │       │   └── .pin-icon
 │       ├── .column-title-container
@@ -242,12 +298,7 @@ The board content is generated dynamically by `boardRenderer.js`.
 │               ├── .donut-menu-item.span-width-control
 │               │   ├── .span-width-label
 │               │   └── .span-width-controls
-│               │       ├── .span-width-btn
-│               │       ├── .span-width-value
-│               │       └── .span-width-btn
 │               └── .donut-menu-item.stack-control
-│                   ├── .stack-label
-│                   └── .stack-toggle-btn
 │
 ├── .column-inner (.column-loading when loading)
 │   └── .column-content
@@ -259,21 +310,48 @@ The board content is generated dynamically by `boardRenderer.js`.
 │           └── .add-task-btn
 │
 ├── .column-footer                              [STICKY FOOTER]
+│   └── [footer bars - dynamic]                 .footer-bar-{tagname}
 └── .column-margin.column-margin-bottom         [STICKY MARGIN BOTTOM]
+```
+
+#### Column CSS Key Properties
+
+```css
+.kanban-full-height-column {
+  width: var(--column-width);         /* Default: 350px */
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.kanban-full-height-column.collapsed-vertical {
+  width: 32px;
+}
+
+/* Sticky positioning for stacks */
+.kanban-column-stack .kanban-full-height-column .column-title {
+  position: sticky;
+  z-index: 100;
+}
 ```
 
 ### Task Structure
 
 ```
 .task-item [data-task-id="..."]
-│   Classes: .collapsed, .has-marp-header-*, .has-marp-footer-*, .loading
+│   Classes: .collapsed, .has-header-bar, .has-footer-bar, .task-loading
 │
 ├── .loading-overlay (when loading)
 │   ├── .loading-spinner
 │   └── .loading-text
 │
+├── [header bars - dynamic]                     .header-bars-container
+├── [corner badges - dynamic]                   .corner-badge-{position}
+│
 ├── .task-header
-│   ├── .task-drag-handle
+│   ├── .task-drag-handle                       # ⋮⋮ grip
 │   ├── .task-collapse-toggle (.rotated when collapsed)
 │   ├── .task-title-container
 │   │   ├── .task-title-display.markdown-content
@@ -282,14 +360,43 @@ The board content is generated dynamically by `boardRenderer.js`.
 │       └── .donut-menu
 │           ├── .donut-menu-btn
 │           └── .donut-menu-dropdown
-│               ├── .donut-menu-item
-│               ├── .donut-menu-divider
-│               └── .donut-menu-item.has-submenu [data-submenu-type]
 │
-└── .task-description-container
-    ├── .task-description-display.markdown-content
-    │   └── .task-section (multiple - rendered markdown sections)
-    └── .task-description-edit (<textarea>)
+├── .task-description-container
+│   ├── .task-description-display.markdown-content
+│   │   └── .task-section (multiple - keyboard navigable)
+│   └── .task-description-edit (<textarea>)
+│
+└── [footer bars - dynamic]                     .footer-bars-container
+```
+
+#### Task CSS Key Properties
+
+```css
+.task-item {
+  border-radius: 4px;
+  gap: var(--whitespace-div2);
+  margin-bottom: var(--whitespace-div2);
+  min-height: var(--task-height);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: visible;
+}
+
+.task-item.collapsed .task-description-container {
+  display: none;
+}
+
+/* Separator line between tasks */
+.task-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  bottom: 0px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--vscode-panel-border);
+}
 ```
 
 ### Task Section Content (Markdown Rendered)
@@ -312,31 +419,34 @@ The board content is generated dynamically by `boardRenderer.js`.
 │   └── <pre><code>
 │
 ├── [DIAGRAMS]
-│   ├── .plantuml-placeholder
+│   ├── .plantuml-placeholder / .mermaid-placeholder
 │   │   ├── .placeholder-spinner
 │   │   └── .placeholder-text
-│   ├── .plantuml-diagram
+│   ├── .plantuml-diagram / .mermaid-diagram
 │   │   ├── <svg>
-│   │   └── .plantuml-actions
-│   │       └── .plantuml-convert-btn
-│   ├── .mermaid-placeholder
-│   ├── .mermaid-diagram
+│   │   └── .plantuml-actions / .mermaid-actions
+│   │       └── .plantuml-convert-btn / .mermaid-convert-btn
 │   └── .plantuml-error / .mermaid-error
 │
 ├── [INCLUDES]
-│   └── .include-container
-│       ├── .include-header
-│       └── .include-content
+│   └── .include-container [data-include-file="..."]
+│       ├── .include-title-bar
+│       │   └── .include-path-overlay-container
+│       │       ├── .include-filename-link
+│       │       ├── .include-menu-btn
+│       │       └── .include-path-menu
+│       └── .include-content-area
 │
 ├── [MULTICOLUMN]
 │   └── .multicolumn-container
 │       └── .multicolumn-column (multiple)
 │
-└── [HEADER/FOOTER BARS]
-    ├── .header-bars-container
-    │   └── .header-bar.header-bar-{tag}
-    └── .footer-bars-container
-        └── .footer-bar.footer-bar-{tag}
+├── [TAGS]
+│   └── .kanban-tag [data-tag="..."]
+│
+└── [FIGURES]
+    └── figure.media-figure
+        └── img / video / iframe
 ```
 
 ---
@@ -361,9 +471,10 @@ Used for both columns and tasks.
         │   [data-column-id="..."]
         │
         └── .donut-menu-submenu                 [SUBMENU CONTENT]
-            ├── .donut-menu-tag-chip.kanban-tag
-            │   ├── .tag-chip-check
-            │   └── .tag-chip-name
+            ├── .donut-menu-tags-grid           [TAG CHIP GRID]
+            │   └── .donut-menu-tag-chip.kanban-tag
+            │       ├── .tag-chip-check
+            │       └── .tag-chip-name
             └── .donut-menu-item
 ```
 
@@ -374,7 +485,7 @@ Used for both columns and tasks.
 ├── .drag-menu-trigger
 │   ├── .drag-menu-icon
 │   └── .drag-menu-label
-└── .drag-menu-dropdown
+└── .drag-menu-dropdown                         [Appears on hover]
     └── .drag-menu-item [draggable="true"]
         ├── .drag-menu-item-icon
         └── .drag-menu-item-text
@@ -404,56 +515,59 @@ Used for both columns and tasks.
 | Class | Purpose | Used On |
 |-------|---------|---------|
 | `.kanban-board` | Main board container | `#kanban-board` |
+| `.kanban-board.multi-row` | Multi-row layout mode | `#kanban-board` |
 | `.kanban-row` | Row container for columns | Dynamic |
 | `.kanban-column-stack` | Stack container (groups columns) | Dynamic |
 | `.kanban-full-height-column` | Column container | Dynamic |
 | `.tasks-container` | Task list container | Inside column |
 | `.task-item` | Task card | Dynamic |
+| `.task-section` | Navigable markdown section | Inside task description |
 
-### State Classes
+### Column State Classes
 
-| Class | Purpose | Used On |
-|-------|---------|---------|
-| `.collapsed` | Collapsed state | Column, Task |
-| `.rotated` | Rotation for chevron | Collapse toggle |
-| `.loading` | Loading state | Task |
-| `.column-loading` | Column loading state | `.column-inner` |
-| `.visible` | Visible state | Menus, modals |
-| `.active` | Active/selected state | Menu items, toggles |
-| `.selected` | Selected item | Menu items, search results |
-| `.pinned` / `.unpinned` | Pin state | Pin button |
-| `.fold-collapsed` / `.fold-expanded` / `.fold-mixed` | Fold state | Fold button |
-| `.danger` | Destructive action style | Delete buttons |
-| `.faded` | Reduced opacity | Disabled items |
-| `.hidden` | Display none | Various |
-| `.disabled-section` | Grayed out section | Marp options |
+| Class | Effect |
+|-------|--------|
+| `.collapsed` | Generic collapsed state |
+| `.collapsed-vertical` | Vertical fold (rotated text, narrow) |
+| `.collapsed-horizontal` | Horizontal fold (header only) |
+| `.column-span-2` | Double width |
+| `.column-span-3` | Triple width |
+| `.column-span-4` | Quadruple width |
+| `.dragging` | Being dragged |
+| `.drag-over` | Drop target active |
+| `.drag-over-append` | Append drop target |
+| `.external-drag-over` | External file drag |
+| `.drag-source` | Source of drag operation |
+| `.column-loading` | Loading state |
+| `.has-header-bar` | Has header bar decoration |
+| `.has-header-label` | Header bar has text |
+| `.has-footer-bar` | Has footer bar decoration |
+| `.has-footer-label` | Footer bar has text |
 
-### Span/Width Classes
+### Task State Classes
 
-| Class | Purpose |
-|-------|---------|
-| `.span-1` through `.span-6` | Column width multiplier |
+| Class | Effect |
+|-------|--------|
+| `.collapsed` | Description hidden |
+| `.dragging` | Being dragged |
+| `.drag-source` | Source of drag |
+| `.task-loading` | Loading content |
+| `.has-header-bar` | Has header decoration |
+| `.has-footer-bar` | Has footer decoration |
 
-### Marp Header/Footer Classes
+### Stack Classes
 
-| Class Pattern | Purpose |
-|---------------|---------|
-| `.has-marp-header-{tag}` | Column/task has header bar |
-| `.has-marp-footer-{tag}` | Column/task has footer bar |
-| `.header-bar-{tag}` | Header bar for specific tag |
-| `.footer-bar-{tag}` | Footer bar for specific tag |
+| Class | Effect |
+|-------|--------|
+| `.kanban-column-stack` | Stacked column container |
+| `.all-vertical-folded` | All columns in stack folded vertically |
 
-### Typography Classes
+### Row Classes
 
-| Class | Purpose |
-|-------|---------|
-| `.markdown-content` | Container for rendered markdown |
-| `.task-title-display` | Task title text |
-| `.task-title-edit` | Task title textarea |
-| `.task-description-display` | Task description content |
-| `.task-description-edit` | Task description textarea |
-| `.column-title-text` | Column title text |
-| `.column-title-edit` | Column title textarea |
+| Class | Effect |
+|-------|--------|
+| `.kanban-row` | Row container |
+| `.drag-over` | Row is drop target |
 
 ### Button Classes
 
@@ -466,22 +580,46 @@ Used for both columns and tasks.
 | `.add-column-btn` | Add column button |
 | `.donut-menu-btn` | Menu trigger button |
 | `.collapse-toggle` | Collapse/expand chevron |
+| `.task-collapse-toggle` | Task collapse toggle |
 | `.pin-btn` | Pin toggle button |
 | `.fold-all-btn` | Fold all tasks button |
+| `.drag-handle` | Drag grip handle |
+| `.task-drag-handle` | Task drag handle |
+| `.column-drag-handle` | Column drag handle |
 
-### Container Classes
+### Button State Classes
 
-| Class | Purpose |
-|-------|---------|
-| `.modal` | Modal overlay |
-| `.modal-content` | Modal dialog |
-| `.modal-header` | Modal header section |
-| `.modal-body` | Modal content section |
-| `.modal-actions` | Modal button row |
-| `.export-field` | Export form field |
-| `.export-field-row` | Horizontal field group |
-| `.export-field-half` | 50% width field |
-| `.export-field-third` | 33% width field |
+| Class | Effect |
+|-------|--------|
+| `.active` | Toggle on |
+| `.pending` | Unsaved changes |
+| `.saved` | Recently saved |
+| `.pinned` | Sticky enabled |
+| `.unpinned` | Sticky disabled |
+| `.fold-collapsed` | Fold button - all collapsed |
+| `.fold-expanded` | Fold button - all expanded |
+| `.fold-mixed` | Fold button - mixed state |
+| `.rotated` | Collapse toggle rotated (90deg) |
+| `.danger` | Destructive action (red) |
+
+### Utility Classes
+
+| Class | Effect |
+|-------|--------|
+| `.hidden` | `display: none !important` |
+| `.faded` | `opacity: 0.5` |
+| `.disabled-section` | Grayed out section, `pointer-events: none` |
+| `.markdown-content` | Rendered markdown container |
+
+### Global Body Classes
+
+| Class | Effect |
+|-------|--------|
+| `.week-highlight-background` | Week background highlighting mode |
+| `.week-highlight-glow` | Week glow effect mode |
+| `.sticky-stack-mode-titleonly` | Only title sticky in stacks |
+| `.small-card-fonts` | Reduced font size mode |
+| `.task-height-limited` | Fixed task heights mode |
 
 ---
 
@@ -491,14 +629,30 @@ Used for both columns and tasks.
 
 | Attribute | Purpose | Example |
 |-----------|---------|---------|
-| `data-column-id` | Column identifier | `data-column-id="col-123"` |
-| `data-row-number` | Row position | `data-row-number="1"` |
+| `data-column-id` | Unique identifier | `col-d72067ad-e32f-469a-9b6d-0ba6dd9e0771` |
+| `data-column-index` | Position in board | `0`, `1`, `2` |
+| `data-row` | Row number | `1` |
+| `data-column-sticky` | Sticky state | `true`, `false` |
+| `data-column-bg-tag` | Background color tag | `green`, `blue`, `red` |
+| `data-column-border-tag` | Border style tag | Tag name |
+| `data-all-tags` | All tags (space-separated) | `green blue important` |
+| `data-current-day` | Current date match | `true` |
+| `data-current-week` | Current week match | `true` |
+| `data-current-weekday` | Current weekday match | `true` |
+| `data-current-hour` | Current hour match | `true` |
+| `data-current-time` | Current time slot match | `true` |
 
 ### Task Attributes
 
 | Attribute | Purpose | Example |
 |-----------|---------|---------|
-| `data-task-id` | Task identifier | `data-task-id="task-456"` |
+| `data-task-id` | Unique identifier | `task-72bedfc8-7d9b-43ef-bd1c-82d621924454` |
+| `data-task-index` | Position in column | `0`, `1`, `2` |
+| `data-task-bg-tag` | Background color tag | `blue`, `yellow` |
+| `data-task-border-tag` | Border style tag | Tag name |
+| `data-all-tags` | All tags (space-separated) | `blue important` |
+| `data-task-initialized` | JS handlers attached | `true` |
+| `data-current-*` | Temporal highlights | `true` |
 
 ### Menu Attributes
 
@@ -516,8 +670,88 @@ Used for both columns and tasks.
 | Attribute | Purpose |
 |-----------|---------|
 | `draggable="true"` | Element can be dragged |
-| `data-drag-setup` | Indicates drag handlers attached |
+| `data-drag-setup` | Drag handlers attached |
 | `data-task-initialized` | Task element fully initialized |
+| `data-task-drag-setup` | Task container ready |
+
+---
+
+## CSS Variables Reference
+
+### Spacing Variables
+
+```css
+:root {
+  --whitespace: 4px;
+  --whitespace-mul2: calc(var(--whitespace) * 2);
+  --whitespace-div2: calc(var(--whitespace) / 2);
+  --whitespace-div4: calc(var(--whitespace) / 4);
+}
+```
+
+### Dimension Variables
+
+```css
+:root {
+  --task-height: auto;
+  --task-section-min-height: auto;
+  --task-section-max-height: auto;
+  --column-width: 350px;
+  --collapsed-column-width: 40px;
+}
+```
+
+### Color Variables
+
+```css
+:root {
+  --board-background: var(--vscode-editor-background);
+  --column-background: var(--vscode-editor-background);
+  --task-background: var(--vscode-editor-background);
+  --task-focus-color: gray;
+  --section-focus-color: gray;
+}
+```
+
+### Temporal Highlighting Variables
+
+```css
+:root {
+  --current-week-highlight-color: #ff0000;
+  --current-week-border-width: 3px;
+  --current-week-border-style: solid;
+  --current-week-glow-size: 0 0 10px;
+}
+```
+
+### Button Variables
+
+```css
+:root {
+  /* Primary */
+  --button-background: var(--vscode-button-background);
+  --button-foreground: var(--vscode-button-foreground);
+  --button-border: 1px solid var(--vscode-button-border, transparent);
+  --button-background-hover: var(--vscode-button-hoverBackground);
+  --button-foreground-hover: var(--vscode-button-foreground);
+  --button-background-active: var(--vscode-button-background);
+  --button-foreground-active: var(--vscode-button-foreground);
+  --button-border-active: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
+
+  /* Secondary */
+  --button-secondary-background: var(--vscode-button-secondaryBackground);
+  --button-secondary-foreground: var(--vscode-button-secondaryForeground);
+  --button-secondary-border: 1px solid var(--vscode-button-border, transparent);
+  --button-secondary-background-hover: var(--vscode-button-secondaryHoverBackground);
+
+  /* Alternative (drag handles, card sources) */
+  --button-alternative-background: var(--vscode-button-secondaryBackground);
+  --button-alternative-foreground: var(--vscode-button-secondaryForeground);
+  --button-alternative-border: 1px solid var(--vscode-button-border, transparent);
+  --button-alternative-background-hover: var(--vscode-button-secondaryHoverBackground);
+  --button-alternative-foreground-hover: var(--vscode-button-secondaryForeground);
+}
+```
 
 ---
 
@@ -525,174 +759,240 @@ Used for both columns and tasks.
 
 | Layer | Z-Index | Elements |
 |-------|---------|----------|
-| Base content | 0 | Board, columns, tasks |
-| Column sticky elements | 10-20 | Headers, footers, margins |
-| Drop indicators | 50 | Drag feedback |
+| Base content | 0-1 | Board, columns, tasks |
+| Header bars container | 9 | `.header-bars-container` |
+| Row header | 10 | `.kanban-row-header` (sticky left) |
+| Column title text | 10 | `.column-title` base |
+| Column header | 11 | `.column-header` |
+| Drop indicators | 50 | Drag feedback elements |
+| Sticky elements in stacks | 100 | `.column-margin`, `.column-header`, `.column-title`, `.column-footer` |
 | File info bar | 100 | `#file-info-bar` |
-| Menus/dropdowns | 200-300 | Donut menus, file bar menus |
+| Dropdown menus | 200-300 | Donut menus when moved to body |
+| File search modal | 1000 | `.file-search-overlay` |
 | Modals | 1000+ | All `.modal` elements |
 | Context menus | 1100 | `#path-context-menu` |
+| Tooltips | 10000-10001 | Tooltip content and arrows |
 
 ---
 
-## CSS Variable Dependencies
+## CSS Selector Patterns
 
-The HTML structure relies on these CSS variables (defined in `:root`):
+### Tag-Based Styling
 
-### Spacing
-- `--whitespace` - Base spacing unit
-- `--whitespace-mul2`, `--whitespace-div2`, `--whitespace-div4` - Derived spacing
+Dynamic styles are injected via `#dynamic-tag-styles`:
 
-### Sizing
-- `--column-width` - Column width
-- `--collapsed-column-width` - Collapsed column width
-- `--task-height` - Task height limit
-- `--task-section-min-height`, `--task-section-max-height` - Section heights
+```css
+/* Background by tag */
+.kanban-full-height-column[data-column-bg-tag="tagname"] .column-header { }
+.kanban-full-height-column[data-column-bg-tag="tagname"] .column-title { }
+.kanban-full-height-column[data-column-bg-tag="tagname"] .column-content { }
+.kanban-full-height-column[data-column-bg-tag="tagname"] .column-footer { }
 
-### Colors
-- `--board-background` - Board background color
-- `--column-background` - Column background color
-- `--task-background` - Task background color
-- `--task-focus-color`, `--task-hover-color` - Task interaction colors
-- `--current-week-highlight-color` - Week tag highlight
+/* Collapsed variant */
+.kanban-full-height-column.collapsed[data-column-bg-tag="tagname"] .column-header { }
 
-### VS Code Theme Variables
-All `--vscode-*` variables are inherited from the VS Code theme.
+/* Border by tag */
+.kanban-full-height-column[data-column-border-tag="tagname"] .column-header { }
+.kanban-full-height-column[data-column-border-tag="tagname"] .column-title { }
+.kanban-full-height-column[data-column-border-tag="tagname"] .column-inner { }
+.kanban-full-height-column[data-column-border-tag="tagname"] .column-footer { }
 
----
+/* Task styling by tag */
+.task-item[data-task-bg-tag="tagname"] { }
+.task-item[data-task-bg-tag="tagname"]:hover { }
+.task-item[data-task-border-tag="tagname"] { }
 
-## Real World Example
+/* Tag badge styling */
+.kanban-tag[data-tag="tagname"] { }
 
-This section documents actual class combinations and patterns observed in a real board (`tmp/full-board.html` - 961KB, 17,451 lines, 3 columns, 11 tasks).
+/* Description line highlighting */
+.task-description-display p:has(.kanban-tag[data-tag="tagname"]),
+.task-description-display li:has(.kanban-tag[data-tag="tagname"]) { }
 
-### Actual Column Attributes
-
-```html
-<div class="kanban-full-height-column"
-     data-column-id="col-d72067ad-e32f-469a-9b6d-0ba6dd9e0771"
-     data-column-index="0"
-     data-row="1"
-     data-column-sticky="false"
-     data-column-bg-tag="green"
-     data-all-tags="green">
+/* Header/footer bars */
+.header-bar-tagname { }
+.footer-bar-tagname { }
 ```
 
-### Actual Task Attributes
+### Stack Context
 
-```html
-<div class="task-item"
-     data-task-id="task-72bedfc8-7d9b-43ef-bd1c-82d621924454"
-     data-task-index="0"
-     data-task-bg-tag="blue"
-     data-all-tags="blue"
-     style=" "
-     data-task-initialized="true">
+```css
+/* Within stacks */
+.kanban-column-stack .kanban-full-height-column { }
+.kanban-column-stack .kanban-full-height-column .column-title { }
+.kanban-column-stack .kanban-full-height-column:not(:first-child) .column-margin { }
+
+/* All folded in stack */
+.kanban-column-stack.all-vertical-folded .kanban-full-height-column { }
+
+/* Collapsed columns in stacks - hide content */
+.kanban-column-stack .kanban-full-height-column.collapsed-vertical .column-inner,
+.kanban-column-stack .kanban-full-height-column.collapsed-horizontal .column-inner {
+  display: none !important;
+}
 ```
 
-### Tag Rendering
+### Multi-Row Context
 
-Tags are rendered inline within markdown content:
-```html
-<h1>Heading 1 in Columntitle <span class="kanban-tag" data-tag="green">#green</span></h1>
-<h2>Heading 2 in Tasktitle <span class="kanban-tag" data-tag="blue">#blue</span></h2>
+```css
+.kanban-board.multi-row .kanban-row { }
+.kanban-board.multi-row .kanban-full-height-column { }
+.kanban-row:has(.kanban-full-height-column.dragging) { }
+.kanban-row:not(:has(.kanban-full-height-column)) { }
+.kanban-row:not(:has(.kanban-full-height-column))::after {
+  content: "Drop columns here";
+}
 ```
 
-### Include Container Structure
+### Temporal Highlighting
 
-```html
-<div class="include-container" data-include-file="/path/to/file.md">
-    <div class="include-title-bar">
-        <span class="include-path-overlay-container">
-            <span class="include-filename-link"
-                  data-file-path="/path/to/file.md"
-                  onclick="handleRegularIncludeClick(...)">include(file.md)</span>
-            <button class="include-menu-btn" onclick="toggleIncludePathMenu(...)">☰</button>
-            <div class="include-path-menu">
-                <button class="include-path-menu-item">📄 Open</button>
-                <button class="include-path-menu-item">🔍 Reveal in File Explorer</button>
-                <button class="include-path-menu-item disabled" disabled="">🔎 Search for File</button>
-                <div class="include-path-menu-divider"></div>
-                <button class="include-path-menu-item">📁 Convert to Relative</button>
-                <button class="include-path-menu-item disabled" disabled="">📂 Convert to Absolute</button>
-                <div class="include-path-menu-divider"></div>
-                <button class="include-path-menu-item">🗑️ Delete</button>
-            </div>
-        </span>
-    </div>
-    <div class="include-content-area">
-        <!-- rendered markdown content -->
-    </div>
-</div>
+```css
+.kanban-full-height-column[data-current-week="true"] .column-header,
+.kanban-full-height-column[data-current-week="true"] .column-title,
+.kanban-full-height-column[data-current-week="true"] .column-inner,
+.kanban-full-height-column[data-current-week="true"] .column-footer { }
+
+.kanban-full-height-column[data-current-day="true"] .column-title { }
+
+.task-item[data-current-time="true"] { }
+
+/* Highlight modes (body classes) */
+body.week-highlight-background .kanban-full-height-column[data-current-week="true"] { }
+body.week-highlight-glow .kanban-full-height-column[data-current-week="true"] { }
 ```
 
-### File Bar Menu Structure
+### Sticky Stack Mode
 
-```html
-<div class="file-bar-menu">
-    <button class="file-bar-menu-btn" onclick="toggleFileBarMenu(event, this)">☰</button>
-    <div class="file-bar-menu-dropdown">
-        <button class="file-bar-menu-item" onclick="undo()">↶ Undo</button>
-        <button class="file-bar-menu-item" onclick="redo()">↷ Redo</button>
-        <div class="file-bar-menu-divider"></div>
-        <button class="file-bar-menu-item" onclick="selectFile()">📂 Open...</button>
-        <button class="file-bar-menu-item" onclick="showExportDialog()">📤 Export...</button>
-        <div class="file-bar-menu-divider"></div>
-        <div class="file-bar-menu-item has-submenu">
-            Column Width →
-            <div class="file-bar-menu-submenu" data-menu="columnWidth">...</div>
-        </div>
-    </div>
-</div>
-```
+```css
+/* Per-column sticky control */
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-header {
+  position: relative !important;
+}
+.kanban-column-stack .kanban-full-height-column[data-column-sticky="false"] .column-title {
+  position: relative !important;
+}
 
-### Task Section with Description
-
-```html
-<div class="task-description-container">
-    <div class="task-description-display markdown-content" onclick="handleDescriptionClick(...)">
-        <div class="task-section" tabindex="0">
-            <p>Some text content...</p>
-        </div>
-    </div>
-    <textarea class="task-description-edit" data-field="description" style="display: none;">
-        Raw markdown content
-    </textarea>
-</div>
+/* Title-only sticky mode */
+body.sticky-stack-mode-titleonly .kanban-column-stack .kanban-full-height-column[data-column-sticky="true"] .column-header {
+  position: relative !important;
+}
 ```
 
 ---
 
-## Updated Data Attributes Reference
+## Stack Layout System
 
-### Column Attributes (Complete)
+The stack layout is managed by `stackLayoutManager.js` and involves both CSS and JavaScript.
 
-| Attribute | Purpose | Example |
-|-----------|---------|---------|
-| `data-column-id` | Unique column identifier | `col-d72067ad-e32f-469a-9b6d-0ba6dd9e0771` |
-| `data-column-index` | Column position in board | `0`, `1`, `2` |
-| `data-row` | Row number containing column | `1` |
-| `data-column-sticky` | Whether header is sticky | `true`, `false` |
-| `data-column-bg-tag` | Background color tag | `green`, `blue`, `red` |
-| `data-all-tags` | All tags on column (space-separated) | `green blue` |
+### Column Structure in Stacks
 
-### Task Attributes (Complete)
+```
+.kanban-column-stack (CSS: display: grid; grid-template: 1fr / 1fr)
+│
+├── .kanban-full-height-column[1]
+│   ├── .column-offset          ← margin-top: 0px (first column)
+│   ├── .column-margin          ← top: 0px (sticky)
+│   ├── .column-header          ← top: Xpx (sticky, calculated)
+│   ├── .column-title           ← top: Ypx (sticky, calculated)
+│   ├── .column-inner           ← z-index: calculated, HIDDEN when folded
+│   └── .column-footer          ← bottom: Zpx (sticky from bottom)
+│
+├── .kanban-full-height-column[2]
+│   ├── .column-offset          ← margin-top: (col1.totalHeight + margin)px
+│   ├── .column-margin          ← top: calculated
+│   ├── .column-header          ← top: calculated
+│   ├── .column-title           ← top: calculated
+│   ├── .column-inner           ← HIDDEN when folded
+│   └── .column-footer          ← bottom: calculated
+│
+└── ... more columns
+```
 
-| Attribute | Purpose | Example |
-|-----------|---------|---------|
-| `data-task-id` | Unique task identifier | `task-72bedfc8-7d9b-43ef-bd1c-82d621924454` |
-| `data-task-index` | Task position in column | `0`, `1`, `2` |
-| `data-task-bg-tag` | Background color tag | `blue`, `yellow`, `cyan` |
-| `data-all-tags` | All tags on task (space-separated) | `blue important` |
-| `data-task-initialized` | Whether JS handlers attached | `true` |
-| `data-field` | Field type for textareas | `title`, `description` |
+### Stack CSS
 
-### Drag/Drop Attributes
+```css
+.kanban-column-stack {
+  display: grid;
+  grid-template: 1fr / 1fr;
+  position: relative;
+  height: 100%;
+}
 
-| Attribute | Purpose | Example |
-|-----------|---------|---------|
-| `draggable` | Element is draggable | `true` |
-| `data-drag-setup` | Drag handlers attached | `true` |
-| `data-task-drag-setup` | Task container ready | `true` |
+/* All columns in same grid cell */
+.kanban-column-stack .kanban-full-height-column {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: start;
+  pointer-events: none;  /* Disabled on wrapper */
+}
+
+/* Re-enable pointer events on interactive elements */
+.kanban-column-stack .kanban-full-height-column .column-header,
+.kanban-column-stack .kanban-full-height-column .column-title,
+.kanban-column-stack .kanban-full-height-column .column-footer,
+.kanban-column-stack .kanban-full-height-column .column-inner {
+  pointer-events: auto;
+}
+
+/* Sticky positioning */
+.kanban-column-stack .kanban-full-height-column .column-margin,
+.kanban-column-stack .kanban-full-height-column .column-header,
+.kanban-column-stack .kanban-full-height-column .column-title,
+.kanban-column-stack .kanban-full-height-column .column-footer {
+  position: sticky;
+  background: var(--column-background);
+  z-index: 100;
+}
+
+/* 3D layering for proper overlap */
+.kanban-column-stack .kanban-full-height-column .column-inner {
+  transform: translateZ(-0.08px);
+}
+.kanban-column-stack .kanban-full-height-column .column-margin {
+  transform: translateZ(-0.11px);
+}
+.kanban-column-stack .kanban-full-height-column .column-header {
+  transform: translateZ(-0.133px);
+}
+```
+
+### Height Calculation (JavaScript)
+
+For each column, `updateStackLayoutCore()` measures:
+
+| Measurement | Source Element | When Folded |
+|-------------|----------------|-------------|
+| `columnHeaderHeight` | `.column-header.offsetHeight` | Measured normally |
+| `headerHeight` | `.column-title.offsetHeight` | Measured normally |
+| `footerHeight` | `.column-footer.offsetHeight` | Measured normally |
+| `contentHeight` | `.column-content.scrollHeight` | **Set to 0** |
+| `marginHeight` | `.column-margin.offsetHeight` | Default: 4px |
+
+```javascript
+totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
+// For folded columns: contentHeight = 0 but headers/footers still counted
+```
+
+### JavaScript-Set Inline Styles
+
+These are set by `updateStackLayoutCore()`:
+
+| Element | Property | Purpose |
+|---------|----------|---------|
+| `.column-offset` | `margin-top` | Vertical position in stack |
+| `.column-margin` | `top` | Sticky position for margin |
+| `.column-header` | `top` | Sticky position for header bars |
+| `.column-title` | `top` | Sticky position for title |
+| `.column-footer` | `bottom` | Sticky position from bottom |
+| `.column-inner` | `z-index` | Layer behind sticky elements |
+
+### Stack State Classes
+
+| Class | Applied To | Description |
+|-------|------------|-------------|
+| `.all-vertical-folded` | `.kanban-column-stack` | All columns vertically folded |
+| `.collapsed-vertical` | `.kanban-full-height-column` | Column folded vertically (narrow) |
+| `.collapsed-horizontal` | `.kanban-full-height-column` | Column folded horizontally (header only) |
 
 ---
 
@@ -715,14 +1015,7 @@ Three similar menu patterns exist:
 Both `.image-path-menu` and `.include-path-menu` share nearly identical structure.
 **Opportunity**: Unify into a single `.resource-path-menu` pattern.
 
-### 4. Empty Template Items
-Donut menus contain many empty whitespace lines from template rendering:
-```html
-<!-- Lines 14143-14313 are mostly empty template placeholders -->
-```
-**Not a CSS issue** - This is a rendering optimization opportunity.
-
-### 5. Diagram Patterns
+### 4. Diagram Patterns
 PlantUML and Mermaid use parallel structures:
 - `.plantuml-placeholder` / `.mermaid-placeholder`
 - `.plantuml-diagram` / `.mermaid-diagram`
@@ -730,7 +1023,7 @@ PlantUML and Mermaid use parallel structures:
 
 **Opportunity**: Create `.diagram-placeholder`, `.diagram-container`, `.diagram-error` base classes.
 
-### 6. Button Classes
+### 5. Button Classes
 Multiple button patterns with similar styling:
 - `.add-task-btn`, `.add-column-btn`, `.collapsed-add-task-btn`
 - `.donut-menu-btn`, `.file-bar-menu-btn`, `.include-menu-btn`
@@ -738,142 +1031,46 @@ Multiple button patterns with similar styling:
 
 **Opportunity**: Use `.btn` base with modifier classes.
 
-### 7. Nesting Depth
+### 6. Nesting Depth
 Deep selector chains observed:
 ```css
 .donut-menu .donut-menu-dropdown .donut-menu-item.has-submenu .donut-menu-submenu
 ```
 **Opportunity**: Flatten selectors using BEM or direct class targeting.
 
----
+### 7. Tag Color Duplication
+20+ tag colors with identical property patterns, each duplicated for column/task contexts.
+**Opportunity**: Generate with CSS custom properties or SCSS.
 
-## Stack Layout System (CRITICAL)
-
-The stack layout is managed by `stackLayoutManager.js` and involves both CSS and JavaScript.
-
-### Column Structure in Stacks
-
-```
-.kanban-column-stack
-│
-├── .kanban-full-height-column[1]
-│   ├── .column-offset          ← margin-top: 0px (first column)
-│   ├── .column-margin          ← top: 0px (sticky)
-│   ├── .column-header          ← top: Xpx (sticky, calculated)
-│   ├── .column-title           ← top: Ypx (sticky, calculated)
-│   ├── .column-inner           ← z-index: calculated, HIDDEN when folded
-│   └── .column-footer          ← bottom: Zpx (sticky from bottom)
-│
-├── .kanban-full-height-column[2]
-│   ├── .column-offset          ← margin-top: (col1.totalHeight + margin)px
-│   ├── .column-margin          ← top: calculated
-│   ├── .column-header          ← top: calculated
-│   ├── .column-title           ← top: calculated
-│   ├── .column-inner           ← HIDDEN when folded
-│   └── .column-footer          ← bottom: calculated
-│
-└── ... more columns
-```
-
-### Height Calculation for Stacking
-
-For each column, `updateStackLayoutCore()` measures:
-
-| Measurement | Source Element | When Folded |
-|-------------|----------------|-------------|
-| `columnHeaderHeight` | `.column-header.offsetHeight` | Measured normally |
-| `headerHeight` | `.column-title.offsetHeight` | Measured normally |
-| `footerHeight` | `.column-footer.offsetHeight` | Measured normally |
-| `contentHeight` | `.column-content.scrollHeight` | **Set to 0** |
-| `marginHeight` | `.column-margin.offsetHeight` | Default: 4px |
-
-```javascript
-totalHeight = columnHeaderHeight + headerHeight + footerHeight + contentHeight;
-// For folded columns: contentHeight = 0
-// Headers/footers still counted!
-```
-
-### Column Offset Calculation
-
-The `column-offset` element's `margin-top` positions each column below the ones above:
-
-```javascript
-// For column at index N:
-contentPadding = sum of (totalHeight + marginHeight) for columns 0 to N-1
-
-columnOffset.style.marginTop = contentPadding > 0 ? `${contentPadding}px` : '';
-```
-
-### CSS for Stacked Columns
-
-```css
-/* Base sticky positioning */
-.kanban-column-stack .column-margin,
-.kanban-column-stack .column-header,
-.kanban-column-stack .column-title,
-.kanban-column-stack .column-footer {
-    position: sticky;
-    background: var(--column-background);
-    z-index: 100;
-}
-
-/* Content hidden when folded IN STACKS */
-.kanban-column-stack .collapsed-vertical .column-inner,
-.kanban-column-stack .collapsed-horizontal .column-inner {
-    display: none !important;
-}
-```
-
-### Stack State Classes
-
-| Class | Applied To | Description |
-|-------|------------|-------------|
-| `.all-vertical-folded` | `.kanban-column-stack` | All columns vertically folded → horizontal layout |
-| `.collapsed-vertical` | `.kanban-full-height-column` | Column folded vertically (narrow) |
-| `.collapsed-horizontal` | `.kanban-full-height-column` | Column folded horizontally (header only) |
-
-### JavaScript-Set Inline Styles
-
-These are set by `updateStackLayoutCore()` via `requestAnimationFrame`:
-
-| Element | Property | Purpose |
-|---------|----------|---------|
-| `.column-offset` | `margin-top` | Vertical position in stack |
-| `.column-margin` | `top` | Sticky position for margin |
-| `.column-header` | `top` | Sticky position for header bars |
-| `.column-title` | `top` | Sticky position for title |
-| `.column-footer` | `bottom` | Sticky position from bottom |
-| `.column-inner` | `z-index` | Layer behind sticky elements |
-
-### Function Reference (stackLayoutManager.js)
-
-| Function | Purpose |
-|----------|---------|
-| `updateStackLayoutCore()` | Immediate layout calculation and application |
-| `updateStackLayoutDebounced()` | 150ms debounced version (default) |
-| `applyStackedColumnStyles()` | High-level orchestrator with scroll preservation |
-| `enforceFoldModesForStacks()` | Enforces horizontal folding in multi-column stacks |
+### 8. `!important` Overuse
+Many tag-based styles use `!important` to override defaults.
+**Opportunity**: Restructure specificity hierarchy.
 
 ---
 
-## Notes for CSS Simplification
+## File References
 
-1. **Nested selectors** - Many classes have deep nesting (e.g., `.donut-menu .donut-menu-dropdown .donut-menu-item`)
+| File | Purpose |
+|------|---------|
+| `webview.html` | Main HTML structure |
+| `webview.css` | Core styles (~4500 lines) |
+| `boardRenderer.js` | Column/task HTML generation |
+| `taskEditor.js` | Task editing UI |
+| `menuOperations.js` | Menu handling |
+| `utils/tagStyleManager.js` | Dynamic tag styles |
+| `utils/stackLayoutManager.js` | Stack layout calculations |
+| `utils/styleManager.js` | CSS variable management |
+| `utils/columnFoldingManager.js` | Column fold state |
+| `utils/rowLayoutManager.js` | Multi-row layout |
 
-2. **Duplicate patterns** - Header/footer bars use similar styling with tag-specific variations
+---
 
-3. **State combinations** - Elements can have multiple state classes (`.collapsed.has-marp-header-x`)
+## Dynamic Style Injection
 
-4. **Responsive considerations** - `container-type: inline-size` on file info bar
+Styles are injected at runtime:
 
-5. **Sticky elements** - Complex sticky positioning for column headers/footers - **CRITICAL: JS calculates `top` values**
-
-6. **Dynamic class generation** - Marp header/footer classes are generated from tag names
-
-7. **Diagram styles** - PlantUML and Mermaid have nearly identical CSS patterns (potential consolidation)
-
-8. **Tag colors** - 20+ tag colors with identical property patterns, each duplicated for column/task contexts
-
-9. **Stack layout CSS/JS split** - CSS handles `position: sticky`, JS calculates actual `top/bottom` values for layering
-
-10. **Folded column handling** - `.column-inner` is hidden via CSS, but headers/footers remain visible with measured heights
+| Element ID | Purpose |
+|------------|---------|
+| `#dynamic-tag-styles` | Tag color/border/background styles |
+| `#layout-styles` | Layout preset styles |
+| Inline `style` attributes | Stack positions (`top`, `bottom`, `margin-top`) |
