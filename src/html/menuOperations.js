@@ -1795,12 +1795,599 @@ function copyToClipboard(text) {
     }
 }
 
+// ============================================================================
+// TASK AND COLUMN OPERATIONS
+// ============================================================================
+
+function duplicateTask(taskId, columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { task: originalTask, column: targetColumn, columnId: actualColumnId } = found;
+            const duplicatedTask = {
+                id: `temp-duplicate-${Date.now()}`,
+                title: originalTask.title,
+                description: originalTask.description
+            };
+
+            // Insert after the original task
+            const originalIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            updateCacheForNewTask(actualColumnId, duplicatedTask, originalIndex + 1);
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+function insertTaskBefore(taskId, columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-before-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+function insertTaskAfter(taskId, columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    if (window.cachedBoard) {
+        const found = findTaskInBoard(taskId, columnId);
+        if (found) {
+            const { column: targetColumn, columnId: actualColumnId } = found;
+            const targetIndex = targetColumn.tasks.findIndex(task => task.id === taskId);
+            if (targetIndex >= 0) {
+                const newTask = {
+                    id: `temp-insert-after-${Date.now()}`,
+                    title: '',
+                    description: ''
+                };
+
+                updateCacheForNewTask(actualColumnId, newTask, targetIndex + 1);
+            }
+        }
+    }
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+/**
+ * Move a task within its column in a specified direction
+ * @param {string} taskId - Task to move
+ * @param {string} columnId - Column containing the task
+ * @param {'top'|'up'|'down'|'bottom'} direction - Direction to move
+ */
+function moveTaskInDirection(taskId, columnId, direction) {
+    closeAllMenus();
+
+    if (!window.cachedBoard) return;
+
+    const found = findTaskInBoard(taskId, columnId);
+    if (!found) return;
+
+    const { column } = found;
+    const taskIndex = column.tasks.findIndex(t => t.id === taskId);
+    if (taskIndex < 0) return;
+
+    let newIndex;
+    const lastIndex = column.tasks.length - 1;
+
+    switch (direction) {
+        case 'top':
+            if (taskIndex === 0) return; // Already at top
+            column.tasks.splice(taskIndex, 1);
+            column.tasks.unshift(found.task);
+            newIndex = 0;
+            break;
+
+        case 'up':
+            if (taskIndex === 0) return; // Can't go up
+            // Swap with previous
+            [column.tasks[taskIndex], column.tasks[taskIndex - 1]] =
+                [column.tasks[taskIndex - 1], column.tasks[taskIndex]];
+            newIndex = taskIndex - 1;
+            break;
+
+        case 'down':
+            if (taskIndex === lastIndex) return; // Can't go down
+            // Swap with next
+            [column.tasks[taskIndex], column.tasks[taskIndex + 1]] =
+                [column.tasks[taskIndex + 1], column.tasks[taskIndex]];
+            newIndex = taskIndex + 1;
+            break;
+
+        case 'bottom':
+            if (taskIndex === lastIndex) return; // Already at bottom
+            column.tasks.splice(taskIndex, 1);
+            column.tasks.push(found.task);
+            newIndex = column.tasks.length - 1;
+            break;
+
+        default:
+            return;
+    }
+
+    moveTaskInDOM(taskId, column.id, newIndex);
+    markUnsavedChanges();
+}
+
+// Shorthand functions for menu onclick handlers
+function moveTaskToTop(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'top'); }
+function moveTaskUp(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'up'); }
+function moveTaskDown(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'down'); }
+function moveTaskToBottom(taskId, columnId) { moveTaskInDirection(taskId, columnId, 'bottom'); }
+
+/**
+ * Moves a task to a different column
+ * Purpose: Drag and drop or menu-based task relocation
+ * Used by: Move submenu selections
+ * @param {string} taskId - Task to move
+ * @param {string} fromColumnId - Source column
+ * @param {string} toColumnId - Destination column
+ * Side effects: Unfolds target column
+ */
+function moveTaskToColumn(taskId, fromColumnId, toColumnId) {
+    // Unfold the destination column if it's collapsed BEFORE any DOM changes
+    unfoldColumnIfCollapsed(toColumnId);
+
+    if (!window.cachedBoard) {
+        closeAllMenus();
+        return;
+    }
+
+    const fromColumn = window.cachedBoard.columns.find(col => col.id === fromColumnId);
+    const toColumn = window.cachedBoard.columns.find(col => col.id === toColumnId);
+
+    if (!fromColumn || !toColumn) {
+        closeAllMenus();
+        return;
+    }
+
+    const taskIndex = fromColumn.tasks.findIndex(t => t.id === taskId);
+    if (taskIndex < 0) {
+        closeAllMenus();
+        return;
+    }
+
+    // Update cache - move task to end of target column
+    const task = fromColumn.tasks.splice(taskIndex, 1)[0];
+    toColumn.tasks.push(task);
+
+    // Update DOM directly - move to end of target column
+    moveTaskInDOM(taskId, fromColumnId, toColumn.tasks.length - 1, toColumnId);
+
+    markUnsavedChanges();
+    closeAllMenus();
+}
+
+function deleteTask(taskId, columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // NEW CACHE SYSTEM: Remove task from cached board instead of sending to VS Code immediately
+    if (window.cachedBoard) {
+        // Find the task in any column (task might have been moved since the menu was generated)
+        let foundColumn = null;
+        let taskIndex = -1;
+
+        for (const column of window.cachedBoard.columns) {
+            taskIndex = column.tasks.findIndex(t => t.id === taskId);
+            if (taskIndex >= 0) {
+                foundColumn = column;
+                break;
+            }
+        }
+
+        if (foundColumn && taskIndex >= 0) {
+            const deletedTask = foundColumn.tasks.splice(taskIndex, 1)[0];
+
+            // Remove task from DOM immediately
+            const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (taskElement) {
+                // Get the column element before removing the task
+                const columnElement = taskElement.closest('.kanban-full-height-column');
+
+                taskElement.remove();
+
+                // Check if column is now empty and add placeholder button (before height recalc)
+                updateColumnEmptyState(foundColumn.id);
+
+                // Recalculate stack heights after task deletion and button restoration
+                if (columnElement) {
+                    const stack = columnElement.closest('.kanban-column-stack');
+                    if (stack && typeof updateStackLayoutDebounced === 'function') {
+                        updateStackLayoutDebounced(stack);
+                    }
+                }
+            }
+
+            // Send message to VS Code - action system handles undo capture and board sync
+            vscode.postMessage({ type: 'deleteTask', taskId, columnId: foundColumn.id });
+        }
+    }
+}
+
+// Helper function to update column empty state (add/remove placeholder button)
+function updateColumnEmptyState(columnId) {
+    const tasksContainer = document.querySelector(`#tasks-${columnId}`);
+    if (!tasksContainer) { return; }
+
+    // Count actual task elements (not placeholder buttons)
+    const taskElements = tasksContainer.querySelectorAll('.task-item');
+    const hasAddButton = tasksContainer.querySelector('.add-task-btn');
+
+    // Add button if column is empty (CSS handles hiding when tasks present)
+    if (taskElements.length === 0 && !hasAddButton) {
+        const addButton = document.createElement('button');
+        addButton.className = 'add-task-btn';
+        addButton.setAttribute('onclick', `addTask('${columnId}')`);
+        addButton.innerHTML = '\n                        + Add Task\n                    ';
+        tasksContainer.appendChild(addButton);
+    }
+}
+
+// Make updateColumnEmptyState globally available
+window.updateColumnEmptyState = updateColumnEmptyState;
+
+// Helper function to update cache when creating tasks
+function updateCacheForNewTask(columnId, newTask, insertIndex = -1) {
+    if (window.cachedBoard) {
+        const targetColumn = window.cachedBoard.columns.find(col => col.id === columnId);
+        if (targetColumn) {
+            if (insertIndex >= 0 && insertIndex <= targetColumn.tasks.length) {
+                targetColumn.tasks.splice(insertIndex, 0, newTask);
+            } else {
+                targetColumn.tasks.push(newTask);
+            }
+
+            // Mark as unsaved since we added a task
+            markUnsavedChanges();
+
+            // Use incremental DOM update instead of full redraw
+            if (typeof window.addSingleTaskToDOM === 'function') {
+                const taskElement = window.addSingleTaskToDOM(columnId, newTask, insertIndex);
+
+                // Focus the newly created task and start editing
+                if (taskElement) {
+                    setTimeout(() => {
+                        scrollToElementIfNeeded(taskElement, 'task');
+
+                        // Start editing the title
+                        const titleContainer = taskElement.querySelector('.task-title-container');
+                        if (titleContainer && window.editTitle) {
+                            window.editTitle(titleContainer, newTask.id, columnId);
+                        }
+                    }, 50);
+                }
+            } else {
+                // Fallback to full render if incremental function not available
+                if (typeof renderBoard === 'function') {
+                    renderBoard();
+                }
+            }
+        }
+    }
+}
+
+// Helper function to update cache when creating columns
+function updateCacheForNewColumn(newColumn, insertIndex = -1, referenceColumnId = null) {
+    if (window.cachedBoard) {
+        let actualInsertIndex = insertIndex;
+
+        if (referenceColumnId) {
+            // Insert relative to reference column
+            const referenceIndex = window.cachedBoard.columns.findIndex(col => col.id === referenceColumnId);
+            if (referenceIndex >= 0) {
+                actualInsertIndex = insertIndex >= 0 ? insertIndex : referenceIndex + 1;
+                window.cachedBoard.columns.splice(actualInsertIndex, 0, newColumn);
+            } else {
+                // Fallback: add to end
+                window.cachedBoard.columns.push(newColumn);
+                actualInsertIndex = window.cachedBoard.columns.length - 1;
+            }
+        } else {
+            // Simple insertion
+            if (insertIndex >= 0 && insertIndex <= window.cachedBoard.columns.length) {
+                window.cachedBoard.columns.splice(insertIndex, 0, newColumn);
+            } else {
+                window.cachedBoard.columns.push(newColumn);
+                actualInsertIndex = window.cachedBoard.columns.length - 1;
+            }
+        }
+
+        // CRITICAL: Sort columns by row to match backend ordering
+        if (typeof window.sortColumnsByRow === 'function') {
+            window.cachedBoard.columns = window.sortColumnsByRow(window.cachedBoard.columns);
+            // Recalculate actual insert index after sorting
+            actualInsertIndex = window.cachedBoard.columns.findIndex(col => col.id === newColumn.id);
+        }
+
+        // Mark as unsaved
+        if (typeof markUnsavedChanges === 'function') {
+            markUnsavedChanges();
+        }
+
+        // Use incremental DOM update instead of full redraw
+        if (typeof window.addSingleColumnToDOM === 'function') {
+            const columnElement = window.addSingleColumnToDOM(newColumn, actualInsertIndex, referenceColumnId);
+
+            // Focus the newly created column and start editing its title
+            if (columnElement) {
+                setTimeout(() => {
+                    scrollToElementIfNeeded(columnElement, 'column');
+
+                    // Start editing the column title
+                    if (window.editColumnTitle) {
+                        window.editColumnTitle(newColumn.id, columnElement);
+                    }
+                }, 50);
+            }
+        } else {
+            // Fallback to full render if incremental function not available
+            if (typeof renderBoard === 'function') {
+                renderBoard();
+            }
+        }
+    }
+}
+
+function addTask(columnId) {
+    // Close all menus properly
+    closeAllMenus();
+
+    // Cache-first: Only update cached board, no automatic save
+    const newTask = {
+        id: `temp-menu-${Date.now()}`,
+        title: '',
+        description: ''
+    };
+
+    updateCacheForNewTask(columnId, newTask);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+// Helper function to unfold a column if it's collapsed
+function unfoldColumnIfCollapsed(columnId, skipUnfold = false) {
+    if (skipUnfold) {
+        return false; // Skip unfolding
+    }
+    const column = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+    if (window.isColumnCollapsed && window.isColumnCollapsed(column)) {
+        toggleColumnCollapse(columnId);
+        return true; // Column was unfolded
+    }
+    return false; // Column was already unfolded
+}
+
+function addTaskAndUnfold(columnId) {
+    unfoldColumnIfCollapsed(columnId);
+    addTask(columnId);
+}
+
+function addColumn(rowNumber) {
+    // Cache-first: Create new column and add to end of the specified row
+    const title = (rowNumber && rowNumber > 1) ? `#row${rowNumber}` : '';
+    const newColumn = {
+        id: `temp-column-${Date.now()}`,
+        title: title,
+        tasks: []
+    };
+
+    // Find the last column in this row to determine insert position
+    let insertIndex = -1;
+    if (window.cachedBoard?.columns) {
+        // Find the index after the last column in this row
+        for (let i = window.cachedBoard.columns.length - 1; i >= 0; i--) {
+            const col = window.cachedBoard.columns[i];
+            const colRow = getColumnRow(col.title);
+            if (colRow === rowNumber) {
+                // Found the last column in this row, insert after it
+                insertIndex = i + 1;
+                break;
+            }
+        }
+
+        // If no columns found in this row, find where this row should start
+        if (insertIndex === -1) {
+            // Find the first column that belongs to a higher row number
+            for (let i = 0; i < window.cachedBoard.columns.length; i++) {
+                const col = window.cachedBoard.columns[i];
+                const colRow = getColumnRow(col.title);
+                if (colRow > rowNumber) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    updateCacheForNewColumn(newColumn, insertIndex);
+
+    // No VS Code message - cache-first system requires explicit save via Cmd+S
+}
+
+// Window exports for task/column operations
+window.duplicateTask = duplicateTask;
+window.insertTaskBefore = insertTaskBefore;
+window.insertTaskAfter = insertTaskAfter;
+window.addTask = addTask;
+window.addTaskAndUnfold = addTaskAndUnfold;
+window.addColumn = addColumn;
 
 // Include mode operations moved to utils/includeModeManager.js:
 // - toggleColumnIncludeMode, enableColumnIncludeMode, editColumnIncludeFile
 // - updateColumnIncludeFile, disableColumnIncludeMode
 // - enableTaskIncludeMode, editTaskIncludeFile, updateTaskIncludeFile
 // - disableTaskIncludeMode, toggleTaskIncludeMode
+
+// ============================================================================
+// TAG TOGGLE OPERATIONS
+// ============================================================================
+
+/**
+ * Toggles a tag on/off for a column
+ * Purpose: Add or remove tags from column titles
+ * Used by: Tag menu clicks for columns
+ * @param {string} columnId - Column to modify
+ * @param {string} tagName - Tag to toggle
+ * @param {Event} event - Click event
+ * Side effects: Updates pending changes, triggers visual updates
+ */
+function toggleColumnTag(columnId, tagName, event) {
+    // Throttle duplicate calls
+    if (!window.menuUtils.shouldExecute(`column-${columnId}-${tagName}`)) {
+        return;
+    }
+
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    // Find column in board data
+    const found = window.menuUtils.findColumnInBoard(columnId);
+    if (!found) return;
+    const { column } = found;
+
+    // Check DOM element exists
+    const domElement = document.querySelector(`.kanban-full-height-column[data-column-id="${columnId}"]`);
+    if (!domElement) return;
+
+    // Toggle tag in title (preserving row tags for columns)
+    const oldTitle = column.title || '';
+    const { newTitle, wasActive } = window.menuUtils.toggleTagInTitle(oldTitle, tagName, true);
+
+    // Sync to all board references
+    window.menuUtils.syncTitleToBoards('column', columnId, null, newTitle);
+
+    // Add to pending changes
+    if (!window.pendingColumnChanges) {
+        window.pendingColumnChanges = new Map();
+    }
+    window.pendingColumnChanges.set(columnId, { columnId, title: newTitle });
+
+    // Mark as unsaved
+    markUnsavedChanges();
+
+    // Check visibility before layout changes
+    const rect = domElement.getBoundingClientRect();
+    const isVisible = rect.left >= 0 && rect.right <= window.innerWidth;
+
+    // Update DOM immediately
+    updateColumnDisplayImmediate(columnId, newTitle, !wasActive, tagName);
+    updateTagButtonAppearance(columnId, 'column', tagName, !wasActive);
+    updateTagCategoryCounts(columnId, 'column');
+
+    // Recalculate stack heights if visual tags changed (only this stack)
+    const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
+    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
+    if (visualTagsBefore.length !== visualTagsAfter.length) {
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            window.applyStackedColumnStyles(columnId);
+        }
+    }
+
+    // Scroll to element if needed
+    if (!isVisible) {
+        requestAnimationFrame(() => {
+            scrollToElementIfNeeded(domElement, 'column');
+        });
+    }
+}
+
+/**
+ * Toggles a tag on/off for a task
+ * Purpose: Add or remove tags from task titles
+ * Used by: Tag menu clicks for tasks
+ * @param {string} taskId - Task to modify
+ * @param {string} columnId - Parent column ID
+ * @param {string} tagName - Tag to toggle
+ * @param {Event} event - Click event
+ * Side effects: Updates pending changes, triggers visual updates
+ */
+function toggleTaskTag(taskId, columnId, tagName, event) {
+    // Throttle duplicate calls
+    if (!window.menuUtils.shouldExecute(`task-${taskId}-${tagName}`)) {
+        return;
+    }
+
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+
+    // Find task in board data
+    const found = window.menuUtils.findTaskInBoard(taskId, columnId);
+    if (!found) return;
+    const { column, task } = found;
+
+    // Check DOM element exists
+    const domElement = document.querySelector(`[data-task-id="${taskId}"]`);
+    if (!domElement) return;
+
+    // Toggle tag in title (no row tag preservation for tasks)
+    const oldTitle = task.title || '';
+    const { newTitle, wasActive } = window.menuUtils.toggleTagInTitle(oldTitle, tagName, false);
+
+    // Sync to all board references
+    window.menuUtils.syncTitleToBoards('task', taskId, column.id, newTitle);
+
+    // Mark as unsaved
+    markUnsavedChanges();
+
+    // Check visibility before layout changes
+    const rect = domElement.getBoundingClientRect();
+    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+
+    // Update DOM immediately
+    updateTaskDisplayImmediate(taskId, newTitle, !wasActive, tagName);
+    updateTagButtonAppearance(taskId, 'task', tagName, !wasActive);
+    updateTagCategoryCounts(taskId, 'task', columnId);
+
+    // Recalculate stack heights if visual tags changed (only this stack)
+    const visualTagsBefore = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(oldTitle) : [];
+    const visualTagsAfter = window.getActiveTagsInTitle ? window.getActiveTagsInTitle(newTitle) : [];
+    if (visualTagsBefore.length !== visualTagsAfter.length) {
+        if (typeof window.applyStackedColumnStyles === 'function') {
+            window.applyStackedColumnStyles(columnId);
+        }
+    }
+
+    // Scroll to element if needed
+    if (!isVisible) {
+        requestAnimationFrame(() => {
+            scrollToElementIfNeeded(domElement, 'task');
+        });
+    }
+}
+
+// Window exports for tag operations
+window.toggleColumnTag = toggleColumnTag;
+window.toggleTaskTag = toggleTaskTag;
 
 // Enhanced DOM update functions using unique IDs
 // CRITICAL: Always use data-column-id and data-task-id selectors to avoid title conflicts

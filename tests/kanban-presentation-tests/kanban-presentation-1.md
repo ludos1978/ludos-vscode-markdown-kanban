@@ -30,15 +30,43 @@ kanban-plugin: board
   ![](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/yannis-papanastasopoulos-U6dnImauDAE-unsplash.jpg)
   
   :---
+- [ ] Test 7: Pie Chart
+  Test 7: Pie Chart
+  
+  ```mermaid
+  pie title Browser Usage
+      "Chrome" : 58
+      "Firefox" : 22
+      "Safari" : 12
+      "Edge" : 8
+  ```
 
 ## # A #red
 - [ ] #pink
   ![photo-1756244866467-f4682840070c](/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/Media/photo-1756244866467-f4682840070c.avif)
 - [ ] ## Include # #orange
   !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-1.md)!!!
-- [ ] ## Task #brown
-  and some content
+- [ ] Test 2: Class Diagram
+  Test 2: Class Diagram
   
+  ```plantuml
+  class User {
+    +name: string
+    +email: string
+    +login()
+    +logout()
+  }
   
+  class Admin {
+    +permissions: string[]
+    +grantAccess()
+  }
+  
+  User <|-- Admin
+  ```
+- [ ] drawio
+  ![](./kanban-presentation-1-MEDIA/drawio.drawio)
+
+## !!!include(/Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian/tests/kanban-presentation-tests/root-include-2.md)!!!
 
 

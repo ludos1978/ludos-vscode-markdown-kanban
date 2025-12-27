@@ -1114,23 +1114,20 @@ function setTaskSectionHeight(height) {
 // ============================================================================
 // ROW LAYOUT FUNCTIONS (moved to utils/rowLayoutManager.js)
 // ============================================================================
-// Local aliases that use the new manager with current context
-const detectRowsFromBoard = (board) => window.rowLayoutManager.detectRowsFromBoard(board);
-const getColumnRow = (title) => window.rowLayoutManager.getColumnRow(title);
-const sortColumnsByRow = (columns) => window.rowLayoutManager.sortColumnsByRow(columns);
-const updateColumnRowTag = (columnId, newRow) => {
+// Wrapper functions that use the manager with current context
+function updateColumnRowTagWithContext(columnId, newRow) {
     window.rowLayoutManager.updateColumnRowTag(columnId, newRow, {
         currentBoard,
         cachedBoard: window.cachedBoard,
         postMessage: vscode.postMessage
     });
-};
-const cleanupRowTags = () => {
+}
+function cleanupRowTagsWithContext() {
     window.rowLayoutManager.cleanupRowTags({
         currentBoard,
         renderBoard
     });
-};
+}
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1542,7 +1539,7 @@ if (!webviewEventListenersInitialized) {
             window.currentBoard = currentBoard; // Expose to window for debug overlay verification
 
             // Clean up any duplicate row tags
-            cleanupRowTags();
+            cleanupRowTagsWithContext();
 
             // Update version display if provided
             if (message.version) {

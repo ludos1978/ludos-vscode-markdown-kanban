@@ -1080,8 +1080,24 @@ async function createPDFSlideshow(element, filePath, pageCount, fileMtime) {
             const { pngDataUrl } = result;
 
             // Update image
-            // Height recalculation is handled automatically by the column ResizeObserver
             imageContainer.innerHTML = `<img src="${pngDataUrl}" alt="PDF page ${pageNumber}" class="diagram-rendered" />`;
+
+            // Trigger height recalculation after image loads
+            const img = imageContainer.querySelector('img');
+            if (img) {
+                const triggerRecalc = () => {
+                    const columnElement = imageContainer.closest('.kanban-full-height-column');
+                    const columnId = columnElement?.getAttribute('data-column-id');
+                    if (typeof window.applyStackedColumnStyles === 'function') {
+                        window.applyStackedColumnStyles(columnId);
+                    }
+                };
+                if (img.complete) {
+                    requestAnimationFrame(triggerRecalc);
+                } else {
+                    img.onload = triggerRecalc;
+                }
+            }
 
             // Update state
             currentPage = pageNumber;
@@ -1194,6 +1210,25 @@ async function processDiagramQueue() {
                 <img src="${imageDataUrl}" alt="${displayLabel}" class="diagram-rendered" data-original-src="${decodedPath}" />
                 <button class="image-menu-btn" onclick="event.stopPropagation(); toggleImagePathMenu(this.parentElement, '${escapedPath}')" title="Path options">☰</button>
             </div>`;
+
+            // Trigger height recalculation after image loads
+            // Data URLs load synchronously but we still need to trigger recalc
+            const img = element.querySelector('img');
+            if (img) {
+                const triggerRecalc = () => {
+                    const columnElement = element.closest('.kanban-full-height-column');
+                    const columnId = columnElement?.getAttribute('data-column-id');
+                    if (typeof window.applyStackedColumnStyles === 'function') {
+                        window.applyStackedColumnStyles(columnId);
+                    }
+                };
+                if (img.complete) {
+                    // Already loaded (data URLs), trigger on next frame
+                    requestAnimationFrame(triggerRecalc);
+                } else {
+                    img.onload = triggerRecalc;
+                }
+            }
 
         } catch (error) {
             console.error(`[Diagram] Rendering failed for ${item.filePath}:`, error);

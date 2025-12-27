@@ -124,7 +124,14 @@
       "Bash(if [ -d \"$dep\" ])",
       "Bash(then echo \"$dep\")",
       "Bash(chmod:*)",
-      "Bash(cloc:*)"
+      "Bash(cloc:*)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log --oneline -5)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian diff:*)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian show HEAD~1:src/html/menuOperations.js)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log --all --oneline -- \"*/deleteTask*\" \"*/addColumn*\")",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log -p --all -S \"function deleteTask\" -- \"*.js\")",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian show:*)",
+      "Bash(git -C /Users/rspoerri/_REPOSITORIES/_TINKERING_REPOs/markdown-kanban-obsidian log:*)"
     ],
     "deny": [],
     "ask": []

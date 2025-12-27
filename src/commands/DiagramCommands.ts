@@ -433,6 +433,50 @@ export class DiagramCommands extends BaseMessageCommand {
 </svg>`;
     }
 
+    /**
+     * Check if an Excalidraw file is empty (no elements or only deleted elements)
+     */
+    private isEmptyExcalidrawFile(content: string, filePath: string): boolean {
+        try {
+            // For .excalidraw.svg files, check if the SVG has meaningful content
+            if (filePath.endsWith('.excalidraw.svg')) {
+                // Check for actual drawing elements in the SVG
+                // Empty excalidraw SVGs typically only have basic structure
+                const hasDrawingContent = content.includes('<path') ||
+                    content.includes('<rect') ||
+                    content.includes('<circle') ||
+                    content.includes('<ellipse') ||
+                    content.includes('<text');
+                return !hasDrawingContent;
+            }
+
+            // For JSON files (.excalidraw, .excalidraw.json)
+            const data = JSON.parse(content);
+            if (!data.elements || !Array.isArray(data.elements)) {
+                return true;
+            }
+            // Filter out deleted elements
+            const activeElements = data.elements.filter((el: { isDeleted?: boolean }) => !el.isDeleted);
+            return activeElements.length === 0;
+        } catch {
+            return false; // If we can't parse, assume not empty
+        }
+    }
+
+    /**
+     * Create a placeholder SVG for empty Excalidraw diagrams
+     */
+    private createEmptyExcalidrawPlaceholder(): string {
+        const width = 400;
+        const height = 300;
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#fef9f0" stroke="#e8d5b5" stroke-width="2" rx="8"/>
+  <text x="${width / 2}" y="${height / 2 - 10}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#8b7355">Empty Excalidraw</text>
+  <text x="${width / 2}" y="${height / 2 + 15}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#b09070">Click to edit</text>
+</svg>`;
+    }
+
     // ============= EXCALIDRAW HANDLERS =============
 
     /**
@@ -465,6 +509,24 @@ export class DiagramCommands extends BaseMessageCommand {
             // Get file modification time for cache invalidation
             const stats = await fs.promises.stat(absolutePath);
             const fileMtime = stats.mtimeMs;
+
+            // Check if the Excalidraw file is empty
+            const fileContent = await fs.promises.readFile(absolutePath, 'utf8');
+            const isEmptyDiagram = this.isEmptyExcalidrawFile(fileContent, absolutePath);
+
+            if (isEmptyDiagram) {
+                // Return a placeholder SVG for empty diagrams
+                const placeholderSvg = this.createEmptyExcalidrawPlaceholder();
+                const dataUrl = `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString('base64')}`;
+
+                this.postMessage({
+                    type: 'excalidrawRenderSuccess',
+                    requestId,
+                    svgDataUrl: dataUrl,
+                    fileMtime
+                });
+                return;
+            }
 
             // Render as SVG
             const svg = await service.renderSVG(absolutePath);

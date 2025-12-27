@@ -322,6 +322,7 @@ export class WebviewManager {
 
         // Replace all JavaScript file references
         const jsFiles = [
+            'utils/dateUtils.js',
             'utils/colorUtils.js',
             'utils/fileTypeUtils.js',
             'utils/tagUtils.js',
@@ -336,7 +337,15 @@ export class WebviewManager {
             'utils/exportTreeUI.js',
             'utils/smartLogger.js',
             'utils/menuUtils.js',
+            'utils/menuConfig.js',
             'utils/presentationParser.js',
+            'utils/tagStyleManager.js',
+            'utils/stackLayoutManager.js',
+            'utils/columnFoldingManager.js',
+            'utils/imagePathManager.js',
+            'utils/includeModeManager.js',
+            'utils/dropIndicatorManager.js',
+            'utils/rowLayoutManager.js',
             'markdownRenderer.js',
             'taskEditor.js',
             'boardRenderer.js',

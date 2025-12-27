@@ -188,16 +188,22 @@ let templateDragState = {
 // ============================================================================
 // DROP INDICATOR FUNCTIONS (moved to utils/dropIndicatorManager.js)
 // ============================================================================
-// Local aliases for frequently used drop indicator functions
-const showTaskDropIndicator = (container, options) => {
+// Helper wrappers that add dragState context to the manager calls
+function showTaskDropIndicatorWithState(container, options) {
     window.dropIndicatorManager.showTaskDropIndicator(container, { ...options, dragState });
-};
-const showColumnDropIndicator = (stack, beforeCol) => {
+}
+function showColumnDropIndicatorWithState(stack, beforeCol) {
     window.dropIndicatorManager.showColumnDropIndicator(stack, beforeCol, { dragState, templateDragState });
-};
-const hideDropIndicator = () => window.dropIndicatorManager.hideDropIndicator(dragState);
-const cleanupDropIndicator = () => window.dropIndicatorManager.cleanupDropIndicator();
-const cleanupDropZoneHighlights = () => window.dropIndicatorManager.cleanupDropZoneHighlights();
+}
+function hideDropIndicatorWithState() {
+    window.dropIndicatorManager.hideDropIndicator(dragState);
+}
+function cleanupDropIndicatorLocal() {
+    window.dropIndicatorManager.cleanupDropIndicator();
+}
+function cleanupDropZoneHighlightsLocal() {
+    window.dropIndicatorManager.cleanupDropZoneHighlights();
+}
 
 /**
  * Sets up global drag and drop event listeners
@@ -358,7 +364,7 @@ function setupGlobalDragAndDrop() {
         
         // Always clean up visual indicators
         hideDropFeedback();
-        hideDropIndicator();
+        hideDropIndicatorWithState();
 
         const dt = e.dataTransfer;
         if (!dt) {
@@ -510,9 +516,9 @@ function setupGlobalDragAndDrop() {
 
             if (dropResult && dropResult.columnElement) {
                 const tasksContainer = dropResult.columnElement.querySelector('.tasks-container');
-                showTaskDropIndicator(tasksContainer, { clientY: e.clientY, column: dropResult.columnElement });
+                showTaskDropIndicatorWithState(tasksContainer, { clientY: e.clientY, column: dropResult.columnElement });
             } else {
-                hideDropIndicator();
+                hideDropIndicatorWithState();
             }
             showDropFeedback();
         }
@@ -545,8 +551,8 @@ function setupGlobalDragAndDrop() {
 
         if (isReallyLeaving || (!boardContainer.contains(e.relatedTarget) && e.relatedTarget !== null)) {
             hideDropFeedback();
-            hideDropIndicator();
-            cleanupDropZoneHighlights();
+            hideDropIndicatorWithState();
+            cleanupDropZoneHighlightsLocal();
         }
     }, false);
 
@@ -588,8 +594,8 @@ function setupGlobalDragAndDrop() {
             e.preventDefault();
             // Clean up indicators if drop happens outside board
             hideDropFeedback();
-            hideDropIndicator();
-            cleanupDropZoneHighlights();
+            hideDropIndicatorWithState();
+            cleanupDropZoneHighlightsLocal();
         }
     }, false);
 
@@ -1434,7 +1440,7 @@ function setupGlobalDragAndDrop() {
         dragState.dropTargetBeforeColumn = null;
 
         // Hide indicator
-        hideDropIndicator();
+        hideDropIndicatorWithState();
 
         // Remove board template-dragging class
         const boardElement = document.getElementById('kanban-board');
@@ -1448,7 +1454,7 @@ function setupGlobalDragAndDrop() {
 
     function cleanupDragVisuals() {
         // PERFORMANCE: Hide internal drop indicator
-        hideDropIndicator();
+        hideDropIndicatorWithState();
 
         // Remove visual feedback from tasks
         if (dragState.draggedTask) {
@@ -1491,11 +1497,11 @@ function setupGlobalDragAndDrop() {
         }
 
         // Clean up drop zone highlights
-        cleanupDropZoneHighlights();
+        cleanupDropZoneHighlightsLocal();
 
         // Hide drop feedback and indicators
         hideDropFeedback();
-        hideDropIndicator();
+        hideDropIndicatorWithState();
     }
 
     function resetDragState() {
@@ -3106,12 +3112,12 @@ function setupColumnDragAndDrop() {
             if (!board) {return;}
 
             // Clear previous highlights
-            cleanupDropZoneHighlights();
+            cleanupDropZoneHighlightsLocal();
 
             // For task/clipboard/emptycard drags, reset drop state at start of each dragover
             // If no valid target is found, task returns to original position with no highlight
             if (stillTaskDrag || stillClipboardDrag || stillEmptyCardDrag) {
-                hideDropIndicator();
+                hideDropIndicatorWithState();
             }
 
             // STEP 1: Find ROW by Y coordinate (direct DOM query)
@@ -3185,7 +3191,7 @@ function setupColumnDragAndDrop() {
                         }
                     }
                 }
-                showColumnDropIndicator(foundStack, null);
+                showColumnDropIndicatorWithState(foundStack, null);
                 return;
             }
 
@@ -3311,7 +3317,7 @@ function setupColumnDragAndDrop() {
                         columnId: targetColumn?.dataset?.columnId
                     });
                 }
-                showTaskDropIndicator(tasksContainer, { afterElement });
+                showTaskDropIndicatorWithState(tasksContainer, { afterElement });
                 return;
             }
 
@@ -3364,7 +3370,7 @@ function setupColumnDragAndDrop() {
 
             // Only show line indicator for template drags, not column drags
             if (!stillColumnDrag) {
-                showColumnDropIndicator(foundStack, beforeColumn);
+                showColumnDropIndicatorWithState(foundStack, beforeColumn);
             }
 
             // For template drags, update target info
