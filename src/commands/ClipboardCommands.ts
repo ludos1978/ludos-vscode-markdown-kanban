@@ -21,6 +21,7 @@ import {
 import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage, toForwardSlashes } from '../utils/stringUtils';
+import { showError, showWarning, showInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -354,7 +355,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
             await vscode.commands.executeCommand('revealFileInOS', safeFileUri(mediaFolderPath, 'ClipboardCommands-revealMedia'));
         } catch (error) {
             console.error('[ClipboardCommands] Error opening media folder:', error);
-            vscode.window.showErrorMessage(`Failed to open media folder: ${getErrorMessage(error)}`);
+            showError(`Failed to open media folder: ${getErrorMessage(error)}`);
         }
     }
 
@@ -493,7 +494,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
             });
 
             // Show success message
-            vscode.window.showInformationMessage(`Created ${diagramTypeLabel} diagram: ${fullFileName}`);
+            showInfo(`Created ${diagramTypeLabel} diagram: ${fullFileName}`);
 
         } catch (error) {
             console.error('[ClipboardCommands] Error creating diagram file:', error);
@@ -504,7 +505,7 @@ export class ClipboardCommands extends SwitchBasedCommand {
                 diagramType: diagramType,
                 dropPosition: dropPosition
             });
-            vscode.window.showErrorMessage(`Failed to create diagram: ${getErrorMessage(error)}`);
+            showError(`Failed to create diagram: ${getErrorMessage(error)}`);
         }
     }
 

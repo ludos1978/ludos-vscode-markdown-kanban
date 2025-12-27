@@ -31,6 +31,7 @@ import { findColumn } from '../actions/helpers';
 import { KanbanColumn } from '../board/KanbanTypes';
 import { PresentationGenerator } from '../services/export/PresentationGenerator';
 import { safeFileUri } from '../utils/uriUtils';
+import { showError, showWarning, showInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownFile } from '../files/MarkdownFile';
@@ -197,7 +198,7 @@ ${tasksContent}`;
                             const normalizedKey = MarkdownFile.normalizeRelativePath(includeFilePath);
                             preloadedContent.set(normalizedKey, content);
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to generate tasks content: ${getErrorMessage(error)}`);
+                            showError(`Failed to generate tasks content: ${getErrorMessage(error)}`);
                             this.postMessage({
                                 type: 'revertColumnTitle',
                                 columnId: columnId,
@@ -239,7 +240,7 @@ ${tasksContent}`;
 
                 const errorMsg = getErrorMessage(error);
                 if (errorMsg !== 'USER_CANCELLED') {
-                    vscode.window.showErrorMessage(`Failed to switch column include: ${errorMsg}`);
+                    showError(`Failed to switch column include: ${errorMsg}`);
                 }
             }
         } else {

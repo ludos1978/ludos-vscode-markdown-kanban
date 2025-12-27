@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { configService } from './ConfigurationService';
+import { showWarning } from './NotificationService';
 import {
     getBackupFolderPath,
     getWorkspaceBackupFolderPath,
@@ -87,7 +88,7 @@ export class BackupManager {
             return backupPath;
         } catch (error) {
             console.error('[BackupManager] Failed to create backup:', error);
-            vscode.window.showWarningMessage(`Failed to create backup: ${error}`);
+            showWarning(`Failed to create backup: ${error}`);
             return null;
         }
     }
@@ -122,7 +123,7 @@ export class BackupManager {
             return backupPath;
         } catch (error) {
             console.error('[BackupManager] Failed to create backup from content:', error);
-            vscode.window.showWarningMessage(`Failed to create backup: ${error}`);
+            showWarning(`Failed to create backup: ${error}`);
             return null;
         }
     }

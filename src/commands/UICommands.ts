@@ -24,6 +24,7 @@ import {
 } from '../core/bridge/MessageTypes';
 import { ResolvedTarget } from '../core/stores/BoardStore';
 import { KanbanBoard } from '../markdownParser';
+import { showError as notifyError, showWarning, showInfo as notifyInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 
 /**
@@ -241,11 +242,11 @@ export class UICommands extends SwitchBasedCommand {
      */
     private async handleShowMessage(message: ShowMessageRequestMessage, _context: CommandContext): Promise<CommandResult> {
         if (message.messageType === 'error') {
-            vscode.window.showErrorMessage(message.text);
+            notifyError(message.text);
         } else if (message.messageType === 'warning') {
-            vscode.window.showWarningMessage(message.text);
+            showWarning(message.text);
         } else {
-            vscode.window.showInformationMessage(message.text);
+            notifyInfo(message.text);
         }
         return this.success();
     }
@@ -254,7 +255,7 @@ export class UICommands extends SwitchBasedCommand {
      * Handle showError command
      */
     private async handleShowError(message: ShowErrorMessage): Promise<CommandResult> {
-        vscode.window.showErrorMessage(message.text);
+        notifyError(message.text);
         return this.success();
     }
 
@@ -262,7 +263,7 @@ export class UICommands extends SwitchBasedCommand {
      * Handle showInfo command
      */
     private async handleShowInfo(message: ShowInfoMessage): Promise<CommandResult> {
-        vscode.window.showInformationMessage(message.text);
+        notifyInfo(message.text);
         return this.success();
     }
 

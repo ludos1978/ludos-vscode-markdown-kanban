@@ -19,6 +19,7 @@ import { ConfigurationService } from '../services/ConfigurationService';
 import { safeFileUri } from '../utils/uriUtils';
 import { getErrorMessage } from '../utils/stringUtils';
 import { FileChangeEvent } from '../files/MarkdownFile';
+import { showError, showInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -186,7 +187,7 @@ export class ExportCommands extends SwitchBasedCommand {
                 });
 
                 if (!result.success) {
-                    vscode.window.showErrorMessage(result.message);
+                    showError(result.message);
                 }
                 return;
             }
@@ -221,15 +222,15 @@ export class ExportCommands extends SwitchBasedCommand {
 
                 // Show result message
                 if (result.success) {
-                    vscode.window.showInformationMessage(result.message);
+                    showInfo(result.message);
                 } else {
-                    vscode.window.showErrorMessage(result.message);
+                    showError(result.message);
                 }
             });
 
         } catch (error) {
             console.error('[ExportCommands.handleExport] Error:', error);
-            vscode.window.showErrorMessage(`Export failed: ${getErrorMessage(error)}`);
+            showError(`Export failed: ${getErrorMessage(error)}`);
         }
     }
 
@@ -299,7 +300,7 @@ export class ExportCommands extends SwitchBasedCommand {
                 }
             } catch (error) {
                 console.error('[ExportCommands.autoExport] Auto-export failed:', error);
-                vscode.window.showErrorMessage(`Auto-export failed: ${getErrorMessage(error)}`);
+                showError(`Auto-export failed: ${getErrorMessage(error)}`);
             }
         });
 
@@ -498,7 +499,7 @@ export class ExportCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[ExportCommands.handleOpenInMarpPreview] Error:', error);
             const errorMessage = getErrorMessage(error);
-            vscode.window.showErrorMessage(`Failed to open Marp preview: ${errorMessage}`);
+            showError(`Failed to open Marp preview: ${errorMessage}`);
         }
     }
 

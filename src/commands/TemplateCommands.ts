@@ -22,6 +22,7 @@ import { KanbanColumn } from '../board/KanbanTypes';
 import { IdGenerator } from '../utils/idGenerator';
 import { getErrorMessage } from '../utils/stringUtils';
 import { UndoCapture } from '../core/stores/UndoCapture';
+import { showError } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 
@@ -106,7 +107,7 @@ export class TemplateCommands extends SwitchBasedCommand {
 
             const templatePath = message.templatePath;
             if (!templatePath) {
-                vscode.window.showErrorMessage('No template path provided');
+                showError('No template path provided');
                 return this.failure('No template path provided');
             }
 
@@ -134,7 +135,7 @@ export class TemplateCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[TemplateCommands.handleApplyTemplate] Error:', error);
             const errorMsg = getErrorMessage(error);
-            vscode.window.showErrorMessage(`Failed to load template: ${errorMsg}`);
+            showError(`Failed to load template: ${errorMsg}`);
             return this.failure(errorMsg);
         }
     }
@@ -242,7 +243,7 @@ export class TemplateCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[TemplateCommands.createEmptyColumn] Error:', error);
             const errorMsg = getErrorMessage(error);
-            vscode.window.showErrorMessage(`Failed to create empty column: ${errorMsg}`);
+            showError(`Failed to create empty column: ${errorMsg}`);
             return this.failure(errorMsg);
         }
     }
@@ -263,7 +264,7 @@ export class TemplateCommands extends SwitchBasedCommand {
         try {
             const templatePath = message.templatePath;
             if (!templatePath) {
-                vscode.window.showErrorMessage('No template path provided');
+                showError('No template path provided');
                 return this.failure('No template path provided');
             }
 
@@ -276,7 +277,7 @@ export class TemplateCommands extends SwitchBasedCommand {
             // Validate required variables
             const validation = VariableProcessor.validateVariables(template.variables, finalVariables);
             if (!validation.valid) {
-                vscode.window.showErrorMessage(`Missing required variables: ${validation.missing.join(', ')}`);
+                showError(`Missing required variables: ${validation.missing.join(', ')}`);
                 return this.failure(`Missing required variables: ${validation.missing.join(', ')}`);
             }
 
@@ -284,7 +285,7 @@ export class TemplateCommands extends SwitchBasedCommand {
             const fileRegistry = context.getFileRegistry();
             const mainFile = fileRegistry?.getMainFile();
             if (!mainFile) {
-                vscode.window.showErrorMessage('No main file found');
+                showError('No main file found');
                 return this.failure('No main file found');
             }
             const boardFolder = path.dirname(mainFile.getPath());
@@ -304,7 +305,7 @@ export class TemplateCommands extends SwitchBasedCommand {
             // Get current board
             const currentBoard = context.getCurrentBoard();
             if (!currentBoard) {
-                vscode.window.showErrorMessage('No board available');
+                showError('No board available');
                 return this.failure('No board available');
             }
 
@@ -389,7 +390,7 @@ export class TemplateCommands extends SwitchBasedCommand {
         } catch (error) {
             console.error('[TemplateCommands.applyTemplateWithVariables] Error:', error);
             const errorMsg = getErrorMessage(error);
-            vscode.window.showErrorMessage(`Failed to apply template: ${errorMsg}`);
+            showError(`Failed to apply template: ${errorMsg}`);
             return this.failure(errorMsg);
         }
     }

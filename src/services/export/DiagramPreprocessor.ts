@@ -3,6 +3,7 @@ import { MermaidExportService } from './MermaidExportService';
 import { DrawIOService } from './DrawIOService';
 import { ExcalidrawService } from './ExcalidrawService';
 import { DiagramPatterns } from '../../shared/regexPatterns';
+import { showError } from '../NotificationService';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
@@ -274,7 +275,7 @@ export class DiagramPreprocessor {
         // Check if service is ready
         if (!this.mermaidService.isReady()) {
             console.error('[DiagramPreprocessor] ❌ MermaidExportService not ready (no webview)');
-            vscode.window.showErrorMessage(
+            showError(
                 'Cannot export Mermaid diagrams: Please open the Kanban board view first, then try exporting again.'
             );
             return [];

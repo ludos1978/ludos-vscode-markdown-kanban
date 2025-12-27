@@ -27,6 +27,7 @@ import { MarkdownKanbanParser } from '../markdownParser';
 import { ExportService } from '../services/export/ExportService';
 import { safeFileUri, getErrorMessage, selectMarkdownFile } from '../utils';
 import { PanelCommandAccess, hasIncludeFileMethods } from '../types/PanelCommandAccess';
+import { showError, showWarning, showInfo } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -168,7 +169,7 @@ export class IncludeCommands extends SwitchBasedCommand {
     private async handleRequestIncludeFileName(message: RequestIncludeFileNameMessage, context: CommandContext): Promise<CommandResult> {
         const currentFilePath = context.fileManager.getFilePath();
         if (!currentFilePath) {
-            vscode.window.showErrorMessage('No active kanban file');
+            showError('No active kanban file');
             return this.success();
         }
 
@@ -216,7 +217,7 @@ export class IncludeCommands extends SwitchBasedCommand {
 
         const currentFilePath = context.fileManager.getFilePath();
         if (!currentFilePath) {
-            vscode.window.showErrorMessage('No active kanban file');
+            showError('No active kanban file');
             return this.success();
         }
 
@@ -276,7 +277,7 @@ export class IncludeCommands extends SwitchBasedCommand {
 
         const currentFilePath = context.fileManager.getFilePath();
         if (!currentFilePath) {
-            vscode.window.showErrorMessage('No active kanban file');
+            showError('No active kanban file');
             return this.success();
         }
 
@@ -312,7 +313,7 @@ export class IncludeCommands extends SwitchBasedCommand {
     private async handleRequestTaskIncludeFileName(taskId: string, columnId: string, context: CommandContext): Promise<CommandResult> {
         const currentFilePath = context.fileManager.getFilePath();
         if (!currentFilePath) {
-            vscode.window.showErrorMessage('No active kanban file');
+            showError('No active kanban file');
             return this.success();
         }
 

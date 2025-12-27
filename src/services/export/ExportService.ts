@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { showWarning } from '../NotificationService';
 import { TagUtils, TagVisibility } from '../../utils/tagUtils';
 import { PresentationParser } from './PresentationParser';
 import { PresentationGenerator } from './PresentationGenerator';
@@ -1616,7 +1617,7 @@ export class ExportService {
         } catch (error) {
             console.error('[ExportService] Diagram preprocessing failed:', error);
             // Continue with original file if preprocessing fails
-            vscode.window.showWarningMessage(
+            showWarning(
                 'Diagram preprocessing failed. Exporting without diagram conversion.'
             );
         }

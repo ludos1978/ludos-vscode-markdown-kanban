@@ -22,6 +22,7 @@ import { FileSearchService, TrackedFileData } from '../fileSearchService';
 import { PathFormat } from '../services/FileSearchWebview';
 import { LinkOperations } from '../utils/linkOperations';
 import { UndoCapture } from '../core/stores/UndoCapture';
+import { showInfo, showWarning } from '../services/NotificationService';
 
 /**
  * Path Commands Handler
@@ -450,16 +451,16 @@ export class PathCommands extends SwitchBasedCommand {
             if (fs.existsSync(parentDir)) {
                 try {
                     await vscode.commands.executeCommand('revealFileInOS', safeFileUri(parentDir, 'PathCommands-revealParentFolder'));
-                    vscode.window.showInformationMessage(`File not found. Opened parent folder: ${path.basename(parentDir)}`);
+                    showInfo(`File not found. Opened parent folder: ${path.basename(parentDir)}`);
                     return this.success({ revealed: true, path: parentDir, fallbackToParent: true });
                 } catch (error) {
                     const errorMessage = getErrorMessage(error);
                     console.error(`[PathCommands] Error revealing parent folder:`, error);
-                    vscode.window.showWarningMessage(`File not found and failed to open parent folder: ${errorMessage}`);
+                    showWarning(`File not found and failed to open parent folder: ${errorMessage}`);
                     return this.failure(`File not found and failed to open parent folder: ${errorMessage}`);
                 }
             } else {
-                vscode.window.showWarningMessage(`File not found: ${resolvedPath}`);
+                showWarning(`File not found: ${resolvedPath}`);
                 return this.failure(`Path does not exist: ${resolvedPath}`);
             }
         }
@@ -470,7 +471,7 @@ export class PathCommands extends SwitchBasedCommand {
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             console.error(`[PathCommands] Error revealing path in explorer:`, error);
-            vscode.window.showWarningMessage(`Failed to reveal in file explorer: ${errorMessage}`);
+            showWarning(`Failed to reveal in file explorer: ${errorMessage}`);
             return this.failure(`Failed to reveal in file explorer: ${errorMessage}`);
         }
     }
@@ -627,7 +628,7 @@ export class PathCommands extends SwitchBasedCommand {
             filePath: foundFile.getRelativePath()
         });
 
-        vscode.window.showInformationMessage(`Element deleted`);
+        showInfo(`Element deleted`);
 
         return this.success({
             deleted: true,
@@ -816,7 +817,7 @@ export class PathCommands extends SwitchBasedCommand {
             filePath: foundFile.getRelativePath()
         });
 
-        vscode.window.showInformationMessage(successMessage);
+        showInfo(successMessage);
 
         return this.success({
             replaced: true,
@@ -933,7 +934,7 @@ export class PathCommands extends SwitchBasedCommand {
         }
 
         if (pathsToReplace.size === 0) {
-            vscode.window.showWarningMessage('No matching paths found to replace.');
+            showWarning('No matching paths found to replace.');
             return this.success({ replaced: false, count: 0 });
         }
 
@@ -1000,7 +1001,7 @@ export class PathCommands extends SwitchBasedCommand {
         const skippedMsg = skippedPaths.length > 0
             ? ` (${skippedPaths.length} skipped - file not found)`
             : '';
-        vscode.window.showInformationMessage(
+        showInfo(
             `Replaced ${pathsToReplace.size} paths${skippedMsg}`
         );
 

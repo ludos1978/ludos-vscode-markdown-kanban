@@ -13,6 +13,7 @@
 import { SwitchBasedCommand, CommandContext, CommandMetadata, CommandResult, MessageHandler } from './interfaces';
 import { PathResolver } from '../services/PathResolver';
 import { getErrorMessage } from '../utils/stringUtils';
+import { showInfo, showWarning } from '../services/NotificationService';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import {
@@ -233,9 +234,9 @@ export class FileCommands extends SwitchBasedCommand {
         const resolution = await context.fileManager.resolveFilePath(message.path);
         if (resolution && resolution.exists) {
             await vscode.env.clipboard.writeText(resolution.resolvedPath);
-            vscode.window.showInformationMessage('Full path copied: ' + resolution.resolvedPath);
+            showInfo('Full path copied: ' + resolution.resolvedPath);
         } else {
-            vscode.window.showWarningMessage('Could not resolve path: ' + message.path);
+            showWarning('Could not resolve path: ' + message.path);
         }
         return this.success();
     }
