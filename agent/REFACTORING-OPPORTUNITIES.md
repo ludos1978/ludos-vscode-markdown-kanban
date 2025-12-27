@@ -11,6 +11,9 @@ This document consolidates code quality analysis across HTML, CSS, JavaScript, a
 | 2025-12-27 | `saveCurrentField()` split into 20 focused methods | ✅ DONE | ~70 (better structure) |
 | 2025-12-27 | `getTextColorsForBackground()` helper in colorUtils.js | ✅ DONE | ~15 |
 | 2025-12-27 | Updated tagStyleManager.js to use new color helper | ✅ DONE | ~14 |
+| 2025-12-27 | Unified dropdown positioning in menuUtils.js | ✅ DONE | ~50 |
+| 2025-12-27 | NotificationService.ts for centralized notifications | ✅ DONE | ~200 (when fully adopted) |
+| 2025-12-27 | SwitchBasedCommand base class for command handlers | ✅ DONE | ~220 (when fully adopted) |
 
 ---
 

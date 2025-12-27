@@ -904,65 +904,17 @@ function setupMenuHoverHandlers(menu, dropdown) {
     });
 }
 
-// Simple dropdown positioning - move to body to escape stacking contexts
+// Simple dropdown positioning - uses unified menuUtils.positionDropdownMenu
 function positionDropdown(triggerButton, dropdown) {
-    const rect = triggerButton.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // Move dropdown to body first to get accurate measurements
-    if (dropdown.parentElement !== document.body) {
-        // Store original parent for cleanup later
-        dropdown._originalParent = dropdown.parentElement;
-        dropdown._originalNextSibling = dropdown.nextSibling;
-        document.body.appendChild(dropdown);
-        dropdown.classList.add('moved-to-body');
+    // Use unified function with moveToBody enabled (for donut menu stacking context escape)
+    if (window.menuUtils && window.menuUtils.positionDropdownMenu) {
+        window.menuUtils.positionDropdownMenu(triggerButton, dropdown, {
+            moveToBody: true,
+            offsetY: 5,
+            defaultWidth: 180,
+            defaultHeight: 300
+        });
     }
-    
-    // Ensure fixed positioning and correct z-index
-    dropdown.style.position = 'fixed';
-    dropdown.style.zIndex = '2147483640';
-    
-    // Get actual dropdown dimensions by temporarily showing it
-    const originalDisplay = dropdown.style.display;
-    const originalVisibility = dropdown.style.visibility;
-    dropdown.style.visibility = 'hidden';
-    dropdown.style.display = 'block';
-    
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const dropdownWidth = dropdownRect.width || 180;
-    const dropdownHeight = dropdownRect.height || 300;
-    
-    // Calculate horizontal position (prefer right side of trigger)
-    let left = rect.right - dropdownWidth;
-    
-    // Check boundaries and adjust
-    if (left < 10) {left = 10;}
-    if (left + dropdownWidth > viewportWidth - 10) {
-        left = viewportWidth - dropdownWidth - 10;
-    }
-    
-    // Calculate vertical position (prefer below trigger)
-    let top = rect.bottom + 5;
-    
-    // If dropdown goes off bottom, position above trigger
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = rect.top - dropdownHeight - 5;
-    }
-    
-    // Final boundary check
-    if (top < 10) {top = 10;}
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = viewportHeight - dropdownHeight - 10;
-    }
-    
-    // Apply positioning
-    dropdown.style.left = left + 'px';
-    dropdown.style.top = top + 'px';
-    
-    // Restore original visibility
-    dropdown.style.visibility = originalVisibility;
-    dropdown.style.display = originalDisplay;
 }
 
 // NOTE: toggleFileBarMenu and positionFileBarDropdown are defined in webview.js

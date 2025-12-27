@@ -22,6 +22,7 @@ import { NewExportOptions } from '../../services/export/ExportService';
 import { CapturedEdit } from '../../files/FileInterfaces';
 import { BoardChangeTrigger } from '../../core/events';
 import { ActionExecutor, BoardAction, ExecuteOptions, ActionResult } from '../../actions';
+import { getErrorMessage } from '../../utils/stringUtils';
 import * as vscode from 'vscode';
 
 /**
@@ -353,5 +354,63 @@ export abstract class BaseMessageCommand implements MessageCommand {
         });
 
         return executor.execute(action, options);
+    }
+}
+
+/**
+ * Handler function type for switch-based commands
+ */
+export type MessageHandler = (message: IncomingMessage, context: CommandContext) => Promise<CommandResult>;
+
+/**
+ * Abstract base class for commands that use a switch statement to dispatch message types.
+ *
+ * Reduces boilerplate by:
+ * - Providing a standard execute() implementation with try-catch
+ * - Using a handlers record to map message types to handler methods
+ * - Automatic error handling with consistent logging
+ *
+ * Child classes define handlers as a protected record, allowing type-safe handler lookup.
+ *
+ * @example
+ * export class TaskCommands extends SwitchBasedCommand {
+ *     readonly metadata = {
+ *         id: 'task-commands',
+ *         messageTypes: ['addTask', 'deleteTask'],
+ *         // ...
+ *     };
+ *
+ *     protected handlers = {
+ *         addTask: this.handleAddTask.bind(this),
+ *         deleteTask: this.handleDeleteTask.bind(this),
+ *     };
+ *
+ *     private async handleAddTask(msg: IncomingMessage, ctx: CommandContext) { ... }
+ *     private async handleDeleteTask(msg: IncomingMessage, ctx: CommandContext) { ... }
+ * }
+ */
+export abstract class SwitchBasedCommand extends BaseMessageCommand {
+    /**
+     * Record mapping message types to their handler methods.
+     * Child classes must define this with all handlers bound to `this`.
+     */
+    protected abstract handlers: Record<string, MessageHandler>;
+
+    /**
+     * Execute the command by looking up the handler for the message type.
+     * Provides consistent error handling and logging.
+     */
+    async execute(message: IncomingMessage, context: CommandContext): Promise<CommandResult> {
+        try {
+            const handler = this.handlers[message.type];
+            if (handler) {
+                return await handler(message, context);
+            }
+            return this.failure(`Unknown ${this.metadata.id} command: ${message.type}`);
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            console.error(`[${this.metadata.id}] Error handling ${message.type}:`, error);
+            return this.failure(errorMessage);
+        }
     }
 }

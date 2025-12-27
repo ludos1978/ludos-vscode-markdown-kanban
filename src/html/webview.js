@@ -540,52 +540,17 @@ async function updateClipboardCardSource(force = false) {
     }
 }
 
-// Function to position file bar dropdown (uses dynamic measurement)
+// Function to position file bar dropdown - uses unified menuUtils.positionDropdownMenu
 function positionFileBarDropdown(triggerButton, dropdown) {
-    const rect = triggerButton.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Get actual dropdown dimensions by temporarily showing it
-    const originalDisplay = dropdown.style.display;
-    const originalVisibility = dropdown.style.visibility;
-    dropdown.style.visibility = 'hidden';
-    dropdown.style.display = 'block';
-
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const dropdownWidth = dropdownRect.width || 200;
-    const dropdownHeight = dropdownRect.height || 150;
-
-    // Calculate horizontal position (prefer aligned with right edge of trigger)
-    let left = rect.right - dropdownWidth;
-
-    // Check horizontal boundaries
-    if (left < 10) { left = 10; }
-    if (left + dropdownWidth > viewportWidth - 10) {
-        left = viewportWidth - dropdownWidth - 10;
+    // Use unified function (no moveToBody needed for file bar menus)
+    if (window.menuUtils && window.menuUtils.positionDropdownMenu) {
+        window.menuUtils.positionDropdownMenu(triggerButton, dropdown, {
+            moveToBody: false,
+            offsetY: 4,
+            defaultWidth: 200,
+            defaultHeight: 150
+        });
     }
-
-    // Calculate vertical position (prefer below trigger)
-    let top = rect.bottom + 4;
-
-    // If dropdown goes off bottom, position above trigger
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = rect.top - dropdownHeight - 4;
-    }
-
-    // Final vertical boundary check
-    if (top < 10) { top = 10; }
-    if (top + dropdownHeight > viewportHeight - 10) {
-        top = viewportHeight - dropdownHeight - 10;
-    }
-
-    // Apply positioning
-    dropdown.style.left = left + 'px';
-    dropdown.style.top = top + 'px';
-
-    // Restore original visibility
-    dropdown.style.visibility = originalVisibility;
-    dropdown.style.display = originalDisplay;
 }
 
 // Function to toggle file bar menu

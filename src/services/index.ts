@@ -33,6 +33,19 @@ export {
 // Output channel
 export { getOutputChannel, initializeOutputChannel } from './OutputChannelService';
 
+// Notifications
+export {
+    NotificationService,
+    notificationService,
+    showError,
+    showWarning,
+    showInfo,
+    confirm,
+    confirmUnsavedChanges,
+    ConfirmResult,
+    SaveDiscardResult
+} from './NotificationService';
+
 // Asset services
 export * from './assets';
 

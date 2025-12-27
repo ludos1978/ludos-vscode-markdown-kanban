@@ -344,6 +344,105 @@ function postEditMessage(elementType, elementId, columnId, newTitle) {
     }
 }
 
+/**
+ * Unified dropdown positioning function
+ * Positions a dropdown menu relative to a trigger button, handling viewport boundaries
+ *
+ * @param {HTMLElement} triggerButton - The button that triggers the dropdown
+ * @param {HTMLElement} dropdown - The dropdown element to position
+ * @param {Object} options - Positioning options
+ * @param {boolean} options.moveToBody - Move dropdown to body to escape stacking contexts (default: false)
+ * @param {number} options.offsetY - Vertical offset from trigger (default: 5)
+ * @param {number} options.margin - Minimum margin from viewport edges (default: 10)
+ * @param {number} options.defaultWidth - Fallback width if measurement fails (default: 180)
+ * @param {number} options.defaultHeight - Fallback height if measurement fails (default: 200)
+ * @param {string} options.zIndex - Z-index for dropdown (default: '2147483640')
+ */
+function positionDropdownMenu(triggerButton, dropdown, options = {}) {
+    const {
+        moveToBody = false,
+        offsetY = 5,
+        margin = 10,
+        defaultWidth = 180,
+        defaultHeight = 200,
+        zIndex = '2147483640'
+    } = options;
+
+    const rect = triggerButton.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Move dropdown to body if needed to escape stacking contexts
+    if (moveToBody && dropdown.parentElement !== document.body) {
+        dropdown._originalParent = dropdown.parentElement;
+        dropdown._originalNextSibling = dropdown.nextSibling;
+        document.body.appendChild(dropdown);
+        dropdown.classList.add('moved-to-body');
+    }
+
+    // Set positioning styles
+    dropdown.style.position = 'fixed';
+    dropdown.style.zIndex = zIndex;
+
+    // Get actual dropdown dimensions by temporarily showing it
+    const originalDisplay = dropdown.style.display;
+    const originalVisibility = dropdown.style.visibility;
+    dropdown.style.visibility = 'hidden';
+    dropdown.style.display = 'block';
+
+    const dropdownRect = dropdown.getBoundingClientRect();
+    const dropdownWidth = dropdownRect.width || defaultWidth;
+    const dropdownHeight = dropdownRect.height || defaultHeight;
+
+    // Calculate horizontal position (prefer right edge aligned with trigger)
+    let left = rect.right - dropdownWidth;
+
+    // Check horizontal boundaries
+    if (left < margin) { left = margin; }
+    if (left + dropdownWidth > viewportWidth - margin) {
+        left = viewportWidth - dropdownWidth - margin;
+    }
+
+    // Calculate vertical position (prefer below trigger)
+    let top = rect.bottom + offsetY;
+
+    // If dropdown goes off bottom, position above trigger
+    if (top + dropdownHeight > viewportHeight - margin) {
+        top = rect.top - dropdownHeight - offsetY;
+    }
+
+    // Final vertical boundary check
+    if (top < margin) { top = margin; }
+    if (top + dropdownHeight > viewportHeight - margin) {
+        top = viewportHeight - dropdownHeight - margin;
+    }
+
+    // Apply positioning
+    dropdown.style.left = left + 'px';
+    dropdown.style.top = top + 'px';
+
+    // Restore original visibility
+    dropdown.style.visibility = originalVisibility;
+    dropdown.style.display = originalDisplay;
+}
+
+/**
+ * Restore a dropdown that was moved to body back to its original parent
+ * @param {HTMLElement} dropdown - The dropdown to restore
+ */
+function restoreDropdownPosition(dropdown) {
+    if (dropdown._originalParent && dropdown.classList.contains('moved-to-body')) {
+        if (dropdown._originalNextSibling) {
+            dropdown._originalParent.insertBefore(dropdown, dropdown._originalNextSibling);
+        } else {
+            dropdown._originalParent.appendChild(dropdown);
+        }
+        dropdown.classList.remove('moved-to-body');
+        dropdown._originalParent = null;
+        dropdown._originalNextSibling = null;
+    }
+}
+
 // Create menuUtils object
 const menuUtils = {
     shouldExecute,
@@ -363,7 +462,10 @@ const menuUtils = {
     updateIncludeInTitle,
     hasIncludeMode,
     getIncludeFile,
-    postEditMessage
+    postEditMessage,
+    // Dropdown positioning utilities
+    positionDropdownMenu,
+    restoreDropdownPosition
 };
 
 // Global window exposure
