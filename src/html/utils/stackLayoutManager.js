@@ -309,8 +309,8 @@ function reorganizeStacksForColumn(columnId) {
     });
 
     // Update drop zones
-    if (typeof window.cleanupStacksAndAddDropZones === 'function') {
-        window.cleanupStacksAndAddDropZones(rowContainer);
+    if (typeof window.cleanupAndRecreateDropZones === 'function') {
+        window.cleanupAndRecreateDropZones(rowContainer);
     }
 
     return true;

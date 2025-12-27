@@ -1706,6 +1706,12 @@ function deleteColumn(columnId) {
                 if (typeof window.updateStackBottomDropZones === 'function') {
                     window.updateStackBottomDropZones();
                 }
+
+                // Clean up empty stacks and recreate drop zones
+                const rowContainer = stack?.closest('.kanban-row');
+                if (rowContainer && typeof window.cleanupAndRecreateDropZones === 'function') {
+                    window.cleanupAndRecreateDropZones(rowContainer);
+                }
             }
 
             // NOTE: We intentionally do NOT call markUnsavedChanges() here.
