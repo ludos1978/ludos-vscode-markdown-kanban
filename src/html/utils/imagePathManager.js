@@ -15,6 +15,22 @@
  */
 
 // ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Close all path-related menus (image, include, and floating menus)
+ * Centralized cleanup to avoid code duplication across menu operations
+ */
+function closeAllPathMenus() {
+    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
+        menu.classList.remove('visible');
+    });
+    document.getElementById('floating-image-path-menu')?.remove();
+    document.getElementById('floating-include-path-menu')?.remove();
+}
+
+// ============================================================================
 // PATH CONVERSION
 // ============================================================================
 
@@ -38,13 +54,7 @@ function convertPathsToAbsolute() {
  */
 function convertSinglePath(imagePath, direction, skipRefresh = false) {
     console.log(`[convertSinglePath] Called with path: "${imagePath}", direction: ${direction}, skipRefresh: ${skipRefresh}`);
-
-    // Close all menus (both image and include) - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     vscode.postMessage({
         type: 'convertSinglePath',
@@ -64,13 +74,7 @@ function convertSinglePath(imagePath, direction, skipRefresh = false) {
  */
 function openPath(filePath) {
     console.log(`[openPath] Called with path: "${filePath}"`);
-
-    // Close all menus (both image and include) - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     vscode.postMessage({
         type: 'openPath',
@@ -84,13 +88,7 @@ function openPath(filePath) {
  */
 function revealPathInExplorer(filePath) {
     console.log(`[revealPathInExplorer] Called with path: "${filePath}"`);
-
-    // Close all menus (both image and include) - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     vscode.postMessage({
         type: 'revealPathInExplorer',
@@ -144,13 +142,7 @@ function getShortDisplayPath(filePath, maxFolderChars = 20) {
  */
 function searchForFile(filePath, taskId, columnId, isColumnTitle) {
     console.log(`[searchForFile] Called with path: "${filePath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
-
-    // Close all menus - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     const message = {
         type: 'searchForFile',
@@ -173,13 +165,7 @@ function searchForFile(filePath, taskId, columnId, isColumnTitle) {
  */
 function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
     console.log(`[browseForImage] Called with oldPath: "${oldPath}", taskId: ${taskId}, columnId: ${columnId}, isColumnTitle: ${isColumnTitle}`);
-
-    // Close all menus - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     const message = {
         type: 'browseForImage',
@@ -198,13 +184,7 @@ function browseForImage(oldPath, taskId, columnId, isColumnTitle) {
  */
 function deleteFromMarkdown(path) {
     console.log(`[deleteFromMarkdown] Called with path: "${path}"`);
-
-    // Close all menus - including floating menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
-    document.getElementById('floating-image-path-menu')?.remove();
-    document.getElementById('floating-include-path-menu')?.remove();
+    closeAllPathMenus();
 
     vscode.postMessage({
         type: 'deleteFromMarkdown',
@@ -222,16 +202,8 @@ function deleteFromMarkdown(path) {
  * Creates menu dynamically and appends to body to avoid stacking context issues
  */
 function toggleImagePathMenu(container, imagePath) {
-    // Close any existing floating menus
-    const existingMenu = document.getElementById('floating-image-path-menu');
-    if (existingMenu) {
-        existingMenu.remove();
-    }
-
-    // Close any other open menus (both image and include)
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
+    // Close any existing floating menus and other open menus
+    closeAllPathMenus();
 
     // Get button position for menu placement
     const button = container.querySelector('.image-menu-btn');
@@ -318,16 +290,8 @@ function toggleImagePathMenu(container, imagePath) {
  * Creates a floating menu appended to body to escape stacking context issues
  */
 function toggleIncludePathMenu(container, includePath) {
-    // Remove any existing floating menu
-    const existingMenu = document.getElementById('floating-include-path-menu');
-    if (existingMenu) {
-        existingMenu.remove();
-    }
-
-    // Close any other open menus (both image and include)
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        menu.classList.remove('visible');
-    });
+    // Close any existing floating menus and other open menus
+    closeAllPathMenus();
 
     // Get button position for menu placement
     const button = container.querySelector('.include-menu-btn');
@@ -383,12 +347,8 @@ function toggleIncludePathMenu(container, includePath) {
  * Toggle the image-not-found menu visibility
  */
 function toggleImageNotFoundMenu(container) {
-    // Close any other open menus
-    document.querySelectorAll('.image-path-menu.visible, .include-path-menu.visible, .image-not-found-menu.visible').forEach(menu => {
-        if (menu.parentElement !== container) {
-            menu.classList.remove('visible');
-        }
-    });
+    // Close any other open menus except this container's own menu
+    closeAllPathMenus();
 
     const menu = container.querySelector('.image-not-found-menu');
     if (menu) {
@@ -871,6 +831,9 @@ if (!window._imagePathManagerInitialized) {
 // ============================================================================
 // WINDOW EXPORTS
 // ============================================================================
+
+// Utility functions
+window.closeAllPathMenus = closeAllPathMenus;
 
 // Path conversion
 window.convertPathsToRelative = convertPathsToRelative;
