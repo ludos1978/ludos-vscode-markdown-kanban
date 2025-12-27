@@ -817,20 +817,6 @@ body.small-card-fonts .task-title-container .markdown-content img {
 	align-items: center;
 }
 
-.column-inner {
-  /* This is the scrollable container for sticky positioning */
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  /* overflow-y: auto; */ /* must be disabled for sticky childs to work */
-	/* border-bottom: 0.5px solid var(--vscode-panel-border); */
-	/* border-radius: 0px 0px 4px 4px; */
-  overflow-x: visible;
-  /* min-height: 100%; */
-	max-height: min-content;
-  background-color: transparent;
-}
-
 /* Note: .column-footer is defined later in the file with complete styling */
 
 .column-content {

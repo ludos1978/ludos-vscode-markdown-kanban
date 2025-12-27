@@ -27,3 +27,5 @@ _Export/
 tests/kanban-huge-test
 *-unsavedchanges.md
 .*.md.mediacache.json
+drawio-cache/
+*.drawio.bkp
