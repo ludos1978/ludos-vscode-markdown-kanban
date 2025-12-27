@@ -6,6 +6,7 @@ import { PluginLoader } from './plugins';
 import { selectMarkdownFile } from './utils';
 import { initializeOutputChannel } from './services/OutputChannelService';
 import { SaveEventDispatcher } from './SaveEventDispatcher';
+import { showError, showWarning, showInfo } from './services/NotificationService';
 
 // Re-export for external access
 export { getOutputChannel } from './services/OutputChannelService';
@@ -85,7 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// Check if file is markdown
 		if (!targetUri.fsPath.endsWith('.md')) {
-			vscode.window.showErrorMessage('Please select a markdown file.');
+			showError('Please select a markdown file.');
 			return;
 		}
 		
@@ -98,14 +99,14 @@ export function activate(context: vscode.ExtensionContext) {
 			// Create or show kanban panel in center area
 			KanbanWebviewPanel.createOrShow(context.extensionUri, context, document);
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to open kanban: ${error}`);
+			showError(`Failed to open kanban: ${error}`);
 		}
 	});
 
 	const disableFileListenerCommand = vscode.commands.registerCommand('markdown-kanban.disableFileListener', async () => {
 		fileListenerEnabled = !fileListenerEnabled;
 		const status = fileListenerEnabled ? 'enabled' : 'disabled';
-		vscode.window.showInformationMessage(`Kanban auto-switching ${status}`);
+		showInfo(`Kanban auto-switching ${status}`);
 	});
 
 	// Command to toggle file opening behavior
@@ -113,9 +114,9 @@ export function activate(context: vscode.ExtensionContext) {
 		const currentSetting = configService.getConfig('openLinksInNewTab');
 
 		await configService.updateConfig('openLinksInNewTab', !currentSetting, vscode.ConfigurationTarget.Global);
-		
+
 		const newBehavior = !currentSetting ? 'new tabs' : 'current tab';
-		vscode.window.showInformationMessage(`Kanban file links will now open in ${newBehavior}`);
+		showInfo(`Kanban file links will now open in ${newBehavior}`);
 	});
 
 	// Command to toggle file lock
@@ -126,7 +127,7 @@ export function activate(context: vscode.ExtensionContext) {
 			if (panel) {
 				panel.toggleFileLock();
 			} else {
-				vscode.window.showWarningMessage('No kanban panel is open for this document.');
+				showWarning('No kanban panel is open for this document.');
 			}
 		} else {
 			// Try to find any active panel (for backward compatibility)
@@ -134,9 +135,9 @@ export function activate(context: vscode.ExtensionContext) {
 			if (panels.length === 1) {
 				panels[0].toggleFileLock();
 			} else if (panels.length > 1) {
-				vscode.window.showWarningMessage('Multiple kanban panels open. Please focus on the markdown document you want to lock/unlock.');
+				showWarning('Multiple kanban panels open. Please focus on the markdown document you want to lock/unlock.');
 			} else {
-				vscode.window.showWarningMessage('No kanban panel is currently open.');
+				showWarning('No kanban panel is currently open.');
 			}
 		}
 	});
@@ -145,7 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const openKanbanFromPanelCommand = vscode.commands.registerCommand('markdown-kanban.openKanbanFromPanel', async () => {
 		const panels = KanbanWebviewPanel.getAllPanels();
 		if (panels.length === 0) {
-			vscode.window.showWarningMessage('No kanban panel is currently open.');
+			showWarning('No kanban panel is currently open.');
 			return;
 		}
 
@@ -156,9 +157,9 @@ export function activate(context: vscode.ExtensionContext) {
 				const document = await vscode.workspace.openTextDocument(targetUri);
 				// This will create a new panel or reuse existing one for this document
 				KanbanWebviewPanel.createOrShow(context.extensionUri, context, document);
-				vscode.window.showInformationMessage(`Kanban opened for: ${document.fileName}`);
+				showInfo(`Kanban opened for: ${document.fileName}`);
 			} catch (error) {
-				vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+				showError(`Failed to open file: ${error}`);
 			}
 		}
 	});
@@ -167,7 +168,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const switchFileCommand = vscode.commands.registerCommand('markdown-kanban.switchFile', async () => {
 		const panels = KanbanWebviewPanel.getAllPanels();
 		if (panels.length === 0) {
-			vscode.window.showWarningMessage('No kanban panel is currently open.');
+			showWarning('No kanban panel is currently open.');
 			return;
 		}
 
@@ -179,9 +180,9 @@ export function activate(context: vscode.ExtensionContext) {
 				const document = await vscode.workspace.openTextDocument(targetUri);
 				// This will create a new panel or reuse existing one
 				KanbanWebviewPanel.createOrShow(context.extensionUri, context, document);
-				vscode.window.showInformationMessage(`Kanban opened for: ${document.fileName}`);
+				showInfo(`Kanban opened for: ${document.fileName}`);
 			} catch (error) {
-				vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+				showError(`Failed to open file: ${error}`);
 			}
 		}
 	});
@@ -189,7 +190,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const insertSnippetCommand = vscode.commands.registerCommand('markdown-kanban.insertSnippet', async () => {
 		const panels = KanbanWebviewPanel.getAllPanels();
 		if (panels.length === 0) {
-			vscode.window.showWarningMessage('No kanban panel is currently open.');
+			showWarning('No kanban panel is currently open.');
 			return;
 		}
 

@@ -4,6 +4,7 @@ import { FileTypeUtils, toForwardSlashes, selectMarkdownFile, safeDecodeURICompo
 import * as fs from 'fs';
 import { configService } from './services/ConfigurationService';
 import { HandleFileDropMessage, HandleUriDropMessage, EditorDropPosition } from './core/bridge/MessageTypes';
+import { showError, showInfo } from './services/NotificationService';
 
 export interface FileInfo {
     fileName: string;
@@ -97,7 +98,7 @@ export class FileManager {
         this._isFileLocked = !this._isFileLocked;
         this.sendFileInfo();
         const status = this._isFileLocked ? 'locked' : 'unlocked';
-        vscode.window.showInformationMessage(`Kanban file ${status}`);
+        showInfo(`Kanban file ${status}`);
     }
 
     public getCurrentDocumentUri(): vscode.Uri | undefined {
@@ -128,7 +129,7 @@ export class FileManager {
                 const document = await vscode.workspace.openTextDocument(targetUri);
                 return document;
             } catch (error) {
-                vscode.window.showErrorMessage(`Failed to open file: ${error}`);
+                showError(`Failed to open file: ${error}`);
                 return null;
             }
         }
@@ -239,7 +240,7 @@ export class FileManager {
             });
             
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to handle file drop: ${error}`);
+            showError(`Failed to handle file drop: ${error}`);
         }
     }
 
@@ -285,7 +286,7 @@ export class FileManager {
             }
             
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to handle URI drop: ${error}`);
+            showError(`Failed to handle URI drop: ${error}`);
         }
     }
 

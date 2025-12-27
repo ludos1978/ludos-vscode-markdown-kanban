@@ -11,6 +11,7 @@ import { getErrorMessage } from './utils/stringUtils';
 import { PanelContext, WebviewManager } from './panel';
 import { BoardStore } from './core/stores';
 import { DOCUMENT_CHANGE_DEBOUNCE_MS } from './constants/TimeoutConstants';
+import { showError, showWarning, showInfo } from './services/NotificationService';
 
 /**
  * Save operation state for hybrid state machine + version tracking
@@ -270,7 +271,7 @@ export class KanbanFileService {
                 }
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Kanban parsing error: ${getErrorMessage(error)}`);
+            showError(`Kanban parsing error: ${getErrorMessage(error)}`);
             this.setBoard({
                 valid: false,
                 title: 'Error Loading Board',
@@ -354,7 +355,7 @@ export class KanbanFileService {
     public async initializeFile(): Promise<void> {
         const document = this.fileManager.getDocument();
         if (!document) {
-            vscode.window.showErrorMessage('No document loaded');
+            showError('No document loaded');
             return;
         }
 
@@ -364,7 +365,7 @@ export class KanbanFileService {
         );
 
         if (!isDocumentOpen) {
-            vscode.window.showWarningMessage(
+            showWarning(
                 `Cannot initialize: "${path.basename(document.fileName)}" has been closed. Please reopen the file.`,
                 'Open File'
             ).then(async selection => {
@@ -399,11 +400,11 @@ export class KanbanFileService {
             // Reload the file after successful initialization (forceReload=true to bypass early-return check)
             await this.loadMarkdownFile(document, true);
 
-            vscode.window.showInformationMessage('Kanban board initialized successfully');
+            showInfo('Kanban board initialized successfully');
         } catch (error) {
             // STATE MACHINE: Error recovery
             this._saveState = SaveState.IDLE;
-            vscode.window.showErrorMessage(`Failed to initialize file: ${error}`);
+            showError(`Failed to initialize file: ${error}`);
         }
     }
 

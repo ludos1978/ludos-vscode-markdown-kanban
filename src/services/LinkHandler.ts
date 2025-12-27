@@ -16,6 +16,7 @@ import {
     hasExtension,
     DOTTED_EXTENSIONS
 } from '../constants/FileExtensions';
+import { showError, showWarning, showInfo } from './NotificationService';
 
 export class LinkHandler {
     private _fileManager: FileManager;
@@ -51,7 +52,7 @@ export class LinkHandler {
             const resolution = await this._fileManager.resolveFilePath(href, includeContext);
 
             if (!resolution) {
-                vscode.window.showErrorMessage(`Could not resolve file path: ${href}`);
+                showError(`Could not resolve file path: ${href}`);
                 return;
             }
 
@@ -89,14 +90,12 @@ export class LinkHandler {
                 const pathsList = attemptedPaths.map((p, i) => `  ${i + 1}. ${p}`).join('\n');
 
                 if (isAbsolute) {
-                    vscode.window.showWarningMessage(
-                        `File not found: ${resolvedPath}\n\nAttempted path:\n${pathsList}${contextInfo}`,
-                        { modal: false }
+                    showWarning(
+                        `File not found: ${resolvedPath}\n\nAttempted path:\n${pathsList}${contextInfo}`
                     );
                 } else {
-                    vscode.window.showWarningMessage(
-                        `File not found: ${href}\n\nSearched in the following locations:\n${pathsList}${contextInfo}`,
-                        { modal: false }
+                    showWarning(
+                        `File not found: ${href}\n\nSearched in the following locations:\n${pathsList}${contextInfo}`
                     );
                 }
 
@@ -113,7 +112,7 @@ export class LinkHandler {
                     return;
                 }
             } catch (error) {
-                vscode.window.showErrorMessage(`Error accessing file: ${resolvedPath}`);
+                showError(`Error accessing file: ${resolvedPath}`);
                 return;
             }
 
@@ -133,7 +132,7 @@ export class LinkHandler {
                     await vscode.commands.executeCommand('vscode.open', fileUri);
 
                     const diagramType = isDrawioFile(resolvedPath) ? 'draw.io' : 'Excalidraw';
-                    vscode.window.showInformationMessage(
+                    showInfo(
                         `Opened ${diagramType} diagram: ${path.basename(resolvedPath)}`
                     );
                     return;
@@ -142,12 +141,12 @@ export class LinkHandler {
                     // If VS Code can't open it, try opening externally
                     try {
                         await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
-                        vscode.window.showInformationMessage(
+                        showInfo(
                             `Opened externally: ${path.basename(resolvedPath)}`
                         );
                         return;
                     } catch (externalError) {
-                        vscode.window.showErrorMessage(`Failed to open diagram file: ${resolvedPath}`);
+                        showError(`Failed to open diagram file: ${resolvedPath}`);
                         return;
                     }
                 }
@@ -207,7 +206,7 @@ export class LinkHandler {
                         );
 
                         const resolutionMethod = isWorkspaceRelative ? 'workspace-relative' : 'document-relative';
-                        vscode.window.showInformationMessage(
+                        showInfo(
                             `Opened in VS Code: ${path.basename(resolvedPath)} (${resolutionMethod} path: ${href})`
                         );
                     }
@@ -215,33 +214,33 @@ export class LinkHandler {
                     console.warn(`VS Code couldn't open file, trying OS default: ${resolvedPath}`, error);
                     try {
                         await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
-                        vscode.window.showInformationMessage(
+                        showInfo(
                             `Opened externally: ${path.basename(resolvedPath)}`
                         );
                     } catch (externalError) {
-                        vscode.window.showErrorMessage(`Failed to open file: ${resolvedPath}`);
+                        showError(`Failed to open file: ${resolvedPath}`);
                     }
                 }
             } else {
                 try {
                     await vscode.env.openExternal(safeFileUri(resolvedPath, 'linkHandler'));
-                    vscode.window.showInformationMessage(
+                    showInfo(
                         `Opened externally: ${path.basename(resolvedPath)}`
                     );
                 } catch (error) {
                     try {
                         await vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolvedPath, 'linkHandler'));
-                        vscode.window.showInformationMessage(
+                        showInfo(
                             `Revealed in file explorer: ${path.basename(resolvedPath)}`
                         );
                     } catch (revealError) {
-                        vscode.window.showErrorMessage(`Failed to open file: ${resolvedPath}`);
+                        showError(`Failed to open file: ${resolvedPath}`);
                     }
                 }
             }
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to handle file link: ${href}`);
+            showError(`Failed to handle file link: ${href}`);
         }
     }
 
@@ -262,7 +261,7 @@ export class LinkHandler {
                 columnId,
                 linkIndex
             });
-            vscode.window.showErrorMessage(`No document loaded to update links. originalPath: ${originalPath}, taskId: ${taskId}, columnId: ${columnId}`);
+            showError(`No document loaded to update links. originalPath: ${originalPath}, taskId: ${taskId}, columnId: ${columnId}`);
             return;
         }
 
@@ -282,7 +281,7 @@ export class LinkHandler {
             linkIndex
         });
 
-        vscode.window.showInformationMessage(`Link updated: ${originalPath} → ${configuredPath}`);
+        showInfo(`Link updated: ${originalPath} → ${configuredPath}`);
     }
 
     /**
@@ -356,20 +355,20 @@ export class LinkHandler {
                                 });
                             }
 
-                            vscode.window.showInformationMessage(
+                            showInfo(
                                 `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)}`
                             );
                         } else {
                             // For binary files (images, videos, etc.), reveal in file explorer or open with default application
                             try {
                                 await vscode.commands.executeCommand('revealFileInOS', safeFileUri(resolution.resolvedPath, 'linkHandler-resolution'));
-                                vscode.window.showInformationMessage(
+                                showInfo(
                                     `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)} (in default application)`
                                 );
                             } catch (osError) {
                                 // Fallback: try to open with VS Code anyway
                                 await vscode.env.openExternal(safeFileUri(resolution.resolvedPath, 'linkHandler-resolution'));
-                                vscode.window.showInformationMessage(
+                                showInfo(
                                     `Opened wiki link: ${documentName} → ${path.basename(resolution.resolvedPath)}`
                                 );
                             }
@@ -417,9 +416,8 @@ export class LinkHandler {
             ? `\n\nNote: "${documentName}" already has an extension, so it was tried as-is first.`
             : `\n\nNote: "${documentName}" has no extension, so markdown extensions (.md, .markdown, .txt) were tried first.`;
 
-        vscode.window.showWarningMessage(
-            `Wiki link not found: [[${documentName}]]\n\nTried filenames: ${extensionsList}\n\nSearched in the following locations:\n${pathsList}${hasExtensionNote}${contextInfo}`,
-            { modal: false }
+        showWarning(
+            `Wiki link not found: [[${documentName}]]\n\nTried filenames: ${extensionsList}\n\nSearched in the following locations:\n${pathsList}${hasExtensionNote}${contextInfo}`
         );
 
         console.warn(`[LinkHandler] Wiki link not found: [[${documentName}]] (tried ${allAttemptedPaths.length} paths)`);

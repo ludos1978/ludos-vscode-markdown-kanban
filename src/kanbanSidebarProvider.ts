@@ -7,6 +7,7 @@ import {
 	isBackupFile,
 	isConflictFile
 } from './constants/FileNaming';
+import { showWarning, showInfo, notificationService } from './services/NotificationService';
 
 /**
  * File type categories for filtering
@@ -171,7 +172,7 @@ class KanbanDragAndDropController implements vscode.TreeDragAndDropController<Ka
 				if (uri.fsPath.endsWith('.md')) {
 					await this.provider.addFile(uri);
 				} else {
-					vscode.window.showWarningMessage(`${path.basename(uri.fsPath)} is not a markdown file`);
+					showWarning(`${path.basename(uri.fsPath)} is not a markdown file`);
 				}
 			} catch (error) {
 				console.error('[Kanban Sidebar] Failed to parse dropped URI:', error);
@@ -348,7 +349,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	 */
 	async scanWorkspace(maxFiles: number = 500): Promise<void> {
 		if (!vscode.workspace.workspaceFolders) {
-			vscode.window.showWarningMessage('No workspace folder opened');
+			showWarning('No workspace folder opened');
 			return;
 		}
 
@@ -394,7 +395,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 			this.refresh();
 
 			if (!token.isCancellationRequested) {
-				vscode.window.showInformationMessage(`Found ${foundFiles.length} kanban board(s)`);
+				showInfo(`Found ${foundFiles.length} kanban board(s)`);
 			}
 		});
 	}
@@ -455,7 +456,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		await this.saveToWorkspaceState();
 		this.refresh();
 
-		vscode.window.showInformationMessage(`Removed ${item.label} from kanban list`);
+		showInfo(`Removed ${item.label} from kanban list`);
 	}
 
 	/**
@@ -534,13 +535,12 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 	 * Clear all kanban files
 	 */
 	async clear(): Promise<void> {
-		const choice = await vscode.window.showWarningMessage(
+		const result = await notificationService.confirm(
 			'Remove all kanban boards from sidebar?',
-			{ modal: true },
-			'Yes', 'No'
+			'Yes'
 		);
 
-		if (choice !== 'Yes') {
+		if (result !== 'confirm') {
 			return;
 		}
 
@@ -555,7 +555,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		await this.saveToWorkspaceState();
 		this.refresh();
 
-		vscode.window.showInformationMessage('Kanban sidebar cleared');
+		showInfo('Kanban sidebar cleared');
 	}
 
 	/**
@@ -568,7 +568,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		// Show feedback message
 		const label = FileTypeDetector.getCategoryLabel(category);
 		const count = this.categoryCounts.get(category) || this.kanbanFiles.size;
-		vscode.window.showInformationMessage(`Filter: ${label} (${count} file(s))`);
+		showInfo(`Filter: ${label} (${count} file(s))`);
 	}
 
 	/**
@@ -701,18 +701,18 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 
 		// Check if already exists
 		if (this.kanbanFiles.has(filePath)) {
-			vscode.window.showWarningMessage('File already in kanban list');
+			showWarning('File already in kanban list');
 			return;
 		}
 
 		// Validate it's a kanban file
 		const isValid = await this.isKanbanFile(filePath);
 		if (!isValid) {
-			const choice = await vscode.window.showWarningMessage(
+			const result = await notificationService.confirm(
 				'This file does not appear to be a kanban board (missing "kanban-plugin: board" in YAML header). Add anyway?',
-				'Yes', 'No'
+				'Yes'
 			);
-			if (choice !== 'Yes') {
+			if (result !== 'confirm') {
 				return;
 			}
 		}
@@ -729,7 +729,7 @@ export class KanbanSidebarProvider implements vscode.TreeDataProvider<KanbanBoar
 		await this.saveToWorkspaceState();
 		this.refresh();
 
-		vscode.window.showInformationMessage(`Added ${path.basename(filePath)} to kanban list`);
+		showInfo(`Added ${path.basename(filePath)} to kanban list`);
 	}
 
 	/**
