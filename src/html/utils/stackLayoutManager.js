@@ -150,18 +150,8 @@ function applyStackedColumnStyles(columnId = null) {
     }
 
     // Update only the target stack (or all if columnId is null)
-    console.log('[STACK-DEBUG] calling enforceFoldModesForStacks');
     enforceFoldModesForStacks(targetStack);
-    console.log('[STACK-DEBUG] calling updateStackLayoutImmediate');
-    try {
-        // Use window.updateStackLayoutImmediate to call the real function (not debounced)
-        if (typeof window.updateStackLayoutImmediate === 'function') {
-            window.updateStackLayoutImmediate(targetStack);
-        }
-        console.log('[STACK-DEBUG] updateStackLayoutImmediate returned');
-    } catch (e) {
-        console.error('[STACK-DEBUG] updateStackLayoutImmediate ERROR:', e);
-    }
+    updateStackLayoutCore(targetStack);
 
     // Update bottom drop zones after layout changes
     if (typeof window.updateStackBottomDropZones === 'function') {
@@ -358,17 +348,14 @@ function updateStackLayoutDebounced(stackElement = null) {
     }
 
     updateStackLayoutTimer = setTimeout(() => {
-        // Use window.updateStackLayoutImmediate to avoid calling debounced version recursively
-        if (typeof window.updateStackLayoutImmediate === 'function') {
-            window.updateStackLayoutImmediate(pendingStackElement);
-        }
+        updateStackLayoutCore(pendingStackElement);
         updateStackLayoutTimer = null;
         pendingStackElement = null;
     }, 150); // 150ms debounce delay
 }
 
 /**
- * Update stack layout positions
+ * Update stack layout positions (core implementation)
  * Calculates and applies sticky positioning for columns within vertical stacks.
  *
  * This is the core layout engine that:
@@ -379,7 +366,7 @@ function updateStackLayoutDebounced(stackElement = null) {
  *
  * @param {HTMLElement} stackElement - Specific stack to update, or null for all stacks
  */
-function updateStackLayout(stackElement = null) {
+function updateStackLayoutCore(stackElement = null) {
     console.log('[STACK-DEBUG] updateStackLayout called, stackElement:', stackElement);
     const stacks = stackElement ? [stackElement] : document.querySelectorAll('.kanban-column-stack');
     console.log('[STACK-DEBUG] Found stacks:', stacks.length);
@@ -782,18 +769,15 @@ window.applyStackedColumnStyles = applyStackedColumnStyles;
 // Stack reorganization
 window.reorganizeStacksForColumn = reorganizeStacksForColumn;
 
-// Save reference to real function BEFORE window assignments (global scope issue)
-const _updateStackLayoutReal = updateStackLayout;
-
-// Core layout engine - debounced version is default
+// Core layout engine - debounced version is default for external callers
 window.updateStackLayout = updateStackLayoutDebounced;
-window.updateStackLayoutImmediate = _updateStackLayoutReal;
+window.updateStackLayoutImmediate = updateStackLayoutCore;
 window.updateStackLayoutDebounced = updateStackLayoutDebounced;
 
-// Legacy aliases for backward compatibility (can be removed after full migration)
+// Legacy aliases
 window.recalculateStackHeights = updateStackLayoutDebounced;
 window.recalculateStackHeightsDebounced = updateStackLayoutDebounced;
-window.recalculateStackHeightsImmediate = _updateStackLayoutReal;
+window.recalculateStackHeightsImmediate = updateStackLayoutCore;
 
 // Scroll handler
 window.setupStackedColumnScrollHandler = setupStackedColumnScrollHandler;
